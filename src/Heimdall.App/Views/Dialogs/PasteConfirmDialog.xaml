@@ -31,10 +31,10 @@
                 <Setter Property="Height" Value="26"/>
                 <Setter Property="Data" Value="{DynamicResource Geo.Status.Error}"/>
                 <Setter Property="Stretch" Value="Uniform"/>
-                <Setter Property="Fill" Value="{DynamicResource WarningBrush}"/>
+                <Setter Property="Fill" Value="{DynamicResource WarningIndicatorBrush}"/>
                 <Style.Triggers>
                     <DataTrigger Binding="{Binding IsDangerous}" Value="True">
-                        <Setter Property="Fill" Value="{DynamicResource ErrorBrush}"/>
+                        <Setter Property="Fill" Value="{DynamicResource ErrorIndicatorBrush}"/>
                     </DataTrigger>
                 </Style.Triggers>
             </Style>

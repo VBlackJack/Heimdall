@@ -126,6 +126,7 @@ internal static class ThemeTextColours
         ("AccentColor", "AccentTextColor", MinimumContrast, true),
         ("TextSecondaryColor", "SecondaryTextColor", MinimumContrast, true),
         ("BorderColor", "BorderStrongColor", MinimumBoundaryContrast, false),
+        ("TextSecondaryColor", "InputBorderColor", MinimumBoundaryContrast, false),
         ("ErrorColor", "ErrorIndicatorColor", MinimumBoundaryContrast, true),
         ("WarningColor", "WarningIndicatorColor", MinimumBoundaryContrast, true),
         ("SuccessColor", "SuccessIndicatorColor", MinimumBoundaryContrast, true),

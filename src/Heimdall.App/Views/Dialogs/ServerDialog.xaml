@@ -68,10 +68,10 @@
                         <Setter Property="Visibility" Value="Visible"/>
                     </DataTrigger>
                     <DataTrigger Binding="{Binding AgentChipState}" Value="{x:Static vm:SshAgentChipState.Warn}">
-                        <Setter Property="BorderBrush" Value="{DynamicResource WarningBrush}"/>
+                        <Setter Property="BorderBrush" Value="{DynamicResource WarningIndicatorBrush}"/>
                     </DataTrigger>
                     <DataTrigger Binding="{Binding AgentChipState}" Value="{x:Static vm:SshAgentChipState.Ok}">
-                        <Setter Property="BorderBrush" Value="{DynamicResource SuccessBrush}"/>
+                        <Setter Property="BorderBrush" Value="{DynamicResource SuccessIndicatorBrush}"/>
                     </DataTrigger>
                 </Style.Triggers>
             </Style>
@@ -102,11 +102,11 @@
                     </DataTrigger>
                     <DataTrigger Binding="{Binding TestChipState}" Value="{x:Static vm:SshTestChipState.Success}">
                         <Setter Property="Visibility" Value="Visible"/>
-                        <Setter Property="BorderBrush" Value="{DynamicResource SuccessBrush}"/>
+                        <Setter Property="BorderBrush" Value="{DynamicResource SuccessIndicatorBrush}"/>
                     </DataTrigger>
                     <DataTrigger Binding="{Binding TestChipState}" Value="{x:Static vm:SshTestChipState.Failure}">
                         <Setter Property="Visibility" Value="Visible"/>
-                        <Setter Property="BorderBrush" Value="{DynamicResource ErrorBrush}"/>
+                        <Setter Property="BorderBrush" Value="{DynamicResource ErrorIndicatorBrush}"/>
                     </DataTrigger>
                     <DataTrigger Binding="{Binding TestChipState}" Value="{x:Static vm:SshTestChipState.Cancelled}">
                         <Setter Property="Visibility" Value="Visible"/>
@@ -2116,7 +2116,7 @@
                                                                                         <Setter Property="Visibility" Value="Visible"/>
                                                                                     </DataTrigger>
                                                                                     <DataTrigger Binding="{Binding IsBroken}" Value="True">
-                                                                                        <Setter Property="BorderBrush" Value="{DynamicResource ErrorBrush}"/>
+                                                                                        <Setter Property="BorderBrush" Value="{DynamicResource ErrorIndicatorBrush}"/>
                                                                                         <Setter Property="ToolTip" Value="{loc:Translate TooltipPostConnectLibraryBroken}"/>
                                                                                     </DataTrigger>
                                                                                 </Style.Triggers>

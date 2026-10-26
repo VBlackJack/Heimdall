@@ -594,7 +594,7 @@
                         </Trigger>
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="Bd" Property="Background" Value="{DynamicResource CardBrush}"/>
-                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource WarningBrush}"/>
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource WarningIndicatorBrush}"/>
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
                             <Setter TargetName="Bd" Property="Background" Value="{DynamicResource HighlightBrush}"/>
@@ -672,7 +672,7 @@
                             <Setter TargetName="TextBoxBorder" Property="Opacity" Value="{StaticResource OpacityDisabled}"/>
                         </Trigger>
                         <Trigger Property="Validation.HasError" Value="True">
-                            <Setter TargetName="TextBoxBorder" Property="BorderBrush" Value="{DynamicResource ErrorBrush}"/>
+                            <Setter TargetName="TextBoxBorder" Property="BorderBrush" Value="{DynamicResource ErrorIndicatorBrush}"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

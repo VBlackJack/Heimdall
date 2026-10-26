@@ -40,7 +40,7 @@
                             DataContext="{Binding Session, RelativeSource={RelativeSource AncestorType=Window}}">
                     <Path x:Name="TypeIcon"
                           Style="{StaticResource GeoIconSmall}"
-                          Fill="{DynamicResource InfoBrush}"
+                          Fill="{DynamicResource InfoIndicatorBrush}"
                           VerticalAlignment="Center" Margin="0,0,6,0"/>
                     <TextBlock x:Name="SessionTitle" Text="{Binding Title, Mode=OneWay}"
                                FontSize="{StaticResource FontSizeBodyLarge}" FontWeight="SemiBold"

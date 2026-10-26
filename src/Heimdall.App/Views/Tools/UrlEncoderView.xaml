@@ -130,7 +130,7 @@
                             <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding HasDecodeError}" Value="True">
-                                    <Setter Property="BorderBrush" Value="{DynamicResource ErrorBrush}" />
+                                    <Setter Property="BorderBrush" Value="{DynamicResource ErrorIndicatorBrush}" />
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>

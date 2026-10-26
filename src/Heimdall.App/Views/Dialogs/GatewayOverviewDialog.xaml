@@ -100,7 +100,7 @@
                         Margin="0,0,0,10"
                         CornerRadius="6"
                         Background="{DynamicResource CardBrush}"
-                        BorderBrush="{DynamicResource WarningBrush}"
+                        BorderBrush="{DynamicResource WarningIndicatorBrush}"
                         BorderThickness="1"
                         Visibility="{Binding HasWarningMessage, Converter={StaticResource BoolToVisibilityConverter}}">
                     <TextBlock Text="{Binding WarningMessage}"
@@ -160,7 +160,7 @@
                                                 Padding="6,1"
                                                 CornerRadius="3"
                                                 Background="{DynamicResource BackgroundBrush}"
-                                                BorderBrush="{DynamicResource InfoBrush}"
+                                                BorderBrush="{DynamicResource InfoIndicatorBrush}"
                                                 BorderThickness="1">
                                             <TextBlock Text="{Binding SessionCountText}"
                                                        FontSize="{StaticResource FontSizeSmallCaption}"

@@ -112,7 +112,7 @@
                         Visibility="{Binding IsScanning, Converter={StaticResource BoolToVisibilityConverter}}"
                         IsEnabled="{Binding IsScanning}"
                         Style="{DynamicResource SecondaryButtonStyle}"
-                        BorderBrush="{DynamicResource ErrorBrush}"
+                        BorderBrush="{DynamicResource ErrorIndicatorBrush}"
                         Foreground="{DynamicResource ErrorTextBrush}"
                         Padding="{StaticResource PaddingButtonPrimary}" Margin="0,2,0,2"
                         VerticalAlignment="Center"

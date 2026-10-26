@@ -71,7 +71,7 @@
                                FontSize="{StaticResource FontSizeCaption}" VerticalAlignment="Center"/>
                     <Ellipse x:Name="HealthDot"
                              Width="8" Height="8"
-                             Fill="{DynamicResource SuccessBrush}"
+                             Fill="{DynamicResource SuccessIndicatorBrush}"
                              VerticalAlignment="Center"
                              Margin="0,0,6,0"/>
                     <TextBlock x:Name="StatusTextBlock"

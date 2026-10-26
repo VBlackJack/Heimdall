@@ -161,7 +161,7 @@
 
                 <Border x:Name="SecurityNoticeBadge"
                         DockPanel.Dock="Right"
-                        BorderBrush="{DynamicResource WarningBrush}"
+                        BorderBrush="{DynamicResource WarningIndicatorBrush}"
                         BorderThickness="1"
                         CornerRadius="{StaticResource CornerRadiusSm}"
                         Padding="6,1"
@@ -956,10 +956,10 @@
                          VerticalAlignment="Center">
                     <Ellipse.Style>
                         <Style TargetType="Ellipse">
-                            <Setter Property="Fill" Value="{DynamicResource SuccessBrush}"/>
+                            <Setter Property="Fill" Value="{DynamicResource SuccessIndicatorBrush}"/>
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding IsConnected}" Value="False">
-                                    <Setter Property="Fill" Value="{DynamicResource ErrorBrush}"/>
+                                    <Setter Property="Fill" Value="{DynamicResource ErrorIndicatorBrush}"/>
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>
