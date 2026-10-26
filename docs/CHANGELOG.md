@@ -12,6 +12,58 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-10-26: clearer Settings sections, and the last contrast gaps closed (v2026.102602)
+
+### Settings (#694)
+
+- **The rail's group names read as headings**, the way Heimdall-rs draws them: upper case through
+  the new `UpperCaseTextConverter` (interface language casing; the automation name keeps the name as
+  written), 24 px above a group (was 14), sections indented 10 px under it, rail 210 to 220 px.
+  Colour unchanged (`TextTertiaryBrush`). Pinned by `AGroupHeadingStandsOutFromItsSections` and
+  `TheUpperCaseFollowsTheInterfaceLanguage`.
+
+### Contrast follow-up (#693, #695, #696, #698, #699)
+
+A second pass on 2026-10-26: the static audit re-run on master with the colours the C# code itself
+derives (every pair under the 9 accents), the 14 themes not yet seen measured on screen (280 of 280
+regions at their threshold), and the terminal page read live over CDP.
+
+- **Pressed primary outline** (#693). In `PrimaryButtonStyle` the `IsPressed` trigger now follows
+  `IsFocused`: a press focuses the button and the later trigger wins, so the focus border hid the
+  pressed outline. Pinned by `APressedPrimaryButtonsOutlineWinsOverItsFocusBorder`.
+- **RDP import status chips** (#695). The status cell is a vertical `StackPanel` of left-aligned
+  chips whose text wraps, instead of a `WrapPanel` that cut a chip wider than the column; the three
+  text columns give 50 px to it. Pinned by `StatusChips_StackAndWrapInsideTheColumn` and
+  `HeaderAndRows_ShareTheirColumnWidths`.
+- **Terminal scrollbar and loading text** (#696). They were fixed Dracula colours; they now take
+  `TerminalSearchChrome`'s derived colours: the scheme's background for the track, the 3 to 1 border
+  for the thumb, the 4.5 to 1 text for the hovered thumb and the loading text.
+- **Input outline and status outlines** (#698). `InputBorderBrush` paints the new derived
+  `InputBorderColor` (3 to 1 on the window and on a card; Dracula was 1.94 on a card). 38
+  `BorderBrush` / `Fill` / `Stroke` sites move from the raw semantic brushes to the `*IndicatorBrush`
+  colours (2.91 on a Dracula card); an outline on its own fill keeps the raw brush. Guarded by
+  `StatusOutlinesAndGlyphsUseTheDerivedIndicators`.
+- **Last gaps** (#699). No `Opacity` on secondary or tertiary text anywhere (eight sites at 0.85,
+  4.48 to 1 on Parchment; the guard now covers every view, not only the Notes tool). The JWT part
+  colours are derived to 4.5 to 1 on the window and a card (4.00 on a Drakul card). The RDP health dot
+  paints the derived indicators, the neutral one at rest (was `TextDisabledBrush`, 1.85).
+- Not changed, on purpose: the pressed primary outline measures 2.11 to 1 against the window; forcing
+  3 to 1 would merge it back into the accent fill, which #693 just fixed.
+
+### SSH (#697)
+
+- **A refused plink sign-in is named correctly under load.** When plink exited before opening the
+  tunnel, the start joined the stderr drain for 500 ms and then cancelled it; on a loaded machine the
+  drain had not read "Access denied" yet, and the result was `TunnelPortNotListening` instead of
+  `AuthRejected`. The start now awaits the drain of an exited plink for up to 5 s (no blocked
+  thread), still bounded for a pipe another process holds open. Pinned by
+  `StartAsync_StderrReadLateAfterTheExit_StillNamesTheRefusal` and
+  `StartAsync_StderrThatNeverCloses_StillReturns`; found by running the suite with one CPU burner per
+  core.
+
+- Tests: App.Tests 11,333, Core.Tests 4,552, UiTests 240, Ssh 646, Sftp 525, Rdp 576, Terminal 134,
+  TwinShell 207 (18,213 passed).
+
 ## 2026-10-26: Magellan by default, and contrast that holds on every theme (v2026.102601)
 
 ### Theme (#684)
