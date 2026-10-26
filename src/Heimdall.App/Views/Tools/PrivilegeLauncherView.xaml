@@ -67,7 +67,7 @@
                 <!-- Elevation warning -->
                 <Border x:Name="WarningPanel" Padding="{StaticResource SpacingMd}"
                         Background="{DynamicResource SurfaceBrush}"
-                        BorderBrush="{DynamicResource WarningBrush}"
+                        BorderBrush="{DynamicResource WarningIndicatorBrush}"
                         BorderThickness="1" CornerRadius="{StaticResource CornerRadiusSm}"
                         Margin="{StaticResource MarginSectionBottom}" Visibility="Collapsed">
                     <DockPanel>

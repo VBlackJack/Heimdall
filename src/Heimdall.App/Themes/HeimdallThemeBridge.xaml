@@ -38,7 +38,11 @@
          derives it from BorderColor on every theme change, so it reaches 3 to 1 on the background
          and on a card (WCAG 1.4.11, Theming/ThemeTextColours.cs). BorderBrush stays decorative. -->
     <SolidColorBrush x:Key="BorderStrongBrush" Color="{DynamicResource BorderStrongColor}" />
-    <SolidColorBrush x:Key="InputBorderBrush" Color="{DynamicResource TextSecondaryColor}" />
+    <!-- The outline that identifies an input or a secondary button. InputBorderColor is not in any
+         theme: HeimdallThemeService derives it from TextSecondaryColor on every theme change, so it
+         reaches 3 to 1 on the window and on a card (WCAG 1.4.11). On the raw colour the Dracula
+         outline was 1.94 to 1 on a card. -->
+    <SolidColorBrush x:Key="InputBorderBrush" Color="{DynamicResource InputBorderColor}" />
     <SolidColorBrush x:Key="HighlightBrush" Color="{DynamicResource SelectionColor}" />
     <SolidColorBrush x:Key="SuccessBrush" Color="{DynamicResource SuccessColor}" />
     <SolidColorBrush x:Key="WarningBrush" Color="{DynamicResource WarningColor}" />

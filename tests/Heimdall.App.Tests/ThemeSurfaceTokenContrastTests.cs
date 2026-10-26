@@ -17,6 +17,7 @@
 using System.Globalization;
 using System.IO;
 using System.Windows;
+using System.Xml;
 using System.Xml.Linq;
 using Heimdall.App.Tests.Views.EmbeddedRdp;
 using Heimdall.App.Theming;
@@ -75,15 +76,29 @@ public sealed class ThemeSurfaceTokenContrastTests
         }
     }
 
+    /// <summary>
+    /// An input's outline reads at 3 to 1 on the window and on a card, where most inputs and the
+    /// secondary buttons sit. Measured on the window only, the raw Dracula colour passed at 3.03
+    /// while it was 1.94 to 1 on every Settings card.
+    /// </summary>
     [Theory]
     [MemberData(nameof(Themes))]
     public void AnInputBorderIsVisible(string theme)
     {
         ResourceDictionary palette = Palette(theme);
-        Color background = ColorOf(palette, "BackgroundBrush");
         Color border = ColorOf(palette, "InputBorderBrush");
+        List<string> faint = [];
 
-        Assert.True(Contrast(Over(border, background), background) >= 3.0, Report(theme, "input border", border, background));
+        foreach (string ground in new[] { "BackgroundBrush", "CardBrush" })
+        {
+            Color under = ColorOf(palette, ground);
+            if (Contrast(Over(border, under), under) < MinimumBoundaryContrast)
+            {
+                faint.Add(Report(theme, "input border on " + ground, border, under));
+            }
+        }
+
+        Assert.True(faint.Count == 0, string.Join(Environment.NewLine, faint));
     }
 
     [Theory]
@@ -184,6 +199,60 @@ public sealed class ThemeSurfaceTokenContrastTests
 
     private static readonly string[] IndicatorBrushes =
         ["SuccessIndicatorBrush", "WarningIndicatorBrush", "ErrorIndicatorBrush", "InfoIndicatorBrush", "NeutralIndicatorBrush"];
+
+    /// <summary>The raw semantic brushes, which the theme draws as it is with no contrast floor.</summary>
+    private static readonly string[] RawSemanticBrushes =
+        ["{DynamicResource ErrorBrush}", "{DynamicResource WarningBrush}", "{DynamicResource SuccessBrush}", "{DynamicResource InfoBrush}"];
+
+    /// <summary>How many status outlines and glyphs the views draw today; the scan must reach them.</summary>
+    private const int MinimumStatusOutlinesAndGlyphs = 38;
+
+    /// <summary>
+    /// A status outline or glyph (BorderBrush, Fill or Stroke, attributes and setters) uses a
+    /// derived *IndicatorBrush, never the raw semantic brush: the raw Dracula red was 2.91 to 1 on
+    /// a card around the host key warning, an input in error and the danger buttons. The one
+    /// exception is an outline drawn on its own fill, the danger button's: its label identifies it.
+    /// </summary>
+    [Fact]
+    public void StatusOutlinesAndGlyphsUseTheDerivedIndicators()
+    {
+        string root = Path.Combine(ViewSource.RepoRoot(), "src", "Heimdall.App");
+        int indicators = 0;
+        List<string> raw = [];
+        foreach (string path in SourceFileEnumeration.EnumerateFiles(root, "*.xaml"))
+        {
+            foreach (XElement element in XDocument.Load(path, LoadOptions.SetLineInfo).Descendants())
+            {
+                IEnumerable<(string Property, string? Value)> uses = element.Name.LocalName == "Setter"
+                    && (string?)element.Attribute("Property") is "BorderBrush" or "Fill" or "Stroke"
+                        ? [((string)element.Attribute("Property")!, (string?)element.Attribute("Value"))]
+                        : new[] { "BorderBrush", "Fill", "Stroke" }.Select(name => (name, (string?)element.Attribute(name)));
+                foreach ((string property, string? value) in uses.Where(use => use.Value is not null))
+                {
+                    if (value!.Contains("IndicatorBrush}", StringComparison.Ordinal))
+                    {
+                        indicators++;
+                    }
+                    else if (RawSemanticBrushes.Contains(value) && !IsOutlineOnItsOwnFill(element, property, value))
+                    {
+                        raw.Add($"{Path.GetRelativePath(root, path)}:{((IXmlLineInfo)element).LineNumber} {property} {value}");
+                    }
+                }
+            }
+        }
+
+        Assert.True(raw.Count == 0, string.Join(Environment.NewLine, raw));
+        Assert.True(indicators >= MinimumStatusOutlinesAndGlyphs, $"the scan found only {indicators} indicator outlines and glyphs");
+    }
+
+    /// <summary>A BorderBrush the same element or the same setter group also paints as the Background.</summary>
+    private static bool IsOutlineOnItsOwnFill(XElement element, string property, string value) =>
+        property == "BorderBrush"
+        && (element.Name.LocalName == "Setter"
+            ? element.Parent?.Elements().Any(setter => setter.Name.LocalName == "Setter"
+                && (string?)setter.Attribute("Property") == "Background"
+                && (string?)setter.Attribute("Value") == value) == true
+            : (string?)element.Attribute("Background") == value);
 
     /// <summary>
     /// The selected-row ground the derivation measures is the one the bridge paints: the accent at

@@ -64,7 +64,7 @@
 
         <Border Grid.Row="1"
                 Style="{StaticResource DialogSectionCardStyle}"
-                BorderBrush="{DynamicResource WarningBrush}"
+                BorderBrush="{DynamicResource WarningIndicatorBrush}"
                 Margin="0,0,0,12"
                 Visibility="{Binding HasNoGateways, Converter={StaticResource BoolToVisibilityConverter}}">
             <TextBlock Text="{loc:Translate NewTunnelNoGatewaysNotice}"

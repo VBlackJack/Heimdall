@@ -157,7 +157,7 @@
                             <TextBlock x:Name="Mw_TabSettingsText" Text="{loc:Translate NavTabSettings}"/>
                             <Ellipse x:Name="Mw_SettingsUnsavedDot"
                                      Width="8" Height="8"
-                                     Fill="{DynamicResource WarningBrush}"
+                                     Fill="{DynamicResource WarningIndicatorBrush}"
                                      Margin="6,0,0,0"
                                      VerticalAlignment="Center"
                                      Visibility="{Binding Settings.IsDirty, Converter={StaticResource BoolToVisibilityConverter}}"
@@ -812,7 +812,7 @@
                                                 <Path.Style>
                                                     <Style TargetType="Path">
                                                         <Setter Property="Data" Value="{StaticResource Geo.Tree.Group}"/>
-                                                        <Setter Property="Fill" Value="{DynamicResource InfoBrush}"/>
+                                                        <Setter Property="Fill" Value="{DynamicResource InfoIndicatorBrush}"/>
                                                         <Style.Triggers>
                                                             <DataTrigger Binding="{Binding HasColor}" Value="True">
                                                                 <Setter Property="Fill" Value="{Binding Color, Converter={StaticResource StringToBrushConverter}}"/>
@@ -823,7 +823,7 @@
                                                             </DataTrigger>
                                                             <DataTrigger Binding="{Binding HasError}" Value="True">
                                                                 <Setter Property="Data" Value="{StaticResource Geo.Status.Error}"/>
-                                                                <Setter Property="Fill" Value="{DynamicResource ErrorBrush}"/>
+                                                                <Setter Property="Fill" Value="{DynamicResource ErrorIndicatorBrush}"/>
                                                             </DataTrigger>
                                                         </Style.Triggers>
                                                     </Style>
@@ -1072,7 +1072,7 @@
                                                     <Border.Style>
                                                         <Style TargetType="Border">
                                                             <Setter Property="Background" Value="{DynamicResource CardBrush}"/>
-                                                            <Setter Property="BorderBrush" Value="{DynamicResource InfoBrush}"/>
+                                                            <Setter Property="BorderBrush" Value="{DynamicResource InfoIndicatorBrush}"/>
                                                             <Style.Triggers>
                                                                 <DataTrigger Binding="{Binding IsGatewayMissing}" Value="True">
                                                                     <Setter Property="BorderBrush" Value="{DynamicResource WarningTextBrush}"/>
@@ -1692,7 +1692,7 @@
                                                                  VerticalAlignment="Center" Margin="0,0,5,0">
                                                             <Ellipse.Style>
                                                                 <Style TargetType="Ellipse">
-                                                                    <Setter Property="Fill" Value="{DynamicResource InfoBrush}"/>
+                                                                    <Setter Property="Fill" Value="{DynamicResource InfoIndicatorBrush}"/>
                                                                     <Style.Triggers>
                                                                         <DataTrigger Binding="{Binding HasTabGroupColor}" Value="True">
                                                                             <Setter Property="Fill" Value="{Binding TabGroupColor, Converter={StaticResource StringToBrushConverter}}"/>
@@ -1936,7 +1936,7 @@
                                             <Setter TargetName="PostConnectIndicator" Property="Visibility" Value="Visible"/>
                                         </DataTrigger>
                                         <DataTrigger Binding="{Binding HasTabGroup}" Value="True">
-                                            <Setter TargetName="TabHeaderBorder" Property="BorderBrush" Value="{DynamicResource InfoBrush}"/>
+                                            <Setter TargetName="TabHeaderBorder" Property="BorderBrush" Value="{DynamicResource InfoIndicatorBrush}"/>
                                         </DataTrigger>
                                         <DataTrigger Binding="{Binding HasTabGroupColor}" Value="True">
                                             <Setter TargetName="TabHeaderBorder" Property="BorderBrush" Value="{Binding TabGroupColor, Converter={StaticResource StringToBrushConverter}}"/>
@@ -2884,7 +2884,7 @@
                                     Margin="0,0,16,4"
                                     Padding="10,6"
                                     Background="{DynamicResource SurfaceBrush}"
-                                    BorderBrush="{DynamicResource ErrorBrush}"
+                                    BorderBrush="{DynamicResource ErrorIndicatorBrush}"
                                     BorderThickness="1"
                                     CornerRadius="{StaticResource CornerRadiusMd}"
                                     Visibility="{Binding Settings.HasValidationErrors, Converter={StaticResource BoolToVisibilityConverter}}"

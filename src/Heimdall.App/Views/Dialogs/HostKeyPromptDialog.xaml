@@ -47,7 +47,7 @@
                 <Style.Triggers>
                     <DataTrigger Binding="{Binding IsMismatch}" Value="True">
                         <Setter Property="Background" Value="{DynamicResource CardBrush}"/>
-                        <Setter Property="BorderBrush" Value="{DynamicResource ErrorBrush}"/>
+                        <Setter Property="BorderBrush" Value="{DynamicResource ErrorIndicatorBrush}"/>
                         <Setter Property="Foreground" Value="{DynamicResource ErrorTextBrush}"/>
                     </DataTrigger>
                 </Style.Triggers>
@@ -65,10 +65,10 @@
 
             <Style x:Key="WarningCardStyle" TargetType="Border" BasedOn="{StaticResource DialogSectionCardStyle}">
                 <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/>
-                <Setter Property="BorderBrush" Value="{DynamicResource WarningBrush}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource WarningIndicatorBrush}"/>
                 <Style.Triggers>
                     <DataTrigger Binding="{Binding IsMismatch}" Value="True">
-                        <Setter Property="BorderBrush" Value="{DynamicResource ErrorBrush}"/>
+                        <Setter Property="BorderBrush" Value="{DynamicResource ErrorIndicatorBrush}"/>
                     </DataTrigger>
                 </Style.Triggers>
             </Style>
@@ -87,10 +87,10 @@
                 <Setter Property="Height" Value="26"/>
                 <Setter Property="Data" Value="{DynamicResource Geo.Status.Error}"/>
                 <Setter Property="Stretch" Value="Uniform"/>
-                <Setter Property="Fill" Value="{DynamicResource WarningBrush}"/>
+                <Setter Property="Fill" Value="{DynamicResource WarningIndicatorBrush}"/>
                 <Style.Triggers>
                     <DataTrigger Binding="{Binding IsMismatch}" Value="True">
-                        <Setter Property="Fill" Value="{DynamicResource ErrorBrush}"/>
+                        <Setter Property="Fill" Value="{DynamicResource ErrorIndicatorBrush}"/>
                     </DataTrigger>
                 </Style.Triggers>
             </Style>

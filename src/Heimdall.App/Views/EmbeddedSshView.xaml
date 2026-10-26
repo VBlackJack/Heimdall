@@ -195,7 +195,7 @@
             <Border x:Name="BroadcastBorder"
                     Grid.Column="0"
                     Background="{DynamicResource BackgroundBrush}"
-                    BorderBrush="{DynamicResource WarningBrush}"
+                    BorderBrush="{DynamicResource WarningIndicatorBrush}"
                     BorderThickness="0"
                     ClipToBounds="True">
                 <Grid>
