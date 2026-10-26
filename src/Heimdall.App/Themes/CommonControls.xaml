@@ -356,15 +356,17 @@
                             <Setter TargetName="ButtonBorder" Property="Background" Value="{DynamicResource AccentHoverFillBrush}"/>
                             <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="{DynamicResource AccentHoverFillBrush}"/>
                         </Trigger>
+                        <Trigger Property="IsFocused" Value="True">
+                            <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="{DynamicResource FocusIndicatorBrush}"/>
+                        </Trigger>
                         <!-- Pressed keeps the accent fill, the one shade the label is readable on in
                              every theme and accent; the pressed shade outlines it instead. As a
-                             fill it held the label at 3.29 to 4.4 to 1 on the dark themes. -->
+                             fill it held the label at 3.29 to 4.4 to 1 on the dark themes.
+                             After IsFocused on purpose: the later trigger wins, and a press always
+                             focuses the button, so the focus border used to hide the outline. -->
                         <Trigger Property="IsPressed" Value="True">
                             <Setter TargetName="ButtonBorder" Property="Background" Value="{DynamicResource AccentBrush}"/>
                             <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="{DynamicResource AccentPressedBrush}"/>
-                        </Trigger>
-                        <Trigger Property="IsFocused" Value="True">
-                            <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="{DynamicResource FocusIndicatorBrush}"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="{StaticResource OpacityDisabled}"/>
