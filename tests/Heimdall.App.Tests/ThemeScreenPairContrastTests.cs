@@ -135,6 +135,29 @@ public sealed class ThemeScreenPairContrastTests
     }
 
     /// <summary>
+    /// A pressed primary button shows its pressed outline. Pressing focuses the button, and in a
+    /// template the later trigger wins: with IsFocused after IsPressed, the focus border covered the
+    /// outline on every press (seen on screen on 2026-10-26).
+    /// </summary>
+    [Fact]
+    public void APressedPrimaryButtonsOutlineWinsOverItsFocusBorder()
+    {
+        XElement style = KeyedStyle("Themes/CommonControls.xaml", "PrimaryButtonStyle");
+        List<XElement> triggers = [.. style.Descendants(Presentation + "Trigger")];
+        int OrderOf(string property) => triggers.FindIndex(trigger =>
+            (string?)trigger.Attribute("Property") == property
+            && (string?)trigger.Attribute("Value") == "True"
+            && trigger.Elements(Presentation + "Setter").Any(setter => (string?)setter.Attribute("Property") == "BorderBrush"));
+
+        int focused = OrderOf("IsFocused");
+        int pressed = OrderOf("IsPressed");
+
+        Assert.True(focused >= 0 && pressed >= 0, "the focus or press trigger no longer sets the border");
+        Assert.True(pressed > focused, $"IsPressed (trigger {pressed}) must come after IsFocused (trigger {focused})");
+        Assert.Equal("AccentPressedBrush", TriggerSetterKey(style, "IsPressed", "BorderBrush", "ButtonBorder"));
+    }
+
+    /// <summary>
     /// A hovered primary button keeps its label readable. On ThemeForge's hover shade the label was
     /// 4.35 to 1 on Parchment and 4.30 on Folio; the style paints the derived hover fill instead.
     /// </summary>
