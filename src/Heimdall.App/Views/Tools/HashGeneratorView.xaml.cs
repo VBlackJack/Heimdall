@@ -177,7 +177,7 @@ public partial class HashGeneratorView : UserControl, IToolView
         if (e.Data.GetDataPresent(System.Windows.DataFormats.FileDrop) &&
             e.Data.GetData(System.Windows.DataFormats.FileDrop) is string[] files &&
             files.Length > 0 &&
-            _vm.HashFileCommand.CanExecute(files[0])) { DropZoneBorder.BorderBrush = (System.Windows.Media.Brush)FindResource("AccentBrush"); }
+            _vm.HashFileCommand.CanExecute(files[0])) { DropZoneBorder.BorderBrush = (System.Windows.Media.Brush)FindResource("AccentBorderBrush"); }
     }
 
     private void OnDragLeave(object sender, System.Windows.DragEventArgs e) => DropZoneBorder.BorderBrush = (System.Windows.Media.Brush)FindResource("BorderBrush");

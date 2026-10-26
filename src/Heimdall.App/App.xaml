@@ -56,7 +56,7 @@
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsChecked" Value="True">
                                     <Setter TargetName="TabBorder" Property="BorderBrush"
-                                            Value="{DynamicResource AccentBrush}"/>
+                                            Value="{DynamicResource AccentBorderBrush}"/>
                                     <Setter Property="Foreground"
                                             Value="{DynamicResource TextPrimaryBrush}"/>
                                     <Setter Property="FontWeight" Value="SemiBold"/>

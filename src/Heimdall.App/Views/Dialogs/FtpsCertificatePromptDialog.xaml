@@ -101,7 +101,7 @@
                 <Style.Triggers>
                     <DataTrigger Binding="{Binding RejectIsDefault}" Value="True">
                         <Setter Property="Background" Value="{DynamicResource AccentBrush}"/>
-                        <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                        <Setter Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
                         <Setter Property="Foreground" Value="{DynamicResource TextOnAccentBrush}"/>
                     </DataTrigger>
                 </Style.Triggers>

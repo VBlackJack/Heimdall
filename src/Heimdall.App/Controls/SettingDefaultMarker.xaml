@@ -35,7 +35,7 @@
     <StackPanel Orientation="Horizontal">
         <Border x:Name="Sdm_Badge"
                 Background="{DynamicResource SurfaceBrush}"
-                BorderBrush="{DynamicResource AccentBrush}"
+                BorderBrush="{DynamicResource AccentBorderBrush}"
                 BorderThickness="1"
                 CornerRadius="{DynamicResource CornerRadiusSm}"
                 Padding="6,0"

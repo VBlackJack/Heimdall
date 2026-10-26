@@ -730,7 +730,7 @@
                                             <Style.Triggers>
                                                 <Trigger Property="theming:DropTargetVisualState.IsDropTarget" Value="True">
                                                     <Setter Property="Background" Value="{DynamicResource TreeRowDropTargetBrush}"/>
-                                                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
                                                 </Trigger>
                                             </Style.Triggers>
                                         </Style>
@@ -1108,7 +1108,7 @@
                                              hovered row were painted alike. -->
                                         <DataTrigger Binding="{Binding IsSelected, FallbackValue=False}" Value="True">
                                             <Setter TargetName="ServerSelectionChrome" Property="Background" Value="{DynamicResource TreeRowSelectedBrush}"/>
-                                            <Setter TargetName="ServerSelectionChrome" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                            <Setter TargetName="ServerSelectionChrome" Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
                                         </DataTrigger>
                                     </DataTemplate.Triggers>
                                 </DataTemplate>
@@ -1215,15 +1215,15 @@
                                                     </Trigger>
                                                     <Trigger Property="theming:DropTargetVisualState.Insertion" Value="Before">
                                                         <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="{StaticResource SessionTreeInsertBeforeThickness}"/>
-                                                        <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                                        <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
                                                     </Trigger>
                                                     <Trigger Property="theming:DropTargetVisualState.Insertion" Value="After">
                                                         <Setter TargetName="SelectionBorder" Property="BorderThickness" Value="{StaticResource SessionTreeInsertAfterThickness}"/>
-                                                        <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                                        <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
                                                     </Trigger>
                                                     <Trigger Property="theming:DropTargetVisualState.IsDropTarget" Value="True">
                                                         <Setter TargetName="SelectionBorder" Property="Background" Value="{DynamicResource TreeRowDropTargetBrush}"/>
-                                                        <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                                        <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
                                                     </Trigger>
                                                     <Trigger Property="IsEnabled" Value="False">
                                                         <Setter TargetName="SelectionBorder" Property="Opacity" Value="{StaticResource OpacityDisabled}"/>
@@ -2001,7 +2001,7 @@
                             <Border x:Name="ContentDropZone"
                                     Visibility="Collapsed"
                                     Background="{DynamicResource DragDropOverlayBackground}"
-                                    BorderBrush="{DynamicResource AccentBrush}"
+                                    BorderBrush="{DynamicResource AccentBorderBrush}"
                                     BorderThickness="2"
                                     CornerRadius="4"
                                     IsHitTestVisible="False">
@@ -2119,7 +2119,7 @@
                                     <Border Width="64" Height="64"
                                             CornerRadius="32"
                                             Background="{DynamicResource SurfaceBrush}"
-                                            BorderBrush="{DynamicResource AccentBrush}"
+                                            BorderBrush="{DynamicResource AccentBorderBrush}"
                                             BorderThickness="1"
                                             HorizontalAlignment="Center"
                                             Margin="0,0,0,16">
@@ -6024,7 +6024,7 @@
                 Margin="24"
                 CornerRadius="12"
                 Background="{DynamicResource DragDropOverlayBackground}"
-                BorderBrush="{DynamicResource AccentBrush}"
+                BorderBrush="{DynamicResource AccentBorderBrush}"
                 BorderThickness="2"
                 Visibility="Collapsed"
                 IsHitTestVisible="False">
@@ -6405,7 +6405,7 @@
                                                             Value="{DynamicResource HighlightBrush}"/>
                                                 </Trigger>
                                                 <Trigger Property="IsKeyboardFocused" Value="True">
-                                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
                                                 </Trigger>
                                             </ControlTemplate.Triggers>
                                         </ControlTemplate>
@@ -6551,7 +6551,7 @@
                                                             Value="{DynamicResource HighlightBrush}"/>
                                                 </Trigger>
                                                 <Trigger Property="IsKeyboardFocused" Value="True">
-                                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
                                                 </Trigger>
                                             </ControlTemplate.Triggers>
                                         </ControlTemplate>
@@ -6786,7 +6786,7 @@
                     HorizontalAlignment="Left" VerticalAlignment="Top"
                     Visibility="Collapsed"
                     IsHitTestVisible="False"
-                    BorderBrush="{DynamicResource AccentBrush}"
+                    BorderBrush="{DynamicResource AccentBorderBrush}"
                     BorderThickness="2"
                     CornerRadius="{StaticResource CornerRadiusSm}"/>
             <Border x:Name="OnboardingCard"
