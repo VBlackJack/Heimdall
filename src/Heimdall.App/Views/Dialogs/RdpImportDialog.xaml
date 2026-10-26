@@ -117,9 +117,9 @@
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="42"/>
-                    <ColumnDefinition Width="160"/>
-                    <ColumnDefinition Width="170"/>
-                    <ColumnDefinition Width="170"/>
+                    <ColumnDefinition Width="140"/>
+                    <ColumnDefinition Width="150"/>
+                    <ColumnDefinition Width="150"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="130"/>
                 </Grid.ColumnDefinitions>
@@ -158,9 +158,9 @@
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="42"/>
-                                            <ColumnDefinition Width="160"/>
-                                            <ColumnDefinition Width="170"/>
-                                            <ColumnDefinition Width="170"/>
+                                            <ColumnDefinition Width="140"/>
+                                            <ColumnDefinition Width="150"/>
+                                            <ColumnDefinition Width="150"/>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="130"/>
                                         </Grid.ColumnDefinitions>
@@ -188,50 +188,63 @@
                                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                                    TextTrimming="CharacterEllipsis"/>
 
-                                        <WrapPanel Grid.Column="4" Margin="4,0,8,0">
+                                        <!-- One chip per line, each as wide as its text and no wider than the
+                                             column: a long gateway or conflict name wraps inside its chip.
+                                             In a WrapPanel a chip wider than the column was cut at its edge. -->
+                                        <StackPanel Grid.Column="4" Margin="4,0,8,0">
                                             <Border Margin="0,0,6,4"
+                                                    HorizontalAlignment="Left"
                                                     Padding="6,2"
                                                     CornerRadius="10"
                                                     Background="{DynamicResource ErrorBrush}"
                                                     Visibility="{Binding HasParseError, Converter={StaticResource BoolToVisibilityConverter}}">
                                                 <TextBlock Text="{Binding ParseErrorText}"
                                                            Foreground="{DynamicResource TextOnAccentBrush}"
+                                                           TextWrapping="Wrap"
                                                            FontSize="{StaticResource FontSizeCaption}"/>
                                             </Border>
                                             <Border Margin="0,0,6,4"
+                                                    HorizontalAlignment="Left"
                                                     Padding="6,2"
                                                     CornerRadius="10"
                                                     Background="{DynamicResource WarningBrush}"
                                                     Visibility="{Binding HasPasswordBlob, Converter={StaticResource BoolToVisibilityConverter}}">
                                                 <TextBlock Text="{Binding PasswordText}"
                                                            Foreground="{DynamicResource TextOnAccentBrush}"
+                                                           TextWrapping="Wrap"
                                                            FontSize="{StaticResource FontSizeCaption}"/>
                                             </Border>
                                             <Border Margin="0,0,6,4"
+                                                    HorizontalAlignment="Left"
                                                     Padding="6,2"
                                                     CornerRadius="10"
                                                     Background="{DynamicResource AccentBrush}"
                                                     Visibility="{Binding HasNameConflict, Converter={StaticResource BoolToVisibilityConverter}}">
                                                 <TextBlock Text="{Binding ConflictText}"
                                                            Foreground="{DynamicResource TextOnAccentBrush}"
+                                                           TextWrapping="Wrap"
                                                            FontSize="{StaticResource FontSizeCaption}"/>
                                             </Border>
                                             <Border Margin="0,0,6,4"
+                                                    HorizontalAlignment="Left"
                                                     Padding="6,2"
                                                     CornerRadius="10"
                                                     Background="{DynamicResource WarningBrush}"
                                                     Visibility="{Binding HasGateway, Converter={StaticResource BoolToVisibilityConverter}}">
                                                 <TextBlock Text="{Binding GatewayText}"
                                                            Foreground="{DynamicResource TextOnAccentBrush}"
+                                                           TextWrapping="Wrap"
                                                            FontSize="{StaticResource FontSizeCaption}"/>
                                             </Border>
                                             <Border Margin="0,0,6,4"
+                                                    HorizontalAlignment="Left"
                                                     Padding="6,2"
                                                     CornerRadius="10"
                                                     Background="{DynamicResource TextSecondaryBrush}"
                                                     Visibility="{Binding HasUnknownKeys, Converter={StaticResource BoolToVisibilityConverter}}">
                                                 <TextBlock Text="{Binding UnknownKeysText}"
                                                            Foreground="{DynamicResource TextOnAccentBrush}"
+                                                           TextWrapping="Wrap"
                                                            FontSize="{StaticResource FontSizeCaption}"/>
                                             </Border>
                                             <!-- Outlined rather than filled: the quieter of the chips, and
@@ -240,6 +253,7 @@
                                                  Snapped to device pixels: at a fractional position the
                                                  1 px outline was drawn as two blended rows, 2.2 to 1. -->
                                             <Border Margin="0,0,6,4"
+                                                    HorizontalAlignment="Left"
                                                     Padding="5,1"
                                                     CornerRadius="10"
                                                     BorderBrush="{DynamicResource BorderStrongBrush}"
@@ -248,9 +262,10 @@
                                                     Visibility="{Binding HasSkippedMappings, Converter={StaticResource BoolToVisibilityConverter}}">
                                                 <TextBlock Text="{Binding SkippedMappingsText}"
                                                            Foreground="{DynamicResource TextSecondaryBrush}"
+                                                           TextWrapping="Wrap"
                                                            FontSize="{StaticResource FontSizeCaption}"/>
                                             </Border>
-                                        </WrapPanel>
+                                        </StackPanel>
 
                                         <ComboBox Grid.Column="5"
                                                   Margin="4,0,0,0"
