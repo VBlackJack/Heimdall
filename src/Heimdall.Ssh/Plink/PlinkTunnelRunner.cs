@@ -161,6 +161,15 @@ public sealed class PlinkTunnelRunner : IDisposable
     /// </summary>
     private static readonly TimeSpan DrainJoinTimeout = TimeSpan.FromMilliseconds(500);
 
+    /// <summary>
+    /// How long a start waits for the stderr drain of a plink that has already exited. The pipe
+    /// closes with the process, so the drain ends on its own, but on a loaded machine reading the
+    /// last lines, the ones that say why plink exited, can take far longer than
+    /// <see cref="DrainJoinTimeout"/>: a refused sign-in was then reported as a port nobody
+    /// listened on. Bounded all the same, for a pipe another process still holds open.
+    /// </summary>
+    private static readonly TimeSpan ExitedDrainTimeout = TimeSpan.FromSeconds(5);
+
     public PlinkTunnelRunner(
         int portCheckIntervalMs = AppSettings.DefaultPlinkPortCheckIntervalMs,
         int killGracePeriodMs = AppSettings.DefaultPlinkKillGracePeriodMs)
@@ -397,7 +406,7 @@ public sealed class PlinkTunnelRunner : IDisposable
                 {
                     // The pipe closes with the process, so the drain ends on its own once it
                     // has read the last lines; Stop would cancel it before it got there.
-                    WaitForDrainToFinish();
+                    await WaitForExitedDrainAsync(cancellationToken).ConfigureAwait(false);
                 }
 
                 Stop();
@@ -954,15 +963,24 @@ public sealed class PlinkTunnelRunner : IDisposable
         return ownership;
     }
 
-    private void WaitForDrainToFinish()
+    /// <summary>
+    /// Waits, without blocking a thread, for the stderr drain of a plink that has exited to read
+    /// to the end of the pipe, at most <see cref="ExitedDrainTimeout"/>.
+    /// </summary>
+    private async Task WaitForExitedDrainAsync(CancellationToken cancellationToken)
     {
+        if (_drainTask is not Task drain)
+        {
+            return;
+        }
+
         try
         {
-            _drainTask?.Wait(DrainJoinTimeout);
+            await drain.WaitAsync(ExitedDrainTimeout, cancellationToken).ConfigureAwait(false);
         }
-        catch (AggregateException ex)
+        catch (TimeoutException)
         {
-            Core.Logging.FileLogger.Debug("[PlinkTunnelRunner] stderr drain ended with an error", ex);
+            Core.Logging.FileLogger.Debug("[PlinkTunnelRunner] stderr drain still reading after plink exited");
         }
     }
 
