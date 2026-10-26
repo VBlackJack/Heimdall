@@ -27,6 +27,7 @@ using Heimdall.App.Localization;
 using Heimdall.App.Services;
 using Heimdall.App.Services.Macros;
 using Heimdall.App.Services.WinRm;
+using Heimdall.App.Theming;
 using Heimdall.App.ViewModels;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Models;
@@ -154,7 +155,13 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     /// Maps color scheme names to xterm.js theme JSON object literals.
     /// Keys must match the values stored in <see cref="AppSettings.TerminalColorScheme"/>.
     /// </summary>
-    private static readonly FrozenDictionary<string, string> ColorSchemes =
+    /// <summary>
+    /// The colours xterm.js 5.5 draws with when a scheme sets none (the Default scheme is empty), for
+    /// the page chrome that must match the terminal under it.
+    /// </summary>
+    internal const string XtermDefaultColours = "{ background: '#000000', foreground: '#FFFFFF', cursor: '#FFFFFF', red: '#CC0000' }";
+
+    internal static readonly FrozenDictionary<string, string> ColorSchemes =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["Dracula"] = """
@@ -3162,6 +3169,17 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         html = html.Replace("/*{{CSS_FG}}*/", fgColor, StringComparison.Ordinal);
         html = html.Replace("/*{{CSS_CURSOR}}*/", cursorColor, StringComparison.Ordinal);
         html = html.Replace("/*{{CSS_SELECTION}}*/", selectionColor, StringComparison.Ordinal);
+        foreach ((string placeholder, string colour) in TerminalSearchChrome.CssVariables(themeJson, XtermDefaultColours))
+        {
+            html = html.Replace(placeholder, colour, StringComparison.Ordinal);
+        }
+
+        // WCAG 1.4.3 for every ANSI colour: xterm.js raises a cell's foreground until it reaches this
+        // ratio on the cell's background (Solarized Dark's own palette fails for 9 of 16 colours).
+        html = html.Replace(
+            "/*{{TERMINAL_MIN_CONTRAST}}*/",
+            ThemeTextColours.MinimumContrast.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            StringComparison.Ordinal);
 
         html = TerminalHtmlLocalizer.Localize(html, key => _localizer?[key]);
         return html;

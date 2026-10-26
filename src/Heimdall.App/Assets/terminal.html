@@ -12,6 +12,15 @@
             --terminal-fg: /*{{CSS_FG}}*/;
             --terminal-cursor: /*{{CSS_CURSOR}}*/;
             --terminal-selection: /*{{CSS_SELECTION}}*/;
+            /* Search bar colours, derived from the active scheme by TerminalSearchChrome */
+            --search-bar-bg: /*{{CSS_SEARCH_BAR_BG}}*/;
+            --search-input-bg: /*{{CSS_SEARCH_INPUT_BG}}*/;
+            --search-hover-bg: /*{{CSS_SEARCH_HOVER_BG}}*/;
+            --search-text: /*{{CSS_SEARCH_TEXT}}*/;
+            --search-border: /*{{CSS_SEARCH_BORDER}}*/;
+            --search-focus: /*{{CSS_SEARCH_FOCUS}}*/;
+            --search-no-match-text: /*{{CSS_SEARCH_NO_MATCH_TEXT}}*/;
+            --search-no-match-border: /*{{CSS_SEARCH_NO_MATCH_BORDER}}*/;
         }
 
         * {
@@ -59,8 +68,8 @@
             top: 4px;
             right: 12px;
             z-index: 100;
-            background: #44475A;
-            border: 1px solid #6272A4;
+            background: var(--search-bar-bg);
+            border: 1px solid var(--search-border);
             border-radius: 6px;
             padding: 4px 8px;
             align-items: center;
@@ -72,9 +81,9 @@
         }
 
         #search-input {
-            background: #282A36;
-            color: #F8F8F2;
-            border: 1px solid #6272A4;
+            background: var(--search-input-bg);
+            color: var(--search-text);
+            border: 1px solid var(--search-border);
             border-radius: 4px;
             padding: 3px 8px;
             font-size: 12px;
@@ -84,15 +93,15 @@
         }
 
         #search-input:focus {
-            border-color: #BD93F9;
+            border-color: var(--search-focus);
         }
 
         #search-input.no-match {
-            border-color: #FF5555;
+            border-color: var(--search-no-match-border);
         }
 
         #search-status {
-            color: #F8F8F2;
+            color: var(--search-text);
             font-size: 11px;
             min-width: 48px;
             text-align: center;
@@ -100,13 +109,13 @@
         }
 
         #search-status.no-match {
-            color: #FF8080;
+            color: var(--search-no-match-text);
         }
 
         .search-btn {
-            background: #44475A;
-            color: #F8F8F2;
-            border: 1px solid #6272A4;
+            background: var(--search-bar-bg);
+            color: var(--search-text);
+            border: 1px solid var(--search-border);
             border-radius: 4px;
             padding: 2px 6px;
             font-size: 11px;
@@ -114,7 +123,7 @@
         }
 
         .search-btn:hover {
-            background: #6272A4;
+            background: var(--search-hover-bg);
         }
 
         .xterm,
@@ -580,6 +589,8 @@
                     convertEol: /*{{TERMINAL_CONVERT_EOL}}*/,
                     cursorBlink: !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches),
                     cursorStyle: 'block',
+                    // Each cell's foreground is raised to this contrast on its background at render time.
+                    minimumContrastRatio: /*{{TERMINAL_MIN_CONTRAST}}*/,
                     fontFamily: '/*{{TERMINAL_FONT_FAMILY}}*/, "Courier New", monospace',
                     fontSize: baseFontSize,
                     scrollback: scrollbackLines,
