@@ -25,8 +25,12 @@
     <SolidColorBrush x:Key="AccentHoverBrush" Color="{DynamicResource AccentHoverColor}" />
     <SolidColorBrush x:Key="AccentPressedBrush" Color="{DynamicResource AccentPressedColor}" />
     <SolidColorBrush x:Key="TextPrimaryBrush" Color="{DynamicResource TextPrimaryColor}" />
-    <SolidColorBrush x:Key="TextSecondaryBrush" Color="{DynamicResource TextSecondaryColor}" />
-    <SolidColorBrush x:Key="TextTertiaryBrush" Color="{DynamicResource TextSecondaryColor}" />
+    <!-- Secondary and tertiary text. SecondaryTextColor is not in any theme: HeimdallThemeService
+         derives it from TextSecondaryColor on every theme change, so it reads at 4.5 to 1 on the
+         window, a card, a hovered row and a selected row (Theming/ThemeTextColours.cs). The disabled
+         text, the input border and the scroll thumb keep the theme's own colour. -->
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="{DynamicResource SecondaryTextColor}" />
+    <SolidColorBrush x:Key="TextTertiaryBrush" Color="{DynamicResource SecondaryTextColor}" />
     <SolidColorBrush x:Key="TextDisabledBrush" Color="{DynamicResource TextSecondaryColor}" Opacity="0.55" />
     <SolidColorBrush x:Key="BorderBrush" Color="{DynamicResource BorderColor}" />
     <!-- A line that carries a boundary: the sidebar divider, grid header separators, tool header
