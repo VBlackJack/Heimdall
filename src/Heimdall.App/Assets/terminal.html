@@ -21,6 +21,10 @@
             --search-focus: /*{{CSS_SEARCH_FOCUS}}*/;
             --search-no-match-text: /*{{CSS_SEARCH_NO_MATCH_TEXT}}*/;
             --search-no-match-border: /*{{CSS_SEARCH_NO_MATCH_BORDER}}*/;
+            --loading-text: /*{{CSS_LOADING_TEXT}}*/;
+            --scrollbar-track: /*{{CSS_SCROLLBAR_TRACK}}*/;
+            --scrollbar-thumb: /*{{CSS_SCROLLBAR_THUMB}}*/;
+            --scrollbar-thumb-hover: /*{{CSS_SCROLLBAR_THUMB_HOVER}}*/;
         }
 
         * {
@@ -56,7 +60,7 @@
             align-items: center;
             justify-content: center;
             background: var(--terminal-bg);
-            color: rgba(248, 248, 242, 0.72);
+            color: var(--loading-text);
             font-size: 13px;
             letter-spacing: 0.02em;
         }
@@ -137,19 +141,19 @@
             padding: 4px;
         }
 
-        /* Dracula-themed scrollbar for xterm viewport */
+        /* Scrollbar for xterm viewport, coloured from the active scheme */
         .xterm .xterm-viewport::-webkit-scrollbar {
             width: 10px;
         }
         .xterm .xterm-viewport::-webkit-scrollbar-track {
-            background: #282A36;
+            background: var(--scrollbar-track);
         }
         .xterm .xterm-viewport::-webkit-scrollbar-thumb {
-            background: #44475A;
+            background: var(--scrollbar-thumb);
             border-radius: 5px;
         }
         .xterm .xterm-viewport::-webkit-scrollbar-thumb:hover {
-            background: #6272A4;
+            background: var(--scrollbar-thumb-hover);
         }
     </style>
     <link rel="stylesheet" href="./Terminal/xterm.min.css" />
