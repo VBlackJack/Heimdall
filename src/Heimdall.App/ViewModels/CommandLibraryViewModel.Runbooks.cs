@@ -97,7 +97,7 @@ public sealed partial class CommandLibraryViewModel
     {
         if (IsRunbooksVisible)
         {
-            IsRunbooksVisible = false;
+            ShowGeneratorForSelection();
             return;
         }
 

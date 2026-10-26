@@ -228,13 +228,29 @@ public sealed partial class CommandLibraryViewModel
     {
         if (IsHistoryVisible)
         {
-            IsHistoryVisible = false;
+            ShowGeneratorForSelection();
             return;
         }
         IsGeneratorVisible = false;
         IsRunbooksVisible = false;
         IsHistoryVisible = true;
         await LoadHistoryAsync();
+    }
+
+    /// <summary>
+    /// Hands the bottom of the tool back to the generator of the action still selected, or
+    /// leaves it empty when nothing is.
+    /// </summary>
+    /// <remarks>
+    /// Opening the history or the runbooks hides the generator without clearing the selection.
+    /// Closing them has to undo that here: the row stays highlighted, so clicking it again
+    /// changes no selection and could never bring the generator back.
+    /// </remarks>
+    private void ShowGeneratorForSelection()
+    {
+        IsHistoryVisible = false;
+        IsRunbooksVisible = false;
+        IsGeneratorVisible = _selectedAction is not null;
     }
 
     // ── Action-service envelope ───────────────────────────────────
