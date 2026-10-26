@@ -42,6 +42,7 @@ public sealed partial class CommandLibraryViewModel
 {
     /// <summary>Whether the Runbooks panel is open.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsBottomPanelVisible))]
     private bool _isRunbooksVisible;
 
     /// <summary>True when the panel is open on a store with no runbook.</summary>

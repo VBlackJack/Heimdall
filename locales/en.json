@@ -6562,6 +6562,7 @@
   "ToolCmdLibHistoryThisHostOnly": "This host only",
   "ToolCmdLibBtnRunbooks": "Runbooks",
   "ToolCmdLibRunbooksTitle": "Runbooks",
+  "ToolCmdLibBottomPanelGripTooltip": "Drag to resize this panel (or focus it and use the Up and Down arrows). Double-click to go back to the automatic height.",
   "ToolCmdLibRunbooksEmpty": "No runbook yet. Press + to chain library actions and commands into one.",
   "ToolCmdLibRunbookNew": "New runbook",
   "ToolCmdLibRunbookEdit": "Edit runbook",

@@ -86,6 +86,7 @@ public partial class CommandLibraryView : UserControl, IToolView, ICommandCaptur
         _viewModel.LibraryReloaded += OnLibraryReloaded;
 
         DataContext = _viewModel;
+        RestoreBottomPanelHeight(services.GetService<ConfigManager>()?.CurrentSettings);
 
         // The toggle is hidden until there is more than one terminal to reach, so the targets
         // are read once here rather than only when the panel is opened: a panel whose own

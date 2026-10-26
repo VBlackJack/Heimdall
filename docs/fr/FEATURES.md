@@ -202,6 +202,10 @@ paramètres et un générateur qui produit la commande finale à votre place.
 - Une sélection sur plusieurs lignes devient une seule ligne, ses lignes reliées par ` ; ` pour Windows et ` && ` pour Linux, à relire avant d'enregistrer
 - Annuler laisse la bibliothèque sur sa liste ; Enregistrer ajoute l'action et la sélectionne. Une capture n'écrit rien dans l'historique
 
+**Disposition**
+- Le générateur, l'historique et les runbooks se partagent le bas de l'outil, un à la fois, et la liste au-dessus garde toujours la place de deux lignes : dans une fenêtre basse, le panneau ouvert défile au lieu de pousser la liste ou la barre Copier / Envoyer au terminal hors de vue
+- Faites glisser la poignée au-dessus du panneau ouvert pour choisir sa hauteur, ou donnez le focus à la poignée et utilisez les flèches Haut et Bas ; la hauteur est commune aux trois panneaux et retenue d'un lancement à l'autre. Double-cliquez sur la poignée pour revenir à la hauteur automatique
+
 **Historique**
 - Chaque commande copiée ou envoyée est enregistrée avec son titre, sa catégorie et son horodatage, l'hôte de la session depuis laquelle la bibliothèque a été ouverte, et le fait qu'elle a été envoyée ou seulement copiée
 - Une case **Cet hôte uniquement** en haut du panneau, cochée par défaut quand la bibliothèque appartient à une session, ne montre que ce qui est parti vers cet hôte ; elle garde son état quand le panneau se recharge
@@ -361,7 +365,7 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
 - **Ergonomie des sessions dans la barre latérale** : barre d'outils sur deux lignes avec recherche pleine largeur au-dessus d'actions purement iconographiques, largeur par défaut de 320 px, et troncature intelligente des noms longs qui préserve l'identifiant de session tout en abrégeant les suffixes entre parenthèses en fin de nom
 - Mode plein écran (F11), bascule de la barre latérale (Ctrl+B), filtre (Ctrl+F)
 - **Accueil au premier lancement** : une visite guidée en 6 étapes qui met en surbrillance le contrôle réel dont elle parle - le voile est découpé autour de la cible et cerclé - et qui navigue vers le bon onglet avant chaque étape plutôt qu'après. Rejouable à tout moment depuis `Paramètres > Général`, si bien qu'une touche Échap réflexe ne la termine plus définitivement. Une étape dont la cible est introuvable retombe sur une carte centrée plutôt que de cercler du vide
-- Interface trilingue : anglais, français et espagnol (7 399 clés i18n par langue, parité exacte entre les trois catalogues)
+- Interface trilingue : anglais, français et espagnol (7 400 clés i18n par langue, parité exacte entre les trois catalogues)
 - i18n déclarative : extension de balisage WPF `{loc:Translate Key}` avec changement de langue à chaud
 - Accessibilité WCAG 2.1 AA : AutomationProperties.Name sur tous les contrôles interactifs via `{loc:Translate}`, LiveSetting="Polite" sur les sorties dynamiques, indicateurs de focus clavier, infobulles sur les états désactivés, décompte des résultats de filtre annoncé en région live à chaque changement, et lignes de dossier prenant le focus clavier comme cibles fiables du menu contextuel Maj+F10 / touche Applications, avec un nom d'automatisation localisé
 

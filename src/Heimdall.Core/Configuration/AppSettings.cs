@@ -604,6 +604,13 @@ public sealed class AppSettings
     public bool CmdLibGitSyncOnStartup { get; set; }
     public bool CmdLibGitSyncAutoPush { get; set; } = true;
 
+    /// <summary>
+    /// Height, in pixels, the operator gave the Command Library's bottom panel (generator,
+    /// history, runbooks) by dragging its grip; 0 keeps the automatic height. No range: a value
+    /// of 0 or less is ignored on load, and the layout clamps one taller than the window.
+    /// </summary>
+    public int CmdLibBottomPanelHeight { get; set; }
+
     // Master-password vault (DEK/KEK + DPAPI). These are NOT bare secrets:
     // VaultWrappedDek is already double-protected (Argon2id KEK wrap + DPAPI).
     /// <summary>Whether the master-password vault is configured (the "vault enabled" flag).</summary>

@@ -34,6 +34,10 @@
         <sys:Double x:Key="CmdLibGeneratorMaxHeight">450</sys:Double>
         <sys:Double x:Key="CmdLibHistoryMaxHeight">300</sys:Double>
         <sys:Double x:Key="CmdLibRunbooksMaxHeight">420</sys:Double>
+        <sys:Double x:Key="CmdLibBottomPanelMinHeight">96</sys:Double>
+        <sys:Double x:Key="CmdLibBottomPanelGripHeight">8</sys:Double>
+        <sys:Double x:Key="CmdLibBottomPanelGripBarWidth">40</sys:Double>
+        <sys:Double x:Key="CmdLibBottomPanelGripBarHeight">3</sys:Double>
     </UserControl.Resources>
     <Grid>
         <Grid.RowDefinitions>
@@ -278,7 +282,7 @@
              last child and takes what the open panel leaves. -->
         <DockPanel x:Name="BodyPanel" Grid.Row="4">
         <!-- ═══════════ GENERATOR PANEL ═══════════ -->
-        <Border DockPanel.Dock="Bottom"
+        <Border x:Name="GeneratorPanel" DockPanel.Dock="Bottom"
                 Visibility="{Binding IsGeneratorVisible, Converter={StaticResource BoolToVisibilityConverter}}"
                 Background="{DynamicResource SurfaceBrush}"
                 BorderBrush="{DynamicResource BorderBrush}"
@@ -288,6 +292,7 @@
                     <Binding Path="ActualHeight" ElementName="BodyPanel"/>
                     <Binding Source="{StaticResource CmdLibActionListMinHeight}"/>
                     <Binding Source="{StaticResource CmdLibGeneratorMaxHeight}"/>
+                    <Binding Path="Height" RelativeSource="{RelativeSource Self}"/>
                 </MultiBinding>
             </Border.MaxHeight>
             <Grid>
@@ -668,7 +673,7 @@
         </Border>
 
         <!-- ═══════════ HISTORY PANEL ═══════════ -->
-        <Border DockPanel.Dock="Bottom"
+        <Border x:Name="HistoryPanel" DockPanel.Dock="Bottom"
                 Visibility="{Binding IsHistoryVisible, Converter={StaticResource BoolToVisibilityConverter}}"
                 Background="{DynamicResource SurfaceBrush}"
                 BorderBrush="{DynamicResource BorderBrush}"
@@ -678,6 +683,7 @@
                     <Binding Path="ActualHeight" ElementName="BodyPanel"/>
                     <Binding Source="{StaticResource CmdLibActionListMinHeight}"/>
                     <Binding Source="{StaticResource CmdLibHistoryMaxHeight}"/>
+                    <Binding Path="Height" RelativeSource="{RelativeSource Self}"/>
                 </MultiBinding>
             </Border.MaxHeight>
             <DockPanel>
@@ -866,6 +872,7 @@
                     <Binding Path="ActualHeight" ElementName="BodyPanel"/>
                     <Binding Source="{StaticResource CmdLibActionListMinHeight}"/>
                     <Binding Source="{StaticResource CmdLibRunbooksMaxHeight}"/>
+                    <Binding Path="Height" RelativeSource="{RelativeSource Self}"/>
                 </MultiBinding>
             </Border.MaxHeight>
             <Grid>
@@ -1288,6 +1295,52 @@
                                Style="{StaticResource ToolEmptyStateTextStyle}"/>
                 </StackPanel>
             </Border>
+
+            <!-- The grip that resizes whichever bottom panel is open. It lies over the bottom
+                 edge of the list rather than in a row of its own, so it costs the list none of
+                 its reserve, and it sits exactly on the top edge of the open panel. A Thumb
+                 rather than a GridSplitter, which needs a Grid: the body is a DockPanel on
+                 purpose (see its comment above). The drag, the arrow keys and the double-click
+                 reset live in the code-behind. -->
+            <Thumb x:Name="BottomPanelGrip"
+                   VerticalAlignment="Bottom"
+                   Height="{StaticResource CmdLibBottomPanelGripHeight}"
+                   Cursor="SizeNS"
+                   Focusable="True"
+                   IsTabStop="True"
+                   Visibility="{Binding IsBottomPanelVisible, Converter={StaticResource BoolToVisibilityConverter}}"
+                   ToolTip="{loc:Translate ToolCmdLibBottomPanelGripTooltip}"
+                   AutomationProperties.Name="{loc:Translate A11yGridSplitter}"
+                   AutomationProperties.HelpText="{loc:Translate ToolCmdLibBottomPanelGripTooltip}"
+                   DragDelta="OnBottomPanelGripDragDelta"
+                   DragCompleted="OnBottomPanelGripDragCompleted"
+                   MouseDoubleClick="OnBottomPanelGripDoubleClick"
+                   KeyDown="OnBottomPanelGripKeyDown">
+                <Thumb.Template>
+                    <ControlTemplate TargetType="Thumb">
+                        <Border x:Name="GripBackground" Background="Transparent">
+                            <Border x:Name="GripBar"
+                                    Width="{StaticResource CmdLibBottomPanelGripBarWidth}"
+                                    Height="{StaticResource CmdLibBottomPanelGripBarHeight}"
+                                    CornerRadius="{StaticResource CornerRadiusSm}"
+                                    Background="{DynamicResource BorderStrongBrush}"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="GripBar" Property="Background" Value="{DynamicResource AccentBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsDragging" Value="True">
+                                <Setter TargetName="GripBar" Property="Background" Value="{DynamicResource AccentBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="GripBar" Property="Background" Value="{DynamicResource AccentBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Thumb.Template>
+            </Thumb>
         </Grid>
         </DockPanel>
     </Grid>

@@ -48,6 +48,31 @@ public sealed class RemainingHeightConverterTests
         Assert.Equal(Cap, Convert(available, Reserved, Cap));
     }
 
+    /// <summary>
+    /// Once the operator has dragged the panel, the cap stops standing in for that choice: the
+    /// panel may grow past it, still never into the list's reserve.
+    /// </summary>
+    [Theory]
+    [InlineData(1000, 700, 1000 - Reserved)]
+    [InlineData(390, 200, 390 - Reserved)]
+    public void AHandChosenHeightLiftsTheCapButNotTheReserve(double available, double chosen, double expected)
+    {
+        object result = new RemainingHeightConverter().Convert(
+            [available, Reserved, Cap, chosen], typeof(double), null!, CultureInfo.InvariantCulture);
+
+        Assert.Equal(expected, result);
+    }
+
+    /// <summary>Positive control: an automatic height (NaN) keeps the cap.</summary>
+    [Fact]
+    public void AnAutomaticHeightKeepsTheCap()
+    {
+        object result = new RemainingHeightConverter().Convert(
+            [1000d, Reserved, Cap, double.NaN], typeof(double), null!, CultureInfo.InvariantCulture);
+
+        Assert.Equal(Cap, result);
+    }
+
     [Fact]
     public void AnUnresolvedBindingImposesNoLimit()
     {
