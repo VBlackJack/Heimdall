@@ -508,7 +508,7 @@ public sealed class ToolsTabPopulationService
     {
         var categoryBrushKey = GetCategoryBrushKey(descriptor.Category);
         const string DefaultBorderKey = "BorderBrush";
-        const string ActiveBorderKey = "AccentBrush";
+        const string ActiveBorderKey = "AccentBorderBrush";
         const string DefaultBackgroundKey = "CardBrush";
         const string ActiveBackgroundKey = "HighlightBrush";
 

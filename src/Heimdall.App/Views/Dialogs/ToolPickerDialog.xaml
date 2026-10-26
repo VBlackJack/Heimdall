@@ -130,7 +130,7 @@
                                                     </Trigger>
                                                     <Trigger Property="IsSelected" Value="True">
                                                         <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource SurfaceBrush}"/>
-                                                        <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                                        <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
                                                         <Setter TargetName="ItemBorder" Property="BorderThickness" Value="1"/>
                                                     </Trigger>
                                                 </ControlTemplate.Triggers>

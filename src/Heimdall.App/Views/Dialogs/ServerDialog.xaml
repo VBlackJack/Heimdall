@@ -98,7 +98,7 @@
                 <Style.Triggers>
                     <DataTrigger Binding="{Binding TestChipState}" Value="{x:Static vm:SshTestChipState.InProgress}">
                         <Setter Property="Visibility" Value="Visible"/>
-                        <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                        <Setter Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
                     </DataTrigger>
                     <DataTrigger Binding="{Binding TestChipState}" Value="{x:Static vm:SshTestChipState.Success}">
                         <Setter Property="Visibility" Value="Visible"/>
@@ -252,11 +252,11 @@
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="CardBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                    <Setter TargetName="CardBorder" Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
                                     <Setter TargetName="CardBorder" Property="Background" Value="{DynamicResource SurfaceBrush}"/>
                                 </Trigger>
                                 <Trigger Property="IsPressed" Value="True">
-                                    <Setter TargetName="CardBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                    <Setter TargetName="CardBorder" Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
                                     <Setter Property="Opacity" Value="0.85"/>
                                 </Trigger>
                                 <Trigger Property="IsFocused" Value="True">
@@ -1619,7 +1619,7 @@
                                                                     Margin="0,0,0,12"
                                                                     CornerRadius="{StaticResource CornerRadiusLg}"
                                                                     Background="{DynamicResource SurfaceBrush}"
-                                                                    BorderBrush="{DynamicResource AccentBrush}"
+                                                                    BorderBrush="{DynamicResource AccentBorderBrush}"
                                                                     BorderThickness="1"
                                                                     Visibility="{Binding IsAutoResolutionMode, Converter={StaticResource BoolToVisibilityConverter}}">
                                                                 <StackPanel>

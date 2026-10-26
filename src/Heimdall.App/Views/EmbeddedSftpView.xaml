@@ -785,7 +785,7 @@
         <Border x:Name="DragOverlay"
                 Grid.Row="3"
                 Background="{DynamicResource DragDropOverlayBackground}"
-                BorderBrush="{DynamicResource AccentBrush}"
+                BorderBrush="{DynamicResource AccentBorderBrush}"
                 BorderThickness="2"
                 CornerRadius="{StaticResource CornerRadiusSm}"
                 IsHitTestVisible="False"

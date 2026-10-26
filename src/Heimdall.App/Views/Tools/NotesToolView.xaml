@@ -55,7 +55,7 @@
             <Style.Triggers>
                 <DataTrigger Binding="{Binding IsSelected}" Value="True">
                     <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/>
-                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
                     <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}"/>
                 </DataTrigger>
             </Style.Triggers>
@@ -426,7 +426,7 @@
                                     </DataTrigger>
                                     <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=TreeViewItem}}" Value="True">
                                         <Setter TargetName="ItemChrome" Property="Background" Value="{DynamicResource SurfaceBrush}"/>
-                                        <Setter TargetName="ItemChrome" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                        <Setter TargetName="ItemChrome" Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
                                         <Setter TargetName="ItemChrome" Property="BorderThickness" Value="3,0,0,0"/>
                                         <Setter TargetName="FolderTitleText" Property="Foreground" Value="{DynamicResource AccentTextBrush}"/>
                                         <Setter TargetName="NoteTitleText" Property="Foreground" Value="{DynamicResource AccentTextBrush}"/>

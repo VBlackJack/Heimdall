@@ -46,6 +46,12 @@ namespace Heimdall.App.Theming;
 /// accent for the hover fill on every theme, and on a light one that leaves no label colour, light
 /// or dark, at 4.5 to 1 (Parchment with the green accent: 3.64 and 4.30). The hover fill is the
 /// theme's hover shade where the label reads on it, the pressed shade where it does not.</para>
+/// <para>ThemeForge applies an accent tint to the accent brushes only, never to
+/// <c>AccentColor</c>. Every accent derived here starts from the accent the application paints,
+/// read through <c>AccentBrush</c>, so accent text, the selected-row tint and the accent outline
+/// follow the tint; derived from <c>AccentColor</c>, the accent text kept the theme's accent in 120
+/// of the 136 tinted theme and tint pairs, and the red tint left accent borders at 2.91 to 1 on a
+/// Drakul card.</para>
 /// </remarks>
 internal static class ThemeTextColours
 {
@@ -75,6 +81,15 @@ internal static class ThemeTextColours
 
     /// <summary>The resource key the primary button's hover fill is written to.</summary>
     internal const string AccentHoverFillKey = "AccentHoverFillColor";
+
+    /// <summary>
+    /// The resource key the accent the application paints is written to: the accent tint's
+    /// colour when one is chosen, the theme's accent otherwise.
+    /// </summary>
+    internal const string ActiveAccentKey = "ActiveAccentColor";
+
+    /// <summary>The resource key the accent outline (focus rings, selection and focus borders) is written to.</summary>
+    internal const string AccentBorderKey = "AccentBorderColor";
 
     /// <summary>How far the lightness moves per step, on the 0 to 1 HSL scale.</summary>
     private const double LightnessStep = 0.01;
@@ -127,14 +142,22 @@ internal static class ThemeTextColours
         }
 
         bool lighten = ThemeLuminance.IsDark(background);
+        Color? activeAccent = ActiveAccent(find);
         Color[] regions = [background, card];
         Color[] rows = RowGrounds(background, card, find);
         foreach ((string sourceKey, string textKey, double contrast, bool inRows) in Pairs)
         {
-            if (find(sourceKey) is Color source)
+            Color? source = sourceKey == AccentKey ? activeAccent : find(sourceKey) as Color?;
+            if (source is Color colour)
             {
-                target[textKey] = Derive(source, inRows ? rows : regions, lighten, contrast);
+                target[textKey] = Derive(colour, inRows ? rows : regions, lighten, contrast);
             }
+        }
+
+        if (activeAccent is Color accent)
+        {
+            target[ActiveAccentKey] = accent;
+            target[AccentBorderKey] = Derive(accent, regions, lighten, MinimumBoundaryContrast);
         }
 
         if (AccentHoverFill(background, find) is Color hoverFill)
@@ -160,12 +183,23 @@ internal static class ThemeTextColours
             grounds.Add(selection);
         }
 
-        if (find(AccentKey) is Color accent)
+        if (ActiveAccent(find) is Color accent)
         {
             grounds.Add(Over(accent, SelectedRowOpacity, background));
         }
 
         return [.. grounds];
+    }
+
+    /// <summary>
+    /// The accent the application paints: <c>AccentBrush</c> as the application resolves it, which
+    /// an accent tint replaces, else the theme's <c>AccentColor</c>.
+    /// </summary>
+    /// <param name="find">Looks a resource up in the application.</param>
+    internal static Color? ActiveAccent(Func<string, object?> find)
+    {
+        ArgumentNullException.ThrowIfNull(find);
+        return ColourOf(find("AccentBrush")) ?? ColourOf(find(AccentKey));
     }
 
     /// <summary>

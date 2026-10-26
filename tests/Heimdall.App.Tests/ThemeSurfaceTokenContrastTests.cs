@@ -155,8 +155,163 @@ public sealed class ThemeSurfaceTokenContrastTests
     {
         (string _, string colourKey, double opacity) = Assert.Single(BridgeBrushes(), brush => brush.Key == "TreeRowSelectedBrush");
 
-        Assert.Equal(ThemeTextColours.AccentKey, colourKey);
+        Assert.Equal(ThemeTextColours.ActiveAccentKey, colourKey);
         Assert.Equal(ThemeTextColours.SelectedRowOpacity, opacity);
+    }
+
+    /// <summary>
+    /// The bridge paints every accent surface with the accent the application paints, so a tint
+    /// reaches the selected row, the local session badge and the local protocol mark as it reaches
+    /// the buttons. ThemeForge tints the accent brushes only; on <c>AccentColor</c> these kept the
+    /// theme's accent under any tint.
+    /// </summary>
+    [Fact]
+    public void TheBridgesAccentSurfacesFollowTheActiveAccent()
+    {
+        Dictionary<string, string> colourKeys = BridgeBrushes().ToDictionary(brush => brush.Key, brush => brush.ColourKey);
+
+        foreach (string brush in new[] { "TreeRowSelectedBrush", "LocalBadgeBrush", "ProtocolLocalBrush" })
+        {
+            Assert.Equal(ThemeTextColours.ActiveAccentKey, colourKeys[brush]);
+        }
+
+        Assert.Equal(ThemeTextColours.AccentBorderKey, colourKeys["AccentBorderBrush"]);
+        Assert.DoesNotContain(colourKeys, pair => pair.Value == ThemeTextColours.AccentKey && pair.Key != "AccentBrush");
+    }
+
+    /// <summary>
+    /// With every accent tint, the accent text reads at 4.5 to 1 on the window, a card, a hovered
+    /// row and the tinted selected row, and the accent outline at 3 to 1 on the window and a card.
+    /// A tint puts its source colour in AccentBrush (ThemeForge 2.1.0, <c>CreateAccentTintDictionary</c>),
+    /// which is what the resolver below hands the derivation. With the red tint the raw accent was
+    /// 2.91 to 1 on a Drakul card.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Themes))]
+    public void TheAccentTextAndOutlineAreReadableWithEveryTint(string theme)
+    {
+        ResourceDictionary colours = ThemeColours(theme);
+        Color background = (Color)colours[ThemeTextColours.BackgroundKey];
+        Color card = (Color)colours[ThemeTextColours.CardKey];
+        Color hovered = (Color)colours[ThemeTextColours.SelectionKey];
+        List<string> unreadable = [];
+
+        foreach (string tint in TintSources)
+        {
+            Color tinted = (Color)colours[tint];
+            ResourceDictionary derived = new();
+            ThemeTextColours.Apply(derived, Tinted(colours, tinted));
+            Color text = (Color)derived["AccentTextColor"];
+            Color outline = (Color)derived[ThemeTextColours.AccentBorderKey];
+            Color selected = Over(Color.FromArgb((byte)Math.Round(255 * ThemeTextColours.SelectedRowOpacity), tinted.R, tinted.G, tinted.B), background);
+
+            Assert.Equal(tinted, (Color)derived[ThemeTextColours.ActiveAccentKey]);
+            foreach ((string name, Color ground) in new[] { ("window", background), ("card", card), ("hovered row", hovered), ("selected row", selected) })
+            {
+                if (Contrast(text, ground) < MinimumTextContrast)
+                {
+                    unreadable.Add(Report(theme, $"{tint} accent text on the {name}", text, ground));
+                }
+            }
+
+            foreach ((string name, Color ground) in new[] { ("window", background), ("card", card) })
+            {
+                if (Contrast(outline, ground) < MinimumBoundaryContrast)
+                {
+                    unreadable.Add(Report(theme, $"{tint} accent outline on the {name}", outline, ground));
+                }
+            }
+        }
+
+        Assert.True(unreadable.Count == 0, string.Join(Environment.NewLine, unreadable));
+    }
+
+    /// <summary>
+    /// The accent text follows the tint rather than the theme's accent: under a tint it is the
+    /// tint's colour, or a step of the tint's own hue, in most theme and tint pairs (120 of 136 on
+    /// 2026-10-26; the others are tints whose derived text lands on the theme accent's), and the
+    /// outline is the tint itself, unchanged, wherever that already reaches 3 to 1.
+    /// </summary>
+    [Fact]
+    public void TheAccentTextFollowsTheTint()
+    {
+        int followed = 0;
+        foreach (string theme in ThemeNames.All)
+        {
+            ResourceDictionary colours = ThemeColours(theme);
+            ResourceDictionary untinted = new();
+            ThemeTextColours.Apply(untinted, key => colours[key]);
+            foreach (string tint in TintSources)
+            {
+                Color tinted = (Color)colours[tint];
+                ResourceDictionary derived = new();
+                ThemeTextColours.Apply(derived, Tinted(colours, tinted));
+                Color text = (Color)derived["AccentTextColor"];
+                if (text != (Color)untinted["AccentTextColor"])
+                {
+                    followed++;
+                }
+
+                Color outline = (Color)derived[ThemeTextColours.AccentBorderKey];
+                bool tintIsAnOutline = Contrast(tinted, (Color)colours[ThemeTextColours.BackgroundKey]) >= MinimumBoundaryContrast
+                    && Contrast(tinted, (Color)colours[ThemeTextColours.CardKey]) >= MinimumBoundaryContrast;
+                Assert.True(tintIsAnOutline == (outline == tinted), $"{theme} {tint}: tint {tinted}, outline {outline}");
+            }
+        }
+
+        Assert.True(followed >= 110, $"the accent text followed the tint in only {followed} of {ThemeNames.All.Count * TintSources.Length} pairs");
+    }
+
+    /// <summary>A style's base BorderBrush setter when the same style fills the control with the accent.</summary>
+    private static bool IsOutlineOnItsOwnAccentFill(XElement element) =>
+        element.Name.LocalName == "Setter"
+        && element.Attribute("TargetName") is null
+        && element.Parent is { Name.LocalName: "Style" } style
+        && style.Elements().Any(setter => setter.Name.LocalName == "Setter"
+            && (string?)setter.Attribute("Property") == "Background"
+            && (string?)setter.Attribute("Value") == "{DynamicResource AccentBrush}");
+
+    /// <summary>The theme colour keys the eight accent tints take their colour from.</summary>
+    private static readonly string[] TintSources =
+        ["BlueColor", "CyanColor", "GreenColor", "OrangeColor", "PinkColor", "PurpleColor", "RedColor", "YellowColor"];
+
+    /// <summary>The theme's resources as the application resolves them under an accent tint.</summary>
+    private static Func<string, object?> Tinted(ResourceDictionary colours, Color tint) =>
+        key => key == "AccentBrush" ? new System.Windows.Media.SolidColorBrush(tint) : colours[key];
+
+    /// <summary>
+    /// Accent outlines (BorderBrush and Stroke, attributes and setters) use the derived
+    /// AccentBorderBrush, never the raw accent, which a tint can leave under 3 to 1. The one
+    /// exception is an outline drawn on its own accent fill, the primary button's: it identifies
+    /// nothing the fill does not, and the button hierarchy test holds it to the fill.
+    /// </summary>
+    [Fact]
+    public void AccentOutlinesUseTheDerivedBorder()
+    {
+        string root = Path.Combine(ViewSource.RepoRoot(), "src", "Heimdall.App");
+        int outlines = 0;
+        List<string> raw = [];
+        foreach (string path in SourceFileEnumeration.EnumerateFiles(root, "*.xaml"))
+        {
+            foreach (XElement element in XDocument.Load(path, LoadOptions.SetLineInfo).Descendants())
+            {
+                IEnumerable<string?> values = element.Name.LocalName == "Setter"
+                    && (string?)element.Attribute("Property") is "BorderBrush" or "Stroke"
+                        ? [(string?)element.Attribute("Value")]
+                        : [(string?)element.Attribute("BorderBrush"), (string?)element.Attribute("Stroke")];
+                foreach (string? value in values.Where(value => value is not null))
+                {
+                    outlines++;
+                    if (value == "{DynamicResource AccentBrush}" && !IsOutlineOnItsOwnAccentFill(element))
+                    {
+                        raw.Add($"{Path.GetFileName(path)}:{((System.Xml.IXmlLineInfo)element).LineNumber}");
+                    }
+                }
+            }
+        }
+
+        Assert.True(outlines >= 500, $"the walk found {outlines} outlines");
+        Assert.True(raw.Count == 0, "accent outlines on the raw AccentBrush; use AccentBorderBrush: " + string.Join(", ", raw));
     }
 
     /// <summary>

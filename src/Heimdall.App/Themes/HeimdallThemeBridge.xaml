@@ -52,6 +52,12 @@
     <SolidColorBrush x:Key="ErrorTextBrush" Color="{DynamicResource ErrorTextColor}" />
     <SolidColorBrush x:Key="InfoTextBrush" Color="{DynamicResource InfoTextColor}" />
     <SolidColorBrush x:Key="AccentTextBrush" Color="{DynamicResource AccentTextColor}" />
+    <!-- The accent the application paints and its outline. ActiveAccentColor and AccentBorderColor
+         are not in any theme: HeimdallThemeService writes them on every theme and accent change from
+         AccentBrush as resolved, so they follow an accent tint, which ThemeForge applies to the
+         accent brushes only. The outline reaches 3 to 1 on the window and on a card (WCAG 1.4.11):
+         focus rings, focused inputs, selected items (Theming/ThemeTextColours.cs). -->
+    <SolidColorBrush x:Key="AccentBorderBrush" Color="{DynamicResource AccentBorderColor}" />
     <SolidColorBrush x:Key="BadgeTextBrush" Color="{DynamicResource BackgroundColor}" />
     <SolidColorBrush x:Key="TextOnAccentBrush" Color="{DynamicResource BackgroundColor}" />
     <!-- The primary button's hover fill. AccentHoverFillColor is not in any theme: HeimdallThemeService
@@ -64,7 +70,7 @@
     <SolidColorBrush x:Key="TreeViewIndentGuideBrush" Color="{DynamicResource BorderColor}" Opacity="0.50" />
     <!-- Session tree row states. Hover keeps HighlightBrush; a selected row and a drop target each
          get their own tint, so the three never read as one state. -->
-    <SolidColorBrush x:Key="TreeRowSelectedBrush" Color="{DynamicResource AccentColor}" Opacity="0.18" />
+    <SolidColorBrush x:Key="TreeRowSelectedBrush" Color="{DynamicResource ActiveAccentColor}" Opacity="0.18" />
     <SolidColorBrush x:Key="TreeRowDropTargetBrush" Color="{DynamicResource InfoColor}" Opacity="0.30" />
     <SolidColorBrush x:Key="DragDropOverlayBackground" Color="{DynamicResource BackgroundColor}" Opacity="0.40" />
     <!-- Modal scrim: the window background at 70% (alpha B3), so a light theme dims to a light veil. -->
@@ -80,7 +86,7 @@
     <SolidColorBrush x:Key="ProtocolTelnetBrush" Color="{DynamicResource CommentColor}" />
     <SolidColorBrush x:Key="ProtocolFtpBrush" Color="{DynamicResource BlueColor}" />
     <SolidColorBrush x:Key="ProtocolCitrixBrush" Color="{DynamicResource PurpleColor}" />
-    <SolidColorBrush x:Key="ProtocolLocalBrush" Color="{DynamicResource AccentColor}" />
+    <SolidColorBrush x:Key="ProtocolLocalBrush" Color="{DynamicResource ActiveAccentColor}" />
 
     <!-- Connection badge brushes -->
     <SolidColorBrush x:Key="RdpBadgeBrush" Color="{DynamicResource BlueColor}" />
@@ -92,7 +98,7 @@
     <SolidColorBrush x:Key="FtpBadgeBrush" Color="{DynamicResource BlueColor}" />
     <SolidColorBrush x:Key="CitrixBadgeBrush" Color="{DynamicResource PurpleColor}" />
     <SolidColorBrush x:Key="TelnetBadgeBrush" Color="{DynamicResource CommentColor}" />
-    <SolidColorBrush x:Key="LocalBadgeBrush" Color="{DynamicResource AccentColor}" />
+    <SolidColorBrush x:Key="LocalBadgeBrush" Color="{DynamicResource ActiveAccentColor}" />
 
     <!-- Tool category brushes -->
     <SolidColorBrush x:Key="ToolBadgeBrush" Color="{DynamicResource CyanColor}" />

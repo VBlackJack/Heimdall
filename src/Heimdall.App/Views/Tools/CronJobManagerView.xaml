@@ -241,7 +241,7 @@
                             Margin="{StaticResource MarginSubsectionTop}"
                             Padding="{StaticResource PaddingAlertBanner}"
                             Background="{DynamicResource CardBrush}"
-                            BorderBrush="{DynamicResource AccentBrush}"
+                            BorderBrush="{DynamicResource AccentBorderBrush}"
                             BorderThickness="1"
                             CornerRadius="{StaticResource CornerRadiusSm}"
                             AutomationProperties.AutomationId="CronJob.DetailPanel"

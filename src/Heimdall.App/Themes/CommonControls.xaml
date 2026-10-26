@@ -258,7 +258,7 @@
                 <ControlTemplate>
                     <Rectangle Margin="{StaticResource SpacingXxs}"
                                StrokeThickness="2"
-                               Stroke="{DynamicResource AccentBrush}"
+                               Stroke="{DynamicResource AccentBorderBrush}"
                                SnapsToDevicePixels="True"
                                RadiusX="4"
                                RadiusY="4"/>
@@ -273,7 +273,7 @@
                 <ControlTemplate>
                     <Rectangle Margin="-3"
                                StrokeThickness="2"
-                               Stroke="{DynamicResource AccentBrush}"
+                               Stroke="{DynamicResource AccentBorderBrush}"
                                SnapsToDevicePixels="True"
                                RadiusX="4"
                                RadiusY="4"/>
@@ -454,7 +454,7 @@
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Bd" Property="Background" Value="{DynamicResource HighlightBrush}"/>
-                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
                             <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceBrush}"/>
@@ -532,7 +532,7 @@
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="ButtonBorder" Property="Background" Value="{DynamicResource HighlightBrush}"/>
-                            <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
                         </Trigger>
                         <Trigger Property="IsPressed" Value="True">
                             <Setter TargetName="ButtonBorder" Property="Background" Value="{DynamicResource SurfaceBrush}"/>
@@ -656,7 +656,7 @@
                             <Setter TargetName="TextBoxBorder" Property="BorderBrush" Value="{DynamicResource TextPrimaryBrush}"/>
                         </Trigger>
                         <Trigger Property="IsKeyboardFocused" Value="True">
-                            <Setter TargetName="TextBoxBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            <Setter TargetName="TextBoxBorder" Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
                         </Trigger>
                         <Trigger Property="IsReadOnly" Value="True">
                             <Setter TargetName="TextBoxBorder" Property="Background" Value="{DynamicResource SurfaceBrush}"/>
@@ -709,7 +709,7 @@
                             <Setter TargetName="TextBoxBorder" Property="BorderBrush" Value="{DynamicResource TextPrimaryBrush}"/>
                         </Trigger>
                         <Trigger Property="IsKeyboardFocused" Value="True">
-                            <Setter TargetName="TextBoxBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            <Setter TargetName="TextBoxBorder" Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter TargetName="TextBoxBorder" Property="Opacity" Value="{StaticResource OpacityDisabled}"/>
@@ -749,7 +749,7 @@
                             <Setter TargetName="PasswordBorder" Property="BorderBrush" Value="{DynamicResource TextPrimaryBrush}"/>
                         </Trigger>
                         <Trigger Property="IsKeyboardFocused" Value="True">
-                            <Setter TargetName="PasswordBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            <Setter TargetName="PasswordBorder" Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter TargetName="PasswordBorder" Property="Opacity" Value="{StaticResource OpacityDisabled}"/>
@@ -977,7 +977,7 @@
                             <Setter TargetName="ToggleBorder" Property="Background" Value="{DynamicResource HighlightBrush}"/>
                         </Trigger>
                         <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="ToggleBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            <Setter TargetName="ToggleBorder" Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
                             <Setter TargetName="Arrow" Property="Fill" Value="{DynamicResource TextPrimaryBrush}"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
@@ -1017,11 +1017,11 @@
                             <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource HighlightBrush}"/>
                         </Trigger>
                         <Trigger Property="IsSelected" Value="True">
-                            <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
                             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
                             <Setter TargetName="ItemBorder" Property="Background">
                                 <Setter.Value>
-                                    <SolidColorBrush Color="{DynamicResource AccentColor}" Opacity="{StaticResource OpacityAccentOverlay}"/>
+                                    <SolidColorBrush Color="{DynamicResource ActiveAccentColor}" Opacity="{StaticResource OpacityAccentOverlay}"/>
                                 </Setter.Value>
                             </Setter>
                         </Trigger>
@@ -1105,14 +1105,14 @@
                             <Setter TargetName="PopupBorder" Property="MinHeight" Value="32"/>
                         </Trigger>
                         <Trigger Property="IsKeyboardFocusWithin" Value="True">
-                            <Setter TargetName="DropDownToggle" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            <Setter TargetName="DropDownToggle" Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
                         </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="DropDownToggle" Property="Background" Value="{DynamicResource HighlightBrush}"/>
                         </Trigger>
                         <Trigger Property="IsDropDownOpen" Value="True">
-                            <Setter TargetName="DropDownToggle" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
-                            <Setter TargetName="PopupBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            <Setter TargetName="DropDownToggle" Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
+                            <Setter TargetName="PopupBorder" Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
                         </Trigger>
                         <Trigger Property="IsEditable" Value="True">
                             <Setter TargetName="SelectionBox" Property="Visibility" Value="Hidden"/>
@@ -1269,12 +1269,12 @@
                             <Setter Property="FontWeight" Value="SemiBold"/>
                         </Trigger>
                         <Trigger Property="IsFocused" Value="True">
-                            <Setter TargetName="TabBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            <Setter TargetName="TabBorder" Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
                             <Setter TargetName="TabBorder" Property="BorderThickness" Value="1,1,1,2"/>
                         </Trigger>
                         <Trigger Property="theming:DropTargetVisualState.IsDropTarget" Value="True">
                             <Setter TargetName="TabBorder" Property="Background" Value="{DynamicResource HighlightBrush}"/>
-                            <Setter TargetName="TabBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            <Setter TargetName="TabBorder" Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
                             <Setter TargetName="TabBorder" Property="BorderThickness" Value="2,1,1,0"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
@@ -1366,12 +1366,12 @@
                         </Trigger>
                         <Trigger Property="IsSelected" Value="True">
                             <Setter TargetName="SegmentBorder" Property="Background" Value="{DynamicResource AccentBrush}"/>
-                            <Setter TargetName="SegmentBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            <Setter TargetName="SegmentBorder" Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
                             <Setter Property="Foreground" Value="{DynamicResource TextOnAccentBrush}"/>
                             <Setter Property="FontWeight" Value="SemiBold"/>
                         </Trigger>
                         <Trigger Property="IsFocused" Value="True">
-                            <Setter TargetName="SegmentBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            <Setter TargetName="SegmentBorder" Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter TargetName="SegmentBorder" Property="Opacity" Value="{StaticResource OpacityDisabled}"/>
@@ -1529,7 +1529,7 @@
                         </Trigger>
                         <Trigger Property="IsSelected" Value="True">
                             <Setter TargetName="RailBorder" Property="Background" Value="{DynamicResource HighlightBrush}"/>
-                            <Setter TargetName="RailBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            <Setter TargetName="RailBorder" Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
                             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
                             <Setter Property="FontWeight" Value="SemiBold"/>
                         </Trigger>
@@ -1735,14 +1735,14 @@
                         <Trigger Property="IsSelected" Value="True">
                             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
                             <Setter TargetName="SelectionBorder" Property="Background" Value="{DynamicResource CardBrush}"/>
-                            <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
                         </Trigger>
                         <Trigger Property="IsKeyboardFocused" Value="True">
                             <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource FocusIndicatorBrush}"/>
                         </Trigger>
                         <Trigger Property="theming:DropTargetVisualState.IsDropTarget" Value="True">
                             <Setter TargetName="SelectionBorder" Property="Background" Value="{DynamicResource HighlightBrush}"/>
-                            <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            <Setter TargetName="SelectionBorder" Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter TargetName="SelectionBorder" Property="Opacity" Value="{StaticResource OpacityDisabled}"/>
@@ -1881,11 +1881,11 @@
                         </Trigger>
                         <Trigger Property="IsHighlighted" Value="True">
                             <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource HighlightBrush}"/>
-                            <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
                         </Trigger>
                         <Trigger Property="IsSubmenuOpen" Value="True">
                             <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource HighlightBrush}"/>
-                            <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Foreground" Value="{DynamicResource TextDisabledBrush}"/>
@@ -1956,17 +1956,17 @@
                     </BulletDecorator>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="BoxBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            <Setter TargetName="BoxBorder" Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
                             <Setter TargetName="BoxBorder" Property="Background" Value="{DynamicResource HighlightBrush}"/>
                         </Trigger>
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="BoxBorder" Property="Background" Value="{DynamicResource AccentBrush}"/>
-                            <Setter TargetName="BoxBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            <Setter TargetName="BoxBorder" Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
                             <Setter TargetName="CheckGlyph" Property="Visibility" Value="Visible"/>
                         </Trigger>
                         <Trigger Property="IsChecked" Value="{x:Null}">
                             <Setter TargetName="BoxBorder" Property="Background" Value="{DynamicResource AccentBrush}"/>
-                            <Setter TargetName="BoxBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            <Setter TargetName="BoxBorder" Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
                             <Setter TargetName="IndeterminateGlyph" Property="Visibility" Value="Visible"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
@@ -2013,11 +2013,11 @@
                     </BulletDecorator>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="OuterCircle" Property="Stroke" Value="{DynamicResource AccentBrush}"/>
+                            <Setter TargetName="OuterCircle" Property="Stroke" Value="{DynamicResource AccentBorderBrush}"/>
                             <Setter TargetName="OuterCircle" Property="Fill" Value="{DynamicResource HighlightBrush}"/>
                         </Trigger>
                         <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="OuterCircle" Property="Stroke" Value="{DynamicResource AccentBrush}"/>
+                            <Setter TargetName="OuterCircle" Property="Stroke" Value="{DynamicResource AccentBorderBrush}"/>
                             <Setter TargetName="OuterCircle" Property="Fill" Value="{DynamicResource AccentBrush}"/>
                             <Setter TargetName="InnerDot" Property="Visibility" Value="Visible"/>
                         </Trigger>
@@ -2114,16 +2114,16 @@
                             <Setter TargetName="ItemBorder" Property="Background" Value="{DynamicResource HighlightBrush}"/>
                         </Trigger>
                         <Trigger Property="IsSelected" Value="True">
-                            <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
                             <Setter TargetName="ItemBorder" Property="Background">
                                 <Setter.Value>
-                                    <SolidColorBrush Color="{DynamicResource AccentColor}" Opacity="{StaticResource OpacityAccentOverlay}"/>
+                                    <SolidColorBrush Color="{DynamicResource ActiveAccentColor}" Opacity="{StaticResource OpacityAccentOverlay}"/>
                                 </Setter.Value>
                             </Setter>
                             <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
                         </Trigger>
                         <Trigger Property="IsKeyboardFocused" Value="True">
-                            <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            <Setter TargetName="ItemBorder" Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter TargetName="ItemBorder" Property="Opacity" Value="{StaticResource OpacityDisabled}"/>
@@ -2620,10 +2620,10 @@
                             <Setter TargetName="Watermark" Property="Visibility" Value="Visible"/>
                         </MultiTrigger>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            <Setter Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
                         </Trigger>
                         <Trigger Property="IsKeyboardFocused" Value="True">
-                            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            <Setter Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -2736,7 +2736,7 @@
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="TabBorder" Property="BorderBrush"
-                                    Value="{DynamicResource AccentBrush}"/>
+                                    Value="{DynamicResource AccentBorderBrush}"/>
                             <Setter Property="Foreground"
                                     Value="{DynamicResource TextPrimaryBrush}"/>
                             <Setter Property="FontWeight" Value="SemiBold"/>
