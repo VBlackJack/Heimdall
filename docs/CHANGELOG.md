@@ -12,9 +12,9 @@
 
 All notable changes to Heimdall are documented in this file.
 
-## Unreleased
+## 2026-10-26: Magellan by default, and contrast that holds on every theme (v2026.102601)
 
-### Theme
+### Theme (#684)
 
 - **Magellan is the default theme** (owner decision 2026-10-25). `HeimdallThemeService.DefaultTheme`,
   the new `AppSettings.FactoryDefaultTheme` (which `AppSettings.DefaultTheme` and the Settings panel
@@ -24,6 +24,48 @@ All notable changes to Heimdall are documented in this file.
   and not migrated. The theme's per-setting marker and reset compare with `Magellan`; the full
   "Reset to defaults" still keeps the current theme, as before. Pinned by
   `TheDefaultThemeIsMagellanEverywhereADefaultIsStated` and `TheThemeMarkerComparesAgainstMagellan`.
+
+### Contrast (#685 to #691)
+
+A contrast audit of the 17 themes and 9 accents (2026-10-25) measured every foreground and ground
+pair the XAML draws; these fixes close what it found.
+
+- **Screens that failed on Magellan** (#685). Status-line separators move from the decorative
+  `BorderBrush` to `TextTertiaryBrush` (1.27 to 1 before); the ARP alert dismiss glyph, the external
+  tool provider badge, the inactive onboarding dots, the active broadcast pill and the RDP import
+  "skipped" chip get readable colours; Notes tool text is no longer dimmed with `Opacity`; a pressed
+  primary button keeps the accent fill and outlines it with the pressed shade, since no label colour
+  reaches 4.5 to 1 on that shade in every theme. Pinned by `ThemeScreenPairContrastTests`.
+- **Derived text over hovered and selected rows** (#686). `ThemeTextColours` derives the semantic
+  and accent text colours against four grounds (window, card, hovered row, selected row) instead of
+  two; Magellan's error text was 4.06 to 1 on a hovered row, Cinder's 3.63. New
+  `AccentHoverFillBrush`: the primary button's hover fill is the hover shade where the label reads on
+  it, the pressed shade where it does not (Parchment and Folio).
+- **Semantic text on the derived `*TextBrush` keys** (#687). About 60 sites (XAML Foregrounds,
+  converters, view-model keys, code-behind) painted text with the raw `ErrorBrush`, `WarningBrush`,
+  `SuccessBrush`, `InfoBrush` or `AccentBrush`, 2.91 to 1 on a Drakul card. `SemanticTextBrushes`
+  maps a shared fill key to its text key; `SemanticTextForegroundGuardTests` replaces
+  `AccentForegroundSetterGuardTests` and walks the four doors for all five brushes.
+- **Derived secondary text** (#688). `TextSecondaryBrush` and `TextTertiaryBrush` paint the derived
+  `SecondaryTextColor`, 4.5 to 1 on the four grounds. Dracula's secondary text was its comment colour
+  #6272A4, 3.03 to 1 on the window and 1.94 on a card; it becomes #AFB8D1.
+- **Accents follow the accent tint** (#689). ThemeForge applies a tint to the accent brushes only, so
+  `ThemeTextColours` now reads the accent the application paints (`ActiveAccentColor`): accent text,
+  the selected-row tint, the local badge and the local protocol mark follow the tint. New
+  `AccentBorderBrush`, the accent derived to 3 to 1 on the window and a card, for 59 outlines (focus
+  rings, focused inputs, selected items, checked toggles).
+- **Terminal** (#690). The terminal page asks xterm.js for `minimumContrastRatio` 4.5, so every ANSI
+  colour reads on its cell whatever the scheme. The search bar takes its colours from the active
+  scheme through `TerminalSearchChrome` instead of fixed Dracula greys (no-match status 3.77 to 1).
+- **Status dots and the import chip outline** (#691). The session tree and session properties dots
+  paint `Success/Warning/Error/Info/NeutralIndicatorBrush`, derived to 3 to 1 on the four grounds
+  (the Dracula error dot was 2.91 on a hovered row); the neutral ring of a local session is now a
+  visible grey. The RDP import "partial mapping" chip snaps to device pixels: its 1 px outline was
+  drawn as two blended rows, 2.2 to 1 on screen.
+- Checked on screen with the master build on Magellan, Dracula and Parchment, default and red
+  accents: rows, primary button hover and press, focus rings and the RDP import chips.
+- Tests: App.Tests 11,302, Core.Tests 4,552, UiTests 240, Ssh 644, Sftp 525, Rdp 576, Terminal 134,
+  TwinShell 207 (18,180 passed).
 
 ## 2026-10-23: subscribed Citrix apps, idempotent re-import, and Workspace settings (v2026.102301)
 
