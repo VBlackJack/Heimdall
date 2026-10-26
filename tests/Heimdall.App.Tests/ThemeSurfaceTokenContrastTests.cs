@@ -47,15 +47,16 @@ public sealed class ThemeSurfaceTokenContrastTests
         "SuccessTextBrush",
         "InfoTextBrush",
         "AccentTextBrush",
+        "TextSecondaryBrush",
+        "TextTertiaryBrush",
     ];
 
     public static TheoryData<string> Themes { get; } = new(ThemeNames.All);
 
     /// <summary>
     /// The third tier of text is never fainter than the second. #608 drew it in the comment
-    /// colour at 82 percent, 2.49 to 1 on Dracula. The second tier itself, ThemeForge's
-    /// TextSecondaryColor, is 3.03 to 1 on Dracula, under the 4.5 WCAG asks for: that gap is in
-    /// the palette, not here, and this test does not claim 4.5.
+    /// colour at 82 percent, 2.49 to 1 on Dracula. Both tiers are now the derived secondary text
+    /// colour, which the semantic text test holds at 4.5 on every ground.
     /// </summary>
     [Theory]
     [MemberData(nameof(Themes))]
