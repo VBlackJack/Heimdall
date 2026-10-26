@@ -16,6 +16,7 @@
 
 using System.Globalization;
 using System.IO;
+using System.Reflection;
 using System.Windows;
 using System.Xml;
 using System.Xml.Linq;
@@ -199,6 +200,60 @@ public sealed class ThemeSurfaceTokenContrastTests
 
     private static readonly string[] IndicatorBrushes =
         ["SuccessIndicatorBrush", "WarningIndicatorBrush", "ErrorIndicatorBrush", "InfoIndicatorBrush", "NeutralIndicatorBrush"];
+
+    /// <summary>
+    /// The JWT parser's part colours (titles, outlines and decoded text) read at 4.5 to 1 on the
+    /// window and on a card. On the raw blue, green and orange the header was 4.00 to 1 on a Drakul
+    /// card, the payload 4.20 on a Folio card and the signature 4.43 on a Tarn card.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Themes))]
+    public void TheJwtPartColoursAreReadable(string theme)
+    {
+        ResourceDictionary palette = Palette(theme);
+        List<string> unreadable = [];
+
+        foreach (string brush in new[] { "JwtHeaderBrush", "JwtPayloadBrush", "JwtSignatureBrush" })
+        {
+            Color text = ColorOf(palette, brush);
+            foreach (string ground in new[] { "BackgroundBrush", "CardBrush" })
+            {
+                Color under = ColorOf(palette, ground);
+                if (Contrast(Over(text, under), under) < MinimumTextContrast)
+                {
+                    unreadable.Add(Report(theme, brush + " on " + ground, text, under));
+                }
+            }
+        }
+
+        Assert.True(unreadable.Count == 0, string.Join(Environment.NewLine, unreadable));
+    }
+
+    /// <summary>
+    /// The RDP toolbar's health dot paints a derived indicator in every state, the neutral one at
+    /// rest. At rest it was TextDisabledBrush, 1.85 to 1 on the toolbar on 15 themes, and its
+    /// states were the raw semantic brushes.
+    /// </summary>
+    [Fact]
+    public void TheRdpHealthDotPaintsTheDerivedIndicators()
+    {
+        MethodInfo resolve = typeof(Heimdall.App.Views.EmbeddedRdpView).GetMethod(
+            "ResolveHealthDotBrushKey", BindingFlags.NonPublic | BindingFlags.Static)
+            ?? throw new InvalidOperationException("EmbeddedRdpView.ResolveHealthDotBrushKey was not found");
+
+        foreach (Heimdall.App.Views.EmbeddedRdp.RdpHealthDotState state in Enum.GetValues<Heimdall.App.Views.EmbeddedRdp.RdpHealthDotState>())
+        {
+            Assert.Contains((string)resolve.Invoke(null, [state])!, IndicatorBrushes);
+        }
+
+        XDocument view = XDocument.Load(Path.Combine(ViewSource.RepoRoot(), "src", "Heimdall.App", "Views", "EmbeddedRdpView.xaml"));
+        XNamespace x = "http://schemas.microsoft.com/winfx/2006/xaml";
+        foreach ((string name, string property) in new[] { ("HealthDotColor", "Background"), ("HealthDotGlyph", "Foreground") })
+        {
+            XElement element = view.Descendants().Single(e => (string?)e.Attribute(x + "Name") == name);
+            Assert.Equal("{DynamicResource NeutralIndicatorBrush}", (string?)element.Attribute(property));
+        }
+    }
 
     /// <summary>The raw semantic brushes, which the theme draws as it is with no contrast floor.</summary>
     private static readonly string[] RawSemanticBrushes =

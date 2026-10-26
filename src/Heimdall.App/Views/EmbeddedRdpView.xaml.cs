@@ -3030,10 +3030,10 @@ public partial class EmbeddedRdpView
 
     private static string ResolveHealthDotBrushKey(RdpHealthDotState state) => state switch
     {
-        RdpHealthDotState.Healthy => "SuccessBrush",
-        RdpHealthDotState.Transitional => "WarningBrush",
-        RdpHealthDotState.Faulted => "ErrorBrush",
-        _ => "TextDisabledBrush"
+        RdpHealthDotState.Healthy => "SuccessIndicatorBrush",
+        RdpHealthDotState.Transitional => "WarningIndicatorBrush",
+        RdpHealthDotState.Faulted => "ErrorIndicatorBrush",
+        _ => "NeutralIndicatorBrush"
     };
 
     private static string ResolveHealthDotGlyph(RdpHealthDotState state) => state switch
