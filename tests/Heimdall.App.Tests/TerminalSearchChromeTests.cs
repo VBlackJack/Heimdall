@@ -103,6 +103,52 @@ public sealed class TerminalSearchChromeTests
         Assert.Matches(@"minimumContrastRatio:\s*/\*\{\{TERMINAL_MIN_CONTRAST\}\}\*/", page);
     }
 
+    /// <summary>
+    /// The loading text and the scrollbar take the scheme's colours too. They were fixed Dracula
+    /// colours: near white loading text and Dracula greys on every scheme, Parchment included.
+    /// </summary>
+    [Fact]
+    public void TheLoadingTextAndTheScrollbarTakeTheSchemesColours()
+    {
+        string page = File.ReadAllText(Path.Combine(ViewSource.RepoRoot(), "src", "Heimdall.App", "Assets", "terminal.html"));
+        Match loading = Regex.Match(page, @"#loading\s*\{(?<rules>[^}]*)\}", RegexOptions.CultureInvariant);
+        MatchCollection scrollbar = Regex.Matches(page, @"::-webkit-scrollbar[\w:-]*\s*\{(?<rules>[^}]*)\}", RegexOptions.CultureInvariant);
+
+        Assert.True(loading.Success, "the loading rule was not found");
+        Assert.True(scrollbar.Count >= 4, $"expected the scrollbar, track, thumb and hovered thumb rules, found {scrollbar.Count}");
+        Assert.Contains("var(--loading-text)", loading.Groups["rules"].Value, StringComparison.Ordinal);
+        foreach (string rules in new[] { loading.Groups["rules"].Value }.Concat(scrollbar.Select(rule => rule.Groups["rules"].Value)))
+        {
+            Assert.DoesNotMatch(@"#[0-9A-Fa-f]{3,8}\b|rgba?\(", rules);
+        }
+
+        foreach (string variable in new[] { "--scrollbar-track", "--scrollbar-thumb", "--scrollbar-thumb-hover" })
+        {
+            Assert.Contains($"var({variable})", page, StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>
+    /// The scrollbar thumb stands out from its track at 3 to 1 (WCAG 1.4.11), and the loading text
+    /// and the hovered thumb read at 4.5 to 1 on the scheme's background, in every scheme.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Schemes))]
+    public void TheScrollbarAndTheLoadingTextReadInEveryScheme(string scheme)
+    {
+        Dictionary<string, Color> page = TerminalSearchChrome.CssVariables(EmbeddedSshView.ColorSchemes[scheme], EmbeddedSshView.XtermDefaultColours)
+            .ToDictionary(variable => variable.Placeholder, variable => ParseHex(variable.Colour), StringComparer.Ordinal);
+        Color track = page["/*{{CSS_SCROLLBAR_TRACK}}*/"];
+        List<string> unreadable = [];
+
+        Assert.Equal(Derive(scheme).Input, track);
+        Check(unreadable, scheme, "scrollbar thumb on its track", page["/*{{CSS_SCROLLBAR_THUMB}}*/"], track, ThemeTextColours.MinimumBoundaryContrast);
+        Check(unreadable, scheme, "hovered scrollbar thumb on its track", page["/*{{CSS_SCROLLBAR_THUMB_HOVER}}*/"], track, ThemeTextColours.MinimumContrast);
+        Check(unreadable, scheme, "loading text on the background", page["/*{{CSS_LOADING_TEXT}}*/"], track, ThemeTextColours.MinimumContrast);
+
+        Assert.True(unreadable.Count == 0, string.Join(Environment.NewLine, unreadable));
+    }
+
     /// <summary>The colours reach the page as #RRGGBB, the only shape the placeholders may take.</summary>
     [Fact]
     public void TheVariablesAreSixDigitHexColours()
@@ -115,6 +161,14 @@ public sealed class TerminalSearchChromeTests
             }
         }
     }
+
+    private static Color ParseHex(string hex) => new()
+    {
+        A = byte.MaxValue,
+        R = byte.Parse(hex.AsSpan(1, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture),
+        G = byte.Parse(hex.AsSpan(3, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture),
+        B = byte.Parse(hex.AsSpan(5, 2), NumberStyles.HexNumber, CultureInfo.InvariantCulture),
+    };
 
     private static TerminalSearchChrome.Palette Derive(string scheme) =>
         TerminalSearchChrome.Derive(EmbeddedSshView.ColorSchemes[scheme], EmbeddedSshView.XtermDefaultColours);

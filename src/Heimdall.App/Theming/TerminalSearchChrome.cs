@@ -21,7 +21,8 @@ using Color = System.Windows.Media.Color;
 namespace Heimdall.App.Theming;
 
 /// <summary>
-/// The colours of the terminal page's search bar, derived from the active terminal colour scheme.
+/// The colours of the terminal page's search bar, loading text and scrollbar, derived from the
+/// active terminal colour scheme.
 /// </summary>
 /// <remarks>
 /// <para>The bar used to be drawn in fixed Dracula greys whatever the scheme: its pink no-match
@@ -29,6 +30,10 @@ namespace Heimdall.App.Theming;
 /// background and foreground, mixes its surfaces from them, and derives each colour drawn on those
 /// surfaces with <see cref="ThemeTextColours.Derive"/>: text at 4.5 to 1 (WCAG 1.4.3), borders and
 /// the focus outline at 3 to 1 (WCAG 1.4.11).</para>
+/// <para>The loading text and the scrollbar were fixed Dracula colours too: on a light scheme the
+/// loading text was near white on white. They reuse the bar's colours: the scrollbar track is the
+/// scheme's background, its thumb the border (3 to 1 on that background), and the hovered thumb
+/// and the loading text the bar's text (4.5 to 1).</para>
 /// <para>A scheme that leaves a colour out gets xterm.js's own default for it, the colour the
 /// terminal under the bar is drawn with; the caller hands those defaults in with the scheme, from
 /// the terminal palettes they belong to.</para>
@@ -59,6 +64,10 @@ internal static class TerminalSearchChrome
             ("/*{{CSS_SEARCH_FOCUS}}*/", Hex(palette.Focus)),
             ("/*{{CSS_SEARCH_NO_MATCH_TEXT}}*/", Hex(palette.NoMatchText)),
             ("/*{{CSS_SEARCH_NO_MATCH_BORDER}}*/", Hex(palette.NoMatchBorder)),
+            ("/*{{CSS_LOADING_TEXT}}*/", Hex(palette.Text)),
+            ("/*{{CSS_SCROLLBAR_TRACK}}*/", Hex(palette.Input)),
+            ("/*{{CSS_SCROLLBAR_THUMB}}*/", Hex(palette.Border)),
+            ("/*{{CSS_SCROLLBAR_THUMB_HOVER}}*/", Hex(palette.Text)),
         ];
     }
 
