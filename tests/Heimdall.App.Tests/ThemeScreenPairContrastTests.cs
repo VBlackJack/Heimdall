@@ -253,29 +253,9 @@ public sealed class ThemeScreenPairContrastTests
         Assert.True(dimmed.Count == 0, "dimmed text: " + string.Join(", ", dimmed));
     }
 
-    /// <summary>
-    /// The one exemption above: Dracula's secondary text is a palette gap, 3.03 to 1 on its window
-    /// and 1.94 on a card, gated nowhere (see <c>TertiaryTextIsNoFainterThanSecondaryText</c>).
-    /// Once it reads at 4.5, this fails, and the exemption goes.
-    /// </summary>
-    [Fact]
-    public void DraculasSecondaryTextIsStillThePaletteGapTheExemptionNames()
-    {
-        ResourceDictionary palette = ThemeSurfaceTokenContrastTests.Palette(ThemeNames.Dracula);
-        Color card = ThemeSurfaceTokenContrastTests.ColorOf(palette, "CardBrush");
-        Color secondary = ThemeSurfaceTokenContrastTests.ColorOf(palette, "TextSecondaryBrush");
-
-        Assert.True(ThemeSurfaceTokenContrastTests.Contrast(secondary, card) < MinimumTextContrast);
-    }
-
     private static void AssertOrCollect(
         List<string> unreadable, string theme, string what, string brush, IReadOnlyList<string> ground, double minimum)
     {
-        if (IsDraculaSecondaryTier(theme, brush) && minimum > MinimumGraphicContrast)
-        {
-            return;
-        }
-
         ResourceDictionary palette = ThemeSurfaceTokenContrastTests.Palette(theme);
         Color under = ThemeSurfaceTokenContrastTests.ColorOf(palette, "BackgroundBrush");
         foreach (string layer in ground)
@@ -289,9 +269,6 @@ public sealed class ThemeScreenPairContrastTests
             unreadable.Add(Report(theme, $"{what}: {brush} on {string.Join(" > ", ground)}", top, under));
         }
     }
-
-    private static bool IsDraculaSecondaryTier(string theme, string brush) =>
-        theme == ThemeNames.Dracula && brush is "TextSecondaryBrush" or "TextTertiaryBrush";
 
     private static string Report(string theme, string what, Color foreground, Color background) =>
         string.Format(

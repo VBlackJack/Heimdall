@@ -28,7 +28,9 @@ namespace Heimdall.App.Theming;
 /// <remarks>
 /// <para>A ThemeForge palette gives one colour per meaning (error, warning, success, info,
 /// accent) and that colour is tuned for fills, badges and borders. As text it can fall short:
-/// on Drakul the error red is 2.91 to 1 on the card, the accent 3.79 to 1.</para>
+/// on Drakul the error red is 2.91 to 1 on the card, the accent 3.79 to 1. The secondary text
+/// colour is derived the same way: Dracula's is its comment colour, 3.03 to 1 on the window and
+/// 1.94 on a card, and on most dark themes it fell to 3.75 to 4.4 on a hovered row.</para>
 /// <para>The derivation keeps the hue and saturation and only moves the lightness, away from the
 /// grounds (lighter on a dark theme, darker on a light one), one small step at a time, and stops
 /// at the first value readable on every ground. A theme colour that already passes is returned
@@ -103,6 +105,7 @@ internal static class ThemeTextColours
         ("SuccessColor", "SuccessTextColor", MinimumContrast, true),
         ("InfoColor", "InfoTextColor", MinimumContrast, true),
         ("AccentColor", "AccentTextColor", MinimumContrast, true),
+        ("TextSecondaryColor", "SecondaryTextColor", MinimumContrast, true),
         ("BorderColor", "BorderStrongColor", MinimumBoundaryContrast, false),
     ];
 
