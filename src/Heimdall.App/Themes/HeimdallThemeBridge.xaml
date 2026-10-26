@@ -58,6 +58,15 @@
          accent brushes only. The outline reaches 3 to 1 on the window and on a card (WCAG 1.4.11):
          focus rings, focused inputs, selected items (Theming/ThemeTextColours.cs). -->
     <SolidColorBrush x:Key="AccentBorderBrush" Color="{DynamicResource AccentBorderColor}" />
+    <!-- Status indicators (the session tree's dot, the session properties dot). The *IndicatorColor
+         keys are not in any theme: HeimdallThemeService derives them on every theme change, so each
+         dot reaches 3 to 1 on the window, a card, a hovered row and a selected row (WCAG 1.4.11,
+         Theming/ThemeTextColours.cs). -->
+    <SolidColorBrush x:Key="SuccessIndicatorBrush" Color="{DynamicResource SuccessIndicatorColor}" />
+    <SolidColorBrush x:Key="WarningIndicatorBrush" Color="{DynamicResource WarningIndicatorColor}" />
+    <SolidColorBrush x:Key="ErrorIndicatorBrush" Color="{DynamicResource ErrorIndicatorColor}" />
+    <SolidColorBrush x:Key="InfoIndicatorBrush" Color="{DynamicResource InfoIndicatorColor}" />
+    <SolidColorBrush x:Key="NeutralIndicatorBrush" Color="{DynamicResource NeutralIndicatorColor}" />
     <SolidColorBrush x:Key="BadgeTextBrush" Color="{DynamicResource BackgroundColor}" />
     <SolidColorBrush x:Key="TextOnAccentBrush" Color="{DynamicResource BackgroundColor}" />
     <!-- The primary button's hover fill. AccentHoverFillColor is not in any theme: HeimdallThemeService

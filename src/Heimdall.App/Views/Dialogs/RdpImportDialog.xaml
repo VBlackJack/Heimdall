@@ -236,12 +236,15 @@
                                             </Border>
                                             <!-- Outlined rather than filled: the quieter of the chips, and
                                                  a disabled-grey fill left its label at 3.6 to 1. The
-                                                 padding gives back the outline's pixel so the chips align. -->
+                                                 padding gives back the outline's pixel so the chips align.
+                                                 Snapped to device pixels: at a fractional position the
+                                                 1 px outline was drawn as two blended rows, 2.2 to 1. -->
                                             <Border Margin="0,0,6,4"
                                                     Padding="5,1"
                                                     CornerRadius="10"
                                                     BorderBrush="{DynamicResource BorderStrongBrush}"
                                                     BorderThickness="1"
+                                                    SnapsToDevicePixels="True"
                                                     Visibility="{Binding HasSkippedMappings, Converter={StaticResource BoolToVisibilityConverter}}">
                                                 <TextBlock Text="{Binding SkippedMappingsText}"
                                                            Foreground="{DynamicResource TextSecondaryBrush}"
