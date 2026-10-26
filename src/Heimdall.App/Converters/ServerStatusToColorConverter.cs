@@ -58,7 +58,7 @@ public sealed class ServerStatusToColorConverter : IMultiValueConverter
             || values[0] == DependencyProperty.UnsetValue
             || values[1] == DependencyProperty.UnsetValue)
         {
-            return ResolveBrush("BorderBrush", Brushes.Gray);
+            return ResolveBrush("NeutralIndicatorBrush", Brushes.Gray);
         }
 
         string connectionType = values[0]?.ToString()?.ToUpperInvariant() ?? string.Empty;
@@ -70,16 +70,16 @@ public sealed class ServerStatusToColorConverter : IMultiValueConverter
         // State-based colors take priority over type-based colors
         return connectionState switch
         {
-            "connected" => ResolveBrush("SuccessBrush", Brushes.Green),
-            "remotesessionhandedoff" => ResolveBrush("InfoBrush", Brushes.Cyan),
-            "launchedexternalclient" => ResolveBrush("WarningBrush", Brushes.Orange),
-            "error" => ResolveBrush("ErrorBrush", Brushes.Red),
+            "connected" => ResolveBrush("SuccessIndicatorBrush", Brushes.Green),
+            "remotesessionhandedoff" => ResolveBrush("InfoIndicatorBrush", Brushes.Cyan),
+            "launchedexternalclient" => ResolveBrush("WarningIndicatorBrush", Brushes.Orange),
+            "error" => ResolveBrush("ErrorIndicatorBrush", Brushes.Red),
             "initializing" or "validatingconfig" or "establishingtunnel"
                 or "tunnelestablished" or "launchingrdp" or "launchingssh"
                 or "launchingsftp" or "launchingftp" or "launchingvnc"
                 or "launchingtelnet" or "launchinglocal" or "launchingcitrix" or "launchingwinrm"
                 or "launchingweb"
-                or "disconnecting" => ResolveBrush("WarningBrush", Brushes.Orange),
+                or "disconnecting" => ResolveBrush("WarningIndicatorBrush", Brushes.Orange),
             // Disconnected (or unknown state): prefer the live health verdict when
             // available, otherwise fall back to the legacy connection-type palette.
             _ => healthState is not null
@@ -93,24 +93,24 @@ public sealed class ServerStatusToColorConverter : IMultiValueConverter
 
     private Brush ResolveHealthBrush(HealthStatus status) => status switch
     {
-        HealthStatus.Up => ResolveBrush("SuccessBrush", Brushes.Green),
-        HealthStatus.Down => ResolveBrush("ErrorBrush", Brushes.Red),
-        HealthStatus.Probing => ResolveBrush("WarningBrush", Brushes.Orange),
-        _ => ResolveBrush("TextDisabledBrush", Brushes.Gray)
+        HealthStatus.Up => ResolveBrush("SuccessIndicatorBrush", Brushes.Green),
+        HealthStatus.Down => ResolveBrush("ErrorIndicatorBrush", Brushes.Red),
+        HealthStatus.Probing => ResolveBrush("WarningIndicatorBrush", Brushes.Orange),
+        _ => ResolveBrush("NeutralIndicatorBrush", Brushes.Gray)
     };
 
     private Brush ResolveConnectionTypeBrush(string connectionType) => connectionType switch
     {
-        "RDP" => ResolveBrush("InfoBrush", Brushes.Cyan),
-        "SSH" => ResolveBrush("SuccessBrush", Brushes.Green),
-        "SFTP" => ResolveBrush("WarningBrush", Brushes.Orange),
-        "FTP" => ResolveBrush("WarningBrush", Brushes.Orange),
-        "VNC" => ResolveBrush("InfoBrush", Brushes.Cyan),
-        "WEB" => ResolveBrush("InfoBrush", Brushes.Cyan),
-        "TELNET" => ResolveBrush("SuccessBrush", Brushes.Green),
-        "CITRIX" => ResolveBrush("InfoBrush", Brushes.Cyan),
-        "LOCAL" => ResolveBrush("BorderBrush", Brushes.Gray),
-        _ => ResolveBrush("BorderBrush", Brushes.Gray)
+        "RDP" => ResolveBrush("InfoIndicatorBrush", Brushes.Cyan),
+        "SSH" => ResolveBrush("SuccessIndicatorBrush", Brushes.Green),
+        "SFTP" => ResolveBrush("WarningIndicatorBrush", Brushes.Orange),
+        "FTP" => ResolveBrush("WarningIndicatorBrush", Brushes.Orange),
+        "VNC" => ResolveBrush("InfoIndicatorBrush", Brushes.Cyan),
+        "WEB" => ResolveBrush("InfoIndicatorBrush", Brushes.Cyan),
+        "TELNET" => ResolveBrush("SuccessIndicatorBrush", Brushes.Green),
+        "CITRIX" => ResolveBrush("InfoIndicatorBrush", Brushes.Cyan),
+        "LOCAL" => ResolveBrush("NeutralIndicatorBrush", Brushes.Gray),
+        _ => ResolveBrush("NeutralIndicatorBrush", Brushes.Gray)
     };
 
     private Brush ResolveBrush(string resourceKey, Brush fallback)

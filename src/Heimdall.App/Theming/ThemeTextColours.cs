@@ -42,6 +42,10 @@ namespace Heimdall.App.Theming;
 /// <para>Each pair carries its own target: text asks 4.5 to 1 (WCAG 1.4.3), a boundary line that
 /// identifies a region asks 3 to 1 (WCAG 1.4.11). On Drakul the border colour is the card colour
 /// itself, 1.00 to 1 on a card.</para>
+/// <para>A status dot is a graphic that carries state, drawn in list rows: the indicator colours
+/// reach 3 to 1 on the same four grounds as text (WCAG 1.4.11). The raw Dracula error red was 2.91
+/// to 1 on a hovered row. The neutral indicator, for a session with no status to show, starts from
+/// the border colour, which is the card colour on several themes.</para>
 /// <para>The primary button's label is the background colour, fixed. ThemeForge lightens the
 /// accent for the hover fill on every theme, and on a light one that leaves no label colour, light
 /// or dark, at 4.5 to 1 (Parchment with the green accent: 3.64 and 4.30). The hover fill is the
@@ -122,6 +126,11 @@ internal static class ThemeTextColours
         ("AccentColor", "AccentTextColor", MinimumContrast, true),
         ("TextSecondaryColor", "SecondaryTextColor", MinimumContrast, true),
         ("BorderColor", "BorderStrongColor", MinimumBoundaryContrast, false),
+        ("ErrorColor", "ErrorIndicatorColor", MinimumBoundaryContrast, true),
+        ("WarningColor", "WarningIndicatorColor", MinimumBoundaryContrast, true),
+        ("SuccessColor", "SuccessIndicatorColor", MinimumBoundaryContrast, true),
+        ("InfoColor", "InfoIndicatorColor", MinimumBoundaryContrast, true),
+        ("BorderColor", "NeutralIndicatorColor", MinimumBoundaryContrast, true),
     ];
 
     /// <summary>

@@ -70,15 +70,15 @@ public sealed class ConnectionStateToBrushConverter : IValueConverter, IMultiVal
         string state = value?.ToString()?.ToLowerInvariant() ?? string.Empty;
         string resourceKey = state switch
         {
-            "connected" => "SuccessBrush",
-            "error" => "ErrorBrush",
+            "connected" => "SuccessIndicatorBrush",
+            "error" => "ErrorIndicatorBrush",
             "disconnected" => "TextSecondaryBrush",
             "initializing" or "validatingconfig" or "establishingtunnel"
                 or "launchingrdp" or "launchingssh" or "launchingsftp"
                 or "launchinglocal" or "launchingvnc" or "launchingftp"
                 or "launchingtelnet" or "launchingcitrix" or "launchingwinrm" or "launchingweb"
-                or "launchedexternalclient" or "disconnecting" => "WarningBrush",
-            "tunnelestablished" or "remotesessionhandedoff" => "InfoBrush",
+                or "launchedexternalclient" or "disconnecting" => "WarningIndicatorBrush",
+            "tunnelestablished" or "remotesessionhandedoff" => "InfoIndicatorBrush",
             _ => "TextSecondaryBrush"
         };
 

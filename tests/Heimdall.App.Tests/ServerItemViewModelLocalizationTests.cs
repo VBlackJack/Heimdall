@@ -598,10 +598,11 @@ public sealed class ServerItemViewModelLocalizationTests
     [MemberData(nameof(AllConnectionStates))]
     public void OverridesHealth_MatchesTheBrushPriorityOfTheSidebarDot(ConnectionState state)
     {
-        // Unknown health is what makes the two branches observable: it is the ONLY input for which
-        // the converter answers TextDisabledBrush, and it answers it only from the health branch.
-        // Every state branch resolves Success/Info/Warning/Error, and the type fallback resolves
-        // Border/Info/Success/Warning - so the key alone tells which branch ran.
+        // Unknown health is what makes the two branches observable: for an SSH session it is the
+        // ONLY input for which the converter answers NeutralIndicatorBrush, and it answers it only
+        // from the health branch. Every state branch resolves a Success/Info/Warning/Error
+        // indicator, and the SSH type fallback the Success one - so the key alone tells which
+        // branch ran.
         string? requestedKey = null;
         ServerStatusToColorConverter converter = new(key =>
         {
@@ -615,7 +616,7 @@ public sealed class ServerItemViewModelLocalizationTests
             null!,
             CultureInfo.InvariantCulture);
 
-        bool dotUsedHealth = requestedKey == "TextDisabledBrush";
+        bool dotUsedHealth = requestedKey == "NeutralIndicatorBrush";
 
         Assert.Equal(!dotUsedHealth, ConnectionStateSets.StateOverridesHealth(state.ToString()));
     }

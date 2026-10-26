@@ -211,6 +211,10 @@ public sealed class ThemeScreenPairContrastTests
             ground.Add(Key(fill));
         }
 
+        // A 1 px outline at a fractional position is drawn as two blended rows, 2.2 to 1 on screen
+        // where the colour itself reaches 3: the outline must land on whole device pixels.
+        Assert.Equal("True", (string?)chip.Attribute("SnapsToDevicePixels"));
+
         List<string> unreadable = [];
         AssertOrCollect(unreadable, theme, "skipped chip label", Key(label.Attribute("Foreground")), ground, MinimumTextContrast);
         if (chip.Attribute("BorderBrush") is XAttribute outline)

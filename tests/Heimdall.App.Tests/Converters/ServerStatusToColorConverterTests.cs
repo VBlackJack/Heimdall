@@ -53,7 +53,7 @@ public sealed class ServerStatusToColorConverterTests
             parameter: null!,
             CultureInfo.InvariantCulture);
 
-        Assert.Equal("WarningBrush", requestedKey);
+        Assert.Equal("WarningIndicatorBrush", requestedKey);
         Assert.Same(warningBrush, result);
     }
 
@@ -74,7 +74,7 @@ public sealed class ServerStatusToColorConverterTests
             parameter: null!,
             CultureInfo.InvariantCulture);
 
-        Assert.Equal("InfoBrush", requestedKey);
+        Assert.Equal("InfoIndicatorBrush", requestedKey);
         Assert.Same(infoBrush, result);
     }
 
@@ -86,7 +86,7 @@ public sealed class ServerStatusToColorConverterTests
         var result = converter.Convert(["SSH", "Disconnected"], typeof(Brush), null!, CultureInfo.InvariantCulture);
 
         Assert.Same(TaggedBrush, result);
-        Assert.Equal("SuccessBrush", keys.Single());
+        Assert.Equal("SuccessIndicatorBrush", keys.Single());
     }
 
     [Fact]
@@ -99,7 +99,7 @@ public sealed class ServerStatusToColorConverterTests
             typeof(Brush), null!, CultureInfo.InvariantCulture);
 
         Assert.Same(TaggedBrush, result);
-        Assert.Equal("TextDisabledBrush", keys.Single());
+        Assert.Equal("NeutralIndicatorBrush", keys.Single());
     }
 
     [Fact]
@@ -113,7 +113,7 @@ public sealed class ServerStatusToColorConverterTests
             typeof(Brush), null!, CultureInfo.InvariantCulture);
 
         Assert.Same(TaggedBrush, result);
-        Assert.Equal("SuccessBrush", keys.Single());
+        Assert.Equal("SuccessIndicatorBrush", keys.Single());
     }
 
     [Fact]
@@ -127,7 +127,7 @@ public sealed class ServerStatusToColorConverterTests
             typeof(Brush), null!, CultureInfo.InvariantCulture);
 
         Assert.Same(TaggedBrush, result);
-        Assert.Equal("ErrorBrush", keys.Single());
+        Assert.Equal("ErrorIndicatorBrush", keys.Single());
     }
 
     [Fact]
@@ -141,7 +141,7 @@ public sealed class ServerStatusToColorConverterTests
             typeof(Brush), null!, CultureInfo.InvariantCulture);
 
         Assert.Same(TaggedBrush, result);
-        Assert.Equal("SuccessBrush", keys.Single());
+        Assert.Equal("SuccessIndicatorBrush", keys.Single());
     }
 
     [Fact]
@@ -157,7 +157,7 @@ public sealed class ServerStatusToColorConverterTests
             CultureInfo.InvariantCulture);
 
         Assert.Same(TaggedBrush, result);
-        Assert.Equal("WarningBrush", keys.Single());
+        Assert.Equal("WarningIndicatorBrush", keys.Single());
     }
 
     [Fact]
@@ -171,7 +171,7 @@ public sealed class ServerStatusToColorConverterTests
             typeof(Brush), null!, CultureInfo.InvariantCulture);
 
         Assert.Same(TaggedBrush, result);
-        Assert.Equal("WarningBrush", keys.Single());
+        Assert.Equal("WarningIndicatorBrush", keys.Single());
     }
 
     [Fact]
@@ -191,7 +191,7 @@ public sealed class ServerStatusToColorConverterTests
             parameter: null!,
             CultureInfo.InvariantCulture);
 
-        Assert.Equal("WarningBrush", requestedKey);
+        Assert.Equal("WarningIndicatorBrush", requestedKey);
         Assert.Same(warningBrush, result);
     }
 
@@ -212,7 +212,7 @@ public sealed class ServerStatusToColorConverterTests
             parameter: null!,
             CultureInfo.InvariantCulture);
 
-        Assert.Equal("InfoBrush", requestedKey);
+        Assert.Equal("InfoIndicatorBrush", requestedKey);
         Assert.Same(infoBrush, result);
     }
 
@@ -240,12 +240,12 @@ public sealed class ServerStatusToColorConverterTests
 
         converter.Convert(state, typeof(Brush), parameter: null!, CultureInfo.InvariantCulture);
 
-        Assert.Equal("WarningBrush", requestedKey);
+        Assert.Equal("WarningIndicatorBrush", requestedKey);
     }
 
     [Theory]
-    [InlineData("Connected", "SuccessBrush")]
-    [InlineData("Error", "ErrorBrush")]
+    [InlineData("Connected", "SuccessIndicatorBrush")]
+    [InlineData("Error", "ErrorIndicatorBrush")]
     [InlineData("Disconnected", "TextSecondaryBrush")]
     [InlineData("SomethingUnknown", "TextSecondaryBrush")]
     public void ConnectionState_AnchorStates_UseExpectedBrushKeys(string state, string expectedKey)

@@ -146,6 +146,46 @@ public sealed class ThemeSurfaceTokenContrastTests
     }
 
     /// <summary>
+    /// A status dot reads at 3 to 1 on the window, a card, a hovered row and a selected row, for
+    /// every status it can show. The raw Dracula error red was 2.91 to 1 on a hovered row, and the
+    /// neutral ring of a local session was the decorative border colour, the card colour itself on
+    /// several themes.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Themes))]
+    public void StatusIndicatorsAreVisibleOnTheBackgroundOnACardAndOnRows(string theme)
+    {
+        ResourceDictionary palette = Palette(theme);
+        Color background = ColorOf(palette, "BackgroundBrush");
+        (string Name, Color Ground)[] grounds =
+        [
+            ("BackgroundBrush", background),
+            ("CardBrush", ColorOf(palette, "CardBrush")),
+            ("HighlightBrush over BackgroundBrush", Over(ColorOf(palette, "HighlightBrush"), background)),
+            ("TreeRowSelectedBrush over BackgroundBrush", Over(ColorOf(palette, "TreeRowSelectedBrush"), background)),
+        ];
+        List<string> faint = [];
+
+        foreach (string indicator in IndicatorBrushes)
+        {
+            Assert.True(palette.Contains(indicator), $"{theme}: the bridge resolves no {indicator}");
+            Color dot = ColorOf(palette, indicator);
+            foreach ((string name, Color under) in grounds)
+            {
+                if (Contrast(Over(dot, under), under) < MinimumBoundaryContrast)
+                {
+                    faint.Add(Report(theme, indicator + " on " + name, dot, under));
+                }
+            }
+        }
+
+        Assert.True(faint.Count == 0, string.Join(Environment.NewLine, faint));
+    }
+
+    private static readonly string[] IndicatorBrushes =
+        ["SuccessIndicatorBrush", "WarningIndicatorBrush", "ErrorIndicatorBrush", "InfoIndicatorBrush", "NeutralIndicatorBrush"];
+
+    /// <summary>
     /// The selected-row ground the derivation measures is the one the bridge paints: the accent at
     /// the opacity of <c>TreeRowSelectedBrush</c>. Changing one without the other would derive text
     /// colours for a row the tree no longer draws.
