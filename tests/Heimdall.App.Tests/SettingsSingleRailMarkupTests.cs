@@ -14,8 +14,10 @@
  * limitations under the License.
  */
 
+using System.Globalization;
 using System.IO;
 using System.Xml.Linq;
+using Heimdall.App.Converters;
 
 namespace Heimdall.App.Tests;
 
@@ -136,6 +138,64 @@ public sealed class SettingsSingleRailMarkupTests
         Assert.Equal("False", setters["IsEnabled"]);
         Assert.Equal("False", setters["Focusable"]);
         Assert.Equal("False", setters["IsTabStop"]);
+    }
+
+    /// <summary>
+    /// A group name reads as the heading of the sections under it, as in Heimdall-rs: upper case,
+    /// semi-bold, muted, well more room above it than between two sections, and the sections
+    /// indented under it.
+    /// </summary>
+    /// <remarks>
+    /// It was the section names' own case, 14 above it against 2 between sections, and at the
+    /// left edge of the section names, so on Magellan the groups did not read as groups.
+    /// </remarks>
+    [Fact]
+    public void AGroupHeadingStandsOutFromItsSections()
+    {
+        XDocument theme = Theme();
+        XElement heading = Named(theme, "SettingsRailGroupHeaderStyle", Xaml + "Key");
+        Dictionary<string, string?> setters = Setters(heading);
+        Assert.Equal("{DynamicResource TextTertiaryBrush}", setters["Foreground"]);
+        Assert.Equal("SemiBold", setters["FontWeight"]);
+        Assert.Equal("{StaticResource SettingsRailGroupHeaderMargin}", setters["Margin"]);
+
+        // The name is shown through the upper case converter, not as written.
+        XElement text = heading.Descendants().Single(element => element.Name.LocalName == "TextBlock");
+        Assert.Contains("Converter={StaticResource SettingsRailGroupHeaderCaseConverter}", text.Attribute("Text")?.Value, StringComparison.Ordinal);
+        Assert.Equal(nameof(UpperCaseTextConverter), Named(theme, "SettingsRailGroupHeaderCaseConverter", Xaml + "Key").Name.LocalName);
+        Assert.DoesNotContain(heading.Descendants(), element => element.Name.LocalName == "ContentPresenter");
+
+        double[] headingMargin = Thickness(theme, "SettingsRailGroupHeaderMargin");
+        Dictionary<string, string?> section = Setters(Named(theme, "SettingsRailTabItemStyle", Xaml + "Key"));
+        Assert.Equal("{StaticResource SettingsRailItemMargin}", section["Margin"]);
+        double[] sectionMargin = Thickness(theme, "SettingsRailItemMargin");
+        double sectionTextLeft = sectionMargin[0] + double.Parse(section["Padding"]!.Split(',')[0], CultureInfo.InvariantCulture);
+
+        Assert.True(headingMargin[1] >= 5 * sectionMargin[3], $"{headingMargin[1]} above a group is not well more than the {sectionMargin[3]} between sections");
+        Assert.True(sectionMargin[0] >= 8, $"the sections are indented by {sectionMargin[0]} only");
+        Assert.True(sectionTextLeft - headingMargin[0] >= 16, $"a section name starts at {sectionTextLeft}, a group name at {headingMargin[0]}: they line up");
+    }
+
+    /// <summary>
+    /// The upper case follows the interface language, not the binding's culture, which is the
+    /// element language and en-US unless set.
+    /// </summary>
+    [Fact]
+    public void TheUpperCaseFollowsTheInterfaceLanguage()
+    {
+        CultureInfo original = CultureInfo.CurrentUICulture;
+        try
+        {
+            CultureInfo.CurrentUICulture = CultureInfo.GetCultureInfo("tr-TR");
+            object shown = new UpperCaseTextConverter().Convert("bilgi", typeof(string), null!, CultureInfo.GetCultureInfo("en-US"));
+            // Turkish upper-cases a dotted i to a dotted capital I, U+0130.
+            string dottedCapitalI = char.ConvertFromUtf32(0x0130);
+            Assert.Equal("B" + dottedCapitalI + "LG" + dottedCapitalI, shown);
+        }
+        finally
+        {
+            CultureInfo.CurrentUICulture = original;
+        }
     }
 
     /// <summary>
@@ -280,6 +340,16 @@ public sealed class SettingsSingleRailMarkupTests
             element => element.Name.LocalName == "ContentPresenter"
                 && element.Attribute("Content")?.Value == "{TemplateBinding controls:SettingsRail.Footer}");
     }
+
+    private static Dictionary<string, string?> Setters(XElement style) =>
+        style.Elements()
+            .Where(element => element.Name.LocalName == "Setter")
+            .ToDictionary(setter => setter.Attribute("Property")!.Value, setter => setter.Attribute("Value")?.Value);
+
+    private static double[] Thickness(XDocument theme, string key) =>
+        Named(theme, key, Xaml + "Key").Value.Split(',')
+            .Select(part => double.Parse(part, CultureInfo.InvariantCulture))
+            .ToArray();
 
     private static List<XElement> RailItems() =>
         Named(Window(), "Mw_SettingsSubTabControl").Elements()
