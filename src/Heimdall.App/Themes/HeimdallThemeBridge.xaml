@@ -121,10 +121,13 @@
     <SolidColorBrush x:Key="ToolSystemBrush" Color="{DynamicResource CyanColor}" />
     <SolidColorBrush x:Key="ToolExternalBrush" Color="{DynamicResource PinkColor}" />
 
-    <!-- JWT viewer brushes -->
-    <SolidColorBrush x:Key="JwtHeaderBrush" Color="{DynamicResource BlueColor}" />
-    <SolidColorBrush x:Key="JwtPayloadBrush" Color="{DynamicResource GreenColor}" />
-    <SolidColorBrush x:Key="JwtSignatureBrush" Color="{DynamicResource OrangeColor}" />
+    <!-- JWT viewer brushes: the part titles, their outlines and the decoded text. The *TextColor keys
+         are not in any theme: HeimdallThemeService derives them from the blue, green and orange on
+         every theme change, so they read at 4.5 to 1 on the window and on a card. On the raw colours
+         the header was 4.00 to 1 on a Drakul card and the payload 4.20 on a Folio card. -->
+    <SolidColorBrush x:Key="JwtHeaderBrush" Color="{DynamicResource JwtHeaderTextColor}" />
+    <SolidColorBrush x:Key="JwtPayloadBrush" Color="{DynamicResource JwtPayloadTextColor}" />
+    <SolidColorBrush x:Key="JwtSignatureBrush" Color="{DynamicResource JwtSignatureTextColor}" />
 
     <!-- File type icon brushes -->
     <SolidColorBrush x:Key="FileScriptBrush" Color="{DynamicResource GreenColor}" />

@@ -55,8 +55,6 @@ public sealed class TextDisabledBrushGuardTests
     private static readonly IReadOnlyDictionary<(string File, string Site), string> Kept =
         new Dictionary<(string File, string Site), string>
         {
-            [("EmbeddedRdpView.xaml", "HealthDotGlyph")] =
-                "the health dot's state glyph: code-behind recolours it per state, unknown is dimmed on purpose",
             [("CommonControls.xaml", "ToolEmptyStateIconStyle")] =
                 "the decorative icon glyph above an empty-state message, not the message itself",
         };

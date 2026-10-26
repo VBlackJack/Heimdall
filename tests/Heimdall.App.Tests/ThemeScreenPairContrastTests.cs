@@ -280,6 +280,38 @@ public sealed class ThemeScreenPairContrastTests
         Assert.True(dimmed.Count == 0, "dimmed text: " + string.Join(", ", dimmed));
     }
 
+    /// <summary>
+    /// Secondary and tertiary text anywhere is not dimmed with Opacity on top of its brush: the
+    /// derived colour is sized to 4.5 to 1 at full opacity. At 0.85 the command palette's snippet
+    /// headers and the password generator's crack-time line were 4.48 to 1 on Parchment.
+    /// </summary>
+    [Fact]
+    public void SecondaryAndTertiaryTextIsNotDimmedByOpacity()
+    {
+        int tierTexts = 0;
+        List<string> dimmed = [];
+        foreach (string path in SourceFileEnumeration.EnumerateFiles(Path.Combine(ViewSource.RepoRoot(), "src", "Heimdall.App"), "*.xaml"))
+        {
+            foreach (XElement block in Load(path).Descendants(Presentation + "TextBlock"))
+            {
+                if ((string?)block.Attribute("Foreground") is "{DynamicResource TextSecondaryBrush}" or "{DynamicResource TextTertiaryBrush}")
+                {
+                    tierTexts++;
+                    if (IsDimmed(Opacity(block.Attribute("Opacity")?.Value)))
+                    {
+                        dimmed.Add(Path.GetFileName(path) + ":" + Describe(block));
+                    }
+                }
+            }
+        }
+
+        Assert.True(dimmed.Count == 0, "dimmed text: " + string.Join(", ", dimmed));
+        Assert.True(tierTexts >= MinimumTierTexts, $"the scan found only {tierTexts} secondary and tertiary texts");
+    }
+
+    /// <summary>How many secondary and tertiary TextBlocks the views draw; the scan must reach them.</summary>
+    private const int MinimumTierTexts = 200;
+
     private static void AssertOrCollect(
         List<string> unreadable, string theme, string what, string brush, IReadOnlyList<string> ground, double minimum)
     {
