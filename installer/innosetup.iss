@@ -55,6 +55,11 @@ Name: "quicklaunchicon"; Description: "{cm:CreateQuickLaunchIcon}"; GroupDescrip
 ; would survive the upgrade and be loaded again as a shipped action.
 Type: filesandordirs; Name: "{app}\data\seed\actions"
 Type: filesandordirs; Name: "{app}\data\packs"
+#if Variant == "Standard"
+; The Standard edition runs on the system Evergreen Runtime. A SelfContained install it
+; replaces left its bundled Fixed Version Runtime here, which never updates.
+Type: filesandordirs; Name: "{app}\runtimes\webview2"
+#endif
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs

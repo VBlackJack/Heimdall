@@ -14,23 +14,32 @@
  * limitations under the License.
  */
 
+using System.Reflection;
 using Microsoft.Win32;
 
 namespace Heimdall.Core.Updates;
 
 /// <summary>
-/// Determines the running build variant by probing for the bundled WebView2
-/// runtime marker, and whether the running copy is one the installer put there.
-/// The base directory and both probes are injectable so the detector can be
-/// exercised without touching the real filesystem or registry.
+/// Determines the running build variant from the edition the build stamped into the
+/// executable, falling back to the bundled WebView2 runtime marker for a build that
+/// carries no stamp, and whether the running copy is one the installer put there.
+/// The base directory, the stamp and both probes are injectable so the detector can
+/// be exercised without touching the real filesystem, registry or entry assembly.
 /// </summary>
 public sealed class VariantDetector : IVariantDetector
 {
+    /// <summary>
+    /// The <see cref="AssemblyMetadataAttribute"/> key Build.ps1 sets through the
+    /// <c>HeimdallEdition</c> MSBuild property, one value per published edition.
+    /// </summary>
+    public const string EditionMetadataKey = "HeimdallEdition";
+
     private const string MarkerRelativePath = @"runtimes\webview2\msedgewebview2.exe";
 
     private readonly string _baseDirectory;
     private readonly Func<string, bool> _fileExists;
     private readonly Func<IReadOnlyList<string>> _readInstallLocations;
+    private readonly Func<BuildVariant?> _readStampedEdition;
 
     /// <param name="baseDirectory">Where the running copy lives; the application base directory by default.</param>
     /// <param name="fileExists">The file probe; the real filesystem by default.</param>
@@ -39,20 +48,70 @@ public sealed class VariantDetector : IVariantDetector
     /// Windows registry by default. A copy that appears in none of them was not
     /// installed by the installer.
     /// </param>
+    /// <param name="readStampedEdition">
+    /// Yields the edition stamped into the running executable, or null when it carries
+    /// none; the entry assembly's metadata by default.
+    /// </param>
     public VariantDetector(
         string? baseDirectory = null,
         Func<string, bool>? fileExists = null,
-        Func<IReadOnlyList<string>>? readInstallLocations = null)
+        Func<IReadOnlyList<string>>? readInstallLocations = null,
+        Func<BuildVariant?>? readStampedEdition = null)
     {
         _baseDirectory = baseDirectory ?? AppContext.BaseDirectory;
         _fileExists = fileExists ?? File.Exists;
         _readInstallLocations = readInstallLocations ?? ReadRegisteredInstallLocations;
+        _readStampedEdition = readStampedEdition ?? ReadEntryAssemblyEdition;
     }
 
+    /// <inheritdoc />
+    /// <remarks>
+    /// The stamp wins over the marker. The marker folder outlives the edition that put it
+    /// there: a Standard installer run over a SelfContained install, or a Standard archive
+    /// extracted over a SelfContained one, leaves <c>runtimes\webview2</c> behind, and the
+    /// marker alone then reported SelfContained, made the Standard build run on that
+    /// abandoned runtime, and fetched the SelfContained installer on the next update. The
+    /// marker only decides for a build that carries no stamp, such as a local
+    /// <c>dotnet build</c>.
+    /// </remarks>
     public BuildVariant Detect()
     {
+        BuildVariant? stamped = _readStampedEdition();
+        if (stamped is { } edition)
+        {
+            return edition;
+        }
+
         string markerPath = Path.Combine(_baseDirectory, MarkerRelativePath);
         return _fileExists(markerPath) ? BuildVariant.SelfContained : BuildVariant.Standard;
+    }
+
+    /// <summary>
+    /// Parses an edition stamp. Unknown or empty values read as no stamp, so the marker
+    /// decides rather than a guess.
+    /// </summary>
+    internal static BuildVariant? ParseEdition(string? value)
+        => Enum.TryParse(value, ignoreCase: true, out BuildVariant edition) && Enum.IsDefined(edition)
+            ? edition
+            : null;
+
+    private static BuildVariant? ReadEntryAssemblyEdition()
+    {
+        Assembly? entry = Assembly.GetEntryAssembly();
+        if (entry is null)
+        {
+            return null;
+        }
+
+        foreach (AssemblyMetadataAttribute metadata in entry.GetCustomAttributes<AssemblyMetadataAttribute>())
+        {
+            if (string.Equals(metadata.Key, EditionMetadataKey, StringComparison.Ordinal))
+            {
+                return ParseEdition(metadata.Value);
+            }
+        }
+
+        return null;
     }
 
     /// <inheritdoc />
