@@ -26,7 +26,9 @@ namespace Heimdall.App.Converters;
 /// </summary>
 /// <remarks>
 /// <para>Bound as a <c>MultiBinding</c> on <c>MaxHeight</c>, with three values in order: the
-/// container's height, the height reserved for the other region, and the panel's cap.</para>
+/// container's height, the height reserved for the other region, and the panel's cap. An optional
+/// fourth value is the height the operator gave the panel by hand; when it is set the cap no longer
+/// applies, because the cap only stands in for a choice nobody has made yet.</para>
 /// <para>A panel in an auto-sized row is served before a star-sized neighbour, so a cap alone
 /// lets it take everything in a short window and push the neighbour out of view. This is what
 /// lets the auto row give way instead.</para>
@@ -36,6 +38,7 @@ public sealed class RemainingHeightConverter : IMultiValueConverter
     private const int AvailableIndex = 0;
     private const int ReservedIndex = 1;
     private const int CapIndex = 2;
+    private const int ExplicitHeightIndex = 3;
     private const int ValueCount = 3;
 
     public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
@@ -56,7 +59,13 @@ public sealed class RemainingHeightConverter : IMultiValueConverter
             return cap;
         }
 
-        return Math.Max(0, Math.Min(cap, available - reserved));
+        double room = Math.Max(0, available - reserved);
+        bool chosenByHand = values.Length > ExplicitHeightIndex
+            && values[ExplicitHeightIndex] is double chosen
+            && !double.IsNaN(chosen)
+            && chosen > 0;
+
+        return chosenByHand ? room : Math.Min(cap, room);
     }
 
     public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)

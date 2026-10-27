@@ -279,11 +279,19 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
 
     /// <summary>Whether the history panel is currently visible.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsBottomPanelVisible))]
     private bool _isHistoryVisible;
 
     /// <summary>Whether the generator panel is currently visible (an action is selected).</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsBottomPanelVisible))]
     private bool _isGeneratorVisible;
+
+    /// <summary>
+    /// Whether one of the three panels sharing the bottom of the tool (generator, history,
+    /// runbooks) is open, which is when the grip that resizes them is offered.
+    /// </summary>
+    public bool IsBottomPanelVisible => IsGeneratorVisible || IsHistoryVisible || IsRunbooksVisible;
 
     /// <summary>Whether the active selection has both Windows and Linux templates.</summary>
     [ObservableProperty]

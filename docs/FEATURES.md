@@ -202,6 +202,10 @@ generator that produces the final command for you.
 - A selection over several lines becomes one line, its lines joined with ` ; ` for Windows and ` && ` for Linux, for you to read before saving
 - Cancel leaves the library on its list; Save adds the action and selects it. A capture writes nothing to the history
 
+**Layout**
+- The generator, the history and the runbooks share the bottom of the tool, one at a time, and the list above always keeps room for two rows: in a short window the open panel scrolls instead of pushing the list or the Copy / Send bar out of view
+- Drag the grip above the open panel to choose its height, or focus the grip and use the Up and Down arrows; the height is shared by the three panels and remembered across restarts. Double-click the grip to go back to the automatic height
+
 **History**
 - Every command you copy or send is recorded with its title, category and timestamp, the host of the session the library was opened from, and whether it was sent or only copied
 - A **This host only** box at the top of the panel, ticked by default when the library belongs to a session, shows only what went to that host; it keeps its state while the panel reloads
@@ -361,7 +365,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - **Sidebar sessions UX**: two-row toolbar with full-width search above icon-only actions, 320px default width, and smart long-name truncation that preserves the session identifier while ellipsizing trailing parenthesized suffixes
 - Fullscreen mode (F11), toggle sidebar (Ctrl+B), filter (Ctrl+F)
 - **First-launch onboarding**: a 6-step guided tour that spotlights the real control it is describing - the scrim is cut around the target and ringed - and navigates to the right tab before each step rather than after it. Replayable at any time from `Settings > General`, so one reflex Escape no longer ends it for good. A step whose target cannot be resolved degrades to a centred card rather than ringing empty space
-- Trilingual interface: English, French and Spanish (7,399 i18n keys per language, exact parity across the three catalogues)
+- Trilingual interface: English, French and Spanish (7,400 i18n keys per language, exact parity across the three catalogues)
 - Declarative i18n: `{loc:Translate Key}` WPF markup extension with runtime language switching
 - WCAG 2.1 AA accessibility: AutomationProperties.Name on all interactive controls via `{loc:Translate}`, LiveSetting="Polite" on dynamic outputs, keyboard focus indicators, disabled state tooltips, a live-region filter result count announced on change, and keyboard-focused folder rows as reliable Shift+F10 / Apps context-menu targets with a localized automation name
 

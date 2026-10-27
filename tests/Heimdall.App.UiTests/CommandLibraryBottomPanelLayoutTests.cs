@@ -16,6 +16,8 @@
 
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Heimdall.App.UiTests.Infrastructure;
@@ -153,6 +155,181 @@ public sealed class CommandLibraryBottomPanelLayoutTests
             $"A history row is {rowWidth:F0} px wide in a panel of {panelWidth:F0} px.");
     }
 
+    [StaFact]
+    public void TheGripIsOfferedOnlyWhileABottomPanelIsOpen()
+    {
+        Visibility withPanel = Visibility.Collapsed;
+        Visibility withoutPanel = Visibility.Visible;
+
+        RenderGenerator(TallViewHeight, (view, viewModel) =>
+        {
+            withPanel = Grip(view).Visibility;
+            viewModel.IsGeneratorVisible = false;
+            Settle(view);
+            withoutPanel = Grip(view).Visibility;
+        });
+
+        Assert.Equal(Visibility.Visible, withPanel);
+        Assert.Equal(Visibility.Collapsed, withoutPanel);
+    }
+
+    /// <summary>
+    /// The grip sits on the top edge of the open panel. A first version landed in the header,
+    /// a row of the outer grid, and every other test here still passed because they raise the
+    /// grip's events directly: found on the running app.
+    /// </summary>
+    [StaFact]
+    public void TheGripSitsOnTopOfTheOpenPanel()
+    {
+        double gripBottom = 0;
+        double panelTop = 0;
+
+        RenderGenerator(TallViewHeight, (view, _) =>
+        {
+            var grip = Grip(view);
+            gripBottom = grip.TransformToAncestor(view).Transform(new Point(0, grip.ActualHeight)).Y;
+            panelTop = FindGeneratorPanel(view).TransformToAncestor(view).Transform(new Point(0, 0)).Y;
+        });
+
+        Assert.True(panelTop > 0, "The generator was not laid out.");
+        Assert.Equal(panelTop, gripBottom, precision: 0);
+    }
+
+    /// <summary>
+    /// Dragging up grows the panel by the distance dragged, past its automatic cap, and the
+    /// height is remembered when the drag ends.
+    /// </summary>
+    [StaFact]
+    public void DraggingTheGripUpGrowsThePanelAndRemembersIt()
+    {
+        const double Drag = 100;
+        double before = 0;
+        double after = 0;
+        var persisted = new List<int>();
+
+        RenderGenerator(TallViewHeight, (view, _) =>
+        {
+            view.PersistBottomPanelHeight = persisted.Add;
+            var panel = FindGeneratorPanel(view);
+            before = panel.ActualHeight;
+
+            Grip(view).RaiseEvent(new DragDeltaEventArgs(0, -Drag));
+            Settle(view);
+            Grip(view).RaiseEvent(new DragCompletedEventArgs(0, -Drag, false));
+            after = panel.ActualHeight;
+        });
+
+        Assert.Equal(before + Drag, after, precision: 0);
+        Assert.Equal([(int)Math.Round(after)], persisted);
+    }
+
+    /// <summary>However far the grip is dragged, the list keeps its reserve.</summary>
+    [StaFact]
+    public void TheGripNeverTakesTheListsReserve()
+    {
+        double listHeight = 0;
+        double reserve = 0;
+
+        RenderGenerator(ShortViewHeight, (view, _) =>
+        {
+            view.PersistBottomPanelHeight = _ => { };
+            Grip(view).RaiseEvent(new DragDeltaEventArgs(0, -5000));
+            Settle(view);
+            listHeight = FindActionList(view).ActualHeight;
+            reserve = (double)view.FindResource("CmdLibActionListMinHeight");
+        });
+
+        Assert.True(
+            listHeight >= reserve - 1,
+            $"The list got {listHeight:F0} px after a long drag, below its reserve of {reserve:F0} px.");
+    }
+
+    [StaFact]
+    public void TheArrowKeysMoveTheGripByOneStep()
+    {
+        double before = 0;
+        double afterUp = 0;
+        double afterDown = 0;
+
+        RenderGenerator(TallViewHeight, (view, _) =>
+        {
+            view.PersistBottomPanelHeight = _ => { };
+            var panel = FindGeneratorPanel(view);
+            before = panel.ActualHeight;
+
+            PressKey(Grip(view), Key.Up);
+            Settle(view);
+            afterUp = panel.ActualHeight;
+
+            PressKey(Grip(view), Key.Down);
+            PressKey(Grip(view), Key.Down);
+            Settle(view);
+            afterDown = panel.ActualHeight;
+        });
+
+        Assert.Equal(before + CommandLibraryView.BottomPanelKeyboardStep, afterUp, precision: 0);
+        Assert.Equal(before - CommandLibraryView.BottomPanelKeyboardStep, afterDown, precision: 0);
+    }
+
+    /// <summary>A double-click hands the height back to the panel and forgets the chosen one.</summary>
+    [StaFact]
+    public void DoubleClickingTheGripRestoresTheAutomaticHeight()
+    {
+        double automatic = 0;
+        double restored = 0;
+        double explicitHeight = 0;
+        var persisted = new List<int>();
+
+        RenderGenerator(TallViewHeight, (view, _) =>
+        {
+            view.PersistBottomPanelHeight = persisted.Add;
+            var panel = FindGeneratorPanel(view);
+            automatic = panel.ActualHeight;
+
+            Grip(view).RaiseEvent(new DragDeltaEventArgs(0, -120));
+            Settle(view);
+            Grip(view).RaiseEvent(new MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left)
+            {
+                RoutedEvent = Control.MouseDoubleClickEvent
+            });
+            Settle(view);
+            restored = panel.ActualHeight;
+            explicitHeight = panel.Height;
+        });
+
+        Assert.Equal(automatic, restored, precision: 0);
+        Assert.True(double.IsNaN(explicitHeight), "The panel kept an explicit height after the reset.");
+        Assert.Equal([0], persisted);
+    }
+
+    [StaTheory]
+    [InlineData(200, 200)]
+    [InlineData(0, double.NaN)]
+    public void ARememberedHeightIsAppliedAndZeroKeepsTheAutomaticOne(int saved, double expected)
+    {
+        double applied = 0;
+
+        RenderGenerator(TallViewHeight, (view, _) =>
+        {
+            view.RestoreBottomPanelHeight(new Heimdall.Core.Configuration.AppSettings
+            {
+                CmdLibBottomPanelHeight = saved
+            });
+            applied = FindGeneratorPanel(view).Height;
+        });
+
+        Assert.Equal(expected, applied);
+    }
+
+    private static Thumb Grip(CommandLibraryView view) => (Thumb)view.FindName("BottomPanelGrip");
+
+    private static void PressKey(UIElement target, Key key)
+        => target.RaiseEvent(new KeyEventArgs(
+            Keyboard.PrimaryDevice, PresentationSource.FromVisual(target), 0, key)
+        {
+            RoutedEvent = Keyboard.KeyDownEvent
+        });
+
     private static void RenderGenerator(
         double height, Action<CommandLibraryView, CommandLibraryViewModel> read)
         => Render(height, viewModel =>
@@ -194,11 +371,7 @@ public sealed class CommandLibraryBottomPanelLayoutTests
                     ResizeMode = ResizeMode.NoResize
                 };
                 window.Show();
-                view.UpdateLayout();
-                // The panels' caps follow the body's ActualHeight, which is only known once a
-                // layout pass has run; let the bindings it fed settle before reading.
-                view.Dispatcher.Invoke(DispatcherPriority.Background, new System.Action(() => { }));
-                view.UpdateLayout();
+                Settle(view);
                 read(view, viewModel);
             });
         }
@@ -206,6 +379,17 @@ public sealed class CommandLibraryBottomPanelLayoutTests
         {
             WpfTestHost.Invoke(() => window?.Close());
         }
+    }
+
+    /// <summary>
+    /// Lays the view out until the bindings fed by the body's ActualHeight have settled: the
+    /// panels' caps are only known once a layout pass has run.
+    /// </summary>
+    private static void Settle(FrameworkElement view)
+    {
+        view.UpdateLayout();
+        view.Dispatcher.Invoke(DispatcherPriority.Background, new System.Action(() => { }));
+        view.UpdateLayout();
     }
 
     private static ListView FindActionList(DependencyObject root)
