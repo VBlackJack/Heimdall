@@ -12,6 +12,61 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-10-27: Command Library finishing touches (v2026.102702)
+
+The rest of the 2026-10-26 UX/UI audit of the Command Library (P2-3, the seven P3, and the
+plausible Enter point), plus a Notes defect found on the way. The audit is now fully addressed.
+
+### Button weight and on states (#706)
+
+- **The primary style follows the terminal.** Without a terminal, Send to Terminal kept the filled
+  primary style while disabled, beside a secondary Copy. The view now gives the primary style to
+  Copy when `HasTerminalSink` is false and to Send otherwise, by `SetResourceReference` (a style
+  cannot be swapped by a trigger on the button itself). Send stays visible: a gesture hidden on a
+  state read once becomes unreachable when a terminal appears later.
+- **History, Runbooks and the favorites filter show their on state** with an `AccentBorderBrush`
+  outline and an accessible name ending in ", on" (`ToolCmdLibToggleOnFormat`, en/fr/es). They stay
+  `Button`s: a `ToggleButton` beside a command can be flipped through UIA without the view model.
+  Pinned by `CommandLibraryButtonStateTests`.
+
+### Finishing points (#707)
+
+- **No required-field error before the first edit**, unless the shipped default itself is wrong:
+  the message is held back only when the error count equals the count of empty required fields.
+- **Rows named for UIA** (parameters, examples, links, broadcast targets, runbook variables) through
+  each `ItemContainerStyle`; set in the data template the name is inert.
+- **Risk badge minimum width** (64 px, fits EJECUTAR), so titles start in one column; **Duplicate
+  uses `F413`** instead of the Copy glyph; **unique tab indices** following the screen;
+  `Consolas` x7 becomes `FontFamilyMonospace`.
+- Pinned by `CommandLibraryFinishingTests` and `CommandLibraryValidationDisplayTests`.
+
+### Hidden-generator shortcuts and the Notes width (#708)
+
+- **Enter in a runbook variable copied the hidden generator's command, and Ctrl+Enter sent it.** A
+  single-line `TextBox` does not handle Enter, so it bubbled to the view's `InputBindings`. Copy,
+  Send and Insert now require `IsGeneratorVisible`. Pinned by
+  `CommandLibraryHiddenGeneratorShortcutTests`, with a real Return raised in the variable.
+- **The Notes sidebar width was never restored**: the view asked DI for `AppSettings`, which is not
+  registered. It reads `ConfigManager.CurrentSettings`; `AppSettingsServiceLookupGuardTests` refuses
+  `GetService<AppSettings>` in the sources.
+
+### Runbook editor and run panel (#709)
+
+- **Runbook editor rows named for UIA**: variables by reference, steps by command or action title,
+  parameters by label (`RunbookDialogRowNameTests`).
+- **The run panel weighs Copy and Send on the run's `HasTerminal`**, like the command detail.
+- **Design tokens**: theme tokens replace the literal paddings and margins equal to them in the view
+  and the runbook dialog; repeated values without a token are named once as local resources.
+  `CommandLibraryDesignTokenGuardTests` refuses a written-out font family or a token-equal spacing in
+  those two files.
+
+### Test stability (#710)
+
+- `SessionCoordinatorPreMountTests` joins the protector collection: loading the shell unseals saved
+  secrets, which the runtime guard reported only when the settings read completed synchronously.
+- The grip drag test sizes its drag to the room the rendered body leaves, and prints the measured
+  heights when there is none; one runner laid the body out shorter than the window asked for.
+
 ## 2026-10-27: a Command Library that fits a laptop screen, with a resizable panel (v2026.102701)
 
 From a UX/UI audit of the Command Library on 2026-10-26 (1 P1, 4 P2, 7 P3; the P1 and P2 are in
