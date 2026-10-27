@@ -45,6 +45,7 @@ public partial class CommandLibraryView : UserControl, IToolView, ICommandCaptur
     {
         InitializeComponent();
         IsVisibleChanged += OnViewIsVisibleChanged;
+        DataContextChanged += OnDataContextChangedForPrimaryAction;
     }
 
     /// <summary>
