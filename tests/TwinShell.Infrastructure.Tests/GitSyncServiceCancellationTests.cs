@@ -403,7 +403,7 @@ public sealed class GitSyncServiceCancellationTests
             => true;
     }
 
-    private sealed class FakeLocalizationService : ILocalizationService
+    internal sealed class FakeLocalizationService : ILocalizationService
     {
         public CultureInfo CurrentCulture => CultureInfo.InvariantCulture;
 
