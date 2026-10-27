@@ -456,8 +456,18 @@ public static class TwinShellSchema
     /// Step 1 filled the column with lower-case ids for every row that existed before it, and
     /// SQLite compares text case-sensitively: a lookup by public id missed each of those rows,
     /// so an import created a second copy of the entry and a tombstone never reached it.
+    /// <para>
+    /// That second copy is the twin this step meets: the lower-case original and an upper-case
+    /// row with the same id, which the unique index allows because it compares the raw text.
+    /// Upper-casing the original would break the index and roll the upgrade back, so the
+    /// original gets a new random id instead. Nothing is merged or deleted: both rows stay
+    /// visible as before, and the upper-case one, the copy the folder's file matches, keeps the
+    /// sync identity.
+    /// </para>
+    /// <para>
     /// Idempotent: only a row not already in upper case is written. A table or column that
     /// does not exist is left alone.
+    /// </para>
     /// </remarks>
     private static async Task ApplyUpperCasePublicIdsAsync(
         DbConnection connection,
@@ -473,6 +483,14 @@ public static class TwinShellSchema
             }
 
             EnsureKnownPublicIdTable(tableName);
+            await ExecuteNonQueryAsync(
+                connection,
+                transaction,
+                "UPDATE " + tableName + " SET " + PublicIdColumnName + " = upper(" + UuidSql + ") "
+                + "WHERE " + PublicIdColumnName + " <> upper(" + PublicIdColumnName + ") "
+                + "AND EXISTS (SELECT 1 FROM " + tableName + " twin "
+                + "WHERE twin." + PublicIdColumnName + " = upper(" + tableName + "." + PublicIdColumnName + "))",
+                cancellationToken);
             await ExecuteNonQueryAsync(
                 connection,
                 transaction,
