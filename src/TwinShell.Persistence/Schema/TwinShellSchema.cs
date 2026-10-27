@@ -139,7 +139,11 @@ public static class TwinShellSchema
         new SchemaStep(
             11,
             "Deterministic public ids for system actions and their templates",
-            ApplySeedPublicIdsAsync)
+            ApplySeedPublicIdsAsync),
+        new SchemaStep(
+            12,
+            "Upper-case public ids, the form EF writes and compares",
+            ApplyUpperCasePublicIdsAsync)
     }.AsReadOnly();
 
     public static IReadOnlyList<SchemaStep> Steps => SchemaSteps;
@@ -442,6 +446,40 @@ public static class TwinShellSchema
             "[TwinShell] Seed public ids written for "
             + actionIds.Count.ToString(CultureInfo.InvariantCulture) + " system action(s) and "
             + templateIds.Count.ToString(CultureInfo.InvariantCulture) + " template(s)");
+    }
+
+    /// <summary>
+    /// Rewrites every public id in upper case, the text EF Core writes for a Guid and binds
+    /// when it looks one up.
+    /// </summary>
+    /// <remarks>
+    /// Step 1 filled the column with lower-case ids for every row that existed before it, and
+    /// SQLite compares text case-sensitively: a lookup by public id missed each of those rows,
+    /// so an import created a second copy of the entry and a tombstone never reached it.
+    /// Idempotent: only a row not already in upper case is written. A table or column that
+    /// does not exist is left alone.
+    /// </remarks>
+    private static async Task ApplyUpperCasePublicIdsAsync(
+        DbConnection connection,
+        DbTransaction transaction,
+        CancellationToken cancellationToken)
+    {
+        foreach (string tableName in PublicIdTables)
+        {
+            if (!await TableExistsAsync(connection, transaction, tableName, cancellationToken)
+                || !await ColumnExistsAsync(connection, transaction, tableName, PublicIdColumnName, cancellationToken))
+            {
+                continue;
+            }
+
+            EnsureKnownPublicIdTable(tableName);
+            await ExecuteNonQueryAsync(
+                connection,
+                transaction,
+                "UPDATE " + tableName + " SET " + PublicIdColumnName + " = upper(" + PublicIdColumnName + ") "
+                + "WHERE " + PublicIdColumnName + " <> upper(" + PublicIdColumnName + ")",
+                cancellationToken);
+        }
     }
 
     private static async Task<List<string>> ReadIdsAsync(
