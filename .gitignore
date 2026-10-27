@@ -28,7 +28,8 @@ CLAUDE.md
 _bookkeeping/
 prompts/
 
-## WebView2 Fixed Version Runtime (downloaded per-machine via Setup-WebView2.ps1)
+## WebView2 Fixed Version Runtime (installed from a hand-downloaded CAB by scripts/Update-WebView2FixedRuntime.ps1;
+## Setup-WebView2.ps1 installs the system Evergreen Runtime instead and puts nothing here)
 runtimes/
 
 ## Secrets and certificates

@@ -1,7 +1,10 @@
 <!--
   Heimdall WiX MSI Installer
   WiX v4+ format. Produces an .msi for enterprise GPO/SCCM deployment.
-  Build: wix build -d AppVersion=<assembly version> -d SourceDir=<publish directory>
+  Build: wix build -d AppVersion=<MSI product version> -d SourceDir=<publish directory>
+  AppVersion is <yy>.<M>.<DD*100+xx> from the YYYY.MMDDxx build number (2026.102702 ->
+  26.10.2702, see ConvertTo-MsiProductVersion in scripts/BuildVersioning.ps1): Windows
+  Installer compares only three fields, so the assembly version 1.0.MMDD.xx lost the year.
          -o Heimdall.msi Product.wxs -ext WixToolset.UI.wixext
 -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
