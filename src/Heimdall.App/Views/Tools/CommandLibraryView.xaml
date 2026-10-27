@@ -31,6 +31,13 @@
     <UserControl.Resources>
         <converters:RemainingHeightConverter x:Key="RemainingHeightConverter"/>
         <sys:Double x:Key="CmdLibActionListMinHeight">128</sys:Double>
+        <!-- Square icon buttons of the header and the rows. -->
+        <sys:Double x:Key="CmdLibIconButtonSize">28</sys:Double>
+        <Thickness x:Key="CmdLibBlockMarginTop">0,6,0,0</Thickness>
+        <Thickness x:Key="CmdLibChipMargin">0,2,8,2</Thickness>
+        <Thickness x:Key="CmdLibCaptionMarginTop">0,2,0,0</Thickness>
+        <Thickness x:Key="CmdLibRowMargin">0,2,0,2</Thickness>
+        <Thickness x:Key="CmdLibPanelHeaderMargin">12,8,12,4</Thickness>
         <sys:Double x:Key="CmdLibGeneratorMaxHeight">450</sys:Double>
         <sys:Double x:Key="CmdLibHistoryMaxHeight">300</sys:Double>
         <sys:Double x:Key="CmdLibRunbooksMaxHeight">420</sys:Double>
@@ -98,8 +105,8 @@
                         Tag="{Binding IsHistoryVisible}"
                         ToolTip="{loc:Translate ToolCmdLibBtnHistory}"
                         Style="{StaticResource CmdLibOnOffButtonStyle}"
-                        FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28"
-                        Padding="4"
+                        FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="{StaticResource CmdLibIconButtonSize}" Height="{StaticResource CmdLibIconButtonSize}"
+                        Padding="{StaticResource SpacingXs}"
                         Margin="{StaticResource MarginInlineControl}"
                         TabIndex="26">
                     <AutomationProperties.Name>
@@ -117,8 +124,8 @@
                         Tag="{Binding IsRunbooksVisible}"
                         ToolTip="{loc:Translate ToolCmdLibBtnRunbooks}"
                         Style="{StaticResource CmdLibOnOffButtonStyle}"
-                        FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28"
-                        Padding="4"
+                        FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="{StaticResource CmdLibIconButtonSize}" Height="{StaticResource CmdLibIconButtonSize}"
+                        Padding="{StaticResource SpacingXs}"
                         Margin="{StaticResource MarginInlineControl}"
                         TabIndex="25">
                     <AutomationProperties.Name>
@@ -137,8 +144,8 @@
                         AutomationProperties.Name="{loc:Translate ToolCmdLibBtnSync}"
                         IsEnabled="{Binding IsSyncing, Converter={StaticResource InvertBoolConverter}}"
                         Style="{DynamicResource GhostButtonStyle}"
-                        FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28"
-                        Padding="4"
+                        FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="{StaticResource CmdLibIconButtonSize}" Height="{StaticResource CmdLibIconButtonSize}"
+                        Padding="{StaticResource SpacingXs}"
                         Margin="{StaticResource MarginInlineControl}"
                         TabIndex="24"/>
                 <Button DockPanel.Dock="Right"
@@ -149,8 +156,8 @@
                         AutomationProperties.Name="{loc:Translate ToolCmdLibBtnCancelSync}"
                         Visibility="{Binding IsSyncing, Converter={StaticResource BoolToVisibilityConverter}}"
                         Style="{DynamicResource GhostButtonStyle}"
-                        FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28"
-                        Padding="4"
+                        FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="{StaticResource CmdLibIconButtonSize}" Height="{StaticResource CmdLibIconButtonSize}"
+                        Padding="{StaticResource SpacingXs}"
                         Margin="{StaticResource MarginInlineControl}"
                         TabIndex="23"/>
                 <Button DockPanel.Dock="Right"
@@ -160,8 +167,8 @@
                         ToolTip="{loc:Translate ToolCmdLibBtnImport}"
                         AutomationProperties.Name="{loc:Translate ToolCmdLibBtnImport}"
                         Style="{DynamicResource GhostButtonStyle}"
-                        FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28"
-                        Padding="4"
+                        FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="{StaticResource CmdLibIconButtonSize}" Height="{StaticResource CmdLibIconButtonSize}"
+                        Padding="{StaticResource SpacingXs}"
                         Margin="{StaticResource MarginInlineControl}"
                         TabIndex="22"/>
                 <Button DockPanel.Dock="Right"
@@ -171,8 +178,8 @@
                         ToolTip="{loc:Translate ToolCmdLibBtnExport}"
                         AutomationProperties.Name="{loc:Translate ToolCmdLibBtnExport}"
                         Style="{DynamicResource GhostButtonStyle}"
-                        FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28"
-                        Padding="4"
+                        FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="{StaticResource CmdLibIconButtonSize}" Height="{StaticResource CmdLibIconButtonSize}"
+                        Padding="{StaticResource SpacingXs}"
                         Margin="{StaticResource MarginInlineControl}"
                         TabIndex="21"/>
                 <Button DockPanel.Dock="Right"
@@ -182,8 +189,8 @@
                         ToolTip="{loc:Translate ToolCmdLibBtnAdd}"
                         AutomationProperties.Name="{loc:Translate ToolCmdLibBtnAdd}"
                         Style="{DynamicResource GhostButtonStyle}"
-                        FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28"
-                        Padding="4"
+                        FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="{StaticResource CmdLibIconButtonSize}" Height="{StaticResource CmdLibIconButtonSize}"
+                        Padding="{StaticResource SpacingXs}"
                         Margin="{StaticResource MarginInlineControl}"
                         TabIndex="20"/>
                 <TextBlock Text="{loc:Translate ToolCmdLibTitle}"
@@ -258,7 +265,7 @@
                     <Button Content="&#xE711;" FontFamily="{StaticResource FontFamilyIcons}"
                             FontSize="{StaticResource FontSizeSmallCaption}"
                             HorizontalAlignment="Right" VerticalAlignment="Center"
-                            Margin="{StaticResource MarginInlineXs}" Padding="4"
+                            Margin="{StaticResource MarginInlineXs}" Padding="{StaticResource SpacingXs}"
                             Style="{DynamicResource GhostButtonStyle}" MinHeight="0"
                             Command="{Binding ClearSearchCommand}"
                             AutomationProperties.Name="{loc:Translate A11yClearSearch}"
@@ -266,11 +273,11 @@
                 </Grid>
 
                 <!-- Filter controls - wrappable -->
-                <WrapPanel Grid.Row="1" Margin="0,6,0,0" VerticalAlignment="Center">
+                <WrapPanel Grid.Row="1" Margin="{StaticResource CmdLibBlockMarginTop}" VerticalAlignment="Center">
                     <TextBlock Text="{Binding ResultCountText}"
                                FontSize="{StaticResource FontSizeCaption}"
                                Foreground="{DynamicResource TextSecondaryBrush}"
-                               VerticalAlignment="Center" Margin="0,2,8,2"
+                               VerticalAlignment="Center" Margin="{StaticResource CmdLibChipMargin}"
                                MinWidth="65"/>
                     <Button Content="&#x2605;"
                             TabIndex="1"
@@ -279,8 +286,8 @@
                             Tag="{Binding FavoritesFilterActive}"
                             ToolTip="{loc:Translate ToolCmdLibFilterFavorites}"
                             Style="{StaticResource CmdLibOnOffButtonStyle}"
-                            FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28" Padding="4"
-                            Margin="0,2,8,2"
+                            FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="{StaticResource CmdLibIconButtonSize}" Height="{StaticResource CmdLibIconButtonSize}" Padding="{StaticResource SpacingXs}"
+                            Margin="{StaticResource CmdLibChipMargin}"
                             Foreground="{Binding FavoritesFilterBrushKey, Converter={StaticResource ResourceKeyToBrushConverter}}">
                         <AutomationProperties.Name>
                             <MultiBinding Converter="{StaticResource AccessibleStateNameConverter}">
@@ -290,7 +297,7 @@
                             </MultiBinding>
                         </AutomationProperties.Name>
                     </Button>
-                    <ComboBox MinWidth="180" Margin="0,2,8,2"
+                    <ComboBox MinWidth="180" Margin="{StaticResource CmdLibChipMargin}"
                               x:Name="CmbCategoryFilter"
                               FontSize="{StaticResource FontSizeBody}"
                               ItemsSource="{Binding CategoryFilterItems}"
@@ -298,7 +305,7 @@
                               ToolTip="{loc:Translate ToolCmdLibDialogLblCategory}"
                               AutomationProperties.Name="{loc:Translate ToolCmdLibDialogLblCategory}"
                               TabIndex="2"/>
-                    <ComboBox MinWidth="150" Margin="0,2,8,2"
+                    <ComboBox MinWidth="150" Margin="{StaticResource CmdLibChipMargin}"
                               x:Name="CmbTagFilter"
                               FontSize="{StaticResource FontSizeBody}"
                               ItemsSource="{Binding TagFilterItems}"
@@ -306,7 +313,7 @@
                               ToolTip="{loc:Translate ToolCmdLibDialogLblTags}"
                               AutomationProperties.Name="{loc:Translate ToolCmdLibDialogLblTags}"
                               TabIndex="3"/>
-                    <ComboBox MinWidth="130" Margin="0,2,8,2"
+                    <ComboBox MinWidth="130" Margin="{StaticResource CmdLibChipMargin}"
                               x:Name="CmbPlatformFilter"
                               FontSize="{StaticResource FontSizeBody}"
                               ItemsSource="{Binding PlatformFilterItems}"
@@ -314,7 +321,7 @@
                               ToolTip="{loc:Translate ToolCmdLibDialogLblPlatform}"
                               AutomationProperties.Name="{loc:Translate ToolCmdLibDialogLblPlatform}"
                               TabIndex="4"/>
-                    <ComboBox MinWidth="120" Margin="0,2,0,2"
+                    <ComboBox MinWidth="120" Margin="{StaticResource CmdLibRowMargin}"
                               x:Name="CmbRiskFilter"
                               FontSize="{StaticResource FontSizeBody}"
                               ItemsSource="{Binding RiskFilterItems}"
@@ -488,7 +495,7 @@
                                              of a Border MouseBinding, which only resolved CommandParameter
                                              for the first realized container. Copy is a sibling Button so
                                              clicking it never triggers the row apply. -->
-                                        <Border Padding="6,3" Margin="0,2,0,0"
+                                        <Border Padding="6,3" Margin="{StaticResource CmdLibCaptionMarginTop}"
                                                 Background="{DynamicResource BackgroundBrush}"
                                                 CornerRadius="{StaticResource CornerRadiusSm}">
                                             <Grid>
@@ -533,7 +540,7 @@
                                                         Style="{DynamicResource GhostButtonStyle}"
                                                         ToolTip="{loc:Translate ToolCmdLibBtnCopyExample}"
                                                         AutomationProperties.Name="{loc:Translate ToolCmdLibBtnCopyExample}"
-                                                        FontSize="{StaticResource IconSizeSmall}" Width="24" Height="24"
+                                                        FontSize="{StaticResource IconSizeSmall}" Width="{StaticResource TargetMinSize}" Height="{StaticResource TargetMinSize}"
                                                         Padding="{StaticResource SpacingXxs}" VerticalAlignment="Top"
                                                         Focusable="False"/>
                                             </Grid>
@@ -575,8 +582,8 @@
                                 ToolTip="{loc:Translate ToolCmdLibBtnEdit}"
                                 AutomationProperties.Name="{loc:Translate ToolCmdLibBtnEdit}"
                                 Style="{DynamicResource GhostButtonStyle}"
-                                FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28"
-                                Padding="4"
+                                FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="{StaticResource CmdLibIconButtonSize}" Height="{StaticResource CmdLibIconButtonSize}"
+                                Padding="{StaticResource SpacingXs}"
                                 Margin="{StaticResource MarginInlineXs}" TabIndex="7"/>
                         <!-- Unlike Edit and Delete this has no visibility gate: copying a
                              shipped action into your own library is the only way to get a
@@ -587,8 +594,8 @@
                                 ToolTip="{loc:Translate ToolCmdLibDuplicate}"
                                 AutomationProperties.Name="{loc:Translate ToolCmdLibDuplicate}"
                                 Style="{DynamicResource GhostButtonStyle}"
-                                FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28"
-                                Padding="4"
+                                FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="{StaticResource CmdLibIconButtonSize}" Height="{StaticResource CmdLibIconButtonSize}"
+                                Padding="{StaticResource SpacingXs}"
                                 Margin="{StaticResource MarginInlineXs}" TabIndex="8"/>
                         <Button Command="{Binding DeleteSelectedCommand}"
                                 x:Name="BtnDelete"
@@ -597,8 +604,8 @@
                                 ToolTip="{loc:Translate ToolCmdLibBtnDelete}"
                                 AutomationProperties.Name="{loc:Translate ToolCmdLibBtnDelete}"
                                 Style="{DynamicResource GhostButtonStyle}"
-                                FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28"
-                                Padding="4"
+                                FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="{StaticResource CmdLibIconButtonSize}" Height="{StaticResource CmdLibIconButtonSize}"
+                                Padding="{StaticResource SpacingXs}"
                                 TabIndex="9"/>
                     </StackPanel>
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"
@@ -654,8 +661,8 @@
                                       ToolTip="{loc:Translate ToolCmdLibBroadcastToggleTooltip}"
                                       AutomationProperties.Name="{loc:Translate ToolCmdLibBroadcastToggleTooltip}"
                                       Style="{DynamicResource ToolbarToggleButtonStyle}"
-                                      FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28"
-                                      Padding="4"
+                                      FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="{StaticResource CmdLibIconButtonSize}" Height="{StaticResource CmdLibIconButtonSize}"
+                                      Padding="{StaticResource SpacingXs}"
                                       Margin="{StaticResource MarginInlineSm}" TabIndex="13"/>
                     </StackPanel>
                     <!-- Inline hint shown only for non-injectable sessions (RDP/VNC/etc.):
@@ -680,9 +687,9 @@
                         Background="{DynamicResource SurfaceBrush}"
                         BorderBrush="{DynamicResource BorderBrush}"
                         BorderThickness="0,1,0,0"
-                        Padding="12">
+                        Padding="{StaticResource SpacingMd}">
                     <StackPanel>
-                        <DockPanel Margin="0,0,0,6">
+                        <DockPanel Margin="{StaticResource MarginDetailRow}">
                             <TextBlock DockPanel.Dock="Left"
                                        Text="{loc:Translate ToolCmdLibBroadcastHeader}"
                                        FontWeight="SemiBold"
@@ -715,7 +722,7 @@
                                    Visibility="{Binding HasNoBroadcastTargets, Converter={StaticResource BoolToVisibilityConverter}}"
                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                    FontSize="{StaticResource FontSizeCaption}"
-                                   TextWrapping="Wrap" Margin="0,2,0,2"/>
+                                   TextWrapping="Wrap" Margin="{StaticResource CmdLibRowMargin}"/>
 
                         <ScrollViewer MaxHeight="{StaticResource CmdLibBroadcastListMaxHeight}" VerticalScrollBarVisibility="Auto">
                             <ItemsControl ItemsSource="{Binding BroadcastTargets}"
@@ -739,7 +746,7 @@
                             </ItemsControl>
                         </ScrollViewer>
 
-                        <DockPanel Margin="0,8,0,0">
+                        <DockPanel Margin="{StaticResource MarginSubsectionTop}">
                             <Button DockPanel.Dock="Right"
                                     x:Name="BtnBroadcast"
                                     Command="{Binding BroadcastCommand}"
@@ -757,7 +764,7 @@
                                        FontSize="{StaticResource FontSizeCaption}"
                                        TextWrapping="Wrap"
                                        VerticalAlignment="Center"
-                                       Margin="0,0,8,0"/>
+                                       Margin="{StaticResource MarginInlineSm}"/>
                         </DockPanel>
                     </StackPanel>
                 </Border>
@@ -779,15 +786,15 @@
                 </MultiBinding>
             </Border.MaxHeight>
             <DockPanel>
-                <DockPanel DockPanel.Dock="Top" Margin="12,8,12,4">
+                <DockPanel DockPanel.Dock="Top" Margin="{StaticResource CmdLibPanelHeaderMargin}">
                     <Button DockPanel.Dock="Right"
                             Content="&#xE74D;" FontFamily="{StaticResource FontFamilyIcons}"
                             Command="{Binding ClearHistoryCommand}"
                             ToolTip="{loc:Translate ToolCmdLibHistoryClear}"
                             AutomationProperties.Name="{loc:Translate ToolCmdLibHistoryClear}"
                             Style="{DynamicResource GhostButtonStyle}"
-                            FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28"
-                            Padding="4"/>
+                            FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="{StaticResource CmdLibIconButtonSize}" Height="{StaticResource CmdLibIconButtonSize}"
+                            Padding="{StaticResource SpacingXs}"/>
                     <!-- Only offered when the library was opened for a host: without one there is
                          nothing to compare a row against. -->
                     <CheckBox DockPanel.Dock="Right"
@@ -876,7 +883,7 @@
                                         ToolTip="{loc:Translate ToolCmdLibHistoryReplay}"
                                         AutomationProperties.Name="{loc:Translate ToolCmdLibHistoryReplay}"
                                         Style="{DynamicResource GhostButtonStyle}"
-                                        FontSize="{StaticResource IconSizeSmall}" Width="24" Height="24"
+                                        FontSize="{StaticResource IconSizeSmall}" Width="{StaticResource TargetMinSize}" Height="{StaticResource TargetMinSize}"
                                         Padding="{StaticResource SpacingXxs}" VerticalAlignment="Center"
                                         Margin="{StaticResource MarginInlineStart}" Focusable="False"/>
                                 <Button DockPanel.Dock="Right"
@@ -887,7 +894,7 @@
                                         ToolTip="{loc:Translate ToolCmdLibBtnCopy}"
                                         AutomationProperties.Name="{loc:Translate ToolCmdLibBtnCopy}"
                                         Style="{DynamicResource GhostButtonStyle}"
-                                        FontSize="{StaticResource IconSizeSmall}" Width="24" Height="24"
+                                        FontSize="{StaticResource IconSizeSmall}" Width="{StaticResource TargetMinSize}" Height="{StaticResource TargetMinSize}"
                                         Padding="{StaticResource SpacingXxs}" VerticalAlignment="Center"
                                         Margin="{StaticResource MarginInlineStart}" Focusable="False"/>
                                 <TextBlock DockPanel.Dock="Right"
@@ -971,42 +978,42 @@
                 <!-- The list of runbooks -->
                 <DockPanel x:Name="RunbookListPanel"
                            Visibility="{Binding IsRunbookListVisible, Converter={StaticResource BoolToVisibilityConverter}}">
-                    <DockPanel DockPanel.Dock="Top" Margin="12,8,12,4">
+                    <DockPanel DockPanel.Dock="Top" Margin="{StaticResource CmdLibPanelHeaderMargin}">
                         <Button DockPanel.Dock="Right"
                                 Content="&#xE768;" FontFamily="{StaticResource FontFamilyIcons}"
                                 Command="{Binding RunRunbookCommand}"
                                 ToolTip="{loc:Translate ToolCmdLibRunbookRun}"
                                 AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookRun}"
                                 Style="{DynamicResource GhostButtonStyle}"
-                                FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28" Padding="4"/>
+                                FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="{StaticResource CmdLibIconButtonSize}" Height="{StaticResource CmdLibIconButtonSize}" Padding="{StaticResource SpacingXs}"/>
                         <Button DockPanel.Dock="Right"
                                 Content="&#xE74D;" FontFamily="{StaticResource FontFamilyIcons}"
                                 Command="{Binding DeleteRunbookCommand}"
                                 ToolTip="{loc:Translate ToolCmdLibRunbookDelete}"
                                 AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookDelete}"
                                 Style="{DynamicResource GhostButtonStyle}"
-                                FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28" Padding="4"/>
+                                FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="{StaticResource CmdLibIconButtonSize}" Height="{StaticResource CmdLibIconButtonSize}" Padding="{StaticResource SpacingXs}"/>
                         <Button DockPanel.Dock="Right"
                                 Content="&#xF413;" FontFamily="{StaticResource FontFamilyIcons}"
                                 Command="{Binding DuplicateRunbookCommand}"
                                 ToolTip="{loc:Translate ToolCmdLibRunbookDuplicate}"
                                 AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookDuplicate}"
                                 Style="{DynamicResource GhostButtonStyle}"
-                                FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28" Padding="4"/>
+                                FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="{StaticResource CmdLibIconButtonSize}" Height="{StaticResource CmdLibIconButtonSize}" Padding="{StaticResource SpacingXs}"/>
                         <Button DockPanel.Dock="Right"
                                 Content="&#xE70F;" FontFamily="{StaticResource FontFamilyIcons}"
                                 Command="{Binding EditRunbookCommand}"
                                 ToolTip="{loc:Translate ToolCmdLibRunbookEdit}"
                                 AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookEdit}"
                                 Style="{DynamicResource GhostButtonStyle}"
-                                FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28" Padding="4"/>
+                                FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="{StaticResource CmdLibIconButtonSize}" Height="{StaticResource CmdLibIconButtonSize}" Padding="{StaticResource SpacingXs}"/>
                         <Button DockPanel.Dock="Right"
                                 Content="&#xE710;" FontFamily="{StaticResource FontFamilyIcons}"
                                 Command="{Binding NewRunbookCommand}"
                                 ToolTip="{loc:Translate ToolCmdLibRunbookNew}"
                                 AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookNew}"
                                 Style="{DynamicResource GhostButtonStyle}"
-                                FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28" Padding="4"/>
+                                FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="{StaticResource CmdLibIconButtonSize}" Height="{StaticResource CmdLibIconButtonSize}" Padding="{StaticResource SpacingXs}"/>
                         <TextBlock Text="{loc:Translate ToolCmdLibRunbooksTitle}"
                                    FontSize="{StaticResource FontSizeBody}"
                                    FontWeight="SemiBold"
@@ -1108,7 +1115,7 @@
 
                     <StackPanel DockPanel.Dock="Top"
                                 Visibility="{Binding HasVariables, Converter={StaticResource BoolToVisibilityConverter}}"
-                                Margin="0,6,0,0">
+                                Margin="{StaticResource CmdLibBlockMarginTop}">
                         <TextBlock Text="{loc:Translate ToolCmdLibRunbookRunVariables}"
                                    FontSize="{StaticResource FontSizeCaption}"
                                    FontWeight="SemiBold"
@@ -1123,7 +1130,7 @@
                             </ItemsControl.ItemContainerStyle>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <DockPanel Margin="0,2,0,2">
+                                    <DockPanel Margin="{StaticResource CmdLibRowMargin}">
                                         <TextBlock DockPanel.Dock="Left"
                                                    Text="{Binding Reference}" Width="{StaticResource CmdLibRunbookVariableLabelWidth}"
                                                    FontFamily="{StaticResource FontFamilyMonospace}"
@@ -1144,7 +1151,7 @@
                     </StackPanel>
 
                     <!-- The current step: its command, why it cannot go, and the five gestures. -->
-                    <StackPanel DockPanel.Dock="Bottom" Margin="0,6,0,0">
+                    <StackPanel DockPanel.Dock="Bottom" Margin="{StaticResource CmdLibBlockMarginTop}">
                         <TextBlock Text="{loc:Translate ToolCmdLibRunbookRunCommand}"
                                    FontSize="{StaticResource FontSizeCaption}"
                                    FontWeight="SemiBold"
@@ -1162,35 +1169,37 @@
                                    Visibility="{Binding HasCurrentValidationError, Converter={StaticResource BoolToVisibilityConverter}}"
                                    FontSize="{StaticResource FontSizeCaption}"
                                    Foreground="{DynamicResource ErrorTextBrush}"
-                                   TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                   TextWrapping="Wrap" Margin="{StaticResource CmdLibCaptionMarginTop}"/>
                         <TextBlock Text="{loc:Translate ToolCmdLibRunbookNoTerminal}"
                                    Visibility="{Binding ShowNoTerminalHint, Converter={StaticResource BoolToVisibilityConverter}}"
                                    FontSize="{StaticResource FontSizeCaption}"
                                    Foreground="{DynamicResource TextSecondaryBrush}"
-                                   TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                   TextWrapping="Wrap" Margin="{StaticResource CmdLibCaptionMarginTop}"/>
                         <TextBlock Text="{loc:Translate ToolCmdLibRunbookFinished}"
                                    Visibility="{Binding IsFinished, Converter={StaticResource BoolToVisibilityConverter}}"
                                    FontSize="{StaticResource FontSizeCaption}"
                                    Foreground="{DynamicResource SuccessTextBrush}"
-                                   TextWrapping="Wrap" Margin="0,2,0,0"/>
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,6,0,0">
+                                   TextWrapping="Wrap" Margin="{StaticResource CmdLibCaptionMarginTop}"/>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="{StaticResource CmdLibBlockMarginTop}">
                             <Button Content="{loc:Translate ToolCmdLibRunbookSkip}"
                                     Command="{Binding SkipCommand}"
                                     AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookSkip}"
                                     Style="{DynamicResource SecondaryButtonStyle}"
-                                    Margin="0,0,8,0"/>
-                            <Button Content="{loc:Translate ToolCmdLibBtnCopy}"
+                                    Margin="{StaticResource MarginInlineSm}"/>
+                            <Button x:Name="BtnRunCopy"
+                                    Content="{loc:Translate ToolCmdLibBtnCopy}"
                                     Command="{Binding CopyCommand}"
                                     AutomationProperties.Name="{loc:Translate ToolCmdLibBtnCopy}"
                                     Style="{DynamicResource SecondaryButtonStyle}"
-                                    Margin="0,0,8,0"/>
+                                    Margin="{StaticResource MarginInlineSm}"/>
                             <Button Content="{loc:Translate ToolCmdLibBtnInsert}"
                                     Command="{Binding InsertCommand}"
                                     ToolTip="{loc:Translate ToolCmdLibBtnInsertTooltip}"
                                     AutomationProperties.Name="{loc:Translate ToolCmdLibBtnInsert}"
                                     Style="{DynamicResource SecondaryButtonStyle}"
-                                    Margin="0,0,8,0"/>
-                            <Button Content="{loc:Translate ToolCmdLibBtnSend}"
+                                    Margin="{StaticResource MarginInlineSm}"/>
+                            <Button x:Name="BtnRunSend"
+                                    Content="{loc:Translate ToolCmdLibBtnSend}"
                                     Command="{Binding SendCommand}"
                                     AutomationProperties.Name="{loc:Translate ToolCmdLibBtnSend}"
                                     Style="{DynamicResource PrimaryButtonStyle}"/>
@@ -1200,7 +1209,7 @@
                     <ListView ItemsSource="{Binding Steps}"
                               AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookSectionSteps}"
                               Background="Transparent" BorderThickness="0"
-                              Margin="0,6,0,0"
+                              Margin="{StaticResource CmdLibBlockMarginTop}"
                               ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                         <ListView.ItemContainerStyle>
                             <Style TargetType="ListViewItem">
@@ -1325,7 +1334,7 @@
                                     ToolTip="{Binding FavoriteTooltip}"
                                     AutomationProperties.Name="{Binding FavoriteTooltip}"
                                     Style="{DynamicResource GhostButtonStyle}"
-                                    FontSize="{StaticResource FontSizeBodyLarge}" Width="24" Height="24"
+                                    FontSize="{StaticResource FontSizeBodyLarge}" Width="{StaticResource TargetMinSize}" Height="{StaticResource TargetMinSize}"
                                     VerticalAlignment="Center" Margin="{StaticResource MarginInlineStart}"
                                     Foreground="{DynamicResource WarningTextBrush}"/>
                             <!-- Risk badge -->

@@ -61,7 +61,14 @@ public sealed partial class RunbookStepEditorItem : ObservableObject
 
     /// <summary>The literal command of a literal step.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(AccessibleLabel))]
     private string _command = string.Empty;
+
+    /// <summary>
+    /// What the step's row says to a screen reader: the action's title, or the literal command,
+    /// which is what the operator reads on the row.
+    /// </summary>
+    public string AccessibleLabel => IsAction ? ActionTitle : Command;
 
     /// <summary>True when the literal command is written for Windows, false for Linux.</summary>
     [ObservableProperty]

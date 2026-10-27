@@ -7,6 +7,7 @@
         xmlns:vm="clr-namespace:Heimdall.App.ViewModels.Dialogs"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:sys="clr-namespace:System;assembly=mscorlib"
         mc:Ignorable="d"
         d:DataContext="{d:DesignInstance Type=vm:RunbookDialogViewModel}"
         Title="{Binding DialogTitle}"
@@ -24,6 +25,12 @@
                 <ResourceDictionary Source="/Themes/DialogCommonStyles.xaml"/>
             </ResourceDictionary.MergedDictionaries>
             <converters:NullToVisibilityConverter x:Key="NullToVis"/>
+            <Thickness x:Key="RunbookDialogFieldPadding">4,3</Thickness>
+            <Thickness x:Key="RunbookDialogBlockMarginTop">0,6,0,0</Thickness>
+            <Thickness x:Key="RunbookDialogRowMargin">0,2,0,2</Thickness>
+            <Thickness x:Key="RunbookDialogSectionMargin">0,16,0,4</Thickness>
+            <Thickness x:Key="RunbookDialogLabelMargin">0,12,0,4</Thickness>
+            <sys:Double x:Key="RunbookDialogParameterLabelWidth">150</sys:Double>
         </ResourceDictionary>
     </Window.Resources>
 
@@ -45,7 +52,7 @@
                          MaxLength="200"/>
 
                 <!-- Description -->
-                <TextBlock Text="{loc:Translate ToolCmdLibDialogLblDescription}" Style="{StaticResource DialogLabelStyle}" Margin="0,12,0,4"/>
+                <TextBlock Text="{loc:Translate ToolCmdLibDialogLblDescription}" Style="{StaticResource DialogLabelStyle}" Margin="{StaticResource RunbookDialogLabelMargin}"/>
                 <TextBox Text="{Binding Description, UpdateSourceTrigger=PropertyChanged}"
                          AutomationProperties.Name="{loc:Translate ToolCmdLibDialogLblDescription}"
                          Style="{StaticResource DialogFormTextBoxStyle}"
@@ -55,7 +62,7 @@
                          MaxLength="1000"/>
 
                 <!-- Failure mode: stored and shown; the run is manual, the tooltip says why. -->
-                <TextBlock Text="{loc:Translate ToolCmdLibRunbookLblMode}" Style="{StaticResource DialogLabelStyle}" Margin="0,12,0,4"/>
+                <TextBlock Text="{loc:Translate ToolCmdLibRunbookLblMode}" Style="{StaticResource DialogLabelStyle}" Margin="{StaticResource RunbookDialogLabelMargin}"/>
                 <ComboBox SelectedIndex="{Binding ExecutionModeIndex}"
                           AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookLblMode}"
                           AutomationProperties.HelpText="{loc:Translate ToolCmdLibRunbookModeTooltip}"
@@ -66,7 +73,7 @@
                 </ComboBox>
 
                 <!-- ── Variables ───────────────────────────── -->
-                <DockPanel Margin="0,16,0,4">
+                <DockPanel Margin="{StaticResource RunbookDialogSectionMargin}">
                     <Button DockPanel.Dock="Right"
                             Content="{loc:Translate ToolCmdLibRunbookAddVariable}"
                             Command="{Binding AddVariableCommand}"
@@ -79,11 +86,18 @@
                 <TextBlock Text="{loc:Translate ToolCmdLibRunbookVariablesHelp}"
                            FontSize="{StaticResource FontSizeCaption}"
                            Foreground="{DynamicResource TextSecondaryBrush}"
-                           TextWrapping="Wrap" Margin="0,0,0,4"/>
+                           TextWrapping="Wrap" Margin="{StaticResource MarginLabelBottom}"/>
                 <ItemsControl ItemsSource="{Binding Variables}">
+                    <ItemsControl.ItemContainerStyle>
+                        <!-- The name goes on the container: set in the template it is inert, and the
+                             row announced its class name to a screen reader. -->
+                        <Style TargetType="ContentPresenter">
+                            <Setter Property="AutomationProperties.Name" Value="{Binding Reference}"/>
+                        </Style>
+                    </ItemsControl.ItemContainerStyle>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Grid Margin="0,2,0,2">
+                            <Grid Margin="{StaticResource RunbookDialogRowMargin}">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="2*"/>
@@ -93,7 +107,7 @@
                                          Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
                                          AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookLblVariableName}"
                                          ToolTip="{loc:Translate ToolCmdLibRunbookLblVariableName}"
-                                         FontFamily="Consolas" Margin="0,0,4,0" Padding="4,3"
+                                         FontFamily="{StaticResource FontFamilyMonospace}" Margin="{StaticResource MarginInlineXs}" Padding="{StaticResource RunbookDialogFieldPadding}"
                                          Background="{DynamicResource CardBrush}"
                                          Foreground="{DynamicResource TextPrimaryBrush}"
                                          BorderBrush="{DynamicResource BorderBrush}"/>
@@ -101,13 +115,13 @@
                                          Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
                                          AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookLblVariableDefault}"
                                          ToolTip="{loc:Translate ToolCmdLibRunbookLblVariableDefault}"
-                                         Margin="0,0,4,0" Padding="4,3"
+                                         Margin="{StaticResource MarginInlineXs}" Padding="{StaticResource RunbookDialogFieldPadding}"
                                          Background="{DynamicResource CardBrush}"
                                          Foreground="{DynamicResource TextPrimaryBrush}"
                                          BorderBrush="{DynamicResource BorderBrush}"/>
                                 <Button Grid.Column="2"
                                         Content="&#xE711;" FontFamily="{StaticResource FontFamilyIcons}"
-                                        FontSize="{StaticResource IconSizeSmall}" Width="24" Height="24"
+                                        FontSize="{StaticResource IconSizeSmall}" Width="{StaticResource TargetMinSize}" Height="{StaticResource TargetMinSize}"
                                         Command="{Binding DataContext.RemoveVariableCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                         CommandParameter="{Binding}"
                                         ToolTip="{loc:Translate ToolCmdLibRunbookRemoveVariable}"
@@ -119,13 +133,13 @@
                 </ItemsControl>
 
                 <!-- ── Steps ───────────────────────────────── -->
-                <DockPanel Margin="0,16,0,4">
+                <DockPanel Margin="{StaticResource RunbookDialogSectionMargin}">
                     <Button DockPanel.Dock="Right"
                             Content="{loc:Translate ToolCmdLibRunbookAddCommand}"
                             Command="{Binding AddCommandCommand}"
                             AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookAddCommand}"
                             Style="{DynamicResource SecondaryButtonStyle}"
-                            Margin="8,0,0,0"/>
+                            Margin="{StaticResource MarginInlineControl}"/>
                     <Button DockPanel.Dock="Right"
                             Content="{loc:Translate ToolCmdLibRunbookAddAction}"
                             Command="{Binding AddActionCommand}"
@@ -141,9 +155,14 @@
                            Foreground="{DynamicResource TextSecondaryBrush}"
                            TextWrapping="Wrap"/>
                 <ItemsControl ItemsSource="{Binding Steps}">
+                    <ItemsControl.ItemContainerStyle>
+                        <Style TargetType="ContentPresenter">
+                            <Setter Property="AutomationProperties.Name" Value="{Binding AccessibleLabel}"/>
+                        </Style>
+                    </ItemsControl.ItemContainerStyle>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
-                            <Border Margin="0,4,0,4" Padding="8"
+                            <Border Margin="0,4,0,4" Padding="{StaticResource SpacingSm}"
                                     Background="{DynamicResource SurfaceBrush}"
                                     BorderBrush="{DynamicResource BorderBrush}"
                                     BorderThickness="1" CornerRadius="4">
@@ -151,7 +170,7 @@
                                     <DockPanel>
                                         <Button DockPanel.Dock="Right"
                                                 Content="&#xE711;" FontFamily="{StaticResource FontFamilyIcons}"
-                                                FontSize="{StaticResource IconSizeSmall}" Width="24" Height="24"
+                                                FontSize="{StaticResource IconSizeSmall}" Width="{StaticResource TargetMinSize}" Height="{StaticResource TargetMinSize}"
                                                 Command="{Binding DataContext.RemoveStepCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                 CommandParameter="{Binding}"
                                                 ToolTip="{loc:Translate ToolCmdLibRunbookRemoveStep}"
@@ -159,7 +178,7 @@
                                                 Style="{DynamicResource GhostButtonStyle}"/>
                                         <Button DockPanel.Dock="Right"
                                                 Content="&#xE74B;" FontFamily="{StaticResource FontFamilyIcons}"
-                                                FontSize="{StaticResource IconSizeSmall}" Width="24" Height="24"
+                                                FontSize="{StaticResource IconSizeSmall}" Width="{StaticResource TargetMinSize}" Height="{StaticResource TargetMinSize}"
                                                 Command="{Binding DataContext.MoveDownCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                 CommandParameter="{Binding}"
                                                 ToolTip="{loc:Translate ToolCmdLibRunbookMoveDown}"
@@ -167,7 +186,7 @@
                                                 Style="{DynamicResource GhostButtonStyle}"/>
                                         <Button DockPanel.Dock="Right"
                                                 Content="&#xE74A;" FontFamily="{StaticResource FontFamilyIcons}"
-                                                FontSize="{StaticResource IconSizeSmall}" Width="24" Height="24"
+                                                FontSize="{StaticResource IconSizeSmall}" Width="{StaticResource TargetMinSize}" Height="{StaticResource TargetMinSize}"
                                                 Command="{Binding DataContext.MoveUpCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                 CommandParameter="{Binding}"
                                                 ToolTip="{loc:Translate ToolCmdLibRunbookMoveUp}"
@@ -189,18 +208,23 @@
                                     <!-- Action step: one value per parameter; {{name}} uses a variable. -->
                                     <ItemsControl ItemsSource="{Binding Parameters}"
                                                   Visibility="{Binding IsAction, Converter={StaticResource BoolToVisibilityConverter}}"
-                                                  Margin="0,6,0,0">
+                                                  Margin="{StaticResource RunbookDialogBlockMarginTop}">
+                                        <ItemsControl.ItemContainerStyle>
+                                            <Style TargetType="ContentPresenter">
+                                                <Setter Property="AutomationProperties.Name" Value="{Binding DisplayLabel}"/>
+                                            </Style>
+                                        </ItemsControl.ItemContainerStyle>
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
-                                                <DockPanel Margin="0,2,0,2" ToolTip="{Binding DisplayTooltip}">
+                                                <DockPanel Margin="{StaticResource RunbookDialogRowMargin}" ToolTip="{Binding DisplayTooltip}">
                                                     <TextBlock DockPanel.Dock="Left"
-                                                               Text="{Binding DisplayLabel}" Width="150"
+                                                               Text="{Binding DisplayLabel}" Width="{StaticResource RunbookDialogParameterLabelWidth}"
                                                                FontSize="{StaticResource FontSizeCaption}"
                                                                Foreground="{DynamicResource TextSecondaryBrush}"
                                                                VerticalAlignment="Center"/>
                                                     <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
                                                              AutomationProperties.Name="{Binding DisplayLabel}"
-                                                             FontFamily="Consolas" Padding="4,3"
+                                                             FontFamily="{StaticResource FontFamilyMonospace}" Padding="{StaticResource RunbookDialogFieldPadding}"
                                                              Background="{DynamicResource CardBrush}"
                                                              Foreground="{DynamicResource TextPrimaryBrush}"
                                                              BorderBrush="{DynamicResource BorderBrush}"/>
@@ -211,11 +235,11 @@
 
                                     <!-- Literal step: the command and the platform it is written for. -->
                                     <StackPanel Visibility="{Binding IsLiteral, Converter={StaticResource BoolToVisibilityConverter}}"
-                                                Margin="0,6,0,0">
+                                                Margin="{StaticResource RunbookDialogBlockMarginTop}">
                                         <TextBox Text="{Binding Command, UpdateSourceTrigger=PropertyChanged}"
                                                  AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookLblCommand}"
                                                  ToolTip="{loc:Translate ToolCmdLibRunbookLblCommand}"
-                                                 FontFamily="Consolas" Padding="4,3"
+                                                 FontFamily="{StaticResource FontFamilyMonospace}" Padding="{StaticResource RunbookDialogFieldPadding}"
                                                  Background="{DynamicResource CardBrush}"
                                                  Foreground="{DynamicResource TextPrimaryBrush}"
                                                  BorderBrush="{DynamicResource BorderBrush}"/>
@@ -243,7 +267,7 @@
                    Text="{Binding ValidationError}"
                    Foreground="{DynamicResource ErrorTextBrush}"
                    FontSize="{StaticResource FontSizeBody}"
-                   Margin="0,8,0,0" TextWrapping="Wrap"
+                   Margin="{StaticResource MarginSubsectionTop}" TextWrapping="Wrap"
                    Visibility="{Binding ValidationError, Converter={StaticResource NullToVis}}"/>
 
         <StackPanel Grid.Row="2" Orientation="Horizontal"
@@ -251,7 +275,7 @@
             <Button IsCancel="True" MinWidth="80"
                     Content="{loc:Translate BtnCancel}"
                     AutomationProperties.Name="{loc:Translate BtnCancel}"
-                    Margin="0,0,8,0"
+                    Margin="{StaticResource MarginInlineSm}"
                     Style="{DynamicResource SecondaryButtonStyle}"/>
             <Button IsDefault="True" MinWidth="80"
                     Content="{loc:Translate BtnSave}"
