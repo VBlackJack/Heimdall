@@ -80,8 +80,11 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
             throw new InvalidOperationException(TooManyParametersMessage(template.Parameters.Count));
         }
 
-        // PERFORMANCE: Use StringBuilder for multiple string replacements (40-60% fewer allocations)
-        var command = new StringBuilder(template.CommandPattern);
+        // What each declared placeholder becomes: the escaped value, or null when an optional
+        // parameter was left empty and its argument is to be dropped. Every value is resolved
+        // first and the pattern is walked once afterwards (see SubstitutePlaceholders), so a
+        // value typed by the operator is never read as pattern text.
+        var substitutions = new Dictionary<string, string?>(StringComparer.Ordinal);
 
         foreach (var parameter in template.Parameters)
         {
@@ -108,8 +111,7 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
 
                 // An optional value left empty means "leave the argument out": quoting it
                 // would hand the command an empty argument instead (hostname '').
-                var withoutPlaceholder = RemoveEmptyPlaceholder(command.ToString(), placeholder);
-                command.Clear().Append(withoutPlaceholder);
+                substitutions.TryAdd(placeholder, null);
                 continue;
             }
 
@@ -129,54 +131,91 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
                 .All(context => context == CommandPatternQuoting.QuoteContext.Bare);
             var escapedValue = EscapeParameterValue(value, parameter.Type, template.Platform, parameter.Quoting, everyOccurrenceBare);
 
-            command.Replace(placeholder, escapedValue);
+            substitutions.TryAdd(placeholder, escapedValue);
         }
 
-        return EnforceCommandLength(command.ToString());
+        return EnforceCommandLength(SubstitutePlaceholders(template.CommandPattern, substitutions));
     }
 
     /// <summary>
-    /// Removes every occurrence of <paramref name="placeholder"/> from
-    /// <paramref name="command"/> together with the run of spaces each one leaves.
+    /// Builds the command in one pass over <paramref name="pattern"/>: pattern text is copied,
+    /// each declared placeholder is replaced by its entry in <paramref name="substitutions"/>,
+    /// and an entry of <see langword="null"/> drops the placeholder together with the run of
+    /// spaces it leaves.
     /// </summary>
     /// <remarks>
-    /// Only the spaces next to a removed placeholder are touched: two spaces written into
+    /// <para>
+    /// A value is never scanned again. Replacing one parameter after another over the whole
+    /// command let a value that spelled another parameter's placeholder (<c>{b}</c> typed
+    /// into <c>{a}</c>) be rewritten later with the quoting of the wrong position, so
+    /// <c>echo {a} {b}</c> with a=<c>{b}</c> and b=<c>x; id</c> ran <c>id</c>. Dropping an
+    /// optional placeholder likewise could no longer reach into a value's text.
+    /// </para>
+    /// <para>
+    /// Only the spaces next to a dropped placeholder are touched: two spaces written into
     /// the pattern elsewhere, inside a quoted grep expression for instance, are the
     /// author's and stay. A placeholder that ends the command takes the space before it
-    /// along, so <c>hostname {name}</c> becomes <c>hostname</c>.
+    /// along, so <c>hostname {name}</c> becomes <c>hostname</c>. A space that ends an
+    /// inserted value belongs to the value and is left alone.
+    /// </para>
     /// </remarks>
-    internal static string RemoveEmptyPlaceholder(string command, string placeholder)
+    internal static string SubstitutePlaceholders(string pattern, IReadOnlyDictionary<string, string?> substitutions)
     {
-        var result = new StringBuilder(command.Length);
+        var result = new StringBuilder(pattern.Length);
+
+        // Everything before this length came from an inserted value: the space handling
+        // around a dropped placeholder looks only at pattern text written after it.
+        var valueEnd = 0;
+        var closeBrace = -1;
+        var noMoreClosingBrace = false;
         var index = 0;
 
-        while (true)
+        while (index < pattern.Length)
         {
-            var found = command.IndexOf(placeholder, index, StringComparison.Ordinal);
-            if (found < 0)
-            {
-                result.Append(command, index, command.Length - index);
-                break;
-            }
+            var current = pattern[index];
 
-            result.Append(command, index, found - index);
-            index = found + placeholder.Length;
-
-            if (result.Length == 0 || result[^1] == ' ')
+            if (current == '{')
             {
-                while (index < command.Length && command[index] == ' ')
+                if (closeBrace < index && !noMoreClosingBrace)
                 {
-                    index++;
+                    closeBrace = pattern.IndexOf('}', index);
+                    noMoreClosingBrace = closeBrace < 0;
+                }
+
+                if (closeBrace > index
+                    && substitutions.TryGetValue(pattern.Substring(index, closeBrace - index + 1), out var replacement))
+                {
+                    index = closeBrace + 1;
+
+                    if (replacement is not null)
+                    {
+                        result.Append(replacement);
+                        valueEnd = result.Length;
+                        continue;
+                    }
+
+                    if (result.Length == 0 || (result.Length > valueEnd && result[^1] == ' '))
+                    {
+                        while (index < pattern.Length && pattern[index] == ' ')
+                        {
+                            index++;
+                        }
+                    }
+
+                    if (index >= pattern.Length)
+                    {
+                        while (result.Length > valueEnd && result[^1] == ' ')
+                        {
+                            result.Length--;
+                        }
+                    }
+
+                    continue;
                 }
             }
 
-            if (index >= command.Length)
-            {
-                while (result.Length > 0 && result[^1] == ' ')
-                {
-                    result.Length--;
-                }
-            }
+            result.Append(current);
+            index++;
         }
 
         return result.ToString();
