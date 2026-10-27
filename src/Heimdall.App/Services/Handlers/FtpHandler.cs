@@ -106,6 +106,12 @@ internal sealed class FtpHandler : IProtocolHandler
                     ct)
                 .ConfigureAwait(false);
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // The user cancelled: not a failure to report. Same contract as SshHandler.
+            browser.Dispose();
+            throw;
+        }
         catch (FtpsCertificateRejectedException ex)
         {
             browser.Dispose();
@@ -117,8 +123,9 @@ internal sealed class FtpHandler : IProtocolHandler
         catch (Exception ex)
         {
             browser.Dispose();
-            Core.Logging.FileLogger.Warn($"FTP connect failed: {ex.Message}");
-            var userMsg = _localizer["ErrorFtpConnectionFailed"];
+            FtpConnectFailureKind failureKind = FtpConnectFailureClassifier.Classify(ex);
+            Core.Logging.FileLogger.Warn($"FTP connect failed ({failureKind}): {ex.GetType().Name}: {ex.Message}");
+            var userMsg = _localizer[FtpConnectFailureClassifier.MessageKey(failureKind)];
             _connectionSm.SetError(server.Id, userMsg);
             return new ConnectionResult(false, userMsg, null);
         }
