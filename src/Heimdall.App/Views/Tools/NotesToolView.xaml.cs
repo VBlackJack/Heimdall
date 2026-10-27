@@ -516,8 +516,9 @@ public partial class NotesToolView : UserControl, IToolView
         return Enum.TryParse(argument[prefix.Length..], ignoreCase: true, out templateKind);
     }
 
+    // AppSettings is not in the container; ConfigManager publishes the loaded snapshot.
     private static AppSettings? ResolveAppSettings()
-        => (Application.Current as App)?.Services?.GetService<AppSettings>();
+        => (Application.Current as App)?.Services?.GetService<ConfigManager>()?.CurrentSettings;
 
     private static int LoadSidebarWidth()
     {

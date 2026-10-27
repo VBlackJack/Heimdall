@@ -61,6 +61,8 @@ public sealed class CommandLibraryShortcutTests
             var viewModel = CreateViewModel();
             viewModel.SetClipboardText = text => { copied.Add(text); return true; };
             viewModel.ApplyExampleText("echo ready");
+            // Examples live in the generator, so it is on screen when one is applied.
+            viewModel.IsGeneratorVisible = true;
 
             view = new CommandLibraryView { DataContext = viewModel };
             window = Show(view);
@@ -103,6 +105,8 @@ public sealed class CommandLibraryShortcutTests
         {
             var viewModel = CreateViewModel();
             viewModel.SetClipboardText = text => { copied.Add(text); return true; };
+            // On screen, so the only thing missing is a command: a hidden generator refuses too.
+            viewModel.IsGeneratorVisible = true;
 
             view = new CommandLibraryView { DataContext = viewModel };
             window = Show(view);
