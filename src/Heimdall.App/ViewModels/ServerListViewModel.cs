@@ -454,16 +454,28 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     {
         ArgumentNullException.ThrowIfNull(profile);
 
-        // The prompt names what would run: for a web profile the program and its arguments.
-        string executable = string.Equals(profile.ConnectionType, "WEB", StringComparison.OrdinalIgnoreCase)
-            ? $"{profile.WebExternalProgram} {profile.WebExternalArguments}".Trim()
-            : string.IsNullOrWhiteSpace(profile.LocalShellExecutable)
-                ? "powershell.exe"
-                : profile.LocalShellExecutable;
-        string body = _localizer.Format(
-            "ConfirmExecutionImportedBody",
-            profile.DisplayName,
-            executable);
+        // The prompt names what would run: for a web profile the program and its arguments, for
+        // a Citrix profile the ICA file the shell would open, which is not a program at all.
+        string body;
+        if (string.Equals(profile.ConnectionType, "CITRIX", StringComparison.OrdinalIgnoreCase))
+        {
+            body = _localizer.Format(
+                "ConfirmExecutionImportedIcaBody",
+                profile.DisplayName,
+                profile.CitrixIcaFilePath ?? string.Empty);
+        }
+        else
+        {
+            string executable = string.Equals(profile.ConnectionType, "WEB", StringComparison.OrdinalIgnoreCase)
+                ? $"{profile.WebExternalProgram} {profile.WebExternalArguments}".Trim()
+                : string.IsNullOrWhiteSpace(profile.LocalShellExecutable)
+                    ? "powershell.exe"
+                    : profile.LocalShellExecutable;
+            body = _localizer.Format(
+                "ConfirmExecutionImportedBody",
+                profile.DisplayName,
+                executable);
+        }
         bool confirmed = await _dialogService.ShowConfirmAsync(
             _localizer["ConfirmExecutionImportedTitle"],
             body,
@@ -808,15 +820,26 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             outcome.SkippedDuplicates,
             outcome.WarningCount);
 
+        string details = WithSanitizationWarnings(summary, outcome.Sanitization);
         if (outcome.ImportedCount > 0)
         {
-            _dialogService.ShowInfo(_localizer["DialogTitleImportOpenSshConfig"], summary);
+            _dialogService.ShowInfo(_localizer["DialogTitleImportOpenSshConfig"], details);
             StatusMessageRequested?.Invoke(summary);
         }
         else
         {
-            _dialogService.ShowWarning(_localizer["DialogTitleImportOpenSshConfig"], summary);
+            _dialogService.ShowWarning(_localizer["DialogTitleImportOpenSshConfig"], details);
         }
+    }
+
+    /// <summary>
+    /// The import summary followed by what the import boundary took away, profile by profile,
+    /// so a dropped key path can be re-entered by a user who trusts it.
+    /// </summary>
+    private string WithSanitizationWarnings(string summary, ImportedProfileSanitizationReport sanitization)
+    {
+        IReadOnlyList<string> lines = ImportSummaryText.SanitizationWarnings(_localizer, sanitization);
+        return lines.Count == 0 ? summary : string.Join(Environment.NewLine, [summary, .. lines]);
     }
 
     public async Task ImportPuttySessionsAsync(CancellationToken cancellationToken = default)
@@ -847,14 +870,15 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             outcome.SkippedInvalid,
             outcome.WarningCount);
 
+        string details = WithSanitizationWarnings(summary, outcome.Sanitization);
         if (outcome.ImportedCount > 0)
         {
-            _dialogService.ShowInfo(_localizer["DialogTitleImportPuttySessions"], summary);
+            _dialogService.ShowInfo(_localizer["DialogTitleImportPuttySessions"], details);
             StatusMessageRequested?.Invoke(summary);
         }
         else
         {
-            _dialogService.ShowWarning(_localizer["DialogTitleImportPuttySessions"], summary);
+            _dialogService.ShowWarning(_localizer["DialogTitleImportPuttySessions"], details);
         }
     }
 

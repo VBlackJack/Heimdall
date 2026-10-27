@@ -3044,7 +3044,13 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                 return;
             }
 
-            ImportedProfileSanitizer.Sanitize(imported);
+            ImportedProfileSanitizationReport sanitization = ImportedProfileSanitizer.Sanitize(imported);
+            IReadOnlyList<string> sanitizationWarnings = ImportSummaryText.SanitizationWarnings(_localizer, sanitization);
+            if (sanitizationWarnings.Count > 0)
+            {
+                importWarnings ??= new List<string>();
+                importWarnings.AddRange(sanitizationWarnings);
+            }
 
             (List<ServerProfileDto> validImported, List<string> validationFailures) =
                 ImportedProfileValidator.FilterValid(imported, ProfileImportService.SupportedConnectionTypes);

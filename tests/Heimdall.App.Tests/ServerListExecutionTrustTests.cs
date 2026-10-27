@@ -166,6 +166,29 @@ public sealed class ServerListExecutionTrustTests
         Assert.Equal(1, fixture.DialogService.ConfirmCallCount);
     }
 
+    // P1-01. An imported Citrix profile with an ICA file is confirmed before the shell opens it,
+    // and the prompt names that file, not a program it does not run.
+    [Fact]
+    public async Task ConfirmAndTrustExecutionAsync_CitrixIcaProfile_NamesTheIcaFile()
+    {
+        await using ServerListExecutionTrustFixture fixture = await ServerListExecutionTrustFixture.CreateAsync(false);
+        ServerProfileDto promptProfile = new()
+        {
+            Id = "citrix-1",
+            DisplayName = "Imported Citrix",
+            ConnectionType = "CITRIX",
+            CitrixIcaFilePath = @"C:\Users\me\Downloads\launch.ica"
+        };
+
+        await fixture.ViewModel.ConfirmAndTrustExecutionAsync(promptProfile);
+
+        Assert.Contains(
+            "\"Imported Citrix\" was imported and will open this Citrix ICA file: C:\\Users\\me\\Downloads\\launch.ica.",
+            fixture.DialogService.LastConfirmMessage,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("powershell.exe", fixture.DialogService.LastConfirmMessage, StringComparison.Ordinal);
+    }
+
     private static ServerProfileDto CreateLocalShellProfile(string id)
     {
         return new ServerProfileDto

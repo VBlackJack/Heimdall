@@ -857,6 +857,94 @@ public sealed class CitrixHandlerTests
             CitrixUseSso = useSso
         };
 
+    // P1-01. The ICA path is handed to the shell, which opens any file type with its associated
+    // program. A share or device path is refused before any file system call (the existence test
+    // itself would send the user's NetNTLMv2 response), and so is anything but a .ica file,
+    // including an alternate data stream whose name ends in .ica.
+    [Theory]
+    [InlineData(@"\\attacker.example\share\a.ica")]
+    [InlineData("//attacker.example/share/a.ica")]
+    [InlineData(@"\\?\UNC\attacker.example\share\a.ica")]
+    [InlineData(@"\\?\C:\Citrix\a.ica")]
+    [InlineData(@"\\.\C:\Citrix\a.ica")]
+    [InlineData(@"C:\Users\me\Downloads\x.hta")]
+    [InlineData(@"C:\Users\me\Downloads\a.ica.exe")]
+    [InlineData(@"C:\Users\me\Downloads\x.exe:.ica")]
+    [InlineData(@"C:\Users\me\Downloads\x.hta:stream.ica")]
+    public async Task ConnectAsync_IcaFile_NotALocalIcaFile_IsRefusedWithoutTouchingTheFileSystem(string icaPath)
+    {
+        int fileProbes = 0;
+        int launches = 0;
+        CitrixHandler handler = new(
+            new ConnectionStateMachine(),
+            new LocalizationManager(),
+            _ =>
+            {
+                launches++;
+                return null;
+            },
+            static stored => stored,
+            static () => null,
+            static _ => { },
+            static _ => { },
+            capturePreLaunchWindows: static () => new HashSet<nint>(),
+            fileExists: _ =>
+            {
+                fileProbes++;
+                return true;
+            });
+
+        ConnectionResult result = await handler.ConnectAsync(
+            CreateIcaServer(icaPath),
+            new AppSettings(),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal("CitrixIcaFileRejected", result.ErrorMessage);
+        Assert.Equal(0, fileProbes);
+        Assert.Equal(0, launches);
+    }
+
+    [Fact]
+    public async Task ConnectAsync_IcaFile_LocalIcaFile_IsOpenedByItsFullPath()
+    {
+        string? launched = null;
+        bool? shellExecute = null;
+        CitrixHandler handler = new(
+            new ConnectionStateMachine(),
+            new LocalizationManager(),
+            startInfo =>
+            {
+                launched = startInfo.FileName;
+                shellExecute = startInfo.UseShellExecute;
+                return null;
+            },
+            static stored => stored,
+            static () => null,
+            static _ => { },
+            static _ => { },
+            capturePreLaunchWindows: static () => new HashSet<nint>(),
+            fileExists: static path => string.Equals(path, @"C:\Citrix\app.ICA", StringComparison.Ordinal));
+
+        ConnectionResult result = await handler.ConnectAsync(
+            CreateIcaServer(@"C:\Citrix\.\app.ICA"),
+            new AppSettings(),
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal(@"C:\Citrix\app.ICA", launched);
+        Assert.True(shellExecute);
+    }
+
+    private static ServerProfileDto CreateIcaServer(string icaFilePath) =>
+        new()
+        {
+            Id = "srv-citrix-ica",
+            DisplayName = "Citrix ICA test",
+            ConnectionType = "CITRIX",
+            CitrixIcaFilePath = icaFilePath
+        };
+
     private static ServerProfileDto CreateCacheServer(string launchCommandLine) =>
         new()
         {

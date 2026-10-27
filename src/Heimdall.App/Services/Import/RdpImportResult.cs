@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+using Heimdall.Core.Configuration;
+
 namespace Heimdall.App.Services.Import;
 
 public sealed class RdpImportResult
@@ -29,4 +31,7 @@ public sealed class RdpImportResult
     public int PasswordsIgnoredCount { get; init; }
 
     public IReadOnlyList<string> Warnings { get; init; } = [];
+
+    /// <summary>What the import boundary turned off on the profiles that were written.</summary>
+    public ImportedProfileSanitizationReport Sanitization { get; init; } = ImportedProfileSanitizationReport.Empty;
 }
