@@ -107,6 +107,13 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     /// </summary>
     private bool _generatedFromExample;
 
+    /// <summary>
+    /// True once the operator has changed a parameter of the template on screen. Until then a
+    /// required field left empty keeps the command invalid without printing an error for a field
+    /// nobody has touched yet; any other error still shows at once.
+    /// </summary>
+    private bool _parametersTouched;
+
     private ListCollectionView? _actionsView;
     private DispatcherTimer? _historyCopyTimer;
 
@@ -759,6 +766,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     {
         if (e.PropertyName == nameof(CommandLibraryParameterEntry.Value))
         {
+            _parametersTouched = true;
             RegenerateCommand();
         }
     }
@@ -1257,9 +1265,17 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
             else
             {
                 GeneratedCommand = _activeTemplate.CommandPattern;
-                ValidationError = string.Join(
-                    Environment.NewLine,
-                    errors.Select(static error => $"- {error}"));
+                // The validator reports exactly one error per required field left empty and
+                // checks nothing else on an empty value, so equal counts mean every error is a
+                // missing value: silent until the first edit.
+                int missingRequired = _parameters.Count(
+                    static parameter => parameter.Required && string.IsNullOrWhiteSpace(parameter.Value));
+                bool onlyUntouchedMissingValues = !_parametersTouched && errors.Count == missingRequired;
+                ValidationError = onlyUntouchedMissingValues
+                    ? string.Empty
+                    : string.Join(
+                        Environment.NewLine,
+                        errors.Select(static error => $"- {error}"));
                 IsCommandValid = false;
             }
         }
@@ -1292,6 +1308,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
         if (_activeTemplate is null) return;
 
         ActiveTemplateName = _activeTemplate.Name;
+        _parametersTouched = false;
 
         ResetParameterSubscriptions();
         _parameters.Clear();
