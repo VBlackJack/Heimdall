@@ -435,6 +435,7 @@ public sealed class CommandCredentialProvider : ICredentialProvider
     /// placeholder of a known password manager tool (see <see cref="KnownVaultTools"/>).
     /// For non-shell targets and cmd, a value that ends in backslashes right before a closing
     /// double quote has them doubled, so the quote still closes the argument (MSVC CRT rules).
+    /// The one-pass expansion is <see cref="ArgumentTemplate.Expand"/>, shared with the external tools.
     /// </summary>
     internal string ExpandTemplate(
         string template,
@@ -463,54 +464,7 @@ public sealed class CommandCredentialProvider : ICredentialProvider
         // cmd hands a quoted argument to the program it starts unchanged, and that program parses
         // it by the CRT rules, so the closing quote needs the same protection there.
         bool protectClosingQuote = !shellTarget || IsCmdTarget(executable);
-        return ExpandPlaceholders(template, placeholders, protectClosingQuote);
-    }
-
-    /// <summary>
-    /// Replaces every placeholder of the template in one pass over the template only, so a value
-    /// is never expanded again: a host or entry name that contains <c>{KeyFile}</c> used to be
-    /// replaced by the local key file path. When an occurrence is followed by a double quote and
-    /// <paramref name="protectClosingQuote"/> is set, trailing backslashes of the value are
-    /// doubled: an entry named <c>share\</c> would otherwise turn the closing quote into a
-    /// literal one and merge the following arguments into it.
-    /// </summary>
-    private static string ExpandPlaceholders(
-        string template,
-        IReadOnlyList<(string Token, string Value)> placeholders,
-        bool protectClosingQuote)
-    {
-        var builder = new StringBuilder(template.Length);
-        int position = 0;
-        while (position < template.Length)
-        {
-            (string Token, string Value)? match = null;
-            if (template[position] == '{')
-            {
-                foreach (var placeholder in placeholders)
-                {
-                    if (string.Compare(template, position, placeholder.Token, 0, placeholder.Token.Length,
-                            StringComparison.OrdinalIgnoreCase) == 0)
-                    {
-                        match = placeholder;
-                        break;
-                    }
-                }
-            }
-
-            if (match is not { } found)
-            {
-                builder.Append(template[position]);
-                position++;
-                continue;
-            }
-
-            int after = position + found.Token.Length;
-            bool closedByQuote = after < template.Length && template[after] == '"';
-            builder.Append(protectClosingQuote && closedByQuote ? DoubleTrailingBackslashes(found.Value) : found.Value);
-            position = after;
-        }
-
-        return builder.ToString();
+        return ArgumentTemplate.Expand(template, placeholders, protectClosingQuote);
     }
 
     /// <summary>Whether the executable is cmd.exe or a batch file that cmd runs.</summary>
@@ -521,17 +475,6 @@ public sealed class CommandCredentialProvider : ICredentialProvider
             || name.Equals("cmd.exe", StringComparison.OrdinalIgnoreCase)
             || name.EndsWith(".bat", StringComparison.OrdinalIgnoreCase)
             || name.EndsWith(".cmd", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string DoubleTrailingBackslashes(string value)
-    {
-        int trailing = 0;
-        while (trailing < value.Length && value[value.Length - 1 - trailing] == '\\')
-        {
-            trailing++;
-        }
-
-        return trailing == 0 ? value : value + new string('\\', trailing);
     }
 
     /// <summary>Whether the executable is one of <see cref="KnownVaultTools"/>.</summary>
