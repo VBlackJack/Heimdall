@@ -5583,7 +5583,7 @@
   "ToolCronJobDetailHeader": "Detalles de la entrada",
   "ToolCronJobDetailSchedule": "Programación: {0}",
   "ToolCronJobDetailCommand": "Comando: {0}",
-  "ToolCronJobDetailNextRuns": "Próximas ejecuciones:\n{0}",
+  "ToolCronJobDetailNextRuns": "Próximas ejecuciones (hora local de este equipo, no la del servidor):\n{0}",
   "ToolCronJobErrorEmpty": "Pega el contenido de crontab para interpretarlo.",
   "ToolCronJobErrorNoParsed": "No se encontraron entradas de crontab válidas.",
   "ToolCronJobErrorTimeout": "Se agotó el tiempo de espera al cargar las tareas.",

@@ -5582,7 +5582,7 @@
   "ToolCronJobDetailHeader": "D\u00e9tails de l'entr\u00e9e",
   "ToolCronJobDetailSchedule": "Planification : {0}",
   "ToolCronJobDetailCommand": "Commande : {0}",
-  "ToolCronJobDetailNextRuns": "Prochaines ex\u00e9cutions :\n{0}",
+  "ToolCronJobDetailNextRuns": "Prochaines ex\u00e9cutions (heure locale de ce poste, pas celle du serveur) :\n{0}",
   "ToolCronJobErrorEmpty": "Veuillez coller le contenu de crontab \u00e0 analyser.",
   "ToolCronJobErrorNoParsed": "Aucune entr\u00e9e crontab valide trouv\u00e9e.",
   "ToolCronJobErrorTimeout": "Le chargement des t\u00e2ches a expir\u00e9.",

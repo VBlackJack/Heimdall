@@ -5583,7 +5583,7 @@
   "ToolCronJobDetailHeader": "Entry Details",
   "ToolCronJobDetailSchedule": "Schedule: {0}",
   "ToolCronJobDetailCommand": "Command: {0}",
-  "ToolCronJobDetailNextRuns": "Next runs:\n{0}",
+  "ToolCronJobDetailNextRuns": "Next runs (this workstation's local time, not the server's):\n{0}",
   "ToolCronJobErrorEmpty": "Please paste crontab content to parse.",
   "ToolCronJobErrorNoParsed": "No valid crontab entries found.",
   "ToolCronJobErrorTimeout": "Loading tasks timed out.",
