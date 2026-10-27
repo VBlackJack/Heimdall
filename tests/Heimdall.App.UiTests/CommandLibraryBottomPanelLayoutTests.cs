@@ -199,12 +199,22 @@ public sealed class CommandLibraryBottomPanelLayoutTests
     /// Dragging up grows the panel by the distance dragged, past its automatic cap, and the
     /// height is remembered when the drag ends.
     /// </summary>
+    /// <remarks>
+    /// The drag is sized to the room the rendered body actually leaves. A fixed 100 px drag
+    /// failed one CI run on 2026-10-27 and passed the same tree before it: the panel grew by 69 px
+    /// and stopped at the list's reserve, because that runner laid the body out shorter than the
+    /// window height asked for. Stopping at the reserve is the clamp working, which
+    /// <see cref="TheGripNeverTakesTheListsReserve"/> pins; this test is about the growth.
+    /// </remarks>
     [StaFact]
     public void DraggingTheGripUpGrowsThePanelAndRemembersIt()
     {
-        const double Drag = 100;
+        const double PreferredDrag = 100;
+        const double MinimumDrag = 32;
         double before = 0;
         double after = 0;
+        double drag = 0;
+        string layout = string.Empty;
         var persisted = new List<int>();
 
         RenderGenerator(TallViewHeight, (view, _) =>
@@ -212,14 +222,25 @@ public sealed class CommandLibraryBottomPanelLayoutTests
             view.PersistBottomPanelHeight = persisted.Add;
             var panel = FindGeneratorPanel(view);
             before = panel.ActualHeight;
+            double body = ((FrameworkElement)view.FindName("BodyPanel")).ActualHeight;
+            double room = body - (double)view.FindResource("CmdLibActionListMinHeight");
+            drag = Math.Min(PreferredDrag, Math.Floor(room - before));
+            layout = $"view {view.ActualHeight:F0}, body {body:F0}, panel {before:F0}, room {room:F0}, "
+                + $"screen {SystemParameters.PrimaryScreenHeight:F0}";
 
-            Grip(view).RaiseEvent(new DragDeltaEventArgs(0, -Drag));
+            if (drag < MinimumDrag)
+            {
+                return;
+            }
+
+            Grip(view).RaiseEvent(new DragDeltaEventArgs(0, -drag));
             Settle(view);
-            Grip(view).RaiseEvent(new DragCompletedEventArgs(0, -Drag, false));
+            Grip(view).RaiseEvent(new DragCompletedEventArgs(0, -drag, false));
             after = panel.ActualHeight;
         });
 
-        Assert.Equal(before + Drag, after, precision: 0);
+        Assert.True(drag >= MinimumDrag, $"No room left to drag the grip into: {layout}.");
+        Assert.Equal(before + drag, after, precision: 0);
         Assert.Equal([(int)Math.Round(after)], persisted);
     }
 
