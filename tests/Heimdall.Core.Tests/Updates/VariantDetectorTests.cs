@@ -53,6 +53,49 @@ public sealed class VariantDetectorTests
         Assert.Equal(@"C:\App\runtimes\webview2\msedgewebview2.exe", probed);
     }
 
+    /// <summary>
+    /// A Standard install over a SelfContained one leaves the marker behind: the stamp
+    /// says Standard, and the stamp wins.
+    /// </summary>
+    [Fact]
+    public void Detect_StampedStandardWithLeftoverMarker_ReturnsStandard()
+    {
+        var detector = new VariantDetector(@"C:\App", _ => true, () => [], () => BuildVariant.Standard);
+
+        Assert.Equal(BuildVariant.Standard, detector.Detect());
+    }
+
+    [Fact]
+    public void Detect_StampedSelfContainedWithoutMarker_ReturnsSelfContained()
+    {
+        var detector = new VariantDetector(@"C:\App", _ => false, () => [], () => BuildVariant.SelfContained);
+
+        Assert.Equal(BuildVariant.SelfContained, detector.Detect());
+    }
+
+    [Theory]
+    [InlineData(true, BuildVariant.SelfContained)]
+    [InlineData(false, BuildVariant.Standard)]
+    public void Detect_NoStamp_FallsBackToTheMarker(bool markerPresent, BuildVariant expected)
+    {
+        var detector = new VariantDetector(@"C:\App", _ => markerPresent, () => [], () => null);
+
+        Assert.Equal(expected, detector.Detect());
+    }
+
+    [Theory]
+    [InlineData("Standard", BuildVariant.Standard)]
+    [InlineData("SelfContained", BuildVariant.SelfContained)]
+    [InlineData("selfcontained", BuildVariant.SelfContained)]
+    [InlineData("", null)]
+    [InlineData(null, null)]
+    [InlineData("Portable", null)]
+    [InlineData("42", null)]
+    public void ParseEdition_ReadsOnlyAKnownEdition(string? value, BuildVariant? expected)
+    {
+        Assert.Equal(expected, VariantDetector.ParseEdition(value));
+    }
+
     [Theory]
     [InlineData(@"C:\Program Files\Heimdall\")]
     [InlineData(@"C:\Program Files\Heimdall")]

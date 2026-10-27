@@ -15,6 +15,7 @@
  */
 
 using System.IO;
+using Heimdall.Core.Updates;
 using Microsoft.Web.WebView2.Core;
 
 namespace Heimdall.App.Services;
@@ -22,14 +23,16 @@ namespace Heimdall.App.Services;
 /// <summary>
 /// Centralizes WebView2 runtime detection and environment creation.
 /// Supports three resolution strategies in priority order:
-/// 1. Bundled Fixed Version Runtime in <c>runtimes/webview2/</c> (fully portable)
+/// 1. Bundled Fixed Version Runtime in <c>runtimes/webview2/</c>, SelfContained edition only
 /// 2. System-wide Evergreen Runtime (Microsoft Edge or standalone installer)
 /// 3. Unavailable - caller should show fallback UI
 /// </summary>
 public static class WebView2Helper
 {
-    private static readonly string BundledRuntimePath =
-        Path.Combine(AppContext.BaseDirectory, "runtimes", "webview2");
+    private const string RuntimeExecutableName = "msedgewebview2.exe";
+
+    private static readonly Lazy<string?> BundledRuntimeFolder = new(
+        () => BundledRuntimeFolderFor(new VariantDetector().Detect(), AppContext.BaseDirectory, File.Exists));
 
     private static bool? _isAvailable;
 
@@ -49,8 +52,32 @@ public static class WebView2Helper
     /// <summary>
     /// Returns true if using the bundled Fixed Version Runtime.
     /// </summary>
-    public static bool IsBundled => Directory.Exists(BundledRuntimePath)
-        && File.Exists(Path.Combine(BundledRuntimePath, "msedgewebview2.exe"));
+    public static bool IsBundled => BundledRuntimeFolder.Value is not null;
+
+    /// <summary>
+    /// The folder to hand WebView2 as its browser executable folder, or null for the
+    /// system Evergreen Runtime.
+    /// </summary>
+    /// <remarks>
+    /// Only the SelfContained edition uses the bundled runtime. The folder's presence alone
+    /// used to decide, and it survives a switch of edition: a Standard install over a
+    /// SelfContained one kept <c>runtimes\webview2</c>, so the Standard build kept running
+    /// on a Fixed Version Runtime nothing would ever update, instead of the Evergreen one it
+    /// is built for.
+    /// </remarks>
+    internal static string? BundledRuntimeFolderFor(
+        BuildVariant edition,
+        string baseDirectory,
+        Func<string, bool> fileExists)
+    {
+        if (edition != BuildVariant.SelfContained)
+        {
+            return null;
+        }
+
+        string folder = Path.Combine(baseDirectory, "runtimes", "webview2");
+        return fileExists(Path.Combine(folder, RuntimeExecutableName)) ? folder : null;
+    }
 
     /// <summary>
     /// Creates a <see cref="CoreWebView2Environment"/> using the best available runtime.
@@ -65,7 +92,7 @@ public static class WebView2Helper
         var userDataFolder = Path.Combine(
             Path.GetTempPath(), "Heimdall", "WebView2", userDataSubfolder);
 
-        string? browserExecutableFolder = IsBundled ? BundledRuntimePath : null;
+        string? browserExecutableFolder = BundledRuntimeFolder.Value;
         var options = new CoreWebView2EnvironmentOptions(
             additionalBrowserArguments: EmbeddedBrowserArguments(null));
 
@@ -141,7 +168,7 @@ public static class WebView2Helper
             string userDataFolder = Path.Combine(
                 Core.Configuration.ApplicationDataPathResolver.Resolve(),
                 WebConsoleProfileFolderFor(gatewayId, proxyPort));
-            string? browserExecutableFolder = IsBundled ? BundledRuntimePath : null;
+            string? browserExecutableFolder = BundledRuntimeFolder.Value;
             string? arguments = WebConsoleBrowserArguments(proxyPort);
             CoreWebView2EnvironmentOptions options = new(
                 additionalBrowserArguments: EmbeddedBrowserArguments(arguments));
@@ -190,7 +217,7 @@ public static class WebView2Helper
         if (IsBundled)
         {
             Core.Logging.FileLogger.Info(
-                $"WebView2 Fixed Version Runtime found at: {BundledRuntimePath}");
+                $"WebView2 Fixed Version Runtime found at: {BundledRuntimeFolder.Value}");
             return true;
         }
 
