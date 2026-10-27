@@ -38,6 +38,15 @@
         <sys:Double x:Key="CmdLibBottomPanelGripHeight">8</sys:Double>
         <sys:Double x:Key="CmdLibBottomPanelGripBarWidth">40</sys:Double>
         <sys:Double x:Key="CmdLibBottomPanelGripBarHeight">3</sys:Double>
+        <!-- Wide enough for the longest shipped badge (EJECUTAR in Spanish) so titles start in one
+             column whatever the risk; a longer translation grows the badge rather than clipping. -->
+        <sys:Double x:Key="CmdLibRiskBadgeMinWidth">64</sys:Double>
+        <sys:Double x:Key="CmdLibParameterLabelWidth">130</sys:Double>
+        <sys:Double x:Key="CmdLibRunbookVariableLabelWidth">150</sys:Double>
+        <sys:Double x:Key="CmdLibRunbookStepNumberWidth">24</sys:Double>
+        <sys:Double x:Key="CmdLibHelpMaxHeight">200</sys:Double>
+        <sys:Double x:Key="CmdLibHelpLineHeight">20</sys:Double>
+        <sys:Double x:Key="CmdLibBroadcastListMaxHeight">140</sys:Double>
         <!-- A ghost button that shows when it is on: the History and Runbooks panels and the
              favorites filter. They stay plain buttons whose Tag carries the view model's state,
              as the tab strip's broadcast marker does, rather than ToggleButtons: a ToggleButton
@@ -71,6 +80,7 @@
                 BorderThickness="0,0,0,1">
             <DockPanel>
                 <Button DockPanel.Dock="Right"
+                        x:Name="BtnHelp"
                         Content="?"
                         Command="{Binding ToggleHelpCommand}"
                         ToolTip="{loc:Translate ToolHelpTooltip}"
@@ -80,7 +90,7 @@
                         FontSize="{StaticResource FontSizeBody}"
                         FontWeight="Bold"
                         Margin="{StaticResource MarginInlineControl}"
-                        TabIndex="15"/>
+                        TabIndex="27"/>
                 <Button DockPanel.Dock="Right"
                         x:Name="BtnHistory"
                         Content="&#xE81C;" FontFamily="{StaticResource FontFamilyIcons}"
@@ -91,7 +101,7 @@
                         FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28"
                         Padding="4"
                         Margin="{StaticResource MarginInlineControl}"
-                        TabIndex="14">
+                        TabIndex="26">
                     <AutomationProperties.Name>
                         <MultiBinding Converter="{StaticResource AccessibleStateNameConverter}">
                             <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[ToolCmdLibBtnHistory]"/>
@@ -110,7 +120,7 @@
                         FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28"
                         Padding="4"
                         Margin="{StaticResource MarginInlineControl}"
-                        TabIndex="14">
+                        TabIndex="25">
                     <AutomationProperties.Name>
                         <MultiBinding Converter="{StaticResource AccessibleStateNameConverter}">
                             <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[ToolCmdLibBtnRunbooks]"/>
@@ -120,6 +130,7 @@
                     </AutomationProperties.Name>
                 </Button>
                 <Button DockPanel.Dock="Right"
+                        x:Name="BtnSync"
                         Content="&#xE895;" FontFamily="{StaticResource FontFamilyIcons}"
                         Command="{Binding SyncCommand}"
                         ToolTip="{loc:Translate ToolCmdLibBtnSync}"
@@ -129,8 +140,9 @@
                         FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28"
                         Padding="4"
                         Margin="{StaticResource MarginInlineControl}"
-                        TabIndex="13"/>
+                        TabIndex="24"/>
                 <Button DockPanel.Dock="Right"
+                        x:Name="BtnCancelSync"
                         Content="&#xE711;" FontFamily="{StaticResource FontFamilyIcons}"
                         Command="{Binding CancelSyncCommand}"
                         ToolTip="{loc:Translate ToolCmdLibBtnCancelSync}"
@@ -140,8 +152,9 @@
                         FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28"
                         Padding="4"
                         Margin="{StaticResource MarginInlineControl}"
-                        TabIndex="13"/>
+                        TabIndex="23"/>
                 <Button DockPanel.Dock="Right"
+                        x:Name="BtnImport"
                         Content="&#xE8B5;" FontFamily="{StaticResource FontFamilyIcons}"
                         Command="{Binding ImportCommand}"
                         ToolTip="{loc:Translate ToolCmdLibBtnImport}"
@@ -150,8 +163,9 @@
                         FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28"
                         Padding="4"
                         Margin="{StaticResource MarginInlineControl}"
-                        TabIndex="12"/>
+                        TabIndex="22"/>
                 <Button DockPanel.Dock="Right"
+                        x:Name="BtnExport"
                         Content="&#xEDE1;" FontFamily="{StaticResource FontFamilyIcons}"
                         Command="{Binding ExportCommand}"
                         ToolTip="{loc:Translate ToolCmdLibBtnExport}"
@@ -160,8 +174,9 @@
                         FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28"
                         Padding="4"
                         Margin="{StaticResource MarginInlineControl}"
-                        TabIndex="11"/>
+                        TabIndex="21"/>
                 <Button DockPanel.Dock="Right"
+                        x:Name="BtnAdd"
                         Content="&#xE710;" FontFamily="{StaticResource FontFamilyIcons}"
                         Command="{Binding AddActionCommand}"
                         ToolTip="{loc:Translate ToolCmdLibBtnAdd}"
@@ -170,7 +185,7 @@
                         FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28"
                         Padding="4"
                         Margin="{StaticResource MarginInlineControl}"
-                        TabIndex="10"/>
+                        TabIndex="20"/>
                 <TextBlock Text="{loc:Translate ToolCmdLibTitle}"
                            FontSize="{StaticResource FontSizeSubtitle}"
                            FontWeight="SemiBold"
@@ -205,12 +220,12 @@
                         AutomationProperties.Name="{loc:Translate BtnClose}"
                         Style="{DynamicResource ToolCloseHelpButtonStyle}"
                         VerticalAlignment="Top"
-                        TabIndex="16"/>
-                <ScrollViewer MaxHeight="200" VerticalScrollBarVisibility="Auto">
+                        TabIndex="28"/>
+                <ScrollViewer MaxHeight="{StaticResource CmdLibHelpMaxHeight}" VerticalScrollBarVisibility="Auto">
                     <TextBlock Text="{Binding HelpContentText}" TextWrapping="Wrap"
                                FontSize="{StaticResource FontSizeBody}"
                                Foreground="{DynamicResource TextSecondaryBrush}"
-                               LineHeight="20"/>
+                               LineHeight="{StaticResource CmdLibHelpLineHeight}"/>
                 </ScrollViewer>
             </DockPanel>
         </Border>
@@ -258,6 +273,7 @@
                                VerticalAlignment="Center" Margin="0,2,8,2"
                                MinWidth="65"/>
                     <Button Content="&#x2605;"
+                            TabIndex="1"
                             x:Name="BtnFavoritesFilter"
                             Command="{Binding ToggleFavoritesFilterCommand}"
                             Tag="{Binding FavoritesFilterActive}"
@@ -275,33 +291,37 @@
                         </AutomationProperties.Name>
                     </Button>
                     <ComboBox MinWidth="180" Margin="0,2,8,2"
+                              x:Name="CmbCategoryFilter"
                               FontSize="{StaticResource FontSizeBody}"
                               ItemsSource="{Binding CategoryFilterItems}"
                               SelectedIndex="{Binding CategoryFilterIndex, Mode=TwoWay}"
                               ToolTip="{loc:Translate ToolCmdLibDialogLblCategory}"
                               AutomationProperties.Name="{loc:Translate ToolCmdLibDialogLblCategory}"
-                              TabIndex="1"/>
+                              TabIndex="2"/>
                     <ComboBox MinWidth="150" Margin="0,2,8,2"
+                              x:Name="CmbTagFilter"
                               FontSize="{StaticResource FontSizeBody}"
                               ItemsSource="{Binding TagFilterItems}"
                               SelectedIndex="{Binding TagFilterIndex, Mode=TwoWay}"
                               ToolTip="{loc:Translate ToolCmdLibDialogLblTags}"
                               AutomationProperties.Name="{loc:Translate ToolCmdLibDialogLblTags}"
-                              TabIndex="2"/>
+                              TabIndex="3"/>
                     <ComboBox MinWidth="130" Margin="0,2,8,2"
+                              x:Name="CmbPlatformFilter"
                               FontSize="{StaticResource FontSizeBody}"
                               ItemsSource="{Binding PlatformFilterItems}"
                               SelectedIndex="{Binding PlatformFilterIndex, Mode=TwoWay}"
                               ToolTip="{loc:Translate ToolCmdLibDialogLblPlatform}"
                               AutomationProperties.Name="{loc:Translate ToolCmdLibDialogLblPlatform}"
-                              TabIndex="3"/>
+                              TabIndex="4"/>
                     <ComboBox MinWidth="120" Margin="0,2,0,2"
+                              x:Name="CmbRiskFilter"
                               FontSize="{StaticResource FontSizeBody}"
                               ItemsSource="{Binding RiskFilterItems}"
                               SelectedIndex="{Binding RiskFilterIndex, Mode=TwoWay}"
                               ToolTip="{loc:Translate ToolCmdLibDialogLblRisk}"
                               AutomationProperties.Name="{loc:Translate ToolCmdLibDialogLblRisk}"
-                              TabIndex="4"/>
+                              TabIndex="5"/>
                 </WrapPanel>
             </Grid>
         </Border>
@@ -373,12 +393,19 @@
 
                         <ItemsControl ItemsSource="{Binding Parameters}"
                                       Margin="{StaticResource MarginLabelBottom}">
+                            <ItemsControl.ItemContainerStyle>
+                                <!-- The name goes on the container: set in the template it is inert, and the
+                                     row announced its class name to a screen reader. -->
+                                <Style TargetType="ContentPresenter">
+                                    <Setter Property="AutomationProperties.Name" Value="{Binding DisplayLabel}"/>
+                                </Style>
+                            </ItemsControl.ItemContainerStyle>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <DockPanel Margin="{StaticResource MarginLabelBottom}"
                                                ToolTip="{Binding DisplayTooltip}">
                                         <TextBlock DockPanel.Dock="Left"
-                                                   Text="{Binding DisplayLabel}" Width="130"
+                                                   Text="{Binding DisplayLabel}" Width="{StaticResource CmdLibParameterLabelWidth}"
                                                    FontSize="{StaticResource FontSizeBody}"
                                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                                    VerticalAlignment="Center"/>
@@ -400,7 +427,7 @@
                                                  ToolTip="{Binding DisplayTooltip}"
                                                  AutomationProperties.Name="{Binding DisplayLabel}"
                                                  FontSize="{StaticResource FontSizeBody}"
-                                                 FontFamily="Consolas"
+                                                 FontFamily="{StaticResource FontFamilyMonospace}"
                                                  Padding="{StaticResource PaddingInput}"
                                                  Background="{DynamicResource CardBrush}"
                                                  Foreground="{DynamicResource TextPrimaryBrush}"
@@ -420,7 +447,7 @@
                         <TextBox Text="{Binding GeneratedCommand, Mode=OneWay}"
                                  IsReadOnly="True" TextWrapping="NoWrap"
                                  HorizontalScrollBarVisibility="Auto"
-                                 FontFamily="Consolas"
+                                 FontFamily="{StaticResource FontFamilyMonospace}"
                                  FontSize="{StaticResource FontSizeBody}"
                                  Padding="{StaticResource PaddingInput}"
                                  Background="{DynamicResource CardBrush}"
@@ -447,6 +474,13 @@
                                        Foreground="{DynamicResource TextSecondaryBrush}"
                                        Margin="{StaticResource MarginLabelBottom}"/>
                             <ItemsControl ItemsSource="{Binding SelectedActionExamples}">
+                                <ItemsControl.ItemContainerStyle>
+                                    <!-- The name goes on the container: set in the template it is inert, and the
+                                         row announced its class name to a screen reader. -->
+                                    <Style TargetType="ContentPresenter">
+                                        <Setter Property="AutomationProperties.Name" Value="{Binding Command}"/>
+                                    </Style>
+                                </ItemsControl.ItemContainerStyle>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <!-- Card row. The apply action lives on a flat Button (in the
@@ -482,7 +516,7 @@
                                                     </Button.Template>
                                                     <StackPanel>
                                                         <TextBlock Text="{Binding Command}"
-                                                                   FontFamily="Consolas"
+                                                                   FontFamily="{StaticResource FontFamilyMonospace}"
                                                                    FontSize="{StaticResource FontSizeCaption}"
                                                                    Foreground="{DynamicResource AccentTextBrush}"
                                                                    TextWrapping="Wrap"/>
@@ -508,6 +542,13 @@
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
                             <ItemsControl ItemsSource="{Binding SelectedActionLinks}" Margin="0,4,0,0">
+                                <ItemsControl.ItemContainerStyle>
+                                    <!-- The name goes on the container: set in the template it is inert, and the
+                                         row announced its class name to a screen reader. -->
+                                    <Style TargetType="ContentPresenter">
+                                        <Setter Property="AutomationProperties.Name" Value="{Binding Title}"/>
+                                    </Style>
+                                </ItemsControl.ItemContainerStyle>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <TextBlock FontSize="{StaticResource FontSizeCaption}">
@@ -528,6 +569,7 @@
                 <DockPanel Grid.Row="1" Margin="12,0,12,12">
                     <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
                         <Button Command="{Binding EditSelectedCommand}"
+                                x:Name="BtnEdit"
                                 Content="&#xE70F;" FontFamily="{StaticResource FontFamilyIcons}"
                                 Visibility="{Binding CanEditSelected, Converter={StaticResource BoolToVisibilityConverter}}"
                                 ToolTip="{loc:Translate ToolCmdLibBtnEdit}"
@@ -540,14 +582,16 @@
                              shipped action into your own library is the only way to get a
                              variant of one, since they cannot be edited. -->
                         <Button Command="{Binding DuplicateSelectedCommand}"
-                                Content="&#xE8C8;" FontFamily="{StaticResource FontFamilyIcons}"
+                                x:Name="BtnDuplicate"
+                                Content="&#xF413;" FontFamily="{StaticResource FontFamilyIcons}"
                                 ToolTip="{loc:Translate ToolCmdLibDuplicate}"
                                 AutomationProperties.Name="{loc:Translate ToolCmdLibDuplicate}"
                                 Style="{DynamicResource GhostButtonStyle}"
                                 FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28"
                                 Padding="4"
-                                Margin="{StaticResource MarginInlineXs}" TabIndex="9"/>
+                                Margin="{StaticResource MarginInlineXs}" TabIndex="8"/>
                         <Button Command="{Binding DeleteSelectedCommand}"
+                                x:Name="BtnDelete"
                                 Content="&#xE74D;" FontFamily="{StaticResource FontFamilyIcons}"
                                 Visibility="{Binding CanEditSelected, Converter={StaticResource BoolToVisibilityConverter}}"
                                 ToolTip="{loc:Translate ToolCmdLibBtnDelete}"
@@ -555,7 +599,7 @@
                                 Style="{DynamicResource GhostButtonStyle}"
                                 FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28"
                                 Padding="4"
-                                TabIndex="8"/>
+                                TabIndex="9"/>
                     </StackPanel>
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"
                                 HorizontalAlignment="Right">
@@ -569,7 +613,7 @@
                                 Style="{DynamicResource SecondaryButtonStyle}"
                                 Padding="{StaticResource PaddingButtonCopy}"
                                 FontSize="{StaticResource FontSizeBody}"
-                                Margin="{StaticResource MarginInlineSm}" TabIndex="5"/>
+                                Margin="{StaticResource MarginInlineSm}" TabIndex="10"/>
                         <!-- Insert sits between Copy and Send: it reaches the terminal like Send and
                              runs nothing, like Copy. Enabled under Send's condition. -->
                         <Button x:Name="BtnInsert"
@@ -584,7 +628,7 @@
                                 Style="{DynamicResource SecondaryButtonStyle}"
                                 Padding="{StaticResource PaddingButtonCopy}"
                                 FontSize="{StaticResource FontSizeBody}"
-                                Margin="{StaticResource MarginInlineSm}" TabIndex="5"/>
+                                Margin="{StaticResource MarginInlineSm}" TabIndex="11"/>
                         <Button x:Name="BtnSend"
                                 Command="{Binding SendCommand}"
                                 IsEnabled="{Binding IsSendEnabled}"
@@ -596,7 +640,7 @@
                                 Style="{DynamicResource PrimaryButtonStyle}"
                                 Padding="{StaticResource PaddingButtonPrimary}"
                                 FontSize="{StaticResource FontSizeBody}"
-                                TabIndex="6"/>
+                                TabIndex="12"/>
                         <!-- IsChecked is the only mutator, and it is two-way on purpose. With a
                              one-way IsChecked beside a Command, anything that drives the control
                              through the UIA Toggle pattern - an automation client, a screen reader -
@@ -612,7 +656,7 @@
                                       Style="{DynamicResource ToolbarToggleButtonStyle}"
                                       FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28"
                                       Padding="4"
-                                      Margin="{StaticResource MarginInlineSm}" TabIndex="7"/>
+                                      Margin="{StaticResource MarginInlineSm}" TabIndex="13"/>
                     </StackPanel>
                     <!-- Inline hint shown only for non-injectable sessions (RDP/VNC/etc.):
                          command is ready but there is no terminal sink to Send into,
@@ -673,9 +717,16 @@
                                    FontSize="{StaticResource FontSizeCaption}"
                                    TextWrapping="Wrap" Margin="0,2,0,2"/>
 
-                        <ScrollViewer MaxHeight="140" VerticalScrollBarVisibility="Auto">
+                        <ScrollViewer MaxHeight="{StaticResource CmdLibBroadcastListMaxHeight}" VerticalScrollBarVisibility="Auto">
                             <ItemsControl ItemsSource="{Binding BroadcastTargets}"
                                           AutomationProperties.Name="{loc:Translate ToolCmdLibBroadcastHeader}">
+                                <ItemsControl.ItemContainerStyle>
+                                    <!-- The name goes on the container: set in the template it is inert, and the
+                                         row announced its class name to a screen reader. -->
+                                    <Style TargetType="ContentPresenter">
+                                        <Setter Property="AutomationProperties.Name" Value="{Binding AccessibleName}"/>
+                                    </Style>
+                                </ItemsControl.ItemContainerStyle>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
                                         <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
@@ -880,7 +931,7 @@
                                                   Visibility="{Binding IsReadable, Converter={StaticResource BoolToVisibilityConverter}}">
                                         <TextBlock Text="{Binding GeneratedCommand}"
                                                    FontSize="{StaticResource FontSizeCaption}"
-                                                   FontFamily="Consolas"
+                                                   FontFamily="{StaticResource FontFamilyMonospace}"
                                                    Foreground="{DynamicResource AccentTextBrush}"
                                                    TextWrapping="NoWrap"/>
                                     </ScrollViewer>
@@ -936,7 +987,7 @@
                                 Style="{DynamicResource GhostButtonStyle}"
                                 FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28" Padding="4"/>
                         <Button DockPanel.Dock="Right"
-                                Content="&#xE8C8;" FontFamily="{StaticResource FontFamilyIcons}"
+                                Content="&#xF413;" FontFamily="{StaticResource FontFamilyIcons}"
                                 Command="{Binding DuplicateRunbookCommand}"
                                 ToolTip="{loc:Translate ToolCmdLibRunbookDuplicate}"
                                 AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookDuplicate}"
@@ -1063,18 +1114,25 @@
                                    FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextSecondaryBrush}"/>
                         <ItemsControl ItemsSource="{Binding Variables}">
+                            <ItemsControl.ItemContainerStyle>
+                                <!-- The name goes on the container: set in the template it is inert, and the
+                                     row announced its class name to a screen reader. -->
+                                <Style TargetType="ContentPresenter">
+                                    <Setter Property="AutomationProperties.Name" Value="{Binding Reference}"/>
+                                </Style>
+                            </ItemsControl.ItemContainerStyle>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
                                     <DockPanel Margin="0,2,0,2">
                                         <TextBlock DockPanel.Dock="Left"
-                                                   Text="{Binding Reference}" Width="150"
-                                                   FontFamily="Consolas"
+                                                   Text="{Binding Reference}" Width="{StaticResource CmdLibRunbookVariableLabelWidth}"
+                                                   FontFamily="{StaticResource FontFamilyMonospace}"
                                                    FontSize="{StaticResource FontSizeCaption}"
                                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                                    VerticalAlignment="Center"/>
                                         <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
                                                  AutomationProperties.Name="{Binding Reference}"
-                                                 FontFamily="Consolas"
+                                                 FontFamily="{StaticResource FontFamilyMonospace}"
                                                  Padding="{StaticResource PaddingInput}"
                                                  Background="{DynamicResource CardBrush}"
                                                  Foreground="{DynamicResource TextPrimaryBrush}"
@@ -1094,7 +1152,7 @@
                         <TextBox Text="{Binding CurrentCommand, Mode=OneWay}"
                                  IsReadOnly="True"
                                  AutomationProperties.Name="{loc:Translate ToolCmdLibRunbookRunCommand}"
-                                 FontFamily="Consolas"
+                                 FontFamily="{StaticResource FontFamilyMonospace}"
                                  TextWrapping="Wrap"
                                  Padding="{StaticResource PaddingInput}"
                                  Background="{DynamicResource CardBrush}"
@@ -1170,7 +1228,7 @@
                                                Margin="{StaticResource MarginInlineControl}"/>
                                     <TextBlock DockPanel.Dock="Left"
                                                Text="{Binding Number}"
-                                               Width="24"
+                                               Width="{StaticResource CmdLibRunbookStepNumberWidth}"
                                                FontSize="{StaticResource FontSizeCaption}"
                                                Foreground="{DynamicResource TextSecondaryBrush}"
                                                VerticalAlignment="Center"/>
@@ -1195,12 +1253,13 @@
         <!-- ═══════════ ACTION LIST ═══════════ -->
         <Grid>
             <ListView
+                      x:Name="ActionList"
                       Background="Transparent" BorderThickness="0"
                       ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                       ItemsSource="{Binding ActionsView}"
                       SelectedItem="{Binding SelectedEntry, Mode=TwoWay}"
                       AutomationProperties.Name="{loc:Translate ToolCmdLibTitle}"
-                      TabIndex="5">
+                      TabIndex="6">
                 <ListView.ItemContainerStyle>
                     <Style TargetType="ListViewItem">
                         <!-- The row's text lives in TextBlocks inside a DockPanel, none of which
@@ -1271,6 +1330,7 @@
                                     Foreground="{DynamicResource WarningTextBrush}"/>
                             <!-- Risk badge -->
                             <Border DockPanel.Dock="Left"
+                                    MinWidth="{StaticResource CmdLibRiskBadgeMinWidth}"
                                     CornerRadius="{StaticResource CornerRadiusSm}" Padding="4,1"
                                     VerticalAlignment="Center" Margin="{StaticResource MarginLabelInline}"
                                     ToolTip="{Binding RiskLabel}">
@@ -1281,6 +1341,7 @@
                                     </MultiBinding>
                                 </Border.Background>
                                 <TextBlock Text="{Binding RiskBadge}"
+                                           HorizontalAlignment="Center"
                                            FontSize="{StaticResource FontSizeSmallCaption}"
                                            FontWeight="Bold" Foreground="{DynamicResource BadgeTextBrush}"/>
                             </Border>
