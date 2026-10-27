@@ -47,6 +47,23 @@ public class MobaXtermImporterTests
     private static string? ResolveDas(string name) =>
         string.Equals(name, "DAS", StringComparison.Ordinal) ? ResolvedLogin : null;
 
+    // --- Byte order mark ---
+
+    [Fact]
+    public void BomFile_DecodedThenParsed_ImportsTheRootSessionsOfTheFirstSection()
+    {
+        byte[] bytes = [0xEF, 0xBB, 0xBF, .. System.Text.Encoding.UTF8.GetBytes(SampleIni)];
+
+        MobaXtermImportResult result = MobaXtermImporter.Parse(
+            MobaXtermFileDecoder.Decode(bytes),
+            new MobaXtermImportOptions());
+
+        Assert.Equal(5, result.Servers.Count);
+        Assert.Contains(result.Servers, server => server.RemoteServer == "web01.example.com");
+        Assert.Contains(result.Servers, server => server.RemoteServer == "db01.example.com");
+        Assert.Contains(result.Servers, server => server.RemoteServer == "win01.example.com");
+    }
+
     // --- Shared session file (anonymized real structure) ---
 
     [Fact]

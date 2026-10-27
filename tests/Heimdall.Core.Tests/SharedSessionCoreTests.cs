@@ -170,7 +170,7 @@ public sealed class SharedSessionCoreTests
     {
         byte[] bytes = [0xEF, 0xBB, 0xBF, .. Encoding.UTF8.GetBytes("caf\u00e9")];
 
-        Assert.EndsWith("caf\u00e9", MobaXtermFileDecoder.Decode(bytes), StringComparison.Ordinal);
+        Assert.Equal("caf\u00e9", MobaXtermFileDecoder.Decode(bytes));
         Assert.True(MobaXtermFileDecoder.HasUtf8Bom(bytes));
     }
 
