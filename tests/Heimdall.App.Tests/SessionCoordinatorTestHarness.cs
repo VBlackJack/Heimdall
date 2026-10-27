@@ -43,9 +43,24 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Heimdall.App.Tests;
 
-public sealed partial class SessionCoordinatorPreMountTests
+/// <summary>
+/// The session coordinator driven through the real shell, one harness per test.
+/// </summary>
+/// <remarks>
+/// A member of the protector collection because loading the shell reaches the protector:
+/// <c>ReloadConfigurationAsync</c> runs <c>SettingsViewModel.LoadFromSettings</c>, which unseals
+/// the saved secrets. The runtime guard reports that only when the settings read completes
+/// synchronously and the test frame is still on the stack, so the class failed one CI run on
+/// 2026-10-27 and passed the same tree before it.
+/// </remarks>
+[Collection(CredentialProtectorAppCollection.Name)]
+public sealed partial class SessionCoordinatorPreMountTests : IDisposable
 {
     internal static readonly TimeSpan TestTimeout = TimeSpan.FromSeconds(5);
+
+    private readonly CredentialProtectorStateScope _scope = new();
+
+    public void Dispose() => _scope.Dispose();
 
     internal static ConnectionResult SuccessWithTerminalSession()
     {
