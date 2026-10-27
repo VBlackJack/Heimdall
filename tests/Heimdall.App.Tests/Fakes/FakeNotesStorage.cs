@@ -45,6 +45,9 @@ internal sealed class FakeNotesStorage : INotesStorageService
 
     public Exception? SaveFailure { get; set; }
 
+    /// <summary>The synchronous save reports a write lock it could not take.</summary>
+    public bool SyncSaveLockTimesOut { get; set; }
+
     public Exception? ListFailure { get; set; }
 
     public IReadOnlyCollection<string> Paths => _notes.Keys.ToList();
@@ -186,9 +189,15 @@ internal sealed class FakeNotesStorage : INotesStorageService
         return Task.CompletedTask;
     }
 
-    public void SaveNote(string filePath, string content)
+    public bool SaveNote(string filePath, string content)
     {
+        if (SyncSaveLockTimesOut)
+        {
+            return false;
+        }
+
         SaveInternal(filePath, content);
+        return true;
     }
 
     public Task DeleteNoteAsync(string filePath, CancellationToken cancellationToken = default)
