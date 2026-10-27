@@ -49,6 +49,12 @@
       9. Build.ps1 writes the project file only through the  -> a future edit cannot
          helper                                                 reintroduce the
                                                                  unguarded write.
+     10. A Debug build leaves the file alone and carries the -> the release
+         version through MSBuild, like a dry run                preflight's clean
+                                                                tree survives a
+                                                                local build.
+     11. Build.ps1 feeds both helpers that one decision      -> -DryRun:$DryRun
+                                                                cannot come back.
 
     Exits non-zero if any expectation fails.
 
@@ -233,6 +239,46 @@ if (Test-Path -LiteralPath $buildScript) {
         "Build.ps1 writes Heimdall.App.csproj only through Update-AppProjectVersion ($($directWrites.Count) direct write(s))"
 } else {
     Write-Host "SKIP: $buildScript not found" -ForegroundColor Yellow
+}
+
+# ----------------------------------------------------------------------------
+# Cases 10 and 11: a Debug build leaves the project file alone too. It used to
+# write it on every local build, and the release preflight refuses a dirty tree,
+# so one Debug build before a release blocked the release.
+# ----------------------------------------------------------------------------
+Assert-True ((Test-LeavesProjectFileUntouched -Mode 'Debug') -eq $true) 'a Debug build leaves the project file untouched'
+Assert-True ((Test-LeavesProjectFileUntouched -Mode 'Debug' -DryRun) -eq $true) 'a Debug dry run leaves the project file untouched'
+Assert-True ((Test-LeavesProjectFileUntouched -Mode 'Release' -DryRun) -eq $true) 'a Release dry run leaves the project file untouched'
+Assert-True ((Test-LeavesProjectFileUntouched -Mode 'Release') -eq $false) 'only a real Release run writes the project file'
+
+$sandbox = New-SandboxProject
+try {
+    $before = [System.IO.File]::ReadAllBytes($sandbox)
+    $leave = Test-LeavesProjectFileUntouched -Mode 'Debug'
+    $wrote = Update-AppProjectVersion -Path $sandbox `
+        -AssemblyVersion $testAssemblyVersion `
+        -InformationalVersion $testInformationalVersion `
+        -DryRun:$leave
+    $after = [System.IO.File]::ReadAllBytes($sandbox)
+    $identical = ($before.Length -eq $after.Length) -and
+        ([System.Linq.Enumerable]::SequenceEqual($before, $after))
+    Assert-True ($identical -and $wrote -eq $false) 'a Debug build leaves Heimdall.App.csproj byte-identical'
+    $debugArgs = @(Get-VersionOverrideArgs -AssemblyVersion $testAssemblyVersion -InformationalVersion $testInformationalVersion -DryRun:$leave)
+    Assert-True ($debugArgs.Count -eq 2) 'a Debug build carries the version through MSBuild overrides instead'
+} finally {
+    Remove-Sandbox -ProjectPath $sandbox
+}
+
+# Build.ps1 feeds both helpers from the one decision, not from -DryRun alone: a
+# call still passing -DryRun:$DryRun would bring the Debug write back.
+if (Test-Path -LiteralPath $buildScript) {
+    $buildLines = @(Get-Content -LiteralPath $buildScript)
+    $decision = @($buildLines | Where-Object { $_ -match '\$leaveProjectFile\s*=\s*Test-LeavesProjectFileUntouched\s+-Mode\s+\$Mode' })
+    $helperCalls = @($buildLines | Where-Object { $_ -match '-DryRun:\$leaveProjectFile' })
+    $rawDryRunCalls = @($buildLines | Where-Object { $_ -match '(?:Update-AppProjectVersion|Get-VersionOverrideArgs).*-DryRun:\$DryRun' -or ($_ -match '^\s*-DryRun:\$DryRun\s*$') })
+    Assert-True ($decision.Count -eq 1) 'Build.ps1 takes the write decision from Test-LeavesProjectFileUntouched with its mode'
+    Assert-True ($helperCalls.Count -eq 2) "both version helpers receive that decision ($($helperCalls.Count) call(s))"
+    Assert-True ($rawDryRunCalls.Count -eq 0) "no version helper is fed -DryRun:`$DryRun directly ($($rawDryRunCalls.Count) found)"
 }
 
 Write-Host ''

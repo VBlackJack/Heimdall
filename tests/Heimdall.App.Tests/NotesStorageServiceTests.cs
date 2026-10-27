@@ -350,6 +350,39 @@ public class NotesStorageServiceTests : IDisposable
     }
 
     [Fact]
+    public void SaveNoteSync_WhenAnotherWriteHoldsTheLock_ReportsNotSaved()
+    {
+        using var writeLock = new SemaphoreSlim(1, 1);
+        var service = new NotesStorageService(_testDir, writeLock, TimeSpan.FromMilliseconds(50));
+        service.EnsureInitialized();
+        var path = Path.Combine(_testDir, "held.md");
+
+        // Held the way a slow asynchronous save holds it.
+        writeLock.Wait();
+        bool saved;
+        try
+        {
+            saved = service.SaveNote(path, "unsaved");
+        }
+        finally
+        {
+            writeLock.Release();
+        }
+
+        Assert.False(saved);
+        Assert.False(File.Exists(path));
+    }
+
+    [Fact]
+    public void SaveNoteSync_ReportsSaved()
+    {
+        _service.EnsureInitialized();
+        var path = Path.Combine(_testDir, "reported.md");
+
+        Assert.True(_service.SaveNote(path, "content"));
+    }
+
+    [Fact]
     public void SaveNoteSync_CreatesSubdirectories()
     {
         _service.EnsureInitialized();

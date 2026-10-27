@@ -212,7 +212,10 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
 
         MigrateLegacyData();
 
-        if (!File.Exists(_settingsPath))
+        // A missing document with a good backup is restored, never replaced by defaults: the
+        // next save would copy those defaults over the only copy of the user's configuration.
+        if (!File.Exists(_settingsPath)
+            && !await RestoreMissingDocumentFromBackupAsync(_settingsPath, SettingsDocumentName).ConfigureAwait(false))
         {
             if (File.Exists(_settingsDefaultPath))
             {
@@ -227,7 +230,8 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
             }
         }
 
-        if (!File.Exists(_serversPath))
+        if (!File.Exists(_serversPath)
+            && !await RestoreMissingDocumentFromBackupAsync(_serversPath, ServersDocumentName).ConfigureAwait(false))
         {
             if (File.Exists(_serversDefaultPath))
             {
@@ -511,12 +515,23 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
     private async Task<AppSettings> LoadSettingsInternalAsync(
         bool requireSupportedSchemaForWrite = false)
     {
-        if (!File.Exists(_settingsPath))
+        string json;
+        if (File.Exists(_settingsPath))
+        {
+            json = await ReadDocumentTextAsync(_settingsPath, SettingsDocumentName).ConfigureAwait(false);
+        }
+        else if (await ReadLastGoodCopyAsync(_settingsPath, SettingsDocumentName, MissingDocumentState)
+            .ConfigureAwait(false) is { } lastGood)
+        {
+            // Deleted after start: a save from defaults here would be the one that empties the
+            // backup at the save after it.
+            json = lastGood;
+        }
+        else
         {
             return new AppSettings();
         }
 
-        var json = await ReadDocumentTextAsync(_settingsPath, "settings.json").ConfigureAwait(false);
         var settings = JsonSerializer.Deserialize<AppSettings>(json, ReadOptions) ?? new AppSettings();
         ValidateSchemaVersion(
             "settings",
@@ -1150,12 +1165,21 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
     private async Task<ServerInventoryDocument> LoadServerInventoryInternalAsync(
         bool requireSupportedSchemaForWrite = false)
     {
-        if (!File.Exists(_serversPath))
+        string json;
+        if (File.Exists(_serversPath))
+        {
+            json = await ReadDocumentTextAsync(_serversPath, ServersDocumentName).ConfigureAwait(false);
+        }
+        else if (await ReadLastGoodCopyAsync(_serversPath, ServersDocumentName, MissingDocumentState)
+            .ConfigureAwait(false) is { } lastGood)
+        {
+            json = lastGood;
+        }
+        else
         {
             return new ServerInventoryDocument();
         }
 
-        var json = await ReadDocumentTextAsync(_serversPath, "servers.json").ConfigureAwait(false);
         using JsonDocument parsed = JsonDocument.Parse(json);
         ServerInventoryDocument document;
         if (parsed.RootElement.ValueKind == JsonValueKind.Array)
@@ -1495,27 +1519,66 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
             return text;
         }
 
+        return await ReadLastGoodCopyAsync(path, documentName, UnreadableDocumentState).ConfigureAwait(false)
+            ?? text;
+    }
+
+    /// <summary>How the log names a document that is there but is not readable JSON.</summary>
+    private const string UnreadableDocumentState = "not readable";
+
+    /// <summary>How the log names a document that is not there at all.</summary>
+    private const string MissingDocumentState = "missing";
+
+    /// <summary>
+    /// The backup of a configuration document when it is readable JSON, recorded as a recovery;
+    /// otherwise null.
+    /// </summary>
+    /// <remarks>
+    /// A missing document is treated like an unreadable one. Started on defaults, the application
+    /// wrote them into the empty place, and the next save copied those defaults over the backup:
+    /// the trusted keys, the vault material and the HMAC key the backup still held were gone.
+    /// </remarks>
+    private async Task<string?> ReadLastGoodCopyAsync(string path, string documentName, string documentState)
+    {
         string backupPath = BackupPathFor(path);
         if (!File.Exists(backupPath))
         {
-            return text;
+            return null;
         }
 
         string backup = await File.ReadAllTextAsync(backupPath, Utf8NoBom).ConfigureAwait(false);
         if (!IsReadableJson(backup))
         {
-            return text;
+            return null;
         }
 
         Logging.FileLogger.Error(
-            $"{documentName} is not readable; loaded the last good copy from {backupPath}. "
-            + "The damaged file is replaced at the next save.");
+            $"{documentName} is {documentState}; loaded the last good copy from {backupPath}. "
+            + "The document is replaced at the next save.");
         lock (_recoveredDocuments)
         {
             _recoveredDocuments.Add(documentName);
         }
 
         return backup;
+    }
+
+    /// <summary>
+    /// Puts the last good copy back in place of a document that is missing, before anything
+    /// writes defaults there.
+    /// </summary>
+    /// <returns>True when the document was restored from its backup.</returns>
+    private async Task<bool> RestoreMissingDocumentFromBackupAsync(string path, string documentName)
+    {
+        string? lastGood = await ReadLastGoodCopyAsync(path, documentName, MissingDocumentState)
+            .ConfigureAwait(false);
+        if (lastGood is null)
+        {
+            return false;
+        }
+
+        await WriteFileAsync(path, lastGood).ConfigureAwait(false);
+        return true;
     }
 
     private readonly HashSet<string> _recoveredDocuments = new(StringComparer.Ordinal);

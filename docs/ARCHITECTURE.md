@@ -800,6 +800,10 @@ Build editions:
 
 `Build.ps1 -Variant Both` (default) produces both variants + Inno Setup installers. `Build.ps1 -Mode Release -Publish` creates a GitHub release with all artifacts. `Build.ps1 -DryRun` simulates the release without touching git/GitHub. Batch shortcuts: `Run.bat`, `Test.bat`, `Build.bat`, `Release.bat`.
 
+The Self-Contained edition bundles whatever `runtimes/webview2/` holds (git-ignored). Fill it with `scripts/Update-WebView2FixedRuntime.ps1 -CabPath <Microsoft.WebView2.FixedVersionRuntime.*.x64.cab>`: it requires a valid Microsoft signature on `msedgewebview2.exe` and writes `heimdall-runtime.json` with the executable's FileVersion and its timestamp from the CAB. A Release refuses a runtime without that manifest or older than 60 days, and refuses to drop the Self-Contained edition when the runtime is missing (`-Variant Standard` builds without it). Each edition is stamped into the executable (`HeimdallEdition` assembly metadata), so a Standard build never runs on a runtime folder a previous Self-Contained install left behind.
+
+Before the version bump, a Release checks that the whole tree is clean, the branch is `master`, HEAD equals `origin/master` after a fetch, and the `ci.yml` push run for HEAD succeeded (waiting a bounded time under `-Publish`). Findings are fatal under `-Publish` and warnings otherwise. The only override is `-AcceptCiFailure "<reason>"`, whose reason is written into the release notes. The release is created with `--target` set to the release commit, and the MSI ProductVersion is `<yy>.<M>.<DD*100+seq>` (2026.102702 becomes 26.10.2702), since Windows Installer compares only three fields.
+
 ### Test baseline
 
 `dotnet test Heimdall.slnx --no-build` discovers 5,578 tests across the five test projects (`Heimdall.App.Tests`, `Heimdall.App.UiTests`, `Heimdall.Core.Tests`, `Heimdall.Rdp.Tests`, `Heimdall.Ssh.Tests`): 5,578 passing and 0 skipped. Partial per-project TRX files can report smaller counts and be mistaken for a regression - always run the aggregated command for a correct baseline.

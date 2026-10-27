@@ -36,6 +36,9 @@ public static class AppConstants
     /// <summary>Writable network-scan history subfolder.</summary>
     public const string NetworkScansDirectoryName = "network-scans";
 
+    /// <summary>Writable subfolder holding the hosts file editor's backups.</summary>
+    public const string HostsBackupsDirectoryName = "hosts-backups";
+
     /// <summary>Restrictive staging root for verified application updates.</summary>
     public const string UpdatesDirectoryName = "updates";
 

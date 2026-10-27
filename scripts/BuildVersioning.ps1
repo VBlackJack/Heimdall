@@ -4,8 +4,9 @@
     application project, and decides whether that tracked file may be written.
 
 .DESCRIPTION
-    Dot-source this file to get Get-StampedAppProjectText, Update-AppProjectVersion
-    and Get-VersionOverrideArgs.
+    Dot-source this file to get Get-StampedAppProjectText, Update-AppProjectVersion,
+    Get-VersionOverrideArgs, Test-LeavesProjectFileUntouched and
+    ConvertTo-MsiProductVersion.
 
     Build.ps1 stamps two values into src/Heimdall.App/Heimdall.App.csproj:
     <Version>, the Win32-compatible 1.0.MMDD.xx assembly version, and
@@ -149,4 +150,97 @@ function Get-VersionOverrideArgs {
         return @()
     }
     return @("-p:Version=$AssemblyVersion", "-p:InformationalVersion=$InformationalVersion")
+}
+
+function Test-LeavesProjectFileUntouched {
+    <#
+    .SYNOPSIS
+        Decides whether a run must leave the tracked project file alone and carry
+        the version through MSBuild global properties instead.
+    .DESCRIPTION
+        Only a real Release run writes the project file, because only a Release
+        run can turn that write into the release commit. A Debug build used to
+        write it too, which left a tracked file modified after every local build:
+        the release preflight requires a clean working tree, so one Debug build
+        before a release would have blocked it. Debug therefore behaves like a
+        dry run here. Pass the result as -DryRun to Update-AppProjectVersion and
+        Get-VersionOverrideArgs.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidateSet('Debug', 'Release')]
+        [string]$Mode,
+
+        [switch]$DryRun
+    )
+
+    return ($DryRun.IsPresent -or $Mode -ne 'Release')
+}
+
+# Windows Installer limits on ProductVersion: major and minor are bytes, build is a
+# 16-bit word, and only these three fields are compared on upgrade.
+$script:MsiMaxMajor = 255
+$script:MsiMaxMinor = 255
+$script:MsiMaxBuild = 65535
+# The MSI major is the year minus this base, so it fits a byte until 2255.
+$script:MsiYearBase = 2000
+# The build field is DD * this factor + the release sequence, so the sequence
+# (two digits in the build number) never overflows into the day.
+$script:MsiDayFactor = 100
+
+function ConvertTo-MsiProductVersion {
+    <#
+    .SYNOPSIS
+        Derives the MSI ProductVersion from a YYYY.MMDDxx build number.
+    .DESCRIPTION
+        The MSI used to receive the assembly version 1.0.MMDD.xx. Windows Installer
+        compares only the first three fields, so the year was invisible and the
+        sequence ignored: the first build of 2027 (1.0.105.x) would compare older
+        than any build from October 2026 and MajorUpgrade would refuse it, and two
+        releases of the same day compared equal and installed side by side.
+
+        The result is <yy>.<M>.<DD*100+xx>: 2026.102702 -> 26.10.2702. Every field
+        is within the Windows Installer limits, the order of the triples is the
+        order of the build numbers, and any value is above the legacy 1.0.x.y form
+        so an upgrade from an older MSI still applies. The assembly version is
+        unchanged; nothing compares it.
+    .OUTPUTS
+        The ProductVersion string. Throws on a build number it cannot map.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$BuildNumber
+    )
+
+    if ($BuildNumber -notmatch '^(\d{4})\.(\d{2})(\d{2})(\d{2})$') {
+        throw "Build number '$BuildNumber' is not in the YYYY.MMDDxx form."
+    }
+
+    $year = [int]$Matches[1]
+    $month = [int]$Matches[2]
+    $day = [int]$Matches[3]
+    $sequence = [int]$Matches[4]
+
+    $major = $year - $script:MsiYearBase
+    $build = $day * $script:MsiDayFactor + $sequence
+
+    if ($major -lt 1 -or $major -gt $script:MsiMaxMajor) {
+        throw "Build number '$BuildNumber' gives an MSI major version $major outside 1..$($script:MsiMaxMajor)."
+    }
+    if ($month -lt 1 -or $month -gt 12 -or $month -gt $script:MsiMaxMinor) {
+        throw "Build number '$BuildNumber' has month $month, outside 1..12."
+    }
+    if ($day -lt 1 -or $day -gt 31) {
+        throw "Build number '$BuildNumber' has day $day, outside 1..31."
+    }
+    if ($sequence -lt 1 -or $sequence -ge $script:MsiDayFactor) {
+        throw "Build number '$BuildNumber' has release sequence $sequence, outside 1..$($script:MsiDayFactor - 1)."
+    }
+    if ($build -gt $script:MsiMaxBuild) {
+        throw "Build number '$BuildNumber' gives an MSI build field $build above $($script:MsiMaxBuild)."
+    }
+
+    return "{0}.{1}.{2}" -f $major, $month, $build
 }

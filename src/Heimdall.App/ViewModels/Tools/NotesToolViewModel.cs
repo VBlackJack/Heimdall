@@ -109,7 +109,13 @@ internal sealed partial class NotesToolViewModel : ObservableObject, IDisposable
 
         try
         {
-            _storage.SaveNote(CurrentNotePath, CurrentMarkdown);
+            // A save that could not take the write lock wrote nothing: the note stays
+            // dirty and the close is refused, rather than closing over the lost edits.
+            if (!_storage.SaveNote(CurrentNotePath, CurrentMarkdown))
+            {
+                return false;
+            }
+
             IsDirty = false;
             return true;
         }

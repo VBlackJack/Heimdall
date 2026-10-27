@@ -1,6 +1,15 @@
-﻿<#
+<#
 .SYNOPSIS
     Build script for Heimdall - produces portable distributions and installers.
+
+.DESCRIPTION
+    In Release mode, before the version bump, the run checks that the whole tree is
+    clean, that the branch is master, that HEAD equals origin/master after a fetch, and
+    that the latest ci.yml push run for HEAD succeeded, waiting a bounded time for one
+    in progress under -Publish (scripts/ReleasePreflight.ps1). A Release with the
+    SelfContained edition also requires a recorded WebView2 runtime younger than
+    MaxWebView2RuntimeAgeDays (scripts/WebView2RuntimeGate.ps1). A finding is fatal with
+    -Publish and a warning otherwise; -AcceptCiFailure is the only override.
 
 .PARAMETER Mode
     Build mode: 'Debug' (default) or 'Release'.
@@ -33,6 +42,13 @@
     Override the hand-written release-notes requirement. By default the publish step
     refuses to continue when neither -ReleaseNotesFile nor the tracked convention file
     exists; pass this switch to publish the generated Downloads/Checksums sections only.
+
+.PARAMETER AcceptCiFailure
+    The one override of the release gates (the preflight and the WebView2 runtime age),
+    given as the reason in words: the publish continues and the reason, with the findings
+    it overrode, is written into the generated release notes. It does not excuse a missing
+    WebView2 runtime; pass -Variant Standard for that. Refresh the runtime with
+    scripts/Update-WebView2FixedRuntime.ps1 rather than overriding its age.
 
 .EXAMPLE
     .\Build.ps1                              # Debug build
@@ -71,7 +87,10 @@ param(
     [switch]$AllowNonAsciiNotes,
 
     # Override the hand-written release-notes requirement (publish generated notes only).
-    [switch]$AllowAutoNotesOnly
+    [switch]$AllowAutoNotesOnly,
+
+    # The one override of the release gates, as a reason written into the release notes.
+    [string]$AcceptCiFailure
 )
 
 $ErrorActionPreference = 'Stop'
@@ -85,6 +104,11 @@ $ProjectRoot = $PSScriptRoot
 . (Join-Path $ProjectRoot 'scripts\BuildVersioning.ps1')
 
 . (Join-Path $ProjectRoot 'scripts\PublishArtifactSelection.ps1')
+# Release preflight (clean tree, master, in step with origin, CI green) and the
+# release-create arguments pinned to the release commit.
+. (Join-Path $ProjectRoot 'scripts\ReleasePreflight.ps1')
+# Whether the SelfContained edition may bundle runtimes/webview2.
+. (Join-Path $ProjectRoot 'scripts\WebView2RuntimeGate.ps1')
 $AppProject = Join-Path $ProjectRoot 'src\Heimdall.App\Heimdall.App.csproj'
 $SolutionFile = Get-ChildItem -Path $ProjectRoot -Filter '*.slnx' | Select-Object -First 1
 $distDir = Join-Path $ProjectRoot "Dist\$($Mode.ToLower())"
@@ -173,6 +197,9 @@ if ($Version) {
 
 $assemblyDate = $buildNumber.Substring(5, 4)
 $assemblyVer = "1.0.${assemblyDate}.$sequence"
+# The MSI compares only three fields and caps them, so it gets a form of its own that
+# keeps the year and the sequence. See ConvertTo-MsiProductVersion.
+$msiVersion = ConvertTo-MsiProductVersion -BuildNumber $buildNumber
 $totalSteps = if ($Mode -eq 'Release') { 6 } else { 5 }
 $step = 0
 
@@ -183,24 +210,105 @@ if ($Publish) { Write-Host "  Publish: GitHub Release" -ForegroundColor Cyan }
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
+# ── Determine which variants to produce ───────────────────────────────────
+#
+# Decided before anything is built: a Release that cannot bundle the runtime it was
+# asked to bundle stops here rather than after the test run. A missing runtime is
+# fatal with no override; a stale or unrecorded one is a release-gate finding below.
+
+$variants = switch ($Variant) {
+    'Both'          { @('Standard', 'SelfContained') }
+    'Standard'      { @('Standard') }
+    'SelfContained' { @('SelfContained') }
+}
+
+$releaseGateFailures = @()
+$wv2Runtime = Join-Path $ProjectRoot 'runtimes\webview2'
+$wv2Gate = Resolve-WebView2RuntimeGate -RuntimeDirectory $wv2Runtime -Mode $Mode -Variants $variants
+switch ($wv2Gate.Decision) {
+    'NotRequired' { }
+    'Ready' {
+        foreach ($line in $wv2Gate.Messages) { Write-Host "[webview2] $line" -ForegroundColor DarkGray }
+    }
+    'Stale' {
+        foreach ($line in $wv2Gate.Messages) { Write-Host "[webview2] $line" -ForegroundColor Yellow }
+        $releaseGateFailures += @($wv2Gate.Messages)[0]
+    }
+    'FallBackToStandard' {
+        foreach ($line in $wv2Gate.Messages) { Write-Host "[!] $line" -ForegroundColor DarkYellow }
+    }
+    'Abort' {
+        foreach ($line in $wv2Gate.Messages) { Write-Host "[!] $line" -ForegroundColor Red }
+        exit 1
+    }
+    default {
+        Write-Host "[!] Unexpected WebView2 runtime decision: $($wv2Gate.Decision)" -ForegroundColor Red
+        exit 1
+    }
+}
+$variants = @($wv2Gate.Variants)
+
+# ── Release preflight: the tree about to ship is the one CI verified ──────
+#
+# Runs before the version bump so a refused release leaves nothing to undo. Fatal
+# under -Publish, where a CI run still in progress is waited for (bounded); a dry
+# run or a local Release build prints the same findings as warnings. The checks and
+# their reasons live in scripts/ReleasePreflight.ps1. -AcceptCiFailure is the one
+# override of every release-gate finding, and its reason goes into the notes.
+
+$releaseGateOverride = $null
+if ($Mode -eq 'Release') {
+    $releasePreflightFatal = $Publish.IsPresent -and -not $DryRun.IsPresent
+    $preflight = Invoke-ReleasePreflight -WaitForCi:$releasePreflightFatal
+    if ($preflight.Passed) {
+        Write-Host "[preflight] Clean tree on master at origin, CI green for $($preflight.HeadSha)" -ForegroundColor Green
+    }
+    $releaseGateFailures += @($preflight.Failures)
+
+    $gateArgs = @{ Failures = @($releaseGateFailures); Fatal = $releasePreflightFatal }
+    if ($PSBoundParameters.ContainsKey('AcceptCiFailure')) { $gateArgs['AcceptCiFailure'] = $AcceptCiFailure }
+    $gateOutcome = Resolve-ReleaseGateOutcome @gateArgs
+    switch ($gateOutcome.Decision) {
+        'Pass' { }
+        'Warn' {
+            foreach ($line in $gateOutcome.Messages) { Write-Host "[release gate] WARNING: $line" -ForegroundColor Yellow }
+        }
+        'Overridden' {
+            Write-Host "[release gate] ************************************************************" -ForegroundColor Yellow
+            foreach ($line in $gateOutcome.Messages) { Write-Host "[release gate] OVERRIDDEN: $line" -ForegroundColor Yellow }
+            Write-Host "[release gate] ************************************************************" -ForegroundColor Yellow
+            $releaseGateOverride = [pscustomobject]@{ Reason = $AcceptCiFailure; Failures = @($releaseGateFailures) }
+        }
+        'Abort' {
+            foreach ($line in $gateOutcome.Messages) { Write-Host "[!] $line" -ForegroundColor Red }
+            exit 1
+        }
+        default {
+            Write-Host "[!] Unexpected release gate decision: $($gateOutcome.Decision)" -ForegroundColor Red
+            exit 1
+        }
+    }
+}
+
 # ── Step 1: Update version in csproj ───────────────────────────────────────
 #
-# The real publish path writes the project file: that write is what the release
-# commit carries. A dry run must not touch it, so it receives the same two
-# versions as MSBuild global properties instead, splatted into the build and
-# publish invocations below. See scripts/BuildVersioning.ps1 for why, and for
-# the measurement that chose this over writing the file and restoring it.
+# The real Release path writes the project file: that write is what the release
+# commit carries. A dry run and a Debug build must not touch it, so they receive
+# the same two versions as MSBuild global properties instead, splatted into the
+# build and publish invocations below. See scripts/BuildVersioning.ps1 for why,
+# and for the measurement that chose this over writing the file and restoring it.
 
 $step++
-$versionArgs = @(Get-VersionOverrideArgs -AssemblyVersion $assemblyVer -InformationalVersion $buildNumber -DryRun:$DryRun)
+$leaveProjectFile = Test-LeavesProjectFileUntouched -Mode $Mode -DryRun:$DryRun
+$versionArgs = @(Get-VersionOverrideArgs -AssemblyVersion $assemblyVer -InformationalVersion $buildNumber -DryRun:$leaveProjectFile)
 $versionWritten = Update-AppProjectVersion -Path $AppProject `
     -AssemblyVersion $assemblyVer `
     -InformationalVersion $buildNumber `
-    -DryRun:$DryRun
+    -DryRun:$leaveProjectFile
 if ($versionWritten) {
     Write-Host "[$step/$totalSteps] Version set to $buildNumber (assembly: $assemblyVer)" -ForegroundColor Green
 } else {
-    Write-Host "[$step/$totalSteps] Version $buildNumber (assembly: $assemblyVer) passed to MSBuild; $(Split-Path $AppProject -Leaf) left untouched (dry run)" -ForegroundColor Magenta
+    Write-Host "[$step/$totalSteps] Version $buildNumber (assembly: $assemblyVer) passed to MSBuild; $(Split-Path $AppProject -Leaf) left untouched ($Mode$(if ($DryRun) { ' dry run' }))" -ForegroundColor Magenta
 }
 
 # Runs a native command with its stderr folded into its output, records every line in
@@ -307,24 +415,6 @@ if (-not $SkipTests) {
     Write-Host "[$step/$totalSteps] Format check skipped" -ForegroundColor DarkYellow
 }
 
-# ── Determine which variants to produce ───────────────────────────────────
-
-$variants = switch ($Variant) {
-    'Both'          { @('Standard', 'SelfContained') }
-    'Standard'      { @('Standard') }
-    'SelfContained' { @('SelfContained') }
-}
-
-$wv2Runtime = Join-Path $ProjectRoot 'runtimes\webview2'
-$hasWv2Runtime = Test-Path (Join-Path $wv2Runtime 'msedgewebview2.exe')
-
-if ($variants -contains 'SelfContained' -and -not $hasWv2Runtime) {
-    Write-Host "[!] WebView2 Fixed Version Runtime not found in runtimes/webview2/" -ForegroundColor Red
-    Write-Host "    Run Setup-WebView2.ps1 first, or use -Variant Standard" -ForegroundColor Red
-    Write-Host "    Falling back to Standard edition only." -ForegroundColor DarkYellow
-    $variants = @('Standard')
-}
-
 # ── Helper: publish one variant ───────────────────────────────────────────
 
 function Remove-TreeRobust {
@@ -405,7 +495,10 @@ function Publish-Variant {
     Remove-TreeRobust -Path $variantDir
 
     Write-Host "  Publishing $VariantName to $variantFolder..." -ForegroundColor Yellow
-    dotnet publish $AppProject -c $Mode -o $variantDir --nologo --verbosity quiet --self-contained true -r win-x64 -p:PublishSingleFile=false @versionArgs
+    # HeimdallEdition stamps the edition into the executable (AssemblyMetadata, read by
+    # VariantDetector): the runtimes\webview2 folder alone cannot say which edition is
+    # running, because a Standard install over a SelfContained one can leave it behind.
+    dotnet publish $AppProject -c $Mode -o $variantDir --nologo --verbosity quiet --self-contained true -r win-x64 -p:PublishSingleFile=false "-p:HeimdallEdition=$VariantName" @versionArgs
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Publish FAILED." -ForegroundColor Red
         exit 1
@@ -545,7 +638,7 @@ if ($Mode -eq 'Release') {
     try {
         & $wix build `
             -arch x64 `
-            -d "AppVersion=$assemblyVer" `
+            -d "AppVersion=$msiVersion" `
             -d "SourceDir=$($msiSource.Dir)" `
             -o $msiPath `
             -pdbtype none `
@@ -558,7 +651,7 @@ if ($Mode -eq 'Release') {
     } finally {
         Pop-Location
     }
-    Write-Host "    + Heimdall_${buildNumber}.msi (ProductVersion $assemblyVer)" -ForegroundColor DarkGray
+    Write-Host "    + Heimdall_${buildNumber}.msi (ProductVersion $msiVersion)" -ForegroundColor DarkGray
 
     Write-Host "[$step/$totalSteps] Installers done" -ForegroundColor Green
 }
@@ -714,6 +807,11 @@ if (($Publish -or $DryRun) -and $Mode -eq 'Release') {
         Write-Host "[$label] Prepended custom notes from $(Split-Path $customNotesPath -Leaf)." -ForegroundColor DarkGray
     }
 
+    # An -AcceptCiFailure override is recorded where every reader of the release sees it.
+    if ($null -ne $releaseGateOverride) {
+        $notes += Get-ReleaseGateOverrideNotes -Reason $releaseGateOverride.Reason -Failures $releaseGateOverride.Failures
+    }
+
     $notes += "### Downloads`n`n"
     $notes += "| File | Description |`n|------|-------------|`n"
     foreach ($a in $artifacts) {
@@ -741,8 +839,6 @@ if (($Publish -or $DryRun) -and $Mode -eq 'Release') {
     $notesLabel = if ($isDry) { $notesFile } else { Split-Path $notesFile -Leaf }
     Write-Output "[$label] Wrote $notesLabel."
 
-    $createArgs = @('release', 'create', "v$buildNumber") + $artifacts + @('--title', "v$buildNumber", '--notes-file', $notesFile)
-
     Write-Host "[$label] Release notes:" -ForegroundColor DarkGray
     Write-Host $notes -ForegroundColor DarkGray
 
@@ -752,7 +848,9 @@ if (($Publish -or $DryRun) -and $Mode -eq 'Release') {
         Write-Output "[$label] Would run: git status --porcelain -- $AppProject"
         Write-Output "[$label] Would run: git commit -m `"release: v${buildNumber}`" (if version file changed)"
         Write-Output "[$label] Would run: git push"
-        Write-Output "[$label] Would run: gh $($createArgs -join ' ')"
+        $dryCreateArgs = Get-ReleaseCreateArgs -BuildNumber $buildNumber -Artifacts $artifacts -NotesFile $notesFile `
+            -TargetSha '<sha of the release commit>'
+        Write-Output "[$label] Would run: gh $($dryCreateArgs -join ' ')"
         Write-Output ""
         Write-Output "[$label] Dry run complete. No changes made to git or GitHub."
     } else {
@@ -798,6 +896,16 @@ if (($Publish -or $DryRun) -and $Mode -eq 'Release') {
                 exit 1
             }
             Write-Output "[$label] Pushed to remote."
+
+            # The tag must point at the commit this run built and pushed, not at
+            # whatever the default branch is when GitHub processes the call.
+            $releaseShaOut = & git rev-parse HEAD 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                Write-Output "[!] Cannot read the release commit SHA."
+                $releaseShaOut | ForEach-Object { Write-Output $_ }
+                exit 1
+            }
+            $releaseSha = ([string]($releaseShaOut | Select-Object -First 1)).Trim()
         } finally {
             $ErrorActionPreference = $prevEAP
             if ($null -eq $prevGitPrompt) {
@@ -829,6 +937,8 @@ if (($Publish -or $DryRun) -and $Mode -eq 'Release') {
                     exit 1
                 }
             } else {
+                $createArgs = Get-ReleaseCreateArgs -BuildNumber $buildNumber -Artifacts $artifacts -NotesFile $notesFile `
+                    -TargetSha $releaseSha
                 $createOut = & gh @createArgs 2>&1
                 if ($LASTEXITCODE -ne 0) {
                     Write-Output "[!] GitHub release creation failed."

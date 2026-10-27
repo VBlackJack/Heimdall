@@ -45,6 +45,25 @@ public sealed class ShutdownDecisionsTests
     }
 
     [Theory]
+    [InlineData(false, false, true, nameof(UnhandledExceptionRoute.ShowInline))]
+    [InlineData(false, false, false, nameof(UnhandledExceptionRoute.ShowOnDispatcher))]
+    [InlineData(true, false, false, nameof(UnhandledExceptionRoute.LogOnly))]
+    [InlineData(true, false, true, nameof(UnhandledExceptionRoute.LogOnly))]
+    [InlineData(false, true, false, nameof(UnhandledExceptionRoute.LogOnly))]
+    public void RouteAppDomainUnhandledException_NeverShowsOrWaitsDuringShutdown(
+        bool isShuttingDown,
+        bool dispatcherShutdownStarted,
+        bool onDispatcherThread,
+        string expected)
+    {
+        // A worker that crashed during teardown showed a modal box from the UI thread and
+        // waited on it, so the exit - and the update relauncher - waited for a click.
+        Assert.Equal(
+            Enum.Parse<UnhandledExceptionRoute>(expected),
+            ShutdownDecisions.RouteAppDomainUnhandledException(isShuttingDown, dispatcherShutdownStarted, onDispatcherThread));
+    }
+
+    [Theory]
     [InlineData(false, false, true)]
     [InlineData(true, false, false)]
     [InlineData(false, true, false)]
