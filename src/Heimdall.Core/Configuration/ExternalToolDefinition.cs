@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 
+using System.Globalization;
+using Heimdall.Core.Security;
+
 namespace Heimdall.Core.Configuration;
 
 /// <summary>
@@ -54,12 +57,19 @@ public sealed class ExternalToolDefinition
     ];
 
     /// <summary>
-    /// Replaces variable placeholders in <see cref="Arguments"/> with actual server values.
-    /// Sanitization is context-aware: for shell targets (.bat, .cmd, cmd.exe, powershell)
-    /// all cmd metacharacters are stripped. For regular executables, only characters that
-    /// affect MSVC CRT argument parsing are removed, preserving legitimate values like
-    /// <c>Web (prod)</c> or paths with single quotes. See CWE-78.
+    /// Replaces variable placeholders in <see cref="Arguments"/> with actual server values, in
+    /// one pass over the template (<see cref="ArgumentTemplate.Expand"/>): a value is never
+    /// expanded again. Sanitization is context-aware: for shell targets (.bat, .cmd, cmd.exe,
+    /// powershell) all cmd metacharacters are stripped. For regular executables, only characters
+    /// that affect MSVC CRT argument parsing are removed, preserving legitimate values like
+    /// <c>Web (prod)</c> or paths with single quotes; a value right before a closing double quote
+    /// has its trailing backslashes doubled. Quotes are never added. See CWE-78 and CWE-88.
     /// </summary>
+    /// <remarks>
+    /// Values are not judged here; this is the form the settings preview shows. A launch goes
+    /// through <see cref="TryResolveArguments"/>, which refuses a value that would not stay one
+    /// plain argument.
+    /// </remarks>
     public string ResolveArguments(
         string host,
         int port,
@@ -70,19 +80,135 @@ public sealed class ExternalToolDefinition
         string? project = null,
         string? gateway = null)
     {
-        Func<string, string> sanitize = Security.InputValidator.IsShellTarget(ExecutablePath)
+        var placeholders = BuildPlaceholders(host, port, user, serverName, protocol, keyFile, project, gateway);
+        return ExpandWith(Arguments, ExecutablePath, placeholders);
+    }
+
+    /// <summary>
+    /// <see cref="ResolveArguments"/> for a launch: false, with the placeholder at fault, when a
+    /// substituted value would not stay one plain argument (<see cref="ArgumentTemplate.FindUnsafeValue"/>).
+    /// </summary>
+    /// <remarks>
+    /// A user name of <c>-oProxyCommand=\\host\s\p.exe a</c> handed to OpenSSH through
+    /// <c>{User}@{Host}</c> runs a program of the profile author's choosing; with a space it also
+    /// splits into several arguments. Neither is altered into something that might still work:
+    /// the launch is refused and the user told why.
+    /// </remarks>
+    public bool TryResolveArguments(
+        string host,
+        int port,
+        string user,
+        out string arguments,
+        out ArgumentTemplateRejection? rejection,
+        string? serverName = null,
+        string? protocol = null,
+        string? keyFile = null,
+        string? project = null,
+        string? gateway = null)
+    {
+        var placeholders = BuildPlaceholders(host, port, user, serverName, protocol, keyFile, project, gateway);
+        rejection = ArgumentTemplate.FindUnsafeValue(Arguments, placeholders);
+        if (rejection is not null)
+        {
+            arguments = string.Empty;
+            return false;
+        }
+
+        arguments = ExpandWith(Arguments, ExecutablePath, placeholders);
+        return true;
+    }
+
+    /// <summary>
+    /// Expands <paramref name="template"/> for <paramref name="executablePath"/> the way an
+    /// external tool's arguments are expanded. The auto-detected tools share it.
+    /// </summary>
+    /// <remarks>
+    /// The values have already been sanitized by the caller; the double quotes are stripped once
+    /// more here, so that no value can close a quote of the template whatever sanitizer it went
+    /// through.
+    /// </remarks>
+    public static string ExpandWith(
+        string template,
+        string executablePath,
+        IReadOnlyList<(string Token, string Value)> placeholders)
+    {
+        ArgumentNullException.ThrowIfNull(template);
+        ArgumentNullException.ThrowIfNull(placeholders);
+
+        var unquoted = placeholders
+            .Select(static placeholder => (placeholder.Token, placeholder.Value.Replace("\"", string.Empty, StringComparison.Ordinal)))
+            .ToArray();
+        return ArgumentTemplate.Expand(
+            template,
+            unquoted,
+            protectClosingQuote: !InputValidator.IsShellTarget(executablePath));
+    }
+
+    /// <summary>
+    /// <see cref="TryResolveArguments"/> for an auto-detected tool (Sysinternals, NirSoft), whose
+    /// template knows only <c>{Host}</c>, <c>{Port}</c> and <c>{User}</c>. Every value is stripped
+    /// of shell metacharacters, as a detected tool's always were.
+    /// </summary>
+    /// <param name="template">The tool's argument template.</param>
+    /// <param name="executablePath">The tool's executable.</param>
+    /// <param name="host">The target host, or empty.</param>
+    /// <param name="port">The target port as text, or empty.</param>
+    /// <param name="user">The user name, or empty.</param>
+    /// <param name="arguments">The expanded arguments, or empty when refused.</param>
+    /// <param name="rejection">Why a value was refused, or null.</param>
+    public static bool TryResolveDetectedArguments(
+        string template,
+        string executablePath,
+        string? host,
+        string? port,
+        string? user,
+        out string arguments,
+        out ArgumentTemplateRejection? rejection)
+    {
+        ArgumentNullException.ThrowIfNull(template);
+
+        (string Token, string Value)[] placeholders =
+        [
+            ("{Host}", SanitizeStrict(host ?? string.Empty)),
+            ("{Port}", port ?? string.Empty),
+            ("{User}", SanitizeStrict(user ?? string.Empty)),
+        ];
+        rejection = ArgumentTemplate.FindUnsafeValue(template, placeholders);
+        if (rejection is not null)
+        {
+            arguments = string.Empty;
+            return false;
+        }
+
+        arguments = ExpandWith(template, executablePath, placeholders);
+        return true;
+    }
+
+    private (string Token, string Value)[] BuildPlaceholders(
+        string host,
+        int port,
+        string user,
+        string? serverName,
+        string? protocol,
+        string? keyFile,
+        string? project,
+        string? gateway)
+    {
+        Func<string, string> sanitize = InputValidator.IsShellTarget(ExecutablePath)
             ? SanitizeStrict
             : SanitizeRelaxed;
 
-        return Arguments
-            .Replace("{Host}", sanitize(host), StringComparison.OrdinalIgnoreCase)
-            .Replace("{Port}", port.ToString(), StringComparison.OrdinalIgnoreCase)
-            .Replace("{User}", sanitize(user), StringComparison.OrdinalIgnoreCase)
-            .Replace("{ServerName}", sanitize(serverName ?? ""), StringComparison.OrdinalIgnoreCase)
-            .Replace("{Protocol}", sanitize(protocol ?? ""), StringComparison.OrdinalIgnoreCase)
-            .Replace("{KeyFile}", sanitize(keyFile ?? ""), StringComparison.OrdinalIgnoreCase)
-            .Replace("{Project}", sanitize(project ?? ""), StringComparison.OrdinalIgnoreCase)
-            .Replace("{Gateway}", sanitize(gateway ?? ""), StringComparison.OrdinalIgnoreCase);
+        return
+        [
+            ("{Host}", sanitize(host)),
+            ("{Port}", port.ToString(CultureInfo.InvariantCulture)),
+            ("{User}", sanitize(user)),
+            ("{ServerName}", sanitize(serverName ?? "")),
+            ("{Protocol}", sanitize(protocol ?? "")),
+            ("{KeyFile}", sanitize(keyFile ?? "")),
+            ("{Project}", sanitize(project ?? "")),
+            ("{Gateway}", sanitize(gateway ?? "")),
+        ];
     }
 
     /// <summary>

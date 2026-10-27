@@ -17,7 +17,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
-using System.Text.RegularExpressions;
 using Heimdall.App.ViewModels;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Logging;
@@ -66,17 +65,23 @@ public sealed class ExternalToolLaunchService
             return;
         }
 
-        var arguments = server is not null
-            ? tool.ResolveArguments(
+        string arguments = tool.Arguments;
+        if (server is not null
+            && !tool.TryResolveArguments(
                 server.RemoteServer,
                 server.EffectivePort,
                 server.Username,
+                out arguments,
+                out ArgumentTemplateRejection? rejection,
                 serverName: server.DisplayName,
                 protocol: server.ConnectionType,
                 keyFile: server.SshKeyPath,
                 project: server.ProjectName,
-                gateway: server.GatewayName)
-            : tool.Arguments;
+                gateway: server.GatewayName))
+        {
+            ReportRejectedArgument(tool.Name, rejection!, localize);
+            return;
+        }
 
         var processInfo = new ProcessStartInfo
         {
@@ -127,10 +132,19 @@ public sealed class ExternalToolLaunchService
             return;
         }
 
-        var arguments = tool.Arguments
-            .Replace("{Host}", SanitizeToolArgument(server.RemoteServer), StringComparison.OrdinalIgnoreCase)
-            .Replace("{Port}", server.EffectivePort.ToString(CultureInfo.InvariantCulture), StringComparison.OrdinalIgnoreCase)
-            .Replace("{User}", SanitizeToolArgument(server.Username), StringComparison.OrdinalIgnoreCase);
+        // The same expansion and the same refusal as a configured tool.
+        if (!ExternalToolDefinition.TryResolveDetectedArguments(
+                tool.Arguments,
+                tool.ExecutablePath,
+                server.RemoteServer,
+                server.EffectivePort.ToString(CultureInfo.InvariantCulture),
+                server.Username,
+                out string arguments,
+                out ArgumentTemplateRejection? rejection))
+        {
+            ReportRejectedArgument(tool.Name, rejection!, localize);
+            return;
+        }
 
         var processInfo = new ProcessStartInfo
         {
@@ -171,6 +185,29 @@ public sealed class ExternalToolLaunchService
         return false;
     }
 
+    private void ReportRejectedArgument(string toolName, ArgumentTemplateRejection rejection, Func<string, string> localize)
+    {
+        FileLogger.Warn(
+            $"Blocked external tool '{toolName}': the value of {rejection.Token} was refused ({rejection.Reason}).");
+        _dialogService.ShowWarning(
+            localize("AppName"),
+            string.Format(
+                CultureInfo.CurrentCulture,
+                localize("ExternalToolLaunchError"),
+                toolName,
+                string.Format(
+                    CultureInfo.CurrentCulture,
+                    localize(RejectionMessageKey(rejection.Reason)),
+                    rejection.Token)));
+    }
+
+    /// <summary>The locale key telling the user why a value was refused and what to do.</summary>
+    internal static string RejectionMessageKey(ArgumentRejection reason) => reason switch
+    {
+        ArgumentRejection.LeadingDash => "ExternalToolArgumentLeadingDash",
+        _ => "ExternalToolArgumentNeedsQuotes",
+    };
+
     private void TryLaunchProcess(
         string toolName,
         ProcessStartInfo processInfo,
@@ -198,19 +235,5 @@ public sealed class ExternalToolLaunchService
                     toolName,
                     ex.Message));
         }
-    }
-
-    /// <summary>
-    /// Strips shell metacharacters from a tool argument value to prevent
-    /// placeholder injection in third-party tool argument templates.
-    /// </summary>
-    private static string SanitizeToolArgument(string value)
-    {
-        if (string.IsNullOrEmpty(value))
-        {
-            return string.Empty;
-        }
-
-        return Regex.Replace(value, @"[;&|`$<>()!""'\r\n%^]", "");
     }
 }

@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 
 namespace Heimdall.App.Services.Import;
@@ -69,6 +70,42 @@ internal static class ImportSummaryText
                 "ImportCountOrphanReferencesOne",
                 "ImportCountOrphanReferences",
                 orphanReferences));
+
+    /// <summary>
+    /// The lines telling what the import boundary took away, profile by profile: each file path
+    /// dropped because it named a network share or a device, with the value so the user can
+    /// re-enter it, and the trust switches turned off.
+    /// </summary>
+    internal static IReadOnlyList<string> SanitizationWarnings(
+        LocalizationManager localizer,
+        ImportedProfileSanitizationReport report)
+    {
+        ArgumentNullException.ThrowIfNull(localizer);
+        ArgumentNullException.ThrowIfNull(report);
+
+        List<string> lines = [];
+        foreach (ImportedItemSanitization item in report.Items)
+        {
+            foreach (ImportedPathRemoval removal in item.ClearedPaths)
+            {
+                lines.Add(localizer.Format(
+                    "ImportWarningNetworkPathCleared",
+                    item.Name,
+                    localizer[removal.LabelKey],
+                    removal.Value));
+            }
+
+            if (item.ResetFlags.Count > 0)
+            {
+                lines.Add(localizer.Format(
+                    "ImportWarningTrustFlagsReset",
+                    item.Name,
+                    string.Join(", ", item.ResetFlags.Select(flag => localizer[flag.LabelKey]))));
+            }
+        }
+
+        return lines;
+    }
 
     /// <summary>The result of an OpenSSH config import.</summary>
     internal static string OpenSsh(LocalizationManager localizer, int imported, int skippedDuplicates, int warnings) =>

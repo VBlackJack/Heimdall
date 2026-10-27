@@ -94,6 +94,22 @@ public sealed class WebConnectionTypeTests
         Assert.Equal("-new-window https://ilo.example.test:8443/ --host ilo.example.test:8443", info.Arguments);
     }
 
+    // S-01. The browser's command line is built by the external tool rule: a user name that would
+    // begin an argument with a dash is an option to the browser, and the launch is refused.
+    [Fact]
+    public void OpeningExternally_UserNameStartingWithADash_IsRefused()
+    {
+        ServerProfileDto profile = Profile();
+        profile.WebExternalProgram = @"C:\Legacy\firefox.exe";
+        profile.WebExternalArguments = "{Url} --user {User}";
+        profile.WebUsername = "-profile";
+
+        ProcessStartInfo? info = WebExternalLaunch.TryCreate(profile, WebAddress.From(profile)!, out string? error);
+
+        Assert.Null(info);
+        Assert.Equal("ErrorWebExternalArgumentRejected", error);
+    }
+
     [Fact]
     public void OpeningExternally_WithAProgramAndNoArguments_PassesTheAddress()
     {

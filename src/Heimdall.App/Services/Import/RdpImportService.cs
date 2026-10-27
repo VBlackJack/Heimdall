@@ -174,6 +174,13 @@ public sealed class RdpImportService(IConfigManager configManager, LocalizationM
             var parseErrorMessage = TryMapSchema(schema, candidate, skippedMappings);
             var hasParseError = parseErrorMessage is not null;
 
+            // The import boundary every other import crosses: a file written elsewhere may not
+            // turn on drive or USB redirection for a host of its choosing.
+            ImportedProfileSanitizationReport sanitization = ImportedProfileSanitizer.Sanitize([candidate]);
+            IReadOnlyList<ImportedTrustFlag> resetTrustFlags = sanitization.Items.Count == 0
+                ? []
+                : sanitization.Items[0].ResetFlags;
+
             entries.Add(new RdpImportPreviewEntry
             {
                 SourceFilePath = path,
@@ -184,6 +191,7 @@ public sealed class RdpImportService(IConfigManager configManager, LocalizationM
                 ParseErrorMessage = parseErrorMessage,
                 UnknownKeyCount = schema.UnknownKeys.Count,
                 SkippedMappings = skippedMappings,
+                ResetTrustFlags = resetTrustFlags,
                 Schema = schema
             });
         }
@@ -210,6 +218,7 @@ public sealed class RdpImportService(IConfigManager configManager, LocalizationM
                     ConflictingExistingName = hasExistingConflict ? conflictingName : hasBatchConflict ? entry.ProposedName : null,
                     UnknownKeyCount = entry.UnknownKeyCount,
                     SkippedMappings = entry.SkippedMappings,
+                    ResetTrustFlags = entry.ResetTrustFlags,
                     Schema = entry.Schema
                 };
             })
@@ -237,6 +246,7 @@ public sealed class RdpImportService(IConfigManager configManager, LocalizationM
             var renamedCount = 0;
             var skippedCount = 0;
             var passwordsIgnoredCount = 0;
+            var sanitized = new List<ImportedItemSanitization>();
 
             foreach (RdpImportSelectionEntry selectionEntry in selection.Entries)
             {
@@ -280,7 +290,18 @@ public sealed class RdpImportService(IConfigManager configManager, LocalizationM
                             continue;
 
                         case RdpConflictResolution.Replace:
-                            inventory[existingIndex] = ReplaceExisting(inventory[existingIndex], previewEntry);
+                            {
+                                ServerProfileDto existing = inventory[existingIndex];
+                                ServerProfileDto replaced = ReplaceExisting(existing, previewEntry);
+
+                                // The file is mapped onto the existing profile again here, so the
+                                // switches it would turn on are turned off again; a switch the user
+                                // had already turned on stays theirs.
+                                IReadOnlyList<ImportedTrustFlag> turnedOn = ImportedTrustFlags.ResetTurnedOn(existing, replaced);
+                                AddSanitized(sanitized, replaced.DisplayName, turnedOn);
+                                inventory[existingIndex] = replaced;
+                            }
+
                             replacedCount++;
                             LogImport(previewEntry, "replaced");
                             continue;
@@ -290,6 +311,7 @@ public sealed class RdpImportService(IConfigManager configManager, LocalizationM
                                 var renamed = CloneCandidate(previewEntry.Candidate);
                                 renamed.DisplayName = ImportAutoRename.Build(renamed.DisplayName, inventory, _localizer);
                                 inventory.Add(renamed);
+                                AddSanitized(sanitized, renamed.DisplayName, previewEntry.ResetTrustFlags);
                                 importedCount++;
                                 renamedCount++;
                                 LogImport(previewEntry, $"renamed to '{renamed.DisplayName}'");
@@ -300,6 +322,7 @@ public sealed class RdpImportService(IConfigManager configManager, LocalizationM
 
                 var candidate = CloneCandidate(previewEntry.Candidate);
                 inventory.Add(candidate);
+                AddSanitized(sanitized, candidate.DisplayName, previewEntry.ResetTrustFlags);
                 importedCount++;
                 LogImport(previewEntry, "imported");
             }
@@ -311,9 +334,23 @@ public sealed class RdpImportService(IConfigManager configManager, LocalizationM
                 RenamedCount = renamedCount,
                 SkippedCount = skippedCount,
                 PasswordsIgnoredCount = passwordsIgnoredCount,
-                Warnings = warnings
+                Warnings = warnings,
+                Sanitization = sanitized.Count == 0
+                    ? ImportedProfileSanitizationReport.Empty
+                    : new ImportedProfileSanitizationReport(sanitized)
             };
         });
+    }
+
+    private static void AddSanitized(
+        List<ImportedItemSanitization> sanitized,
+        string name,
+        IReadOnlyList<ImportedTrustFlag> resetFlags)
+    {
+        if (resetFlags.Count > 0)
+        {
+            sanitized.Add(new ImportedItemSanitization(name, [], resetFlags));
+        }
     }
 
     private static ServerProfileDto CreateCandidate(string proposedName) =>

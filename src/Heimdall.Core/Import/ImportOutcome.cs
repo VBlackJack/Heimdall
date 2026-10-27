@@ -27,4 +27,9 @@ public sealed record ImportOutcome(
     int ImportedCount,
     int SkippedDuplicates,
     int SkippedInvalid = 0,
-    int WarningCount = 0);
+    int WarningCount = 0)
+{
+    /// <summary>What the import boundary took away, profile by profile, for the summary to name.</summary>
+    public Configuration.ImportedProfileSanitizationReport Sanitization { get; init; } =
+        Configuration.ImportedProfileSanitizationReport.Empty;
+}

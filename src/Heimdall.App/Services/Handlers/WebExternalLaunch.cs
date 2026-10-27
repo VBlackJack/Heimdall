@@ -103,14 +103,22 @@ internal static class WebExternalLaunch
             ExecutablePath = program,
             Arguments = template,
         };
-        string arguments = expander
-            .ResolveArguments(
+        // The browser is started on a command line built from the profile, so a user name that
+        // starts with a dash would reach it as an option, like an external tool's would.
+        if (!expander.TryResolveArguments(
                 profile.RemoteServer ?? string.Empty,
                 address.Port,
                 profile.WebUsername ?? string.Empty,
+                out string resolved,
+                out _,
                 serverName: profile.DisplayName,
-                protocol: "WEB")
-            .Replace(UrlPlaceholder, address.AbsoluteUri, StringComparison.OrdinalIgnoreCase);
+                protocol: "WEB"))
+        {
+            errorKey = "ErrorWebExternalArgumentRejected";
+            return null;
+        }
+
+        string arguments = resolved.Replace(UrlPlaceholder, address.AbsoluteUri, StringComparison.OrdinalIgnoreCase);
 
         return new ProcessStartInfo
         {

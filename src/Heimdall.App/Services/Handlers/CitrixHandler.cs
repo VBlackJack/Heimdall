@@ -47,6 +47,12 @@ internal sealed class CitrixHandler : IProtocolHandler
     private const string SelfServiceStoreBrowseCommand = "storebrowse";
     private const string SelfServiceSsoFlag = "-q";
 
+    // The only file type the ICA launch path hands to the shell.
+    private const string IcaFileExtension = ".ica";
+
+    // "C:" - a colon at or after this index names an alternate data stream, not a drive.
+    private const int DriveDesignatorLength = 2;
+
     private readonly ConnectionStateMachine _connectionSm;
     private readonly LocalizationManager _localizer;
     private readonly Func<ProcessStartInfo, Process?> _startProcess;
@@ -235,12 +241,23 @@ internal sealed class CitrixHandler : IProtocolHandler
                 }
             }
             else if (!string.IsNullOrWhiteSpace(server.CitrixIcaFilePath) &&
-                     File.Exists(server.CitrixIcaFilePath))
+                     !TryNormalizeIcaFilePath(server.CitrixIcaFilePath, out _))
+            {
+                // Refused before the file system is touched: testing whether a share path exists
+                // already sends the user's NetNTLMv2 response to the host it names, and the shell
+                // would open any other file type with whatever program it is associated with.
+                _logWarning("Citrix launch blocked: mode=IcaFile notLocalIcaFile=true");
+                string msg = _localizer["CitrixIcaFileRejected"];
+                _connectionSm.SetError(server.Id, msg);
+                return Task.FromResult(new ConnectionResult(false, msg, null));
+            }
+            else if (TryNormalizeIcaFilePath(server.CitrixIcaFilePath, out string? icaFilePath) &&
+                     _fileExists(icaFilePath))
             {
                 mode = CitrixLaunchMode.IcaFile;
                 process = _startProcess(new ProcessStartInfo
                 {
-                    FileName = server.CitrixIcaFilePath,
+                    FileName = icaFilePath,
                     UseShellExecute = true
                 });
             }
@@ -429,6 +446,50 @@ internal sealed class CitrixHandler : IProtocolHandler
         }
 
         return ConnectionHelpers.FindInPath("SelfService.exe");
+    }
+
+    /// <summary>
+    /// The full path of an ICA file the shell may be handed, or false when the path is not one.
+    /// </summary>
+    /// <remarks>
+    /// <para>The launch runs through the shell, which opens a file with whatever program its type
+    /// is associated with: an <c>.hta</c> or an <c>.exe</c> named here would run. So the extension
+    /// is checked on the full path, after the normalization the shell itself would apply, and
+    /// must be <c>.ica</c>.</para>
+    /// <para>A share or device path is refused before anything else and without touching the file
+    /// system (<see cref="ImportedPathPolicy.IsNetworkOrDevicePath"/>), on the raw value and on
+    /// the full one, which a relative path resolved under a share directory could become. A colon
+    /// past the drive designator names an alternate data stream and is refused too.</para>
+    /// </remarks>
+    internal static bool TryNormalizeIcaFilePath(
+        string? rawPath,
+        [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out string? fullPath)
+    {
+        fullPath = null;
+        if (string.IsNullOrWhiteSpace(rawPath) || ImportedPathPolicy.IsNetworkOrDevicePath(rawPath))
+        {
+            return false;
+        }
+
+        string candidate;
+        try
+        {
+            candidate = Path.GetFullPath(rawPath.Trim());
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return false;
+        }
+
+        if (ImportedPathPolicy.IsNetworkOrDevicePath(candidate)
+            || candidate.IndexOf(Path.VolumeSeparatorChar, DriveDesignatorLength) >= 0
+            || !string.Equals(Path.GetExtension(candidate), IcaFileExtension, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        fullPath = candidate;
+        return true;
     }
 
     internal static bool TryValidateStoreFrontUrl(string? rawUrl, out string validatedUrl)

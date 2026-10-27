@@ -159,6 +159,106 @@ public sealed class ExternalToolLaunchServiceTests : IDisposable
         Assert.DoesNotContain("--token", log, StringComparison.Ordinal);
     }
 
+    // S-01. An imported user name is substituted into "{User}@{Host}": a leading dash made it an
+    // OpenSSH option that runs a program of the profile author's choosing.
+    [Fact]
+    public void LaunchConfigured_ProxyCommandUserName_IsRefusedWithAWarning()
+    {
+        int launches = 0;
+        var dialog = new NullDialogService();
+        var service = new ExternalToolLaunchService(dialog, _ =>
+        {
+            launches++;
+            return null;
+        });
+        var tool = new ExternalToolDefinition
+        {
+            Name = "OpenSSH",
+            ExecutablePath = @"C:\Windows\System32\OpenSSH\ssh.exe",
+            Arguments = "{User}@{Host}"
+        };
+        ServerItemViewModel server = ServerItemViewModel.FromDto(new ServerProfileDto
+        {
+            Id = "server-1",
+            DisplayName = "Server",
+            RemoteServer = "server.example.test",
+            ConnectionType = "SSH",
+            SshUsername = "-oProxyCommand=calc"
+        });
+
+        service.LaunchConfigured(tool, server, LocalizeWithPlaceholders);
+
+        Assert.Equal(0, launches);
+        string warning = Assert.Single(dialog.Warnings);
+        Assert.Equal("OpenSSH: ExternalToolArgumentLeadingDash {User}", warning);
+    }
+
+    [Fact]
+    public void LaunchDetected_HostWithASpaceOutsideQuotes_IsRefusedAndAsksForQuotes()
+    {
+        int launches = 0;
+        var dialog = new NullDialogService();
+        var service = new ExternalToolLaunchService(dialog, _ =>
+        {
+            launches++;
+            return null;
+        });
+        var tool = new ExternalToolInfo
+        {
+            Id = "WHOIS",
+            Name = "Whois",
+            ProviderName = "Sysinternals",
+            ExecutablePath = "whois.exe",
+            Arguments = "-accepteula -nobanner {Host}"
+        };
+        ServerItemViewModel server = ServerItemViewModel.FromDto(new ServerProfileDto
+        {
+            Id = "server-1",
+            DisplayName = "Server",
+            RemoteServer = "a.example.test -v",
+            ConnectionType = "SSH"
+        });
+
+        service.LaunchDetected(tool, server, LocalizeWithPlaceholders);
+
+        Assert.Equal(0, launches);
+        Assert.Equal("Whois: ExternalToolArgumentNeedsQuotes {Host}", Assert.Single(dialog.Warnings));
+    }
+
+    [Fact]
+    public void LaunchDetected_ShippedPsExecTemplate_StillLaunches()
+    {
+        ProcessStartInfo? captured = null;
+        var service = new ExternalToolLaunchService(new NullDialogService(), startInfo =>
+        {
+            captured = startInfo;
+            return null;
+        });
+        var tool = new ExternalToolInfo
+        {
+            Id = "PSEXEC",
+            Name = "PsExec",
+            ProviderName = "Sysinternals",
+            ExecutablePath = "psexec.exe",
+            Arguments = "\\\\{Host} -accepteula -nobanner"
+        };
+        ServerItemViewModel server = ServerItemViewModel.FromDto(new ServerProfileDto
+        {
+            Id = "server-1",
+            DisplayName = "Server",
+            RemoteServer = "srv01.corp.local",
+            ConnectionType = "RDP"
+        });
+
+        service.LaunchDetected(tool, server, LocalizeWithPlaceholders);
+
+        Assert.NotNull(captured);
+        Assert.Equal(@"\\srv01.corp.local -accepteula -nobanner", captured!.Arguments);
+    }
+
+    private static string LocalizeWithPlaceholders(string key) =>
+        key == "ExternalToolLaunchError" ? "{0}: {1}" : key + " {0}";
+
     private string ReadLog()
     {
         FileLogger.Flush();
@@ -253,8 +353,11 @@ public sealed class ExternalToolLaunchServiceTests : IDisposable
         {
         }
 
+        public List<string> Warnings { get; } = [];
+
         public void ShowWarning(string title, string message)
         {
+            Warnings.Add(message);
         }
     }
 }

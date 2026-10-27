@@ -132,6 +132,7 @@ public sealed class OpenSshConfigImporter(IConfigManager configManager, Localiza
 
         var skippedDuplicates = 0;
         var warningCount = 0;
+        var sanitized = new List<ImportedItemSanitization>();
 
         foreach (var candidate in selected)
         {
@@ -143,13 +144,6 @@ public sealed class OpenSshConfigImporter(IConfigManager configManager, Localiza
                 continue;
             }
 
-            if (!string.IsNullOrWhiteSpace(candidate.IdentityFile) && !File.Exists(candidate.IdentityFile))
-            {
-                warningCount++;
-                Heimdall.Core.Logging.FileLogger.Warn(
-                    $"OpenSSH import preserved missing IdentityFile path for alias '{candidate.Alias}': {candidate.IdentityFile}");
-            }
-
             var gatewayPlan = BuildGatewayPlan(
                 candidate,
                 existingGatewayList,
@@ -159,11 +153,34 @@ public sealed class OpenSshConfigImporter(IConfigManager configManager, Localiza
                 DefaultGatewayName);
             foreach (var gateway in gatewayPlan.CreatedGateways)
             {
+                if (ImportedProfileSanitizer.SanitizeGatewayPaths(gateway) is { } gatewayItem)
+                {
+                    sanitized.Add(gatewayItem);
+                    warningCount++;
+                }
+
                 existingGatewayList.Add(gateway);
                 createdGateways.Add(gateway);
             }
 
-            plannedProfiles.Add(MapCandidate(candidate, gatewayPlan.LastGatewayId));
+            // The import boundary runs before the existence test below: testing a share path
+            // already sends the user's NetNTLMv2 response to the host it names.
+            ServerProfileDto profile = MapCandidate(candidate, gatewayPlan.LastGatewayId);
+            ImportedProfileSanitizationReport profileReport = ImportedProfileSanitizer.Sanitize([profile]);
+            if (profileReport.HasChanges)
+            {
+                sanitized.AddRange(profileReport.Items);
+                warningCount += profileReport.ClearedPathCount;
+            }
+
+            if (!string.IsNullOrWhiteSpace(profile.SshKeyPath) && !File.Exists(profile.SshKeyPath))
+            {
+                warningCount++;
+                Heimdall.Core.Logging.FileLogger.Warn(
+                    $"OpenSSH import preserved missing IdentityFile path for alias '{candidate.Alias}': {candidate.IdentityFile}");
+            }
+
+            plannedProfiles.Add(profile);
         }
 
         if (createdGateways.Count > 0)
@@ -201,7 +218,12 @@ public sealed class OpenSshConfigImporter(IConfigManager configManager, Localiza
             return new ImportOutcome(
                 importedCount,
                 finalSkippedDuplicates,
-                WarningCount: warningCount);
+                WarningCount: warningCount)
+            {
+                Sanitization = sanitized.Count == 0
+                    ? ImportedProfileSanitizationReport.Empty
+                    : new ImportedProfileSanitizationReport(sanitized),
+            };
         }).ConfigureAwait(false);
     }
 

@@ -122,8 +122,13 @@ public sealed class ProfileImportService(
             result.RenamedCount,
             result.SkippedCount,
             result.PasswordsIgnoredCount);
+        IReadOnlyList<string> sanitizationWarnings = ImportSummaryText.SanitizationWarnings(_localizer, result.Sanitization);
+        if (sanitizationWarnings.Count > 0)
+        {
+            summary = string.Join(Environment.NewLine, [summary, .. sanitizationWarnings]);
+        }
 
-        if (result.ImportedCount > 0 || result.ReplacedCount > 0)
+        if ((result.ImportedCount > 0 || result.ReplacedCount > 0) && sanitizationWarnings.Count == 0)
         {
             _dialogService.ShowInfo(_localizer["DialogImportRdpTitle"], summary);
         }
@@ -171,7 +176,10 @@ public sealed class ProfileImportService(
             return ProfileImportResult.NoChanges();
         }
 
-        ImportedProfileSanitizer.Sanitize(candidates);
+        // The import boundary: the servers and the gateways of the file lose what a file written
+        // elsewhere may not decide before anything else reads them.
+        ImportedProfileSanitizationReport sanitization = ImportedProfileSanitizer.Sanitize(candidates)
+            .Concat(SanitizeGateways(importDocument.Gateways));
 
         var preview = await BuildJsonPreviewAsync(path, candidates, ct);
         var dialogVm = new RdpImportDialogViewModel(
@@ -191,9 +199,12 @@ public sealed class ProfileImportService(
             result.ReplacedCount,
             result.RenamedCount,
             result.SkippedCount);
-        var fullSummary = BuildJsonImportSummary(summary, result);
+        IReadOnlyList<string> sanitizationWarnings = ImportSummaryText.SanitizationWarnings(_localizer, sanitization);
+        var fullSummary = BuildJsonImportSummary(summary, result, sanitizationWarnings);
 
-        if ((result.ImportedCount > 0 || result.ReplacedCount > 0) && result.GatewayOrphanCount == 0)
+        if ((result.ImportedCount > 0 || result.ReplacedCount > 0)
+            && result.GatewayOrphanCount == 0
+            && sanitizationWarnings.Count == 0)
         {
             _dialogService.ShowInfo(_localizer["ImportDialogTitle"], fullSummary);
         }
@@ -214,6 +225,20 @@ public sealed class ProfileImportService(
             GatewayMergedCount = result.GatewayMergedCount,
             GatewayOrphanCount = result.GatewayOrphanCount
         };
+    }
+
+    private static ImportedProfileSanitizationReport SanitizeGateways(IEnumerable<SshGatewayDto> gateways)
+    {
+        List<ImportedItemSanitization> items = [];
+        foreach (SshGatewayDto gateway in gateways)
+        {
+            if (gateway is not null && ImportedProfileSanitizer.SanitizeGatewayPaths(gateway) is { } item)
+            {
+                items.Add(item);
+            }
+        }
+
+        return items.Count == 0 ? ImportedProfileSanitizationReport.Empty : new ImportedProfileSanitizationReport(items);
     }
 
     private async Task<RdpImportPreview> BuildJsonPreviewAsync(
@@ -443,13 +468,18 @@ public sealed class ProfileImportService(
         }
     }
 
-    private string BuildJsonImportSummary(string profileSummary, ProfileImportResult result)
+    private string BuildJsonImportSummary(
+        string profileSummary,
+        ProfileImportResult result,
+        IReadOnlyList<string> sanitizationWarnings)
     {
         if (result.GatewayCreatedCount == 0 &&
             result.GatewayMergedCount == 0 &&
             result.GatewayOrphanCount == 0)
         {
-            return profileSummary;
+            return sanitizationWarnings.Count == 0
+                ? profileSummary
+                : string.Join(Environment.NewLine, [profileSummary, .. sanitizationWarnings]);
         }
 
         List<string> lines =
@@ -461,6 +491,7 @@ public sealed class ProfileImportService(
                 result.GatewayMergedCount,
                 result.GatewayOrphanCount)
         ];
+        lines.AddRange(sanitizationWarnings);
 
         if (result.GatewayCreatedCount > 0)
         {
