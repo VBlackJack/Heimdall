@@ -89,6 +89,8 @@ public sealed class PuttySessionImporter(
             var importedCount = 0;
             var skippedDuplicates = 0;
             var skippedInvalid = 0;
+            var warningCount = 0;
+            var sanitized = new List<ImportedItemSanitization>();
 
             foreach (PuttySessionCandidate candidate in selected)
             {
@@ -106,11 +108,27 @@ public sealed class PuttySessionImporter(
                     continue;
                 }
 
-                inventory.Add(MapCandidate(candidate));
+                ServerProfileDto profile = MapCandidate(candidate);
+
+                // The import boundary: a key file on a share would send the user's NetNTLMv2
+                // response to the host it names at the first connection.
+                ImportedProfileSanitizationReport report = ImportedProfileSanitizer.Sanitize([profile]);
+                if (report.HasChanges)
+                {
+                    sanitized.AddRange(report.Items);
+                    warningCount += report.ClearedPathCount;
+                }
+
+                inventory.Add(profile);
                 importedCount++;
             }
 
-            return new ImportOutcome(importedCount, skippedDuplicates, skippedInvalid);
+            return new ImportOutcome(importedCount, skippedDuplicates, skippedInvalid, warningCount)
+            {
+                Sanitization = sanitized.Count == 0
+                    ? ImportedProfileSanitizationReport.Empty
+                    : new ImportedProfileSanitizationReport(sanitized),
+            };
         }).ConfigureAwait(false);
     }
 

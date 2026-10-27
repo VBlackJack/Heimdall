@@ -25,8 +25,8 @@ public static class ProfileExecutionTrust
 {
     /// <summary>
     /// Returns true when a LOCAL profile carries a custom local shell executable, arguments,
-    /// working directory, or a request to run elevated, or a WEB profile names a program to open
-    /// its address with.
+    /// working directory, or a request to run elevated, a WEB profile names a program to open
+    /// its address with, or a CITRIX profile names an ICA file to open.
     /// </summary>
     /// <remarks>
     /// The working directory and the elevation mode were outside this payload, so an imported
@@ -38,6 +38,11 @@ public static class ProfileExecutionTrust
     /// carries: the same payload as a local shell, and an imported one must be confirmed before
     /// it runs. Without a program the address goes to the default browser, which runs nothing
     /// the profile chose, and the arguments are not used.
+    ///
+    /// A Citrix profile with an ICA file path hands that file to the shell, which opens it with
+    /// whatever program its type is associated with. The launcher refuses anything but an
+    /// <c>.ica</c> file on a local path, and an imported one is still confirmed first: the file
+    /// was chosen by whoever wrote the import.
     /// </remarks>
     public static bool CarriesLocalExecutionPayload(ServerProfileDto profile)
     {
@@ -47,6 +52,11 @@ public static class ProfileExecutionTrust
         {
             return profile.WebOpenExternally
                 && !string.IsNullOrWhiteSpace(profile.WebExternalProgram);
+        }
+
+        if (string.Equals(profile.ConnectionType, "CITRIX", StringComparison.OrdinalIgnoreCase))
+        {
+            return !string.IsNullOrWhiteSpace(profile.CitrixIcaFilePath);
         }
 
         return string.Equals(profile.ConnectionType, "LOCAL", StringComparison.OrdinalIgnoreCase)

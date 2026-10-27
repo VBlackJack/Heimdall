@@ -25,6 +25,7 @@ using Heimdall.App.Services;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
+using Heimdall.Core.Security;
 
 namespace Heimdall.App.Views.Tools;
 
@@ -74,20 +75,33 @@ public partial class ExternalToolWrapperView : UserControl, IToolView
         TxtProviderBadge.Text = _toolInfo.ProviderName;
         TxtExePath.Text = _toolInfo.ExecutablePath;
 
-        // Build default arguments, replacing placeholders with context values
-        var args = _toolInfo.Arguments;
-        if (context is not null)
+        // Build default arguments, replacing placeholders with context values, by the same rule
+        // as a launch from the server menu: a host that would not stay one plain argument is not
+        // written into the box, and the user is told why.
+        if (!ExternalToolDefinition.TryResolveDetectedArguments(
+                _toolInfo.Arguments,
+                _toolInfo.ExecutablePath,
+                context?.TargetHost,
+                context?.TargetPort?.ToString(CultureInfo.InvariantCulture),
+                user: null,
+                out string args,
+                out ArgumentTemplateRejection? rejection))
         {
-            args = args
-                .Replace("{Host}", context.TargetHost ?? "", StringComparison.OrdinalIgnoreCase)
-                .Replace("{Port}", context.TargetPort?.ToString(CultureInfo.InvariantCulture) ?? "", StringComparison.OrdinalIgnoreCase);
+            ExternalToolDefinition.TryResolveDetectedArguments(
+                _toolInfo.Arguments,
+                _toolInfo.ExecutablePath,
+                host: null,
+                port: null,
+                user: null,
+                out args,
+                out _);
+            TxtError.Text = string.Format(
+                CultureInfo.CurrentCulture,
+                L(ExternalToolLaunchService.RejectionMessageKey(rejection!.Reason)),
+                rejection.Token);
+            TxtError.Visibility = Visibility.Visible;
         }
-        else
-        {
-            args = args
-                .Replace("{Host}", "", StringComparison.OrdinalIgnoreCase)
-                .Replace("{Port}", "", StringComparison.OrdinalIgnoreCase);
-        }
+
         TxtArguments.Text = args.Trim();
 
         // Warn upfront if tool requires elevation (output won't be captured)

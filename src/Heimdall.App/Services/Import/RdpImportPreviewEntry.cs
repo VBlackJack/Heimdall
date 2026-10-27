@@ -45,6 +45,12 @@ public sealed class RdpImportPreviewEntry
     public IReadOnlyList<string> SkippedMappings { get; init; } = [];
 
     /// <summary>
+    /// The trust switches the file turned on and the import boundary turned off again
+    /// (<see cref="ImportedTrustFlags.Denylist"/>), for the import summary to name.
+    /// </summary>
+    public IReadOnlyList<ImportedTrustFlag> ResetTrustFlags { get; init; } = [];
+
+    /// <summary>
     /// What the file said, kept so a Replace can write onto the existing profile exactly the
     /// fields the file carries and nothing else.
     /// </summary>

@@ -138,6 +138,31 @@ public sealed class PuttySessionImporterTests
         Assert.Equal(1, outcome.SkippedInvalid);
     }
 
+    // S-02, entry point family "PuTTY sessions": a key file on a share is dropped at the import
+    // boundary, counted as a warning, and named with its value so the user can re-enter it.
+    [Fact]
+    public async Task ImportSelectedAsync_ShareKeyFile_IsDroppedAndReported()
+    {
+        using var fixture = new PuttyImportFixture([]);
+
+        var outcome = await fixture.Importer.ImportSelectedAsync(
+        [
+            new PuttySessionCandidate
+            {
+                DisplayName = "Roaming",
+                HostName = "ssh.example.com",
+                PublicKeyFile = @"\\fs\home$\u\key.ppk"
+            }
+        ]);
+
+        ServerProfileDto imported = Assert.Single(await fixture.ConfigManager.LoadServersAsync());
+        Assert.Null(imported.SshKeyPath);
+        Assert.Equal(1, outcome.WarningCount);
+        ImportedItemSanitization item = Assert.Single(outcome.Sanitization.Items);
+        Assert.Equal("Roaming", item.Name);
+        Assert.Equal(@"\\fs\home$\u\key.ppk", Assert.Single(item.ClearedPaths).Value);
+    }
+
     private sealed class PuttyImportFixture : IDisposable
     {
         public PuttyImportFixture(IReadOnlyList<RawPuttySession> sessions)
