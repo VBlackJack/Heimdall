@@ -326,6 +326,42 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
     /// </summary>
     private async Task TryCaptureWindowAsync()
     {
+        // The caller discards this task, so nothing may escape it: an unobserved fault would leave
+        // _captureInProgress set and the pane spinning for good. Any failure ends in external mode.
+        try
+        {
+            await CaptureWindowAsync();
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Error($"Citrix: window capture failed, using external mode: {ex}");
+            await FallBackToExternalModeAfterFailureAsync();
+        }
+    }
+
+    private async Task FallBackToExternalModeAfterFailureAsync()
+    {
+        _captureInProgress = false;
+        if (_disposed) return;
+
+        try
+        {
+            await Dispatcher.InvokeAsync(() =>
+            {
+                if (!_disposed)
+                {
+                    ShowExternalFallback();
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"Citrix: external-mode fallback failed: {ex.Message}");
+        }
+    }
+
+    private async Task CaptureWindowAsync()
+    {
         _captureInProgress = true;
         Core.Logging.FileLogger.Info("Citrix: attempting to capture Citrix session window...");
 
@@ -508,11 +544,7 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
     /// </summary>
     private static IntPtr TryFindCitrixAuthWindow()
     {
-        HashSet<int> selfServicePids = new();
-        foreach (Process process in Process.GetProcessesByName(WorkspaceShellProcessName))
-        {
-            selfServicePids.Add(process.Id);
-        }
+        HashSet<int> selfServicePids = CitrixProcessScan.LivePidsInCurrentSession([WorkspaceShellProcessName]);
 
         if (selfServicePids.Count == 0) return IntPtr.Zero;
 
@@ -555,15 +587,9 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
     /// </summary>
     private static CitrixSessionWindow FindNewSessionWindow(HashSet<IntPtr> preLaunchWindows)
     {
-        // The session window must belong to a live Citrix process.
-        HashSet<int> citrixPids = new();
-        foreach (string name in CitrixProcessNames)
-        {
-            foreach (Process process in Process.GetProcessesByName(name))
-            {
-                if (!process.HasExited) citrixPids.Add(process.Id);
-            }
-        }
+        // The session window must belong to a live Citrix process of this Windows session: on a
+        // multi-user host the other users' processes are neither ours nor readable.
+        HashSet<int> citrixPids = CitrixProcessScan.LivePidsInCurrentSession(CitrixProcessNames);
 
         if (citrixPids.Count == 0) return default;
 
