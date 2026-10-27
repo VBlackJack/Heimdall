@@ -23,7 +23,8 @@ namespace Heimdall.App.Services;
 /// </summary>
 /// <remarks>
 /// <para><b>The sessions are closed before anything is awaited, and that order is the point.</b>
-/// <c>App.OnExit</c> is <c>async void</c>, and WPF calls it from inside
+/// <c>App.OnExit</c> was <c>async void</c> when this was written (it now waits for its tail in
+/// a bounded nested frame), and WPF calls it from inside
 /// <c>Application.DoShutdown</c>, whose <c>finally</c> clears <c>Application.Current</c> and
 /// <c>MainWindow</c> the moment the override returns - which, for an asynchronous override, is
 /// its first incomplete await. Everything after that await runs in an application that no

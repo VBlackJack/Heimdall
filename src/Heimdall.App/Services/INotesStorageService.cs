@@ -50,7 +50,14 @@ public interface INotesStorageService
 
     Task SaveNoteAsync(string filePath, string content, CancellationToken cancellationToken = default);
 
-    void SaveNote(string filePath, string content);
+    /// <summary>
+    /// Synchronous save for the close and dispose paths, which cannot await.
+    /// </summary>
+    /// <returns>
+    /// False when the note was not written because another write held the lock past the
+    /// wait: the caller must keep the note dirty rather than report it saved.
+    /// </returns>
+    bool SaveNote(string filePath, string content);
 
     Task DeleteNoteAsync(string filePath, CancellationToken cancellationToken = default);
 

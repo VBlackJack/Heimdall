@@ -35,7 +35,9 @@ namespace Heimdall.App.Tests;
 /// </remarks>
 public sealed class AppExitPathSourceTests
 {
-    private const string OnExitMember = "protected override async void OnExit(ExitEventArgs e)";
+    private const string OnExitMember = "protected override void OnExit(ExitEventArgs e)";
+    private const string ExitTailMember = "private async Task RunExitTailAsync(";
+    private const string AppDomainUnhandledMember = "private void OnAppDomainUnhandledException(object sender, UnhandledExceptionEventArgs args)";
     private const string OnStartupMember = "protected override async void OnStartup(StartupEventArgs e)";
     private const string UnhandledMember = "private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs args)";
     private const string SessionEndingMember = "private void OnSessionEnding(object sender, SessionEndingCancelEventArgs args)";
@@ -59,7 +61,19 @@ public sealed class AppExitPathSourceTests
     private const string DialogDecisionStatement = "if (ShutdownDecisions.ShouldShowUnhandledExceptionDialog(IsShuttingDown))";
     private const string HandledStatement = "args.Handled = true;";
     private const string MarkShutdownStatement = "IsShuttingDown = true;";
-    private const string PersistOnSessionEndStatement = "if (MainWindow is MainWindow window)";
+    private const string FrameWaitCall = "BoundedDispatcherWait.Wait(";
+    private const string PushFrameCall = "Dispatcher.PushFrame(";
+    private const string WindowStateStepStatement = "await ExitStep.RunBoundedAsync(WindowStatePersistStep, DeferredWindowState.RunAsync, ExitWindowStatePersistBudget, Core.Logging.FileLogger.Warn);";
+    private const string DeferOnClosingStatement = "app.DeferredWindowState.Defer(CaptureShutdownPersistence(vm));";
+    private const string DeferDecisionStatement = "bool shuttingDown = DeferStatePersistenceIfShuttingDown(vm);";
+    private const string DeferMember = "private bool DeferStatePersistenceIfShuttingDown(MainViewModel vm)";
+    private const string TailStartStatement = "Task tail = RunExitTailAsync(rdpTrustPersistence, hostKeyPersistenceFlush, step => currentStep = step);";
+    private const string TailWaitStatement = "bool tailCompleted = BoundedDispatcherWait.Wait(Dispatcher, tail, ExitTailBudget, Core.Logging.FileLogger.Warn);";
+    private const string BaseExitStatement = "base.OnExit(e);";
+    private const string AwaitKeyword = "await";
+    private const string SubscribeAppDomainStatement = "AppDomain.CurrentDomain.UnhandledException += OnAppDomainUnhandledException;";
+    private const string AppDomainFlushStatement = "Core.Logging.FileLogger.Flush();";
+    private const string AppDomainRouteStatement = "UnhandledExceptionRoute route = ShutdownDecisions.RouteAppDomainUnhandledException(IsShuttingDown, Dispatcher.HasShutdownStarted, Dispatcher.CheckAccess());";
 
     private const string RdpDisposeMember = "private void Dispose(DisconnectReason reason)";
     private const string RdpCompleteMember = "private void CompleteDispose(DisconnectReason reason)";
@@ -96,23 +110,61 @@ public sealed class AppExitPathSourceTests
         Assert.True(ViewSource.IsStatementOfTheMethodBody(logic, StopX11Statement), "the X11 stop is not a step of OnExit");
         Assert.True(ViewSource.IsStatementOfTheMethodBody(logic, ReleaseSleepStatement), "the sleep release is not a step of OnExit");
         Assert.True(ViewSource.IsStatementOfTheMethodBody(logic, FlushStatement), "the log flush is not a step of OnExit");
-        Assert.True(ViewSource.IsStatementOfTheMethodBody(logic, SnapshotStatement), "the snapshot save is not a step of OnExit");
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(logic, TailStartStatement), "the asynchronous tail is not started by OnExit");
 
-        int snapshot = logic.IndexOf(SnapshotStatement, StringComparison.Ordinal);
-        Assert.True(logic.IndexOf(ReleaseRdpArtifactsStatement, StringComparison.Ordinal) < snapshot, "the RDP artifact release runs after the first await, in an application that no longer exists");
-        Assert.True(logic.IndexOf(ReleaseTunnelsStatement, StringComparison.Ordinal) < snapshot, "the tunnel release runs after the first await");
-        Assert.True(logic.IndexOf(StopSchedulerStatement, StringComparison.Ordinal) < snapshot, "the scheduler stop runs after the first await");
-        Assert.True(logic.IndexOf(StopX11Statement, StringComparison.Ordinal) < snapshot, "the X11 stop runs after the first await");
-        Assert.True(logic.IndexOf(ReleaseSleepStatement, StringComparison.Ordinal) < snapshot, "the sleep release runs after the first await");
-        Assert.True(logic.IndexOf(FlushStatement, StringComparison.Ordinal) < snapshot, "the log is not flushed before the first await");
+        int tail = logic.IndexOf(TailStartStatement, StringComparison.Ordinal);
+        Assert.True(logic.IndexOf(ReleaseRdpArtifactsStatement, StringComparison.Ordinal) < tail, "the RDP artifact release runs after the tail starts");
+        Assert.True(logic.IndexOf(ReleaseTunnelsStatement, StringComparison.Ordinal) < tail, "the tunnel release runs after the tail starts");
+        Assert.True(logic.IndexOf(StopSchedulerStatement, StringComparison.Ordinal) < tail, "the scheduler stop runs after the tail starts");
+        Assert.True(logic.IndexOf(StopX11Statement, StringComparison.Ordinal) < tail, "the X11 stop runs after the tail starts");
+        Assert.True(logic.IndexOf(ReleaseSleepStatement, StringComparison.Ordinal) < tail, "the sleep release runs after the tail starts");
+        Assert.True(logic.IndexOf(FlushStatement, StringComparison.Ordinal) < tail, "the log is not flushed before the tail starts");
+    }
+
+    [Fact]
+    public void OnExit_IsSynchronousAndWaitsForItsTailBeforeReturning()
+    {
+        // As an async void override, OnExit returned to DoShutdown at its first incomplete
+        // await and the dispatcher stopped behind it: the shipped logs end at "Session
+        // snapshot saved", and the trust flushes and the container disposal never ran.
+        string exit = Logic("App.xaml.cs", OnExitMember);
+        Assert.DoesNotContain(AwaitKeyword, exit, StringComparison.Ordinal);
+
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(exit, TailStartStatement), "the asynchronous tail is not started by OnExit");
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(exit, TailWaitStatement), "OnExit does not wait for its tail in the bounded frame");
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(exit, BaseExitStatement), "OnExit does not end with the base call");
+
+        int start = exit.IndexOf(TailStartStatement, StringComparison.Ordinal);
+        int wait = exit.IndexOf(TailWaitStatement, start, StringComparison.Ordinal);
+        Assert.True(wait > start, "the wait does not follow the tail it waits for");
+        Assert.True(exit.IndexOf(BaseExitStatement, wait, StringComparison.Ordinal) > wait, "the base OnExit runs before the tail is waited for");
+    }
+
+    [Fact]
+    public void ExitTail_RunsItsStepsInOrder()
+    {
+        string tail = Logic("App.xaml.cs", ExitTailMember);
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(tail, SnapshotStatement), "the snapshot save is not a step of the exit tail");
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(tail, RdpTrustFlushStatement), "the RDP trust flush is not a step of the exit tail");
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(tail, ContainerDisposeStatement), "the container disposal is not a step of the exit tail");
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(tail, BoundedStepStatement), "the host key flush is not a bounded step of the exit tail");
+
+        // Each search starts from the previous site.
+        int snapshot = tail.IndexOf(SnapshotStatement, StringComparison.Ordinal);
+        int trust = tail.IndexOf(RdpTrustFlushStatement, snapshot, StringComparison.Ordinal);
+        int dispose = tail.IndexOf(ContainerDisposeStatement, Math.Max(trust, 0), StringComparison.Ordinal);
+        int hostKeys = tail.IndexOf(BoundedStepStatement, Math.Max(dispose, 0), StringComparison.Ordinal);
+        Assert.True(trust > snapshot, "the RDP trust flush runs before the sessions are closed");
+        Assert.True(dispose > trust, "the RDP trust flush waits on a settings writer the container has already disposed");
+        Assert.True(hostKeys > dispose, "the host key flush is not the last step of the tail");
     }
 
     [Fact]
     public void OnExit_BoundsTheContainerDisposalAndTheHostKeyFlush()
     {
-        string exit = Logic("App.xaml.cs", OnExitMember);
-        Assert.True(ViewSource.IsStatementOfTheMethodBody(exit, ContainerDisposeStatement), "the container disposal is not a step of OnExit");
-        Assert.True(ViewSource.IsStatementOfTheMethodBody(exit, BoundedStepStatement), "the host key flush is not a bounded step of OnExit");
+        string exit = Logic("App.xaml.cs", ExitTailMember);
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(exit, ContainerDisposeStatement), "the container disposal is not a step of the exit tail");
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(exit, BoundedStepStatement), "the host key flush is not a bounded step of the exit tail");
 
         string dispose = Logic("App.xaml.cs", ContainerDisposeMember);
         Assert.True(ViewSource.IsStatementOfTheMethodBody(dispose, BoundedStepStatement), "the container disposal is not bounded");
@@ -124,9 +176,9 @@ public sealed class AppExitPathSourceTests
     [Fact]
     public void OnExit_FlushesTheRdpTrustWritesBeforeTheContainerGoes()
     {
-        string exit = Logic("App.xaml.cs", OnExitMember);
-        Assert.True(ViewSource.IsStatementOfTheMethodBody(exit, RdpTrustFlushStatement), "the RDP trust flush is not a step of OnExit");
-        Assert.True(ViewSource.IsStatementOfTheMethodBody(exit, ContainerDisposeStatement), "the container disposal is not a step of OnExit");
+        string exit = Logic("App.xaml.cs", ExitTailMember);
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(exit, RdpTrustFlushStatement), "the RDP trust flush is not a step of the exit tail");
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(exit, ContainerDisposeStatement), "the container disposal is not a step of the exit tail");
         Assert.True(
             exit.IndexOf(RdpTrustFlushStatement, StringComparison.Ordinal) < exit.IndexOf(ContainerDisposeStatement, StringComparison.Ordinal),
             "the RDP trust flush waits on a settings writer the container has already disposed");
@@ -166,7 +218,69 @@ public sealed class AppExitPathSourceTests
 
         string ending = Logic("App.xaml.cs", SessionEndingMember);
         Assert.True(ViewSource.IsStatementOfTheMethodBody(ending, MarkShutdownStatement), "a logoff does not mark the application as shutting down");
-        Assert.True(ViewSource.IsStatementOfTheMethodBody(ending, PersistOnSessionEndStatement), "a logoff does not persist the window state");
+
+        // Inside WM_QUERYENDSESSION, an input-synchronous cross-process call: nothing is
+        // pumped there, and nothing is started and left either.
+        Assert.DoesNotContain(FrameWaitCall, ending, StringComparison.Ordinal);
+        Assert.DoesNotContain("PersistStateForShutdownAsync", ending, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void LogoffWindowState_IsDeferredByTheCloseAndRunFirstByTheExitTail()
+    {
+        string closing = Logic("MainWindow.xaml.cs", MainClosingMember);
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(closing, DeferDecisionStatement), "the shutting-down close pass does not defer the state it skips");
+
+        string defer = Logic("MainWindow.xaml.cs", DeferMember);
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(defer, DeferOnClosingStatement), "the skipped state is not handed to the exit tail");
+
+        string tail = Logic("App.xaml.cs", ExitTailMember);
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(tail, WindowStateStepStatement), "the exit tail does not persist the deferred window state");
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(tail, SnapshotStatement), "the snapshot save is not a step of the exit tail");
+        Assert.True(
+            tail.IndexOf(WindowStateStepStatement, StringComparison.Ordinal) < tail.IndexOf(SnapshotStatement, StringComparison.Ordinal),
+            "the deferred window state is not the first step of the exit tail");
+    }
+
+    [Fact]
+    public void ExitPath_PushesExactlyOneFrame()
+    {
+        // Unbounded nested pumps once ended in a stack overflow: OnExit is the one caller,
+        // and the helper the one place a frame is pushed.
+        string app = ViewSource.WithoutCommentsAndLiterals(ReadAppSource("App.xaml.cs"));
+        Assert.Equal(1, CountOccurrences(app, FrameWaitCall));
+        Assert.Equal(1, CountOccurrences(Logic("App.xaml.cs", OnExitMember), FrameWaitCall));
+
+        string helper = ViewSource.WithoutCommentsAndLiterals(ReadAppSource("Services/BoundedDispatcherWait.cs"));
+        Assert.Equal(1, CountOccurrences(helper, PushFrameCall));
+    }
+
+    private static int CountOccurrences(string text, string token)
+    {
+        int count = 0;
+        for (int index = text.IndexOf(token, StringComparison.Ordinal); index >= 0; index = text.IndexOf(token, index + token.Length, StringComparison.Ordinal))
+        {
+            count++;
+        }
+
+        return count;
+    }
+
+    [Fact]
+    public void AppDomainUnhandledException_FlushesThenConsultsTheSharedShutdownDecision()
+    {
+        string startup = Logic("App.xaml.cs", OnStartupMember);
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(startup, SubscribeAppDomainStatement), "the AppDomain handler is not subscribed");
+
+        // The handler showed its dialog with no shutdown guard and waited on the UI thread
+        // for it; the routing is the shared decision, tested on its own.
+        string handler = Logic("App.xaml.cs", AppDomainUnhandledMember);
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(handler, AppDomainFlushStatement), "the AppDomain handler does not flush the log");
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(handler, AppDomainRouteStatement), "the AppDomain handler does not consult the shutdown decision");
+        int flush = handler.IndexOf(AppDomainFlushStatement, StringComparison.Ordinal);
+        Assert.True(
+            handler.IndexOf(AppDomainRouteStatement, flush, StringComparison.Ordinal) > flush,
+            "the log is flushed after the dialog decision, which may block");
     }
 
     [Fact]

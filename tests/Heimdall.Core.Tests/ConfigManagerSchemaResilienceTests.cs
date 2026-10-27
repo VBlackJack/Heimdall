@@ -607,6 +607,58 @@ public sealed class ConfigManagerSchemaResilienceTests : IDisposable
         Assert.Contains("servers.json", _manager.DocumentsRecoveredFromBackup);
     }
 
+    [Fact]
+    public async Task InitializeAsync_MissingSettingsWithBackup_RestoresTheBackupAndKeepsIt()
+    {
+        string backupPath = ConfigManager.BackupPathFor(_manager.SettingsPath);
+        await WriteUtf8Async(backupPath, """{ "defaultTheme": "Blade" }""");
+
+        await _manager.InitializeAsync();
+        AppSettings settings = await _manager.LoadSettingsAsync();
+
+        // Started on defaults, the next save copied them over the only good copy.
+        Assert.Equal("Blade", settings.DefaultTheme);
+        Assert.Contains("settings.json", _manager.DocumentsRecoveredFromBackup);
+
+        await _manager.MergeSettingAsync(saved => saved.SshDefaultMode = "External");
+        await _manager.MergeSettingAsync(saved => saved.SshDefaultMode = "Embedded");
+        Assert.Contains("Blade", await File.ReadAllTextAsync(backupPath), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task LoadSettingsAsync_MissingFileWithBackup_LoadsTheLastGoodCopy()
+    {
+        await WriteUtf8Async(ConfigManager.BackupPathFor(_manager.SettingsPath), """{ "defaultTheme": "Blade" }""");
+
+        AppSettings settings = await _manager.LoadSettingsAsync();
+
+        Assert.Equal("Blade", settings.DefaultTheme);
+        Assert.Contains("settings.json", _manager.DocumentsRecoveredFromBackup);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_MissingSettingsAndNoBackup_StartsOnDefaultsWithoutRecovery()
+    {
+        await _manager.InitializeAsync();
+
+        Assert.True(File.Exists(_manager.SettingsPath));
+        Assert.Empty(_manager.DocumentsRecoveredFromBackup);
+    }
+
+    [Fact]
+    public async Task InitializeAsync_MissingServersWithBackup_RestoresTheBackup()
+    {
+        await WriteUtf8Async(
+            ConfigManager.BackupPathFor(_manager.ServersPath),
+            """[ { "id": "s1", "displayName": "Kept", "connectionType": "SSH" } ]""");
+
+        await _manager.InitializeAsync();
+        List<ServerProfileDto> servers = await _manager.LoadServersAsync();
+
+        Assert.Equal("Kept", Assert.Single(servers).DisplayName);
+        Assert.Contains("servers.json", _manager.DocumentsRecoveredFromBackup);
+    }
+
     private static Task WriteUtf8Async(string path, string content) =>
         File.WriteAllTextAsync(path, content, new UTF8Encoding(false));
 
