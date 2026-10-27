@@ -15,6 +15,7 @@
  */
 
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
@@ -483,6 +484,11 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
             {
                 // Invalid base64; ignore.
             }
+            catch (ExternalException ex)
+            {
+                // The clipboard is held by another process (CLIPBRD_E_CANT_OPEN, a COMException): log, no dialog.
+                Core.Logging.FileLogger.Warn($"EmbeddedVNC clipboard-write failed: {ex.Message}");
+            }
             return;
         }
 
@@ -920,12 +926,20 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
     {
         Dispatcher.Invoke(() =>
         {
-            if (Clipboard.ContainsText())
+            try
             {
-                var text = Clipboard.GetText();
-                var b64 = Convert.ToBase64String(
-                    System.Text.Encoding.UTF8.GetBytes(text));
-                PostWebMessage($"clipboard-paste:{b64}");
+                if (Clipboard.ContainsText())
+                {
+                    var text = Clipboard.GetText();
+                    var b64 = Convert.ToBase64String(
+                        System.Text.Encoding.UTF8.GetBytes(text));
+                    PostWebMessage($"clipboard-paste:{b64}");
+                }
+            }
+            catch (ExternalException ex)
+            {
+                // The clipboard is held by another process (CLIPBRD_E_CANT_OPEN, a COMException): log, no dialog.
+                Core.Logging.FileLogger.Warn($"EmbeddedVNC clipboard-read failed: {ex.Message}");
             }
         });
     }

@@ -181,6 +181,33 @@
                 }
             }
 
+            // The host encodes and decodes clipboard text as UTF-8 (EmbeddedVncView), so the page must too:
+            // bare btoa/atob read and write Latin-1 and throw above U+00FF. Same helpers as terminal.html.
+            function bytesToBase64(bytes) {
+                var binary = '';
+                for (var index = 0; index < bytes.length; index++) {
+                    binary += String.fromCharCode(bytes[index]);
+                }
+                return btoa(binary);
+            }
+
+            function base64ToBytes(base64) {
+                var binary = atob(base64);
+                var bytes = new Uint8Array(binary.length);
+                for (var index = 0; index < binary.length; index++) {
+                    bytes[index] = binary.charCodeAt(index);
+                }
+                return bytes;
+            }
+
+            function stringToBase64(text) {
+                return bytesToBase64(new TextEncoder().encode(text));
+            }
+
+            function base64ToString(base64) {
+                return new TextDecoder().decode(base64ToBytes(base64));
+            }
+
             function showError(title, message) {
                 loadingElement.style.display = 'none';
                 errorTitle.textContent = title;
@@ -325,7 +352,7 @@
                     });
 
                     rfb.addEventListener('clipboard', function (event) {
-                        postMessage('clipboard-write:' + btoa(event.detail.text));
+                        postMessage('clipboard-write:' + stringToBase64(event.detail.text));
                     });
 
                     rfb.addEventListener('desktopname', function (event) {
@@ -367,7 +394,7 @@
                     if (msg.indexOf('clipboard-paste:') === 0) {
                         var b64 = msg.substring('clipboard-paste:'.length);
                         if (rfb && b64) {
-                            rfb.clipboardPasteFrom(atob(b64));
+                            rfb.clipboardPasteFrom(base64ToString(b64));
                         }
                         return;
                     }
