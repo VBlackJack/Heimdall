@@ -6561,6 +6561,7 @@
   "ToolCmdLibHistoryThisHostOnly": "Cet hôte uniquement",
   "ToolCmdLibBtnRunbooks": "Runbooks",
   "ToolCmdLibRunbooksTitle": "Runbooks",
+  "ToolCmdLibToggleOnFormat": "{0}, activé",
   "ToolCmdLibBottomPanelGripTooltip": "Faites glisser pour redimensionner ce panneau (ou donnez-lui le focus et utilisez les flèches Haut et Bas). Double-cliquez pour revenir à la hauteur automatique.",
   "ToolCmdLibRunbooksEmpty": "Aucun runbook pour l'instant. Appuyez sur + pour enchaîner des actions de la bibliothèque et des commandes.",
   "ToolCmdLibRunbookNew": "Nouveau runbook",

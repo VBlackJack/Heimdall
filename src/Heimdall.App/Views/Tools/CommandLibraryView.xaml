@@ -38,6 +38,21 @@
         <sys:Double x:Key="CmdLibBottomPanelGripHeight">8</sys:Double>
         <sys:Double x:Key="CmdLibBottomPanelGripBarWidth">40</sys:Double>
         <sys:Double x:Key="CmdLibBottomPanelGripBarHeight">3</sys:Double>
+        <!-- A ghost button that shows when it is on: the History and Runbooks panels and the
+             favorites filter. They stay plain buttons whose Tag carries the view model's state,
+             as the tab strip's broadcast marker does, rather than ToggleButtons: a ToggleButton
+             beside a Command can be flipped through UIA without the view model following. -->
+        <Style x:Key="CmdLibOnOffButtonStyle" TargetType="Button" BasedOn="{StaticResource GhostButtonStyle}">
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Tag, RelativeSource={RelativeSource Self}}">
+                    <DataTrigger.Value>
+                        <sys:Boolean>True</sys:Boolean>
+                    </DataTrigger.Value>
+                    <Setter Property="Background" Value="{DynamicResource CardBrush}"/>
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
     </UserControl.Resources>
     <Grid>
         <Grid.RowDefinitions>
@@ -67,26 +82,43 @@
                         Margin="{StaticResource MarginInlineControl}"
                         TabIndex="15"/>
                 <Button DockPanel.Dock="Right"
+                        x:Name="BtnHistory"
                         Content="&#xE81C;" FontFamily="{StaticResource FontFamilyIcons}"
                         Command="{Binding ToggleHistoryCommand}"
+                        Tag="{Binding IsHistoryVisible}"
                         ToolTip="{loc:Translate ToolCmdLibBtnHistory}"
-                        AutomationProperties.Name="{loc:Translate ToolCmdLibBtnHistory}"
-                        Style="{DynamicResource GhostButtonStyle}"
+                        Style="{StaticResource CmdLibOnOffButtonStyle}"
                         FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28"
                         Padding="4"
                         Margin="{StaticResource MarginInlineControl}"
-                        TabIndex="14"/>
+                        TabIndex="14">
+                    <AutomationProperties.Name>
+                        <MultiBinding Converter="{StaticResource AccessibleStateNameConverter}">
+                            <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[ToolCmdLibBtnHistory]"/>
+                            <Binding Path="IsHistoryVisible"/>
+                            <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[ToolCmdLibToggleOnFormat]"/>
+                        </MultiBinding>
+                    </AutomationProperties.Name>
+                </Button>
                 <Button DockPanel.Dock="Right"
                         x:Name="BtnRunbooks"
                         Content="&#xE9D5;" FontFamily="{StaticResource FontFamilyIcons}"
                         Command="{Binding ToggleRunbooksCommand}"
+                        Tag="{Binding IsRunbooksVisible}"
                         ToolTip="{loc:Translate ToolCmdLibBtnRunbooks}"
-                        AutomationProperties.Name="{loc:Translate ToolCmdLibBtnRunbooks}"
-                        Style="{DynamicResource GhostButtonStyle}"
+                        Style="{StaticResource CmdLibOnOffButtonStyle}"
                         FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28"
                         Padding="4"
                         Margin="{StaticResource MarginInlineControl}"
-                        TabIndex="14"/>
+                        TabIndex="14">
+                    <AutomationProperties.Name>
+                        <MultiBinding Converter="{StaticResource AccessibleStateNameConverter}">
+                            <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[ToolCmdLibBtnRunbooks]"/>
+                            <Binding Path="IsRunbooksVisible"/>
+                            <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[ToolCmdLibToggleOnFormat]"/>
+                        </MultiBinding>
+                    </AutomationProperties.Name>
+                </Button>
                 <Button DockPanel.Dock="Right"
                         Content="&#xE895;" FontFamily="{StaticResource FontFamilyIcons}"
                         Command="{Binding SyncCommand}"
@@ -226,13 +258,22 @@
                                VerticalAlignment="Center" Margin="0,2,8,2"
                                MinWidth="65"/>
                     <Button Content="&#x2605;"
+                            x:Name="BtnFavoritesFilter"
                             Command="{Binding ToggleFavoritesFilterCommand}"
+                            Tag="{Binding FavoritesFilterActive}"
                             ToolTip="{loc:Translate ToolCmdLibFilterFavorites}"
-                            AutomationProperties.Name="{loc:Translate ToolCmdLibFilterFavorites}"
-                            Style="{DynamicResource GhostButtonStyle}"
+                            Style="{StaticResource CmdLibOnOffButtonStyle}"
                             FontSize="{StaticResource FontSizeBodyLarge}" MinWidth="28" Height="28" Padding="4"
                             Margin="0,2,8,2"
-                            Foreground="{Binding FavoritesFilterBrushKey, Converter={StaticResource ResourceKeyToBrushConverter}}"/>
+                            Foreground="{Binding FavoritesFilterBrushKey, Converter={StaticResource ResourceKeyToBrushConverter}}">
+                        <AutomationProperties.Name>
+                            <MultiBinding Converter="{StaticResource AccessibleStateNameConverter}">
+                                <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[ToolCmdLibFilterFavorites]"/>
+                                <Binding Path="FavoritesFilterActive"/>
+                                <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[ToolCmdLibToggleOnFormat]"/>
+                            </MultiBinding>
+                        </AutomationProperties.Name>
+                    </Button>
                     <ComboBox MinWidth="180" Margin="0,2,8,2"
                               FontSize="{StaticResource FontSizeBody}"
                               ItemsSource="{Binding CategoryFilterItems}"

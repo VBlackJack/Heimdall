@@ -459,7 +459,14 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     /// a separate, coarser gate (see <see cref="IsSendVisible"/>): a visible but
     /// disabled button can still explain itself through <see cref="SendTooltip"/>.
     /// </summary>
-    public bool IsSendEnabled => IsCommandValid && (CanSendToTerminalProbe?.Invoke() ?? false);
+    public bool IsSendEnabled => IsCommandValid && HasTerminalSink;
+
+    /// <summary>
+    /// True when the tab holds a terminal that Send and Insert can reach. Decides which of Copy
+    /// and Send carries the primary style: without a terminal, Copy is the only button that can
+    /// work, and a filled Send that cannot run drew the eye away from it.
+    /// </summary>
+    public bool HasTerminalSink => CanSendToTerminalProbe?.Invoke() ?? false;
 
     /// <summary>
     /// Tooltip for the Send button. When the button is enabled it returns the
@@ -621,6 +628,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     /// </summary>
     public void RefreshSendState()
     {
+        OnPropertyChanged(nameof(HasTerminalSink));
         OnPropertyChanged(nameof(IsSendEnabled));
         SendCommand.NotifyCanExecuteChanged();
         OnPropertyChanged(nameof(SendTooltip));
