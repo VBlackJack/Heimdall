@@ -40,6 +40,7 @@ public sealed class CommandLibraryViewModelClipboardTests
     {
         var viewModel = await CreateViewModelAsync();
         viewModel.GeneratedCommand = "tail -f /tmp/app.log";
+        viewModel.IsGeneratorVisible = true;
 
         var feedback = new List<string>();
         viewModel.SetClipboardText = _ => false;
@@ -55,6 +56,7 @@ public sealed class CommandLibraryViewModelClipboardTests
     {
         var viewModel = await CreateViewModelAsync();
         viewModel.GeneratedCommand = "tail -f /tmp/app.log";
+        viewModel.IsGeneratorVisible = true;
 
         var feedback = new List<string>();
         viewModel.SetClipboardText = _ => true;

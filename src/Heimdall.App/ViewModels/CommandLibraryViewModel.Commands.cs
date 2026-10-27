@@ -39,10 +39,16 @@ public sealed partial class CommandLibraryViewModel
     /// Copies the current generated command to the clipboard, records a
     /// history entry, and triggers the visual feedback animation.
     /// </summary>
+    /// <remarks>
+    /// Copy, Send and Insert act only while the generator is on screen. Their shortcuts are
+    /// declared on the whole view, and a single-line text box lets Enter bubble up to them: with
+    /// the History or Runbooks panel open, the hidden generator still holds the last action's
+    /// command, and Enter in a run variable copied it, or Ctrl+Enter sent it, unseen.
+    /// </remarks>
     [RelayCommand]
     public void Copy()
     {
-        if (string.IsNullOrEmpty(GeneratedCommand)) return;
+        if (!IsGeneratorVisible || string.IsNullOrEmpty(GeneratedCommand)) return;
         var copied = SetClipboardText?.Invoke(GeneratedCommand) ?? false;
         if (!copied) return;
 
@@ -68,7 +74,7 @@ public sealed partial class CommandLibraryViewModel
     [RelayCommand(CanExecute = nameof(IsSendEnabled))]
     public async Task SendAsync()
     {
-        if (string.IsNullOrEmpty(GeneratedCommand) || SendCommandHandler is null || !IsSendEnabled) return;
+        if (!IsGeneratorVisible || string.IsNullOrEmpty(GeneratedCommand) || SendCommandHandler is null || !IsSendEnabled) return;
 
         // Example text bypasses GenerateCommand validation and escaping, and both the
         // example string and the action level come from (possibly imported) data. Force a
@@ -100,7 +106,7 @@ public sealed partial class CommandLibraryViewModel
     [RelayCommand]
     public void Insert()
     {
-        if (string.IsNullOrEmpty(GeneratedCommand) || InsertTextHandler is null || !IsSendEnabled) return;
+        if (!IsGeneratorVisible || string.IsNullOrEmpty(GeneratedCommand) || InsertTextHandler is null || !IsSendEnabled) return;
 
         InsertTextHandler(GeneratedCommand);
         ShowCopyFeedback?.Invoke(InsertTarget);
