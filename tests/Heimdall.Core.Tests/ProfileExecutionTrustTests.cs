@@ -69,6 +69,55 @@ public sealed class ProfileExecutionTrustTests
         Assert.False(ProfileExecutionTrust.RequiresExecutionConfirmation(profile));
     }
 
+    /// <summary>
+    /// P1-01. A Citrix profile with an ICA file path hands that file to the shell. Imported, the
+    /// import cleared its trust flag, so the prompt must appear before the file is opened; a
+    /// Citrix profile that only names a StoreFront runs nothing it chose.
+    /// </summary>
+    [Theory]
+    [InlineData("CITRIX", @"C:\Citrix\app.ica", true)]
+    [InlineData("citrix", @"C:\Users\me\Downloads\x.hta", true)]
+    [InlineData("CITRIX", null, false)]
+    [InlineData("CITRIX", "  ", false)]
+    [InlineData("RDP", @"C:\Citrix\app.ica", false)]
+    public void CarriesLocalExecutionPayload_CitrixIcaFile_IsGated(
+        string connectionType,
+        string? icaFilePath,
+        bool expected)
+    {
+        ServerProfileDto profile = new()
+        {
+            ConnectionType = connectionType,
+            CitrixIcaFilePath = icaFilePath,
+            CitrixStoreFrontUrl = "https://citrix.example.com/Citrix/StoreWeb/",
+            CitrixAppName = "Calculator",
+        };
+
+        Assert.Equal(expected, ProfileExecutionTrust.CarriesLocalExecutionPayload(profile));
+        Assert.Equal(expected, ProfileExecutionTrust.RequiresExecutionConfirmation(profile));
+
+        profile.ExecutionConfirmed = true;
+        Assert.False(ProfileExecutionTrust.RequiresExecutionConfirmation(profile));
+    }
+
+    [Fact]
+    public void RequiresExecutionConfirmation_ImportedCitrixIcaProfile_AsksAgain()
+    {
+        List<ServerProfileDto> imported =
+        [
+            new()
+            {
+                ConnectionType = "CITRIX",
+                CitrixIcaFilePath = @"C:\Citrix\app.ica",
+                ExecutionConfirmed = true,
+            },
+        ];
+
+        ImportedProfileSanitizer.Sanitize(imported);
+
+        Assert.True(ProfileExecutionTrust.RequiresExecutionConfirmation(imported[0]));
+    }
+
     [Fact]
     public void CarriesLocalExecutionPayload_LocalArgumentsOnly_ReturnsTrue()
     {

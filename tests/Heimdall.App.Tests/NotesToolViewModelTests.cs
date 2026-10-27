@@ -183,6 +183,26 @@ public sealed class NotesToolViewModelTests
     }
 
     [Fact]
+    public async Task TrySaveSynchronously_WhenTheWriteLockTimesOut_KeepsTheNoteDirtyAndRefuses()
+    {
+        var storage = CreateStorage(Seed("alpha.md", "# Alpha\nalpha"));
+        var vm = await CreateViewModelAsync(storage);
+        var path = storage.Paths.Single();
+
+        await vm.ReloadAsync(path);
+        vm.CurrentMarkdown = "# Alpha\nlast edits";
+        vm.IsDirty = true;
+        storage.SyncSaveLockTimesOut = true;
+
+        bool saved = vm.TrySaveSynchronously();
+
+        // Reported saved, the tab closed over edits that were never written.
+        Assert.False(saved);
+        Assert.True(vm.IsDirty);
+        Assert.Equal("# Alpha\nalpha", await storage.LoadNoteAsync(path));
+    }
+
+    [Fact]
     public async Task NewNoteFromTemplateCommand_CreatesSelectsAndReloads()
     {
         var storage = CreateStorage(Seed("alpha.md", "# Alpha\nalpha"));

@@ -386,6 +386,36 @@ public sealed class OpenSshConfigImporterTests
         Assert.Equal(["h1.example.com", "h2.example.com", "h3.example.com"], chain.Select(item => item.Host));
     }
 
+    // S-02, entry point family "OpenSSH config": the IdentityFile of a host and of a ProxyJump
+    // hop on a share is dropped at the boundary, before the import tests whether it exists, and
+    // reported with its value.
+    [Fact]
+    public async Task ImportSelectedAsync_ShareIdentityFiles_AreDroppedAndReported()
+    {
+        using var fixture = new OpenSshImportFixture();
+
+        var outcome = await fixture.Importer.ImportSelectedAsync(
+        [
+            new OpenSshImportCandidate
+            {
+                Alias = "roaming",
+                HostName = "ssh.example.com",
+                IdentityFile = @"\\fs\home$\u\.ssh\id_rsa",
+                SourceLineNumber = 1,
+                ProxyJumpChain = [Hop("bastion.example.com", user: "ops", identityFile: "//attacker.example/share/bastion")]
+            }
+        ]);
+
+        ServerProfileDto server = Assert.Single(await fixture.ConfigManager.LoadServersAsync());
+        SshGatewayDto gateway = Assert.Single((await fixture.ConfigManager.LoadSettingsAsync()).SshGateways);
+        Assert.Null(server.SshKeyPath);
+        Assert.Null(gateway.KeyPath);
+        Assert.Equal(2, outcome.WarningCount);
+        Assert.Equal(
+            [@"//attacker.example/share/bastion", @"\\fs\home$\u\.ssh\id_rsa"],
+            outcome.Sanitization.Items.SelectMany(item => item.ClearedPaths).Select(removal => removal.Value));
+    }
+
     private static OpenSshProxyJumpHop Hop(
         string hostName,
         string? user = null,

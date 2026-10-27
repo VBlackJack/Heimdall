@@ -113,6 +113,12 @@ public partial class App : System.Windows.Application
     /// </remarks>
     internal static bool SuppressProductLifecycle { get; set; }
 
+    /// <summary>
+    /// Ceiling on the window state persistence a shutdown-time close deferred to exit: the
+    /// expand state, the window bounds and any unsaved settings.
+    /// </summary>
+    private static readonly TimeSpan ExitWindowStatePersistBudget = TimeSpan.FromSeconds(5);
+
     /// <summary>How long exit waits for the session snapshot to reach disk.</summary>
     private static readonly TimeSpan ExitSnapshotSaveBudget = TimeSpan.FromSeconds(2);
 
@@ -128,6 +134,32 @@ public partial class App : System.Windows.Application
 
     /// <summary>Ceiling on the RDP certificate trust flush at exit.</summary>
     private static readonly TimeSpan ExitRdpTrustFlushBudget = TimeSpan.FromSeconds(5);
+
+    /// <summary>What the exit tail adds to the sum of its step budgets: the step logging and pumping.</summary>
+    private static readonly TimeSpan ExitTailMargin = TimeSpan.FromSeconds(3);
+
+    /// <summary>
+    /// Ceiling on the whole asynchronous exit tail, which <see cref="OnExit"/> waits for in
+    /// one nested frame. Each step is bounded on its own, so this is their sum plus a
+    /// margin: it is reached only when a step's own bound did not hold.
+    /// </summary>
+    private static readonly TimeSpan ExitTailBudget =
+        ExitWindowStatePersistBudget + ExitSnapshotSaveBudget + ExitRdpTrustFlushBudget
+        + ExitContainerDisposeBudget + ExitHostKeyFlushBudget + ExitTailMargin;
+
+    /// <summary>
+    /// How long the crashing thread waits for the unhandled-exception dialog it posted to the
+    /// UI thread. The process ends when the handler returns, so it waits for the user to read
+    /// the dialog; bounded, so a UI thread that never runs the dialog cannot hold the process.
+    /// </summary>
+    private static readonly TimeSpan UnhandledExceptionDialogWait = TimeSpan.FromMinutes(1);
+
+    /// <summary>The exit tail steps, as the log names them.</summary>
+    private const string WindowStatePersistStep = "window state persistence";
+    private const string ExitTailStartStep = "session snapshot and close";
+    private const string RdpTrustFlushStep = "RDP trust flush";
+    private const string ContainerDisposalStep = "service container disposal";
+    private const string HostKeyFlushStep = "trusted host key flush";
 
     /// <summary>
     /// Exit code of a launch that failed before the main window. Nothing in the
@@ -183,14 +215,7 @@ public partial class App : System.Windows.Application
             args.SetObserved();
         };
 
-        AppDomain.CurrentDomain.UnhandledException += (_, args) =>
-        {
-            if (args.ExceptionObject is Exception ex)
-            {
-                Heimdall.Core.Logging.FileLogger.Error("AppDomain unhandled exception", ex);
-                Dispatcher.Invoke(() => ShowUnhandledException(ex));
-            }
-        };
+        AppDomain.CurrentDomain.UnhandledException += OnAppDomainUnhandledException;
 
         _dataRoot = ApplicationDataPathResolver.Resolve();
         InitializeLogging(_dataRoot);
@@ -1558,20 +1583,64 @@ public partial class App : System.Windows.Application
     }
 
     /// <summary>
+    /// The last handler a thread's unhandled exception reaches, on the crashing thread. Logged
+    /// and flushed first, since the process ends when this returns. The dialog follows the
+    /// same shutdown decision as the dispatcher hook, and while shutting down the crashing
+    /// thread is never made to wait on the UI thread.
+    /// </summary>
+    private void OnAppDomainUnhandledException(object sender, UnhandledExceptionEventArgs args)
+    {
+        if (args.ExceptionObject is not Exception exception)
+        {
+            return;
+        }
+
+        Core.Logging.FileLogger.Error("AppDomain unhandled exception", exception);
+        Core.Logging.FileLogger.Flush();
+        UnhandledExceptionRoute route = ShutdownDecisions.RouteAppDomainUnhandledException(IsShuttingDown, Dispatcher.HasShutdownStarted, Dispatcher.CheckAccess());
+        switch (route)
+        {
+            case UnhandledExceptionRoute.ShowInline:
+                ShowUnhandledException(exception);
+                break;
+            case UnhandledExceptionRoute.ShowOnDispatcher:
+                // Posted, then waited for with a bound: an unbounded Invoke held the crashing
+                // thread for as long as the UI thread never ran the dialog.
+                Dispatcher.BeginInvoke(() => ShowUnhandledException(exception)).Wait(UnhandledExceptionDialogWait);
+                break;
+            default:
+                // Logged and flushed above; nothing may hold the exit.
+                break;
+        }
+    }
+
+    /// <summary>
     /// Windows logoff or shutdown. WPF closes every window with the cancellation ignored
     /// and then shuts down; without this the main window took its full interactive close
     /// pass - prompts during a logoff - and a refused or thrown confirmation returned
     /// before the expand state and window bounds were saved.
     /// </summary>
+    /// <remarks>
+    /// <para>Only marks the state. The persistence started here and left died with the
+    /// process at its first write that yielded, and waiting for it here is not an option:
+    /// this runs inside WM_QUERYENDSESSION, an input-synchronous cross-process call, where
+    /// pumping COM or ActiveX work fails and holding the reply brings up the "this app is
+    /// preventing shutdown" screen.</para>
+    /// <para>WPF then closes the windows and calls <see cref="OnExit"/>: the main window's
+    /// close pass captures the state it skipped into <see cref="DeferredWindowState"/>, and
+    /// the exit tail persists it first, inside its bounded frame.</para>
+    /// </remarks>
     private void OnSessionEnding(object sender, SessionEndingCancelEventArgs args)
     {
         IsShuttingDown = true;
-        Heimdall.Core.Logging.FileLogger.Info("Session ending: persisting state before shutdown");
-        if (MainWindow is MainWindow window)
-        {
-            _ = window.PersistStateForShutdownAsync();
-        }
+        Core.Logging.FileLogger.Info("Session ending: state is persisted by the exit tail");
+        Core.Logging.FileLogger.Flush();
     }
+
+    /// <summary>
+    /// The window state a shutdown-time close skipped, run as the first step of the exit tail.
+    /// </summary>
+    internal DeferredShutdownPersistence DeferredWindowState { get; } = new();
 
     private void ShowUnhandledException(Exception exception)
     {
@@ -1629,7 +1698,17 @@ public partial class App : System.Windows.Application
             MessageBoxImage.Error);
     }
 
-    protected override async void OnExit(ExitEventArgs e)
+    /// <remarks>
+    /// Synchronous on purpose. WPF calls this from inside <c>Application.DoShutdown</c> and
+    /// shuts the dispatcher down as soon as it returns; as an <c>async void</c> override it
+    /// returned at its first incomplete await, and the continuations queued behind it never
+    /// ran. The shipped logs of 2026-10-25 and 2026-10-26 stop at "Session snapshot saved":
+    /// the RDP trust flush, the container disposal and the host key flush were all lost, and
+    /// a trust approved just before an update was asked about again. The asynchronous tail
+    /// now runs inside one bounded nested frame, which keeps the dispatcher pumping for the
+    /// continuations that need the UI thread while this method waits.
+    /// </remarks>
+    protected override void OnExit(ExitEventArgs e)
     {
         // Some WPF teardown paths can unload visual children after window
         // closing has completed. Keep the shutdown guard armed for those
@@ -1645,43 +1724,76 @@ public partial class App : System.Windows.Application
         _singleInstanceGuard?.Dispose();
         _singleInstanceGuard = null;
 
-        // Started before the first await, awaited at the end: a trust change made in the last
+        // Started before the tail, waited for at its end: a trust change made in the last
         // quiet window would otherwise be lost with the process.
         Task hostKeyPersistenceFlush = _serviceProvider?.GetService<HostKeyPersistenceCoalescer>()?.FlushAsync()
             ?? Task.CompletedTask;
 
-        // Resolved here, while the container is whole; its queue is awaited below, after the
-        // sessions are closed and before the container that owns the settings writer goes.
+        // Resolved here, while the container is whole; its queue is waited for in the tail,
+        // after the sessions are closed and before the container that owns the settings
+        // writer goes.
         RdpCertificatePersistence? rdpTrustPersistence = _serviceProvider?.GetService<RdpCertificatePersistence>();
 
-        // Everything that releases a resource outside this process runs here, BEFORE the
-        // first await: WPF clears Application.Current the moment an asynchronous OnExit
-        // returns to DoShutdown, which is its first incomplete await, and the continuation
-        // then runs inside an application that no longer exists. The session close was
-        // moved above that line for this reason; these steps were left behind it. Each is
-        // a step of this body, where the exit-path guard reads their order.
+        // Everything that releases a resource outside this process runs here, before the
+        // tail starts: synchronous steps that need no pumping, so a tail that overruns its
+        // budget cannot cost them. Each is a step of this body, where the exit-path guard
+        // reads their order.
         ReleaseRdpArtifacts();
         ReleaseTunnels();
         StopScheduler();
         StopX11Server();
         ReleaseSleepPrevention();
 
-        // The log so far, while the process is still whole. The final flush below sits
-        // behind two awaits, and the tail of a shutdown is the part hardest to reproduce.
+        // The log so far, while the process is still whole. The tail of a shutdown is the
+        // part hardest to reproduce.
         Core.Logging.FileLogger.Flush();
 
+        string currentStep = WindowStatePersistStep;
+        Task tail = RunExitTailAsync(rdpTrustPersistence, hostKeyPersistenceFlush, step => currentStep = step);
+        bool tailCompleted = BoundedDispatcherWait.Wait(Dispatcher, tail, ExitTailBudget, Core.Logging.FileLogger.Warn);
+        if (tailCompleted)
+        {
+            Core.Logging.FileLogger.Info("Heimdall shutdown complete");
+        }
+        else
+        {
+            Core.Logging.FileLogger.Warn(
+                $"Heimdall shutdown complete without its tail: the {currentStep} did not finish within {ExitTailBudget.TotalSeconds:0.#} s.");
+        }
+
+        Core.Logging.FileLogger.Flush();
+        base.OnExit(e);
+    }
+
+    /// <summary>
+    /// The asynchronous steps of exit, in order, each bounded and logged as it starts so a
+    /// log shows where an exit stopped. Never throws: every step contains its own failure.
+    /// </summary>
+    private async Task RunExitTailAsync(
+        RdpCertificatePersistence? rdpTrustPersistence,
+        Task hostKeyPersistenceFlush,
+        Action<string> enterStep)
+    {
+        EnterExitStep(enterStep, WindowStatePersistStep);
+        await ExitStep.RunBoundedAsync(WindowStatePersistStep, DeferredWindowState.RunAsync, ExitWindowStatePersistBudget, Core.Logging.FileLogger.Warn);
+        EnterExitStep(enterStep, ExitTailStartStep);
         await SaveSnapshotAndCloseSessionsAsync();
+        EnterExitStep(enterStep, RdpTrustFlushStep);
         await FlushRdpTrustAsync(rdpTrustPersistence, ExitRdpTrustFlushBudget, Core.Logging.FileLogger.Warn);
+        EnterExitStep(enterStep, ContainerDisposalStep);
         await DisposeContainerBoundedAsync();
+        EnterExitStep(enterStep, HostKeyFlushStep);
         await ExitStep.RunBoundedAsync(
-            "trusted host key flush",
+            HostKeyFlushStep,
             () => hostKeyPersistenceFlush,
             ExitHostKeyFlushBudget,
             Core.Logging.FileLogger.Warn);
+    }
 
-        Core.Logging.FileLogger.Info("Heimdall shutdown complete");
-        Core.Logging.FileLogger.Flush();
-        base.OnExit(e);
+    private static void EnterExitStep(Action<string> enterStep, string step)
+    {
+        enterStep(step);
+        Core.Logging.FileLogger.Info($"[App] exit step: {step}");
     }
 
     /// <summary>
@@ -1749,9 +1861,10 @@ public partial class App : System.Windows.Application
 
     /// <summary>
     /// The sessions are closed BEFORE this method first yields, and the sequence records
-    /// why: WPF clears Application.Current the moment an asynchronous OnExit returns to
-    /// DoShutdown, which is its first incomplete await. The snapshot save is that await.
-    /// Closing after it tore every host down inside an application that no longer existed.
+    /// why: when OnExit was asynchronous, WPF cleared Application.Current the moment it
+    /// returned to DoShutdown at this first incomplete await, and closing after it tore
+    /// every host down inside an application that no longer existed. OnExit now waits for
+    /// the tail in a nested frame; the order stays, so the close never depends on it.
     /// </summary>
     private async Task SaveSnapshotAndCloseSessionsAsync()
     {
@@ -1791,7 +1904,7 @@ public partial class App : System.Windows.Application
         Action<string> logWarn)
     {
         return ExitStep.RunBoundedAsync(
-            "RDP trust flush",
+            RdpTrustFlushStep,
             () => persistence?.PendingWrites ?? Task.CompletedTask,
             budget,
             logWarn);
@@ -1811,7 +1924,7 @@ public partial class App : System.Windows.Application
         }
 
         await ExitStep.RunBoundedAsync(
-            "service container disposal",
+            ContainerDisposalStep,
             () => asyncProvider.DisposeAsync().AsTask(),
             ExitContainerDisposeBudget,
             Core.Logging.FileLogger.Warn);

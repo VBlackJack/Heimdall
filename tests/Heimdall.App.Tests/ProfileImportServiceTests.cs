@@ -46,6 +46,78 @@ public sealed class ProfileImportServiceTests
         Assert.Equal("Import .rdp files", fixture.Dialog.LastRdpImportViewModel.DialogTitle);
     }
 
+    // S-03, entry point family ".rdp files": a rogue .rdp file asking for drive and USB
+    // redirection is a known phishing vector. Both arrive off, smart card redirection (needed for
+    // smart card logon) stays, and the summary names the profile and the switches.
+    [Fact]
+    public async Task ImportFromPathAsync_Rdp_TurnsOffDriveAndUsbRedirection_KeepsSmartCards()
+    {
+        using var fixture = new ProfileImportFixture();
+        var path = await fixture.WriteTextAsync(
+            "Rogue.rdp",
+            "full address:s:rdp.example.com\r\ndrivestoredirect:s:*\r\nredirectsmartcards:i:1\r\nusbdevicestoredirect:s:*\r\n");
+
+        var result = await fixture.Service.ImportFromPathAsync(path, CancellationToken.None);
+
+        ServerProfileDto server = Assert.Single(await fixture.ConfigManager.LoadServersAsync());
+        Assert.False(server.RdpRedirectDrives);
+        Assert.False(server.RdpRedirectUsb);
+        Assert.True(server.RdpRedirectSmartCards);
+        Assert.Contains("Rogue: turned off Redirect drives, Redirect USB devices.", result.UserMessage, StringComparison.Ordinal);
+        Assert.Single(fixture.Dialog.WarningCalls);
+    }
+
+    // S-02 and S-03, entry point family "JSON profile import": servers AND gateways of the file
+    // cross the boundary. A key path on a share is dropped with its value named so the user can
+    // re-enter it, and agent forwarding is turned off.
+    [Fact]
+    public async Task ImportFromPathAsync_Json_DropsShareKeyPathsOfServersAndGateways_AndSaysWhich()
+    {
+        using var fixture = new ProfileImportFixture();
+        ProfileConfigDocument document = new()
+        {
+            Servers =
+            [
+                new ServerProfileDto
+                {
+                    Id = "json-unc",
+                    DisplayName = "Roaming",
+                    ConnectionType = "SSH",
+                    RemoteServer = "ssh.example.com",
+                    SshPort = 22,
+                    SshKeyPath = @"\\fs\home$\u\.ssh\id_rsa",
+                    SshAgentForwarding = true,
+                    SshGatewayId = "gateway-unc"
+                }
+            ],
+            Gateways =
+            [
+                new SshGatewayDto
+                {
+                    Id = "gateway-unc",
+                    Name = "Bastion",
+                    Host = "bastion.example.com",
+                    Port = 22,
+                    User = "ops",
+                    KeyPath = @"\\attacker.example\share\bastion"
+                }
+            ]
+        };
+        var path = await fixture.WriteConfigDocumentAsync("servers-unc.json", document);
+
+        var result = await fixture.Service.ImportFromPathAsync(path, CancellationToken.None);
+
+        ServerProfileDto server = Assert.Single(await fixture.ConfigManager.LoadServersAsync());
+        SshGatewayDto gateway = Assert.Single((await fixture.ConfigManager.LoadSettingsAsync()).SshGateways);
+        Assert.Null(server.SshKeyPath);
+        Assert.False(server.SshAgentForwarding);
+        Assert.Null(gateway.KeyPath);
+        Assert.Contains(@"Roaming: SSH key pointed at a network share or a device and was cleared (\\fs\home$\u\.ssh\id_rsa).", result.UserMessage, StringComparison.Ordinal);
+        Assert.Contains(@"Bastion: Key Path pointed at a network share or a device and was cleared (\\attacker.example\share\bastion).", result.UserMessage, StringComparison.Ordinal);
+        Assert.Contains("Roaming: turned off SSH agent forwarding.", result.UserMessage, StringComparison.Ordinal);
+        Assert.Single(fixture.Dialog.WarningCalls);
+    }
+
     [Fact]
     public async Task ImportFromPathAsync_LegacyMultimonProfile_KeepsMultiMonitorThroughTheDefensiveCopy()
     {

@@ -63,6 +63,52 @@ public sealed class InstallerScriptGuardTests
         Assert.Contains("<MajorUpgrade", wix, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// Switching from the SelfContained edition to the Standard one does not keep the
+    /// bundled WebView2 runtime, and the SelfContained installer does not delete its own.
+    /// </summary>
+    /// <remarks>
+    /// [Files] only adds and overwrites, so a Standard install over a SelfContained one kept
+    /// <c>runtimes\webview2</c>: a Fixed Version Runtime nothing updates, which the marker
+    /// probe then read as the SelfContained edition.
+    /// </remarks>
+    [Fact]
+    public void InnoSetupScript_StandardEditionRemovesALeftoverBundledRuntime()
+    {
+        string inno = File.ReadAllText(Path.Combine(RepositoryRoot(), "installer", "innosetup.iss")).ReplaceLineEndings("\n");
+
+        int installDelete = inno.IndexOf("[InstallDelete]", StringComparison.Ordinal);
+        Assert.True(installDelete >= 0, "innosetup.iss needs an [InstallDelete] section");
+        int nextSection = inno.IndexOf("\n[", installDelete + 1, StringComparison.Ordinal);
+        string section = nextSection < 0 ? inno[installDelete..] : inno[installDelete..nextSection];
+
+        const string entry = "Type: filesandordirs; Name: \"{app}\\runtimes\\webview2\"";
+        int entryIndex = section.IndexOf(entry, StringComparison.Ordinal);
+        Assert.True(entryIndex >= 0, "the [InstallDelete] section must remove {app}\\runtimes\\webview2");
+
+        // The entry must sit inside a Standard-only preprocessor block: unconditional, it
+        // would delete the runtime the SelfContained installer is about to lay down.
+        int open = section.LastIndexOf("#if Variant == \"Standard\"", entryIndex, StringComparison.Ordinal);
+        Assert.True(open >= 0, "the runtime removal must be guarded by #if Variant == \"Standard\"");
+        int closeAfterOpen = section.IndexOf("#endif", open, StringComparison.Ordinal);
+        Assert.True(closeAfterOpen > entryIndex, "the runtime removal must sit before the #endif that closes the Standard block");
+    }
+
+    /// <remarks>
+    /// The Release-mode Build.ps1 used to fall back to the Standard edition in silence when
+    /// runtimes\webview2 was missing, and every SelfContained installation then found no
+    /// installer for its edition. The decision now lives in the gate module and is tested by
+    /// scripts/Test-WebView2RuntimeGate.ps1; this pins that the silent fallback is gone.
+    /// </remarks>
+    [Fact]
+    public void BuildScript_NoLongerDropsTheSelfContainedEditionInSilence()
+    {
+        string script = File.ReadAllText(Path.Combine(RepositoryRoot(), "Build.ps1"));
+
+        Assert.DoesNotContain("Falling back to Standard edition only", script, StringComparison.Ordinal);
+        Assert.Contains("Resolve-WebView2RuntimeGate", script, StringComparison.Ordinal);
+    }
+
     /// <remarks>
     /// An Inno Setup failure or a missing compiler was a yellow warning while a WiX failure
     /// was fatal, so a publish could ship a release without the one asset the in-app

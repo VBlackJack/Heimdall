@@ -88,6 +88,9 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     private object? _lastKeyEventSource;
     private readonly ToolsTabPopulationService _toolsTabPopulation;
     private bool _closeConfirmed;
+
+    /// <summary>Set once the update install has persisted the state before its shutdown.</summary>
+    private bool _shutdownStatePersistenceStarted;
     private bool _closeInProgress;
     private bool _suppressSidebarLaunch;
     private bool _isRdpImportDragActive;
@@ -4523,14 +4526,53 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             return Task.CompletedTask;
         }
 
-        return WindowClosingFlow.PersistBeforeShutdownAsync(
+        _shutdownStatePersistenceStarted = true;
+        return CaptureShutdownPersistence(vm)();
+    }
+
+    /// <summary>
+    /// What a shutdown-time close persists, with the window bounds captured now: a closed
+    /// window reports empty restore bounds, so a capture taken at exit would lose them.
+    /// </summary>
+    private Func<Task> CaptureShutdownPersistence(MainViewModel vm)
+    {
+        WindowBoundsSnapshot snapshot = CaptureWindowBoundsSnapshot();
+        return () => WindowClosingFlow.PersistBeforeShutdownAsync(
             vm.Settings.IsDirty,
             () => vm.Settings.TrySaveAsync(),
             () => vm.ServerList.FlushExpandStateForCloseAsync(),
-            () => SaveWindowBoundsAsync(vm));
+            () => WindowBoundsPersistence.PersistAsync(vm.ConfigManager, snapshot));
+    }
+
+    /// <summary>
+    /// On a shutting-down application the close pass prompts for nothing, but the state is
+    /// not dropped either: a logoff reaches it with nothing saved, so what it would save is
+    /// captured here and the exit tail persists it. An update install has persisted it
+    /// already, and it is not repeated.
+    /// </summary>
+    /// <returns>True when the application is shutting down and the close pass must return.</returns>
+    private bool DeferStatePersistenceIfShuttingDown(MainViewModel vm)
+    {
+        if (Application.Current is not Heimdall.App.App { IsShuttingDown: true } app)
+        {
+            return false;
+        }
+
+        if (_shutdownStatePersistenceStarted)
+        {
+            return true;
+        }
+
+        app.DeferredWindowState.Defer(CaptureShutdownPersistence(vm));
+        return true;
     }
 
     private Task SaveWindowBoundsAsync(MainViewModel vm)
+    {
+        return WindowBoundsPersistence.PersistAsync(vm.ConfigManager, CaptureWindowBoundsSnapshot());
+    }
+
+    private WindowBoundsSnapshot CaptureWindowBoundsSnapshot()
     {
         // Save Normal-state bounds even when maximized
         bool isMaximized = WindowState == WindowState.Maximized;
@@ -4538,7 +4580,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             ? RestoreBounds
             : new Rect(Left, Top, Width, Height);
 
-        WindowBoundsSnapshot snapshot = WindowBoundsPersistence.CaptureSnapshot(
+        return WindowBoundsPersistence.CaptureSnapshot(
             bounds.Left,
             bounds.Top,
             bounds.Width,
@@ -4546,7 +4588,6 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             isMaximized,
             _uiState,
             SessionTreeColumn.ActualWidth);
-        return WindowBoundsPersistence.PersistAsync(vm.ConfigManager, snapshot);
     }
 
     /// <inheritdoc />
@@ -4566,7 +4607,8 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
 
         if (DataContext is not MainViewModel vm) return;
 
-        if (Application.Current is Heimdall.App.App { IsShuttingDown: true })
+        bool shuttingDown = DeferStatePersistenceIfShuttingDown(vm);
+        if (shuttingDown)
         {
             return;
         }

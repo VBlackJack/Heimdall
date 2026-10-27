@@ -3655,6 +3655,57 @@ public sealed partial class SettingsViewModelTests : IDisposable
         }
     }
 
+    // S-03, entry point family "legacy parsers" (mRemoteNG, RDCMan, MobaXterm): they all reach
+    // ImportedProfileSanitizer through this command. An mRemoteNG file that turns on drive
+    // redirection lands with it off, and the summary names the profile and the switch. Smart
+    // card redirection is kept: smart card logon needs it.
+    [Fact]
+    public async Task ImportConfigCommand_MRemoteNg_ResetsTrustFlagsAndSaysWhich()
+    {
+        FakeConfigManager config = new();
+        FakeDialogService dialog = new() { ConfirmResult = true };
+        LocalizationManager localizer = new();
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en");
+        SettingsViewModel viewModel = CreateViewModel(config, dialog, localizer: localizer);
+        string importRoot = Path.Combine(
+            Path.GetTempPath(),
+            "heimdall-settings-import-tests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(importRoot);
+        string importPath = Path.Combine(importRoot, "confCons.xml");
+        const string content = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <mrng:Connections xmlns:mrng="http://mremoteng.org" Name="Connections" ConfVersion="2.6">
+              <Node Name="Box" Type="Connection" Hostname="box.example.com" Protocol="RDP" Port="3389"
+                    RedirectDiskDrives="True" RedirectSmartCards="True" RedirectPrinters="True" />
+            </mrng:Connections>
+            """;
+
+        try
+        {
+            await File.WriteAllTextAsync(importPath, content);
+            viewModel.ImportFilePathProvider = () => importPath;
+
+            await viewModel.ImportConfigCommand.ExecuteAsync(null);
+
+            Assert.NotNull(config.SavedServers);
+            ServerProfileDto saved = Assert.Single(config.SavedServers);
+            Assert.False(saved.RdpRedirectDrives);
+            // Smart cards and printers are not on the denylist and keep what the file said.
+            Assert.True(saved.RdpRedirectSmartCards);
+            Assert.True(saved.RdpRedirectPrinters);
+            string message = Assert.Single(dialog.InfoCalls).Message;
+            Assert.Contains("Box: turned off Redirect drives.", message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (Directory.Exists(importRoot))
+            {
+                Directory.Delete(importRoot, recursive: true);
+            }
+        }
+    }
+
     [Fact]
     public async Task ImportConfigCommand_MobaXtermStoredCredentials_ShowsDetectedPasswordNotice()
     {

@@ -98,4 +98,11 @@
     <ApplicationIcon>app.ico</ApplicationIcon>
   </PropertyGroup>
 
+  <!-- Build.ps1 passes -p:HeimdallEdition=Standard|SelfContained to each published edition.
+       VariantDetector reads the stamp before the runtimes\webview2 marker, which a switch of
+       edition can leave behind. A build without the property carries no stamp. -->
+  <ItemGroup Condition="'$(HeimdallEdition)' != ''">
+    <AssemblyMetadata Include="HeimdallEdition" Value="$(HeimdallEdition)" />
+  </ItemGroup>
+
 </Project>

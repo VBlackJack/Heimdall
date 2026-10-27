@@ -167,7 +167,9 @@ public sealed class RdpImportServiceTests
         Assert.False(candidate.RdpRedirectClipboard);
         Assert.True(candidate.RdpRedirectPrinters);
         Assert.True(candidate.RdpRedirectSmartCards);
-        Assert.True(candidate.RdpRedirectDrives);
+        // Mapped from the file, then turned off at the import boundary (S-03).
+        Assert.False(candidate.RdpRedirectDrives);
+        Assert.Contains(nameof(ServerProfileDto.RdpRedirectDrives), preview.Entries[0].ResetTrustFlags.Select(flag => flag.PropertyName));
         Assert.True(candidate.RdpMultiMonitor);
         Assert.Equal(24, candidate.RdpColorDepth);
         Assert.True(candidate.RdpNla);
@@ -208,14 +210,17 @@ public sealed class RdpImportServiceTests
         ServerProfileDto candidate = entry.Candidate;
 
         Assert.Equal("CORP", candidate.RdpDomain);
-        Assert.True(candidate.RdpRedirectDrives);
+        // Mapped from the file, then turned off at the import boundary (S-03).
+        Assert.False(candidate.RdpRedirectDrives);
+        Assert.Contains(nameof(ServerProfileDto.RdpRedirectDrives), preview.Entries[0].ResetTrustFlags.Select(flag => flag.PropertyName));
         Assert.True(candidate.RdpRedirectComPorts);
         Assert.True(candidate.RdpAudioCapture);
         Assert.True(candidate.RdpAdminMode);
         Assert.False(candidate.RdpCompression);
         Assert.False(candidate.RdpBitmapCaching);
         Assert.False(candidate.RdpAutoReconnect);
-        Assert.True(candidate.RdpRedirectUsb);
+        Assert.False(candidate.RdpRedirectUsb);
+        Assert.Contains(nameof(ServerProfileDto.RdpRedirectUsb), preview.Entries[0].ResetTrustFlags.Select(flag => flag.PropertyName));
         Assert.True(candidate.RdpRedirectWebcam);
         Assert.False(candidate.RdpDynamicResolution);
         Assert.False(candidate.RdpUseGlobalDefaults);
@@ -288,11 +293,14 @@ public sealed class RdpImportServiceTests
         Assert.Equal("CORP", candidate.RdpDomain);
         Assert.True(candidate.RdpAdminMode);
         Assert.False(candidate.RdpRedirectClipboard);
-        Assert.True(candidate.RdpRedirectDrives);
+        // Mapped from the file, then turned off at the import boundary (S-03).
+        Assert.False(candidate.RdpRedirectDrives);
+        Assert.Contains(nameof(ServerProfileDto.RdpRedirectDrives), preview.Entries[0].ResetTrustFlags.Select(flag => flag.PropertyName));
         Assert.True(candidate.RdpRedirectPrinters);
         Assert.True(candidate.RdpRedirectComPorts);
         Assert.True(candidate.RdpRedirectSmartCards);
-        Assert.True(candidate.RdpRedirectUsb);
+        Assert.False(candidate.RdpRedirectUsb);
+        Assert.Contains(nameof(ServerProfileDto.RdpRedirectUsb), preview.Entries[0].ResetTrustFlags.Select(flag => flag.PropertyName));
         Assert.True(candidate.RdpRedirectWebcam);
         Assert.True(candidate.RdpAudioCapture);
         Assert.Equal(2, candidate.RdpAudioMode);
@@ -789,7 +797,9 @@ public sealed class RdpImportServiceTests
         var preview = await fixture.Service.PreviewAsync([path], CancellationToken.None);
         var entry = preview.Entries[0];
 
-        Assert.True(entry.Candidate.RdpRedirectDrives);
+        // Mapped from the file, then turned off at the import boundary (S-03).
+        Assert.False(entry.Candidate.RdpRedirectDrives);
+        Assert.Contains(nameof(ServerProfileDto.RdpRedirectDrives), entry.ResetTrustFlags.Select(flag => flag.PropertyName));
         Assert.Equal(expectSkippedMapping, entry.SkippedMappings.Contains("drivestoredirect"));
     }
 
