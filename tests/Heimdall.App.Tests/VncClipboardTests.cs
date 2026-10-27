@@ -36,7 +36,7 @@ namespace Heimdall.App.Tests;
 /// </remarks>
 public sealed class VncClipboardTests
 {
-    private const string AccentedText = "café € \U0001F600";
+    private const string AccentedText = "caf\u00E9 \u20AC \U0001F600";
     private const string SendMember = "private void SendLocalClipboardToSession()";
     private const string WriteMarker = "message.StartsWith(\"clipboard-write:\"";
     private const string NextMarker = "message.StartsWith(\"credentials-required:\"";
@@ -60,11 +60,11 @@ public sealed class VncClipboardTests
     [Fact]
     public void Latin1Base64_IsGarbledByTheHostDecode()
     {
-        string wire = Convert.ToBase64String(Encoding.Latin1.GetBytes("café"));
+        string wire = Convert.ToBase64String(Encoding.Latin1.GetBytes("caf\u00E9"));
 
         string decoded = Encoding.UTF8.GetString(Convert.FromBase64String(wire));
 
-        Assert.NotEqual("café", decoded);
+        Assert.NotEqual("caf\u00E9", decoded);
     }
 
     [Fact]
