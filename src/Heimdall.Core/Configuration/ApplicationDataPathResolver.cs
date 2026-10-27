@@ -111,6 +111,13 @@ public static class ApplicationDataPathResolver
         return Path.Combine(dataRoot, AppConstants.NetworkScansDirectoryName);
     }
 
+    /// <summary>Resolves the folder of the hosts file editor's backups.</summary>
+    public static string GetHostsBackupsDirectory(string dataRoot)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(dataRoot);
+        return Path.Combine(dataRoot, AppConstants.HostsBackupsDirectoryName);
+    }
+
     /// <summary>Resolves the restrictive staging root for application updates.</summary>
     public static string GetUpdatesDirectory(string dataRoot)
     {
