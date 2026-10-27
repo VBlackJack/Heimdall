@@ -21,7 +21,10 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using Heimdall.App.UiTests.Infrastructure;
 using Heimdall.App.ViewModels;
+using Heimdall.App.ViewModels.CommandLibrary;
 using Heimdall.App.Views.Tools;
+using TwinShell.Core.Enums;
+using TwinShell.Core.Models;
 
 namespace Heimdall.App.UiTests;
 
@@ -101,6 +104,71 @@ public sealed class CommandLibraryButtonStateTests
         Assert.Same(primary, copyAfterTerminalGone);
     }
 
+    /// <summary>
+    /// The run panel had the same defect as the generator: measured on the running app on
+    /// 2026-10-27, its Send to Terminal kept the filled primary style while disabled in a tab with
+    /// no terminal, beside a secondary Copy that was the only gesture that could work.
+    /// </summary>
+    [StaFact]
+    public void InARunWithNoTerminalCopyCarriesThePrimaryStyle()
+    {
+        Style? copy = null;
+        Style? send = null;
+        Style? primary = null;
+
+        Render(viewModel =>
+        {
+            viewModel.SendCommandHandler = _ => { };
+            viewModel.CanSendToTerminalProbe = () => false;
+        }, (view, viewModel) =>
+        {
+            StartRun(viewModel, () => false);
+            Settle(view);
+            primary = (Style)view.FindResource("PrimaryButtonStyle");
+            copy = ((Button)view.FindName("BtnRunCopy")).Style;
+            send = ((Button)view.FindName("BtnRunSend")).Style;
+        });
+
+        Assert.Same(primary, copy);
+        Assert.NotSame(primary, send);
+    }
+
+    /// <summary>
+    /// Positive control and live half for the run panel: with a terminal Send leads, and the weight
+    /// moves to Copy when the terminal goes while the run is open.
+    /// </summary>
+    [StaFact]
+    public void InARunWithATerminalSendLeadsAndFollowsTheProbe()
+    {
+        bool hasTerminal = true;
+        Style? sendWithTerminal = null;
+        Style? copyWithTerminal = null;
+        Style? copyAfterTerminalGone = null;
+        Style? primary = null;
+
+        Render(viewModel =>
+        {
+            viewModel.SendCommandHandler = _ => { };
+            viewModel.CanSendToTerminalProbe = () => hasTerminal;
+        }, (view, viewModel) =>
+        {
+            var run = StartRun(viewModel, () => hasTerminal);
+            Settle(view);
+            primary = (Style)view.FindResource("PrimaryButtonStyle");
+            sendWithTerminal = ((Button)view.FindName("BtnRunSend")).Style;
+            copyWithTerminal = ((Button)view.FindName("BtnRunCopy")).Style;
+
+            hasTerminal = false;
+            run.RefreshSendState();
+            Settle(view);
+            copyAfterTerminalGone = ((Button)view.FindName("BtnRunCopy")).Style;
+        });
+
+        Assert.Same(primary, sendWithTerminal);
+        Assert.NotSame(primary, copyWithTerminal);
+        Assert.Same(primary, copyAfterTerminalGone);
+    }
+
     [StaTheory]
     [InlineData("BtnHistory", nameof(CommandLibraryViewModel.IsHistoryVisible))]
     [InlineData("BtnRunbooks", nameof(CommandLibraryViewModel.IsRunbooksVisible))]
@@ -170,6 +238,31 @@ public sealed class CommandLibraryButtonStateTests
         view.UpdateLayout();
         view.Dispatcher.Invoke(DispatcherPriority.Background, new System.Action(() => { }));
         view.UpdateLayout();
+    }
+
+    private static RunbookRunViewModel StartRun(CommandLibraryViewModel viewModel, Func<bool> hasTerminal)
+    {
+        var run = new RunbookRunViewModel(
+            new CommandBatch
+            {
+                Id = "rb-1",
+                Name = "Check uptime",
+                Commands = [new BatchCommandItem { Order = 0, Command = "uptime", Platform = Platform.Linux }]
+            },
+            new RunbookRunContext
+            {
+                FindAction = _ => null,
+                // A literal step: the run never asks the generator for it.
+                Generator = null!,
+                DialogService = null!,
+                Localize = WpfTestHost.Translate,
+                Send = _ => { },
+                CanSendToTerminal = hasTerminal
+            });
+        viewModel.ActiveRun = run;
+        viewModel.IsRunbooksVisible = true;
+        viewModel.IsGeneratorVisible = false;
+        return run;
     }
 
     private static CommandLibraryViewModel CreateViewModel()
