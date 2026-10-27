@@ -47,11 +47,15 @@ public static class TwinShellSchema
 
     private const string CommandHistoriesTableName = "CommandHistories";
 
+    private const string CommandTemplatesTableName = "CommandTemplates";
+
     private const string TargetHostColumnName = "TargetHost";
 
     private const string CommandBatchesTableName = "CommandBatches";
 
     private const string VariablesColumnName = "VariablesJson";
+
+    private const string IsRetiredColumnName = "IsRetired";
 
     // The translated parameter labels and example descriptions, added when the shipped
     // catalogue started carrying its French beside an English pivot. Default '{}' matches the
@@ -85,7 +89,7 @@ public static class TwinShellSchema
     private static readonly IReadOnlyDictionary<string, string[]> KnownColumns =
         new Dictionary<string, string[]>(StringComparer.Ordinal)
         {
-            [ActionsTableName] = [PublicIdColumnName, "WindowsExamplesJson", "LinuxExamplesJson"],
+            [ActionsTableName] = [PublicIdColumnName, "WindowsExamplesJson", "LinuxExamplesJson", IsRetiredColumnName],
             [ActionTranslationsTableName] = ["ParametersJson", "ExamplesJson"],
             [CommandHistoriesTableName] = [TargetHostColumnName],
             [CommandBatchesTableName] = [PublicIdColumnName, VariablesColumnName],
@@ -123,7 +127,19 @@ public static class TwinShellSchema
         new SchemaStep(
             8,
             "Runbook variables column on CommandBatches",
-            ApplyBatchVariablesColumnAsync)
+            ApplyBatchVariablesColumnAsync),
+        new SchemaStep(
+            9,
+            "Retired flag on Actions",
+            ApplyActionRetiredColumnAsync),
+        new SchemaStep(
+            10,
+            "SyncTombstones table recording the shared entries deleted here",
+            ApplySyncTombstonesTableAsync),
+        new SchemaStep(
+            11,
+            "Deterministic public ids for system actions and their templates",
+            ApplySeedPublicIdsAsync)
     }.AsReadOnly();
 
     public static IReadOnlyList<SchemaStep> Steps => SchemaSteps;
@@ -311,6 +327,171 @@ public static class TwinShellSchema
             "ALTER TABLE " + CommandBatchesTableName + " ADD COLUMN " + VariablesColumnName
             + " TEXT NOT NULL DEFAULT '{}'",
             cancellationToken);
+    }
+
+    /// <summary>
+    /// Adds the <c>IsRetired</c> flag to <c>Actions</c> when it is missing.
+    /// </summary>
+    /// <remarks>
+    /// Idempotent by existence test, like the other column steps. The DEFAULT 0 says what every
+    /// row written before the flag was: live. Retiring a shipped action used to delete its row,
+    /// and its history went with it through the cascade; the seed refresh now marks it instead.
+    /// A database without the table is left alone: <c>EnsureCreated</c> writes it whole.
+    /// </remarks>
+    private static async Task ApplyActionRetiredColumnAsync(
+        DbConnection connection,
+        DbTransaction transaction,
+        CancellationToken cancellationToken)
+    {
+        if (!await TableExistsAsync(connection, transaction, ActionsTableName, cancellationToken))
+        {
+            return;
+        }
+
+        bool exists = await ColumnExistsAsync(
+            connection,
+            transaction,
+            ActionsTableName,
+            IsRetiredColumnName,
+            cancellationToken);
+
+        if (exists)
+        {
+            return;
+        }
+
+        await ExecuteNonQueryAsync(
+            connection,
+            transaction,
+            "ALTER TABLE " + ActionsTableName + " ADD COLUMN " + IsRetiredColumnName
+            + " INTEGER NOT NULL DEFAULT 0",
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Creates the <c>SyncTombstones</c> table: the user actions, templates, runbooks and
+    /// categories deleted here, so the next sync export removes their files from the shared
+    /// folder and records the delete in its <c>_deleted.json</c>.
+    /// </summary>
+    /// <remarks>
+    /// Idempotent through <c>IF NOT EXISTS</c>, like the <c>SeedState</c> step. No row is
+    /// written: a delete made before this version left nothing to record.
+    /// </remarks>
+    private static Task ApplySyncTombstonesTableAsync(
+        DbConnection connection,
+        DbTransaction transaction,
+        CancellationToken cancellationToken)
+        => ExecuteNonQueryAsync(
+            connection,
+            transaction,
+            "CREATE TABLE IF NOT EXISTS \"" + SyncTombstoneConfiguration.TableName + "\" ("
+            + "\"PublicId\" TEXT NOT NULL CONSTRAINT \"PK_" + SyncTombstoneConfiguration.TableName + "\" PRIMARY KEY, "
+            + "\"DeletedAt\" TEXT NOT NULL)",
+            cancellationToken);
+
+    /// <summary>
+    /// Gives every system action, and every template only system actions use, the public id
+    /// <see cref="SeedPublicIds"/> derives from its seed id.
+    /// </summary>
+    /// <remarks>
+    /// The ids used to be drawn at random on each install, so a teammate's copy of a shipped
+    /// action was a different entry from everybody else's. Idempotent: a second run writes
+    /// the same values. A template a user action also uses keeps its id, because the sync
+    /// folder knows it by that id through the user action. EF stores a Guid as upper-case
+    /// text, the form written here.
+    /// </remarks>
+    private static async Task ApplySeedPublicIdsAsync(
+        DbConnection connection,
+        DbTransaction transaction,
+        CancellationToken cancellationToken)
+    {
+        // A database whose tables never got the column has no public id to correct.
+        if (!await TableExistsAsync(connection, transaction, ActionsTableName, cancellationToken)
+            || !await TableExistsAsync(connection, transaction, CommandTemplatesTableName, cancellationToken)
+            || !await ColumnExistsAsync(connection, transaction, ActionsTableName, PublicIdColumnName, cancellationToken)
+            || !await ColumnExistsAsync(connection, transaction, CommandTemplatesTableName, PublicIdColumnName, cancellationToken))
+        {
+            return;
+        }
+
+        List<string> actionIds = await ReadIdsAsync(
+            connection,
+            transaction,
+            "SELECT Id FROM Actions WHERE IsUserCreated = 0",
+            cancellationToken);
+        foreach (string actionId in actionIds)
+        {
+            await UpdatePublicIdAsync(connection, transaction, ActionsTableName, actionId, SeedPublicIds.ForAction(actionId), cancellationToken);
+        }
+
+        List<string> templateIds = await ReadIdsAsync(
+            connection,
+            transaction,
+            "SELECT ct.Id FROM CommandTemplates ct "
+            + "WHERE EXISTS (SELECT 1 FROM Actions a "
+            + "WHERE (a.WindowsCommandTemplateId = ct.Id OR a.LinuxCommandTemplateId = ct.Id) AND a.IsUserCreated = 0) "
+            + "AND NOT EXISTS (SELECT 1 FROM Actions a "
+            + "WHERE (a.WindowsCommandTemplateId = ct.Id OR a.LinuxCommandTemplateId = ct.Id) AND a.IsUserCreated = 1)",
+            cancellationToken);
+        foreach (string templateId in templateIds)
+        {
+            await UpdatePublicIdAsync(connection, transaction, CommandTemplatesTableName, templateId, SeedPublicIds.ForTemplate(templateId), cancellationToken);
+        }
+
+        FileLogger.Info(
+            "[TwinShell] Seed public ids written for "
+            + actionIds.Count.ToString(CultureInfo.InvariantCulture) + " system action(s) and "
+            + templateIds.Count.ToString(CultureInfo.InvariantCulture) + " template(s)");
+    }
+
+    private static async Task<List<string>> ReadIdsAsync(
+        DbConnection connection,
+        DbTransaction transaction,
+        string commandText,
+        CancellationToken cancellationToken)
+    {
+        await using DbCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = commandText;
+
+        List<string> ids = new List<string>();
+        await using DbDataReader reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            if (!reader.IsDBNull(0))
+            {
+                ids.Add(reader.GetString(0));
+            }
+        }
+
+        return ids;
+    }
+
+    private static async Task UpdatePublicIdAsync(
+        DbConnection connection,
+        DbTransaction transaction,
+        string tableName,
+        string id,
+        Guid publicId,
+        CancellationToken cancellationToken)
+    {
+        EnsureKnownPublicIdTable(tableName);
+
+        await using DbCommand command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText = "UPDATE " + tableName + " SET " + PublicIdColumnName + " = @publicId WHERE Id = @id";
+
+        DbParameter publicIdParameter = command.CreateParameter();
+        publicIdParameter.ParameterName = "@publicId";
+        publicIdParameter.Value = publicId.ToString().ToUpperInvariant();
+        command.Parameters.Add(publicIdParameter);
+
+        DbParameter idParameter = command.CreateParameter();
+        idParameter.ParameterName = "@id";
+        idParameter.Value = id;
+        command.Parameters.Add(idParameter);
+
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     private static Task ApplySeedStateTableAsync(

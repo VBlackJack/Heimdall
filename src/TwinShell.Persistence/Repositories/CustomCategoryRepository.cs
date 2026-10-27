@@ -95,6 +95,12 @@ public sealed class CustomCategoryRepository : ICustomCategoryRepository
         var entity = await _context.CustomCategories.FindAsync(id);
         if (entity != null)
         {
+            // A user category's delete reaches the other installs through its sync tombstone.
+            if (!entity.IsSystemCategory)
+            {
+                await SyncTombstoneRepository.RecordAsync(_context, entity.PublicId, DateTime.UtcNow);
+            }
+
             _context.CustomCategories.Remove(entity);
             await _context.SaveChangesAsync();
         }

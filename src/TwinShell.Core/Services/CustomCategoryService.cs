@@ -99,6 +99,7 @@ public sealed class CustomCategoryService : ICustomCategoryService
         if (!isUnique)
             throw new InvalidOperationException($"A category with the name '{category.Name}' already exists");
 
+        category.ModifiedAt = DateTime.UtcNow;
         await _repository.UpdateAsync(category).ConfigureAwait(false);
         return true;
     }

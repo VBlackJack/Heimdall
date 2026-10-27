@@ -102,6 +102,8 @@ public sealed class CommandTemplateRepository : ICommandTemplateRepository
 
         if (entity != null)
         {
+            // The delete reaches the other installs through its sync tombstone.
+            await SyncTombstoneRepository.RecordAsync(_context, entity.PublicId, DateTime.UtcNow);
             _context.CommandTemplates.Remove(entity);
             await _context.SaveChangesAsync();
         }
