@@ -14,16 +14,15 @@
  * limitations under the License.
  */
 
-using System.Collections.ObjectModel;
-using System.ComponentModel;
 using System.IO;
-using System.Net;
 using System.Text;
-using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
-using Heimdall.App.Localization;
+using Heimdall.App.Behaviors;
+using Heimdall.App.Services.HostsFile;
+using Heimdall.App.Views.Dialogs;
+using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
 
@@ -33,25 +32,23 @@ namespace Heimdall.App.Views.Tools;
 /// Hosts file editor providing a friendly DataGrid-based UI for viewing and editing
 /// the Windows hosts file with enable/disable toggling, inline comments, and IP validation.
 /// </summary>
+/// <remarks>
+/// The file model, its validation and the save with backup live in
+/// <see cref="HostsFileDocument" /> and <see cref="HostsFileStore" />; this view only asks
+/// the user and shows the outcome.
+/// </remarks>
 public partial class HostsFileEditorView : UserControl, IToolView
 {
-    private static readonly string HostsFilePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.System),
-        "drivers", "etc", "hosts");
-
-    private static readonly Regex IpAddressPattern = new(
-        @"^(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)$|^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$|^::1$|^::$",
-        RegexOptions.Compiled);
-
+    private readonly HostsFileStore _store = new(
+        HostsFileStore.SystemHostsPath,
+        ApplicationDataPathResolver.GetHostsBackupsDirectory(ApplicationDataPathResolver.Resolve()));
     private LocalizationManager? _localizer;
     private Action<string, string, ToolContext?>? _openToolAction;
-    private readonly ObservableCollection<HostEntry> _entries = [];
-    private readonly List<string> _preambleLines = [];
+    private HostsFileDocument? _document;
 
     public HostsFileEditorView()
     {
         InitializeComponent();
-        HostsGrid.ItemsSource = _entries;
         HostsGrid.PreviewMouseRightButtonDown += ToolContextMenuHelper.SelectRowOnRightClick;
         HostsGrid.ContextMenuOpening += OnHostsContextMenuOpening;
     }
@@ -78,6 +75,7 @@ public partial class HostsFileEditorView : UserControl, IToolView
     private void ApplyLocalization()
     {
         HeaderTitle.Text = L("ToolHostsEditorTitle");
+        TxtUnsaved.Text = L("ToolHostsEditorUnsaved");
         BtnReload.Content = L("ToolHostsEditorBtnReload");
         BtnSave.Content = L("ToolHostsEditorBtnSave");
         BtnAddEntry.Content = L("ToolHostsEditorBtnAdd");
@@ -86,6 +84,7 @@ public partial class HostsFileEditorView : UserControl, IToolView
         ColIpAddress.Header = L("ToolHostsEditorColIp");
         ColHostname.Header = L("ToolHostsEditorColHostname");
         ColComment.Header = L("ToolHostsEditorColComment");
+        ColProblem.Header = L("ToolHostsEditorColProblem");
 
         AutomationProperties.SetName(BtnReload, L("ToolHostsEditorBtnReload"));
         AutomationProperties.SetName(BtnSave, L("ToolHostsEditorBtnSave"));
@@ -102,186 +101,229 @@ public partial class HostsFileEditorView : UserControl, IToolView
     private void LoadHostsFile()
     {
         ClearErrorState();
-        _entries.Clear();
-        _preambleLines.Clear();
+        TxtFilePath.Text = _store.FilePath;
 
-        if (!File.Exists(HostsFilePath))
+        HostsFileDocument? document = null;
+        if (!_store.Exists)
         {
+            // Saving creates the file; there is nothing on disk to lose.
+            document = HostsFileDocument.CreateEmpty();
             TxtFilePath.Text = L("ToolHostsEditorFileNotFound");
             TxtLastModified.Text = string.Empty;
-            UpdateEmptyState();
-            return;
         }
-
-        try
+        else
         {
-            var lines = File.ReadAllLines(HostsFilePath, Encoding.UTF8);
-            bool inPreamble = true;
-
-            foreach (var rawLine in lines)
+            try
             {
-                var line = rawLine.Trim();
-
-                // Empty lines
-                if (string.IsNullOrWhiteSpace(line))
-                {
-                    if (inPreamble)
-                    {
-                        _preambleLines.Add(rawLine);
-                    }
-                    continue;
-                }
-
-                // Pure comment lines (no IP pattern after #)
-                if (line.StartsWith('#'))
-                {
-                    var afterHash = line.TrimStart('#').Trim();
-                    if (TryParseHostLine(afterHash, out var disabledEntry))
-                    {
-                        // Disabled entry: # <IP> <hostname> [# comment]
-                        disabledEntry.Enabled = false;
-                        _entries.Add(disabledEntry);
-                        inPreamble = false;
-                    }
-                    else
-                    {
-                        // Regular comment - keep as preamble if still at top
-                        if (inPreamble)
-                        {
-                            _preambleLines.Add(rawLine);
-                        }
-                    }
-                    continue;
-                }
-
-                inPreamble = false;
-
-                if (TryParseHostLine(line, out var entry))
-                {
-                    entry.Enabled = true;
-                    _entries.Add(entry);
-                }
+                document = _store.Load();
+                ShowLastModified();
             }
+            catch (UnauthorizedAccessException)
+            {
+                TxtLastModified.Text = L("ToolHostsEditorReadDenied");
+            }
+            catch (IOException ex)
+            {
+                TxtLastModified.Text = ex.Message;
+            }
+        }
 
-            TxtFilePath.Text = HostsFilePath;
-            var lastWrite = File.GetLastWriteTime(HostsFilePath);
-            TxtLastModified.Text = string.Format(
-                L("ToolHostsEditorLastModified"),
-                lastWrite.ToString("g"));
-            UpdateEmptyState();
-        }
-        catch (UnauthorizedAccessException)
-        {
-            TxtFilePath.Text = HostsFilePath;
-            TxtLastModified.Text = L("ToolHostsEditorReadDenied");
-        }
-        catch (IOException ex)
-        {
-            TxtFilePath.Text = HostsFilePath;
-            TxtLastModified.Text = ex.Message;
-        }
+        // A file that could not be read leaves no document: saving an empty one over it
+        // would erase every entry it holds.
+        SetDocument(document);
     }
 
-    private static bool TryParseHostLine(string line, out HostEntry entry)
+    private void SetDocument(HostsFileDocument? document)
     {
-        entry = new HostEntry();
-
-        // Split on whitespace
-        var parts = line.Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length < 2)
+        if (_document is not null)
         {
-            return false;
+            _document.IsDirtyChanged -= OnDocumentDirtyChanged;
         }
 
-        // First part must look like an IP address
-        if (!IPAddress.TryParse(parts[0], out _))
+        _document = document;
+        if (_document is not null)
         {
-            return false;
+            _document.IsDirtyChanged += OnDocumentDirtyChanged;
         }
 
-        entry.IpAddress = parts[0];
-        entry.Hostname = parts[1];
+        HostsGrid.ItemsSource = _document?.Entries;
+        BtnSave.IsEnabled = _document is not null;
+        BtnAddEntry.IsEnabled = _document is not null;
+        BtnDeleteSelected.IsEnabled = _document is not null;
+        UpdateDirtyIndicator();
+        UpdateEmptyState();
+    }
 
-        // Look for inline comment: everything after # is comment
-        var commentIndex = line.IndexOf('#');
-        if (commentIndex >= 0)
-        {
-            entry.Comment = line[(commentIndex + 1)..].Trim();
-        }
+    private void ShowLastModified()
+    {
+        var lastWrite = File.GetLastWriteTime(_store.FilePath);
+        TxtLastModified.Text = string.Format(
+            L("ToolHostsEditorLastModified"),
+            lastWrite.ToString("g"));
+    }
 
-        return true;
+    private void OnDocumentDirtyChanged(object? sender, EventArgs e) => UpdateDirtyIndicator();
+
+    private void UpdateDirtyIndicator()
+    {
+        TxtUnsaved.Visibility = _document?.IsDirty == true ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void OnReloadClick(object sender, RoutedEventArgs e)
     {
+        if (ResolveUnsavedChanges() is not null)
+        {
+            return;
+        }
+
         LoadHostsFile();
     }
 
     private void OnSaveClick(object sender, RoutedEventArgs e)
     {
-        SaveHostsFile();
+        _ = PerformSave();
     }
 
-    private void SaveHostsFile()
+    /// <summary>
+    /// Validates, asks for confirmation, then saves with a backup.
+    /// </summary>
+    /// <returns>Null when saved, otherwise why it was not.</returns>
+    private ToolCloseRefusal? PerformSave()
     {
         ClearErrorState();
-        var sb = new StringBuilder();
-
-        // Write preamble (original comment header)
-        foreach (var line in _preambleLines)
+        if (_document is null)
         {
-            sb.AppendLine(line);
+            return ToolCloseRefusal.SaveFailed;
         }
 
-        if (_preambleLines.Count > 0)
+        // Commit a cell still in edit mode, so the value on screen is the one checked and written.
+        HostsGrid.CommitEdit(DataGridEditingUnit.Row, exitEditingMode: true);
+
+        var problems = _document.FindProblems();
+        if (problems.Count > 0)
         {
-            sb.AppendLine();
+            ShowProblems(problems);
+            return ToolCloseRefusal.SaveFailed;
         }
 
-        // Write entries
-        foreach (var entry in _entries)
+        var message = _store.Exists
+            ? string.Format(L("ToolHostsEditorConfirmSave"), _store.FilePath, _store.BackupDirectory, HostsFileStore.MaxTimestampedBackups)
+            : string.Format(L("ToolHostsEditorConfirmCreate"), _store.FilePath);
+        bool confirmed = MessageDialog.ShowConfirm(
+            Window.GetWindow(this),
+            L("ToolHostsEditorTitle"),
+            message,
+            "warning",
+            L("BtnSave"),
+            L("BtnCancel"));
+        if (!confirmed)
         {
-            if (string.IsNullOrWhiteSpace(entry.IpAddress) || string.IsNullOrWhiteSpace(entry.Hostname))
-            {
-                continue;
-            }
-
-            var line = new StringBuilder();
-
-            if (!entry.Enabled)
-            {
-                line.Append("# ");
-            }
-
-            line.Append(entry.IpAddress);
-            line.Append('\t');
-            line.Append(entry.Hostname);
-
-            if (!string.IsNullOrWhiteSpace(entry.Comment))
-            {
-                line.Append("\t# ");
-                line.Append(entry.Comment);
-            }
-
-            sb.AppendLine(line.ToString());
+            return ToolCloseRefusal.UserDeclined;
         }
 
-        try
+        var result = _store.Save(_document);
+        switch (result.Status)
         {
-            File.WriteAllText(HostsFilePath, sb.ToString(), Encoding.UTF8);
-            var lastWrite = File.GetLastWriteTime(HostsFilePath);
-            TxtLastModified.Text = string.Format(
-                L("ToolHostsEditorLastModified"),
-                lastWrite.ToString("g"));
+            case HostsFileSaveStatus.Saved:
+                TxtFilePath.Text = _store.FilePath;
+                ShowLastModified();
+                return null;
+            case HostsFileSaveStatus.InvalidEntries:
+                ShowProblems(result.Problems);
+                break;
+            case HostsFileSaveStatus.BackupFailed:
+                ShowErrorState(string.Format(L("ToolHostsEditorBackupFailed"), _store.BackupDirectory, result.ErrorMessage));
+                break;
+            case HostsFileSaveStatus.ExternallyModified:
+                ShowErrorState(L("ToolHostsEditorExternallyModified"));
+                OfferReloadAfterExternalChange();
+                break;
+            case HostsFileSaveStatus.AccessDenied:
+                ShowErrorState(L("ToolHostsEditorSaveAdminRequired"));
+                break;
+            default:
+                ShowErrorState(string.Format(L("ToolHostsEditorSaveFailed"), result.ErrorMessage));
+                break;
         }
-        catch (UnauthorizedAccessException)
+
+        return ToolCloseRefusal.SaveFailed;
+    }
+
+    /// <summary>
+    /// Another program rewrote the file since it was loaded. Its change is kept; the user
+    /// chooses whether to reload, which discards the edits made here.
+    /// </summary>
+    private void OfferReloadAfterExternalChange()
+    {
+        bool reload = MessageDialog.ShowConfirm(
+            Window.GetWindow(this),
+            L("ToolHostsEditorTitle"),
+            L("ToolHostsEditorExternallyModifiedReloadPrompt"),
+            "warning",
+            L("ToolHostsEditorBtnReload"),
+            L("BtnCancel"));
+        if (reload)
         {
-            ShowErrorState(L("ToolHostsEditorSaveAdminRequired"));
+            LoadHostsFile();
         }
-        catch (IOException ex)
+    }
+
+    private void ShowProblems(IReadOnlyList<HostsFileRowProblem> problems)
+    {
+        var text = new StringBuilder(L("ToolHostsEditorInvalidRows"));
+        foreach (var problem in problems)
         {
-            ShowErrorState(string.Format(L("ToolHostsEditorSaveFailed"), ex.Message));
+            var key = HostEntry.ProblemLocaleKey(problem.Problem) ?? string.Empty;
+            text.AppendLine();
+            text.Append(string.Format(L("ToolHostsEditorInvalidRowItem"), problem.LineNumber, L(key)));
         }
+
+        ShowErrorState(text.ToString());
+
+        var first = problems[0].Entry;
+        HostsGrid.SelectedItem = first;
+        HostsGrid.ScrollIntoView(first);
+    }
+
+    /// <summary>
+    /// Asks what to do with unsaved edits before they are replaced or closed.
+    /// </summary>
+    /// <returns>Null when the caller may proceed, otherwise why it may not.</returns>
+    private ToolCloseRefusal? ResolveUnsavedChanges()
+    {
+        if (_document is null || !_document.IsDirty)
+        {
+            return null;
+        }
+
+        var decision = MessageDialog.ShowThreeWay(
+            Window.GetWindow(this),
+            L("ToolHostsEditorTitle"),
+            L("ToolHostsEditorUnsavedMessage"),
+            "warning",
+            L("BtnSave"),
+            L("BtnDiscard"),
+            L("BtnCancel"));
+
+        return decision switch
+        {
+            true => PerformSave(),
+            false => null,
+            _ => ToolCloseRefusal.UserDeclined,
+        };
+    }
+
+    /// <inheritdoc />
+    public ToolCloseRefusal CloseRefusal { get; private set; } = ToolCloseRefusal.Busy;
+
+    /// <inheritdoc />
+    public bool CanClose()
+    {
+        var refusal = ResolveUnsavedChanges();
+
+        // Set on every refusing call, never left over from an earlier one.
+        CloseRefusal = refusal ?? ToolCloseRefusal.Busy;
+        return refusal is null;
     }
 
     private void ClearErrorState()
@@ -297,55 +339,42 @@ public partial class HostsFileEditorView : UserControl, IToolView
             ? Visibility.Collapsed
             : Visibility.Visible;
         ErrorText.BringIntoView();
+        LiveRegionBehavior.Announce(ErrorText);
     }
 
     private void UpdateEmptyState()
     {
-        EmptyStatePanel.Visibility = _entries.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-        HostsGrid.Visibility = _entries.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        int count = _document?.Entries.Count ?? 0;
+        EmptyStatePanel.Visibility = count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        HostsGrid.Visibility = count > 0 ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void OnAddEntryClick(object sender, RoutedEventArgs e)
     {
-        var entry = new HostEntry
+        if (_document is null)
         {
-            Enabled = true,
-            IpAddress = "127.0.0.1",
-            Hostname = "example.local",
-            Comment = string.Empty
-        };
-        _entries.Add(entry);
-        HostsGrid.ScrollIntoView(entry);
-        HostsGrid.SelectedItem = entry;
+            return;
+        }
+
+        var entry = _document.AddEntry();
         UpdateEmptyState();
+        HostsGrid.SelectedItem = entry;
+        HostsGrid.ScrollIntoView(entry, ColIpAddress);
+        HostsGrid.UpdateLayout();
+        HostsGrid.CurrentCell = new DataGridCellInfo(entry, ColIpAddress);
+        HostsGrid.Focus();
+        HostsGrid.BeginEdit();
     }
 
     private void OnDeleteSelectedClick(object sender, RoutedEventArgs e)
     {
-        var selected = HostsGrid.SelectedItems.Cast<HostEntry>().ToList();
-        foreach (var item in selected)
+        if (_document is null)
         {
-            _entries.Remove(item);
+            return;
         }
-        UpdateEmptyState();
-    }
 
-    private void OnCellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
-    {
-        if (e.Column == ColIpAddress && e.EditingElement is System.Windows.Controls.TextBox tb)
-        {
-            var ip = tb.Text.Trim();
-            if (!string.IsNullOrWhiteSpace(ip) && !IpAddressPattern.IsMatch(ip))
-            {
-                tb.BorderBrush = TryFindResource("ErrorBrush") as Brush ?? System.Windows.Media.Brushes.Red;
-                tb.ToolTip = L("ToolHostsEditorInvalidIp");
-            }
-            else
-            {
-                tb.ClearValue(BorderBrushProperty);
-                tb.ToolTip = null;
-            }
-        }
+        _document.RemoveEntries(HostsGrid.SelectedItems.Cast<HostEntry>());
+        UpdateEmptyState();
     }
 
     private void OnHostsContextMenuOpening(object sender, System.Windows.Controls.ContextMenuEventArgs e)
@@ -428,67 +457,11 @@ public partial class HostsFileEditorView : UserControl, IToolView
 
     public void Dispose()
     {
-        GC.SuppressFinalize(this);
-    }
-}
-
-/// <summary>
-/// Represents a single entry in the hosts file with enable/disable state.
-/// </summary>
-public sealed class HostEntry : INotifyPropertyChanged
-{
-    private bool _enabled;
-    private string _ipAddress = string.Empty;
-    private string _hostname = string.Empty;
-    private string _comment = string.Empty;
-
-    public bool Enabled
-    {
-        get => _enabled;
-        set
+        if (_document is not null)
         {
-            _enabled = value;
-            OnPropertyChanged(nameof(Enabled));
-            OnPropertyChanged(nameof(EnabledDisplay));
+            _document.IsDirtyChanged -= OnDocumentDirtyChanged;
         }
-    }
 
-    /// <summary>
-    /// <see cref="Enabled" /> as a word, for the row's accessible name.
-    /// </summary>
-    /// <remarks>
-    /// Binding the boolean directly would put an English literal into every locale:
-    /// <see cref="bool" /> does not implement <see cref="IFormattable" />, so
-    /// <see cref="string.Format(IFormatProvider, string, object?[])" /> falls through to
-    /// <c>Boolean.ToString()</c>, which ignores the format provider and always returns the
-    /// invariant "True" or "False". The visible column is a checkbox, so this word exists
-    /// only for a screen reader and has to carry its own translation.
-    /// </remarks>
-    public string EnabledDisplay => LocalizationSource.Instance[
-        _enabled ? "A11yStatusDotScheduledEnabled" : "A11yStatusDotScheduledDisabled"];
-
-    public string IpAddress
-    {
-        get => _ipAddress;
-        set { _ipAddress = value; OnPropertyChanged(nameof(IpAddress)); }
-    }
-
-    public string Hostname
-    {
-        get => _hostname;
-        set { _hostname = value; OnPropertyChanged(nameof(Hostname)); }
-    }
-
-    public string Comment
-    {
-        get => _comment;
-        set { _comment = value; OnPropertyChanged(nameof(Comment)); }
-    }
-
-    public event PropertyChangedEventHandler? PropertyChanged;
-
-    private void OnPropertyChanged(string propertyName)
-    {
-        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+        GC.SuppressFinalize(this);
     }
 }
