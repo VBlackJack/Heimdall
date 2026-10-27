@@ -28,10 +28,10 @@ namespace Heimdall.App.Tests;
 /// </summary>
 /// <remarks>
 /// The scan is exercised with fake processes. The view cannot be instantiated here, so the wiring
-/// (the capture entry point catches and falls back, the scan is used, nothing calls
+/// (the capture entry point runs through the guard, the scan is used, nothing calls
 /// <c>GetProcessesByName</c> directly) is pinned as a source invariant. Mutants proved red, each
 /// green once restored: dropping the session comparison, dropping the guard around
-/// <c>HasExited</c>, not disposing the process, and removing the catch in the capture entry point.
+/// <c>HasExited</c>, not disposing the process, and removing the catch in <c>CitrixCaptureGuard</c>.
 /// </remarks>
 public sealed class CitrixProcessScanTests
 {
@@ -126,23 +126,83 @@ public sealed class CitrixProcessScanTests
     }
 
     [Fact]
-    public void TheCaptureEntryPoint_NeverLetsAFailureEscapeTheDiscardedTask()
+    public async Task AFailingCapture_FallsBackAndDoesNotEscape()
     {
-        string code = ReadView();
+        int fallbacks = 0;
+
+        await CitrixCaptureGuard.RunAsync(
+            () => throw new Win32Exception(5, "Access is denied"),
+            () =>
+            {
+                fallbacks++;
+                return Task.CompletedTask;
+            });
+
+        Assert.Equal(1, fallbacks);
+    }
+
+    [Fact]
+    public async Task AFailureAfterAnAwait_FallsBackToo()
+    {
+        int fallbacks = 0;
+
+        await CitrixCaptureGuard.RunAsync(
+            async () =>
+            {
+                await Task.Yield();
+                throw new InvalidOperationException("late failure");
+            },
+            () =>
+            {
+                fallbacks++;
+                return Task.CompletedTask;
+            });
+
+        Assert.Equal(1, fallbacks);
+    }
+
+    [Fact]
+    public async Task ASuccessfulCapture_DoesNotFallBack()
+    {
+        int fallbacks = 0;
+
+        await CitrixCaptureGuard.RunAsync(
+            () => Task.CompletedTask,
+            () =>
+            {
+                fallbacks++;
+                return Task.CompletedTask;
+            });
+
+        Assert.Equal(0, fallbacks);
+    }
+
+    [Fact]
+    public async Task AFailingFallback_DoesNotEscapeEither()
+    {
+        await CitrixCaptureGuard.RunAsync(
+            () => throw new InvalidOperationException("capture"),
+            () => throw new InvalidOperationException("fallback"));
+    }
+
+    [Fact]
+    public void TheCaptureEntryPoint_RunsThroughTheGuard_AndTheFallbackShowsExternalMode()
+    {
+        string code = ViewSource.WithoutCommentsAndLiterals(ReadView());
+
         string entry = ViewSource.HandlerBody(code, "private async Task TryCaptureWindowAsync()");
-
-        int tryIndex = entry.IndexOf("try", StringComparison.Ordinal);
-        int callIndex = entry.IndexOf("await CaptureWindowAsync()", StringComparison.Ordinal);
-        int catchIndex = entry.IndexOf("catch (Exception", StringComparison.Ordinal);
-        int fallbackIndex = entry.IndexOf("FallBackToExternalModeAfterFailureAsync()", StringComparison.Ordinal);
-
-        Assert.True(tryIndex >= 0 && callIndex > tryIndex, "The capture is not inside a try block.");
-        Assert.True(catchIndex > callIndex, "The capture has no catch (Exception) after it.");
-        Assert.True(fallbackIndex > catchIndex, "The catch does not fall back to external mode.");
+        Assert.True(
+            ViewSource.IsStatementOfTheMethodBody(
+                entry,
+                "await CitrixCaptureGuard.RunAsync(CaptureWindowAsync, FallBackToExternalModeAfterFailureAsync);"),
+            "The capture entry point no longer runs the capture through the guard.");
 
         string fallback = ViewSource.HandlerBody(code, "private async Task FallBackToExternalModeAfterFailureAsync()");
-        Assert.Contains("_captureInProgress = false;", fallback, StringComparison.Ordinal);
-        Assert.Contains("ShowExternalFallback();", fallback, StringComparison.Ordinal);
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(fallback, "_captureInProgress = false;"));
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(fallback, "await Dispatcher.InvokeAsync(ShowExternalFallbackUnlessDisposed);"));
+
+        string show = ViewSource.HandlerBody(code, "private void ShowExternalFallbackUnlessDisposed()");
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(show, "ShowExternalFallback();"));
     }
 
     [Fact]

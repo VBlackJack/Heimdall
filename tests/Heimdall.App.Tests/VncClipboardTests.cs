@@ -14,9 +14,12 @@
  * limitations under the License.
  */
 
+using System.ComponentModel;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
+using Heimdall.App.Services;
 using Heimdall.App.Tests.Views.EmbeddedRdp;
 
 namespace Heimdall.App.Tests;
@@ -29,17 +32,17 @@ namespace Heimdall.App.Tests;
 /// COMException on the UI thread.
 /// </summary>
 /// <remarks>
-/// The page and the view are WebView2 and WPF surfaces with no test host here, so the guards read
-/// their source. Mutants proved red, each green once restored: <c>stringToBase64(event.detail.text)</c>
-/// back to <c>btoa(event.detail.text)</c>, <c>base64ToString(b64)</c> back to <c>atob(b64)</c>, and
-/// removal of either <c>catch (ExternalException</c>.
+/// The clipboard guard is behaviour: <see cref="VncClipboardAccess"/> is driven with delegates that
+/// throw what a held clipboard throws. The page runs in WebView2 and cannot be hosted here, so its
+/// encoding is pinned by reading its source, and the view's use of the guard by the statement
+/// predicate. Mutants proved red, each green once restored: <c>stringToBase64(event.detail.text)</c>
+/// back to <c>btoa(event.detail.text)</c>, <c>base64ToString(b64)</c> back to <c>atob(b64)</c>, the
+/// catch in either guard method retyped, and either view call site pointed back at the raw
+/// <c>Clipboard</c> call.
 /// </remarks>
 public sealed class VncClipboardTests
 {
     private const string AccentedText = "caf\u00E9 \u20AC \U0001F600";
-    private const string SendMember = "private void SendLocalClipboardToSession()";
-    private const string WriteMarker = "message.StartsWith(\"clipboard-write:\"";
-    private const string NextMarker = "message.StartsWith(\"credentials-required:\"";
 
     /// <summary>
     /// What the page now sends and receives is exactly what the host's own encode and decode
@@ -50,7 +53,7 @@ public sealed class VncClipboardTests
     {
         string wire = Convert.ToBase64String(Encoding.UTF8.GetBytes(AccentedText));
 
-        Assert.Equal(AccentedText, Encoding.UTF8.GetString(Convert.FromBase64String(wire)));
+        Assert.Equal(AccentedText, VncClipboardAccess.DecodePayload(wire));
     }
 
     /// <summary>
@@ -62,9 +65,91 @@ public sealed class VncClipboardTests
     {
         string wire = Convert.ToBase64String(Encoding.Latin1.GetBytes("caf\u00E9"));
 
-        string decoded = Encoding.UTF8.GetString(Convert.FromBase64String(wire));
+        Assert.NotEqual("caf\u00E9", VncClipboardAccess.DecodePayload(wire));
+    }
 
-        Assert.NotEqual("caf\u00E9", decoded);
+    [Fact]
+    public void InvalidBase64_IsIgnored()
+    {
+        Assert.Null(VncClipboardAccess.DecodePayload("not base64 !"));
+    }
+
+    [Theory]
+    [InlineData(typeof(COMException))]
+    [InlineData(typeof(ExternalException))]
+    public void AHeldClipboard_OnWrite_IsReportedAndDoesNotThrow(Type failure)
+    {
+        List<Exception> reported = [];
+
+        bool written = VncClipboardAccess.TrySetText(
+            _ => throw (Exception)Activator.CreateInstance(failure)!,
+            "text",
+            reported.Add);
+
+        Assert.False(written);
+        Assert.Single(reported);
+    }
+
+    [Fact]
+    public void AFreeClipboard_OnWrite_ReceivesTheText()
+    {
+        string? received = null;
+
+        bool written = VncClipboardAccess.TrySetText(text => received = text, AccentedText, _ => Assert.Fail("no failure expected"));
+
+        Assert.True(written);
+        Assert.Equal(AccentedText, received);
+    }
+
+    [Fact]
+    public void AnUnrelatedFailure_OnWrite_IsNotSwallowed()
+    {
+        Assert.Throws<InvalidOperationException>(
+            () => VncClipboardAccess.TrySetText(_ => throw new InvalidOperationException(), "text", _ => { }));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void AHeldClipboard_OnRead_IsReportedAndDoesNotThrow(bool failsOnContains)
+    {
+        List<Exception> reported = [];
+
+        string? text = VncClipboardAccess.TryGetText(
+            () => failsOnContains ? throw new COMException("CLIPBRD_E_CANT_OPEN") : true,
+            () => throw new COMException("CLIPBRD_E_CANT_OPEN"),
+            reported.Add);
+
+        Assert.Null(text);
+        Assert.Single(reported);
+    }
+
+    [Fact]
+    public void ARead_ReturnsTheTextWhenThereIsSome_AndNullWhenThereIsNone()
+    {
+        Assert.Equal(AccentedText, VncClipboardAccess.TryGetText(() => true, () => AccentedText, _ => Assert.Fail("no failure expected")));
+        Assert.Null(VncClipboardAccess.TryGetText(() => false, () => AccentedText, _ => Assert.Fail("no failure expected")));
+    }
+
+    [Fact]
+    public void TheView_ReachesTheClipboardOnlyThroughTheGuard()
+    {
+        string code = ViewSource.WithoutCommentsAndLiterals(ReadView());
+
+        string send = ViewSource.HandlerBody(code, "private void SendLocalClipboardToSession()");
+        Assert.True(
+            ViewSource.IsStatementOfTheMethodBody(
+                send,
+                "string? text = VncClipboardAccess.TryGetText(Clipboard.ContainsText, Clipboard.GetText, LogClipboardFailure);"),
+            "The local clipboard is no longer read through VncClipboardAccess.");
+
+        string write = ViewSource.HandlerBody(code, "private void HandleClipboardWrite(string base64)");
+        Assert.True(
+            ViewSource.IsStatementOfTheMethodBody(
+                write,
+                "Dispatcher.Invoke(() => VncClipboardAccess.TrySetText(Clipboard.SetText, text, LogClipboardFailure));"),
+            "The local clipboard is no longer written through VncClipboardAccess.");
+
     }
 
     [Fact]
@@ -91,41 +176,6 @@ public sealed class VncClipboardTests
         {
             Assert.Equal(FunctionText(terminal, name), FunctionText(vnc, name));
         }
-
-        Assert.Contains("new TextDecoder().decode(base64ToBytes(base64))", vnc, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void TheHost_GuardsTheClipboardWriteAgainstAHeldClipboard()
-    {
-        string raw = ReadView();
-        int start = raw.IndexOf(WriteMarker, StringComparison.Ordinal);
-        int end = raw.IndexOf(NextMarker, start, StringComparison.Ordinal);
-        Assert.True(start >= 0 && end > start, "The clipboard-write branch was not found.");
-        string branch = raw[start..end];
-
-        AssertGuarded(branch, "Clipboard.SetText");
-    }
-
-    [Fact]
-    public void TheHost_GuardsTheClipboardReadAgainstAHeldClipboard()
-    {
-        string logic = ViewSource.HandlerBody(ReadView(), SendMember);
-
-        AssertGuarded(logic, "Clipboard.ContainsText");
-        AssertGuarded(logic, "Clipboard.GetText");
-    }
-
-    /// <summary>The call sits after a <c>try</c> and before a <c>catch (ExternalException</c> of the same text.</summary>
-    private static void AssertGuarded(string text, string call)
-    {
-        int tryIndex = text.IndexOf("try", StringComparison.Ordinal);
-        int callIndex = text.IndexOf(call, StringComparison.Ordinal);
-        int catchIndex = text.IndexOf("catch (ExternalException", StringComparison.Ordinal);
-
-        Assert.True(tryIndex >= 0, "No try block.");
-        Assert.True(callIndex > tryIndex, $"{call} is not inside a try block.");
-        Assert.True(catchIndex > callIndex, $"{call} has no catch (ExternalException) after it.");
     }
 
     /// <summary>One <c>function name(...) { ... }</c> of a page, to its closing brace, whitespace-normalised.</summary>

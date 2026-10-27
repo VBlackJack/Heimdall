@@ -17,6 +17,10 @@
 #    claim of those tests goes through the predicate; the anchors that only order it do not yet.
 #  - a uniqueness count used to build a mutant, Regex.Matches(source, Regex.Escape(X)).Count. It
 #    asserts that a mutant can be built, not that behaviour is present.
+# Added with the VNC clipboard fix: the four VncClipboardTests entries below read vnc.html, whose
+# clipboard handlers are inline JavaScript lambdas the C# statement predicate cannot see into
+# (the literals it blanks are the messages being checked). The encoding itself is covered by
+# behaviour tests; these four only keep the page from going back to bare btoa/atob.
 tests/Heimdall.App.Tests/C2DeadSettingsRegressionTests.cs|RdpResolutionPresetEditor_BindsToExistingTextProjection|assert-presence|"Text=\"{Binding Settings.RdpResolutionPresetsText, UpdateSourceTrigger=LostFocus}\""
 tests/Heimdall.App.Tests/C2DeadSettingsRegressionTests.cs|RdpAutoReconnectMaximum_HasCompleteSettingsToRuntimeChain|assert-presence|"settings.RdpAutoReconnectMaxAttempts"
 tests/Heimdall.App.Tests/C2DeadSettingsRegressionTests.cs|ApplyRdpDefaults_CoversEveryRdpSettingExposedBySettings|assert-presence|$"{property} = defaults.{property};"
@@ -167,6 +171,10 @@ tests/Heimdall.Core.Tests/ConfigManagerTransactionTests.cs|CommitMigration_Clear
 tests/Heimdall.Core.Tests/ConfigManagerTransactionTests.cs|CommitMigration_ClearsBothBaselineBuffers|index-of|" finally"
 tests/Heimdall.Core.Tests/ConfigManagerTransactionTests.cs|CommitMigration_ClearsBothBaselineBuffers|index-of|"_writeLock.Release();"
 tests/Heimdall.Core.Tests/RdpDocumentationClaimGuardTests.cs|FeatureListDoesNotAdvertiseATcpOnlyMode|assert-presence|"UDP"
+tests/Heimdall.App.Tests/VncClipboardTests.cs|ThePage_EncodesAndDecodesClipboardTextAsUtf8|assert-presence|"stringToBase64(event.detail.text)"
+tests/Heimdall.App.Tests/VncClipboardTests.cs|ThePage_EncodesAndDecodesClipboardTextAsUtf8|assert-presence|"rfb.clipboardPasteFrom(base64ToString(b64))"
+tests/Heimdall.App.Tests/VncClipboardTests.cs|ThePage_EncodesAndDecodesClipboardTextAsUtf8|regex|@"\bbtoa\("
+tests/Heimdall.App.Tests/VncClipboardTests.cs|ThePage_EncodesAndDecodesClipboardTextAsUtf8|regex|@"\batob\("
 tests/Heimdall.Sftp.Tests/FtpBrowserAtomicUploadTests.cs|UploadFileAsync_WiresTheCombinedWarningIntoTheCommitRename|assert-presence|"onExistingTargetReplaced: () => OperationWarningRaised?.Invoke("
 tests/Heimdall.Sftp.Tests/FtpBrowserAtomicUploadTests.cs|UploadFileAsync_WiresTheCombinedWarningIntoTheCommitRename|assert-presence|"RemoteOperationWarning.CreateFtpExistingTargetReplaced("
 tests/Heimdall.Sftp.Tests/SftpBrowserCopyRefusalTests.cs|CopyAsync_RefusesOnAnyNonSuccessOutcome_AndHasNoRoundtripFallback|assert-presence|"ServerSideCopyOutcome outcome = await TryServerSideCopyAsync("

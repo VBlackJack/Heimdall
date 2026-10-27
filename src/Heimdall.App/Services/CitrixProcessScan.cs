@@ -54,6 +54,39 @@ internal sealed class CitrixScanProcess : ICitrixScanProcess
 }
 
 /// <summary>
+/// Runs the window capture so that no failure of it can escape a task nobody observes.
+/// </summary>
+internal static class CitrixCaptureGuard
+{
+    /// <summary>
+    /// Awaits <paramref name="capture"/>; if it throws, logs and awaits <paramref name="fallBack"/>
+    /// instead. A failing fallback is logged too: the caller discards this task.
+    /// </summary>
+    internal static async Task RunAsync(Func<Task> capture, Func<Task> fallBack)
+    {
+        ArgumentNullException.ThrowIfNull(capture);
+        ArgumentNullException.ThrowIfNull(fallBack);
+
+        try
+        {
+            await capture().ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Error($"Citrix: window capture failed, using external mode: {ex}");
+            try
+            {
+                await fallBack().ConfigureAwait(true);
+            }
+            catch (Exception fallbackEx)
+            {
+                Core.Logging.FileLogger.Warn($"Citrix: external-mode fallback failed: {fallbackEx.Message}");
+            }
+        }
+    }
+}
+
+/// <summary>
 /// Collects the live Citrix process ids of the current Windows session.
 /// </summary>
 /// <remarks>

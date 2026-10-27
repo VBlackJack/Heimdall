@@ -328,15 +328,7 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
     {
         // The caller discards this task, so nothing may escape it: an unobserved fault would leave
         // _captureInProgress set and the pane spinning for good. Any failure ends in external mode.
-        try
-        {
-            await CaptureWindowAsync();
-        }
-        catch (Exception ex)
-        {
-            Core.Logging.FileLogger.Error($"Citrix: window capture failed, using external mode: {ex}");
-            await FallBackToExternalModeAfterFailureAsync();
-        }
+        await CitrixCaptureGuard.RunAsync(CaptureWindowAsync, FallBackToExternalModeAfterFailureAsync);
     }
 
     private async Task FallBackToExternalModeAfterFailureAsync()
@@ -344,20 +336,13 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
         _captureInProgress = false;
         if (_disposed) return;
 
-        try
-        {
-            await Dispatcher.InvokeAsync(() =>
-            {
-                if (!_disposed)
-                {
-                    ShowExternalFallback();
-                }
-            });
-        }
-        catch (Exception ex)
-        {
-            Core.Logging.FileLogger.Warn($"Citrix: external-mode fallback failed: {ex.Message}");
-        }
+        await Dispatcher.InvokeAsync(ShowExternalFallbackUnlessDisposed);
+    }
+
+    private void ShowExternalFallbackUnlessDisposed()
+    {
+        if (_disposed) return;
+        ShowExternalFallback();
     }
 
     private async Task CaptureWindowAsync()
