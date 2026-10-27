@@ -34,6 +34,17 @@ public sealed class TelnetSession : ITerminalSession
     private const byte SB = 250;
     private const byte SE = 240;
     private const byte NAWS = 31;
+    private const byte ECHO = 1;
+    private const byte SGA = 3;
+    private const byte TTYPE = 24;
+    private const byte TTYPE_IS = 0;
+    private const byte TTYPE_SEND = 1;
+
+    /// <summary>Terminal type reported to the peer in reply to SB TTYPE SEND (RFC 1091); xterm.js emulates it.</summary>
+    internal const string TerminalTypeName = "xterm-256color";
+
+    private const int CleanExitCode = 0;
+    private const int AbnormalExitCode = 1;
 
     /// <summary>
     /// Most bytes kept from one subnegotiation. Nothing reads the payload today; the cap only stops
@@ -70,6 +81,12 @@ public sealed class TelnetSession : ITerminalSession
 
     /// <summary>Options already refused, so a repeated request is not answered again (RFC 854).</summary>
     private readonly HashSet<(byte Verb, byte Option)> _refused = new();
+
+    /// <summary>Options this side enabled (answered WILL), so a repeated DO is not acknowledged again.</summary>
+    private readonly HashSet<byte> _localEnabled = new();
+
+    /// <summary>Options the peer enabled and we accepted (answered DO), so a repeated WILL is not acknowledged again.</summary>
+    private readonly HashSet<byte> _remoteEnabled = new();
     private int _columns;
     private int _rows;
 
@@ -228,6 +245,9 @@ public sealed class TelnetSession : ITerminalSession
     private async Task ReadLoop(CancellationToken ct)
     {
         byte[] buffer = new byte[4096];
+        // A FIN from the peer (bytesRead == 0) is an orderly close, for instance after the user typed
+        // "exit": it ends the session cleanly. Only a failed read (reset, abort) is an abnormal end.
+        bool readFailed = false;
         try
         {
             while (!ct.IsCancellationRequested && _stream is not null)
@@ -239,10 +259,16 @@ public sealed class TelnetSession : ITerminalSession
             }
         }
         catch (OperationCanceledException) { /* Expected on session dispose */ }
-        catch (Exception ex) { Heimdall.Core.Logging.FileLogger.Warn($"[TelnetSession] ReadLoop: {ex.Message}"); }
+        catch (Exception ex)
+        {
+            readFailed = true;
+            Heimdall.Core.Logging.FileLogger.Warn($"[TelnetSession] ReadLoop: {ex.Message}");
+        }
 
         _isRunning = false;
-        int exitCode = _intentionalClose || ct.IsCancellationRequested ? 0 : 1;
+        int exitCode = readFailed && !_intentionalClose && !ct.IsCancellationRequested
+            ? AbnormalExitCode
+            : CleanExitCode;
         SafeInvokeProcessExited(exitCode);
     }
 
@@ -354,6 +380,7 @@ public sealed class TelnetSession : ITerminalSession
                 break;
 
             case WONT:
+                HandleWont(option);
                 break;
         }
 
@@ -404,6 +431,12 @@ public sealed class TelnetSession : ITerminalSession
 
     private void CompleteSubnegotiation()
     {
+        // RFC 1091: the terminal type is sent only when the peer asks for it with SB TTYPE SEND.
+        if (_sbOption == TTYPE && _localEnabled.Contains(TTYPE) && _sbBuffer.Count > 0 && _sbBuffer[0] == TTYPE_SEND)
+        {
+            SendTerminalType();
+        }
+
         _sbOption = 0;
         _sbBuffer.Clear();
     }
@@ -416,6 +449,8 @@ public sealed class TelnetSession : ITerminalSession
         _sbBuffer.Clear();
         _nawsNegotiated = false;
         _refused.Clear();
+        _localEnabled.Clear();
+        _remoteEnabled.Clear();
     }
 
     private void EmitBufferedData(List<byte> data)
@@ -441,6 +476,15 @@ public sealed class TelnetSession : ITerminalSession
             _nawsNegotiated = true;
             SendNawsSubnegotiation(_columns, _rows);
         }
+        else if (option is SGA or TTYPE)
+        {
+            // Suppress-go-ahead and terminal type are harmless to offer. Same rule as NAWS: a DO for
+            // an option already enabled is not acknowledged again.
+            if (_localEnabled.Add(option))
+            {
+                SendCommand(WILL, option);
+            }
+        }
         else
         {
             // Refuse everything else, once.
@@ -456,12 +500,59 @@ public sealed class TelnetSession : ITerminalSession
             _nawsNegotiated = false;
             SendCommand(WONT, NAWS);
         }
+        else if (option is SGA or TTYPE && _localEnabled.Remove(option))
+        {
+            SendCommand(WONT, option);
+        }
     }
 
     private void HandleWill(byte option)
     {
-        // Refuse all server-side options, once.
+        if (option is ECHO or SGA)
+        {
+            // The server echoes what the user types and stays in character mode. Refusing ECHO makes
+            // telnetd stop echoing (typed text invisible); refusing SGA pushes it to line mode.
+            // Heimdall never echoes locally: xterm.js only renders what the server sends back.
+            if (_remoteEnabled.Add(option))
+            {
+                SendCommand(DO, option);
+            }
+
+            return;
+        }
+
+        // Refuse all other server-side options, once.
         RefuseOnce(DONT, option);
+    }
+
+    private void HandleWont(byte option)
+    {
+        // The peer withdrew an option we accepted: confirm it.
+        if (_remoteEnabled.Remove(option))
+        {
+            SendCommand(DONT, option);
+        }
+    }
+
+    private void SendTerminalType()
+    {
+        if (_stream is null || _disposed) return;
+        try
+        {
+            _stream.Write(BuildTerminalTypeFrame(TerminalTypeName));
+        }
+        catch (Exception ex) { Heimdall.Core.Logging.FileLogger.Warn($"[TelnetSession] SendTerminalType: {ex.Message}"); }
+    }
+
+    /// <summary>IAC SB TTYPE IS &lt;name&gt; IAC SE (RFC 1091).</summary>
+    internal static byte[] BuildTerminalTypeFrame(string terminalType)
+    {
+        byte[] name = Encoding.ASCII.GetBytes(terminalType);
+        List<byte> frame = new List<byte>(name.Length + 6) { IAC, SB, TTYPE, TTYPE_IS };
+        frame.AddRange(name);
+        frame.Add(IAC);
+        frame.Add(SE);
+        return frame.ToArray();
     }
 
     private void RefuseOnce(byte verb, byte option)

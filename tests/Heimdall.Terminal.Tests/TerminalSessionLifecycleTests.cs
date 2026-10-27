@@ -215,7 +215,7 @@ public sealed class TerminalSessionLifecycleTests
             await serverTask.WaitAsync(TimeSpan.FromSeconds(10));
             int exitCode = await exited.Task.WaitAsync(TimeSpan.FromSeconds(10));
 
-            Assert.NotEqual(0, exitCode);
+            Assert.Equal(0, exitCode);
             Assert.True(callbackCount >= 2, $"Expected the read loop to survive the first subscriber exception, got {callbackCount} callback(s).");
         }
         finally
