@@ -140,13 +140,29 @@ public sealed class NotesStorageService : INotesStorageService
 
     private static readonly UTF8Encoding Utf8NoBom = new(encoderShouldEmitUTF8Identifier: false);
 
+    /// <summary>How long the synchronous save waits for a write already in progress.</summary>
+    private static readonly TimeSpan SyncSaveLockWait = TimeSpan.FromSeconds(2);
+
     private readonly string _notesRootPath;
-    private readonly SemaphoreSlim _writeLock = new(1, 1);
+    private readonly SemaphoreSlim _writeLock;
+    private readonly TimeSpan _syncSaveLockWait;
 
     public NotesStorageService(string notesRootPath)
+        : this(notesRootPath, new SemaphoreSlim(1, 1), SyncSaveLockWait)
+    {
+    }
+
+    /// <summary>
+    /// Takes the write lock and the synchronous wait from the caller, so a test can hold
+    /// the lock the way a slow asynchronous save does.
+    /// </summary>
+    internal NotesStorageService(string notesRootPath, SemaphoreSlim writeLock, TimeSpan syncSaveLockWait)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(notesRootPath);
+        ArgumentNullException.ThrowIfNull(writeLock);
         _notesRootPath = notesRootPath;
+        _writeLock = writeLock;
+        _syncSaveLockWait = syncSaveLockWait;
     }
 
     public string NotesRootPath => _notesRootPath;
@@ -362,15 +378,19 @@ public sealed class NotesStorageService : INotesStorageService
     /// Synchronous save for use in <see cref="IToolView.CanClose"/> and
     /// <see cref="IDisposable.Dispose"/>, which cannot be async.
     /// </summary>
-    public void SaveNote(string filePath, string content)
+    /// <remarks>
+    /// A wait that expires is reported, not swallowed: returning normally let the Notes tab
+    /// mark the note clean and close, and the last edits were lost without a word.
+    /// </remarks>
+    public bool SaveNote(string filePath, string content)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
         ValidatePathWithinRoot(filePath);
 
-        if (!_writeLock.Wait(TimeSpan.FromSeconds(2)))
+        if (!_writeLock.Wait(_syncSaveLockWait))
         {
             FileLogger.Warn($"SaveNote timed out waiting for write lock: {filePath}");
-            return;
+            return false;
         }
 
         try
@@ -382,6 +402,7 @@ public sealed class NotesStorageService : INotesStorageService
             }
 
             File.WriteAllText(filePath, content ?? string.Empty, Utf8NoBom);
+            return true;
         }
         finally
         {

@@ -92,6 +92,33 @@ jobs:
           # The script runs in a child scope, so its `exit 1` does not end this block.
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      # Pure PowerShell. The MSI ProductVersion used to be 1.0.MMDD.xx: Windows
+      # Installer compares three fields, so the year was lost and the first 2027
+      # build would have been refused by MajorUpgrade as older.
+      - name: Check the MSI version increases with the build number
+        shell: pwsh
+        run: |
+          ./scripts/Test-MsiProductVersion.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      # Pure PowerShell over fixture manifests and CABs built on the runner. The
+      # SelfContained edition once shipped a seven-month-old WebView2 runtime, and a
+      # Release without one dropped the edition in silence.
+      - name: Check the WebView2 runtime gate
+        shell: pwsh
+        run: |
+          ./scripts/Test-WebView2RuntimeGate.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      # Pure PowerShell over recorded git and gh outputs: a release ships only a
+      # clean master that origin and CI agree on, and its tag is pinned.
+      - name: Check the release preflight
+        shell: pwsh
+        run: |
+          ./scripts/Test-ReleasePreflight.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+
       # Pure PowerShell, no .NET and no build needed. Proves the build's staging
       # copy is idempotent and that its cleanup reaches trees deeper than MAX_PATH.
       # Both defects were live at once on 2026-08-22: the cleanup silently failed on
@@ -192,20 +219,24 @@ jobs:
           ./scripts/InformationalTestFailures.ps1 -ResultsRoot TestResults
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      # The verdict of the vulnerable-dependency step below, on recorded report
+      # shapes, plus the step script on a solution that does not exist and on this
+      # one. After the SDK setup and restore, since it runs dotnet.
+      - name: Check the vulnerable-dependency verdict
+        shell: pwsh
+        run: |
+          ./scripts/Test-VulnerableDependencyReport.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      # A vulnerable package stays a workflow warning, since vulnerability databases
+      # occasionally include false positives or advisories without an upgrade path;
+      # maintainers review it and act accordingly. A scan that did not run to
+      # completion fails the step: it used to ignore the exit code and print "No
+      # vulnerable dependencies detected." over a failed restore.
       - name: Check for vulnerable dependencies
         shell: pwsh
-        # Informational only — emits a workflow warning instead of failing the
-        # build, since vulnerability databases occasionally include false
-        # positives or advisories without an upgrade path. Maintainers should
-        # review the warning and act accordingly.
         run: |
-          $report = dotnet list Heimdall.slnx package --vulnerable --include-transitive 2>&1 | Out-String
-          Write-Host $report
-          if ($report -match "has the following vulnerable packages") {
-            Write-Host "::warning::Vulnerable dependencies detected - see output above"
-          } else {
-            Write-Host "No vulnerable dependencies detected."
-          }
+          ./scripts/Invoke-VulnerableDependencyCheck.ps1 -Solution Heimdall.slnx
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       # One file per test assembly. The console stream interleaves assemblies
       # running in parallel, which tears a failure's name, message and stack

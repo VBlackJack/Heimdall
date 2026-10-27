@@ -62,6 +62,28 @@ internal static class ShutdownDecisions
     public static bool ShouldShowUnhandledExceptionDialog(bool isShuttingDown) => !isShuttingDown;
 
     /// <summary>
+    /// How an exception that reached the AppDomain handler is surfaced, on whatever thread
+    /// it crashed. The dialog rule is <see cref="ShouldShowUnhandledExceptionDialog"/>, the
+    /// one the dispatcher hook applies: the AppDomain handler showed its dialog with no such
+    /// guard, and blocked the crashing thread on the UI thread to do it, so a worker that
+    /// died during teardown held the exit - and the update relauncher waiting on it.
+    /// </summary>
+    public static UnhandledExceptionRoute RouteAppDomainUnhandledException(
+        bool isShuttingDown,
+        bool dispatcherShutdownStarted,
+        bool onDispatcherThread)
+    {
+        if (!ShouldShowUnhandledExceptionDialog(isShuttingDown) || dispatcherShutdownStarted)
+        {
+            return UnhandledExceptionRoute.LogOnly;
+        }
+
+        return onDispatcherThread
+            ? UnhandledExceptionRoute.ShowInline
+            : UnhandledExceptionRoute.ShowOnDispatcher;
+    }
+
+    /// <summary>
     /// How many sessions are connected, counting the ones detached into floating
     /// windows. The close confirmation counted the main collection only, and detaching
     /// removes a session from it: three detached sessions produced a count of zero.
@@ -78,4 +100,17 @@ internal static class ShutdownDecisions
     private static bool IsConnected(SessionTabViewModel session)
         => SplitTreeHelper.EnumerateLeaves(session.RootContent)
             .Any(pane => string.Equals(pane.Status, ConnectedStatus, StringComparison.Ordinal));
+}
+
+/// <summary>Where an unhandled exception goes once it is logged and flushed.</summary>
+internal enum UnhandledExceptionRoute
+{
+    /// <summary>Logged and flushed only: no dialog, and no wait on the UI thread.</summary>
+    LogOnly,
+
+    /// <summary>Shown directly: the crash is on the UI thread itself.</summary>
+    ShowInline,
+
+    /// <summary>Posted to the UI thread, the crashing thread waiting for the dialog with a bound.</summary>
+    ShowOnDispatcher,
 }
