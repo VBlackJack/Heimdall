@@ -1194,6 +1194,8 @@
   "ImportMobaXtermWarningDuplicateSession": "[{0}] {1} : une autre session porte le m\u00eame nom dans ce dossier ; non import\u00e9e.",
   "ImportMobaXtermWarningUnresolvedVariable": "[{0}] {1} : la variable [{2}] n'a pas de valeur ; import\u00e9e avec [{2}] laiss\u00e9 tel quel.",
   "ImportMobaXtermWarningParseError": "[{0}] {1} : illisible ({2}) ; non import\u00e9e.",
+  "ImportRdcManWarningUnnamedServer": "[{0}] un serveur n'a ni nom ni nom d'affichage ; non import\u00e9.",
+  "ImportRdcManWarningUnnamedServerNoGroup": "Un serveur n'a ni nom ni nom d'affichage ; non import\u00e9.",
   "ImportErrorUnknownExtension": "Type de fichier d'import non pris en charge : {0}.",
   "ImportSkippedInvalidHostname": "Ignor\u00e9 '{0}' : format de nom d'h\u00f4te invalide.",
   "ImportClearedInvalidUsername": "Session '{0}' : format de nom d'utilisateur invalide, nom d'utilisateur effac\u00e9.",

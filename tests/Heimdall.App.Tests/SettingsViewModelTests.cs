@@ -3707,6 +3707,56 @@ public sealed partial class SettingsViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task ImportConfigCommand_RdcManServerWithoutName_IsReportedInTheUsersLanguage()
+    {
+        FakeConfigManager config = new();
+        FakeDialogService dialog = new() { ConfirmResult = true };
+        LocalizationManager localizer = new();
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en");
+        SettingsViewModel viewModel = CreateViewModel(config, dialog, localizer: localizer);
+        string importRoot = Path.Combine(
+            Path.GetTempPath(),
+            "heimdall-settings-import-tests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(importRoot);
+        string importPath = Path.Combine(importRoot, "servers.rdg");
+        const string content = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <RDCMan programVersion="2.7" schemaVersion="3">
+              <file>
+                <properties>
+                  <name>Corp</name>
+                </properties>
+                <server>
+                  <properties>
+                    <displayName>   </displayName>
+                  </properties>
+                </server>
+              </file>
+            </RDCMan>
+            """;
+
+        try
+        {
+            await File.WriteAllTextAsync(importPath, content);
+            viewModel.ImportFilePathProvider = () => importPath;
+
+            await viewModel.ImportConfigCommand.ExecuteAsync(null);
+
+            Assert.Empty(config.Servers);
+            (string Title, string Message) warning = Assert.Single(dialog.WarningCalls);
+            Assert.Contains(localizer.Format("ImportRdcManWarningUnnamedServer", "Corp"), warning.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (Directory.Exists(importRoot))
+            {
+                Directory.Delete(importRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task ImportConfigCommand_MobaXtermStoredCredentials_ShowsDetectedPasswordNotice()
     {
         FakeConfigManager config = new();

@@ -3336,7 +3336,24 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     {
         var content = await File.ReadAllTextAsync(filePath, cancellationToken);
         var rdcResult = RdcManImporter.Parse(content);
-        return (rdcResult.Servers, rdcResult.Warnings);
+        return (rdcResult.Servers, FormatRdcManWarnings(rdcResult));
+    }
+
+    /// <summary>
+    /// The parser's own warnings, then one localized line per server it had to leave out for
+    /// lack of a name, so an unnamed server is never dropped without a word.
+    /// </summary>
+    private List<string> FormatRdcManWarnings(RdcManImporter.ImportResult result)
+    {
+        var warnings = new List<string>(result.Warnings);
+        foreach (RdcManImporter.SkippedServer skipped in result.SkippedServers)
+        {
+            warnings.Add(skipped.GroupPath.Length == 0
+                ? _localizer["ImportRdcManWarningUnnamedServerNoGroup"]
+                : _localizer.Format("ImportRdcManWarningUnnamedServer", skipped.GroupPath));
+        }
+
+        return warnings;
     }
 
     private async Task<(List<ServerProfileDto> Servers, List<string>? Warnings)> ImportXmlAsync(
@@ -3351,7 +3368,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         }
 
         var rdcResult = RdcManImporter.Parse(content);
-        return (rdcResult.Servers, rdcResult.Warnings);
+        return (rdcResult.Servers, FormatRdcManWarnings(rdcResult));
     }
 
     [RelayCommand]
