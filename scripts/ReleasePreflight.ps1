@@ -44,6 +44,9 @@
     powershell.exe, so no PowerShell 7 only syntax here.
 #>
 
+# The -AcceptCiFailure reason is published, so it goes through the release-notes guard.
+. (Join-Path $PSScriptRoot 'NotesTypographyGuard.ps1')
+
 $script:ReleaseBranch = 'master'
 $script:ReleaseRemote = 'origin'
 $script:ReleaseWorkflow = 'ci.yml'
@@ -240,6 +243,29 @@ function Invoke-ReleasePreflight {
     }
 }
 
+function Get-ReleaseGateReasonViolations {
+    <#
+    .SYNOPSIS
+        The typography violations of an -AcceptCiFailure reason, found by the release-notes
+        guard (scripts/NotesTypographyGuard.ps1) itself rather than a copy of its rule.
+    .DESCRIPTION
+        The guard reads a file, so the reason is written to a temporary one, as UTF-8
+        without a byte-order mark, and removed afterwards.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)] [string]$Reason
+    )
+
+    $path = Join-Path ([System.IO.Path]::GetTempPath()) ("heimdall-gate-reason-" + [Guid]::NewGuid().ToString('N') + '.md')
+    try {
+        [System.IO.File]::WriteAllText($path, $Reason, [System.Text.UTF8Encoding]::new($false))
+        return @(Get-NotesTypographyViolations -Path $path)
+    } finally {
+        Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
+    }
+}
+
 function Resolve-ReleaseGateOutcome {
     <#
     .SYNOPSIS
@@ -266,6 +292,15 @@ function Resolve-ReleaseGateOutcome {
     $overrideGiven = $PSBoundParameters.ContainsKey('AcceptCiFailure') -and $null -ne $AcceptCiFailure
     if ($overrideGiven -and [string]::IsNullOrWhiteSpace($AcceptCiFailure)) {
         return (& $outcome 'Abort' @('-AcceptCiFailure needs the reason, in words: it is written into the release notes.'))
+    }
+    if ($overrideGiven) {
+        # The reason is published in the release notes, so it passes the same guard as
+        # the hand-written notes file, and is refused here, before any commit or tag.
+        $violations = @(Get-ReleaseGateReasonViolations -Reason $AcceptCiFailure)
+        if ($violations.Count -gt 0) {
+            $listed = @($violations | ForEach-Object { "column $($_.Column) '$($_.Char)' $($_.CodePoint) ($($_.Name)) - $($_.Remedy)" })
+            return (& $outcome 'Abort' (@('The -AcceptCiFailure reason contains characters the French AZERTY keyboard cannot type, and it is published in the release notes:') + $listed))
+        }
     }
     if ($Failures.Count -eq 0) {
         return (& $outcome 'Pass' @())

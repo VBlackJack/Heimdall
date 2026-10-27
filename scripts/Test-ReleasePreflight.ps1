@@ -32,7 +32,9 @@
          Get-ReleaseCreateArgs with $releaseSha
      14. Resolve-ReleaseGateOutcome              -> Pass, Warn, Abort; the
                                                      one override needs a reason,
-                                                     and the notes record it.
+                                                     the notes typography guard
+                                                     must accept it, and the notes
+                                                     record it.
 
     Exits non-zero if any expectation fails.
 
@@ -230,6 +232,24 @@ foreach ($blank in @('', '   ')) {
     $o = Resolve-ReleaseGateOutcome -Failures $found -Fatal $true -AcceptCiFailure $blank
     Assert-True ($o.Decision -eq 'Abort') "an override without a reason ('$blank') is refused ($($o.Decision))"
 }
+# The reason is published, so it passes the release-notes typography guard first. The
+# characters are built from code points so this file stays ASCII.
+$emDash = [string][char]0x2014
+$guillemets = [string][char]0x00AB + ' outage ' + [string][char]0x00BB
+foreach ($bad in @("runner outage $emDash rerun later", $guillemets, ('c' + [string][char]0x0153 + 'ur'))) {
+    $o = Resolve-ReleaseGateOutcome -Failures $found -Fatal $true -AcceptCiFailure $bad
+    Assert-True ($o.Decision -eq 'Abort' -and (@($o.Messages) -join ' ') -match 'AZERTY') "a reason the notes guard refuses is refused ($($o.Decision): $(@($o.Messages)[1]))"
+}
+$o = Resolve-ReleaseGateOutcome -Failures @() -Fatal $false -AcceptCiFailure "outage $emDash"
+Assert-True ($o.Decision -eq 'Abort') "a bad reason is refused even when nothing needed overriding ($($o.Decision))"
+$accented = 'r' + [string][char]0x00E9 + 'seau du runner en panne, relanc' + [string][char]0x00E9 + ' -> OK'
+$o = Resolve-ReleaseGateOutcome -Failures $found -Fatal $true -AcceptCiFailure $accented
+Assert-True ($o.Decision -eq 'Overridden') "French accents and ASCII arrows typed on AZERTY are accepted ($($o.Decision))"
+$buildTextForOrder = Get-Content -LiteralPath (Join-Path (Split-Path -Parent $PSScriptRoot) 'Build.ps1') -Raw
+$outcomeIndex = $buildTextForOrder.IndexOf('Resolve-ReleaseGateOutcome @gateArgs')
+$commitIndex = $buildTextForOrder.IndexOf('git commit -m "release: v')
+Assert-True ($outcomeIndex -ge 0 -and $commitIndex -gt $outcomeIndex) 'the reason is checked before the release commit and tag'
+
 $section = Get-ReleaseGateOverrideNotes -Reason 'CI runner outage' -Failures $found
 Assert-True ($section -match '### Release gate override' -and $section -match 'Reason given: CI runner outage' -and $section -match "- The current branch is 'develop'") 'the override and what it overrode go into the release notes'
 
