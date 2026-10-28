@@ -68,7 +68,11 @@ public sealed class IconOnlyButtonNameGuardTests
 
                 // A Loaded handler is the other route: the localizer is reachable from code only.
                 bool namedFromCode = button.Attribute("Loaded") is not null;
-                bool named = button.Attribute(AutomationName) is not null || namedFromCode;
+                // The name may be written as an attribute or as a property element, which is how a
+                // name built from a binding (the file name in a queue row) has to be written.
+                bool named = button.Attribute(AutomationName) is not null
+                    || button.Element(Presentation + "AutomationProperties.Name") is not null
+                    || namedFromCode;
                 if (!named)
                 {
                     unnamed.Add($"{Path.GetRelativePath(AppRoot(), file)}:{((System.Xml.IXmlLineInfo)button).LineNumber}");
