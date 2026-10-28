@@ -17,6 +17,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.Json;
 
 namespace Heimdall.Core.Tests;
@@ -88,6 +89,20 @@ public sealed class SourceTypographyGuardTests
     /// that matched nothing would otherwise report success having read nothing at all.
     /// </summary>
     private const int MinimumSourceFilesScanned = 800;
+
+    /// <summary>Extensions of our own text files that reach a reader and are not C# or XAML.</summary>
+    private static readonly string[] OwnTextExtensions = [".bat", ".cmd", ".ps1", ".yml", ".yaml", ".html", ".js"];
+
+    /// <summary>Folders holding those files, besides the repository root itself.</summary>
+    private static readonly string[] OwnTextRoots = [SourceDirectoryName, "scripts", "installer", ".github", "assets"];
+
+    private const string VendoredManifestFileName = "VENDORED.json";
+
+    /// <summary>Six vendored directories ship a manifest; fewer found means the lookup is broken.</summary>
+    private const int MinimumVendoredManifests = 6;
+
+    /// <summary>Lower bound on the own script, workflow and page files a healthy sweep opens.</summary>
+    private const int MinimumOwnTextFilesScanned = 40;
 
     /// <summary>Lower bound on the number of locale values a healthy sweep reads.</summary>
     private const int MinimumLocaleValuesScanned = 5000;
@@ -270,6 +285,69 @@ public sealed class SourceTypographyGuardTests
             + string.Join("\n", violations.Take(MaxViolationsReported)));
     }
 
+    /// <summary>
+    /// Our own scripts, batch files, workflows and web pages reach a reader too: a console banner,
+    /// a smoke report, a CI log. The rule is the same one, applied to the file types the C# sweep
+    /// above does not open. A vendored tree is exempt because its text belongs to someone else, but
+    /// only the directories its <c>VENDORED.json</c> declares complete: a file the manifest lists as
+    /// owned (the draw.io host page) is ours and is scanned.
+    /// </summary>
+    [Fact]
+    public void OwnScriptsWorkflowsAndPagesUseNoTypographicSubstitutes()
+    {
+        List<string> violations = [];
+        IReadOnlyList<string> files = OwnTextFiles();
+
+        foreach (string path in files)
+        {
+            // A reader that detects byte order marks would strip a leading U+FEFF before the scan.
+            using StreamReader reader = new(path, new UTF8Encoding(false), detectEncodingFromByteOrderMarks: false);
+            int lineNumber = 0;
+            while (reader.ReadLine() is { } line)
+            {
+                lineNumber++;
+                foreach (char character in line)
+                {
+                    if (Refused.TryGetValue(character, out string? remedy))
+                    {
+                        violations.Add(
+                            $"{Relative(path)}:{lineNumber} contains U+{(int)character:X4} ({remedy})");
+                    }
+                }
+            }
+        }
+
+        Assert.True(
+            files.Count >= MinimumOwnTextFilesScanned,
+            $"only {files.Count} own script, workflow and page files were scanned");
+        Assert.True(
+            violations.Count == 0,
+            $"{violations.Count} typographic substitute(s) in own scripts, workflows and pages:\n"
+            + string.Join("\n", violations.Take(MaxViolationsReported)));
+    }
+
+    /// <summary>
+    /// The sweep above is only worth its verdict if it reaches a nested directory, the root files,
+    /// the workflow folder and the owned page inside a vendored tree, and leaves the vendored
+    /// files alone. Each is asserted on its own so that losing one cannot hide behind the others.
+    /// </summary>
+    [Fact]
+    public void TheOwnTextFileScanReachesWhatItMustAndSkipsWhatItMust()
+    {
+        HashSet<string> scanned = OwnTextFiles()
+            .Select(path => Relative(path).Replace('\\', '/'))
+            .ToHashSet(System.StringComparer.Ordinal);
+
+        Assert.Contains("Build.bat", scanned);
+        Assert.Contains("scripts/smoke/move-to-group-smoke.ps1", scanned);
+        Assert.Contains(scanned, path => path.StartsWith(".github/workflows/", System.StringComparison.Ordinal) && path.EndsWith(".yml", System.StringComparison.Ordinal));
+        Assert.Contains("src/Heimdall.App/Assets/drawio/heimdall-host.html", scanned);
+        Assert.Contains("src/Heimdall.App/Assets/vnc.html", scanned);
+        Assert.DoesNotContain("src/Heimdall.App/Assets/drawio/index.html", scanned);
+        Assert.DoesNotContain(scanned, path => path.StartsWith("src/Heimdall.App/Assets/vnc/", System.StringComparison.Ordinal));
+        Assert.DoesNotContain(scanned, path => path.StartsWith("src/Heimdall.App/Assets/milkdown-editor/dist/", System.StringComparison.Ordinal));
+    }
+
     private static void ScanJson(JsonElement element, string where, List<string> violations)
     {
         switch (element.ValueKind)
@@ -369,12 +447,97 @@ public sealed class SourceTypographyGuardTests
         => path.EndsWith(".cs", System.StringComparison.OrdinalIgnoreCase)
             || path.EndsWith(".xaml", System.StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Scripts, batch files, workflows and pages that are ours: the repository root files plus the
+    /// folders that hold them, minus build output and minus the vendored trees. Recursive, with
+    /// <see cref="TheOwnTextFileScanReachesWhatItMustAndSkipsWhatItMust"/> asserting that it is.
+    /// </summary>
+    private static IReadOnlyList<string> OwnTextFiles()
+    {
+        string repoRoot = FindRepoRoot();
+        IReadOnlyList<VendoredManifest> manifests = LoadVendoredManifests(repoRoot);
+
+        IEnumerable<string> candidates = Directory.EnumerateFiles(repoRoot, "*.*", SearchOption.TopDirectoryOnly);
+        foreach (string folder in OwnTextRoots)
+        {
+            string folderPath = Path.Combine(repoRoot, folder);
+            if (Directory.Exists(folderPath))
+                candidates = candidates.Concat(Directory.EnumerateFiles(folderPath, "*.*", SearchOption.AllDirectories));
+        }
+
+        return
+        [
+            .. candidates
+                .Where(path => OwnTextExtensions.Contains(Path.GetExtension(path), System.StringComparer.OrdinalIgnoreCase))
+                .Where(path => !IsUnderBuildOutput(path, repoRoot))
+                .Where(path => !IsVendored(path, manifests))
+                .OrderBy(path => path, System.StringComparer.Ordinal),
+        ];
+    }
+
+    /// <summary>One <c>VENDORED.json</c>: where it sits, which directories it owns whole, which files stay ours.</summary>
+    private sealed record VendoredManifest(string Directory, IReadOnlyList<string> CompleteDirectories, IReadOnlyList<string> OwnedFiles);
+
+    private static IReadOnlyList<VendoredManifest> LoadVendoredManifests(string repoRoot)
+    {
+        string sourceRoot = Path.Combine(repoRoot, SourceDirectoryName);
+        List<VendoredManifest> manifests = [];
+
+        foreach (string manifestPath in Directory
+            .EnumerateFiles(sourceRoot, VendoredManifestFileName, SearchOption.AllDirectories)
+            .Where(path => !IsUnderBuildOutput(path, repoRoot)))
+        {
+            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(manifestPath));
+            manifests.Add(new VendoredManifest(
+                Path.GetDirectoryName(manifestPath)!,
+                ReadStrings(document.RootElement, "completeDirectories"),
+                ReadStrings(document.RootElement, "ownedFiles")));
+        }
+
+        Assert.True(
+            manifests.Count >= MinimumVendoredManifests,
+            $"only {manifests.Count} {VendoredManifestFileName} file(s) were found, so vendored trees would be scanned");
+        return manifests;
+    }
+
+    private static List<string> ReadStrings(JsonElement root, string propertyName)
+        => root.TryGetProperty(propertyName, out JsonElement array) && array.ValueKind == JsonValueKind.Array
+            ? [.. array.EnumerateArray().Select(item => item.GetString() ?? string.Empty)]
+            : [];
+
+    private static bool IsVendored(string path, IReadOnlyList<VendoredManifest> manifests)
+    {
+        string fullPath = Path.GetFullPath(path);
+
+        foreach (VendoredManifest manifest in manifests)
+        {
+            bool owned = manifest.OwnedFiles.Any(file => string.Equals(
+                Path.GetFullPath(Path.Combine(manifest.Directory, file)),
+                fullPath,
+                System.StringComparison.OrdinalIgnoreCase));
+            if (owned)
+                continue;
+
+            foreach (string complete in manifest.CompleteDirectories)
+            {
+                string completeFull = Path.GetFullPath(Path.Combine(manifest.Directory, complete))
+                    .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                    + Path.DirectorySeparatorChar;
+                if (fullPath.StartsWith(completeFull, System.StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
     private static bool IsUnderBuildOutput(string path, string sourceRoot)
         => Path.GetRelativePath(sourceRoot, path)
             .Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
             .Any(segment =>
                 string.Equals(segment, "bin", System.StringComparison.OrdinalIgnoreCase)
-                || string.Equals(segment, "obj", System.StringComparison.OrdinalIgnoreCase));
+                || string.Equals(segment, "obj", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(segment, "node_modules", System.StringComparison.OrdinalIgnoreCase));
 
     private static string Relative(string path)
         => Path.GetRelativePath(FindRepoRoot(), path);
