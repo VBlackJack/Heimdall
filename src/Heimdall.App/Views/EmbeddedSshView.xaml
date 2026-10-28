@@ -24,77 +24,6 @@
                 BorderBrush="{DynamicResource BorderBrush}"
                 BorderThickness="0,0,0,1">
             <DockPanel LastChildFill="True">
-                <Button x:Name="DisconnectButton"
-                        DockPanel.Dock="Right"
-                        Content="{loc:Translate BtnDisconnectSession}"
-                        Click="OnDisconnectClick"
-                        ToolTip="{loc:Translate TooltipDisconnectSession}"
-                        AutomationProperties.Name="{loc:Translate A11yDisconnectSession}"
-                        Style="{DynamicResource SecondaryButtonStyle}"
-                        MinHeight="{StaticResource SessionHeaderMinTarget}"
-                        Padding="8,2"
-                        FontSize="{StaticResource FontSizeCaption}"
-                        Margin="8,0,0,0"/>
-
-                <Button x:Name="ReconnectButton"
-                        DockPanel.Dock="Right"
-                        Content="{loc:Translate BtnReconnectSession}"
-                        Click="OnReconnectClick"
-                        ToolTip="{loc:Translate TooltipReconnectSession}"
-                        AutomationProperties.Name="{loc:Translate A11yReconnectSession}"
-                        Style="{DynamicResource PrimaryButtonStyle}"
-                        MinHeight="{StaticResource SessionHeaderMinTarget}"
-                        Padding="8,2"
-                        FontSize="{StaticResource FontSizeCaption}"
-                        Margin="8,0,0,0"
-                        Visibility="Collapsed"/>
-
-                <Button x:Name="HealthToggleButton"
-                        DockPanel.Dock="Right"
-                        Content="&#xE9D9;"
-                        FontFamily="{StaticResource FontFamilyIcons}"
-                        Click="OnHealthToggleClick"
-                        ToolTip="{loc:Translate TooltipToggleHealthMonitoring}"
-                        AutomationProperties.Name="{loc:Translate A11yToggleHealthMonitoring}"
-                        Style="{DynamicResource GhostButtonStyle}"
-                        Padding="6,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0"
-                        Visibility="Collapsed"/>
-
-                <Button x:Name="SplitButton"
-                        DockPanel.Dock="Right"
-                        Content="&#xE8A9;"
-                        FontFamily="{StaticResource FontFamilyIcons}"
-                        Click="OnSplitClick"
-                        ToolTip="{loc:Translate TooltipSplitSession}"
-                        AutomationProperties.Name="{loc:Translate A11ySplitSession}"
-                        Style="{DynamicResource GhostButtonStyle}"
-                        Padding="6,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0"/>
-
-                <Button x:Name="ElevateButton"
-                        DockPanel.Dock="Right"
-                        Content="&#xE7EF;"
-                        FontFamily="{StaticResource FontFamilyIcons}"
-                        Click="OnElevateClick"
-                        ToolTip="{loc:Translate TooltipElevateToRoot}"
-                        AutomationProperties.Name="{loc:Translate A11yElevateToRoot}"
-                        Style="{DynamicResource GhostButtonStyle}"
-                        Padding="6,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0"
-                        Visibility="Collapsed"/>
-
-                <!-- Admin badge (visible when session is elevated) -->
-                <Border x:Name="AdminBadge"
-                        DockPanel.Dock="Right"
-                        Background="{DynamicResource WarningBrush}"
-                        CornerRadius="{StaticResource CornerRadiusSm}"
-                        Padding="6,1"
-                        Margin="4,0"
-                        VerticalAlignment="Center"
-                        Visibility="Collapsed">
-                    <TextBlock x:Name="AdminBadgeText" Text="{loc:Translate AdminBadgeLabel}"
-                               FontSize="{StaticResource FontSizeSmallCaption}" FontWeight="Bold"
-                               Foreground="{DynamicResource BadgeTextBrush}"/>
-                </Border>
-
                 <!-- Per-pane broadcast target toggle (visible only in SelectedPanes mode).
                      Docked Left so it is never squeezed out by the right-hand button cluster
                      on narrow split panes. -->
@@ -110,21 +39,92 @@
                           FontSize="{StaticResource FontSizeSmallCaption}"
                           Foreground="{DynamicResource TextPrimaryBrush}"/>
 
-                <!-- Broadcast mode indicator -->
-                <Border x:Name="BroadcastBadge"
-                        DockPanel.Dock="Right"
-                        Visibility="Collapsed"
-                        Background="{DynamicResource BroadcastActiveBrush}"
-                        CornerRadius="{StaticResource CornerRadiusSm}"
-                        Padding="6,1"
-                        Margin="8,0,0,0"
-                        VerticalAlignment="Center">
-                    <TextBlock x:Name="BroadcastBadgeText"
-                               Text="{loc:Translate BroadcastBadgeLabel}"
-                               FontSize="{StaticResource FontSizeSmallCaption}"
-                               FontWeight="Bold"
-                               Foreground="{DynamicResource TextPrimaryBrush}"/>
-                </Border>
+                <!-- The right-hand controls, declared in screen order (left to right) so Tab
+                     follows the eye: a DockPanel stacks right-docked children from the right,
+                     so declaring them one by one made Tab run right to left. -->
+                <StackPanel x:Name="HeaderControls"
+                            DockPanel.Dock="Right"
+                            Orientation="Horizontal">
+                    <!-- Broadcast mode indicator -->
+                    <Border x:Name="BroadcastBadge"
+                            Visibility="Collapsed"
+                            Background="{DynamicResource BroadcastActiveBrush}"
+                            CornerRadius="{StaticResource CornerRadiusSm}"
+                            Padding="6,1"
+                            Margin="8,0,0,0"
+                            VerticalAlignment="Center">
+                        <TextBlock x:Name="BroadcastBadgeText"
+                                   Text="{loc:Translate BroadcastBadgeLabel}"
+                                   FontSize="{StaticResource FontSizeSmallCaption}"
+                                   FontWeight="Bold"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                    </Border>
+
+                    <!-- Admin badge (visible when session is elevated) -->
+                    <Border x:Name="AdminBadge"
+                            Background="{DynamicResource WarningBrush}"
+                            CornerRadius="{StaticResource CornerRadiusSm}"
+                            Padding="6,1"
+                            Margin="4,0"
+                            VerticalAlignment="Center"
+                            Visibility="Collapsed">
+                        <TextBlock x:Name="AdminBadgeText" Text="{loc:Translate AdminBadgeLabel}"
+                                   FontSize="{StaticResource FontSizeSmallCaption}" FontWeight="Bold"
+                                   Foreground="{DynamicResource BadgeTextBrush}"/>
+                    </Border>
+
+                    <Button x:Name="ElevateButton"
+                            Content="&#xE7EF;"
+                            FontFamily="{StaticResource FontFamilyIcons}"
+                            Click="OnElevateClick"
+                            ToolTip="{loc:Translate TooltipElevateToRoot}"
+                            AutomationProperties.Name="{loc:Translate A11yElevateToRoot}"
+                            Style="{DynamicResource GhostButtonStyle}"
+                            Padding="6,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0"
+                            Visibility="Collapsed"/>
+
+                    <Button x:Name="SplitButton"
+                            Content="&#xE8A9;"
+                            FontFamily="{StaticResource FontFamilyIcons}"
+                            Click="OnSplitClick"
+                            ToolTip="{loc:Translate TooltipSplitSession}"
+                            AutomationProperties.Name="{loc:Translate A11ySplitSession}"
+                            Style="{DynamicResource GhostButtonStyle}"
+                            Padding="6,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0"/>
+
+                    <Button x:Name="HealthToggleButton"
+                            Content="&#xE9D9;"
+                            FontFamily="{StaticResource FontFamilyIcons}"
+                            Click="OnHealthToggleClick"
+                            ToolTip="{loc:Translate TooltipToggleHealthMonitoring}"
+                            AutomationProperties.Name="{loc:Translate A11yToggleHealthMonitoring}"
+                            Style="{DynamicResource GhostButtonStyle}"
+                            Padding="6,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0"
+                            Visibility="Collapsed"/>
+
+                    <Button x:Name="ReconnectButton"
+                            Content="{loc:Translate BtnReconnectSession}"
+                            Click="OnReconnectClick"
+                            ToolTip="{loc:Translate TooltipReconnectSession}"
+                            AutomationProperties.Name="{loc:Translate A11yReconnectSession}"
+                            Style="{DynamicResource PrimaryButtonStyle}"
+                            MinHeight="{StaticResource SessionHeaderMinTarget}"
+                            Padding="8,2"
+                            FontSize="{StaticResource FontSizeCaption}"
+                            Margin="8,0,0,0"
+                            Visibility="Collapsed"/>
+
+                    <Button x:Name="DisconnectButton"
+                            Content="{loc:Translate BtnDisconnectSession}"
+                            Click="OnDisconnectClick"
+                            ToolTip="{loc:Translate TooltipDisconnectSession}"
+                            AutomationProperties.Name="{loc:Translate A11yDisconnectSession}"
+                            Style="{DynamicResource SecondaryButtonStyle}"
+                            MinHeight="{StaticResource SessionHeaderMinTarget}"
+                            Padding="8,2"
+                            FontSize="{StaticResource FontSizeCaption}"
+                            Margin="8,0,0,0"/>
+                </StackPanel>
 
                 <!-- A grid, not a horizontal StackPanel: a StackPanel measures its children with
                      unbounded width, so their ellipsis never engages and the panel is cut off
