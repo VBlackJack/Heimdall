@@ -1,0 +1,115 @@
+name: Packaging
+
+# Builds what a release ships (the self-contained publish of both editions, the Inno Setup
+# installers and the WiX MSI) on a clean machine, so a change that breaks packaging is seen
+# on master and not on the day of a release. Nothing is published: the build runs in its
+# dry-run mode, which writes no tag, no release and no commit.
+#
+# A workflow of its own, not a job of ci.yml: the release preflight reads the conclusion of
+# the CI run for the release commit, and a slow installer build inside that run would make
+# every release wait on it. This one gates nothing. It is not a required check; a red run
+# is visible on the commit and in the Actions tab, and that is its whole purpose.
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer push to master never cancels a run in progress: the result of each commit stays
+# readable. The group is the ref, so two runs of one ref queue instead of overlapping.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # Inno Setup is installed from Chocolatey at this exact version, not "latest": the
+  # installer a release ships is built by a compiler somebody chose. This is the version the
+  # installer script was compiled with locally. WiX is pinned in .config/dotnet-tools.json.
+  INNO_SETUP_VERSION: "6.6.0"
+  # Sequence 99 of the current day: a forced version skips the lookup of existing releases
+  # and cannot collide with a real release, which this job never creates.
+  PACKAGING_BUILD_SEQUENCE: "99"
+
+jobs:
+  installers:
+    runs-on: windows-2025-vs2026
+    # Two publishes of the app, two Inno Setup compiles with solid LZMA compression and a
+    # WiX build. Sized above a normal run, below the six-hour default.
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      # The release preflight and the informational-lane report read workflow runs through
+      # the GitHub CLI; both degrade to warnings in a dry run, but should read when they can.
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Install Inno Setup (pinned)
+        shell: pwsh
+        run: |
+          choco install innosetup --version $env:INNO_SETUP_VERSION --allow-downgrade --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+          if (-not (Test-Path $iscc)) { throw "ISCC.exe not found at $iscc after the install." }
+          "HEIMDALL_ISCC_PATH=$iscc" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      # The version comes from the tool manifest, the one place WiX is pinned; the tool goes
+      # to its own folder so a WiX that the runner image carries cannot be the one used.
+      - name: Install WiX (pinned in .config/dotnet-tools.json)
+        shell: pwsh
+        run: |
+          . ./scripts/BuildToolchain.ps1
+          $version = Get-PinnedDotnetTool -ManifestPath .config/dotnet-tools.json -PackageId wix
+          if ([string]::IsNullOrWhiteSpace($version)) { throw 'The tool manifest does not pin wix.' }
+          $toolPath = Join-Path $env:RUNNER_TEMP 'wix'
+          dotnet tool install wix --version $version --tool-path $toolPath
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $wix = Join-Path $toolPath 'wix.exe'
+          & $wix extension add --global "WixToolset.UI.wixext/$version"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "HEIMDALL_WIX_PATH=$wix" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      # The SelfContained edition refuses to build without a fresh Fixed Version Runtime in
+      # runtimes/webview2, which is git-ignored and installed by hand from a Microsoft CAB
+      # before a real release. This job only checks that the installers can be built, so a
+      # stand-in with the same layout and a current manifest satisfies the gate. It is empty:
+      # the installer paths are exercised, the runtime is not.
+      - name: Stand in for the WebView2 runtime
+        shell: pwsh
+        run: |
+          . ./scripts/WebView2RuntimeGate.ps1
+          $runtime = Join-Path $PWD 'runtimes/webview2'
+          New-Item -ItemType Directory -Path $runtime -Force | Out-Null
+          Set-Content -LiteralPath (Join-Path $runtime 'msedgewebview2.exe') -Value 'packaging stand-in' -Encoding ascii
+          $now = [datetime]::UtcNow
+          $manifest = New-WebView2RuntimeManifestJson -FileVersion '0.0.0.0' -RuntimeFileUtc $now -CabSha256 ('0' * 64) -InstalledUtc $now
+          Set-Content -LiteralPath (Join-Path $runtime 'heimdall-runtime.json') -Value $manifest -Encoding ascii
+
+      # Windows PowerShell 5.1 on purpose: it is what Build.bat and Release.bat start, so
+      # this runs the release path as the owner runs it. The tests ran in ci.yml.
+      - name: Build the release in dry-run mode
+        shell: powershell
+        run: |
+          $version = (Get-Date).ToString('yyyy.MMdd') + $env:PACKAGING_BUILD_SEQUENCE
+          ./Build.ps1 -Mode Release -DryRun -SkipTests -Version $version -AllowAutoNotesOnly
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Check the installers exist
+        shell: pwsh
+        run: |
+          $installers = Get-ChildItem Dist/installers -File
+          $installers | ForEach-Object { '{0}  {1:N0} bytes' -f $_.Name, $_.Length }
+          foreach ($pattern in '*_Standard_Setup.exe', '*_SelfContained_Setup.exe', '*.msi') {
+            if (-not ($installers | Where-Object { $_.Name -like $pattern })) {
+              throw "No installer matching $pattern was produced."
+            }
+          }

@@ -55,6 +55,17 @@ Name: "quicklaunchicon"; Description: "{cm:CreateQuickLaunchIcon}"; GroupDescrip
 ; would survive the upgrade and be loaded again as a shipped action.
 Type: filesandordirs; Name: "{app}\data\seed\actions"
 Type: filesandordirs; Name: "{app}\data\packs"
+; The vendored asset trees (Assets\<tree>\VENDORED.json lists each as a complete directory)
+; are replaced whole for the same reason: draw.io alone is about 2300 files, and a file a
+; newer version dropped would otherwise stay on disk beside the new ones. One line per tree,
+; never a wildcard over Assets: Assets also holds files that are not vendored. The tree
+; Assets\milkdown-editor is the editor's source, not shipped, so it has no line here.
+; InstallerStaleFileGuardTests keeps this list in step with the manifests.
+Type: filesandordirs; Name: "{app}\Assets\drawio"
+Type: filesandordirs; Name: "{app}\Assets\milkdown"
+Type: filesandordirs; Name: "{app}\Assets\Terminal"
+Type: filesandordirs; Name: "{app}\Assets\Tools"
+Type: filesandordirs; Name: "{app}\Assets\vnc"
 #if Variant == "Standard"
 ; The Standard edition runs on the system Evergreen Runtime. A SelfContained install it
 ; replaces left its bundled Fixed Version Runtime here, which never updates.
@@ -73,13 +84,25 @@ Name: "{autodesktop}\Heimdall"; Filename: "{app}\Heimdall.exe"; Tasks: desktopic
 Filename: "{app}\Heimdall.exe"; Description: "{cm:LaunchProgram,Heimdall}"; Flags: nowait postinstall skipifsilent
 
 [Code]
+const
+  UninstallKey = 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{B7A4D3E1-8F2C-4A91-9D5E-6C3B8A1F0E72}_is1';
+
+// A per-user install records itself under HKCU, an administrator one (the privileges
+// dialog allows it) under HKLM. The install mode is not chosen yet when this runs, so
+// both hives are read.
+function TryReadInstalledVersion(var Version: String): Boolean;
+begin
+  Result := RegQueryStringValue(HKCU, UninstallKey, 'DisplayVersion', Version)
+    or RegQueryStringValue(HKLM, UninstallKey, 'DisplayVersion', Version);
+end;
+
 function InitializeSetup(): Boolean;
 var
   OldVersion: String;
 begin
   // Check for existing installation and offer upgrade. Skip the prompt in silent mode
   // (the in-app updater already confirmed with the user) so unattended updates never block.
-  if RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{B7A4D3E1-8F2C-4A91-9D5E-6C3B8A1F0E72}_is1', 'DisplayVersion', OldVersion)
+  if TryReadInstalledVersion(OldVersion)
      and (not WizardSilent()) then
   begin
     if MsgBox(FmtMessage(CustomMessage('UpgradePrompt'), [OldVersion, '{#AppVersion}']), mbConfirmation, MB_YESNO) = IDNO then

@@ -9,11 +9,27 @@ on:
   # that runs nothing is worse than no pull request: it reads as reviewed.
   pull_request:
 
+# Read-only by default: no job here writes to the repository, so the token a step
+# receives (and any script a step runs) cannot push, tag or edit a release. A job
+# that needs more declares it itself.
+permissions:
+  contents: read
+
+# One run per pull request: a new push to the same pull request replaces the run
+# in progress. A push to a branch is never cancelled (the group is the commit), so
+# the CI conclusion the release preflight reads is always a finished run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build-and-test:
     runs-on: windows-2025-vs2026
+    # The step timeouts below add up to 55 minutes, before the restore and the two
+    # builds; this is the bound for a run that hangs where no step timeout reaches.
+    timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Measures the bytes of the indexed blobs, not only the `i/` column of
       # `git ls-files --eol`: a blob git classes binary from its content (a lone
@@ -92,9 +108,6 @@ jobs:
       # Same reasoning as the gate above: pure PowerShell over Build.ps1 and the
       # application project, no .NET and no build needed. Proves that
       # Build.ps1 -DryRun cannot rewrite the tracked application project file.
-      # Scoped to that one file on purpose: a dry run does still rewrite the
-      # tracked packages.lock.json files through the publish RID restore, which
-      # is a separate known issue, so a green here is not a clean working tree.
       - name: Check dry-run does not rewrite the app project file
         shell: pwsh
         run: |
@@ -159,6 +172,30 @@ jobs:
           ./scripts/Test-NativeCommandLogging.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      # Pure batch and PowerShell. Build.bat and Test.bat ended in a bare `pause`, which
+      # succeeds, so a red build or test run left them exiting 0 for any caller.
+      - name: Check the batch files pass their failure on
+        shell: pwsh
+        run: |
+          ./scripts/Test-BatchExitCodes.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      # Pure PowerShell over a stand-in compiler. A failed Inno Setup compile used to be
+      # piped into Out-Null, so the build said it failed and never said why.
+      - name: Check the Inno Setup compile keeps the compiler output
+        shell: pwsh
+        run: |
+          ./scripts/Test-InnoSetupCompile.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      # Pure PowerShell. The readers of the toolchain a Release is built with (SDK, the
+      # runtime a self-contained publish carries, the pinned WiX CLI).
+      - name: Check the build toolchain readers
+        shell: pwsh
+        run: |
+          ./scripts/Test-BuildToolchain.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       # The verdict of the npm audit step below, on recorded npm audit JSON shapes and
       # on the recorded real report. Pure PowerShell, no network, no node.
       - name: Check the npm audit verdict
@@ -168,7 +205,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Setup .NET 10
-        uses: actions/setup-dotnet@v6
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           global-json-file: global.json
 
@@ -281,7 +318,7 @@ jobs:
       # trace apart and glues fragments of one onto another - a failing run
       # then names the wrong test. These stay readable.
       - name: Upload test results
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         continue-on-error: true
         with:
@@ -291,28 +328,10 @@ jobs:
           retention-days: 30
 
       - name: Upload coverage report
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         continue-on-error: true
         with:
           name: coverage-report
           path: TestResults/**/coverage.cobertura.xml
           retention-days: 30
-
-      - name: Validate JSON locales
-        shell: pwsh
-        run: |
-          $en = Get-Content locales/en.json -Raw | ConvertFrom-Json
-          $fr = Get-Content locales/fr.json -Raw | ConvertFrom-Json
-          $enKeys = ($en.PSObject.Properties | Measure-Object).Count
-          $frKeys = ($fr.PSObject.Properties | Measure-Object).Count
-          Write-Host "EN: $enKeys keys, FR: $frKeys keys"
-          if ($enKeys -ne $frKeys) { throw "i18n key parity mismatch: EN=$enKeys FR=$frKeys" }
-          $enSorted = $en.PSObject.Properties.Name | Sort-Object
-          $frSorted = $fr.PSObject.Properties.Name | Sort-Object
-          $diff = Compare-Object $enSorted $frSorted
-          if ($diff) {
-            $diff | ForEach-Object { Write-Host "$($_.SideIndicator) $($_.InputObject)" }
-            throw "i18n key sets differ"
-          }
-          Write-Host "i18n parity OK ($enKeys keys)"

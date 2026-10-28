@@ -32,21 +32,26 @@
 
     <StandardDirectory Id="ProgramFiles6432Folder">
       <Directory Id="INSTALLFOLDER" Name="Heimdall">
-        <Component Id="DesktopShortcut" Guid="A1B2C3D4-E5F6-7890-AB12-CD34EF560A78">
+        <!-- The shortcuts are per machine (All Users), so their key paths are under HKLM: a
+             per-user key path is only present for the account that installed, and the
+             component then looks missing to every other account (repair, advertise). The
+             GUIDs are new on purpose: changing a component's key path makes it a different
+             component, and keeping the old GUID is what Windows Installer forbids. -->
+        <Component Id="DesktopShortcut" Guid="18AD40A4-CE40-4E3C-A36F-88F9B4B56415">
           <Shortcut Id="DesktopShortcutFile"
                     Name="Heimdall"
                     Target="[INSTALLFOLDER]Heimdall.exe"
                     WorkingDirectory="INSTALLFOLDER"
                     Directory="DesktopFolder" />
-          <RegistryValue Root="HKCU" Key="Software\Heimdall" Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes" />
+          <RegistryValue Root="HKLM" Key="Software\Heimdall" Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes" />
         </Component>
-        <Component Id="StartMenuShortcut" Guid="B2C3D4E5-F6A7-8901-BC23-DE45FA670B89">
+        <Component Id="StartMenuShortcut" Guid="97CCEFAC-1964-46D0-9D21-F1D9EA2CF74C">
           <Shortcut Id="StartMenuShortcutFile"
                     Name="Heimdall"
                     Target="[INSTALLFOLDER]Heimdall.exe"
                     WorkingDirectory="INSTALLFOLDER"
                     Directory="ProgramMenuFolder" />
-          <RegistryValue Root="HKCU" Key="Software\Heimdall" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
+          <RegistryValue Root="HKLM" Key="Software\Heimdall" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
         </Component>
       </Directory>
     </StandardDirectory>
