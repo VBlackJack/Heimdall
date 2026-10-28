@@ -109,6 +109,9 @@ $ProjectRoot = $PSScriptRoot
 . (Join-Path $ProjectRoot 'scripts\ReleasePreflight.ps1')
 # Whether the SelfContained edition may bundle runtimes/webview2.
 . (Join-Path $ProjectRoot 'scripts\WebView2RuntimeGate.ps1')
+# What the informational CI lanes (CIUnstable, RequiresDesktop) reported for the release
+# commit: printed as warnings and written into the release notes, never a gate.
+. (Join-Path $ProjectRoot 'scripts\InformationalLaneReport.ps1')
 $AppProject = Join-Path $ProjectRoot 'src\Heimdall.App\Heimdall.App.csproj'
 $SolutionFile = Get-ChildItem -Path $ProjectRoot -Filter '*.slnx' | Select-Object -First 1
 $distDir = Join-Path $ProjectRoot "Dist\$($Mode.ToLower())"
@@ -257,6 +260,7 @@ $variants = @($wv2Gate.Variants)
 # override of every release-gate finding, and its reason goes into the notes.
 
 $releaseGateOverride = $null
+$informationalLaneNotes = ''
 if ($Mode -eq 'Release') {
     $releasePreflightFatal = $Publish.IsPresent -and -not $DryRun.IsPresent
     $preflight = Invoke-ReleasePreflight -WaitForCi:$releasePreflightFatal
@@ -287,6 +291,20 @@ if ($Mode -eq 'Release') {
             Write-Host "[!] Unexpected release gate decision: $($gateOutcome.Decision)" -ForegroundColor Red
             exit 1
         }
+    }
+
+    # The informational lanes cannot turn a CI run red, so "CI green" above says nothing
+    # about them. They do not gate the release either; their result for this commit is
+    # printed and written into the notes, so nobody ships a failure unknowingly. Read after
+    # the decision: a refused release pays no artifact download.
+    if ($null -ne $preflight.HeadSha) {
+        $informationalLaneReport = Get-InformationalLaneReport -Sha $preflight.HeadSha
+        $informationalLaneMessages = @(Get-InformationalLaneMessages -Report $informationalLaneReport)
+        if ($informationalLaneMessages.Count -eq 0) {
+            Write-Host "[informational lanes] No failure in $($informationalLaneReport.ResultCount) test result(s) of CIUnstable and RequiresDesktop." -ForegroundColor Green
+        }
+        foreach ($line in $informationalLaneMessages) { Write-Host "[informational lanes] WARNING: $line" -ForegroundColor Yellow }
+        $informationalLaneNotes = Get-InformationalLaneNotes -Report $informationalLaneReport
     }
 }
 
@@ -811,6 +829,9 @@ if (($Publish -or $DryRun) -and $Mode -eq 'Release') {
     if ($null -ne $releaseGateOverride) {
         $notes += Get-ReleaseGateOverrideNotes -Reason $releaseGateOverride.Reason -Failures $releaseGateOverride.Failures
     }
+
+    # The informational lanes' result for this commit, when there is anything to say.
+    $notes += $informationalLaneNotes
 
     $notes += "### Downloads`n`n"
     $notes += "| File | Description |`n|------|-------------|`n"

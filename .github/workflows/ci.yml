@@ -46,6 +46,16 @@ jobs:
           ./scripts/Test-InformationalTestFailures.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      # The release-time reader of the same lanes: a release is not refused for them,
+      # but a failure that CI called green is written into the release notes and
+      # printed. Pure PowerShell over recorded gh replies and TRX fixtures; if it
+      # stopped reading, a release would ship a red lane without a word.
+      - name: Check the release reads the informational lanes
+        shell: pwsh
+        run: |
+          ./scripts/Test-InformationalLaneReport.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       # Placed with the other cheap fail-fast gates, before the SDK is even set
       # up: the typography guard is pure PowerShell over docs/release-notes, so it
       # needs no .NET and no build. Running it here reports a bad character in
@@ -138,6 +148,14 @@ jobs:
         shell: pwsh
         run: |
           ./scripts/Test-NativeCommandLogging.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      # The verdict of the npm audit step below, on recorded npm audit JSON shapes and
+      # on the recorded real report. Pure PowerShell, no network, no node.
+      - name: Check the npm audit verdict
+        shell: pwsh
+        run: |
+          ./scripts/Test-NpmAuditVerdict.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Setup .NET 10
@@ -236,6 +254,17 @@ jobs:
         shell: pwsh
         run: |
           ./scripts/Invoke-VulnerableDependencyCheck.ps1 -Solution Heimdall.slnx
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      # NuGet's scan cannot see the npm dependencies baked into the committed milkdown
+      # bundle (dist/index.html). The audit reads package-lock.json alone, so no install.
+      # Below high it only warns; at high or critical it fails, except for the advisories
+      # that were already in the lock, listed with a reason in npm-audit-baseline.json
+      # next to it. A registry that cannot be reached fails the step: silence is not clean.
+      - name: Audit the milkdown editor npm dependencies
+        shell: pwsh
+        run: |
+          ./scripts/Invoke-NpmAuditCheck.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       # One file per test assembly. The console stream interleaves assemblies
