@@ -1,14 +1,18 @@
 import { Crepe } from '@milkdown/crepe';
 import '@milkdown/crepe/theme/common/style.css';
-import { editorViewCtx } from '@milkdown/kit/core';
+import { editorViewCtx, remarkStringifyOptionsCtx } from '@milkdown/kit/core';
 import { Plugin, PluginKey } from '@milkdown/kit/prose/state';
 import { Decoration, DecorationSet } from '@milkdown/kit/prose/view';
 import { $prose, replaceAll } from '@milkdown/kit/utils';
 
+import { createChangeNotifier } from './change-notifier.js';
+import { createUserEditTracker } from './user-edit.js';
+import { createWikiLinkPattern, withWikiLinkTextHandler } from './wiki-link-markdown.js';
+
 import './styles.css';
 
 const EDITOR_DEBOUNCE_MS = 200;
-const WIKI_LINK_PATTERN = /\[\[([^[\]\r\n]+?)\]\]/g;
+const WIKI_LINK_PATTERN = createWikiLinkPattern();
 
 const appElement = document.getElementById('app');
 const rootElement = document.createElement('div');
@@ -24,10 +28,27 @@ let editorView = null;
 let isApplyingRemoteContent = false;
 let isReadOnly = false;
 let lastMarkdown = '';
-let changeTimer = 0;
 let isReady = false;
 
 const pendingHostMessages = [];
+
+// Whether the person edited the loaded note. The editor changes the document by itself too
+// (it appends a trailing paragraph on the first transaction after a note is opened), and the
+// host must not save a note that was only opened.
+const userEditTracker = createUserEditTracker();
+
+const userEditPlugin = $prose(() => {
+  return new Plugin({
+    key: new PluginKey('HEIMDALL_USER_EDIT'),
+    state: {
+      init: () => null,
+      apply(tr, value) {
+        userEditTracker.observe(tr);
+        return value;
+      },
+    },
+  });
+});
 
 const menuLabels = {
   bold: 'Bold',
@@ -131,18 +152,17 @@ function postToHost(message) {
   }
 }
 
+const changeNotifier = createChangeNotifier({
+  post: postToHost,
+  isUserEdited: () => userEditTracker.isEdited(),
+  delayMs: EDITOR_DEBOUNCE_MS,
+  setTimer: (callback, delayMs) => window.setTimeout(callback, delayMs),
+  clearTimer: (timer) => window.clearTimeout(timer),
+});
+
 function debounceChange(markdown) {
   lastMarkdown = markdown;
-  window.clearTimeout(changeTimer);
-  changeTimer = window.setTimeout(() => {
-    postToHost({
-      type: 'change',
-      payload: {
-        markdown,
-        dirty: true,
-      },
-    });
-  }, EDITOR_DEBOUNCE_MS);
+  changeNotifier.notify(markdown);
 }
 
 function setTheme(theme) {
@@ -166,6 +186,7 @@ async function setContent(markdown) {
   try {
     editor.editor.action(replaceAll(markdown ?? '', true));
     lastMarkdown = markdown ?? '';
+    userEditTracker.reset();
   } finally {
     isApplyingRemoteContent = false;
   }
@@ -386,7 +407,12 @@ async function createEditor() {
     defaultValue: '',
   });
 
-  editor.editor.use(wikiLinkPlugin);
+  editor.editor
+    .config((ctx) => {
+      ctx.update(remarkStringifyOptionsCtx, withWikiLinkTextHandler);
+    })
+    .use(userEditPlugin)
+    .use(wikiLinkPlugin);
 
   editor.on((listener) => {
     listener.mounted((ctx) => {
