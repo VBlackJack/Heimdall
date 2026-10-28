@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
     Tests the npm audit verdict (scripts/NpmAuditVerdict.ps1) on recorded `npm audit --json`
-    shapes, the committed baseline against the recorded real report, and the CI wiring.
+    shapes, the baseline mechanism against the recorded real report, and the CI wiring.
 
 .DESCRIPTION
     The audit covers the npm dependencies baked into the committed milkdown bundle, which
@@ -26,7 +26,7 @@
          with no advisory behind it
      11. The recorded real report of 2026-10-28 -> with an empty baseline Fail with all ten
                                                    high advisories (the parser sees the real
-                                                   shape); with the committed baseline Warn.
+                                                   shape); with a baseline built from it Warn.
      12. A first attempt that cannot be         -> retried once, then trusted.
          trusted
      13. ci.yml runs the check and this suite.
@@ -183,13 +183,22 @@ $v = Get-NpmAuditVerdict -Output $recorded
 $highs = @($v.Findings | Where-Object { $_.Severity -eq 'high' })
 Assert-True ($v.Verdict -eq 'Fail' -and $highs.Count -eq 10) "the recorded report, with no baseline, fails on its ten high advisories ($($v.Verdict), $($highs.Count))"
 Assert-True (@($v.Findings).Count -eq 30) "and counts thirty distinct advisories ($(@($v.Findings).Count))"
-$baseline = @(Read-NpmAuditBaseline -Path $baselineFile)
-Assert-True ($baseline.Count -eq 10) "the committed baseline holds the ten ($($baseline.Count))"
+# The baseline is built from the recorded report itself (its ten highs), so the case does not
+# depend on what the committed baseline holds: it is empty once the bundle's dependencies are
+# patched, and a regression to a non-empty file must not turn this suite red.
+$baseline = @($highs | ForEach-Object { [pscustomobject]@{ Advisory = $_.Id; Package = $_.Package; Reason = 'recorded for the test' } })
+Assert-True ($baseline.Count -eq 10) "the recorded highs make a ten-entry baseline ($($baseline.Count))"
 $v = Get-NpmAuditVerdict -Output $recorded -Baseline $baseline
-Assert-True ($v.Verdict -eq 'Warn' -and @($v.StaleBaseline).Count -eq 0) "with the committed baseline the recorded report warns and no entry is stale ($($v.Verdict))"
+Assert-True ($v.Verdict -eq 'Warn' -and @($v.StaleBaseline).Count -eq 0) "with that baseline the recorded report warns and no entry is stale ($($v.Verdict))"
 $trimmed = @($baseline | Select-Object -Skip 1)
 $v = Get-NpmAuditVerdict -Output $recorded -Baseline $trimmed
 Assert-True ($v.Verdict -eq 'Fail') 'removing one baseline entry fails the gate again'
+
+# The committed baseline parses (every entry carries a reason), and no entry of it is a
+# placeholder: an acceptance must say why this advisory has no patched version in range.
+$committed = @(Read-NpmAuditBaseline -Path $baselineFile)
+$templated = @($committed | Where-Object { $_.Reason -like '*Already in package-lock.json when the audit gate was introduced*' })
+Assert-True ($templated.Count -eq 0) "no committed baseline entry carries the copied template reason ($($templated.Count) of $($committed.Count))"
 
 # 12. One retry.
 $script:attempts = 0
