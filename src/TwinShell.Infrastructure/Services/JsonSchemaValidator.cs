@@ -249,6 +249,10 @@ public static class JsonSchemaValidator
                             "type": ["string", "null"],
                             "enum": ["__QUOTING_MODES__"]
                         },
+                        "flag": {
+                            "type": ["string", "null"],
+                            "maxLength": __PARAMETER_FLAG_MAX_LENGTH__
+                        },
                         "defaultValue": {
                             "type": ["string", "null"]
                         },
@@ -272,6 +276,7 @@ public static class JsonSchemaValidator
     private const string QuotingModesPlaceholder = "[\"__QUOTING_MODES__\"]";
 
     private const string CommandPatternMaxLengthPlaceholder = "__COMMAND_PATTERN_MAX_LENGTH__";
+    private const string ParameterFlagMaxLengthPlaceholder = "__PARAMETER_FLAG_MAX_LENGTH__";
 
     /// <summary>
     /// The template schema with its parameter types taken from
@@ -285,6 +290,10 @@ public static class JsonSchemaValidator
             .Replace(
                 CommandPatternMaxLengthPlaceholder,
                 ValidationConstants.MaxTemplateCommandPatternLength.ToString(CultureInfo.InvariantCulture),
+                StringComparison.Ordinal)
+            .Replace(
+                ParameterFlagMaxLengthPlaceholder,
+                ValidationConstants.MaxParameterFlagLength.ToString(CultureInfo.InvariantCulture),
                 StringComparison.Ordinal)
             .Replace(
                 ParameterTypesPlaceholder,

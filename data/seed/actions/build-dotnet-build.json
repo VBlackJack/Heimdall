@@ -32,6 +32,7 @@
         "label": "Configuration",
         "type": "string",
         "defaultValue": "Release",
+        "flag": "--configuration",
         "required": false,
         "description": "Debug or Release"
       }
@@ -57,6 +58,7 @@
         "label": "Configuration",
         "type": "string",
         "defaultValue": "Release",
+        "flag": "--configuration",
         "required": false,
         "description": "Debug or Release"
       }

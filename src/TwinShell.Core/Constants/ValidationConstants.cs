@@ -149,6 +149,12 @@ public static class ValidationConstants
     /// </summary>
     public const int MaxTemplateCommandPatternLength = 4000;
 
+    /// <summary>
+    /// Maximum length for the flag a template parameter drops with itself (50 characters, the
+    /// bound of a parameter name).
+    /// </summary>
+    public const int MaxParameterFlagLength = 50;
+
     // ===== Service Limits =====
 
     /// <summary>

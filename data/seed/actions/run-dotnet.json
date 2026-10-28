@@ -23,6 +23,7 @@
         "label": "Project",
         "type": "string",
         "defaultValue": ".",
+        "flag": "--project",
         "required": false,
         "description": "Path of the .csproj project"
       }
@@ -40,6 +41,7 @@
         "label": "Project",
         "type": "string",
         "defaultValue": ".",
+        "flag": "--project",
         "required": false,
         "description": "Path of the .csproj project"
       }

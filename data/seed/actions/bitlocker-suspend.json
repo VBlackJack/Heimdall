@@ -30,6 +30,7 @@
         "label": "Number of restarts",
         "type": "string",
         "defaultValue": "1",
+        "flag": "-RebootCount",
         "required": false,
         "description": "Number of restarts before protection resumes automatically"
       }

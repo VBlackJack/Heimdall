@@ -691,6 +691,13 @@ public partial class ParameterEntryVm : ObservableObject
     [ObservableProperty] private string _description = "";
 
     /// <summary>
+    /// The flag the parameter declares for itself (<see cref="TemplateParameter.Flag"/>). The
+    /// editor shows no field for it; it is carried through so that saving an action does not
+    /// silently drop what a duplicated or imported action declared.
+    /// </summary>
+    public string? Flag { get; init; }
+
+    /// <summary>
     /// The values a choice offers, as one comma-separated line.
     /// </summary>
     /// <remarks>
@@ -716,7 +723,8 @@ public partial class ParameterEntryVm : ObservableObject
         DefaultValue = string.IsNullOrWhiteSpace(DefaultValue) ? null : DefaultValue.Trim(),
         Required = Required,
         Description = string.IsNullOrWhiteSpace(Description) ? null : Description.Trim(),
-        AllowedValues = ParseAllowedValues(AllowedValues)
+        AllowedValues = ParseAllowedValues(AllowedValues),
+        Flag = Flag
     };
 
     /// <summary>
@@ -745,7 +753,8 @@ public partial class ParameterEntryVm : ObservableObject
         DefaultValue = p.DefaultValue ?? "",
         Required = p.Required,
         Description = p.Description ?? "",
-        AllowedValues = p.AllowedValues is null ? "" : string.Join(", ", p.AllowedValues)
+        AllowedValues = p.AllowedValues is null ? "" : string.Join(", ", p.AllowedValues),
+        Flag = p.Flag
     };
 }
 

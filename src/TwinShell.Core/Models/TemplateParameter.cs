@@ -82,4 +82,24 @@ public sealed class TemplateParameter
     /// Optional quoting behavior override for command generation.
     /// </summary>
     public QuotingMode? Quoting { get; set; }
+
+    /// <summary>
+    /// The flag that introduces this parameter's value in the command pattern, when the
+    /// parameter is optional and its value is named by a flag; null otherwise.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <c>"-Department"</c> for <c>Set-ADUser -Identity {username} -Department {department}</c>:
+    /// left empty, the parameter is dropped together with the flag just before its placeholder,
+    /// so the command does not end in a bare <c>-Department</c> the shell would reject.
+    /// </para>
+    /// <para>
+    /// Declared rather than guessed from the pattern, because the same shape means two things:
+    /// in <c>fdisk -l {device}</c> and <c>du -sh {path}</c> the token before the placeholder is
+    /// a switch that stands on its own, and dropping it would change what the command does.
+    /// The generator drops the flag only when it is exactly the token written before the
+    /// placeholder, so a stale value cannot remove other text.
+    /// </para>
+    /// </remarks>
+    public string? Flag { get; set; }
 }

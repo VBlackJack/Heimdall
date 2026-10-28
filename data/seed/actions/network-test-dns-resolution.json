@@ -39,6 +39,7 @@
         "label": "DNS server",
         "type": "string",
         "defaultValue": "8.8.8.8",
+        "flag": "-Server",
         "required": false,
         "description": "DNS server to query (optional)"
       }
