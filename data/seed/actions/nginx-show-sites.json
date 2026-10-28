@@ -60,6 +60,10 @@
         "ls -l /etc/nginx/conf.d/": "Affiche les fichiers de sites sur RHEL et dérivées",
         "sudo nginx -T | grep -E '^# configuration file'": "Liste chaque fichier chargé par la configuration"
       }
+    },
+    "es": {
+      "title": "Mostrar los sitios que sirve nginx",
+      "description": "Imprime los nombres de servidor y las direcciones de escucha de todos los bloques server de la configuración de nginx cargada."
     }
   }
 }

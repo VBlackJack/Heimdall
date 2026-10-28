@@ -119,6 +119,10 @@
         "Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Contoso\\Agent' -Name 'LogLevel' -Value 'Verbose' -Type String -WhatIf": "Montre la modification sans l'écrire",
         "reg export 'HKLM\\SOFTWARE\\Contoso' C:\\Temp\\contoso.reg": "Sauvegarde la clé dans un fichier .reg avant de la modifier"
       }
+    },
+    "es": {
+      "title": "Establecer un valor del registro",
+      "description": "Crea o cambia un valor bajo una clave del registro existente."
     }
   }
 }

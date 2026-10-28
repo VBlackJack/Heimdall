@@ -77,6 +77,10 @@
         "mpstat": "Stats CPU par processeur",
         "nproc": "Nombre de processeurs"
       }
+    },
+    "es": {
+      "title": "Estadísticas de CPU por procesador",
+      "description": "Muestra las estadísticas de uso de CPU de cada procesador por separado."
     }
   }
 }

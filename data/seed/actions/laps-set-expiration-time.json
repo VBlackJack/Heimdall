@@ -99,6 +99,10 @@
         "$expDate = (Get-Date).AddDays(30).ToFileTime(); Set-ADComputer -Identity PC-PARIS-001 -Replace @{'ms-Mcs-AdmPwdExpirationTime'=$expDate} | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
         "$expDate = (Get-Date).AddDays(30).ToFileTime(); Set-ADComputer -Identity PC-PARIS-001 -Replace @{'ms-Mcs-AdmPwdExpirationTime'=$expDate} | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
       }
+    },
+    "es": {
+      "title": "Cambiar el tiempo de caducidad de la contraseña de LAPS",
+      "description": "Establece cuánto tiempo sigue siendo válida la contraseña del administrador local gestionada por LAPS."
     }
   }
 }

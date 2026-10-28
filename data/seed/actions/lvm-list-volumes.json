@@ -91,6 +91,10 @@
         "sudo lvdisplay": "Détails des volumes logiques",
         "sudo lvcreate -L 10G -n newvol vg0": "Créer un volume de 10 Go"
       }
+    },
+    "es": {
+      "title": "Listar los volúmenes lógicos de LVM",
+      "description": "Muestra los volúmenes lógicos, los grupos de volúmenes y los volúmenes físicos de LVM."
     }
   }
 }

@@ -41,6 +41,10 @@
       "examples": {
         "Get-Service -Name wuauserv,spooler,Dnscache | Format-Table Name,Status,StartType": "Vérifie des services spécifiques"
       }
+    },
+    "es": {
+      "title": "Comprobar el estado de los servicios críticos",
+      "description": "Comprueba el estado de los servicios críticos de Windows y encuentra los que están detenidos cuando deberían estar en ejecución."
     }
   }
 }

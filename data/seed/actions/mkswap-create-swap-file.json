@@ -93,6 +93,10 @@
         "echo '/swapfile none swap defaults 0 0' | sudo tee -a /etc/fstab": "Active le fichier de swap à chaque démarrage",
         "sudo swapoff /swapfile": "Désactive le fichier de swap avant de le supprimer"
       }
+    },
+    "es": {
+      "title": "Crear y habilitar un archivo de intercambio",
+      "description": "Reserva un archivo, lo formatea como swap y lo habilita al instante."
     }
   }
 }

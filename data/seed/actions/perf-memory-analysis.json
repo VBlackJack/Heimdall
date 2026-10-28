@@ -85,6 +85,10 @@
         "free -t": "Avec le total RAM + swap",
         "free -w": "Afficher buffers et cache séparément"
       }
+    },
+    "es": {
+      "title": "Analizar el uso de memoria en detalle",
+      "description": "Análisis detallado del uso de la memoria del sistema: RAM total, disponible y en uso, y el reparto por proceso."
     }
   }
 }

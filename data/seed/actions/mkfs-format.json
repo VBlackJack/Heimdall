@@ -95,6 +95,10 @@
         "sudo mkfs.btrfs /dev/sde1": "Formater en Btrfs",
         "sudo mkswap /dev/sdf1": "Créer une partition swap"
       }
+    },
+    "es": {
+      "title": "Formatear una partición",
+      "description": "Crea un sistema de archivos en una partición."
     }
   }
 }

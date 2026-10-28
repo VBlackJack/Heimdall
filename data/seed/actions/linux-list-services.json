@@ -36,6 +36,10 @@
       "examples": {
         "systemctl list-units --type=service --all": "Liste tous les services"
       }
+    },
+    "es": {
+      "title": "Listar todos los servicios",
+      "description": "Muestra todos los servicios de systemd con su estado."
     }
   }
 }

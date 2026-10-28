@@ -60,6 +60,10 @@
         "sudo nginx -T": "Teste la configuration et l'affiche avec tous les fichiers inclus",
         "sudo nginx -t -q": "Teste en silence, en n'affichant que les erreurs"
       }
+    },
+    "es": {
+      "title": "Probar la configuración de nginx",
+      "description": "Comprueba la sintaxis de la configuración de nginx y de los archivos que incluye, sin tocar el servidor en ejecución."
     }
   }
 }

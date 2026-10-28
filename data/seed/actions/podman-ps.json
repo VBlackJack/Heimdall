@@ -77,6 +77,10 @@
         "podman exec -it webapp bash": "Shell dans un conteneur",
         "podman stats": "Stats temps réel"
       }
+    },
+    "es": {
+      "title": "Listar los contenedores de Podman",
+      "description": "Muestra los contenedores de Podman (la alternativa a Docker sin privilegios de root)."
     }
   }
 }

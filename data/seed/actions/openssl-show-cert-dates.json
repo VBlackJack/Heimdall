@@ -77,6 +77,10 @@
         "openssl x509 -in web.crt -noout -ext subjectAltName": "Liste les noms couverts par le certificat",
         "openssl x509 -in web.der -inform DER -noout -dates": "Lit un certificat encodé en DER"
       }
+    },
+    "es": {
+      "title": "Mostrar las fechas de un archivo de certificado",
+      "description": "Muestra el sujeto, el emisor y las fechas de validez de un archivo de certificado PEM."
     }
   }
 }

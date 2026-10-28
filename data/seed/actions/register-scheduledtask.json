@@ -142,6 +142,10 @@
         "$action = New-ScheduledTaskAction -Execute 'notepad.exe' -Argument '-Force -Verbose'; $trigger = New-ScheduledTaskTrigger -AtLogOn; Register-ScheduledTask -TaskName 'DailyBackup' -Action $action -Trigger $trigger -User 'jdupont' -Confirm:$false": "Exécute l'action sans demander de confirmation interactive. -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution : aucun filet de sécurité.",
         "$action = New-ScheduledTaskAction -Execute 'notepad.exe' -Argument '-Force -Verbose'; $trigger = New-ScheduledTaskTrigger -AtLogOn; Register-ScheduledTask -TaskName 'DailyBackup' -Action $action -Trigger $trigger -User 'jdupont' -Verbose": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes."
       }
+    },
+    "es": {
+      "title": "Crear una tarea programada",
+      "description": "Registra una tarea programada nueva en el Programador de tareas de Windows"
     }
   }
 }

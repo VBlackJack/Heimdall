@@ -78,6 +78,10 @@
         "Get-Counter '\\Processor(_Total)\\% Processor Time' -Continuous -SampleInterval 1": "Surveillance CPU globale en continu",
         "ps aux --sort=-%cpu | head -n 11": "Top 10 processus Linux par CPU"
       }
+    },
+    "es": {
+      "title": "Analizar los procesos que más CPU usan",
+      "description": "Encuentra y muestra en tiempo real los procesos que más CPU usan, con estadísticas detalladas."
     }
   }
 }

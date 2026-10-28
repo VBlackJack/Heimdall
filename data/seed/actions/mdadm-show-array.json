@@ -77,6 +77,10 @@
         "sudo mdadm --examine /dev/sdb1": "Lit le superbloc RAID d'un disque membre",
         "sudo mdadm --detail --scan": "Affiche les lignes ARRAY pour mdadm.conf"
       }
+    },
+    "es": {
+      "title": "Mostrar el estado de una matriz RAID por software",
+      "description": "Muestra el nivel, el estado, los miembros y el progreso de la reconstrucción de una matriz RAID por software de Linux."
     }
   }
 }

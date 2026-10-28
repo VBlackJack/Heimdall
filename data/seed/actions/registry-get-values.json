@@ -77,6 +77,10 @@
         "Get-ChildItem -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall' | Get-ItemProperty | Select-Object DisplayName,DisplayVersion": "Liste les programmes installés à partir des clés de désinstallation",
         "Invoke-Command -ComputerName SRV-APP01 -ScriptBlock { Get-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Services\\W32Time\\Parameters' }": "Lit une clé sur un serveur distant via la communication à distance PowerShell"
       }
+    },
+    "es": {
+      "title": "Mostrar los valores de una clave del registro",
+      "description": "Muestra todos los valores almacenados bajo una clave del registro."
     }
   }
 }

@@ -80,6 +80,10 @@
         "find / -size +100M": "Trouve tous les fichiers de plus de 100 Mo sur tout le système.",
         "find . -type f -exec grep -l \"error\" {} +": "Trouve les fichiers contenant le mot 'error' (combine find et grep)."
       }
+    },
+    "es": {
+      "title": "Búsqueda avanzada (find)",
+      "description": "Encuentra archivos según criterios (nombre, tamaño, fecha, permisos)."
     }
   }
 }

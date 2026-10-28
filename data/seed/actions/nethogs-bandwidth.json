@@ -83,6 +83,10 @@
         "sudo nethogs -d 5": "Rafraîchir toutes les 5 secondes",
         "sudo nethogs -v 2": "Verbosité maximale"
       }
+    },
+    "es": {
+      "title": "Supervisar el ancho de banda por proceso",
+      "description": "Muestra en tiempo real el uso de red por proceso."
     }
   }
 }

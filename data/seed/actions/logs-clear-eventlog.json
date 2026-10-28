@@ -53,6 +53,10 @@
       "examples": {
         "Clear-EventLog -LogName Application": "Vide le journal Application"
       }
+    },
+    "es": {
+      "title": "Borrar un registro de eventos",
+      "description": "Elimina todos los eventos de un registro de Windows concreto."
     }
   }
 }

@@ -93,6 +93,10 @@
         "sudo passwd -S alice": "Indique si le mot de passe de alice est verrouillé",
         "sudo usermod -L -e 1 alice": "Verrouille le mot de passe et fait expirer le compte, ce qui bloque aussi les clés SSH"
       }
+    },
+    "es": {
+      "title": "Bloquear o desbloquear la contraseña de una cuenta",
+      "description": "Bloquea la contraseña de una cuenta local para que ya no pueda iniciar sesión con ella, o la desbloquea de nuevo."
     }
   }
 }

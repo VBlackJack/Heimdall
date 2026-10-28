@@ -136,6 +136,10 @@
         "Resolve-DnsName google.com -DnsOnly": "Force une vraie requête DNS en désactivant le cache local. Le switch -DnsOnly ignore complètement le cache de résolution Windows et force une interrogation du serveur DNS. Utile pour vérifier les changements DNS récents ou diagnostiquer des problèmes de cache.",
         "Get-Content C:\\domains.txt | ForEach-Object {Resolve-DnsName $_ -ErrorAction SilentlyContinue} | Select-Object Name,IPAddress": "Résout en masse une liste de domaines depuis un fichier. Get-Content charge le fichier. ForEach-Object résout chaque ligne. -ErrorAction SilentlyContinue ignore les erreurs (domaines inexistants). Select-Object formate les résultats. Idéal pour valider une liste de domaines ou créer un inventaire DNS."
       }
+    },
+    "es": {
+      "title": "Probar la resolución DNS",
+      "description": "Resuelve un nombre de dominio a una dirección IP y muestra información DNS detallada."
     }
   }
 }

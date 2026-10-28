@@ -83,6 +83,10 @@
         "Get-Printer -ComputerName PRINT01 | ForEach-Object { Get-PrintJob -PrinterObject $_ }": "Affiche les travaux de toutes les files du serveur d'impression",
         "Get-PrintJob -ComputerName PRINT01 -PrinterName 'HP-Floor2' | Where-Object JobStatus -like '*Error*'": "Trouve les travaux qui bloquent la file avec une erreur"
       }
+    },
+    "es": {
+      "title": "Listar los trabajos de una cola de impresión",
+      "description": "Muestra los trabajos en espera en una cola de impresión con su propietario, su estado y su tamaño."
     }
   }
 }

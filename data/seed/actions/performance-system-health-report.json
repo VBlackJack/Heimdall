@@ -42,6 +42,10 @@
       "examples": {
         "Get-ComputerInfo | Select-Object CsName,WindowsVersion,OsLastBootUpTime,OsTotalVisibleMemorySize": "Informations système de base"
       }
+    },
+    "es": {
+      "title": "Generar un informe completo del estado del sistema",
+      "description": "Recopila y muestra un informe completo sobre el estado del sistema: CPU, RAM, disco, servicios, tiempo de actividad."
     }
   }
 }

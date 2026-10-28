@@ -35,6 +35,10 @@
       "examples": {
         "journalctl -u rsyslog -f": "Suit en temps réel les logs du service rsyslog (pour voir pourquoi il ne transfère pas les messages)."
       }
+    },
+    "es": {
+      "title": "Gestionar el servicio rsyslog",
+      "description": "Reinicia el demonio de registro o comprueba su estado."
     }
   }
 }

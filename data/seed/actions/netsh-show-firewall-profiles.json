@@ -64,6 +64,10 @@
         "netsh advfirewall show domainprofile logging": "Montre où le profil Domaine écrit son journal",
         "Get-NetFirewallProfile | Select-Object Name,Enabled,DefaultInboundAction,DefaultOutboundAction": "Affiche les mêmes réglages avec PowerShell"
       }
+    },
+    "es": {
+      "title": "Mostrar los perfiles del cortafuegos",
+      "description": "Muestra el estado, las acciones predeterminadas y el registro de los perfiles de cortafuegos de Dominio, Privado y Público."
     }
   }
 }

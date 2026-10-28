@@ -118,6 +118,10 @@
         "last reboot": "Historique des redémarrages",
         "last -F": "Avec dates complètes"
       }
+    },
+    "es": {
+      "title": "Mostrar el historial de inicios de sesión",
+      "description": "Lista los últimos inicios de sesión de usuarios en el sistema."
     }
   }
 }

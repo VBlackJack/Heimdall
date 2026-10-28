@@ -53,6 +53,10 @@
       "examples": {
         "sudo systemctl start nginx": "Exemple utilisant le paramètre 'serviceName': Nom du service à démarrer. Remplacez nginx par la valeur appropriée selon votre environnement."
       }
+    },
+    "es": {
+      "title": "Iniciar un servicio",
+      "description": "Inicia un servicio de systemd detenido."
     }
   }
 }

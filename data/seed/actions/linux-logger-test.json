@@ -69,6 +69,10 @@
         "logger -p local0.info \"Test message de TwinShell\"": "Envoie un log simple avec la facilité local0.",
         "logger -n 192.168.1.50 -P 514 -t TEST \"Message direct UDP\"": "🔥 TEST RESEAU : Envoie un log directement à un serveur distant (-n) en UDP, en contournant le démon local. Idéal pour tester le pare-feu/réseau."
       }
+    },
+    "es": {
+      "title": "Probar el envío de registros (logger)",
+      "description": "Envía un mensaje a mano al demonio syslog local o remoto. Útil para comprobar que el enrutamiento de registros funciona (por ejemplo, hacia un SIEM)."
     }
   }
 }

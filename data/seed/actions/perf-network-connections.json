@@ -98,6 +98,10 @@
         "netstat -an | grep ESTABLISHED": "Connexions établies",
         "netstat -r": "Table de routage"
       }
+    },
+    "es": {
+      "title": "Supervisar las conexiones de red activas",
+      "description": "Muestra todas las conexiones de red TCP/UDP activas con sus puertos local y remoto, su estado y su proceso."
     }
   }
 }

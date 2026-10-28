@@ -64,6 +64,10 @@
         "Hide-WindowsUpdate -KBArticleID KB5001234": "Masque la mise à jour KB5001234",
         "Get-WindowsUpdate | Where-Object {$_.Title -like '*Driver*'} | Hide-WindowsUpdate": "Masque toutes les mises à jour de pilotes"
       }
+    },
+    "es": {
+      "title": "Ocultar una actualización concreta",
+      "description": "Oculta una actualización de Windows para impedir su instalación automática."
     }
   }
 }

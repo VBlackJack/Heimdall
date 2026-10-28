@@ -41,6 +41,10 @@
       "examples": {
         "Add-WUServiceManager -ServiceID 7971f918-a847-4430-9279-4a52d1efe18d": "Active Microsoft Update"
       }
+    },
+    "es": {
+      "title": "Habilitar Microsoft Update como origen",
+      "description": "Añade Microsoft Update como origen de actualizaciones (incluye Office, SQL, etc.)."
     }
   }
 }

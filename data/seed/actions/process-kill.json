@@ -112,6 +112,10 @@
         "kill 1234": "Termine gracieusement le processus 1234",
         "xkill": "Tuer par clic graphique"
       }
+    },
+    "es": {
+      "title": "Terminar un proceso",
+      "description": "Fuerza la detención de un proceso concreto por su ID o por su nombre."
     }
   }
 }

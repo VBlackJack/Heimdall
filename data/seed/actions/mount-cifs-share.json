@@ -130,6 +130,10 @@
         "sudo mount -t cifs //fs01/data /mnt/share -o username=alice,domain=EXAMPLE,sec=ntlmssp": "Monte avec un compte de domaine et NTLMSSP",
         "sudo umount /mnt/share": "Démonte le partage"
       }
+    },
+    "es": {
+      "title": "Montar un recurso compartido SMB",
+      "description": "Monta un recurso compartido de Windows o Samba en un punto de montaje local con el cliente CIFS."
     }
   }
 }

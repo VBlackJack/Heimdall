@@ -82,6 +82,10 @@
         "Test-NetConnection -ComputerName 8.8.8.8 -TraceRoute": "Diagnostique la route réseau (Hops). Permet d'identifier à quel routeur/firewall les paquets sont perdus.",
         "Test-NetConnection -ComputerName cloudflare.com -InformationLevel Detailed": "Affiche des détails techniques complets (résolution DNS, adresse source, interface de sortie)."
       }
+    },
+    "es": {
+      "title": "Prueba avanzada de conectividad de red",
+      "description": "Prueba la conectividad de red con un host mediante un traceroute, una prueba de puerto e información de enrutamiento detallada."
     }
   }
 }

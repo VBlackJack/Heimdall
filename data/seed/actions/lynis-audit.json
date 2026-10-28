@@ -78,6 +78,10 @@
         "lynis show details NETW-2705": "Détails d'un test",
         "lynis audit system --pentest": "Mode pentest"
       }
+    },
+    "es": {
+      "title": "Auditoría de seguridad con Lynis",
+      "description": "Ejecuta una auditoría de seguridad completa del sistema con Lynis."
     }
   }
 }

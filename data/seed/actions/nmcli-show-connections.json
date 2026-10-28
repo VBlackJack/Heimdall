@@ -60,6 +60,10 @@
         "sudo nmcli connection modify 'System eth0' ipv4.dns '10.0.0.53'": "Définit le serveur DNS d'un profil",
         "sudo nmcli connection up 'System eth0'": "Active un profil pour appliquer ses modifications"
       }
+    },
+    "es": {
+      "title": "Mostrar las conexiones de NetworkManager",
+      "description": "Lista los perfiles de conexión que guarda NetworkManager, con su tipo y el dispositivo que usan."
     }
   }
 }

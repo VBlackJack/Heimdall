@@ -139,6 +139,10 @@
         "New-NetFirewallRule -DisplayName 'Block outbound SMB' -Direction Outbound -Protocol TCP -RemotePort 445 -Action Block": "Bloque le trafic SMB sortant",
         "Get-NetFirewallRule -DisplayName 'Web HTTPS' | Get-NetFirewallPortFilter": "Vérifie le port de la règle après sa création"
       }
+    },
+    "es": {
+      "title": "Crear una regla de entrada del cortafuegos",
+      "description": "Permite o bloquea un puerto TCP o UDP de entrada en el Firewall de Windows Defender."
     }
   }
 }

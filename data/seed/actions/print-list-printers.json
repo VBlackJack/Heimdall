@@ -77,6 +77,10 @@
         "Get-PrinterDriver -ComputerName PRINT01": "Liste les pilotes installés sur le serveur d'impression",
         "Get-PrinterPort -ComputerName PRINT01": "Liste les ports d'imprimante du serveur d'impression"
       }
+    },
+    "es": {
+      "title": "Listar las impresoras",
+      "description": "Muestra las impresoras de un equipo o de un servidor de impresión con su controlador, su puerto, su recurso compartido y su estado."
     }
   }
 }
