@@ -157,6 +157,19 @@ public class NotesStorageServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task ListNotes_SearchForANoteLink_FindsTheNoteWhereTheEditorEscapedItsBrackets()
+    {
+        _service.EnsureInitialized();
+        await _service.SaveNoteAsync(Path.Combine(_testDir, "escaped.md"), "# Escaped\n\nSee \\[\\[Procedure]] first");
+        await _service.SaveNoteAsync(Path.Combine(_testDir, "plain.md"), "# Plain\n\nSee [[Procedure]] first");
+        await _service.SaveNoteAsync(Path.Combine(_testDir, "other.md"), "# Other\n\nSee [[Network]] first");
+
+        var notes = await _service.ListNotesAsync("[[Procedure]]");
+
+        Assert.Equal(["Escaped", "Plain"], notes.Select(n => n.Title).Order(StringComparer.Ordinal).ToArray());
+    }
+
+    [Fact]
     public async Task ListNotes_ExtractsTitle()
     {
         _service.EnsureInitialized();

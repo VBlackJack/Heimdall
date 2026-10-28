@@ -55,7 +55,9 @@ public static partial class SimpleMarkdownConverter
     [GeneratedRegex(@"\[(.*?)\]\((.+?)\)")]
     private static partial Regex InlineLinkRegex();
 
-    [GeneratedRegex(@"\[\[(.+?)\]\]")]
+    // A backslash may precede each opening bracket: the editor used to save [[X]] as \[\[X]],
+    // and notes written that way still link until their next real edit rewrites them.
+    [GeneratedRegex(@"\\?\[\\?\[(.+?)\]\]")]
     internal static partial Regex NoteLinkRegex();
 
     [GeneratedRegex(@"\*\*(.+?)\*\*")]

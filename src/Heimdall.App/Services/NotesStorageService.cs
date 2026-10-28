@@ -157,6 +157,9 @@ public sealed class NoteTreeNode
 
 public sealed class NotesStorageService : INotesStorageService
 {
+    private const string EscapableBracket = "[";
+    private const string EscapedBracket = "\\[";
+
     private sealed record NoteLookupCandidate(
         string FilePath,
         string Title,
@@ -215,7 +218,7 @@ public sealed class NotesStorageService : INotesStorageService
                 var relativePath = GetRelativePath(filePath);
 
                 if (!string.IsNullOrWhiteSpace(normalizedSearch)
-                    && content.IndexOf(normalizedSearch, StringComparison.OrdinalIgnoreCase) < 0
+                    && !ContentContainsSearch(content, normalizedSearch)
                     && title.IndexOf(normalizedSearch, StringComparison.OrdinalIgnoreCase) < 0
                     && relativePath.IndexOf(normalizedSearch, StringComparison.OrdinalIgnoreCase) < 0)
                 {
@@ -602,6 +605,22 @@ public sealed class NotesStorageService : INotesStorageService
 
         var result = sanitized.ToString().Trim().Trim('.');
         return result.Contains("..", StringComparison.Ordinal) ? string.Empty : result;
+    }
+
+    /// <summary>
+    /// Whether the note's text holds the search text. A note saved by the editor before it wrote
+    /// [[X]] unescaped holds \[\[X]]; a search for [[X]] finds it as well.
+    /// </summary>
+    internal static bool ContentContainsSearch(string content, string search)
+    {
+        if (content.Contains(search, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return search.Contains(EscapableBracket)
+            && content.Replace(EscapedBracket, EscapableBracket, StringComparison.Ordinal)
+                .Contains(search, StringComparison.OrdinalIgnoreCase);
     }
 
     private static string ExtractTitle(string filePath, string content)

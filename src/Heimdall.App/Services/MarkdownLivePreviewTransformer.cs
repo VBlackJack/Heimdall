@@ -37,9 +37,6 @@ public sealed partial class MarkdownLivePreviewTransformer : DocumentColorizingT
     [GeneratedRegex(@"~~(.+?)~~")]
     private static partial Regex StrikethroughPattern();
 
-    [GeneratedRegex(@"\[\[(.+?)\]\]")]
-    private static partial Regex NoteLinkPattern();
-
     // The syntax characters are the secondary text colour, dimmed, so they follow the theme.
     private const string DimSourceBrushKey = "TextSecondaryBrush";
 
@@ -148,23 +145,42 @@ public sealed partial class MarkdownLivePreviewTransformer : DocumentColorizingT
 
     private void ColorizeNoteLinkUnderline(string lineText, int lineOffset)
     {
-        foreach (var match in NoteLinkPattern().Matches(lineText).Cast<Match>())
+        foreach (var span in FindNoteLinkSpans(lineText))
         {
-            var matchStart = lineOffset + match.Index;
-            var matchEnd = matchStart + match.Length;
+            var openEnd = lineOffset + span.NameStart;
+            var closeStart = lineOffset + span.NameEnd;
 
-            // Dim the [[ and ]] markers
-            ChangeLinePart(matchStart, matchStart + 2, element =>
+            // Dim the [[ and ]] markers, with the backslashes of an escaped link
+            ChangeLinePart(lineOffset + span.Start, openEnd, element =>
                 element.TextRunProperties.SetForegroundBrush(_dimBrush));
-            ChangeLinePart(matchEnd - 2, matchEnd, element =>
+            ChangeLinePart(closeStart, lineOffset + span.End, element =>
                 element.TextRunProperties.SetForegroundBrush(_dimBrush));
 
             // Underline the content
-            if (matchStart + 2 < matchEnd - 2)
+            if (openEnd < closeStart)
             {
-                ChangeLinePart(matchStart + 2, matchEnd - 2, element =>
+                ChangeLinePart(openEnd, closeStart, element =>
                     element.TextRunProperties.SetTextDecorations(TextDecorations.Underline));
             }
         }
     }
+
+    /// <summary>
+    /// The note links of one line, found by the pattern the HTML conversion and the Ctrl+click
+    /// use, so the three agree on what a link is: the span of the whole link and the span of
+    /// the name inside its markers. Offsets are relative to the line.
+    /// </summary>
+    internal static IReadOnlyList<NoteLinkSpan> FindNoteLinkSpans(string lineText)
+    {
+        var spans = new List<NoteLinkSpan>();
+        foreach (var match in SimpleMarkdownConverter.NoteLinkRegex().Matches(lineText).Cast<Match>())
+        {
+            var name = match.Groups[1];
+            spans.Add(new NoteLinkSpan(match.Index, name.Index, name.Index + name.Length, match.Index + match.Length));
+        }
+
+        return spans;
+    }
+
+    internal readonly record struct NoteLinkSpan(int Start, int NameStart, int NameEnd, int End);
 }
