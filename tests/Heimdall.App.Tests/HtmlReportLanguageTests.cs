@@ -16,7 +16,8 @@
 
 using System.IO;
 using Heimdall.App.Services;
-using Heimdall.App.Tests.Views.EmbeddedRdp;
+using Heimdall.App.Views.Tools;
+using Heimdall.Core.Localization;
 using Heimdall.Core.Security;
 
 namespace Heimdall.App.Tests;
@@ -59,15 +60,28 @@ public sealed class HtmlReportLanguageTests
         Assert.DoesNotContain("<script>", html, StringComparison.Ordinal);
     }
 
-    // The export handler is the one place that knows the interface language; it cannot be driven
-    // without a window, so this pins that it hands the current locale to the generator.
-    [Fact]
-    public void TheExportHandler_PassesTheInterfaceLanguageToTheGenerator()
+    // The view builds the exported report from its localizer; the report must name the language
+    // that localizer speaks, whatever the language is.
+    [Theory]
+    [InlineData("en")]
+    [InlineData("fr")]
+    [InlineData("es")]
+    public async Task TheView_BuildsTheReportInTheLanguageOfItsLocalizer(string language)
     {
-        string source = File.ReadAllText(Path.Combine(
-            ViewSource.RepoRoot(), "src", "Heimdall.App", "Views", "Tools", "SecNumCloudAuditView.xaml.cs"));
+        LocalizationManager localizer = new();
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), language);
 
-        Assert.Contains("HtmlReportGenerator.Generate(_lastReport, key => L(key), _localizer?.CurrentLocale)", source, StringComparison.Ordinal);
+        string html = SecNumCloudAuditView.BuildHtmlReport(NewReport(), localizer);
+
+        Assert.Contains($"<html lang=\"{language}\">", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheView_BuildsAnEnglishReportWithoutALocalizer()
+    {
+        string html = SecNumCloudAuditView.BuildHtmlReport(NewReport(), localizer: null);
+
+        Assert.Contains("<html lang=\"en\">", html, StringComparison.Ordinal);
     }
 
     private static AuditReport NewReport() => new()
