@@ -189,7 +189,7 @@
                 Padding="0">
             <RichTextBox x:Name="LogViewer"
                          IsReadOnly="True"
-                         FontFamily="Consolas" FontSize="{StaticResource FontSizeBody}"
+                         FontFamily="{StaticResource FontFamilyMonospace}" FontSize="{StaticResource FontSizeBody}"
                          Background="{DynamicResource CardBrush}"
                          Foreground="{DynamicResource TextPrimaryBrush}"
                          BorderThickness="0"

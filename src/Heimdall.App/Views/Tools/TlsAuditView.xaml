@@ -94,7 +94,7 @@
                              Text="{Binding Port, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="70"
                              Style="{StaticResource WatermarkTextBoxStyle}"
                              Tag=""
-                             FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas"
+                             FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="{StaticResource FontFamilyMonospace}"
                              Padding="{StaticResource PaddingInput}" Margin="{StaticResource MarginInlineControl}"
                              Background="{DynamicResource CardBrush}"
                              Foreground="{DynamicResource TextPrimaryBrush}"
@@ -109,7 +109,7 @@
                              TabIndex="0"
                              Style="{StaticResource WatermarkTextBoxStyle}"
                              Tag=""
-                             FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas"
+                             FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="{StaticResource FontFamilyMonospace}"
                              Padding="{StaticResource PaddingInput}"
                              Background="{DynamicResource CardBrush}"
                              Foreground="{DynamicResource TextPrimaryBrush}"
@@ -193,7 +193,7 @@
                                                        Foreground="{Binding RatingBrush}"
                                                        VerticalAlignment="Center" Margin="{StaticResource MarginInlineControl}"/>
                                             <TextBlock Text="{Binding Name}"
-                                                       FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
+                                                       FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}"
                                                        Foreground="{DynamicResource TextPrimaryBrush}"
                                                        VerticalAlignment="Center"/>
                                         </DockPanel>
@@ -229,7 +229,7 @@
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
                                                 <TextBlock Grid.Column="0" Text="{Binding Name}"
-                                                           FontSize="{StaticResource FontSizeCaption}" FontFamily="Consolas"
+                                                           FontSize="{StaticResource FontSizeCaption}" FontFamily="{StaticResource FontFamilyMonospace}"
                                                            Foreground="{DynamicResource TextPrimaryBrush}"
                                                            TextTrimming="CharacterEllipsis"
                                                            VerticalAlignment="Center"/>
@@ -291,24 +291,24 @@
                                 <TextBlock x:Name="LblCertSubject" Grid.Row="0" Grid.Column="0" Text=""
                                            FontSize="{StaticResource FontSizeCaption}" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
                                 <TextBlock x:Name="TxtCertSubject" Grid.Row="0" Grid.Column="2" Text=""
-                                           FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas" Foreground="{DynamicResource TextPrimaryBrush}"
+                                           FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}" Foreground="{DynamicResource TextPrimaryBrush}"
                                            TextWrapping="Wrap" VerticalAlignment="Center"/>
 
                                 <TextBlock x:Name="LblCertIssuer" Grid.Row="2" Grid.Column="0" Text=""
                                            FontSize="{StaticResource FontSizeCaption}" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
                                 <TextBlock x:Name="TxtCertIssuer" Grid.Row="2" Grid.Column="2" Text=""
-                                           FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas" Foreground="{DynamicResource TextPrimaryBrush}"
+                                           FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}" Foreground="{DynamicResource TextPrimaryBrush}"
                                            TextWrapping="Wrap" VerticalAlignment="Center"/>
 
                                 <TextBlock x:Name="LblCertExpiry" Grid.Row="4" Grid.Column="0" Text=""
                                            FontSize="{StaticResource FontSizeCaption}" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
                                 <TextBlock x:Name="TxtCertExpiry" Grid.Row="4" Grid.Column="2" Text=""
-                                           FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                           FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
 
                                 <TextBlock x:Name="LblCertKeySize" Grid.Row="6" Grid.Column="0" Text=""
                                            FontSize="{StaticResource FontSizeCaption}" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
                                 <TextBlock x:Name="TxtCertKeySize" Grid.Row="6" Grid.Column="2" Text=""
-                                           FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas" Foreground="{DynamicResource AccentTextBrush}"
+                                           FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}" Foreground="{DynamicResource AccentTextBrush}"
                                            FontWeight="SemiBold" VerticalAlignment="Center"/>
                             </Grid>
                         </StackPanel>

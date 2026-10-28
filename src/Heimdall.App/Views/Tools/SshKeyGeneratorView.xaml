@@ -154,7 +154,7 @@
                             VerticalAlignment="Center"/>
                     <TextBox x:Name="FingerprintOutput"
                              IsReadOnly="True"
-                             FontFamily="Consolas" FontSize="{StaticResource FontSizeBody}"
+                             FontFamily="{StaticResource FontFamilyMonospace}" FontSize="{StaticResource FontSizeBody}"
                              Background="Transparent"
                              Foreground="{DynamicResource TextPrimaryBrush}"
                              BorderThickness="0"
@@ -188,7 +188,7 @@
                     </StackPanel>
                     <TextBox x:Name="PublicKeyOutput"
                              IsReadOnly="True"
-                             FontFamily="Consolas" FontSize="{StaticResource FontSizeBody}"
+                             FontFamily="{StaticResource FontFamilyMonospace}" FontSize="{StaticResource FontSizeBody}"
                              TextWrapping="Wrap"
                              MaxHeight="120"
                              VerticalScrollBarVisibility="Auto"
@@ -229,7 +229,7 @@
                     </StackPanel>
                     <TextBox x:Name="PrivateKeyOutput"
                              IsReadOnly="True"
-                             FontFamily="Consolas" FontSize="{StaticResource FontSizeBody}"
+                             FontFamily="{StaticResource FontFamilyMonospace}" FontSize="{StaticResource FontSizeBody}"
                              TextWrapping="Wrap"
                              MaxHeight="200"
                              VerticalScrollBarVisibility="Auto"

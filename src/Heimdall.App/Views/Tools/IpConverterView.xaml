@@ -101,7 +101,7 @@
                          Style="{StaticResource WatermarkTextBoxStyle}"
                          Tag="{loc:Translate ToolWatermarkIpOrInteger}"
                          FontSize="{StaticResource FontSizeBodyLarge}"
-                         FontFamily="Consolas"
+                         FontFamily="{StaticResource FontFamilyMonospace}"
                          Padding="{StaticResource PaddingInput}"
                          Margin="{StaticResource MarginSectionSeparator}"
                          Background="{DynamicResource CardBrush}"
@@ -198,7 +198,7 @@
                                    AutomationProperties.AutomationId="IpConverter.DottedOutput"
                                    Text="{Binding DottedText}"
                                    FontSize="{StaticResource FontSizeBodyLarge}"
-                                   FontFamily="Consolas"
+                                   FontFamily="{StaticResource FontFamilyMonospace}"
                                    Foreground="{DynamicResource TextPrimaryBrush}"
                                    VerticalAlignment="Center" />
                         <Button x:Name="BtnCopyDotted"
@@ -229,7 +229,7 @@
                                    AutomationProperties.AutomationId="IpConverter.DecimalOutput"
                                    Text="{Binding DecimalText}"
                                    FontSize="{StaticResource FontSizeBodyLarge}"
-                                   FontFamily="Consolas"
+                                   FontFamily="{StaticResource FontFamilyMonospace}"
                                    Foreground="{DynamicResource TextPrimaryBrush}"
                                    VerticalAlignment="Center" />
                         <Button x:Name="BtnCopyDecimal"
@@ -260,7 +260,7 @@
                                    AutomationProperties.AutomationId="IpConverter.HexOutput"
                                    Text="{Binding HexText}"
                                    FontSize="{StaticResource FontSizeBodyLarge}"
-                                   FontFamily="Consolas"
+                                   FontFamily="{StaticResource FontFamilyMonospace}"
                                    Foreground="{DynamicResource TextPrimaryBrush}"
                                    VerticalAlignment="Center" />
                         <Button x:Name="BtnCopyHex"
@@ -291,7 +291,7 @@
                                    AutomationProperties.AutomationId="IpConverter.BinaryOutput"
                                    Text="{Binding BinaryText}"
                                    FontSize="{StaticResource FontSizeBodyLarge}"
-                                   FontFamily="Consolas"
+                                   FontFamily="{StaticResource FontFamilyMonospace}"
                                    Foreground="{DynamicResource TextPrimaryBrush}"
                                    VerticalAlignment="Center"
                                    TextWrapping="Wrap" />
@@ -323,7 +323,7 @@
                                    AutomationProperties.AutomationId="IpConverter.MappedIpv6Output"
                                    Text="{Binding MappedIpv6Text}"
                                    FontSize="{StaticResource FontSizeBodyLarge}"
-                                   FontFamily="Consolas"
+                                   FontFamily="{StaticResource FontFamilyMonospace}"
                                    Foreground="{DynamicResource TextPrimaryBrush}"
                                    VerticalAlignment="Center" />
                         <Button x:Name="BtnCopyIpv6"

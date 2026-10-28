@@ -102,7 +102,7 @@
                                  TextWrapping="Wrap"
                                  Height="100"
                                  VerticalScrollBarVisibility="Auto"
-                                 FontFamily="Consolas" FontSize="{StaticResource FontSizeBody}"
+                                 FontFamily="{StaticResource FontFamilyMonospace}" FontSize="{StaticResource FontSizeBody}"
                                  Foreground="{DynamicResource TextPrimaryBrush}"
                                  Background="{DynamicResource CardBrush}"
                                  BorderBrush="{DynamicResource BorderBrush}"
@@ -135,7 +135,7 @@
                                        VerticalAlignment="Center" Margin="{StaticResource MarginInlineSm}"/>
                             <TextBox x:Name="TxtStartIp" Grid.Column="1"
                                      Style="{StaticResource WatermarkTextBoxStyle}"
-                                     FontFamily="Consolas" FontSize="{StaticResource FontSizeBody}"
+                                     FontFamily="{StaticResource FontFamilyMonospace}" FontSize="{StaticResource FontSizeBody}"
                                      Foreground="{DynamicResource TextPrimaryBrush}"
                                      Background="{DynamicResource CardBrush}"
                                      BorderBrush="{DynamicResource BorderBrush}"
@@ -146,7 +146,7 @@
                                        VerticalAlignment="Center" Margin="{StaticResource MarginInlineSm}"/>
                             <TextBox x:Name="TxtEndIp" Grid.Column="4"
                                      Style="{StaticResource WatermarkTextBoxStyle}"
-                                     FontFamily="Consolas" FontSize="{StaticResource FontSizeBody}"
+                                     FontFamily="{StaticResource FontFamilyMonospace}" FontSize="{StaticResource FontSizeBody}"
                                      Foreground="{DynamicResource TextPrimaryBrush}"
                                      Background="{DynamicResource CardBrush}"
                                      BorderBrush="{DynamicResource BorderBrush}"
@@ -182,7 +182,7 @@
                                        VerticalAlignment="Center" Margin="{StaticResource MarginInlineSm}"/>
                             <TextBox x:Name="TxtHostsNeeded" Grid.Row="0" Grid.Column="1"
                                      Style="{StaticResource WatermarkTextBoxStyle}"
-                                     FontFamily="Consolas" FontSize="{StaticResource FontSizeBody}"
+                                     FontFamily="{StaticResource FontFamilyMonospace}" FontSize="{StaticResource FontSizeBody}"
                                      MaxWidth="150" HorizontalAlignment="Left"
                                      Foreground="{DynamicResource TextPrimaryBrush}"
                                      Background="{DynamicResource CardBrush}"
@@ -194,7 +194,7 @@
                                        VerticalAlignment="Center" Margin="{StaticResource MarginInlineSm}"/>
                             <TextBox x:Name="TxtBaseNetwork" Grid.Row="2" Grid.Column="1"
                                      Style="{StaticResource WatermarkTextBoxStyle}"
-                                     Text="" FontFamily="Consolas" FontSize="{StaticResource FontSizeBody}"
+                                     Text="" FontFamily="{StaticResource FontFamilyMonospace}" FontSize="{StaticResource FontSizeBody}"
                                      MaxWidth="200" HorizontalAlignment="Left"
                                      Foreground="{DynamicResource TextPrimaryBrush}"
                                      Background="{DynamicResource CardBrush}"
@@ -242,7 +242,7 @@
                         <TextBox x:Name="TxtResult"
                                  IsReadOnly="True"
                                  TabIndex="12"
-                                 FontFamily="Consolas" FontSize="{StaticResource FontSizeBodyLarge}"
+                                 FontFamily="{StaticResource FontFamilyMonospace}" FontSize="{StaticResource FontSizeBodyLarge}"
                                  TextWrapping="Wrap"
                                  AcceptsReturn="True"
                                  VerticalScrollBarVisibility="Auto"

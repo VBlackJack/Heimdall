@@ -90,7 +90,7 @@
                              Height="80" VerticalScrollBarVisibility="Auto"
                              Style="{StaticResource WatermarkTextBoxStyle}"
                              Tag=""
-                             FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
+                             FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}"
                              Padding="{StaticResource PaddingInput}"
                              Background="{DynamicResource CardBrush}"
                              Foreground="{DynamicResource TextPrimaryBrush}"
@@ -106,7 +106,7 @@
                     <TextBox x:Name="TxtPorts" Text=""
                              Style="{StaticResource WatermarkTextBoxStyle}"
                              Tag=""
-                             FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
+                             FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}"
                              Padding="{StaticResource PaddingInput}"
                              Background="{DynamicResource CardBrush}"
                              Foreground="{DynamicResource TextPrimaryBrush}"
@@ -218,7 +218,7 @@
                         TabIndex="8"/>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <TextBlock x:Name="LblSummary" Text=""
-                               FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
+                               FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}"
                                Foreground="{DynamicResource TextSecondaryBrush}"/>
                 </StackPanel>
             </DockPanel>

@@ -116,7 +116,7 @@
                 <TextBox Text="{Binding WindowsPattern, UpdateSourceTrigger=PropertyChanged}"
                          AutomationProperties.Name="{Binding Text, ElementName=LblWinPattern}"
                          Style="{StaticResource DialogFormTextBoxStyle}"
-                         FontFamily="Consolas" TabIndex="5"/>
+                         FontFamily="{StaticResource FontFamilyMonospace}" TabIndex="5"/>
 
                 <TextBlock x:Name="LblWinName" Text="{loc:Translate ToolCmdLibDialogLblTemplateName}" Style="{StaticResource DialogLabelStyle}" Margin="0,4,0,4"/>
                 <TextBox Text="{Binding WindowsTemplateName, UpdateSourceTrigger=PropertyChanged}"
@@ -146,7 +146,7 @@
                                     </Grid.ColumnDefinitions>
                                     <TextBox Grid.Column="0" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
                                              AutomationProperties.Name="{loc:Translate ToolCmdLibDialogParamName}"
-                                             FontFamily="Consolas" Margin="0,0,4,0" Padding="4,3"
+                                             FontFamily="{StaticResource FontFamilyMonospace}" Margin="0,0,4,0" Padding="4,3"
                                              FontSize="{StaticResource FontSizeCaption}"
                                              Background="{DynamicResource CardBrush}"
                                              Foreground="{DynamicResource TextPrimaryBrush}"
@@ -237,7 +237,7 @@
                 <TextBox Text="{Binding LinuxPattern, UpdateSourceTrigger=PropertyChanged}"
                          AutomationProperties.Name="{Binding Text, ElementName=LblLinuxPattern}"
                          Style="{StaticResource DialogFormTextBoxStyle}"
-                         FontFamily="Consolas" TabIndex="8"/>
+                         FontFamily="{StaticResource FontFamilyMonospace}" TabIndex="8"/>
 
                 <TextBlock x:Name="LblLinuxName" Text="{loc:Translate ToolCmdLibDialogLblTemplateName}" Style="{StaticResource DialogLabelStyle}" Margin="0,4,0,4"/>
                 <TextBox Text="{Binding LinuxTemplateName, UpdateSourceTrigger=PropertyChanged}"
@@ -267,7 +267,7 @@
                                     </Grid.ColumnDefinitions>
                                     <TextBox Grid.Column="0" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
                                              AutomationProperties.Name="{loc:Translate ToolCmdLibDialogParamName}"
-                                             FontFamily="Consolas" Margin="0,0,4,0" Padding="4,3"
+                                             FontFamily="{StaticResource FontFamilyMonospace}" Margin="0,0,4,0" Padding="4,3"
                                              FontSize="{StaticResource FontSizeCaption}"
                                              Background="{DynamicResource CardBrush}"
                                              Foreground="{DynamicResource TextPrimaryBrush}"
@@ -379,7 +379,7 @@
                                     </Grid.ColumnDefinitions>
                                     <TextBox Grid.Column="0" Text="{Binding Command, UpdateSourceTrigger=PropertyChanged}"
                                              AutomationProperties.Name="{loc:Translate ToolCmdLibDialogExampleCommand}"
-                                             FontFamily="Consolas" Margin="0,0,4,0" Padding="4,3"
+                                             FontFamily="{StaticResource FontFamilyMonospace}" Margin="0,0,4,0" Padding="4,3"
                                              FontSize="{StaticResource FontSizeCaption}"
                                              Background="{DynamicResource CardBrush}"
                                              Foreground="{DynamicResource TextPrimaryBrush}"
@@ -449,7 +449,7 @@
                                          BorderBrush="{DynamicResource BorderBrush}"/>
                                 <TextBox Grid.Column="1" Text="{Binding Url, UpdateSourceTrigger=PropertyChanged}"
                                          AutomationProperties.Name="{loc:Translate ToolCmdLibDialogLinkUrl}"
-                                         FontFamily="Consolas" Margin="0,0,4,0" Padding="4,3"
+                                         FontFamily="{StaticResource FontFamilyMonospace}" Margin="0,0,4,0" Padding="4,3"
                                          FontSize="{StaticResource FontSizeCaption}"
                                          Background="{DynamicResource CardBrush}"
                                          Foreground="{DynamicResource TextPrimaryBrush}"

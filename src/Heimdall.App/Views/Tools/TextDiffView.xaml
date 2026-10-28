@@ -159,7 +159,7 @@
                              TextWrapping="NoWrap"
                              VerticalScrollBarVisibility="Auto"
                              HorizontalScrollBarVisibility="Auto"
-                             FontFamily="Consolas"
+                             FontFamily="{StaticResource FontFamilyMonospace}"
                              FontSize="{StaticResource FontSizeBodyLarge}"
                              Background="{DynamicResource SurfaceBrush}"
                              Foreground="{DynamicResource TextPrimaryBrush}"
@@ -189,7 +189,7 @@
                              TextWrapping="NoWrap"
                              VerticalScrollBarVisibility="Auto"
                              HorizontalScrollBarVisibility="Auto"
-                             FontFamily="Consolas"
+                             FontFamily="{StaticResource FontFamilyMonospace}"
                              FontSize="{StaticResource FontSizeBodyLarge}"
                              Background="{DynamicResource SurfaceBrush}"
                              Foreground="{DynamicResource TextPrimaryBrush}"
@@ -310,21 +310,21 @@
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Grid.Column="0"
                                                Text="{Binding LeftLineNumber}"
-                                               FontFamily="Consolas"
+                                               FontFamily="{StaticResource FontFamilyMonospace}"
                                                FontSize="{StaticResource FontSizeBody}"
                                                Foreground="{DynamicResource TextSecondaryBrush}"
                                                TextAlignment="Right"
                                                Padding="2,1,6,1" />
                                     <TextBlock Grid.Column="1"
                                                Text="{Binding RightLineNumber}"
-                                               FontFamily="Consolas"
+                                               FontFamily="{StaticResource FontFamilyMonospace}"
                                                FontSize="{StaticResource FontSizeBody}"
                                                Foreground="{DynamicResource TextSecondaryBrush}"
                                                TextAlignment="Right"
                                                Padding="2,1,6,1" />
                                     <TextBlock Grid.Column="2"
                                                Text="{Binding Prefix}"
-                                               FontFamily="Consolas"
+                                               FontFamily="{StaticResource FontFamilyMonospace}"
                                                FontSize="{StaticResource FontSizeBodyLarge}"
                                                FontWeight="Bold"
                                                Padding="0,1,4,1">
@@ -343,7 +343,7 @@
                                         </TextBlock.Style>
                                     </TextBlock>
                                     <TextBlock Grid.Column="3"
-                                               FontFamily="Consolas"
+                                               FontFamily="{StaticResource FontFamilyMonospace}"
                                                FontSize="{StaticResource FontSizeBodyLarge}"
                                                Foreground="{DynamicResource TextPrimaryBrush}"
                                                Padding="0,1,4,1"

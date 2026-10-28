@@ -100,7 +100,7 @@
                                  Foreground="{DynamicResource TextPrimaryBrush}"
                                  Background="{DynamicResource CardBrush}"
                                  BorderBrush="{DynamicResource BorderBrush}"
-                                 Padding="{StaticResource PaddingInput}" FontFamily="Consolas"
+                                 Padding="{StaticResource PaddingInput}" FontFamily="{StaticResource FontFamilyMonospace}"
                                  TabIndex="0"/>
 
                         <!-- HostName -->
@@ -110,7 +110,7 @@
                                  Foreground="{DynamicResource TextPrimaryBrush}"
                                  Background="{DynamicResource CardBrush}"
                                  BorderBrush="{DynamicResource BorderBrush}"
-                                 Padding="{StaticResource PaddingInput}" FontFamily="Consolas"
+                                 Padding="{StaticResource PaddingInput}" FontFamily="{StaticResource FontFamilyMonospace}"
                                  TabIndex="1"/>
 
                         <!-- User -->
@@ -141,7 +141,7 @@
                                  Foreground="{DynamicResource TextPrimaryBrush}"
                                  Background="{DynamicResource CardBrush}"
                                  BorderBrush="{DynamicResource BorderBrush}"
-                                 Padding="{StaticResource PaddingInput}" FontFamily="Consolas"
+                                 Padding="{StaticResource PaddingInput}" FontFamily="{StaticResource FontFamilyMonospace}"
                                  TabIndex="4"/>
 
                         <!-- ProxyJump -->
@@ -151,7 +151,7 @@
                                  Foreground="{DynamicResource TextPrimaryBrush}"
                                  Background="{DynamicResource CardBrush}"
                                  BorderBrush="{DynamicResource BorderBrush}"
-                                 Padding="{StaticResource PaddingInput}" FontFamily="Consolas"
+                                 Padding="{StaticResource PaddingInput}" FontFamily="{StaticResource FontFamilyMonospace}"
                                  TabIndex="5"/>
 
                         <!-- ForwardAgent -->
@@ -213,7 +213,7 @@
                                 TabIndex="10"/>
                         <TextBox x:Name="TxtOutput"
                                  IsReadOnly="True"
-                                 FontFamily="Consolas" FontSize="{StaticResource FontSizeBody}"
+                                 FontFamily="{StaticResource FontFamilyMonospace}" FontSize="{StaticResource FontSizeBody}"
                                  TextWrapping="Wrap"
                                  AcceptsReturn="True"
                                  VerticalScrollBarVisibility="Auto"

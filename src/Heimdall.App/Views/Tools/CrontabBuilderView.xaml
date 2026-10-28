@@ -183,7 +183,7 @@
                                 VerticalAlignment="Center"
                                 TabIndex="11"/>
                         <TextBox x:Name="TxtCronExpression" Text=""
-                                 FontSize="{StaticResource FontSizeHeadline}" FontFamily="Consolas" FontWeight="Bold"
+                                 FontSize="{StaticResource FontSizeHeadline}" FontFamily="{StaticResource FontFamilyMonospace}" FontWeight="Bold"
                                  IsReadOnly="True"
                                  Background="Transparent"
                                  Foreground="{DynamicResource AccentTextBrush}"
@@ -204,7 +204,7 @@
                            Foreground="{DynamicResource TextSecondaryBrush}"/>
                 <TextBox x:Name="TxtManualInput" Text=""
                          Style="{DynamicResource WatermarkTextBoxStyle}"
-                         FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas"
+                         FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="{StaticResource FontFamilyMonospace}"
                          Padding="{StaticResource PaddingInput}" Margin="{StaticResource MarginLabelBottom}"
                          Background="{DynamicResource CardBrush}"
                          Foreground="{DynamicResource TextPrimaryBrush}"
@@ -230,7 +230,7 @@
                     <ItemsControl x:Name="NextRunsList">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <TextBlock Text="{Binding}" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
+                                <TextBlock Text="{Binding}" FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}"
                                            Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,2"/>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>

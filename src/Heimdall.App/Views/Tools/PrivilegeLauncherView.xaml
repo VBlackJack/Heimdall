@@ -100,7 +100,7 @@
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
                             <TextBox x:Name="TxtExecutablePath" Grid.Column="0"
-                                     FontFamily="Consolas" FontSize="{StaticResource FontSizeBody}"
+                                     FontFamily="{StaticResource FontFamilyMonospace}" FontSize="{StaticResource FontSizeBody}"
                                      Padding="{StaticResource PaddingInput}"
                                      Background="Transparent"
                                      Foreground="{DynamicResource TextPrimaryBrush}"
@@ -156,7 +156,7 @@
                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                    Margin="{StaticResource MarginLabelBottom}"/>
                         <TextBox x:Name="TxtArguments"
-                                 FontFamily="Consolas" FontSize="{StaticResource FontSizeBody}"
+                                 FontFamily="{StaticResource FontFamilyMonospace}" FontSize="{StaticResource FontSizeBody}"
                                  Padding="{StaticResource PaddingInput}"
                                  Background="Transparent"
                                  Foreground="{DynamicResource TextPrimaryBrush}"

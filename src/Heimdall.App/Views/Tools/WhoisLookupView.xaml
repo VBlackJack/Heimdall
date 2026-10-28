@@ -92,7 +92,7 @@
                              Style="{StaticResource WatermarkTextBoxStyle}"
                              Tag="{Binding DomainWatermark}"
                              Text="{Binding Domain, UpdateSourceTrigger=PropertyChanged}"
-                             FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas"
+                             FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="{StaticResource FontFamilyMonospace}"
                              Padding="{StaticResource PaddingInput}"
                              Background="{DynamicResource CardBrush}"
                              Foreground="{DynamicResource TextPrimaryBrush}"
@@ -158,7 +158,7 @@
                                        VerticalAlignment="Center"/>
                         </DockPanel>
                         <TextBox x:Name="TxtResults" Text="{Binding Results}"
-                                 FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
+                                 FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}"
                                  Foreground="{DynamicResource TextPrimaryBrush}"
                                  IsReadOnly="True"
                                  AcceptsReturn="True"
@@ -181,7 +181,7 @@
                 BorderBrush="{DynamicResource BorderStrongBrush}"
                 BorderThickness="0,1,0,0">
             <TextBlock x:Name="TxtStatus" Text="{Binding StatusText}"
-                       FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
+                       FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}"
                        Foreground="{DynamicResource TextSecondaryBrush}"/>
         </Border>
     </Grid>

@@ -57,7 +57,7 @@
                         <TextBox x:Name="TxtHost" Text="" MinWidth="140"
                                  Style="{StaticResource WatermarkTextBoxStyle}"
                                  Tag=""
-                                 FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas"
+                                 FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="{StaticResource FontFamilyMonospace}"
                                  Padding="{StaticResource PaddingInput}"
                                  Background="{DynamicResource CardBrush}"
                                  Foreground="{DynamicResource TextPrimaryBrush}"
@@ -70,7 +70,7 @@
                                    FontSize="{StaticResource FontSizeCaption}" VerticalAlignment="Center" Margin="{StaticResource MarginInlineXs}"
                                    Foreground="{DynamicResource TextSecondaryBrush}"/>
                         <TextBox x:Name="TxtMaxHops" Text="" Width="50"
-                                 FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
+                                 FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}"
                                  Padding="{StaticResource PaddingInput}"
                                  Background="{DynamicResource CardBrush}"
                                  Foreground="{DynamicResource TextPrimaryBrush}"
@@ -220,7 +220,7 @@
                         VerticalAlignment="Center"
                         TabIndex="5"/>
                 <TextBlock x:Name="TxtStatus" Text=""
-                           FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
+                           FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}"
                            Foreground="{DynamicResource TextSecondaryBrush}"
                            VerticalAlignment="Center"/>
             </DockPanel>

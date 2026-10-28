@@ -274,7 +274,7 @@
                                 ToolTip="{loc:Translate ToolBtnCopyToClipboard}"/>
                         <TextBox Text="{Binding FingerprintText, Mode=OneWay}"
                                  IsReadOnly="True"
-                                 FontFamily="Consolas"
+                                 FontFamily="{StaticResource FontFamilyMonospace}"
                                  FontSize="{StaticResource FontSizeBody}"
                                  Background="Transparent"
                                  Foreground="{DynamicResource TextPrimaryBrush}"
@@ -310,7 +310,7 @@
                         </StackPanel>
                         <TextBox Text="{Binding CurrentCertPem, Mode=OneWay}"
                                  IsReadOnly="True"
-                                 FontFamily="Consolas"
+                                 FontFamily="{StaticResource FontFamilyMonospace}"
                                  FontSize="{StaticResource FontSizeBody}"
                                  TextWrapping="Wrap"
                                  MaxHeight="200"
@@ -354,7 +354,7 @@
                         </StackPanel>
                         <TextBox Text="{Binding DisplayedKeyText, Mode=OneWay}"
                                  IsReadOnly="True"
-                                 FontFamily="Consolas"
+                                 FontFamily="{StaticResource FontFamilyMonospace}"
                                  FontSize="{StaticResource FontSizeBody}"
                                  TextWrapping="Wrap"
                                  MaxHeight="200"
@@ -390,7 +390,7 @@
                         </StackPanel>
                         <TextBox Text="{Binding LeafCertPem, Mode=OneWay}"
                                  IsReadOnly="True"
-                                 FontFamily="Consolas"
+                                 FontFamily="{StaticResource FontFamilyMonospace}"
                                  FontSize="{StaticResource FontSizeBody}"
                                  TextWrapping="Wrap"
                                  MaxHeight="160"
@@ -422,7 +422,7 @@
                         </StackPanel>
                         <TextBox Text="{Binding DisplayedLeafKeyText, Mode=OneWay}"
                                  IsReadOnly="True"
-                                 FontFamily="Consolas"
+                                 FontFamily="{StaticResource FontFamilyMonospace}"
                                  FontSize="{StaticResource FontSizeBody}"
                                  TextWrapping="Wrap"
                                  MaxHeight="160"

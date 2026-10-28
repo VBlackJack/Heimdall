@@ -83,7 +83,7 @@
                         VerticalAlignment="Stretch" Visibility="Collapsed"
                         TabIndex="3"/>
                 <TextBox x:Name="TxtArguments"
-                         FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas"
+                         FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="{StaticResource FontFamilyMonospace}"
                          Padding="{StaticResource PaddingInput}"
                          Background="{DynamicResource CardBrush}"
                          Foreground="{DynamicResource TextPrimaryBrush}"
@@ -134,7 +134,7 @@
 
             <!-- Text output mode -->
             <TextBox x:Name="TxtOutput"
-                     FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
+                     FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}"
                      Padding="{StaticResource PaddingInput}"
                      IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
                      VerticalScrollBarVisibility="Auto"

@@ -110,7 +110,7 @@
                     <TextBox x:Name="TxtDomain"
                              Background="{DynamicResource CardBrush}"
                              BorderBrush="{DynamicResource BorderBrush}"
-                             FontFamily="Consolas"
+                             FontFamily="{StaticResource FontFamilyMonospace}"
                              FontSize="{StaticResource FontSizeBodyLarge}"
                              Foreground="{DynamicResource TextPrimaryBrush}"
                              Padding="{StaticResource PaddingInput}"
@@ -208,7 +208,7 @@
                                                            Text="{Binding Name}" />
                                                 <TextBlock Margin="0,2,0,0"
                                                            Visibility="{Binding HasValue, Converter={StaticResource BoolToVisibilityConverter}}"
-                                                           FontFamily="Consolas"
+                                                           FontFamily="{StaticResource FontFamilyMonospace}"
                                                            FontSize="{StaticResource FontSizeCaption}"
                                                            Foreground="{DynamicResource TextSecondaryBrush}"
                                                            Text="{Binding Value}"
@@ -245,7 +245,7 @@
                 BorderThickness="0,1,0,0">
             <TextBlock x:Name="TxtStatus"
                        FontSize="{StaticResource FontSizeBody}"
-                       FontFamily="Consolas"
+                       FontFamily="{StaticResource FontFamilyMonospace}"
                        Foreground="{DynamicResource TextSecondaryBrush}" />
         </Border>
     </Grid>
