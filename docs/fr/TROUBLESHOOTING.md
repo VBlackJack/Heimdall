@@ -198,10 +198,10 @@ Lorsque le remplissage automatique échoue silencieusement, activez la journalis
 
 **Symptôme** : `Server rejected the SSH key` ou `No suitable authentication method found` alors même que Pageant tourne avec des clés chargées.
 
-**Cause racine** : SSH.NET 2025.1.0 n'intègre pas de prise en charge de l'agent Pageant. Le repli `NoneAuthenticationMethod` ne déclenche pas la négociation Pageant.
+**Cause racine** : SSH.NET 2026.0.0 n'intègre pas de prise en charge de l'agent Pageant. Le repli `NoneAuthenticationMethod` ne déclenche pas la négociation Pageant.
 
 **Solution** : approche en deux volets :
-1. **Client IPC Pageant** : le `PageantClient` maison dialogue avec Pageant via la mémoire partagée Win32 (`CreateFileMapping` + `WM_COPYDATA`). Il encapsule les clés en `IPrivateKeySource` pour SSH.NET via `PageantKeyWrapper` + `PageantHostAlgorithm`.
+1. **Client IPC Pageant** : le `PageantClient` maison dialogue avec Pageant via la mémoire partagée Win32 (`CreateFileMapping` + `WM_COPYDATA`). Chaque clé devient une `PageantAgentKey`, que `SshAgentKeyWrapper` encapsule en `IPrivateKeySource` pour SSH.NET (la signature passe par `SshAgentHostAlgorithm`).
 2. **Repli Plink** : quand `SshConnectionFactory.RequiresPlinkFallback()` trouve le transfert d'agent activé sur le profil et un agent compatible Plink (Pageant) en cours d'exécution, utiliser `PlinkTunnelRunner` pour les tunnels et `PipeModeSession` pour le SSH interactif. Plink dialogue nativement avec Pageant.
 
 **Fichiers** : `Pageant/PageantClient.cs`, `SshConnectionFactory.cs`, `ConnectionService.cs`
@@ -442,13 +442,14 @@ private const uint AGENT_COPYDATA_ID = 0x804e50ba;
 
 **Cause racine** : les serveurs SSH modernes désactivent l'ancien `ssh-rsa` (SHA-1) et exigent `rsa-sha2-256` ou `rsa-sha2-512`. SSH.NET n'enregistre pas automatiquement ces algorithmes lorsqu'on utilise une implémentation personnalisée d'`IPrivateKeySource`.
 
-**Solution** : enregistrer les algorithmes RSA-SHA2 sur la `ConnectionInfo` avant la connexion :
+**Solution** : proposer les algorithmes RSA-SHA2 depuis la source de clé elle-même. Pour une clé d'agent `ssh-rsa`, `SshAgentKeyWrapper` renvoie trois algorithmes d'hôte, les deux premiers signant avec le drapeau d'agent correspondant :
 ```csharp
-connectionInfo.HostKeyAlgorithms["rsa-sha2-256"] = ...;
-connectionInfo.HostKeyAlgorithms["rsa-sha2-512"] = ...;
+new SshAgentHostAlgorithm("rsa-sha2-256", key, SshAgentSignFlags.RsaSha2_256),
+new SshAgentHostAlgorithm("rsa-sha2-512", key, SshAgentSignFlags.RsaSha2_512),
+new SshAgentHostAlgorithm("ssh-rsa", key),
 ```
 
-**Fichiers** : `SshConnectionFactory.cs`, `Pageant/PageantHostAlgorithm.cs`
+**Fichiers** : `Agents/SshAgentKeyWrapper.cs`, `Agents/SshAgentHostAlgorithm.cs`
 
 ---
 
@@ -459,9 +460,9 @@ connectionInfo.HostKeyAlgorithms["rsa-sha2-512"] = ...;
 
 **Cause racine** : SSH.NET attend le blob de signature complet au format SSH : `[4 bytes: algorithm name length][algorithm name][4 bytes: signature length][signature bytes]`. `PageantClient.SignData()` renvoie déjà ce blob complet en provenance de Pageant. Retirer le préfixe d'algorithme, réencapsuler le blob une seconde fois ou ne renvoyer que les octets bruts de signature corrompt la signature.
 
-**Solution** : `PageantHostAlgorithm.Sign()` doit renvoyer le blob de Pageant inchangé. La documentation XML et `PageantHostAlgorithmTests.Sign_ReturnsBlobFromAgentUnchanged` figent ce contrat.
+**Solution** : `SshAgentHostAlgorithm.Sign()` doit renvoyer inchangé le blob issu de `PageantAgentKey.Sign()`. `PageantHostAlgorithmTests.Sign_ReturnsBlobFromAgentUnchanged` fige le même contrat sur le `PageantHostAlgorithm` propre à Pageant.
 
-**Fichiers** : `Pageant/PageantHostAlgorithm.cs`
+**Fichiers** : `Agents/SshAgentHostAlgorithm.cs`, `Pageant/PageantAgentKey.cs`, `Pageant/PageantHostAlgorithm.cs`
 
 ---
 

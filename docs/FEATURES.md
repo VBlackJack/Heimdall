@@ -565,14 +565,14 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 | Runtime | .NET 10 (C# 14) |
 | UI Framework | WPF (MVVM via CommunityToolkit.Mvvm) |
 | Dependency Injection | Microsoft.Extensions.DependencyInjection |
-| SSH/SFTP | SSH.NET 2025.1.0 |
+| SSH/SFTP | SSH.NET 2026.0.0 |
 | Terminal Rendering | WebView2 + xterm.js |
 | VNC | noVNC (HTML5 VNC client in WebView2) |
 | Code Editor | AvalonEdit |
 | RDP | ActiveX MsTscAx (WindowsFormsHost) |
 | Citrix | StoreBrowse CLI integration |
 | Crypto | System.Security.Cryptography.ProtectedData (DPAPI) |
-| Testing | xUnit (7,900+ passing tests across 8 projects) |
+| Testing | xUnit (every test project of the solution) |
 | Built-in Tools | 58 sysops tools (Ctrl+K → `tools` or Ctrl+Shift+T) |
 | Serialization | System.Text.Json |
 

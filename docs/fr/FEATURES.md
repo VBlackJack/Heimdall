@@ -586,14 +586,14 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
 | Runtime | .NET 10 (C# 14) |
 | Framework UI | WPF (MVVM via CommunityToolkit.Mvvm) |
 | Injection de dépendances | Microsoft.Extensions.DependencyInjection |
-| SSH/SFTP | SSH.NET 2025.1.0 |
+| SSH/SFTP | SSH.NET 2026.0.0 |
 | Rendu du terminal | WebView2 + xterm.js |
 | VNC | noVNC (client VNC HTML5 dans WebView2) |
 | Éditeur de code | AvalonEdit |
 | RDP | ActiveX MsTscAx (WindowsFormsHost) |
 | Citrix | Intégration de la CLI StoreBrowse |
 | Crypto | System.Security.Cryptography.ProtectedData (DPAPI) |
-| Tests | xUnit (7 900+ tests passants répartis sur 8 projets) |
+| Tests | xUnit (tous les projets de test de la solution) |
 | Outils intégrés | 58 outils sysops (Ctrl+K → `tools` ou Ctrl+Shift+T) |
 | Sérialisation | System.Text.Json |
 

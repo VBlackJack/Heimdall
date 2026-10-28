@@ -20,7 +20,7 @@ ni identifiants, ni préférences d'éditeur, ni notes de travail temporaires.
 
 Heimdall est un gestionnaire de connexions Windows en .NET 10 / WPF, destiné aux
 sessions RDP, SSH, SFTP, VNC, Telnet, FTP, Citrix et shell local. L'application
-s'appuie sur MVVM via CommunityToolkit.Mvvm, sur SSH.NET 2025.1.0 pour SSH/SFTP,
+s'appuie sur MVVM via CommunityToolkit.Mvvm, sur SSH.NET 2026.0.0 pour SSH/SFTP,
 sur WebView2 pour les terminaux embarqués et le VNC, et sur DPAPI + HMAC-SHA256
 pour la protection locale des identifiants.
 

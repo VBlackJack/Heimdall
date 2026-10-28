@@ -20,7 +20,7 @@ temporary workflow notes out of it.
 
 Heimdall is a .NET 10 WPF Windows connection manager for RDP, SSH, SFTP,
 VNC, Telnet, FTP, Citrix, and local shell sessions. The app uses MVVM via
-CommunityToolkit.Mvvm, SSH.NET 2025.1.0 for SSH/SFTP, WebView2 for embedded
+CommunityToolkit.Mvvm, SSH.NET 2026.0.0 for SSH/SFTP, WebView2 for embedded
 terminals and VNC, and DPAPI + HMAC-SHA256 for local credential protection.
 
 The solution file is `Heimdall.slnx`. Source projects live under `src/` and
