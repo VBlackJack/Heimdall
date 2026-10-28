@@ -56,6 +56,12 @@ public partial class VaultDisableDialogViewModel : ObservableObject
         _localizer = localizer;
     }
 
+    /// <summary>
+    /// Fires when the password box should take the keyboard focus back: the attempt failed and the
+    /// box, disabled while it ran, accepts input again.
+    /// </summary>
+    public PasswordRefocusSignal PasswordRefocus { get; } = new();
+
     /// <summary>Whether the disable action is currently available.</summary>
     public bool CanSubmit => !IsBusy;
 
@@ -96,6 +102,12 @@ public partial class VaultDisableDialogViewModel : ObservableObject
             finally
             {
                 IsBusy = false;
+                if (!IsCompleted)
+                {
+                    PasswordRefocus.Arm();
+                }
+
+                PasswordRefocus.Release(passwordBoxEnabled: !IsBusy);
             }
         }
         finally

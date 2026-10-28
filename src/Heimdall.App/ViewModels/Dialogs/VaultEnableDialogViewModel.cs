@@ -71,6 +71,12 @@ public partial class VaultEnableDialogViewModel : ObservableObject
         PolicyMessage = localizer.GetString("VaultPolicyHint");
     }
 
+    /// <summary>
+    /// Fires when the password box should take the keyboard focus back: the attempt failed and the
+    /// box, disabled while it ran, accepts input again.
+    /// </summary>
+    public PasswordRefocusSignal PasswordRefocus { get; } = new();
+
     /// <summary>Whether the enable action is currently available.</summary>
     public bool CanSubmit => IsPasswordAcceptable && IsConfirmMatch && !IsBusy;
 
@@ -123,6 +129,12 @@ public partial class VaultEnableDialogViewModel : ObservableObject
             finally
             {
                 IsBusy = false;
+                if (!IsCompleted)
+                {
+                    PasswordRefocus.Arm();
+                }
+
+                PasswordRefocus.Release(passwordBoxEnabled: !IsBusy);
             }
         }
         finally

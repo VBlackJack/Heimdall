@@ -327,4 +327,74 @@ public sealed class VaultUnlockDialogViewModelTests
         Assert.False(viewModel.IsLockedOut);
         Assert.False(viewModel.IsLockoutRefreshScheduled);
     }
+
+    [Fact]
+    public async Task Unlock_WrongPassword_AsksForTheFocusBackOnceTheBoxIsEnabled()
+    {
+        var lockout = new PinManager(maxAttempts: 5, lockoutDuration: TimeSpan.FromMinutes(5));
+        var viewModel = new VaultUnlockDialogViewModel(
+            _ => throw new VaultUnlockException(), lockout, Localizer(), migrationInProgress: false);
+        var canSubmitAtRequest = new List<bool>();
+        viewModel.PasswordRefocus.Requested += (_, _) => canSubmitAtRequest.Add(viewModel.CanSubmit);
+
+        await viewModel.UnlockCommand.ExecuteAsync(Pw("WrongPass1!"));
+
+        // One request, made when the box is enabled again: the box is disabled while the
+        // attempt runs, and focusing a disabled box does nothing.
+        Assert.Equal(new[] { true }, canSubmitAtRequest);
+    }
+
+    [Fact]
+    public async Task Unlock_Success_DoesNotAskForTheFocus()
+    {
+        var viewModel = new VaultUnlockDialogViewModel(
+            _ => Task.CompletedTask, new PinManager(), Localizer(), migrationInProgress: false);
+        var requests = 0;
+        viewModel.PasswordRefocus.Requested += (_, _) => requests++;
+
+        await viewModel.UnlockCommand.ExecuteAsync(Pw("MasterPass1!"));
+
+        Assert.Equal(0, requests);
+    }
+
+    [Fact]
+    public async Task Unlock_FailureThatLocksOut_WaitsForTheLockoutToLiftBeforeAskingForTheFocus()
+    {
+        var lockout = new PinManager(maxAttempts: 1, lockoutDuration: TimeSpan.FromMinutes(5));
+        var viewModel = new VaultUnlockDialogViewModel(
+            _ => throw new VaultUnlockException(), lockout, Localizer(), migrationInProgress: false);
+        var canSubmitAtRequest = new List<bool>();
+        viewModel.PasswordRefocus.Requested += (_, _) => canSubmitAtRequest.Add(viewModel.CanSubmit);
+
+        await viewModel.UnlockCommand.ExecuteAsync(Pw("bad-attempt-1!"));
+
+        // The box is still disabled by the lockout: nothing to focus yet, and the request is
+        // kept rather than dropped.
+        Assert.Empty(canSubmitAtRequest);
+        Assert.True(viewModel.PasswordRefocus.IsPending);
+
+        lockout.RestoreLockoutState(failureCount: 1, lockoutUntilUtc: DateTime.UtcNow.AddMinutes(-1));
+        viewModel.RefreshLockoutState();
+
+        Assert.Equal(new[] { true }, canSubmitAtRequest);
+        Assert.False(viewModel.PasswordRefocus.IsPending);
+    }
+
+    [Fact]
+    public async Task Unlock_HelloFailure_AsksForTheFocusBackOnceTheBoxIsEnabled()
+    {
+        var viewModel = new VaultUnlockDialogViewModel(
+            _ => Task.CompletedTask,
+            new PinManager(),
+            Localizer(),
+            migrationInProgress: false,
+            unlockWithHelloAsync: () => throw new InvalidOperationException("hello"),
+            showHelloUnlock: true);
+        var requests = 0;
+        viewModel.PasswordRefocus.Requested += (_, _) => requests++;
+
+        await viewModel.UnlockWithHelloCommand.ExecuteAsync(null);
+
+        Assert.Equal(1, requests);
+    }
 }

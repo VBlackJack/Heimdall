@@ -90,4 +90,33 @@ public sealed class VaultChangePasswordDialogViewModelTests
         Assert.False(invoked);
         Assert.False(viewModel.IsCompleted);
     }
+
+    [Fact]
+    public async Task Change_Failure_AsksForTheFocusBackOnceTheBoxIsEnabled()
+    {
+        var viewModel = new VaultChangePasswordDialogViewModel(
+            (_, _) => throw new VaultUnlockException(), Localizer());
+        viewModel.Evaluate(C(NewPassword), C(NewPassword));
+        var requests = new List<bool>();
+        viewModel.PasswordRefocus.Requested += (_, _) => requests.Add(viewModel.IsBusy);
+
+        await viewModel.ChangeCommand.ExecuteAsync(
+            new VaultChangePasswordInput(C("wrong-current"), C(NewPassword)));
+
+        Assert.Equal(new[] { false }, requests);
+    }
+
+    [Fact]
+    public async Task Change_Success_DoesNotAskForTheFocus()
+    {
+        var viewModel = new VaultChangePasswordDialogViewModel((_, _) => Task.CompletedTask, Localizer());
+        viewModel.Evaluate(C(NewPassword), C(NewPassword));
+        var requests = 0;
+        viewModel.PasswordRefocus.Requested += (_, _) => requests++;
+
+        await viewModel.ChangeCommand.ExecuteAsync(
+            new VaultChangePasswordInput(C("OldMaster1!Vault"), C(NewPassword)));
+
+        Assert.Equal(0, requests);
+    }
 }

@@ -49,6 +49,11 @@ public partial class VaultDisableDialog : Window
         {
             newVm.PropertyChanged += OnViewModelPropertyChanged;
         }
+
+        if (e.NewValue is VaultDisableDialogViewModel refocusVm)
+        {
+            PasswordBoxRefocus.Attach(PasswordBox, refocusVm.PasswordRefocus);
+        }
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
