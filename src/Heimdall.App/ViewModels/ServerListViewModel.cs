@@ -1772,8 +1772,21 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
                 _localizer.Format("ErrorCredentialProviderTimeout", displayName, settings.CredentialProviderTimeoutMs),
             CredentialProviderLaunchException launch =>
                 _localizer.Format("ErrorCredentialProviderNotFound", launch.Executable),
+            CredentialProviderArgumentException argument => DescribeRefusedArgument(_localizer, argument),
             _ => _localizer.Format("ErrorCredentialProviderFailed", failure.Message),
         };
+    }
+
+    /// <summary>Tells the user which value the credential command refused and what to change.</summary>
+    internal static string DescribeRefusedArgument(LocalizationManager localizer, CredentialProviderArgumentException failure)
+    {
+        ArgumentNullException.ThrowIfNull(localizer);
+        ArgumentNullException.ThrowIfNull(failure);
+
+        string key = failure.Rejection.Reason == ArgumentRejection.LeadingDash
+            ? "ErrorCredentialProviderArgumentLeadingDash"
+            : "ErrorCredentialProviderArgumentNeedsQuotes";
+        return localizer.Format(key, failure.Rejection.Token);
     }
 
     /// <summary>

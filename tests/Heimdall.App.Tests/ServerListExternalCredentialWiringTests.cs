@@ -284,6 +284,27 @@ public sealed class ServerListExternalCredentialWiringTests : IDisposable
             fixture.Dialog.LastErrorMessage);
     }
 
+    [Theory]
+    [InlineData(ArgumentRejection.NeedsQuotes, "ErrorCredentialProviderArgumentNeedsQuotes")]
+    [InlineData(ArgumentRejection.LeadingDash, "ErrorCredentialProviderArgumentLeadingDash")]
+    public async Task ResolveCredentials_ValueRefusedByTheCommand_SaysWhichPlaceholderAndWhatToDo(
+        ArgumentRejection reason, string messageKey)
+    {
+        var provider = new StubCredentialProvider
+        {
+            Exception = new CredentialProviderArgumentException(new ArgumentTemplateRejection("{Title}", reason))
+        };
+        await using var fixture = await Fixture.CreateAsync(new FakeCredentialProviderFactory(provider));
+
+        await fixture.ViewModel.TryResolveExternalCredentialsAsync(
+            CreateSshServer(passwordEncrypted: null), EnabledSettings(), CancellationToken.None, skipOnFailure: false);
+
+        string expected = fixture.Localizer.Format(messageKey, "{Title}");
+        Assert.NotEqual(messageKey, expected);
+        Assert.Contains("{Title}", expected);
+        Assert.Equal(expected, fixture.Dialog.LastErrorMessage);
+    }
+
     [Fact]
     public async Task ResolveCredentials_SshProfileWithAKey_AsksTheVaultQuietly()
     {

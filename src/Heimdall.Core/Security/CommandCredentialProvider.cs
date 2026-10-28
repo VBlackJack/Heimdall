@@ -216,7 +216,7 @@ public sealed class CommandCredentialProvider : ICredentialProvider
             // back to the hint. Never log the value.
             Logging.FileLogger.Warn("CommandCredentialProvider: username command timed out");
         }
-        catch (CredentialProviderLaunchException)
+        catch (Exception ex) when (ex is CredentialProviderLaunchException or CredentialProviderArgumentException)
         {
             // Already logged by RunCommandAsync. The password was found, so the call stands.
         }
@@ -240,6 +240,16 @@ public sealed class CommandCredentialProvider : ICredentialProvider
         string? title,
         CancellationToken ct)
     {
+        // A value that would split into several arguments, or start one as an option, is refused
+        // before anything runs: the vault tool would look up something other than the entry asked for.
+        ArgumentTemplateRejection? rejection = FindUnsafeValue(template, serverHost, port, username, title);
+        if (rejection is not null)
+        {
+            Logging.FileLogger.Warn(
+                $"CommandCredentialProvider: the value of {rejection.Token} was refused ({rejection.Reason})");
+            throw new CredentialProviderArgumentException(rejection);
+        }
+
         var expandedCommand = ExpandTemplate(template, serverHost, port, username, title);
         var (executable, arguments) = SplitCommand(expandedCommand);
 
@@ -446,25 +456,54 @@ public sealed class CommandCredentialProvider : ICredentialProvider
     {
         var (executable, _) = SplitCommand(template);
         bool shellTarget = InputValidator.IsShellTarget(executable);
+        var placeholders = BuildPlaceholders(executable, shellTarget, host, port, username, title);
+
+        // cmd hands a quoted argument to the program it starts unchanged, and that program parses
+        // it by the CRT rules, so the closing quote needs the same protection there.
+        bool protectClosingQuote = !shellTarget || IsCmdTarget(executable);
+        return ArgumentTemplate.Expand(template, placeholders, protectClosingQuote);
+    }
+
+    /// <summary>
+    /// The first placeholder whose sanitized value would not stay one plain argument in
+    /// <paramref name="template"/>, or null. The question is
+    /// <see cref="ArgumentTemplate.FindUnsafeValue"/>, the one the external tools ask.
+    /// </summary>
+    internal ArgumentTemplateRejection? FindUnsafeValue(
+        string template,
+        string host,
+        int port,
+        string? username,
+        string? title)
+    {
+        var (executable, _) = SplitCommand(template);
+        var placeholders = BuildPlaceholders(
+            executable, InputValidator.IsShellTarget(executable), host, port, username, title);
+        return ArgumentTemplate.FindUnsafeValue(template, placeholders);
+    }
+
+    private (string Token, string Value)[] BuildPlaceholders(
+        string executable,
+        bool shellTarget,
+        string host,
+        int port,
+        string? username,
+        string? title)
+    {
         Func<string?, string> sanitizePath = shellTarget ? SanitizeStrict : SanitizePathValue;
         Func<string?, string> sanitize = shellTarget
             ? SanitizeStrict
             : IsKnownVaultTool(executable) ? SanitizePathValue : SanitizeRelaxed;
 
-        var placeholders = new (string Token, string Value)[]
-        {
+        return
+        [
             ("{Host}", sanitize(host)),
             ("{Port}", port.ToString(System.Globalization.CultureInfo.InvariantCulture)),
             ("{User}", sanitize(username)),
             ("{Title}", sanitize(title)),
             ("{Database}", sanitizePath(_databasePath)),
             ("{KeyFile}", sanitizePath(_keyFilePath)),
-        };
-
-        // cmd hands a quoted argument to the program it starts unchanged, and that program parses
-        // it by the CRT rules, so the closing quote needs the same protection there.
-        bool protectClosingQuote = !shellTarget || IsCmdTarget(executable);
-        return ArgumentTemplate.Expand(template, placeholders, protectClosingQuote);
+        ];
     }
 
     /// <summary>Whether the executable is cmd.exe or a batch file that cmd runs.</summary>

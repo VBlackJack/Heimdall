@@ -1104,6 +1104,22 @@ public sealed partial class SettingsViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task TestCredentialProvider_EntryWithASpaceOutsideTheQuotes_SaysToQuoteThePlaceholder()
+    {
+        var localizer = await CreateLocalizerAsync();
+        var viewModel = CreateViewModel(new FakeConfigManager(), localizer: localizer);
+        viewModel.CredentialProviderCommand = "heimdall-missing-vault-tool-xyz show {Title}";
+        viewModel.CredentialProviderTestEntry = "prod db";
+
+        await viewModel.TestCredentialProviderCommand.ExecuteAsync(null);
+
+        Assert.Equal(
+            localizer.Format("ErrorCredentialProviderArgumentNeedsQuotes", "{Title}"),
+            viewModel.CredentialProviderTestResult);
+        Assert.False(viewModel.CredentialProviderTestSucceeded);
+    }
+
+    [Fact]
     public void CollapseTunnelsPanelByDefault_LoadFromSettings_DefaultIsTrue()
     {
         var viewModel = CreateViewModel(new FakeConfigManager());

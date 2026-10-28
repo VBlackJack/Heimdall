@@ -83,6 +83,27 @@ public static class SmbEnumerationEngine
         return colon < 0 ? null : ReplyText.Clean(line[(colon + 1)..]);
     }
 
+    /// <summary>The label of the first <c>label : value</c> line rpcclient's srvinfo prints.</summary>
+    private const string RpcPlatformIdLabel = "platform_id";
+
+    /// <summary>
+    /// The server name of the header line of rpcclient's <c>srvinfo</c>, which reads
+    /// <c>SERVER   Wk Sv PrQ Unx NT SNT comment</c>: its first token. Null when there is no such
+    /// line, or when its first token is a label or an error prefix rather than a name.
+    /// </summary>
+    private static string? HostNameFromSrvInfoHeader(string? headerLine)
+    {
+        // The header carries no colon; every other line srvinfo prints is a "label : value" line.
+        if (string.IsNullOrWhiteSpace(headerLine) || headerLine.Contains(':'))
+        {
+            return null;
+        }
+
+        var token = headerLine.Split(
+            [' ', '\t'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)[0];
+        return ReplyText.Clean(token);
+    }
+
     /// <summary>Six hexadecimal pairs separated by hyphens or colons.</summary>
     private static readonly Regex MacAddressPattern = new(
         "^([0-9A-Fa-f]{2}[-:]){5}[0-9A-Fa-f]{2}$",
@@ -132,14 +153,22 @@ public static class SmbEnumerationEngine
         if (!string.IsNullOrWhiteSpace(rpcclientOutput)
             && !rpcclientOutput.Contains("NT_STATUS_", StringComparison.OrdinalIgnoreCase))
         {
+            string? previousLine = null;
             foreach (var line in rpcclientOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries))
             {
                 var trimmed = line.Trim();
-                if (trimmed.Contains("server_name", StringComparison.OrdinalIgnoreCase))
+                if (trimmed.Length == 0)
                 {
-                    var value = ValueAfterColon(trimmed);
-                    rpcServerName = value ?? rpcServerName;
-                    hasAnyData |= value is not null;
+                    continue;
+                }
+
+                if (trimmed.StartsWith(RpcPlatformIdLabel, StringComparison.OrdinalIgnoreCase))
+                {
+                    // srvinfo prints no "server_name" field: the server's name opens the line above
+                    // the platform_id label, ahead of its type flags and comment.
+                    var name = HostNameFromSrvInfoHeader(previousLine);
+                    rpcServerName = name ?? rpcServerName;
+                    hasAnyData |= name is not null;
                 }
                 else if (trimmed.Contains("os_version", StringComparison.OrdinalIgnoreCase)
                     || trimmed.Contains("os version", StringComparison.OrdinalIgnoreCase))
@@ -148,6 +177,8 @@ public static class SmbEnumerationEngine
                     rpcOsVersion = value ?? rpcOsVersion;
                     hasAnyData |= value is not null;
                 }
+
+                previousLine = trimmed;
             }
         }
 

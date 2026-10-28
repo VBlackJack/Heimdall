@@ -33,7 +33,26 @@ public enum CredTestStatus
     Changed,
 
     /// <summary>Credential test failed due to an operational error.</summary>
-    Error
+    Error,
+
+    /// <summary>
+    /// The check cannot log in to this service from here, so nothing was tested. Neither a
+    /// default credential nor a rejection.
+    /// </summary>
+    NotSupported
+}
+
+/// <summary>What a query run through the gateway says about a credential.</summary>
+public enum TunnelQueryOutcome
+{
+    /// <summary>The client exited 0 and printed the query's result.</summary>
+    Accepted,
+
+    /// <summary>The client ran and did not log in.</summary>
+    Rejected,
+
+    /// <summary>The client did not run (missing, not executable, timed out): nothing was tested.</summary>
+    NotRun
 }
 
 /// <summary>
@@ -64,6 +83,18 @@ public static class DefaultCredentialEngine
     public const int MaxConcurrentServices = 3;
     public const int PortProbeTimeoutMs = 2000;
 
+    /// <summary>
+    /// The services whose login cannot be tested over a direct connection: MySQL and MSSQL are
+    /// tested only through a gateway's own client. A greeting alone says nothing about a credential.
+    /// </summary>
+    private static readonly string[] DirectCheckUnsupportedServices = ["MySQL", "MSSQL"];
+
+    /// <summary>
+    /// The services whose login cannot be tested through a gateway: the VNC check there only
+    /// probed the port, and an open port says nothing about a password.
+    /// </summary>
+    private static readonly string[] GatewayCheckUnsupportedServices = ["VNC"];
+
     private const string HttpVersionPrefix = "HTTP/";
     private const int HttpStatusDigits = 3;
     private const int HttpFirstSuccessStatus = 200;
@@ -87,6 +118,102 @@ public static class DefaultCredentialEngine
     private const int VncFirstSecurityTypeListMinor = 7;
     private const int VncFirstVersion38Minor = 8;
     private const byte VncSecurityTypeNone = 1;
+
+    private const string TunnelExitStatusPrefix = "RC=";
+    private const string TunnelExitStatusSuccess = "RC=0";
+    private const int ShellCommandNotExecutableStatus = 126;
+    private const int ShellCommandNotFoundStatus = 127;
+
+    private static readonly char[] TelnetPromptCharacters = ['$', '#', '>'];
+    private static readonly string[] TelnetRefusalMarkers = ["incorrect", "failed", "denied"];
+
+    /// <summary>
+    /// The shell script that runs <paramref name="command"/> on the gateway and prints its exit
+    /// status on the first line (<c>RC=n</c>), then everything it wrote. Read back with
+    /// <see cref="ClassifyTunnelQuery"/>: success is a positive marker, never the absence of an
+    /// error word.
+    /// </summary>
+    /// <param name="command">The command line, with every argument already shell-escaped.</param>
+    public static string BuildTunnelQueryScript(string command)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        return "out=$(" + command + " 2>&1); rc=$?; printf 'RC=%s\\n%s\\n' \"$rc\" \"$out\"";
+    }
+
+    /// <summary>
+    /// Reads the output of <see cref="BuildTunnelQueryScript"/>. A login is accepted only when the
+    /// command exited 0 and printed <paramref name="expectedLine"/> as a line of its own, which is
+    /// what the query it ran returns. A missing client (<c>command not found</c>, exit 126 or
+    /// 127), empty output or output without the exit status line (a timeout) say nothing about the
+    /// credential and are <see cref="TunnelQueryOutcome.NotRun"/>.
+    /// </summary>
+    /// <param name="output">What the gateway printed.</param>
+    /// <param name="expectedLine">The result of the query, such as <c>1</c> for <c>SELECT 1</c>.</param>
+    public static TunnelQueryOutcome ClassifyTunnelQuery(string? output, string expectedLine)
+    {
+        ArgumentNullException.ThrowIfNull(expectedLine);
+
+        if (string.IsNullOrWhiteSpace(output))
+        {
+            return TunnelQueryOutcome.NotRun;
+        }
+
+        var lines = output.Split('\n').Select(static line => line.Trim()).ToArray();
+        var statusLine = lines.FirstOrDefault(static line => line.Length > 0) ?? string.Empty;
+        if (!statusLine.StartsWith(TunnelExitStatusPrefix, StringComparison.Ordinal))
+        {
+            return TunnelQueryOutcome.NotRun;
+        }
+
+        if (string.Equals(statusLine, TunnelExitStatusSuccess, StringComparison.Ordinal))
+        {
+            return lines.Skip(1).Contains(expectedLine, StringComparer.Ordinal)
+                ? TunnelQueryOutcome.Accepted
+                : TunnelQueryOutcome.Rejected;
+        }
+
+        if (!int.TryParse(
+                statusLine[TunnelExitStatusPrefix.Length..],
+                NumberStyles.None,
+                CultureInfo.InvariantCulture,
+                out var status))
+        {
+            return TunnelQueryOutcome.NotRun;
+        }
+
+        return status is ShellCommandNotExecutableStatus or ShellCommandNotFoundStatus
+            ? TunnelQueryOutcome.NotRun
+            : TunnelQueryOutcome.Rejected;
+    }
+
+    /// <summary>
+    /// Whether what a Telnet service printed after the credentials is a shell or device prompt:
+    /// a prompt character and none of the refusal words. A banner or a blank line is not a login.
+    /// </summary>
+    public static bool IsTelnetLoginAccepted(string? response)
+    {
+        if (string.IsNullOrEmpty(response))
+        {
+            return false;
+        }
+
+        return TelnetRefusalMarkers.All(marker => !response.Contains(marker, StringComparison.OrdinalIgnoreCase))
+            && response.IndexOfAny(TelnetPromptCharacters) >= 0;
+    }
+
+    /// <summary>Whether a check of the service through a gateway has no login behind it.</summary>
+    public static bool IsGatewayCheckUnsupported(string service)
+    {
+        ArgumentNullException.ThrowIfNull(service);
+        return GatewayCheckUnsupportedServices.Contains(service, StringComparer.Ordinal);
+    }
+
+    /// <summary>Whether a direct (no gateway) check of the service has no login behind it.</summary>
+    public static bool IsDirectCheckUnsupported(string service)
+    {
+        ArgumentNullException.ThrowIfNull(service);
+        return DirectCheckUnsupportedServices.Contains(service, StringComparer.Ordinal);
+    }
 
     /// <summary>
     /// Checks if an HTTP status line indicates successful authentication.
@@ -270,13 +397,17 @@ public static class DefaultCredentialEngine
             .Distinct(StringComparer.Ordinal)
             .Count();
 
+        bool anyNotTested = results.Any(r => r.Status == CredTestStatus.NotSupported);
         if (defaultCount == 0)
         {
-            return L(localize, "ToolDefCredNoDefaults");
+            // "No defaults" would claim more than was tested when some checks could not run.
+            return anyNotTested
+                ? L(localize, "ToolDefCredNoDefaultsPartial")
+                : L(localize, "ToolDefCredNoDefaults");
         }
 
         ICountLocalizer counts = countLocalizer ?? DelegateCountLocalizer.English(key => L(localize, key));
-        return string.Format(
+        string summary = string.Format(
             L(localize, "ToolDefCredSummary"),
             counts.FormatCount(
                 defaultCount,
@@ -284,6 +415,7 @@ public static class DefaultCredentialEngine
                 "ToolDefCredSummaryCredentials",
                 defaultCount),
             counts.FormatCount(serviceCount, "ToolDefCredSummaryServicesOne", "ToolDefCredSummaryServices", serviceCount));
+        return anyNotTested ? summary + " " + L(localize, "ToolDefCredSummaryNotTested") : summary;
     }
 
     /// <summary>
@@ -373,6 +505,7 @@ public static class DefaultCredentialEngine
             CredTestStatus.Default => L(localize, "ToolDefCredStatusDefault"),
             CredTestStatus.Changed => L(localize, "ToolDefCredStatusChanged"),
             CredTestStatus.Error => L(localize, "ToolDefCredStatusError"),
+            CredTestStatus.NotSupported => L(localize, "ToolDefCredStatusNotSupported"),
             _ => status.ToString()
         };
     }
@@ -394,6 +527,9 @@ public static class DefaultCredentialEngine
                 service),
             CredTestStatus.Changed => string.Format(
                 L(localize, "ToolDefCredDetailRejected"),
+                service),
+            CredTestStatus.NotSupported => string.Format(
+                L(localize, "ToolDefCredDetailNotSupported"),
                 service),
             _ => string.Empty
         };

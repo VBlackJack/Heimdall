@@ -320,7 +320,7 @@ public class HostileNetworkReplyTests
     {
         var observations = SmbEnumerationEngine.ParseTunnelOutputs(
             "Domain=[WORKGROUP] OS=[Windows 10] Server=[Win10]",
-            "\tserver_name     : DC01\n\tos version      : 10.0\n",
+            "\tDC01           Wk Sv PrQ NT SNT\n\tplatform_id     :\t500\n\tos version      :\t10.0\n",
             "\tDC01            <00> -         B <ACTIVE>\n\tWORKGROUP       <00> - <GROUP> B <ACTIVE>\n\tMAC Address = 00-0C-29-AB-CD-EF\n");
 
         Assert.True(observations.HasAnyData);
@@ -348,9 +348,9 @@ public class HostileNetworkReplyTests
     }
 
     [Theory]
-    [InlineData("server_name")]
-    [InlineData("server_name:")]
-    [InlineData("server_name :   ")]
+    [InlineData("platform_id")]
+    [InlineData("platform_id:")]
+    [InlineData("platform_id :   ")]
     [InlineData("os_version")]
     [InlineData("os version :")]
     public void ParseTunnelOutputs_AnRpcclientLabelWithoutAValue_IsNotDataAndNotItsOwnValue(string rpcclient)

@@ -353,6 +353,7 @@ public partial class DefaultCredentialView : UserControl, IToolView
                 CredTestStatus.Default => (Brush)FindResource("ErrorTextBrush"),
                 CredTestStatus.Changed => (Brush)FindResource("SuccessTextBrush"),
                 CredTestStatus.Error => (Brush)FindResource("WarningTextBrush"),
+                CredTestStatus.NotSupported => (Brush)FindResource("WarningTextBrush"),
                 _ => Brushes.Transparent
             },
             Detail = dto.Status == CredTestStatus.Error

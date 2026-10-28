@@ -82,6 +82,132 @@ public class DefaultCredentialEngineTests
     }
 
     [Fact]
+    public void BuildSummaryText_NothingDefaultButSomeChecksNotRun_DoesNotClearTheServices()
+    {
+        var results = new List<CredTestResultDto>
+        {
+            MakeResult("SSH", 22, CredTestStatus.Changed),
+            MakeResult("MySQL", 3306, CredTestStatus.NotSupported),
+        };
+
+        var summary = DefaultCredentialEngine.BuildSummaryText(results, Localize);
+
+        Assert.Equal("ToolDefCredNoDefaultsPartial", summary);
+    }
+
+    [Fact]
+    public void BuildSummaryText_DefaultsAndSomeChecksNotRun_SaysSo()
+    {
+        var results = new List<CredTestResultDto>
+        {
+            MakeResult("SSH", 22, CredTestStatus.Default),
+            MakeResult("MSSQL", 1433, CredTestStatus.NotSupported),
+        };
+
+        var summary = DefaultCredentialEngine.BuildSummaryText(results, Localize);
+
+        Assert.Equal("1 default on 1 service ToolDefCredSummaryNotTested", summary);
+    }
+
+    [Fact]
+    public void StatusToLabelAndDetail_NotSupported_AreTheirOwnKeys()
+    {
+        Assert.Equal(
+            "ToolDefCredStatusNotSupported",
+            DefaultCredentialEngine.StatusToLabel(CredTestStatus.NotSupported));
+        Assert.Equal(
+            "ToolDefCredDetailNotSupported",
+            DefaultCredentialEngine.StatusToDetail(CredTestStatus.NotSupported, "MySQL"));
+    }
+
+    [Theory]
+    [InlineData("MySQL", true)]
+    [InlineData("MSSQL", true)]
+    [InlineData("PostgreSQL", false)]
+    [InlineData("SSH", false)]
+    public void IsDirectCheckUnsupported_NamesTheServicesWithoutADirectLogin(string service, bool expected)
+    {
+        Assert.Equal(expected, DefaultCredentialEngine.IsDirectCheckUnsupported(service));
+    }
+
+    [Theory]
+    [InlineData("VNC", true)]
+    [InlineData("SSH", false)]
+    [InlineData("MySQL", false)]
+    public void IsGatewayCheckUnsupported_NamesTheServicesThatOnlyProbeThePortThere(string service, bool expected)
+    {
+        Assert.Equal(expected, DefaultCredentialEngine.IsGatewayCheckUnsupported(service));
+    }
+
+    [Fact]
+    public void ClassifyTunnelQuery_ExitZeroAndTheQueryResult_IsAccepted()
+    {
+        Assert.Equal(
+            TunnelQueryOutcome.Accepted,
+            DefaultCredentialEngine.ClassifyTunnelQuery("RC=0\n1\n", "1"));
+    }
+
+    [Fact]
+    public void ClassifyTunnelQuery_AWarningBesideTheQueryResult_IsStillAccepted()
+    {
+        const string output = "RC=0\nmysql: [Warning] Using a password on the command line interface can be insecure.\n1\n";
+
+        Assert.Equal(TunnelQueryOutcome.Accepted, DefaultCredentialEngine.ClassifyTunnelQuery(output, "1"));
+    }
+
+    [Theory]
+    [InlineData("RC=127\nbash: line 1: mysql: command not found\n")]
+    [InlineData("RC=126\nbash: mysql: Permission denied\n")]
+    [InlineData("bash: line 1: mysql: command not found\n")]
+    [InlineData("")]
+    [InlineData("   \n")]
+    [InlineData("RC=\n")]
+    public void ClassifyTunnelQuery_AClientThatDidNotRun_IsNotRunNeverAccepted(string output)
+    {
+        Assert.Equal(TunnelQueryOutcome.NotRun, DefaultCredentialEngine.ClassifyTunnelQuery(output, "1"));
+    }
+
+    [Theory]
+    [InlineData("RC=1\nERROR 1045 (28000): Access denied for user 'root'@'x'\n")]
+    [InlineData("RC=2\npsql: error: connection failed: FATAL: password authentication failed\n")]
+    [InlineData("RC=0\nWelcome\n")]
+    [InlineData("RC=0\n11\n")]
+    [InlineData("RC=0\n")]
+    public void ClassifyTunnelQuery_ARunClientWithoutTheQueryResult_IsRejected(string output)
+    {
+        Assert.Equal(TunnelQueryOutcome.Rejected, DefaultCredentialEngine.ClassifyTunnelQuery(output, "1"));
+    }
+
+    [Fact]
+    public void ClassifyTunnelQuery_TheResultAfterANonZeroExit_IsNotAccepted()
+    {
+        Assert.Equal(
+            TunnelQueryOutcome.Rejected,
+            DefaultCredentialEngine.ClassifyTunnelQuery("RC=1\n1\n", "1"));
+    }
+
+    [Fact]
+    public void BuildTunnelQueryScript_PrintsTheExitStatusFirst()
+    {
+        var script = DefaultCredentialEngine.BuildTunnelQueryScript("client --flag");
+
+        Assert.StartsWith("out=$(client --flag 2>&1); rc=$?;", script, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("bash: line 1: nc: command not found", false)]
+    [InlineData("", false)]
+    [InlineData("Welcome to the device", false)]
+    [InlineData("Login incorrect", false)]
+    [InlineData("router# ", true)]
+    [InlineData("user@host:~$ ", true)]
+    [InlineData("Access denied >", false)]
+    public void IsTelnetLoginAccepted_NeedsAPromptAndNoRefusal(string response, bool expected)
+    {
+        Assert.Equal(expected, DefaultCredentialEngine.IsTelnetLoginAccepted(response));
+    }
+
+    [Fact]
     public void BuildReportText_ContainsHeaderAndData()
     {
         var results = new List<CredTestResultDto>
@@ -201,6 +327,8 @@ public class DefaultCredentialEngineTests
             "ToolDefCredSummaryServices" => "{0} services",
             "ToolDefCredSummaryServicesOne" => "{0} service",
             "ToolDefCredNoDefaults" => "No defaults found",
+            "ToolDefCredNoDefaultsPartial" => "ToolDefCredNoDefaultsPartial",
+            "ToolDefCredSummaryNotTested" => "ToolDefCredSummaryNotTested",
             "ToolDefCredColService" => "Service",
             "ToolDefCredColPort" => "Port",
             "ToolDefCredColUser" => "User",
