@@ -125,7 +125,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     private readonly HashSet<string> _expandedNodes = new(StringComparer.OrdinalIgnoreCase);
     private readonly object _expandSaveSync = new();
     private ITimer? _searchFilterTimer;
-    private System.Threading.Timer? _expandSaveTimer;
+    private ITimer? _expandSaveTimer;
     private Task _expandSaveTask = Task.CompletedTask;
     private long _expandSaveVersion;
     private bool _expandStateSavePending;
@@ -137,7 +137,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     /// </summary>
     private string? _persistedSelectionId;
     private int _searchFilterVersion;
-    private static readonly TimeSpan ExpandStateSaveDelay = TimeSpan.FromMilliseconds(500);
+    internal static readonly TimeSpan ExpandStateSaveDelay = TimeSpan.FromMilliseconds(500);
 
     [ObservableProperty]
     private ObservableCollection<ServerItemViewModel> _servers = [];
@@ -2448,7 +2448,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
                 return;
             }
 
-            _expandSaveTimer = new System.Threading.Timer(
+            _expandSaveTimer = _timeProvider.CreateTimer(
                 _ => StartExpandStateSave(version, expandedNodes, selectedId),
                 null,
                 ExpandStateSaveDelay,

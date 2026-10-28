@@ -16,7 +16,9 @@
 
 using System.Collections.Concurrent;
 using System.IO;
+using Heimdall.App.ViewModels;
 using Heimdall.Core.Configuration;
+using Microsoft.Extensions.Time.Testing;
 
 namespace Heimdall.App.Tests;
 
@@ -80,7 +82,10 @@ public sealed partial class ServerListSelectionTests
     public async Task ExpandStatePersist_RapidTogglesAreDebouncedToLatestSnapshot()
     {
         var configManager = new RecordingConfigManager();
-        await using var fixture = await ServerListSelectionFixture.CreateAsync(configManager: configManager);
+        FakeTimeProvider timeProvider = new();
+        await using var fixture = await ServerListSelectionFixture.CreateAsync(
+            configManager: configManager,
+            timeProvider: timeProvider);
         fixture.LoadServers(
             new AppSettings(),
             CreateServer("alpha", "Alpha", "alpha"),
@@ -90,8 +95,17 @@ public sealed partial class ServerListSelectionTests
         fixture.FolderByPath("alpha").IsExpanded = false;
         fixture.FolderByPath("beta").IsExpanded = true;
 
+        // Nothing is written while the debounce is still open.
+        timeProvider.Advance(ServerListViewModel.ExpandStateSaveDelay - TimeSpan.FromMilliseconds(1));
+        Assert.Equal(0, configManager.MergeSettingCallCount);
+
+        timeProvider.Advance(TimeSpan.FromMilliseconds(1));
         await configManager.WaitForMergeCountAsync(1);
-        await Task.Delay(750);
+
+        // Time moving on schedules nothing more. Draining the save chain before counting is what
+        // makes the absence observable: a save that had been queued would have finished by then.
+        timeProvider.Advance(TimeSpan.FromMinutes(1));
+        await fixture.ViewModel.FlushExpandStateForCloseAsync();
 
         Assert.Equal(1, configManager.MergeSettingCallCount);
         Assert.Equal(["beta"], Assert.Single(configManager.PersistedSnapshots));
@@ -116,8 +130,9 @@ public sealed partial class ServerListSelectionTests
     public async Task ExpandStateCloseFlush_PendingDebouncePersistsLatestSnapshotExactlyOnce()
     {
         RecordingConfigManager configManager = new();
+        FakeTimeProvider timeProvider = new();
         await using ServerListSelectionFixture fixture =
-            await ServerListSelectionFixture.CreateAsync(configManager: configManager);
+            await ServerListSelectionFixture.CreateAsync(configManager: configManager, timeProvider: timeProvider);
         fixture.LoadServers(
             new AppSettings(),
             CreateServer("alpha", "Alpha", "alpha"),
@@ -128,7 +143,12 @@ public sealed partial class ServerListSelectionTests
         fixture.FolderByPath("beta").IsExpanded = true;
 
         await fixture.ViewModel.FlushExpandStateForCloseAsync();
-        await Task.Delay(750);
+
+        // The debounce the flush cancelled must stay cancelled: were it left running, it would
+        // fire here and write the same snapshot a second time. The second flush drains whatever
+        // that would have queued, so the count below cannot be read before the write lands.
+        timeProvider.Advance(TimeSpan.FromMinutes(1));
+        await fixture.ViewModel.FlushExpandStateForCloseAsync();
 
         Assert.Equal(1, configManager.MergeSettingCallCount);
         Assert.Equal(["beta"], Assert.Single(configManager.PersistedSnapshots));
