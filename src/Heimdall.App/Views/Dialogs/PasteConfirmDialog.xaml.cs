@@ -32,7 +32,11 @@ public partial class PasteConfirmDialog : Window
         InitializeComponent();
         WindowThemeHelper.ApplyCurrentTheme(this);
         DataContextChanged += OnDataContextChanged;
+        Loaded += OnLoaded;
     }
+
+    /// <summary>Puts the keyboard on Cancel: pasting is the act that cannot be taken back.</summary>
+    private void OnLoaded(object sender, RoutedEventArgs e) => CancelButton.Focus();
 
     private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
@@ -66,6 +70,7 @@ public partial class PasteConfirmDialog : Window
         }
 
         DataContextChanged -= OnDataContextChanged;
+        Loaded -= OnLoaded;
         base.OnClosed(e);
     }
 }

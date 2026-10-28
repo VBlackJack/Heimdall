@@ -140,7 +140,8 @@
                         Margin="0,0,8,0"
                         Style="{DynamicResource SecondaryButtonStyle}"
                         AutomationProperties.Name="{loc:Translate SharedReportExportCsv}"/>
-                <Button Content="{Binding CloseLabel}"
+                <Button x:Name="CloseButton"
+                        Content="{Binding CloseLabel}"
                         IsDefault="True"
                         IsCancel="True"
                         MinWidth="110"

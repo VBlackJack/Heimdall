@@ -28,5 +28,6 @@ public partial class TrustedHostKeyDetailsDialog : Window
     {
         InitializeComponent();
         WindowThemeHelper.ApplyCurrentTheme(this);
+        Loaded += (_, _) => CloseButton.Focus();
     }
 }

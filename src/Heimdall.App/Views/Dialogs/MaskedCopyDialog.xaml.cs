@@ -30,6 +30,7 @@ public partial class MaskedCopyDialog : Window
         InitializeComponent();
         WindowThemeHelper.ApplyCurrentTheme(this);
         DataContextChanged += OnDataContextChanged;
+        Loaded += (_, _) => CopyButton.Focus();
     }
 
     private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
