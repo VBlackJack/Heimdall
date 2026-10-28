@@ -78,6 +78,12 @@ public static class ValidationConstants
     public const int HistoryRetentionDays = 90;
 
     /// <summary>
+    /// Maximum number of Git sync history entries kept for one remote (500 entries); the
+    /// oldest are deleted after each sync.
+    /// </summary>
+    public const int MaxSyncHistoryEntriesPerRemote = 500;
+
+    /// <summary>
     /// Maximum file size for imports/exports (10MB).
     /// </summary>
     public const long MaxFileSizeBytes = 10 * 1024 * 1024;

@@ -26,6 +26,9 @@ namespace TwinShell.Persistence.Repositories;
 /// </summary>
 public sealed class SyncHistoryRepository : ISyncHistoryRepository
 {
+    /// <summary>Ids per delete statement, well under the parameter limit of SQLite.</summary>
+    private const int DeleteChunkSize = 500;
+
     private readonly TwinShellDbContext _dbContext;
 
     public SyncHistoryRepository(TwinShellDbContext dbContext)
@@ -88,6 +91,41 @@ public sealed class SyncHistoryRepository : ISyncHistoryRepository
         return await _dbContext.SyncHistories
             .Where(e => e.StartedAt < olderThan)
             .ExecuteDeleteAsync();
+    }
+
+    public async Task<int> DeleteBeyondNewestPerRemoteAsync(int keepPerRemote)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(keepPerRemote);
+
+        // The remotes first, so a table inside its bound costs one grouped count.
+        List<string?> crowdedRemotes = await _dbContext.SyncHistories
+            .GroupBy(e => e.RemoteUrl)
+            .Where(group => group.Count() > keepPerRemote)
+            .Select(group => group.Key)
+            .ToListAsync();
+
+        int deleted = 0;
+        foreach (string? remote in crowdedRemotes)
+        {
+            // Newest first with the id as tiebreaker, so two entries stamped alike are
+            // ranked the same way on every run.
+            List<string> excessIds = await _dbContext.SyncHistories
+                .Where(e => e.RemoteUrl == remote)
+                .OrderByDescending(e => e.StartedAt)
+                .ThenBy(e => e.Id)
+                .Skip(keepPerRemote)
+                .Select(e => e.Id)
+                .ToListAsync();
+
+            foreach (string[] chunk in excessIds.Chunk(DeleteChunkSize))
+            {
+                deleted += await _dbContext.SyncHistories
+                    .Where(e => chunk.Contains(e.Id))
+                    .ExecuteDeleteAsync();
+            }
+        }
+
+        return deleted;
     }
 
     public async Task<int> GetCountAsync()

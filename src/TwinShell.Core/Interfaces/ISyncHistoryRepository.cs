@@ -61,6 +61,14 @@ public interface ISyncHistoryRepository
     Task<int> DeleteOldEntriesAsync(DateTime olderThan);
 
     /// <summary>
+    /// Deletes, for every remote that has more than <paramref name="keepPerRemote"/> entries,
+    /// the oldest ones beyond that number.
+    /// </summary>
+    /// <param name="keepPerRemote">How many of the newest entries of each remote to keep</param>
+    /// <returns>Number of entries deleted</returns>
+    Task<int> DeleteBeyondNewestPerRemoteAsync(int keepPerRemote);
+
+    /// <summary>
     /// Gets total count of sync history entries
     /// </summary>
     Task<int> GetCountAsync();
