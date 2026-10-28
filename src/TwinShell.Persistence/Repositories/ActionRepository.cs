@@ -43,11 +43,16 @@ public sealed class ActionRepository : IActionRepository
         _logger = logger;
     }
 
+    /// <summary>
+    /// Every live action. A retired one is left out: it is kept only so the history and
+    /// favorites that point at it stay readable through <see cref="GetByIdAsync"/>.
+    /// </summary>
     public async Task<IEnumerable<Core.Models.Action>> GetAllAsync()
     {
         // PERFORMANCE: AsNoTracking for read-only queries reduces memory overhead by 40-60%
         var entities = await _context.Actions
             .AsNoTracking()
+            .Where(a => !a.IsRetired)
             .Include(a => a.WindowsCommandTemplate)
             .Include(a => a.LinuxCommandTemplate)
             .Include(a => a.Translations)
@@ -77,7 +82,7 @@ public sealed class ActionRepository : IActionRepository
             .Include(a => a.WindowsCommandTemplate)
             .Include(a => a.LinuxCommandTemplate)
             .Include(a => a.Translations)
-            .Where(a => a.Category == category)
+            .Where(a => a.Category == category && !a.IsRetired)
             .ToListAsync();
 
         return entities.Select(ActionMapper.ToModel);
@@ -93,6 +98,7 @@ public sealed class ActionRepository : IActionRepository
             // Fetch from database
             var result = await _context.Actions
                 .AsNoTracking()
+                .Where(a => !a.IsRetired)
                 .Select(a => a.Category)
                 .Distinct()
                 .OrderBy(c => c)
@@ -246,6 +252,11 @@ public sealed class ActionRepository : IActionRepository
             var entity = await _context.Actions.FindAsync(id);
             if (entity != null)
             {
+                if (entity.IsUserCreated)
+                {
+                    await RecordSharedDeleteAsync(entity);
+                }
+
                 _context.Actions.Remove(entity);
                 await _context.SaveChangesAsync();
 
@@ -260,6 +271,30 @@ public sealed class ActionRepository : IActionRepository
         }
     }
 
+    /// <summary>
+    /// Records the delete of a user action, and of each of its templates no other action uses,
+    /// for the next sync export: the folder only learns of a delete through its tombstone.
+    /// </summary>
+    private async Task RecordSharedDeleteAsync(Entities.ActionEntity entity)
+    {
+        DateTime deletedAt = DateTime.UtcNow;
+        await SyncTombstoneRepository.RecordAsync(_context, entity.PublicId, deletedAt);
+
+        foreach (string templateId in new[] { entity.WindowsCommandTemplateId, entity.LinuxCommandTemplateId }.OfType<string>().Distinct())
+        {
+            bool usedElsewhere = await _context.Actions.AnyAsync(a =>
+                a.Id != entity.Id && (a.WindowsCommandTemplateId == templateId || a.LinuxCommandTemplateId == templateId));
+            Guid? templatePublicId = await _context.CommandTemplates
+                .Where(t => t.Id == templateId)
+                .Select(t => (Guid?)t.PublicId)
+                .FirstOrDefaultAsync();
+            if (!usedElsewhere && templatePublicId is { } publicId)
+            {
+                await SyncTombstoneRepository.RecordAsync(_context, publicId, deletedAt);
+            }
+        }
+    }
+
     public async Task<bool> ExistsAsync(string id)
     {
         return await _context.Actions.AnyAsync(a => a.Id == id);
@@ -267,7 +302,7 @@ public sealed class ActionRepository : IActionRepository
 
     public async Task<int> CountAsync()
     {
-        return await _context.Actions.CountAsync();
+        return await _context.Actions.CountAsync(a => !a.IsRetired);
     }
 
     /// <summary>
@@ -280,7 +315,7 @@ public sealed class ActionRepository : IActionRepository
             return 0;
 
         return await _context.Actions
-            .Where(a => a.Category == category)
+            .Where(a => a.Category == category && !a.IsRetired)
             .CountAsync();
     }
 

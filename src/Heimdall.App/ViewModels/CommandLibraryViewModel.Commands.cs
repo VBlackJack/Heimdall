@@ -571,8 +571,9 @@ public sealed partial class CommandLibraryViewModel
         }
 
         var all = await actionService.GetAllActionsAsync();
+        // "My actions" is what Git sync shares too: one predicate, so the two never disagree.
         return scope == CommandLibraryExportScope.Mine
-            ? all.Where(action => action.IsUserCreated).ToList()
+            ? all.Where(TwinShell.Core.Helpers.SharedLibraryContent.IsShared).ToList()
             : all.ToList();
     }
 
@@ -597,7 +598,7 @@ public sealed partial class CommandLibraryViewModel
         }
 
         return (await batchService.GetAllBatchesAsync())
-            .Where(runbook => runbook.IsUserCreated)
+            .Where(TwinShell.Core.Helpers.SharedLibraryContent.IsShared)
             .ToList();
     }
 

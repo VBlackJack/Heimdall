@@ -17,6 +17,7 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using TwinShell.Core.Enums;
+using TwinShell.Core.Helpers;
 using TwinShell.Core.Models;
 using TwinShell.Persistence.Entities;
 using TwinShell.Persistence.Seeding;
@@ -45,14 +46,15 @@ public sealed class SystemSeedRefresherTests
             [SystemAction("kept", "New title"), SystemAction("added", "Added")],
             SecondHash);
 
-        result.Should().Be(new SeedRefreshResult(true, Inserted: 1, Updated: 1, Removed: 1, FavoritesRemoved: 0));
+        result.Should().Be(new SeedRefreshResult(true, Inserted: 1, Updated: 1, Removed: 0, FavoritesRemoved: 0, Retired: 1));
         List<ActionModel> actions = (await fixture.Actions.GetAllAsync()).ToList();
         actions.Select(a => a.Id).Should().BeEquivalentTo(["kept", "added", "mine"]);
         actions.Single(a => a.Id == "kept").Title.Should().Be("New title");
         actions.Single(a => a.Id == "mine").IsUserCreated.Should().BeTrue();
         (await refresher.ReadAppliedHashAsync()).Should().Be(SecondHash);
         (await fixture.DbContext.CommandTemplates.Select(t => t.Id).ToListAsync())
-            .Should().BeEquivalentTo(["kept-lin", "added-lin", "mine-lin"], "a retired action's template leaves with it");
+            .Should().BeEquivalentTo(["kept-lin", "added-lin", "mine-lin", "retired-lin"], "a retired action keeps its template");
+        (await fixture.Actions.GetByIdAsync("retired"))!.IsRetired.Should().BeTrue("a dropped action is retired, never deleted");
     }
 
     [Fact]
@@ -68,8 +70,10 @@ public sealed class SystemSeedRefresherTests
         (await fixture.Actions.GetByIdAsync("kept"))!.Title.Should().Be("Old title");
     }
 
+    // A retired action that a favorite points at is kept as retired since D-04: the favorite
+    // stays with it, and the library no longer lists the action.
     [Fact]
-    public async Task AFavoriteOnASurvivingId_Survives_AndOneOnARetiredIdGoes()
+    public async Task AFavoriteOnASurvivingId_Survives_AndOneOnARetiredIdStaysWithItsRetiredAction()
     {
         await using TwinShellSyncFixture fixture = await TwinShellSyncFixture.CreateAsync();
         var refresher = new SystemSeedRefresher(fixture.DbContext);
@@ -80,10 +84,48 @@ public sealed class SystemSeedRefresherTests
         await fixture.DbContext.SaveChangesAsync();
         fixture.DbContext.ChangeTracker.Clear();
 
-        await refresher.RefreshAsync([SystemAction("kept", "Kept, reworded")], SecondHash);
+        SeedRefreshResult result = await refresher.RefreshAsync([SystemAction("kept", "Kept, reworded")], SecondHash);
 
+        result.Retired.Should().Be(1);
+        result.Removed.Should().Be(0);
         (await fixture.DbContext.UserFavorites.Select(f => f.Id).ToListAsync())
-            .Should().Equal("fav-kept");
+            .Should().BeEquivalentTo(["fav-kept", "fav-retired"]);
+        (await fixture.Actions.GetAllAsync()).Select(a => a.Id).Should().Equal("kept");
+    }
+
+    // D-04: retiring a shipped action used to delete its row, and its whole command history
+    // went with it through the cascade. It is now always retired, history or not.
+    [Fact]
+    public async Task ARetiredActionWithHistory_StaysRetiredWithItsHistory_AndComesBackWhenShippedAgain()
+    {
+        await using TwinShellSyncFixture fixture = await TwinShellSyncFixture.CreateAsync();
+        var refresher = new SystemSeedRefresher(fixture.DbContext);
+        await refresher.RefreshAsync([SystemAction("kept", "Kept"), SystemAction("retired", "Retired")], FirstHash);
+        fixture.DbContext.CommandHistories.Add(new CommandHistoryEntity
+        {
+            Id = "history-retired",
+            ActionId = "retired",
+            GeneratedCommand = "echo retired",
+            Platform = Platform.Linux,
+            CreatedAt = DateTime.UtcNow,
+            Category = CommandCategories.Development,
+            ActionTitle = "Retired"
+        });
+        await fixture.DbContext.SaveChangesAsync();
+        fixture.DbContext.ChangeTracker.Clear();
+
+        SeedRefreshResult result = await refresher.RefreshAsync([SystemAction("kept", "Kept")], SecondHash);
+
+        result.Retired.Should().Be(1);
+        result.Removed.Should().Be(0);
+        (await fixture.DbContext.CommandHistories.Select(h => h.Id).ToListAsync()).Should().Equal("history-retired");
+        (await fixture.Actions.GetAllAsync()).Select(a => a.Id).Should().Equal("kept");
+        (await fixture.Actions.GetByIdAsync("retired"))!.IsRetired.Should().BeTrue();
+
+        await refresher.RefreshAsync([SystemAction("kept", "Kept"), SystemAction("retired", "Retired")], "hash-3");
+
+        (await fixture.Actions.GetAllAsync()).Select(a => a.Id).Should().BeEquivalentTo(["kept", "retired"]);
+        (await fixture.Actions.GetByIdAsync("retired"))!.IsRetired.Should().BeFalse();
     }
 
     [Fact]
@@ -101,7 +143,7 @@ public sealed class SystemSeedRefresherTests
 
         result.Updated.Should().Be(1);
         ActionModel stored = (await fixture.Actions.GetByIdAsync("kept"))!;
-        stored.PublicId.Should().Be(legacy.PublicId, "a sync folder knows the action by its public id");
+        stored.PublicId.Should().Be(SeedPublicIds.ForAction("kept"), "a shipped action has the same public id on every install");
         stored.Translations.Should().ContainSingle().Which.Title.Should().Be("Nouveau titre");
     }
 

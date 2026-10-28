@@ -80,6 +80,7 @@ internal static class TwinShellBootstrapper
         services.AddScoped<ICommandTemplateRepository, CommandTemplateRepository>();
         services.AddScoped<ISyncHistoryRepository, SyncHistoryRepository>();
         services.AddScoped<IBatchRepository, BatchRepository>();
+        services.AddScoped<ISyncTombstoneRepository, SyncTombstoneRepository>();
         services.AddScoped<IUnitOfWork, TwinShell.Persistence.UnitOfWork>();
 
         // Localization bridge for CommandGeneratorService
@@ -176,7 +177,8 @@ internal static class TwinShellBootstrapper
             var result = await refresher.RefreshAsync(validActions, seedHash);
             Heimdall.Core.Logging.FileLogger.Info(
                 $"[TwinShell] Seed applied from {jsonFiles.Length} files: {result.Inserted} inserted, "
-                + $"{result.Updated} updated, {result.Removed} removed, {result.FavoritesRemoved} orphan favorite(s) removed");
+                + $"{result.Updated} updated, {result.Removed} removed, {result.Retired} retired, "
+                + $"{result.FavoritesRemoved} orphan favorite(s) removed");
         }
         catch (Exception ex)
         {
