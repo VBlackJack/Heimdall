@@ -32,7 +32,7 @@ Heimdall.slnx (14 projects)
 │       │          EmbeddedRdpView, EmbeddedSshView, EmbeddedSftpView,
 │       │          EmbeddedCitrixView, EmbeddedVncView, FloatingSessionWindow
 │       ├── Views/Tools: 58 built-in sysops tools (IToolView interface)
-│       └── Services: ConnectionService (.Rdp/.Ssh/.Sftp/.Ftp/.Vnc/.Telnet/.Citrix/.Local/.Tunnel),
+│       └── Services: ConnectionService (dispatches to the handlers in Services/Handlers),
 │                     SplitService, SessionWindowService, EmbeddedSessionManager, ToolRegistry,
 │                     TaskSchedulerService, MacroService, EphemeralFileServer, FileShareService,
 │                     X11ServerManager, WebSocketVncProxy, KeyboardShortcutService,
@@ -249,7 +249,7 @@ Trust store changes reach `settings.json` through `HostKeyPersistenceCoalescer` 
 
 **Problem**: Citrix published applications and desktops require StoreFront authentication and ICA file generation before launching a session.
 
-**Solution**: `ConnectionService.Citrix.cs` uses the `storebrowse.exe` CLI from Citrix Workspace App:
+**Solution**: `CitrixHandler.cs` uses the `storebrowse.exe` CLI from Citrix Workspace App:
 1. Auto-detects `storebrowse.exe` in `%ProgramFiles(x86)%\Citrix\ICA Client\SelfServicePlugin\`
 2. Authenticates against StoreFront to enumerate published resources
 3. Generates ICA file for the selected resource
@@ -479,31 +479,30 @@ A complementary **Windows Hello gate** (`IWindowsHelloService` over `UserConsent
 
 ### 26. MainWindow Code-Behind Split Strategy
 
-**Problem**: `MainWindow.xaml.cs` naturally accretes: it is the owner of ~300 named XAML elements, event handlers, localization wiring, context menus, tab population, and session orchestration. Left unchecked it bloats past 5,000 lines, making navigation, review, and unit testing hard.
+**Problem**: `MainWindow.xaml.cs` naturally accretes: it is the owner of ~300 named XAML elements, event handlers, localization wiring, context menus, tab population, and session orchestration. Left unchecked it keeps growing, making navigation, review, and unit testing hard.
 
 **Solution**: two complementary patterns applied as pure structural splits (no logic change, no rename, no signature change):
 
 1. **Extract to DI-registered services** when the logic does not need named XAML element access - a service takes a handful of dependencies via its constructor, is registered as a singleton in `App.xaml.cs`, and is injected into `MainWindow` alongside `MainViewModel`. Communication back into the window uses either a small callback interface (when many methods need window state) or plain `Action<T>` delegates (when only one or two callbacks are needed).
-   - **`ContextMenuFactory`** (647 lines) - builds the four session `TreeView` context menus and the "Detected Tools" submenu. Reaches back into `MainWindow` through `IContextMenuCallbacks`.
-   - **`SessionTabContextMenuFactory`** (335 lines) - builds the session tab strip context menu (19 conditional items: close/close others/close all/rename/duplicate/detach/split/merge/unsplit/reconnect/...). Reaches back through `ISessionTabContextCallbacks`.
-   - **`ToolsTabPopulationService`** (605 lines) - owns the full-page Tools tab rebuild and the sidebar Tools `TreeView` data/filter. Reaches back via `Action<ToolDescriptor>` (card click) + `Action<string>` (pin click). Theme tokens are resolved via `Application.Current.FindResource` so the service stays decoupled from any `FrameworkElement`.
+   - **`ContextMenuFactory`** - builds the four session `TreeView` context menus and the "Detected Tools" submenu. Reaches back into `MainWindow` through `IContextMenuCallbacks`.
+   - **`SessionTabContextMenuFactory`** - builds the session tab strip context menu (19 conditional items: close/close others/close all/rename/duplicate/detach/split/merge/unsplit/reconnect/...). Reaches back through `ISessionTabContextCallbacks`.
+   - **`ToolsTabPopulationService`** - owns the full-page Tools tab rebuild and the sidebar Tools `TreeView` data/filter. Reaches back via `Action<ToolDescriptor>` (card click) + `Action<string>` (pin click). Theme tokens are resolved via `Application.Current.FindResource` so the service stays decoupled from any `FrameworkElement`.
    - **`FileShareService`** - ephemeral HTTP/TFTP folder sharing lifecycle (previously inline in `OnShareFolderClick`). Event-based API (`ShareStarted` / `ShareStopped`), `IAsyncDisposable` - `App.OnExit` routes through `IAsyncDisposable.DisposeAsync` on the service provider to properly dispose async-only services.
    - **`KeyboardShortcutService`** (18 shortcuts) - fluent shortcut registration with `canExecute` gating, replacing the monolithic `OnPreviewKeyDown` switch. Registered in `MainWindow` constructor.
    - **`SessionWindowService`** - split/merge/detach/unsplit orchestration moved out of MainWindow. Exposes `SplitPaletteRequested` event for MainWindow to open the palette in split mode.
 
 2. **Split into `partial class` files** when the logic *must* touch named XAML elements directly (so extraction to a service would require passing dozens of `FrameworkElement` parameters on every call). The new file declares `public partial class MainWindow` and holds a thematically coherent subset of methods. Cross-file access is free (same class, same assembly) so static helpers and private fields remain shared without any visibility changes. POCOs co-located with the partials (`WindowUIState`, `TreeInteractionState`, `TabInteractionState`) own the fields/flags previously scattered across the monolith.
-   - **`MainWindow.Localization.cs`** (519 lines) - the 8 `Apply*Localization` methods (`ApplyLocalization` orchestrator + Navigation / Toolbar / Tunnel / Scheduled / Settings / About / Accessibility). Phase 5A/5B have since migrated Navigation/Toolbar/Accessibility to `{loc:Translate}` - those apply helpers are now empty stubs pending deletion after Phase 5C/5D.
    - **`MainWindow.WindowUI.cs`** + `WindowUIState` POCO - fullscreen toggle, sidebar collapse, tree scroll persistence, folder expand/collapse memory, window-bounds save/restore.
    - **`MainWindow.TreeInteractions.cs`** + `TreeInteractionState` POCO - session `TreeView` drag-drop, filter box, inline rename, context-menu plumbing. The move-to-group UX now routes both context-menu and drag-drop through the same `ServerListViewModel` core method, validates drag-drop targets against the same project-scoped group set, preserves `_expandedNodes` by avoiding `LoadServers` reloads, and exposes a dedicated no-group drop zone for drag-to-root parity.
    - **`MainWindow.TabInteractions.cs`** + `TabInteractionState` POCO - session tab drag-to-reorder, drag-to-detach, drop target resolution, tab-strip hover tracking.
 
-**Decision rule**: if the method's entire body is `Mw_X.Text = vm.Localize(...)` against named elements, use a partial class. If it manipulates the tree or builds controls from data and can be reshaped to take a `Panel`/`Control` parameter, extract to a service. The same `ConnectionService` in `Heimdall.App/Services/` already uses this partial-class pattern with 10 files for its per-protocol connection flows.
+**Decision rule**: if the method's entire body is `Mw_X.Text = vm.Localize(...)` against named elements, use a partial class. If it manipulates the tree or builds controls from data and can be reshaped to take a `Panel`/`Control` parameter, extract to a service. The per-protocol connection flows, by contrast, live in one `IProtocolHandler` per protocol under `Heimdall.App/Services/Handlers/`, not in partial classes.
 
-**Result**: `MainWindow.xaml.cs` dropped from **4,895 → 2,123 lines (-57%)** across Chantier 1 + Phases 1-3, with each extracted unit now independently reviewable and the door open for targeted unit tests where appropriate. Phase 1 extracted `OnboardingFlowViewModel`, `FileShareService`, and the `WindowUI` partial. Phase 2 extracted `KeyboardShortcutService`, `SidebarViewModel`, `ToolsTabViewModel`, and removed a dead `OnWindowDeactivated` Command Palette handler that had been closing the palette on open. Phase 3 extracted `TreeInteractions`/`TabInteractions` partials, `SessionTabContextMenuFactory`, and `SessionWindowService`.
+**Result**: `MainWindow.xaml.cs` shrank across Chantier 1 + Phases 1-3, with each extracted unit now independently reviewable and the door open for targeted unit tests where appropriate. Phase 1 extracted `OnboardingFlowViewModel`, `FileShareService`, and the `WindowUI` partial. Phase 2 extracted `KeyboardShortcutService`, `SidebarViewModel`, `ToolsTabViewModel`, and removed a dead `OnWindowDeactivated` Command Palette handler that had been closing the palette on open. Phase 3 extracted `TreeInteractions`/`TabInteractions` partials, `SessionTabContextMenuFactory`, and `SessionWindowService`.
 
 ### 27. MainViewModel Sub-VM Composition
 
-**Problem**: `MainViewModel.cs` had grown to 1,917 lines as the single orchestration point for the sidebar, tools tab, command palette, tunnels panel, scheduled tasks, session lifecycle, broadcast mode, and workspace restore. Every new feature landed a few more `[ObservableProperty]` / `[RelayCommand]` / event handler in the same class, blurring domain boundaries and making the VM hard to test in isolation.
+**Problem**: `MainViewModel.cs` had grown into the single orchestration point for the sidebar, tools tab, command palette, tunnels panel, scheduled tasks, session lifecycle, broadcast mode, and workspace restore. Every new feature landed a few more `[ObservableProperty]` / `[RelayCommand]` / event handler in the same class, blurring domain boundaries and making the VM hard to test in isolation.
 
 **Solution**: composed sub-VMs instantiated inside the `MainViewModel` constructor (no DI registration, no service-locator lookup). Each sub-VM takes `MainViewModel` as its first constructor parameter and reaches sibling state through `_main.X` (same pattern already used by `TunnelsViewModel` and `ScheduledTasksViewModel`). Sub-VMs that own event subscriptions implement `IDisposable` and are disposed from `MainViewModel.Dispose`.
 
@@ -519,11 +518,11 @@ Two additional shell-layer sub-VMs were extracted during Phase 2 to mirror the X
 - **`SidebarViewModel`** - Sessions/Tools tab toggle, tool filter text, `SidebarToolCategoryViewModel` tree, lazy population on first activation, `Ctrl+Shift+T` toggle target selection (the sibling RadioButton must be explicitly set - see `ToggleSidebarTab()` gotcha in §Sidebar).
 - **`ToolsTabViewModel`** - full-page Tools browser VM state (favorites, recents, filter, section visibility). Section rendering itself stays in `ToolsTabPopulationService` (which writes to named XAML panels), wired through a Panel-injection event so the VM never touches `FrameworkElement` directly.
 
-**Result**: `MainViewModel.cs` dropped from **1,917 → 628 lines (-67%)**. The shell class now orchestrates sub-VM instantiation, shared settings, the single `OpenToolCallback`, and the composed `LoadAsync` pipeline. Each sub-VM is independently navigable, testable in isolation (sub-VMs that don't touch `Application.Current.Dispatcher` run cleanly in xUnit), and owns its own event-subscription lifecycle via `IDisposable`.
+**Result**: `MainViewModel.cs` is now a shell class. It orchestrates sub-VM instantiation, shared settings, the single `OpenToolCallback`, and the composed `LoadAsync` pipeline. Each sub-VM is independently navigable, testable in isolation (sub-VMs that don't touch `Application.Current.Dispatcher` run cleanly in xUnit), and owns its own event-subscription lifecycle via `IDisposable`.
 
 ### 28. Declarative i18n Migration (Phase 5)
 
-**Problem**: before Phase 5, `MainWindow.Localization.cs` owned localization as an imperative 523-line code-behind pass. `ApplyLocalization()` ran at startup and on every `LocalizationManager.LocaleChanged` notification, dispatching to 7 `Apply*Localization` methods (Navigation, Toolbar, Tunnel, Scheduled, Settings, About, Accessibility) that touched 300+ named XAML elements with assignments such as `Mw_X.Text = vm.Localize("Key")`, `AutomationProperties.SetName(Mw_X, vm.Localize("Key"))`, `Mw_X.Tag = vm.Localize("Key")`, and tooltip/header equivalents. Every locale switch re-ran the full pass and rewrote labels, tooltips, accessibility names, and watermarks by name.
+**Problem**: before Phase 5, a localization partial of `MainWindow` owned localization as an imperative code-behind pass. `ApplyLocalization()` ran at startup and on every `LocalizationManager.LocaleChanged` notification, dispatching to 7 `Apply*Localization` methods (Navigation, Toolbar, Tunnel, Scheduled, Settings, About, Accessibility) that touched 300+ named XAML elements with assignments such as `Mw_X.Text = vm.Localize("Key")`, `AutomationProperties.SetName(Mw_X, vm.Localize("Key"))`, `Mw_X.Tag = vm.Localize("Key")`, and tooltip/header equivalents. Every locale switch re-ran the full pass and rewrote labels, tooltips, accessibility names, and watermarks by name.
 
 **Solution**: Phase 5 moved approximately 307 imperative localization sites to declarative XAML using the existing `{loc:Translate Key}` markup extension. `TranslateExtension` and `LocalizationSource` were intentionally unchanged: the extension creates a WPF `Binding` to `LocalizationSource.Instance[Key]`, and `LocalizationSource` raises `PropertyChanged("Item[]")` when the locale changes so bound DependencyProperties refresh without a code-behind render pass.
 
@@ -536,7 +535,7 @@ Migration was split by UI pattern:
 - **5D.1 - Composites via inline `<Run>` (8 sites)**: status-bar composites (`" " + key + " " + key`) and About feature bullets (`"\u2022 " + key`) were split into anonymous inline `Run` elements containing literal text plus `{loc:Translate Key}` bindings. `ApplyNavigationLocalization` and `ApplyAboutLocalization` were deleted.
 - **5D.2 - Logic-heavy cases (2 sites + helper extraction)**: the share-folder conditional label moved out of `ApplyToolbarLocalization` into `UpdateShareFolderLabel()` on `MainWindow`, called from `SharingStarted`, `SharingStopped`, the locale handler, and startup while `FileShareService` remains non-INPC. The tunnel-panel header `{0}` split moved to `TunnelsViewModel.TunnelPanelHeaderPrefix` / `TunnelPanelHeaderSuffix`, with `Mode=OneWay` inline `Run` bindings and `LocalizationManager.LocaleChanged` re-notification. `ApplyToolbarLocalization` and `ApplyTunnelLocalization` were deleted.
 
-**Result**: `MainWindow.Localization.cs` dropped from **523 → 122 lines (-77%)**. Its remaining responsibilities are deliberately not pure XAML label localization:
+**Result**: the localization partial shrank to a small residue and has since been folded back into `MainWindow.xaml.cs`. The remaining responsibilities are deliberately not pure XAML label localization:
 
 - `ApplyLocalization()` - now a one-call dispatcher to `ApplySettingsLocalization(vm)`.
 - `ApplySettingsLocalization()` - residual runtime UI population: `PopulateCredProvPresets`, `PopulateExtToolPlaceholderList`, `UpdateExtToolPreview`, `UpdateExternalToolProviderStatus`, and the async token-status check. These helpers generate or update dynamic UI from runtime state, so they stay imperative until a dedicated settings-helper extraction.
@@ -548,7 +547,7 @@ The Phase 5 final smoke test also surfaced a latent Command Palette regression f
 
 - `FileShareService` can implement `INotifyPropertyChanged` so `Mw_ShareFolderLabel` becomes a pure binding and `UpdateShareFolderLabel()` disappears.
 - Eight accessibility keys (five navigation tabs from Phase 5B and three gateway buttons from Phase 5C.2) currently preserve imperative behavior over the more descriptive `Access*` variants. If NVDA testing flags phrasing issues, this is a small XAML-only key swap.
-- The 5 residual settings helpers can move into dedicated CredProv / external-tool helper services, eliminating `MainWindow.Localization.cs` entirely. That is an architectural cleanup, not an i18n migration requirement.
+- The 5 residual settings helpers can move into dedicated CredProv / external-tool helper services, removing the last localization code from `MainWindow`. That is an architectural cleanup, not an i18n migration requirement.
 
 ### 29. Post-connect Command Library Resolution
 
@@ -607,7 +606,7 @@ prefill even if future alias tables expand.
 
 Historic formats (`MobaXterm`, `RDCMan`, `mRemoteNG`) keep their dedicated parsers and are not routed through the new service. Their import filter entries remain in the OpenFileDialog so existing workflows are not regressed.
 
-## Design System (CommonControls.xaml - 1,880+ lines, 45 tokens, WCAG AA)
+## Design System (CommonControls.xaml - 45 tokens, WCAG AA)
 
 The application uses a centralized Design System defined in `CommonControls.xaml`, backed by the `ThemeForge.Theme` NuGet package and the `HeimdallThemeBridge.xaml` app brush bridge. The 17 ThemeForge palettes provide canonical color slots; the bridge re-expresses Heimdall's 74 app brush keys on those slots. Theme swapping is owned by `HeimdallThemeService` (singleton DI) - see `docs/TROUBLESHOOTING.md` ("Theme Switching - Stale Colors After Swap") for the reactivity patterns.
 
