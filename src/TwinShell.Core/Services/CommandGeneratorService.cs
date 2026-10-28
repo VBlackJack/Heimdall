@@ -35,14 +35,17 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
 {
     private readonly ILocalizationService _localizationService;
 
+    // Every pattern below ends with \z, not $: $ also matches before a final line feed, and a
+    // value that passes here goes into the command bare, so a trailing line feed would
+    // submit the line.
     // BUGFIX: Declare Regex as static readonly for better performance
-    private static readonly Regex HostnameRegex = new Regex(@"^(?!-)([a-zA-Z0-9-]{1,63}(?<!-)\.)*[a-zA-Z0-9-]{1,63}$", RegexOptions.Compiled);
+    private static readonly Regex HostnameRegex = new Regex(@"^(?!-)([a-zA-Z0-9-]{1,63}(?<!-)\.)*[a-zA-Z0-9-]{1,63}\z", RegexOptions.Compiled);
 
-    private static readonly Regex DriveLetterRegex = new Regex(@"^[A-Za-z]$", RegexOptions.Compiled);
+    private static readonly Regex DriveLetterRegex = new Regex(@"^[A-Za-z]\z", RegexOptions.Compiled);
 
     // A value made only of these characters reads the same to bash and PowerShell with or
     // without quotes; see IsSafeBareValue.
-    private static readonly Regex SafeBareValueRegex = new Regex(@"^[A-Za-z0-9._/:=@+,%-]+$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly Regex SafeBareValueRegex = new Regex(@"^[A-Za-z0-9._/:=@+,%-]+\z", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     // BUGFIX: Declare dangerous characters as static readonly for better performance
     private static readonly char[] DangerousChars = { '&', '|', ';', '`', '$', '(', ')', '<', '>', '\n', '\r' };
@@ -313,14 +316,14 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
                 {
                     case TemplateParameterTypes.Int:
                     case TemplateParameterTypes.Integer:
-                        if (!int.TryParse(value, out _))
+                        if (!IsInteger(value))
                         {
                             errors.Add(_localizationService.GetFormattedString(MessageKeys.ValidationParameterMustBeInteger, parameter.Label));
                         }
                         break;
 
                     case TemplateParameterTypes.Number:
-                        if (!double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
+                        if (!IsNumber(value))
                         {
                             errors.Add(_localizationService.GetFormattedString(MessageKeys.ValidationParameterMustBeNumber, parameter.Label));
                         }
@@ -460,7 +463,7 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
         // The same keys ValidateParameters reports, so a refusal reads the same in the
         // operator's language whichever path met it first.
         string? key = null;
-        switch (parameter.Type.ToLower())
+        switch (parameter.Type.ToLowerInvariant())
         {
             case TemplateParameterTypes.Hostname:
                 if (!IsValidHostname(value))
@@ -478,14 +481,14 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
 
             case TemplateParameterTypes.Int:
             case TemplateParameterTypes.Integer:
-                if (!int.TryParse(value, out _))
+                if (!IsInteger(value))
                 {
                     key = MessageKeys.ValidationParameterMustBeInteger;
                 }
                 break;
 
             case TemplateParameterTypes.Number:
-                if (!double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
+                if (!IsNumber(value))
                 {
                     key = MessageKeys.ValidationParameterMustBeNumber;
                 }
@@ -560,7 +563,7 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
     /// </summary>
     private string EscapeParameterValue(string value, string parameterType, Platform platform, QuotingMode? quotingMode, bool everyOccurrenceBare)
     {
-        switch (parameterType.ToLower())
+        switch (parameterType.ToLowerInvariant())
         {
             case TemplateParameterTypes.Hostname:
             case TemplateParameterTypes.IpAddress:
@@ -644,6 +647,34 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
 
         return value.Replace("'", "'\\''");
     }
+
+    /// <summary>
+    /// True when <paramref name="value"/> is a whole number: an optional sign and digits,
+    /// nothing else.
+    /// </summary>
+    /// <remarks>
+    /// The value goes into the command bare, so the parse must not be more generous than the
+    /// shell: <see cref="NumberStyles.Integer"/> would also accept leading and trailing
+    /// white space, a trailing line feed among it. The current culture is not consulted
+    /// either, since the operator's regional settings say nothing about the target shell.
+    /// </remarks>
+    private static bool IsInteger(string value) =>
+        int.TryParse(value, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out _);
+
+    /// <summary>
+    /// True when <paramref name="value"/> is a decimal number: an optional sign, digits, an
+    /// optional decimal point and an optional exponent, with no surrounding white space.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="NumberStyles.Float"/> allows leading and trailing white space, which
+    /// would reach the command bare; see <see cref="IsInteger"/>.
+    /// </remarks>
+    private static bool IsNumber(string value) =>
+        double.TryParse(
+            value,
+            NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint | NumberStyles.AllowExponent,
+            CultureInfo.InvariantCulture,
+            out _);
 
     /// <summary>
     /// Validates hostname according to RFC 1123
