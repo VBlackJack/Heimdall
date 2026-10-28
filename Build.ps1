@@ -109,6 +109,8 @@ $ProjectRoot = $PSScriptRoot
 . (Join-Path $ProjectRoot 'scripts\ReleasePreflight.ps1')
 # Whether the SelfContained edition may bundle runtimes/webview2.
 . (Join-Path $ProjectRoot 'scripts\WebView2RuntimeGate.ps1')
+# The SDK and runtime a Release was built with, and the pinned installer tools.
+. (Join-Path $ProjectRoot 'scripts\BuildToolchain.ps1')
 # The Inno Setup compile, with its output kept for the build to print.
 . (Join-Path $ProjectRoot 'scripts\InnoSetupCompile.ps1')
 # What the informational CI lanes (CIUnstable, RequiresDesktop) reported for the release
@@ -214,6 +216,14 @@ Write-Host "  Mode: $Mode" -ForegroundColor Cyan
 if ($Publish) { Write-Host "  Publish: GitHub Release" -ForegroundColor Cyan }
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
+
+# global.json allows any later patch of its SDK, and both editions publish self-contained,
+# so the SDK that runs here decides the runtime that ships. A Release says which.
+if ($Mode -eq 'Release') {
+    $sdkVersion = Get-SdkVersion
+    $sdkFloor = (Get-Content -LiteralPath (Join-Path $ProjectRoot 'global.json') -Raw | ConvertFrom-Json).sdk.version
+    Write-Host "[toolchain] .NET SDK $(if ($sdkVersion) { $sdkVersion } else { 'unknown' }) (global.json: $sdkFloor or a later patch)" -ForegroundColor DarkGray
+}
 
 # ── Determine which variants to produce ───────────────────────────────────
 #
@@ -582,6 +592,10 @@ $outputs = @()
 foreach ($v in $variants) {
     $dir = Publish-Variant -VariantName $v
     $outputs += @{ Name = $v; Dir = $dir }
+    if ($Mode -eq 'Release') {
+        $runtimeVersion = Get-PublishedRuntimeVersion -PublishDirectory $dir
+        Write-Host "[toolchain] $v carries .NET runtime $(if ($runtimeVersion) { $runtimeVersion } else { 'unknown (no System.Private.CoreLib.dll in the output)' })" -ForegroundColor DarkGray
+    }
 }
 
 Write-Host "[$step/$totalSteps] Published" -ForegroundColor Green
@@ -648,6 +662,22 @@ if ($Mode -eq 'Release') {
     if ([string]::IsNullOrWhiteSpace($wix) -or -not (Test-Path $wix)) {
         Write-Host "  [!] WiX CLI not found. Install WiX 6, or set `$env:HEIMDALL_WIX_PATH." -ForegroundColor Red
         exit 1
+    }
+
+    # The WiX CLI is pinned in .config/dotnet-tools.json. A different version is a warning
+    # for a dry run and a refusal for a real publish: an MSI built by a tool nobody chose
+    # cannot be rebuilt the same way.
+    $wixCheck = Resolve-PinnedToolCheck -Tool 'WiX' `
+        -Pinned (Get-PinnedDotnetTool -ManifestPath (Join-Path $ProjectRoot '.config\dotnet-tools.json') -PackageId 'wix') `
+        -Actual (Get-WixCliVersion -WixPath $wix)
+    if ($wixCheck.Matches) {
+        Write-Host "[toolchain] $($wixCheck.Message)" -ForegroundColor DarkGray
+    } elseif ($Publish -and -not $DryRun) {
+        Write-Host "  [!] $($wixCheck.Message)" -ForegroundColor Red
+        Write-Host "      Install the pinned version: dotnet tool install --global wix --version <pin>" -ForegroundColor Yellow
+        exit 1
+    } else {
+        Write-Host "[toolchain] WARNING: $($wixCheck.Message)" -ForegroundColor Yellow
     }
 
     $msiSource = $outputs |

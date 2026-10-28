@@ -182,6 +182,14 @@ jobs:
           ./scripts/Test-InnoSetupCompile.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      # Pure PowerShell. The readers of the toolchain a Release is built with (SDK, the
+      # runtime a self-contained publish carries, the pinned WiX CLI).
+      - name: Check the build toolchain readers
+        shell: pwsh
+        run: |
+          ./scripts/Test-BuildToolchain.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       # The verdict of the npm audit step below, on recorded npm audit JSON shapes and
       # on the recorded real report. Pure PowerShell, no network, no node.
       - name: Check the npm audit verdict
