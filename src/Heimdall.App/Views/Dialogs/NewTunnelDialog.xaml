@@ -94,7 +94,16 @@
                           ItemsSource="{Binding Gateways}"
                           SelectedItem="{Binding SelectedGateway}"
                           Margin="0,0,0,8"
+                          TextSearch.TextPath="Name"
                           AutomationProperties.Name="{loc:Translate NewTunnelGatewayLabel}">
+                    <!-- The name goes on the item container, which is what UI Automation reads: the
+                         template below builds a TextBlock, and a name set there never reaches a
+                         screen reader, which then announces the type of the gateway record. -->
+                    <ComboBox.ItemContainerStyle>
+                        <Style TargetType="ComboBoxItem" BasedOn="{StaticResource ThemedComboBoxItemStyle}">
+                            <Setter Property="AutomationProperties.Name" Value="{Binding Name}"/>
+                        </Style>
+                    </ComboBox.ItemContainerStyle>
                     <ComboBox.ItemTemplate>
                         <DataTemplate>
                             <TextBlock>

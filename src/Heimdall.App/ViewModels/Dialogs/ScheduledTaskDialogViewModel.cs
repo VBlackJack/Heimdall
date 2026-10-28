@@ -22,6 +22,19 @@ using Heimdall.Core.Localization;
 
 namespace Heimdall.App.ViewModels.Dialogs;
 
+/// <summary>The input fields of the scheduled task dialog that validation can refuse.</summary>
+public enum ScheduledTaskField
+{
+    /// <summary>The server selection.</summary>
+    Server,
+
+    /// <summary>The time of day of a daily schedule.</summary>
+    TimeOfDay,
+
+    /// <summary>The interval, in minutes, of an interval schedule.</summary>
+    Interval
+}
+
 /// <summary>
 /// ViewModel for the scheduled task add/edit dialog.
 /// Provides structured form fields for server selection, schedule type, and timing.
@@ -151,12 +164,21 @@ public partial class ScheduledTaskDialogViewModel : ObservableValidator
     private string? _validationError;
 
     /// <summary>
+    /// The first field the last validation refused, or <see langword="null"/> when it passed. The
+    /// dialog moves the focus there, so a keyboard or screen reader user lands on the field to fix
+    /// instead of on a Save button that has just said no.
+    /// </summary>
+    public ScheduledTaskField? FirstInvalidField { get; private set; }
+
+    /// <summary>
     /// Triggers full validation of all fields.
     /// </summary>
     [RelayCommand]
     private void Validate()
     {
-        ValidationError = GetValidationError();
+        (ScheduledTaskField? field, string? message) = EvaluateValidation();
+        FirstInvalidField = field;
+        ValidationError = message;
     }
 
     // --- Live re-validation ---
@@ -257,13 +279,13 @@ public partial class ScheduledTaskDialogViewModel : ObservableValidator
     /// <summary>
     /// Custom validation logic for the structured form fields.
     /// </summary>
-    private string? GetValidationError()
+    private (ScheduledTaskField? Field, string? Message) EvaluateValidation()
     {
         // Server is required
         if (SelectedServer is null)
         {
-            return Localizer?["ValidationScheduledTaskServerRequired"]
-                ?? "Please select a server.";
+            return (ScheduledTaskField.Server, Localizer?["ValidationScheduledTaskServerRequired"]
+                ?? "Please select a server.");
         }
 
         if (IsDailySchedule)
@@ -274,8 +296,8 @@ public partial class ScheduledTaskDialogViewModel : ObservableValidator
                 || ts.TotalHours >= 24
                 || ts < TimeSpan.Zero)
             {
-                return Localizer?["ValidationScheduledTaskTimeInvalid"]
-                    ?? "Invalid time format. Use HH:mm (24-hour).";
+                return (ScheduledTaskField.TimeOfDay, Localizer?["ValidationScheduledTaskTimeInvalid"]
+                    ?? "Invalid time format. Use HH:mm (24-hour).");
             }
         }
         else if (IsIntervalSchedule)
@@ -285,12 +307,12 @@ public partial class ScheduledTaskDialogViewModel : ObservableValidator
                 || !int.TryParse(IntervalMinutes, out var minutes)
                 || minutes <= 0)
             {
-                return Localizer?["ValidationScheduledTaskIntervalInvalid"]
-                    ?? "Interval must be a positive number of minutes.";
+                return (ScheduledTaskField.Interval, Localizer?["ValidationScheduledTaskIntervalInvalid"]
+                    ?? "Interval must be a positive number of minutes.");
             }
         }
 
-        return null;
+        return (null, null);
     }
 
     /// <summary>

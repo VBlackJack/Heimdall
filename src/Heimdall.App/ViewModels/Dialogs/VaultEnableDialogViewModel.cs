@@ -29,7 +29,7 @@ namespace Heimdall.App.ViewModels.Dialogs;
 /// secret) behind a busy indicator. No password is ever logged; the buffer is
 /// zeroed after the attempt.
 /// </summary>
-public partial class VaultEnableDialogViewModel : ObservableObject
+public partial class VaultEnableDialogViewModel : ObservableObject, IPasswordRefocusHost
 {
     private readonly Func<char[], Task> _enableAsync;
     private readonly LocalizationManager _localizer;
@@ -70,6 +70,12 @@ public partial class VaultEnableDialogViewModel : ObservableObject
         _localizer = localizer;
         PolicyMessage = localizer.GetString("VaultPolicyHint");
     }
+
+    /// <summary>
+    /// Fires when the password box should take the keyboard focus back: the attempt failed and the
+    /// box, disabled while it ran, accepts input again.
+    /// </summary>
+    public PasswordRefocusSignal PasswordRefocus { get; } = new();
 
     /// <summary>Whether the enable action is currently available.</summary>
     public bool CanSubmit => IsPasswordAcceptable && IsConfirmMatch && !IsBusy;
@@ -123,6 +129,12 @@ public partial class VaultEnableDialogViewModel : ObservableObject
             finally
             {
                 IsBusy = false;
+                if (!IsCompleted)
+                {
+                    PasswordRefocus.Arm();
+                }
+
+                PasswordRefocus.Release(passwordBoxEnabled: !IsBusy);
             }
         }
         finally

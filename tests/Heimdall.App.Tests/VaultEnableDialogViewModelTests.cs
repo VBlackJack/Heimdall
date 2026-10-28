@@ -99,4 +99,31 @@ public sealed class VaultEnableDialogViewModelTests
         Assert.False(viewModel.IsCompleted);
         Assert.Equal("VaultEnableError", viewModel.ErrorMessage);
     }
+
+    [Fact]
+    public async Task Enable_Failure_AsksForTheFocusBackOnceTheBoxIsEnabled()
+    {
+        var viewModel = new VaultEnableDialogViewModel(
+            _ => throw new InvalidOperationException("boom"), Localizer());
+        viewModel.Evaluate(C(StrongPassword), C(StrongPassword));
+        var requests = new List<bool>();
+        viewModel.PasswordRefocus.Requested += (_, _) => requests.Add(viewModel.IsBusy);
+
+        await viewModel.EnableCommand.ExecuteAsync(C(StrongPassword));
+
+        Assert.Equal(new[] { false }, requests);
+    }
+
+    [Fact]
+    public async Task Enable_Success_DoesNotAskForTheFocus()
+    {
+        var viewModel = new VaultEnableDialogViewModel(_ => Task.CompletedTask, Localizer());
+        viewModel.Evaluate(C(StrongPassword), C(StrongPassword));
+        var requests = 0;
+        viewModel.PasswordRefocus.Requested += (_, _) => requests++;
+
+        await viewModel.EnableCommand.ExecuteAsync(C(StrongPassword));
+
+        Assert.Equal(0, requests);
+    }
 }

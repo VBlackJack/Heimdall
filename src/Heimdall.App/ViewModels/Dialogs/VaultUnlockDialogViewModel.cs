@@ -35,7 +35,7 @@ namespace Heimdall.App.ViewModels.Dialogs;
 /// single generic error. No master-password value is ever logged; the password
 /// buffer is zeroed after every attempt.
 /// </remarks>
-public partial class VaultUnlockDialogViewModel : ObservableObject
+public partial class VaultUnlockDialogViewModel : ObservableObject, IPasswordRefocusHost
 {
     private readonly Func<char[], Task> _unlockAsync;
     private readonly Func<Task<VaultHelloUnlockResult>>? _unlockWithHelloAsync;
@@ -124,6 +124,12 @@ public partial class VaultUnlockDialogViewModel : ObservableObject
     /// </summary>
     private static readonly TimeSpan LockoutRefreshInterval = TimeSpan.FromSeconds(1);
 
+    /// <summary>
+    /// Fires when the password box should take the keyboard focus back: an attempt failed and the
+    /// box is enabled again, which with a lockout is later than the attempt itself.
+    /// </summary>
+    public PasswordRefocusSignal PasswordRefocus { get; } = new();
+
     /// <summary>Whether the unlock action is currently available.</summary>
     public bool CanSubmit => !IsLockedOut && !IsBusy;
 
@@ -197,6 +203,7 @@ public partial class VaultUnlockDialogViewModel : ObservableObject
             finally
             {
                 IsBusy = false;
+                ReleasePasswordRefocus();
             }
         }
         finally
@@ -254,6 +261,7 @@ public partial class VaultUnlockDialogViewModel : ObservableObject
         finally
         {
             IsBusy = false;
+            ReleasePasswordRefocus();
         }
     }
 
@@ -298,6 +306,20 @@ public partial class VaultUnlockDialogViewModel : ObservableObject
 
     private void OnLockoutRefreshTick(object? sender, EventArgs e) => UpdateLockoutState();
 
+    /// <summary>
+    /// An attempt that ended without unlocking leaves the password box without the focus it lost
+    /// when it was disabled; the signal fires now, or when the lockout lifts if it is still shut.
+    /// </summary>
+    private void ReleasePasswordRefocus()
+    {
+        if (!IsVerified)
+        {
+            PasswordRefocus.Arm();
+        }
+
+        PasswordRefocus.Release(CanSubmit);
+    }
+
     private void UpdateLockoutState()
     {
         IsLockedOut = _lockout.IsLockedOut;
@@ -318,5 +340,6 @@ public partial class VaultUnlockDialogViewModel : ObservableObject
 
         _lockoutRefreshTimer.Stop();
         LockoutMessage = "";
+        PasswordRefocus.Release(CanSubmit);
     }
 }

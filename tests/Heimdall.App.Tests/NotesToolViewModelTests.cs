@@ -397,6 +397,99 @@ public sealed class NotesToolViewModelTests
         Assert.Contains(vm.TagFilters, chip => chip.Value is null && chip.IsSelected);
     }
 
+    // The chip list is a single-select list bound to SelectedTagFilter, so that UI Automation
+    // reports the chosen chip as selected instead of the colour alone saying so.
+
+    [Fact]
+    public async Task PickingAChip_FiltersByItsTag_AndKeepsItSelected()
+    {
+        var vm = await CreateViewModelAsync(
+            Seed("alpha.md", "# Alpha\nalpha #ops"),
+            Seed("beta.md", "# Beta\nbeta #infra"));
+        await vm.ReloadAsync();
+
+        vm.SelectedTagFilter = vm.TagFilters.Single(chip => chip.Value == "ops");
+        await WaitUntilAsync(() => vm.SelectedTag == "ops");
+
+        Assert.Equal("ops", vm.SelectedTag);
+        Assert.Equal("ops", vm.SelectedTagFilter?.Value);
+        Assert.True(vm.SelectedTagFilter?.IsSelected);
+        Assert.Contains(vm.TagFilters, chip => ReferenceEquals(chip, vm.SelectedTagFilter));
+    }
+
+    [Fact]
+    public async Task ChoosingATagByCommand_SelectsItsChipInTheList()
+    {
+        var vm = await CreateViewModelAsync(
+            Seed("alpha.md", "# Alpha\nalpha #ops"),
+            Seed("beta.md", "# Beta\nbeta #infra"));
+        await vm.ReloadAsync();
+
+        vm.SelectTagCommand.Execute("infra");
+        await WaitUntilAsync(() => vm.SelectedTag == "infra");
+
+        Assert.Equal("infra", vm.SelectedTagFilter?.Value);
+    }
+
+    [Fact]
+    public async Task TogglingTheChosenChipOff_ClearsTheFilter_AndSelectsTheAllChip()
+    {
+        var vm = await CreateViewModelAsync(
+            Seed("alpha.md", "# Alpha\nalpha #ops"),
+            Seed("beta.md", "# Beta\nbeta #infra"));
+        await vm.ReloadAsync();
+        vm.SelectTagCommand.Execute("ops");
+        await WaitUntilAsync(() => vm.SelectedTag == "ops");
+
+        // What a single-select list reports when the chosen item is Ctrl+clicked.
+        vm.SelectedTagFilter = null;
+        await WaitUntilAsync(() => vm.SelectedTag is null);
+
+        Assert.Null(vm.SelectedTag);
+        Assert.NotNull(vm.SelectedTagFilter);
+        Assert.Null(vm.SelectedTagFilter!.Value);
+        Assert.True(vm.SelectedTagFilter.IsSelected);
+    }
+
+    [Fact]
+    public async Task TogglingTheAllChipOff_LeavesTheAllChipSelected()
+    {
+        var vm = await CreateViewModelAsync(
+            Seed("alpha.md", "# Alpha\nalpha #ops"));
+        await vm.ReloadAsync();
+        Assert.NotNull(vm.SelectedTagFilter);
+
+        vm.SelectedTagFilter = null;
+
+        Assert.NotNull(vm.SelectedTagFilter);
+        Assert.Null(vm.SelectedTagFilter!.Value);
+    }
+
+    [Fact]
+    public async Task RedrawingTheChips_IsNotTheUserClearingTheFilter()
+    {
+        var vm = await CreateViewModelAsync(
+            Seed("alpha.md", "# Alpha\nalpha #ops"),
+            Seed("beta.md", "# Beta\nbeta #infra"));
+        await vm.ReloadAsync();
+
+        // A bound list reports a null selection when its items are cleared, and a pick when they
+        // are refilled. Neither is the user choosing a chip.
+        vm.TagFilters.CollectionChanged += (_, args) =>
+        {
+            if (args.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset)
+            {
+                vm.SelectedTagFilter = null;
+            }
+        };
+
+        vm.SelectTagCommand.Execute("ops");
+        await WaitUntilAsync(() => vm.SelectedTag == "ops");
+
+        Assert.Equal("ops", vm.SelectedTag);
+        Assert.Equal("ops", vm.SelectedTagFilter?.Value);
+    }
+
     private static async Task<NotesToolViewModel> CreateViewModelAsync(params FakeNoteSeed[] notes)
         => await CreateViewModelAsync(CreateStorage(notes), new FakeUiDispatcher());
 

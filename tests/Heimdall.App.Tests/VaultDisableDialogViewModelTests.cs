@@ -60,4 +60,30 @@ public sealed class VaultDisableDialogViewModelTests
         Assert.False(invoked);
         Assert.False(viewModel.IsCompleted);
     }
+
+    [Fact]
+    public async Task Disable_Failure_AsksForTheFocusBackOnceTheBoxIsEnabled()
+    {
+        var viewModel = new VaultDisableDialogViewModel(_ => throw new VaultUnlockException(), Localizer());
+        var requests = new List<bool>();
+        viewModel.PasswordRefocus.Requested += (_, _) => requests.Add(viewModel.IsBusy);
+
+        await viewModel.DisableCommand.ExecuteAsync(C("wrong-password"));
+
+        // One request, made after the busy state ended: the box is disabled while busy and
+        // focusing a disabled box does nothing.
+        Assert.Equal(new[] { false }, requests);
+    }
+
+    [Fact]
+    public async Task Disable_Success_DoesNotAskForTheFocus()
+    {
+        var viewModel = new VaultDisableDialogViewModel(_ => Task.CompletedTask, Localizer());
+        var requests = 0;
+        viewModel.PasswordRefocus.Requested += (_, _) => requests++;
+
+        await viewModel.DisableCommand.ExecuteAsync(C("Master1!Vault"));
+
+        Assert.Equal(0, requests);
+    }
 }

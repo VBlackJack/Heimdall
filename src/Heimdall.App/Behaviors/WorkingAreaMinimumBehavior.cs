@@ -15,6 +15,7 @@
  */
 
 using System.Windows;
+using System.Windows.Interop;
 using System.Windows.Media;
 using Heimdall.App.Services;
 
@@ -22,6 +23,7 @@ using Heimdall.App.Services;
 // DpiChangedEventArgs are ambiguous here. These aliases pin the WPF ones.
 using DpiChangedEventArgs = System.Windows.DpiChangedEventArgs;
 using Size = System.Windows.Size;
+using WinForms = System.Windows.Forms;
 
 namespace Heimdall.App.Behaviors;
 
@@ -72,6 +74,88 @@ public static class WorkingAreaMinimumPolicy
 
         return Math.Min(declared, available);
     }
+}
+
+/// <summary>
+/// Decides how tall a window may be, and where it must start, so that it fits the working area of the
+/// display its owner is on.
+/// </summary>
+/// <remarks>
+/// <para>
+/// The minimum clamp above only ever lowers a <em>minimum</em>. A dialog that declares a fixed
+/// <c>Height</c> taller than the working area (750 on a 768 px display, whose working area is about
+/// 728 once the taskbar is out) is not helped by it: the window is simply taller than the screen, and
+/// its Save button sits under the taskbar. The height itself is left alone, because a dialog sized
+/// to its content declares none (it is <see cref="double.NaN"/> when this runs): the ceiling is
+/// <c>MaxHeight</c>, which WPF applies over whatever <c>Height</c> says and over the content's own
+/// size alike.
+/// </para>
+/// <para>
+/// Same discipline as the minimum policy, and free of WPF types beyond <see cref="Rect"/>, for the same
+/// reason: the rule is arithmetic and belongs in the blocking lane. A working area that could not be
+/// measured is never a reason to move or shrink a window.
+/// </para>
+/// </remarks>
+public static class WorkingAreaHeightPolicy
+{
+    /// <summary>What to apply to the window.</summary>
+    /// <param name="MaxHeight">The ceiling for the window's height.</param>
+    /// <param name="Top">The window's top edge.</param>
+    public readonly record struct Result(double MaxHeight, double Top);
+
+    /// <summary>
+    /// The ceiling and the top edge for a window of <paramref name="height"/> that starts at
+    /// <paramref name="top"/> and declared <paramref name="declaredMaxHeight"/>.
+    /// </summary>
+    /// <param name="top">The window's current top edge, in the working area's units.</param>
+    /// <param name="height">The window's declared height; NaN for a window sized to its content.</param>
+    /// <param name="declaredMaxHeight">The ceiling the window asked for; infinity when it asked for none.</param>
+    /// <param name="workingArea">The working area of the owner's display.</param>
+    public static Result Resolve(double top, double height, double declaredMaxHeight, Rect workingArea)
+    {
+        if (!IsMeasurable(workingArea))
+        {
+            return new Result(declaredMaxHeight, top);
+        }
+
+        double declared = double.IsNaN(declaredMaxHeight) ? double.PositiveInfinity : declaredMaxHeight;
+        double maxHeight = Math.Min(declared, workingArea.Height);
+
+        if (double.IsNaN(top) || double.IsInfinity(top))
+        {
+            return new Result(maxHeight, top);
+        }
+
+        // A window of a known height is moved up just far enough to show all of it; one sized to its
+        // content is not, because its height is not known here and sliding every small dialog up to
+        // make room for a worst case would drag it away from where it was centred.
+        bool heightKnown = !double.IsNaN(height) && height > 0;
+        double effective = heightKnown ? Math.Min(height, maxHeight) : double.NaN;
+
+        // A window that is not on this display vertically at all (a manual position on another
+        // monitor) is not this clamp's to move.
+        bool overlaps = top < workingArea.Bottom && (!heightKnown || top + effective > workingArea.Top);
+        if (!overlaps)
+        {
+            return new Result(maxHeight, top);
+        }
+
+        double newTop = top;
+        if (heightKnown)
+        {
+            newTop = Math.Min(newTop, workingArea.Bottom - effective);
+        }
+
+        // The title bar is the handle that moves the window: it is never left above the display.
+        newTop = Math.Max(newTop, workingArea.Top);
+        return new Result(maxHeight, newTop);
+    }
+
+    private static bool IsMeasurable(Rect area)
+        => !area.IsEmpty
+            && double.IsFinite(area.Top)
+            && double.IsFinite(area.Height)
+            && area.Height > 0;
 }
 
 /// <summary>
@@ -139,6 +223,36 @@ public static class WorkingAreaMinimumBehavior
     public static bool GetIsEnabled(DependencyObject element)
         => (bool)element.GetValue(IsEnabledProperty);
 
+    /// <summary>
+    /// Opts a dialog into the height clamp: it is kept within the working area of its owner's display,
+    /// and moved up when its bottom edge would fall under the taskbar. Separate from
+    /// <see cref="IsEnabledProperty"/> because it is not meant for every window that opts into the
+    /// minimum clamp (the main window restores its own placement).
+    /// </summary>
+    public static readonly DependencyProperty ClampHeightProperty =
+        DependencyProperty.RegisterAttached(
+            "ClampHeight",
+            typeof(bool),
+            typeof(WorkingAreaMinimumBehavior),
+            new PropertyMetadata(false, OnClampHeightChanged));
+
+    public static void SetClampHeight(DependencyObject element, bool value)
+        => element.SetValue(ClampHeightProperty, value);
+
+    public static bool GetClampHeight(DependencyObject element)
+        => (bool)element.GetValue(ClampHeightProperty);
+
+    /// <summary>
+    /// The ceiling the window declared before any clamp, so that the clamp is recomputed from what the
+    /// XAML asked for and not from the previous clamp. Unset (null) until the first use.
+    /// </summary>
+    private static readonly DependencyProperty DeclaredMaxHeightProperty =
+        DependencyProperty.RegisterAttached(
+            "DeclaredMaxHeight",
+            typeof(double?),
+            typeof(WorkingAreaMinimumBehavior),
+            new PropertyMetadata(null));
+
     /// <summary>Per-window capture of the declared minimum. Private: it is not a contract.</summary>
     private static readonly DependencyProperty TrackerProperty =
         DependencyProperty.RegisterAttached(
@@ -197,6 +311,140 @@ public static class WorkingAreaMinimumBehavior
         {
             Apply(window);
         }
+    }
+
+    private static void OnClampHeightChanged(DependencyObject element, DependencyPropertyChangedEventArgs e)
+    {
+        if (element is not Window window)
+        {
+            return;
+        }
+
+        if ((bool)e.OldValue)
+        {
+            window.SourceInitialized -= OnHeightWindowReady;
+            window.Loaded -= OnHeightWindowLoaded;
+            window.DpiChanged -= OnHeightWindowDpiChanged;
+
+            if (window.GetValue(DeclaredMaxHeightProperty) is double declared)
+            {
+                window.MaxHeight = declared;
+            }
+
+            window.ClearValue(DeclaredMaxHeightProperty);
+        }
+
+        if ((bool)e.NewValue)
+        {
+            window.SourceInitialized += OnHeightWindowReady;
+            window.Loaded += OnHeightWindowLoaded;
+            window.DpiChanged += OnHeightWindowDpiChanged;
+        }
+    }
+
+    // SourceInitialized is the first moment the window has a handle and so a display to be measured
+    // on. Loaded repeats it because the position a startup location computes is not always visible
+    // to the property yet at that point; the clamp is idempotent, so the second pass changes nothing
+    // when the first one already did the work.
+    private static void OnHeightWindowReady(object? sender, EventArgs e)
+    {
+        if (sender is Window window)
+        {
+            ApplyHeight(window, repositionTop: true);
+        }
+    }
+
+    private static void OnHeightWindowLoaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is Window window)
+        {
+            ApplyHeight(window, repositionTop: true);
+        }
+    }
+
+    private static void OnHeightWindowDpiChanged(object sender, DpiChangedEventArgs e)
+    {
+        if (sender is Window window)
+        {
+            ApplyHeight(window, repositionTop: false);
+        }
+    }
+
+    private static void ApplyHeight(Window window, bool repositionTop)
+    {
+        try
+        {
+            Rect? area = GetOwnerWorkingArea(window);
+            if (area is null)
+            {
+                return;
+            }
+
+            // Captured once, from the window's own property: a second read would find the clamp.
+            double declaredMax = window.GetValue(DeclaredMaxHeightProperty) is double captured
+                ? captured
+                : window.MaxHeight;
+            window.SetValue(DeclaredMaxHeightProperty, declaredMax);
+
+            bool canMove = repositionTop && window.WindowState == WindowState.Normal;
+            WorkingAreaHeightPolicy.Result resolved = WorkingAreaHeightPolicy.Resolve(
+                canMove ? window.Top : double.NaN,
+                window.Height,
+                declaredMax,
+                area.Value);
+
+            window.MaxHeight = resolved.MaxHeight;
+
+            // The ceiling alone bounds the layout; lowering a fixed Height to it as well makes the
+            // window's own frame follow at once instead of waiting on the next layout pass.
+            if (!double.IsNaN(window.Height) && window.Height > resolved.MaxHeight)
+            {
+                window.Height = resolved.MaxHeight;
+            }
+
+            if (canMove && resolved.Top != window.Top)
+            {
+                window.Top = resolved.Top;
+            }
+        }
+        catch (Exception ex)
+        {
+            // A window that cannot be measured keeps the height it declared.
+            Core.Logging.FileLogger.Warn(
+                $"Working-area height clamp skipped for '{window.Title}': {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// The working area, in the window's units, of the display the window's owner is on; of the
+    /// window's own display when it has no owner.
+    /// </summary>
+    private static Rect? GetOwnerWorkingArea(Window window)
+    {
+        IntPtr handle = window.Owner is { } owner
+            ? new WindowInteropHelper(owner).Handle
+            : IntPtr.Zero;
+        if (handle == IntPtr.Zero)
+        {
+            handle = new WindowInteropHelper(window).Handle;
+        }
+
+        if (handle == IntPtr.Zero)
+        {
+            return null;
+        }
+
+        DpiScale dpi = VisualTreeHelper.GetDpi(window);
+        if (!double.IsFinite(dpi.DpiScaleX) || !double.IsFinite(dpi.DpiScaleY)
+            || dpi.DpiScaleX <= 0 || dpi.DpiScaleY <= 0)
+        {
+            return null;
+        }
+
+        return WindowWorkingAreaProvider.ConvertPixelsToDips(
+            WinForms.Screen.FromHandle(handle).WorkingArea,
+            dpi.DpiScaleX,
+            dpi.DpiScaleY);
     }
 
     private static void OnWindowDpiChanged(object sender, DpiChangedEventArgs e)

@@ -108,11 +108,10 @@
 
         <!-- Validation error -->
         <TextBlock Grid.Row="1"
-                   Text="{Binding ValidationError}"
-                   Foreground="{DynamicResource ErrorTextBrush}"
+                   Text="{Binding ValidationError, NotifyOnTargetUpdated=True}"
+                   Style="{StaticResource FieldValidationErrorStyle}"
                    FontSize="{StaticResource FontSizeBody}"
                    Margin="0,8,0,0"
-                   TextWrapping="Wrap"
                    Visibility="{Binding ValidationError, Converter={StaticResource NullToVisibilityConverter}}"/>
 
         <!-- Buttons -->

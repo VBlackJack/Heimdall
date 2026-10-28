@@ -37,7 +37,7 @@ public sealed record VaultChangePasswordInput(char[] CurrentPassword, char[] New
 /// the DEK is unchanged). A wrong current password surfaces the single generic
 /// unlock error. No password is logged; both buffers are zeroed after the attempt.
 /// </summary>
-public partial class VaultChangePasswordDialogViewModel : ObservableObject
+public partial class VaultChangePasswordDialogViewModel : ObservableObject, IPasswordRefocusHost
 {
     private readonly Func<char[], char[], Task> _changeAsync;
     private readonly LocalizationManager _localizer;
@@ -75,6 +75,12 @@ public partial class VaultChangePasswordDialogViewModel : ObservableObject
         _localizer = localizer;
         PolicyMessage = localizer.GetString("VaultPolicyHint");
     }
+
+    /// <summary>
+    /// Fires when the password box should take the keyboard focus back: the attempt failed and the
+    /// box, disabled while it ran, accepts input again.
+    /// </summary>
+    public PasswordRefocusSignal PasswordRefocus { get; } = new();
 
     /// <summary>Whether the change action is currently available (the current password is validated on submit).</summary>
     public bool CanSubmit => IsPasswordAcceptable && IsConfirmMatch && !IsBusy;
@@ -127,6 +133,12 @@ public partial class VaultChangePasswordDialogViewModel : ObservableObject
             finally
             {
                 IsBusy = false;
+                if (!IsCompleted)
+                {
+                    PasswordRefocus.Arm();
+                }
+
+                PasswordRefocus.Release(passwordBoxEnabled: !IsBusy);
             }
         }
         finally

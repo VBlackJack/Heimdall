@@ -17,6 +17,7 @@
         Background="{DynamicResource BackgroundBrush}"
         ResizeMode="CanResizeWithGrip"
         behaviors:DialogChromeBehavior.HideCaptionButtons="True"
+        behaviors:WorkingAreaMinimumBehavior.ClampHeight="True"
         MinWidth="550"
         MinHeight="350"
         ShowInTaskbar="False"
@@ -2056,6 +2057,11 @@
                                                           Foreground="{DynamicResource TextPrimaryBrush}"
                                                           HorizontalContentAlignment="Stretch"
                                                           ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                                                    <ListView.ItemContainerStyle>
+                                                        <Style TargetType="ListViewItem">
+                                                            <Setter Property="behaviors:ItemContainerAccessibilityBehavior.IsEnabled" Value="True"/>
+                                                        </Style>
+                                                    </ListView.ItemContainerStyle>
                                                     <ListView.ItemTemplate>
                                                         <DataTemplate DataType="{x:Type vm:PostConnectStepItemViewModel}">
                                                             <Grid Margin="0,0,0,6">
@@ -3019,11 +3025,10 @@
                        Visibility="{Binding IsOriginBadgeVisible, Converter={StaticResource BoolToVisibilityConverter}}"/>
 
             <!-- Validation error -->
-            <TextBlock Text="{Binding ValidationError}"
-                       Foreground="{DynamicResource ErrorTextBrush}"
+            <TextBlock Text="{Binding ValidationError, NotifyOnTargetUpdated=True}"
+                       Style="{StaticResource FieldValidationErrorStyle}"
                        FontSize="{StaticResource FontSizeBody}"
                        Margin="0,8,0,0"
-                       TextWrapping="Wrap"
                        Visibility="{Binding ValidationError, Converter={StaticResource NullToVisibilityConverter}}"/>
         </StackPanel>
 

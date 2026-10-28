@@ -37,6 +37,7 @@ public partial class VaultEnableDialog : Window
 
         Loaded += (_, _) => NewPasswordBox.Focus();
         DataContextChanged += OnDataContextChanged;
+        PasswordBoxRefocus.Attach(this, NewPasswordBox);
     }
 
     private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)

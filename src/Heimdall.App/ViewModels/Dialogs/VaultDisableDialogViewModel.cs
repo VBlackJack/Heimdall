@@ -29,7 +29,7 @@ namespace Heimdall.App.ViewModels.Dialogs;
 /// clears the wrapped DEK) behind a busy indicator. A wrong password surfaces the
 /// single generic unlock error. No password is logged; the buffer is zeroed.
 /// </summary>
-public partial class VaultDisableDialogViewModel : ObservableObject
+public partial class VaultDisableDialogViewModel : ObservableObject, IPasswordRefocusHost
 {
     private readonly Func<char[], Task> _disableAsync;
     private readonly LocalizationManager _localizer;
@@ -55,6 +55,12 @@ public partial class VaultDisableDialogViewModel : ObservableObject
         _disableAsync = disableAsync;
         _localizer = localizer;
     }
+
+    /// <summary>
+    /// Fires when the password box should take the keyboard focus back: the attempt failed and the
+    /// box, disabled while it ran, accepts input again.
+    /// </summary>
+    public PasswordRefocusSignal PasswordRefocus { get; } = new();
 
     /// <summary>Whether the disable action is currently available.</summary>
     public bool CanSubmit => !IsBusy;
@@ -96,6 +102,12 @@ public partial class VaultDisableDialogViewModel : ObservableObject
             finally
             {
                 IsBusy = false;
+                if (!IsCompleted)
+                {
+                    PasswordRefocus.Arm();
+                }
+
+                PasswordRefocus.Release(passwordBoxEnabled: !IsBusy);
             }
         }
         finally
