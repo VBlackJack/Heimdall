@@ -7,6 +7,16 @@ updates:
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
+    # The Microsoft.* and System.* packages ship from the same servicing train:
+    # their patch releases move together, so they arrive as one pull request
+    # instead of one per package. Minor and major updates stay individual.
+    groups:
+      microsoft-patch:
+        patterns:
+          - "Microsoft.*"
+          - "System.*"
+        update-types:
+          - "patch"
 
   - package-ecosystem: "github-actions"
     directory: "/"
