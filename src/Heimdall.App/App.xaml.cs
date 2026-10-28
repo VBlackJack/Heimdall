@@ -1008,14 +1008,15 @@ public partial class App : System.Windows.Application
         services.AddTransient<TrustedHostKeysSettingsViewModel>();
         services.AddTransient<TrustedRdpCertificatesSettingsViewModel>();
         services.AddTransient<TrustedWebCertificatesSettingsViewModel>();
-        services.AddTransient<CommandLibraryViewModel>();
+        // CommandLibraryViewModel and NotesToolViewModel are deliberately NOT registered: both are
+        // IDisposable and owned by their tool view, which builds them through ToolViewModelFactory.
+        // A disposable transient resolved from the root is kept by the container until exit.
         services.AddSingleton<CommandLibrarySessionMemory>();
         services.AddTransient<ImportOpenSshConfigDialogViewModel>();
         services.AddTransient<ImportPuttySessionsDialogViewModel>();
         services.AddTransient<ImportKnownHostsDialogViewModel>();
         services.AddTransient<ImportKnownHostsConflictDialogViewModel>();
         services.AddTransient<TrustedHostKeyDetailsDialogViewModel>();
-        services.AddTransient<NotesToolViewModel>();
         services.AddTransient<OnboardingFlowViewModel>();
 
         // Windows
