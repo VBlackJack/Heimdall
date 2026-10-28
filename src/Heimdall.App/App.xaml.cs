@@ -1510,8 +1510,6 @@ public partial class App : System.Windows.Application
     {
         // Update logging state
         Core.Logging.FileLogger.SetEnabled(newSettings.EnableLogging);
-        string dataRoot = _dataRoot ?? ApplicationDataPathResolver.Resolve();
-        _notesStoragePath = ResolveNotesStoragePath(newSettings, dataRoot);
 
         // Delegate theme swap to the centralized service on the UI thread.
         // Idempotent: HeimdallThemeService skips the swap when the theme is unchanged.
