@@ -173,11 +173,20 @@ pas terminée tant que l'autre ne dit pas la même chose.
 
 **Les notes de version publiées** sont en anglais seul, dans `docs/release-notes/v<version>.md`.
 Elles sont lues depuis une page de release GitHub et depuis le programme de mise à jour intégré, par
-des gens qui n'ont jamais choisi de langue, et elles sont la seule catégorie publique qui ne vit pas
-en miroir : une moitié française double la maintenance et divise par deux l'attention portée à la
-moitié anglaise. `ReleaseNotesLanguageGuardTests` applique cette règle à partir de la v2026.083101.
-Les notes publiées avant cette version sont antérieures à la règle et restent telles qu'elles ont été
-publiées : réécrire le corps d'une release lui ferait dire ce que la release n'a jamais dit.
+des gens qui n'ont jamais choisi de langue, et le
+fichier publié n'est jamais bilingue : une moitié française dans le fichier double la maintenance et
+divise par deux l'attention portée à la moitié anglaise. `ReleaseNotesLanguageGuardTests` applique
+cette règle à partir de la v2026.083101. Les notes publiées avant cette version sont antérieures à la
+règle et restent telles qu'elles ont été publiées : réécrire le corps d'une release lui ferait dire
+ce que la release n'a jamais dit.
+
+Un miroir français dans un fichier séparé, `docs/fr/release-notes/v<version>.md`, est autorisé et
+facultatif. Quand il existe, il s'écrit avant la publication, dans le commit
+`docs: prepare v<version> release notes`, pour que le tag le contienne. La note anglaise y renvoie
+par une URL absolue épinglée sur le tag
+(`https://github.com/VBlackJack/Heimdall/blob/v<version>/docs/fr/release-notes/v<version>.md`),
+parce qu'un lien relatif est mort sur une page de release. Une garde refuse `](../fr/` dans
+`docs/release-notes`.
 
 `docs/CHANGELOG.md` reste en anglais seul. C'est un journal chronologique d'ingénierie, du même
 genre que les notes de version, et le traduire imposerait une double maintenance perpétuelle sans

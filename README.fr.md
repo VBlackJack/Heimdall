@@ -131,7 +131,7 @@ nom ou son adresse.
 | [Architecture](docs/fr/ARCHITECTURE.md) | Comment tout cela est agencé |
 | [Journal des versions](docs/CHANGELOG.md) | Ce qui a changé, et quand |
 
-Chaque document ci-dessus existe en anglais et en français, sauf le journal des versions et les notes de version, qui n'existent qu'en anglais.
+Chaque document ci-dessus existe en anglais et en français, sauf le journal des versions et les notes de version. Le journal des versions et les notes de version sont rédigés en anglais ; une note de version peut aussi avoir un miroir français facultatif dans docs/fr/release-notes/.
 
 ---
 

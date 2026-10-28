@@ -121,7 +121,7 @@ and **Ctrl+K** to jump straight to a machine by name or address.
 | [Architecture](docs/ARCHITECTURE.md) | How it is put together |
 | [Changelog](docs/CHANGELOG.md) | What changed, and when |
 
-Every document above exists in English and in French, except the changelog and the release notes, which are English only.
+Every document above exists in English and in French, except the changelog and the release notes. The changelog and the release notes are written in English; a release note may also have an optional French mirror under `docs/fr/release-notes/`.
 
 ---
 

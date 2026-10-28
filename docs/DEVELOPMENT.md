@@ -163,11 +163,18 @@ there is published.
 to the other under its title. A change to one is not finished until the other says the same thing.
 
 **Published release notes** are English only, in `docs/release-notes/v<version>.md`. They are read
-from a GitHub release page and from the in-app updater, by people who never chose a locale, and they
-are the one public category that is not mirrored: a French half doubles the maintenance and halves
-the attention the English half gets. `ReleaseNotesLanguageGuardTests` enforces this from
-v2026.083101 on. Notes published before that version predate the rule and are kept exactly as they
-were published: rewriting a release body would make it say something the release never said.
+from a GitHub release page and from the in-app updater, by people who never chose a locale, and the
+published file is never bilingual: a French half inside it doubles the maintenance and halves the
+attention the English half gets. `ReleaseNotesLanguageGuardTests` enforces this from v2026.083101
+on. Notes published before that version predate the rule and are kept exactly as they were
+published: rewriting a release body would make it say something the release never said.
+
+A French mirror in a separate file, `docs/fr/release-notes/v<version>.md`, is allowed and optional.
+When it exists it is written before publication, in the `docs: prepare v<version> release notes`
+commit, so that the tag contains it. The English note links to it with an absolute URL pinned to the
+tag (`https://github.com/VBlackJack/Heimdall/blob/v<version>/docs/fr/release-notes/v<version>.md`),
+because a relative link is dead on a release page. A guard refuses `](../fr/` in
+`docs/release-notes`.
 
 `docs/CHANGELOG.md` is English only. It is a chronological engineering record of the same genre as
 the release notes, and translating it would impose permanent double maintenance with no reader.
