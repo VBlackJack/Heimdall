@@ -873,54 +873,102 @@ public partial class ServerDialogViewModel : ObservableValidator
     {
     }
 
+    /// <summary>
+    /// Builds the registry the agent chip probes. A seam over
+    /// <see cref="SshAgentRegistry.CreateDefault"/> so a test can stand in for the machine's
+    /// agents, which the real ones answer in their own time (a named pipe, a Pageant window).
+    /// </summary>
+    internal Func<SshAgentPreference, SshAgentRegistry> AgentRegistryFactory { get; set; } =
+        SshAgentRegistry.CreateDefault;
+
+    /// <summary>
+    /// Counts the probes started, so a result that arrives after a newer probe, or after the
+    /// protocol left the SSH family, is recognised as stale and dropped. Read and written on the
+    /// UI thread only.
+    /// </summary>
+    private int _agentProbeGeneration;
+
+    /// <summary>
+    /// Asks the agents what they hold and shows it on the chip. The probe, availability check
+    /// included, runs off the UI thread: an agent that does not answer used to freeze the dialog
+    /// every time it opened, was refreshed or changed protocol.
+    /// </summary>
     [RelayCommand]
-    private void RefreshAgentChip()
+    private async Task RefreshAgentChipAsync()
     {
         if (!IsSshFamilyConnection)
         {
-            AgentChipState = SshAgentChipState.Off;
-            AgentChipText = "";
+            ClearAgentChip();
             return;
         }
 
+        int generation = ++_agentProbeGeneration;
+        SshAgentPreference preference = _sshAgentPreference;
+        Func<SshAgentPreference, SshAgentRegistry> registryFactory = AgentRegistryFactory;
+
+        IReadOnlyList<(string Name, int KeyCount)>? agents;
         try
         {
-            SshAgentRegistry registry = SshAgentRegistry.CreateDefault(_sshAgentPreference);
-            (SshAgentChipState state, string text) = ProbeAgent(registry);
-            AgentChipState = state;
-            AgentChipText = text;
+            agents = await Task.Run(() => ProbeAgents(registryFactory(preference)));
         }
         catch (Exception ex)
         {
             FileLogger.Warn($"[ServerDialog] agent chip probe failed: {ex.Message}");
-            AgentChipState = SshAgentChipState.Off;
-            AgentChipText = L("ServerDialogAgentChipOff");
+            agents = null;
         }
+
+        // Back on the UI thread. A newer probe, or a protocol that left the SSH family while
+        // this one waited, owns the chip now.
+        if (generation != _agentProbeGeneration || !IsSshFamilyConnection)
+        {
+            return;
+        }
+
+        (SshAgentChipState state, string text) = agents is null
+            ? (SshAgentChipState.Off, L("ServerDialogAgentChipOff"))
+            : DescribeAgents(agents);
+        AgentChipState = state;
+        AgentChipText = text;
     }
 
     private void RefreshAgentChipIfNeeded()
     {
         if (IsSshFamilyConnection)
         {
-            RefreshAgentChip();
+            // Not awaited: the callers are property setters. A failure is logged here because
+            // nothing else would ever observe it.
+            _ = RefreshAgentChipAsync().ContinueWith(
+                probe => FileLogger.Warn(
+                    $"[ServerDialog] agent chip refresh failed: {probe.Exception?.GetBaseException().Message}"),
+                CancellationToken.None,
+                TaskContinuationOptions.OnlyOnFaulted,
+                TaskScheduler.Default);
             return;
         }
 
+        ClearAgentChip();
+    }
+
+    private void ClearAgentChip()
+    {
+        _agentProbeGeneration++;
         AgentChipState = SshAgentChipState.Off;
         AgentChipText = "";
     }
 
-    private (SshAgentChipState State, string Text) ProbeAgent(SshAgentRegistry registry)
+    /// <summary>The available agents and how many identities each holds. Blocking; run off the UI thread.</summary>
+    private static IReadOnlyList<(string Name, int KeyCount)> ProbeAgents(SshAgentRegistry registry) =>
+        registry.GetAvailableAgents()
+            .Select(agent => (agent.Name, KeyCount: SafeGetIdentityCount(agent)))
+            .ToList();
+
+    private (SshAgentChipState State, string Text) DescribeAgents(IReadOnlyList<(string Name, int KeyCount)> counts)
     {
-        IReadOnlyList<ISshAgent> availableAgents = registry.GetAvailableAgents();
-        if (availableAgents.Count == 0)
+        if (counts.Count == 0)
         {
             return (SshAgentChipState.Off, L("ServerDialogAgentChipOff"));
         }
 
-        List<(string Name, int KeyCount)> counts = availableAgents
-            .Select(agent => (agent.Name, KeyCount: SafeGetIdentityCount(agent)))
-            .ToList();
         int totalKeys = counts.Sum(agent => agent.KeyCount);
         if (totalKeys == 0)
         {
