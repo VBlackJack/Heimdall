@@ -67,7 +67,7 @@ public sealed class SharedPostConnectTrustTests : IAsyncLifetime
         Assert.Equal(1, _confirmCalls);
         AppSettings settings = await _configManager.LoadSettingsAsync();
         Assert.Equal(
-            PostConnectFingerprint.Compute(profile.PostConnectSteps),
+            SharedPostConnectTrust.ApprovalFingerprint(profile),
             settings.SharedPostConnectApprovals[profile.Id]);
         Assert.False(profile.ExecutionConfirmed);
         Assert.Empty(await _configManager.LoadServersAsync());
@@ -111,8 +111,75 @@ public sealed class SharedPostConnectTrustTests : IAsyncLifetime
         Assert.False(allowed);
         Assert.Equal(2, _confirmCalls);
         Assert.Equal(
-            PostConnectFingerprint.Compute(profile.PostConnectSteps),
+            SharedPostConnectTrust.ApprovalFingerprint(profile),
             (await _configManager.LoadSettingsAsync()).SharedPostConnectApprovals[profile.Id]);
+    }
+
+    [Fact]
+    public async Task HostChanged_WithTheSameCommands_AsksAgain()
+    {
+        // The approval is for these commands on THIS machine: a shared file that keeps the commands
+        // and points the profile somewhere else must not inherit it.
+        ServerProfileDto profile = SharedSessionTestData.Create().Profile;
+        await _trust.AuthorizeAsync(profile, Confirm);
+        ServerProfileDto moved = SharedSessionTestData.Create().Profile;
+        moved.RemoteServer = "srv-other.example.test";
+
+        Assert.True(await _trust.AuthorizeAsync(moved, Confirm));
+        Assert.Equal(2, _confirmCalls);
+    }
+
+    [Fact]
+    public async Task PortChanged_WithTheSameCommands_AsksAgain()
+    {
+        ServerProfileDto profile = SharedSessionTestData.Create().Profile;
+        await _trust.AuthorizeAsync(profile, Confirm);
+        ServerProfileDto moved = SharedSessionTestData.Create().Profile;
+        moved.SshPort = 2222;
+
+        await _trust.AuthorizeAsync(moved, Confirm);
+
+        Assert.Equal(2, _confirmCalls);
+    }
+
+    [Fact]
+    public async Task UserChanged_WithTheSameCommands_AsksAgain()
+    {
+        ServerProfileDto profile = SharedSessionTestData.Create().Profile;
+        await _trust.AuthorizeAsync(profile, Confirm);
+        ServerProfileDto other = SharedSessionTestData.Create().Profile;
+        other.SshUsername = "root";
+
+        await _trust.AuthorizeAsync(other, Confirm);
+
+        Assert.Equal(2, _confirmCalls);
+    }
+
+    [Fact]
+    public async Task HostSpelledInAnotherCase_IsTheSameDestination()
+    {
+        ServerProfileDto profile = SharedSessionTestData.Create().Profile;
+        await _trust.AuthorizeAsync(profile, Confirm);
+        ServerProfileDto respelled = SharedSessionTestData.Create().Profile;
+        respelled.RemoteServer = "  SRV-DB01.Example.Test ";
+
+        Assert.True(await _trust.AuthorizeAsync(respelled, Confirm));
+        Assert.Equal(1, _confirmCalls);
+    }
+
+    [Fact]
+    public async Task ApprovalStoredBeforeTheDestinationWasBound_IsAskedAboutOnce()
+    {
+        // Existing approvals are the bare commands' fingerprint. They name no destination, so they
+        // are not honoured: one more question, then the bound value is stored.
+        ServerProfileDto profile = SharedSessionTestData.Create().Profile;
+        await _configManager.MergeSettingAsync(settings =>
+            settings.SharedPostConnectApprovals[profile.Id] = PostConnectFingerprint.Compute(profile.PostConnectSteps));
+
+        Assert.True(await _trust.AuthorizeAsync(profile, Confirm));
+        Assert.Equal(1, _confirmCalls);
+        Assert.True(await _trust.AuthorizeAsync(profile, Confirm));
+        Assert.Equal(1, _confirmCalls);
     }
 
     [Fact]

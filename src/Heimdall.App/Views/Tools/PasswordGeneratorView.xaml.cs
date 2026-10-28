@@ -64,16 +64,21 @@ public partial class PasswordGeneratorView : UserControl, IToolView
     private DispatcherTimer? _clipboardClearTimer;
     private DispatcherTimer? _clipboardHintTimer;
     private int _clipboardSecondsLeft;
-    private string? _lastCopiedPassword;
+    private readonly SecretClipboardGuard _secretClipboard;
 
     public PasswordGeneratorView()
     {
         InitializeComponent();
+        _secretClipboard = new SecretClipboardGuard(ResolveClipboard());
         _vm = new PasswordGeneratorViewModel(ResolvePresetStorage());
         DataContext = _vm;
         _vm.PropertyChanged += OnVmPropertyChanged;
         _vm.SettingsChanged += OnSettingsChanged;
     }
+
+    private static IClipboardService ResolveClipboard()
+        => (Application.Current as App)?.Services?.GetService<IClipboardService>()
+            ?? new WpfClipboardService();
 
     /// <summary>The one place the production preset location is reached.</summary>
     /// <remarks>
@@ -499,10 +504,7 @@ public partial class PasswordGeneratorView : UserControl, IToolView
     {
         if (!string.IsNullOrEmpty(_vm.GeneratedPassword))
         {
-            try { Clipboard.SetText(_vm.GeneratedPassword); }
-            catch (System.Runtime.InteropServices.ExternalException) { return; }
-            StartClipboardClearTimer(_vm.GeneratedPassword);
-            ShowClipboardClearHint();
+            if (!CopySecret(_vm.GeneratedPassword)) { return; }
             CopyFeedbackHelper.ShowCopyFeedback(sender as Button);
         }
     }
@@ -511,8 +513,7 @@ public partial class PasswordGeneratorView : UserControl, IToolView
     {
         if (!string.IsNullOrEmpty(_vm.PhoneticText))
         {
-            try { Clipboard.SetText(_vm.PhoneticText); }
-            catch (System.Runtime.InteropServices.ExternalException) { return; }
+            if (!CopySecret(_vm.PhoneticText)) { return; }
             CopyFeedbackHelper.ShowCopyFeedback(sender as Button);
         }
     }
@@ -573,10 +574,7 @@ public partial class PasswordGeneratorView : UserControl, IToolView
     {
         if (sender is Button btn && btn.Tag is string password)
         {
-            try { Clipboard.SetText(password); }
-            catch (System.Runtime.InteropServices.ExternalException) { return; }
-            StartClipboardClearTimer(password);
-            ShowClipboardClearHint();
+            if (!CopySecret(password)) { return; }
             CopyFeedbackHelper.ShowCopyFeedback(btn);
         }
     }
@@ -674,10 +672,7 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         {
             if (!string.IsNullOrEmpty(_vm.GeneratedPassword))
             {
-                try { Clipboard.SetText(_vm.GeneratedPassword); }
-                catch (System.Runtime.InteropServices.ExternalException) { return; }
-                StartClipboardClearTimer(_vm.GeneratedPassword);
-                ShowClipboardClearHint();
+                if (!CopySecret(_vm.GeneratedPassword)) { return; }
                 CopyFeedbackHelper.ShowCopyFeedback(BtnCopy);
             }
             e.Handled = true;
@@ -1191,17 +1186,11 @@ public partial class PasswordGeneratorView : UserControl, IToolView
             return;
         }
 
-        try
-        {
-            Clipboard.SetText(text);
-        }
-        catch (System.Runtime.InteropServices.ExternalException)
+        if (!CopySecret(text))
         {
             return;
         }
 
-        StartClipboardClearTimer(text);
-        ShowClipboardClearHint();
         CopyFeedbackHelper.ShowCopyFeedback(source);
     }
 
@@ -1445,11 +1434,27 @@ public partial class PasswordGeneratorView : UserControl, IToolView
 
         _clipboardHintTimer.Start();
     }
-    private void StartClipboardClearTimer(string password)
+
+    /// <summary>
+    /// Copies a secret through the sensitive-copy path and starts the countdown when
+    /// auto-clear is on. Every copy this tool makes goes through here.
+    /// </summary>
+    private bool CopySecret(string text)
+    {
+        if (!_secretClipboard.TryCopy(text, _vm.ClipboardAutoClear))
+        {
+            return false;
+        }
+
+        StartClipboardClearTimer();
+        ShowClipboardClearHint();
+        return true;
+    }
+
+    private void StartClipboardClearTimer()
     {
         if (!_vm.ClipboardAutoClear) return;
 
-        _lastCopiedPassword = password;
         _clipboardClearTimer?.Stop();
         _clipboardClearTimer = new DispatcherTimer
         {
@@ -1458,13 +1463,7 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         _clipboardClearTimer.Tick += (_, _) =>
         {
             _clipboardClearTimer.Stop();
-            try
-            {
-                if (Clipboard.ContainsText() && Clipboard.GetText() == _lastCopiedPassword)
-                    Clipboard.Clear();
-            }
-            catch { /* clipboard may be locked by another app */ }
-            _lastCopiedPassword = null;
+            _secretClipboard.ClearIfStillHeld();
         };
         _clipboardClearTimer.Start();
     }
@@ -1489,6 +1488,9 @@ public partial class PasswordGeneratorView : UserControl, IToolView
         _vm.PropertyChanged -= OnVmPropertyChanged;
         _vm.SettingsChanged -= OnSettingsChanged;
         _clipboardClearTimer?.Stop();
+        _clipboardHintTimer?.Stop();
+        // A copy still waiting for its countdown must not outlive the tool.
+        _secretClipboard.Close();
         GC.SuppressFinalize(this);
     }
 }

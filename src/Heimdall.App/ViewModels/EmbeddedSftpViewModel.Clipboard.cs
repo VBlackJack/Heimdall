@@ -19,6 +19,7 @@ using System.Linq;
 using CommunityToolkit.Mvvm.Input;
 using Heimdall.App.Services;
 using Heimdall.Core.Localization;
+using Heimdall.Core.Utilities;
 using Heimdall.Sftp;
 
 namespace Heimdall.App.ViewModels;
@@ -742,9 +743,7 @@ public sealed partial class EmbeddedSftpViewModel
 
     private static string CreateCrossEndpointTempPath()
     {
-        string directory = Path.Combine(Path.GetTempPath(), "Heimdall", "cross-server-paste");
-        Directory.CreateDirectory(directory);
-        return Path.Combine(directory, Guid.NewGuid().ToString("N"));
+        return CrossServerPasteStaging.CreateTempPath();
     }
 
     private static void TryDeleteCrossEndpointTempPath(string path)

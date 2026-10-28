@@ -338,6 +338,9 @@ public partial class App : System.Windows.Application
                 // launch, so a stranded password waited for one.
                 RdpHandler.SweepStaleArtifactsAtStartup();
 
+                // Cross-server paste staging copies a killed session never deleted.
+                CrossServerPasteStaging.SweepStale();
+
                 // And for update attempts: a staging directory survives every ending but
                 // three, with the installer inside it, and the relauncher transcripts
                 // accumulate one per attempt.
