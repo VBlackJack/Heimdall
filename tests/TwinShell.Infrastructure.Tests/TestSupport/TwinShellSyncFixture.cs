@@ -41,6 +41,7 @@ internal sealed class TwinShellSyncFixture : IDisposable, IAsyncDisposable
         IBatchRepository batches,
         ICustomCategoryRepository categories,
         ICommandTemplateRepository templates,
+        ISyncTombstoneRepository tombstones,
         JsonSyncService syncService)
     {
         _rootPath = rootPath;
@@ -50,6 +51,7 @@ internal sealed class TwinShellSyncFixture : IDisposable, IAsyncDisposable
         Batches = batches;
         Categories = categories;
         Templates = templates;
+        Tombstones = tombstones;
         SyncService = syncService;
     }
 
@@ -62,6 +64,8 @@ internal sealed class TwinShellSyncFixture : IDisposable, IAsyncDisposable
     internal ICustomCategoryRepository Categories { get; }
 
     internal ICommandTemplateRepository Templates { get; }
+
+    internal ISyncTombstoneRepository Tombstones { get; }
 
     internal JsonSyncService SyncService { get; }
 
@@ -88,12 +92,14 @@ internal sealed class TwinShellSyncFixture : IDisposable, IAsyncDisposable
         ICustomCategoryRepository categories = new CustomCategoryRepository(dbContext);
         ICommandTemplateRepository templates = new CommandTemplateRepository(dbContext);
         IUnitOfWork unitOfWork = new UnitOfWork(dbContext);
+        ISyncTombstoneRepository tombstones = new SyncTombstoneRepository(dbContext);
         JsonSyncService syncService = new(
             actions,
             batches,
             categories,
             templates,
-            unitOfWork);
+            unitOfWork,
+            tombstoneRepository: tombstones);
 
         return new TwinShellSyncFixture(
             rootPath,
@@ -103,6 +109,7 @@ internal sealed class TwinShellSyncFixture : IDisposable, IAsyncDisposable
             batches,
             categories,
             templates,
+            tombstones,
             syncService);
     }
 

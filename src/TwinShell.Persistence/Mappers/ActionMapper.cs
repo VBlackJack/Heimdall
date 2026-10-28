@@ -52,6 +52,7 @@ public static class ActionMapper
             CreatedAt = action.CreatedAt,
             UpdatedAt = action.UpdatedAt,
             IsUserCreated = action.IsUserCreated,
+            IsRetired = action.IsRetired,
             Translations = ToTranslationEntities(action)
         };
     }
@@ -144,6 +145,7 @@ public static class ActionMapper
             CreatedAt = entity.CreatedAt,
             UpdatedAt = entity.UpdatedAt,
             IsUserCreated = entity.IsUserCreated,
+            IsRetired = entity.IsRetired,
             Translations = (entity.Translations ?? []).Select(ToTranslationModel).ToList()
         };
 

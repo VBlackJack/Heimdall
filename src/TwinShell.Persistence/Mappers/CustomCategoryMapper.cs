@@ -80,6 +80,8 @@ public static class CustomCategoryMapper
         entity.DisplayOrder = domain.DisplayOrder;
         entity.IsHidden = domain.IsHidden;
         entity.Description = domain.Description;
-        entity.ModifiedAt = DateTime.UtcNow;
+        // The caller's timestamp, not now: the category service stamps an edit, and Git sync's
+        // import passes the remote one, which must survive or the next sync sees a local edit.
+        entity.ModifiedAt = domain.ModifiedAt;
     }
 }

@@ -74,6 +74,11 @@ public sealed class ActionEntity
     public bool IsUserCreated { get; set; }
 
     /// <summary>
+    /// A shipped action the seed no longer carries, kept for its history or favorites.
+    /// </summary>
+    public bool IsRetired { get; set; }
+
+    /// <summary>
     /// Other languages of the text above, one row per culture.
     /// </summary>
     public List<ActionTranslationEntity> Translations { get; set; } = new();
