@@ -37,7 +37,7 @@ public sealed record VaultChangePasswordInput(char[] CurrentPassword, char[] New
 /// the DEK is unchanged). A wrong current password surfaces the single generic
 /// unlock error. No password is logged; both buffers are zeroed after the attempt.
 /// </summary>
-public partial class VaultChangePasswordDialogViewModel : ObservableObject
+public partial class VaultChangePasswordDialogViewModel : ObservableObject, IPasswordRefocusHost
 {
     private readonly Func<char[], char[], Task> _changeAsync;
     private readonly LocalizationManager _localizer;

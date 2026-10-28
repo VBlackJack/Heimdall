@@ -17,6 +17,9 @@
 using System.IO;
 using System.Xml.Linq;
 using Heimdall.App.Tests.Views.EmbeddedRdp;
+using Heimdall.App.ViewModels.Dialogs;
+using Heimdall.Core.Localization;
+using Heimdall.Core.Security;
 
 namespace Heimdall.App.Tests;
 
@@ -66,11 +69,21 @@ public sealed class AccessibilityPassMarkupTests
     [Fact]
     public void TheTextAreaOfTheSourceEditor_TakesTheNameOfTheEditor()
     {
-        string code = File.ReadAllText(Path.Combine(AppRoot(), "Views", "Tools", "NotesToolView.xaml.cs"));
+        string source = ViewSource.WithoutCommentsAndLiterals(
+            File.ReadAllText(Path.Combine(AppRoot(), "Views", "Tools", "NotesToolView.xaml.cs")));
 
         // Keyboard focus lands on the text area, not on the editor the markup names.
-        Assert.Contains("Editor.TextArea,", code, StringComparison.Ordinal);
-        Assert.Contains("AutomationProperties.NameProperty", code, StringComparison.Ordinal);
+        string constructor = ViewSource.HandlerBody(source, "public NotesToolView()");
+        Assert.True(
+            ViewSource.IsStatementOfTheMethodBody(constructor, "ForwardEditorNameToTextArea();"),
+            "the view's constructor does not forward the editor's name to its text area");
+
+        string forward = ViewSource.HandlerBody(source, "private void ForwardEditorNameToTextArea()");
+        Assert.True(
+            ViewSource.IsStatementOfTheMethodBody(
+                forward,
+                "BindingOperations.SetBinding(Editor.TextArea, AutomationProperties.NameProperty, forwarded);"),
+            "the forwarding method does not bind the text area's name");
     }
 
     // --- The tag filters are a single-select list (U-10) ---
@@ -146,9 +159,26 @@ public sealed class AccessibilityPassMarkupTests
     [InlineData("VaultDisableDialog", "PasswordBox")]
     public void AVaultDialog_WiresItsPasswordBoxToTheRefocusSignal(string dialog, string box)
     {
-        string code = File.ReadAllText(Path.Combine(AppRoot(), "Views", "Dialogs", dialog + ".xaml.cs"));
+        string source = ViewSource.WithoutCommentsAndLiterals(
+            File.ReadAllText(Path.Combine(AppRoot(), "Views", "Dialogs", dialog + ".xaml.cs")));
 
-        Assert.Contains($"PasswordBoxRefocus.Attach({box}, ", code, StringComparison.Ordinal);
+        string constructor = ViewSource.HandlerBody(source, $"public {dialog}()");
+
+        Assert.True(
+            ViewSource.IsStatementOfTheMethodBody(constructor, $"PasswordBoxRefocus.Attach(this, {box});"),
+            $"{dialog} does not wire {box} to the refocus signal of its view-model");
+    }
+
+    [Fact]
+    public void EveryVaultDialogViewModel_ExposesTheRefocusSignalTheDialogsPickUp()
+    {
+        LocalizationManager localizer = new();
+
+        Assert.IsAssignableFrom<IPasswordRefocusHost>(new VaultUnlockDialogViewModel(
+            _ => Task.CompletedTask, new PinManager(), localizer, migrationInProgress: false));
+        Assert.IsAssignableFrom<IPasswordRefocusHost>(new VaultChangePasswordDialogViewModel((_, _) => Task.CompletedTask, localizer));
+        Assert.IsAssignableFrom<IPasswordRefocusHost>(new VaultEnableDialogViewModel(_ => Task.CompletedTask, localizer));
+        Assert.IsAssignableFrom<IPasswordRefocusHost>(new VaultDisableDialogViewModel(_ => Task.CompletedTask, localizer));
     }
 
     // --- Helpers ---

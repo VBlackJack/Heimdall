@@ -79,13 +79,7 @@ public partial class NotesToolView : UserControl, IToolView
         Editor.TextChanged += OnEditorTextChanged;
         Editor.TextArea.TextEntered += OnTextAreaTextEntered;
         Editor.TextArea.PreviewMouseDown += OnEditorPreviewMouseDown;
-
-        // The keyboard focus lands on the text area, not on the editor that XAML names, so the
-        // name set on the editor is forwarded to the element a screen reader actually reaches.
-        BindingOperations.SetBinding(
-            Editor.TextArea,
-            AutomationProperties.NameProperty,
-            new System.Windows.Data.Binding { Source = Editor, Path = new PropertyPath(AutomationProperties.NameProperty) });
+        ForwardEditorNameToTextArea();
         Editor.IsReadOnly = true;
         Editor.Options.ConvertTabsToSpaces = false;
         Editor.Options.HighlightCurrentLine = true;
@@ -98,6 +92,16 @@ public partial class NotesToolView : UserControl, IToolView
             Editor.TextArea.TextView.LineTransformers.Add(new MarkdownLivePreviewTransformer());
         }
         catch { /* Highlighting is cosmetic - do not block initialization */ }
+    }
+
+    /// <summary>
+    /// The keyboard focus lands on the text area, not on the editor that XAML names, so the name set
+    /// on the editor is forwarded to the element a screen reader actually reaches.
+    /// </summary>
+    private void ForwardEditorNameToTextArea()
+    {
+        var forwarded = new System.Windows.Data.Binding { Source = Editor, Path = new PropertyPath(AutomationProperties.NameProperty) };
+        BindingOperations.SetBinding(Editor.TextArea, AutomationProperties.NameProperty, forwarded);
     }
 
     public void Initialize(ToolContext? context, LocalizationManager? localizer)

@@ -29,7 +29,7 @@ namespace Heimdall.App.ViewModels.Dialogs;
 /// secret) behind a busy indicator. No password is ever logged; the buffer is
 /// zeroed after the attempt.
 /// </summary>
-public partial class VaultEnableDialogViewModel : ObservableObject
+public partial class VaultEnableDialogViewModel : ObservableObject, IPasswordRefocusHost
 {
     private readonly Func<char[], Task> _enableAsync;
     private readonly LocalizationManager _localizer;

@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
 using Heimdall.App.ViewModels.Dialogs;
@@ -31,10 +32,25 @@ namespace Heimdall.App.Views.Dialogs;
 /// </remarks>
 internal static class PasswordBoxRefocus
 {
-    /// <summary>Focuses and selects <paramref name="box"/> each time <paramref name="signal"/> fires.</summary>
-    internal static void Attach(PasswordBox box, PasswordRefocusSignal signal)
+    /// <summary>
+    /// Focuses and selects <paramref name="box"/> each time the signal of the dialog's view-model
+    /// fires. Called from the dialog's constructor: the view-model arrives later, with the data
+    /// context, and is picked up then.
+    /// </summary>
+    internal static void Attach(Window dialog, PasswordBox box)
     {
-        signal.Requested += (_, _) => box.Dispatcher.BeginInvoke(
+        dialog.DataContextChanged += (_, e) =>
+        {
+            if (e.NewValue is IPasswordRefocusHost host)
+            {
+                host.PasswordRefocus.Requested += (_, _) => FocusLater(box);
+            }
+        };
+    }
+
+    private static void FocusLater(PasswordBox box)
+    {
+        box.Dispatcher.BeginInvoke(
             DispatcherPriority.Input,
             () =>
             {

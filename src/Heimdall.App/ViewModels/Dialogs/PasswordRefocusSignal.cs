@@ -16,6 +16,13 @@
 
 namespace Heimdall.App.ViewModels.Dialogs;
 
+/// <summary>A dialog view-model whose password box needs the focus back after a failed attempt.</summary>
+public interface IPasswordRefocusHost
+{
+    /// <summary>Fires when the password box should take the keyboard focus back.</summary>
+    PasswordRefocusSignal PasswordRefocus { get; }
+}
+
 /// <summary>
 /// Tells a dialog when to put the keyboard focus back in its password box after a failed attempt.
 /// </summary>

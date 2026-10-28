@@ -35,7 +35,7 @@ namespace Heimdall.App.ViewModels.Dialogs;
 /// single generic error. No master-password value is ever logged; the password
 /// buffer is zeroed after every attempt.
 /// </remarks>
-public partial class VaultUnlockDialogViewModel : ObservableObject
+public partial class VaultUnlockDialogViewModel : ObservableObject, IPasswordRefocusHost
 {
     private readonly Func<char[], Task> _unlockAsync;
     private readonly Func<Task<VaultHelloUnlockResult>>? _unlockWithHelloAsync;

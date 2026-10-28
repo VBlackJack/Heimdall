@@ -36,6 +36,7 @@ public partial class VaultDisableDialog : Window
 
         Loaded += (_, _) => PasswordBox.Focus();
         DataContextChanged += OnDataContextChanged;
+        PasswordBoxRefocus.Attach(this, PasswordBox);
     }
 
     private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
@@ -48,11 +49,6 @@ public partial class VaultDisableDialog : Window
         if (e.NewValue is INotifyPropertyChanged newVm)
         {
             newVm.PropertyChanged += OnViewModelPropertyChanged;
-        }
-
-        if (e.NewValue is VaultDisableDialogViewModel refocusVm)
-        {
-            PasswordBoxRefocus.Attach(PasswordBox, refocusVm.PasswordRefocus);
         }
     }
 
