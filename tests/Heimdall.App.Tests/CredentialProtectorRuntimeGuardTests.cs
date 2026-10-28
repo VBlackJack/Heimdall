@@ -19,6 +19,7 @@ using System.Runtime.Versioning;
 
 using Heimdall.App.Services;
 using Heimdall.Core.Security;
+using Heimdall.Core.Security.Vault;
 
 namespace Heimdall.App.Tests;
 
@@ -105,6 +106,36 @@ public sealed class ProtectorGuardOutsiderProbeTests : IDisposable
         Assert.NotEmpty(seen);
         Assert.Contains(seen, message => message.Contains(nameof(ProtectorGuardOutsiderProbeTests), StringComparison.Ordinal));
     }
+
+    /// <summary>
+    /// A call that fails after it was seen is still reported, and does not fail the prover. The
+    /// protector throws <see cref="VaultLockedException"/> when a collection member has left the
+    /// vault enabled without a key, and this class shares no lock with those members, so the
+    /// failure arrives at an arbitrary moment. The call is provoked through the observer hook and
+    /// then throws the same exception, so the outcome does not depend on the state of any sibling.
+    /// </summary>
+    [Fact]
+    public void ACallThatThrowsAfterBeingSeen_IsReportedAndDoesNotPropagate()
+    {
+        IReadOnlyList<string> seen = CredentialProtectorRuntimeGuard.Observing(
+            () =>
+            {
+                CredentialProtector.CryptoCallObserver?.Invoke();
+                throw new VaultLockedException();
+            });
+
+        Assert.NotEmpty(seen);
+        Assert.Contains(seen, message => message.Contains(nameof(ProtectorGuardOutsiderProbeTests), StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// An action that fails having shown the observer nothing is not swallowed, so a broken
+    /// action cannot pass as a quiet one.
+    /// </summary>
+    [Fact]
+    public void AnActionThatThrowsWithoutBeingSeen_StillPropagates()
+        => Assert.Throws<InvalidOperationException>(
+            () => CredentialProtectorRuntimeGuard.Observing(() => throw new InvalidOperationException()));
 
     /// <summary>
     /// And so is a call made through a collaborator the test never names, which is the shape the
