@@ -87,6 +87,9 @@ public sealed class ActionConfiguration : IEntityTypeConfiguration<ActionEntity>
         builder.Property(e => e.IsUserCreated)
             .IsRequired();
 
+        builder.Property(e => e.IsRetired)
+            .IsRequired();
+
         // Relationships
         builder.HasOne(e => e.WindowsCommandTemplate)
             .WithMany()

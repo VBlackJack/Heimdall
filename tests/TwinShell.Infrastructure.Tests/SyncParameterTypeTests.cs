@@ -59,7 +59,18 @@ public sealed class SyncParameterTypeTests
                     new TemplateParameter { Name = "drive", Label = "Drive", Type = "driveletter", DefaultValue = "C" }
                 ]
             };
-            await source.Templates.AddAsync(template);
+            // A template travels with the user action that uses it.
+            await source.Actions.AddAsync(new TwinShell.Core.Models.Action
+            {
+                Id = "act-types",
+                Title = "Typed action",
+                Category = CommandCategories.Development,
+                Platform = Platform.Windows,
+                Level = CriticalityLevel.Info,
+                WindowsCommandTemplateId = template.Id,
+                WindowsCommandTemplate = template,
+                IsUserCreated = true
+            });
             (await source.SyncService.ExportDataToYamlAsync(folder)).Success.Should().BeTrue();
 
             await using TwinShellSyncFixture target = await TwinShellSyncFixture.CreateAsync();

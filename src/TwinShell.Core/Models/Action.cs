@@ -126,6 +126,19 @@ public sealed class Action
     public bool IsUserCreated { get; set; }
 
     /// <summary>
+    /// Whether this shipped action left the seed but was kept because history or a favorite
+    /// still points at it.
+    /// </summary>
+    /// <remarks>
+    /// A retired action is hidden from the library, its search and the palette, and stays
+    /// readable by id so the history rows that name it keep their action. A later seed that
+    /// ships the id again brings it back. Local state of this database: never read from a
+    /// seed or a library file, never written to one.
+    /// </remarks>
+    [JsonIgnore]
+    public bool IsRetired { get; set; }
+
+    /// <summary>
     /// Other languages of the pivot text, one entry per culture.
     /// </summary>
     /// <remarks>

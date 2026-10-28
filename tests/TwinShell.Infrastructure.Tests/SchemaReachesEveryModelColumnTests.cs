@@ -98,6 +98,8 @@ public sealed class SchemaReachesEveryModelColumnTests
         sqlOnly.Should().NotContain("PublicId");
         sqlOnly.Should().NotContain("WindowsExamplesJson");
         sqlOnly.Should().NotContain("LinuxExamplesJson");
+        sqlOnly.Should().NotContain("IsRetired");
+        sqlOnly.Should().NotContain("SyncTombstones");
         sqlOnly.Should().Contain("ExamplesJson");
         sqlOnly.Should().Contain("CREATE TABLE \"Actions\"");
         baseline.Should().Contain("NEVER REGENERATE THIS FILE");
