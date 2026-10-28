@@ -3891,6 +3891,8 @@
   "TooltipWebBack": "Pr\u00e9c\u00e9dent",
   "ErrorVncConnectionLost": "La connexion VNC a \u00e9t\u00e9 perdue de fa\u00e7on inattendue.",
   "ErrorVncClientInitFailed": "Le client VNC n'a pas pu d\u00e9marrer.",
+  "ErrorVncLibraryFailedTitle": "La biblioth\u00e8que noVNC n'a pas pu \u00eatre charg\u00e9e",
+  "ErrorVncLibraryFailedMessage": "Le visualiseur VNC int\u00e9gr\u00e9 n'a pas pu d\u00e9marrer. V\u00e9rifiez que le dossier vnc/core est \u00e0 c\u00f4t\u00e9 de vnc.html dans le dossier Assets.",
   "ErrorVncUsernameRequired": "Ce serveur VNC demande un nom d'utilisateur et un mot de passe. Heimdall n'enregistre pas de nom d'utilisateur VNC et ne peut donc pas se connecter \u00e0 ce serveur.",
   "ErrorVncPasswordRequired": "Ce serveur VNC demande un mot de passe et le profil n'en contient pas. Ajoutez le mot de passe au profil, puis reconnectez-vous.",
   "DialogVncPasswordPromptTitle": "Mot de passe VNC requis",
