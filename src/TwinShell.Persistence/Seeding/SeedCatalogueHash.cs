@@ -33,15 +33,23 @@ public static class SeedCatalogueHash
     /// </summary>
     /// <param name="filePaths">The seed files; their order does not matter.</param>
     public static string Compute(IEnumerable<string> filePaths)
+        => Compute(filePaths, File.ReadAllBytes);
+
+    /// <summary>
+    /// Returns the hash of <paramref name="filePaths"/> reading each file through
+    /// <paramref name="readAllBytes"/>, which is how a test counts the reads.
+    /// </summary>
+    public static string Compute(IEnumerable<string> filePaths, Func<string, byte[]> readAllBytes)
     {
         ArgumentNullException.ThrowIfNull(filePaths);
+        ArgumentNullException.ThrowIfNull(readAllBytes);
 
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
 
         foreach (string path in filePaths.OrderBy(Path.GetFileName, StringComparer.Ordinal))
         {
             AppendBlock(hash, Encoding.UTF8.GetBytes(Path.GetFileName(path)));
-            AppendBlock(hash, File.ReadAllBytes(path));
+            AppendBlock(hash, readAllBytes(path));
         }
 
         return Convert.ToHexStringLower(hash.GetHashAndReset());

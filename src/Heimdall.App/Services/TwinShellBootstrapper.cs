@@ -46,6 +46,13 @@ internal static class TwinShellBootstrapper
 
     private static readonly string DbPath = Path.Combine(DbDir, "twinshell.db");
 
+    /// <summary>The stages of the library's initialization, as the startup log names them.</summary>
+    private const string EnsureCreatedStage = "TwinShell EnsureCreated";
+    private const string SchemaUpgradeStage = "TwinShell schema upgrade";
+    private const string PruneHistoryStage = "TwinShell history prune";
+    private const string SeedHashStage = "TwinShell seed fingerprint and hash";
+    private const string ActionCountStage = "TwinShell action count";
+
     /// <summary>
     /// Registers TwinShell persistence and core services.
     /// Call from <see cref="App.ConfigureServices"/>.
@@ -119,9 +126,9 @@ internal static class TwinShellBootstrapper
         using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<TwinShellDbContext>();
 
-        await context.Database.EnsureCreatedAsync();
-        await SchemaUpgrader.UpgradeAsync(context, TwinShellSchema.Steps);
-
+        await StartupStageTimer.RunAsync(EnsureCreatedStage, () => context.Database.EnsureCreatedAsync());
+        await StartupStageTimer.RunAsync(
+            SchemaUpgradeStage, () => SchemaUpgrader.UpgradeAsync(context, TwinShellSchema.Steps));
         await PruneCommandHistoryAsync(scope.ServiceProvider);
 
         var repo = scope.ServiceProvider.GetRequiredService<IActionRepository>();
@@ -148,13 +155,22 @@ internal static class TwinShellBootstrapper
             .ToArray();
 
         // The seed reaches a database whenever it differs from the one last applied, not
-        // only on the first launch: see SystemSeedRefresher.
-        var seedHash = SeedCatalogueHash.Compute(jsonFiles);
+        // only on the first launch: see SystemSeedRefresher. The seed files are read only when
+        // their metadata moved since the hash was taken, and then off the UI thread: reading all
+        // of them on every launch cost seconds after an update or a reboot.
         var refresher = new SystemSeedRefresher(context);
-        if (string.Equals(await refresher.ReadAppliedHashAsync(), seedHash, StringComparison.Ordinal))
+        var seedResolution = await StartupStageTimer.RunAsync(
+            SeedHashStage, () => new SeedHashResolver(refresher).ResolveAsync(jsonFiles));
+        var seedHash = seedResolution.Hash;
+        Heimdall.Core.Logging.FileLogger.Info(
+            seedResolution.ContentRead
+                ? $"[TwinShell] Seed fingerprint changed or unknown: read {jsonFiles.Length} files"
+                : $"[TwinShell] Seed fingerprint unchanged: {jsonFiles.Length} files not read");
+        if (seedResolution.MatchesApplied)
         {
+            var actionCount = await StartupStageTimer.RunAsync(ActionCountStage, () => repo.CountAsync());
             Heimdall.Core.Logging.FileLogger.Info(
-                $"[TwinShell] Command library ready ({await repo.CountAsync()} actions)");
+                $"[TwinShell] Command library ready ({actionCount} actions)");
             return;
         }
 
@@ -174,7 +190,7 @@ internal static class TwinShellBootstrapper
         // still opens on what it had.
         try
         {
-            var result = await refresher.RefreshAsync(validActions, seedHash);
+            var result = await refresher.RefreshAsync(validActions, seedHash, seedResolution.Fingerprint);
             Heimdall.Core.Logging.FileLogger.Info(
                 $"[TwinShell] Seed applied from {jsonFiles.Length} files: {result.Inserted} inserted, "
                 + $"{result.Updated} updated, {result.Removed} removed, {result.Retired} retired, "
@@ -423,8 +439,9 @@ internal static class TwinShellBootstrapper
     {
         try
         {
-            await PruneOlderThanRetentionAsync(
-                scopedProvider.GetRequiredService<ICommandHistoryService>());
+            await StartupStageTimer.RunAsync(
+                PruneHistoryStage,
+                () => PruneOlderThanRetentionAsync(scopedProvider.GetRequiredService<ICommandHistoryService>()));
         }
         catch (Exception ex)
         {
