@@ -119,6 +119,115 @@ public sealed class DocumentationTypographyGuardTests
             "No document below a docs subdirectory was scanned, so the sweep is not recursive.");
     }
 
+    /// <summary>
+    /// Release notes are held to the strict rule: printable ASCII and what the French AZERTY layout
+    /// types, arrows included. The general documentation guard above lets arrows through; a release
+    /// note is read from a release page and a console updater, where they do not survive.
+    /// </summary>
+    /// <remarks>
+    /// The allow-list is read from <c>scripts/NotesTypographyGuard.ps1</c>, the guard that blocks
+    /// <c>Build.ps1 -Mode Release</c>, instead of being copied here: two copies of one decision drift
+    /// apart. Both languages are scanned, <c>docs/release-notes</c> and its French mirror
+    /// <c>docs/fr/release-notes</c>.
+    /// </remarks>
+    [Fact]
+    public void ReleaseNotesUseOnlyAsciiAndAzertyCharacters()
+    {
+        HashSet<char> allowed = ReadReleaseNotesAllowList();
+        List<string> violations = [];
+        IReadOnlyList<string> notes = ReleaseNoteFiles();
+
+        foreach (string path in notes)
+        {
+            // Read with byte order mark detection off, so that a leading U+FEFF is seen and refused.
+            using StreamReader reader = new(path, new System.Text.UTF8Encoding(false), detectEncodingFromByteOrderMarks: false);
+            int lineNumber = 0;
+            while (reader.ReadLine() is { } line)
+            {
+                lineNumber++;
+                foreach (char character in line.Where(c => !allowed.Contains(c)))
+                {
+                    violations.Add(
+                        $"{Relative(path)}:{lineNumber} contains U+{(int)character:X4}, "
+                        + "which is neither printable ASCII nor typeable on the French AZERTY layout");
+                }
+            }
+        }
+
+        Assert.True(violations.Count == 0, string.Join("\n", violations.Take(40)));
+        Assert.True(notes.Count >= 100, $"only {notes.Count} release notes were scanned");
+    }
+
+    /// <summary>
+    /// The French mirror sits one directory below <c>docs/</c>; a sweep that stopped at the English
+    /// folder would report success having read half the notes.
+    /// </summary>
+    [Fact]
+    public void TheReleaseNoteScanReachesTheFrenchMirror()
+    {
+        IReadOnlyList<string> notes = ReleaseNoteFiles();
+
+        Assert.Contains(notes, path => Relative(path).Replace('\\', '/').StartsWith("docs/release-notes/", System.StringComparison.Ordinal));
+        Assert.Contains(notes, path => Relative(path).Replace('\\', '/').StartsWith("docs/fr/release-notes/", System.StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// The allow-list read from the PowerShell guard is the AZERTY one, not an empty or a permissive
+    /// set: the accents are in, and the arrows, the guillemets and the ligatures are out.
+    /// </summary>
+    [Fact]
+    public void TheReleaseNoteAllowListIsTheAzertyOne()
+    {
+        HashSet<char> allowed = ReadReleaseNotesAllowList();
+
+        foreach (char accent in new[] { 'é', 'è', 'ç', 'à', 'ù', 'ê', 'î', 'ô', 'û', 'ï', 'ë', 'ü', 'ñ' })
+            Assert.Contains(accent, allowed);
+
+        foreach (char refused in new[] { '→', '←', '↔', '—', '–', '«', '»', 'œ', 'æ', '…', '’', ' ', '﻿', '☐', '×' })
+            Assert.DoesNotContain(refused, allowed);
+
+        Assert.Contains('A', allowed);
+        Assert.Contains('~', allowed);
+        Assert.Contains('\t', allowed);
+    }
+
+    private const string NotesGuardScript = "scripts/NotesTypographyGuard.ps1";
+    private const string NotesAllowListVariable = "$script:AzertyNonAsciiChars";
+
+    /// <summary>Tab, printable ASCII, and the non-ASCII code points listed in the PowerShell guard.</summary>
+    private static HashSet<char> ReadReleaseNotesAllowList()
+    {
+        string[] lines = File.ReadAllLines(Path.Combine(FindRepoRoot(), NotesGuardScript));
+        int start = Array.FindIndex(lines, line => line.StartsWith(NotesAllowListVariable + " = @(", System.StringComparison.Ordinal));
+        Assert.True(start >= 0, $"{NotesAllowListVariable} was not found in {NotesGuardScript}");
+
+        HashSet<char> allowed = ['\t'];
+        for (char c = ' '; c <= '~'; c++)
+            allowed.Add(c);
+
+        // Only the array body is read. The allow-list and the remedy table further down both list
+        // code points as 0x....; the table grants nothing, and reading it here would allow the
+        // very characters the guard refuses.
+        for (int index = start + 1; index < lines.Length && lines[index].Trim() != ")"; index++)
+        {
+            string code = lines[index].Split('#')[0];
+            foreach (System.Text.RegularExpressions.Match match in System.Text.RegularExpressions.Regex.Matches(code, @"0x([0-9A-Fa-f]{4})"))
+                allowed.Add((char)Convert.ToInt32(match.Groups[1].Value, 16));
+        }
+
+        return allowed;
+    }
+
+    private static IReadOnlyList<string> ReleaseNoteFiles()
+    {
+        string docs = Path.Combine(FindRepoRoot(), "docs");
+        return
+        [
+            .. Directory.EnumerateFiles(Path.Combine(docs, "release-notes"), "*.md", SearchOption.AllDirectories),
+            .. Directory.EnumerateFiles(Path.Combine(docs, "fr", "release-notes"), "*.md", SearchOption.AllDirectories),
+        ];
+    }
+
     // Arrows and trees are the deliberate exception. If someone tightens this guard into "ASCII
     // only", that intent is lost silently, so it is asserted rather than left to the remarks.
     [Fact]

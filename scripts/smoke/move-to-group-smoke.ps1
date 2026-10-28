@@ -804,7 +804,7 @@ $report = [ordered]@{
     S1_ContextMenuMove = 'Red'
     S1_Sample = ''
     S2_SelectionFollows = 'Skipped'
-    S2_Reason = 'UIA TreeView selection readback unreliable under WPF virtualization — delegated to human smoke H1'
+    S2_Reason = 'UIA TreeView selection readback unreliable under WPF virtualization - delegated to human smoke H1'
     S3_ExpansionPreserved = 'Red'
     S3_Sample = ''
     S4_DestinationSetParity = 'Red'
@@ -812,7 +812,7 @@ $report = [ordered]@{
     S5a_NoGroupOffered = 'Red'
     S5a_Sample = ''
     S5b_NoGroupMove = 'Skipped'
-    S5b_Reason = 'Second context-menu pass times out under UIA — delegated to human smoke H3'
+    S5b_Reason = 'Second context-menu pass times out under UIA - delegated to human smoke H3'
 }
 
 try {

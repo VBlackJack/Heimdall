@@ -579,11 +579,11 @@ $report = [ordered]@{
     S1_FavoritesSectionExists = 'Red'
     S1_Sample = ''
     S2_PinViaContextMenu = 'Skipped'
-    S2_Reason = 'WPF programmatic ContextMenu not exposed in UIA automation tree — delegated to human smoke H2/H3'
+    S2_Reason = 'WPF programmatic ContextMenu not exposed in UIA automation tree - delegated to human smoke H2/H3'
     S3_UnpinViaContextMenu = 'Skipped'
-    S3_Reason = 'WPF programmatic ContextMenu not exposed in UIA automation tree — delegated to human smoke H3/H4'
+    S3_Reason = 'WPF programmatic ContextMenu not exposed in UIA automation tree - delegated to human smoke H3/H4'
     S4_RightClickNoLaunch = 'Skipped'
-    S4_Reason = 'Right-click UIA interaction unreliable when ContextMenu is not exposed — delegated to human smoke H2'
+    S4_Reason = 'Right-click UIA interaction unreliable when ContextMenu is not exposed - delegated to human smoke H2'
     S5_AlphabeticalOrder = 'Red'
     S5_Sample = ''
     S6_FilterInteraction = 'Red'
@@ -653,7 +653,7 @@ try {
         $report.S6_Sample = "Filter '$filterTargetName': only '$filterTargetName' visible. Filter cleared: [$($restoredAfterClear -join ', ')]"
     } catch {
         $report.S6_FilterInteraction = 'Skipped'
-        $report.S6_Reason = "Sidebar filter TextBox not reliably targetable via UIA — delegated to human smoke: $($_.Exception.Message)"
+        $report.S6_Reason = "Sidebar filter TextBox not reliably targetable via UIA - delegated to human smoke: $($_.Exception.Message)"
     }
 
     Stop-HeimdallApp -Process $process
