@@ -61,7 +61,7 @@ public static class HtmlReportGenerator
 
     private static void AppendHead(StringBuilder sb, AuditReport report, Func<string, string> l)
     {
-        var scope = Encode(FormatScope(report.Scope));
+        var scope = Encode(FormatScope(report.Scope, l));
         var date = report.StartTime.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 
         sb.AppendLine("<head>");
@@ -360,9 +360,9 @@ code {
 
     private static void AppendHeader(StringBuilder sb, AuditReport report, Func<string, string> l)
     {
-        var scope = Encode(FormatScope(report.Scope));
+        var scope = Encode(FormatScope(report.Scope, l));
         var date = report.StartTime.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
-        var duration = FormatDuration(report.EndTime - report.StartTime);
+        var duration = DurationFormatter.Format(report.EndTime - report.StartTime, l);
 
         sb.AppendLine("<div class=\"header\">");
         sb.Append("<h1>").Append(Encode(l("AuditReportHeading"))).AppendLine("</h1>");
@@ -556,7 +556,7 @@ code {
             .Where(h => !string.IsNullOrEmpty(h))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Count();
-        var duration = FormatDuration(report.EndTime - report.StartTime);
+        var duration = DurationFormatter.Format(report.EndTime - report.StartTime, l);
         var timestamp = report.EndTime.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
 
         sb.AppendLine("<div class=\"footer\">");
@@ -569,7 +569,7 @@ code {
         sb.AppendLine("</div>");
     }
 
-    private static string FormatScope(AuditScope scope)
+    private static string FormatScope(AuditScope scope, Func<string, string> l)
     {
         var parts = new List<string>();
 
@@ -583,22 +583,7 @@ code {
             parts.Add(scope.Subnet);
         }
 
-        return parts.Count > 0 ? string.Join(" | ", parts) : "N/A";
-    }
-
-    private static string FormatDuration(TimeSpan duration)
-    {
-        if (duration.TotalHours >= 1)
-        {
-            return $"{(int)duration.TotalHours}h {duration.Minutes:D2}m {duration.Seconds:D2}s";
-        }
-
-        if (duration.TotalMinutes >= 1)
-        {
-            return $"{duration.Minutes}m {duration.Seconds:D2}s";
-        }
-
-        return $"{duration.Seconds}s";
+        return parts.Count > 0 ? string.Join(" | ", parts) : l("ValueNotAvailable");
     }
 
     private static string StatusToCssClass(AuditStatus status) => status switch

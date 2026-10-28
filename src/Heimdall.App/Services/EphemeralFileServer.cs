@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.Globalization;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
@@ -21,6 +22,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Web;
+using Heimdall.App.Localization;
 using Heimdall.Core.Models;
 using Heimdall.Core.Utilities;
 
@@ -43,6 +45,13 @@ public sealed class EphemeralFileServer : IDisposable, IAsyncDisposable
     private const int TftpMaxRetries = 3;
     private const int MaxConcurrentTftpTransfers = 8;
     private const int MaxConcurrentHttpRequests = 8;
+
+    // Catalogue keys of the text the HTTP server sends to a browser.
+    private const string UnauthorizedKey = "FileServerUnauthorized";
+    private const string NotFoundKey = "FileServerNotFound";
+    private const string PageTitleKey = "FileServerPageTitle";
+    private const string IndexOfKey = "FileServerIndexOf";
+    private const string FooterKey = "FileServerFooter";
 
     // TFTP opcodes (RFC 1350)
     private const ushort OpcodeRrq = 1;
@@ -88,6 +97,13 @@ public sealed class EphemeralFileServer : IDisposable, IAsyncDisposable
     /// cannot create a file symbolic link without the SeCreateSymbolicLink privilege.
     /// </summary>
     internal Func<string, bool> IsLink { get; init; } = IsSymbolicLinkOrJunction;
+
+    /// <summary>
+    /// Resolves a catalogue key to the interface language for the pages and messages that the
+    /// HTTP server sends to a browser. The TFTP error strings are not routed through it: they
+    /// are NetASCII text for remote clients, so they stay in English whatever the interface.
+    /// </summary>
+    internal Func<string, string> Localize { get; init; } = key => LocalizationSource.Instance[key];
 
     public EphemeralFileServer()
     {
@@ -353,7 +369,7 @@ public sealed class EphemeralFileServer : IDisposable, IAsyncDisposable
                 $"[EphemeralFileServer] Unauthorized HTTP request: {RedactToken(request.Url?.ToString() ?? request.RawUrl ?? "/")}");
 
             response.StatusCode = 401;
-            var unauthorized = Encoding.UTF8.GetBytes("Unauthorized");
+            var unauthorized = Encoding.UTF8.GetBytes(Localize(UnauthorizedKey));
             response.ContentType = "text/plain; charset=utf-8";
             response.ContentLength64 = unauthorized.Length;
             await response.OutputStream.WriteAsync(unauthorized);
@@ -403,7 +419,8 @@ public sealed class EphemeralFileServer : IDisposable, IAsyncDisposable
         else
         {
             response.StatusCode = 404;
-            var notFound = Encoding.UTF8.GetBytes("<html><body><h1>404 - Not Found</h1></body></html>");
+            var notFound = Encoding.UTF8.GetBytes(
+                $"<html><body><h1>{HttpUtility.HtmlEncode(Localize(NotFoundKey))}</h1></body></html>");
             response.ContentType = "text/html; charset=utf-8";
             response.ContentLength64 = notFound.Length;
             await response.OutputStream.WriteAsync(notFound);
@@ -415,11 +432,14 @@ public sealed class EphemeralFileServer : IDisposable, IAsyncDisposable
     {
         var sb = new StringBuilder();
         sb.Append("<!DOCTYPE html><html><head><meta charset='utf-8'/>");
-        sb.Append("<title>Heimdall File Server</title>");
+        sb.Append($"<title>{HttpUtility.HtmlEncode(Localize(PageTitleKey))}</title>");
         sb.Append("<style>body{font-family:monospace;margin:20px}a{text-decoration:none;color:#0066cc}");
         sb.Append("a:hover{text-decoration:underline}table{border-collapse:collapse}");
         sb.Append("td{padding:4px 16px 4px 0}</style></head><body>");
-        sb.Append($"<h2>Index of /{HttpUtility.HtmlEncode(relativePath)}</h2><hr/><table>");
+        sb.Append("<h2>").Append(string.Format(
+            CultureInfo.InvariantCulture,
+            HttpUtility.HtmlEncode(Localize(IndexOfKey)),
+            HttpUtility.HtmlEncode(relativePath))).Append("</h2><hr/><table>");
 
         // Parent directory link
         if (!string.IsNullOrEmpty(relativePath))
@@ -453,7 +473,7 @@ public sealed class EphemeralFileServer : IDisposable, IAsyncDisposable
             sb.Append($"<td>{info.LastWriteTime:yyyy-MM-dd HH:mm}</td></tr>");
         }
 
-        sb.Append("</table><hr/><em>Heimdall Ephemeral File Server</em></body></html>");
+        sb.Append($"</table><hr/><em>{HttpUtility.HtmlEncode(Localize(FooterKey))}</em></body></html>");
 
         var html = Encoding.UTF8.GetBytes(sb.ToString());
         response.ContentType = "text/html; charset=utf-8";
