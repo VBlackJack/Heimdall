@@ -16,6 +16,7 @@
         Background="{DynamicResource BackgroundBrush}"
         ResizeMode="CanResizeWithGrip"
         behaviors:DialogChromeBehavior.HideCaptionButtons="True"
+        behaviors:WorkingAreaMinimumBehavior.ClampHeight="True"
         MinWidth="520" MinHeight="420"
         ShowInTaskbar="False">
 
@@ -264,10 +265,10 @@
         </ScrollViewer>
 
         <TextBlock Grid.Row="1"
-                   Text="{Binding ValidationError}"
-                   Foreground="{DynamicResource ErrorTextBrush}"
+                   Text="{Binding ValidationError, NotifyOnTargetUpdated=True}"
+                   Style="{StaticResource FieldValidationErrorStyle}"
                    FontSize="{StaticResource FontSizeBody}"
-                   Margin="{StaticResource MarginSubsectionTop}" TextWrapping="Wrap"
+                   Margin="{StaticResource MarginSubsectionTop}"
                    Visibility="{Binding ValidationError, Converter={StaticResource NullToVis}}"/>
 
         <StackPanel Grid.Row="2" Orientation="Horizontal"

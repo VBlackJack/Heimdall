@@ -6376,6 +6376,7 @@
                         </ListBox.ItemTemplate>
                         <ListBox.ItemContainerStyle>
                             <Style TargetType="ListBoxItem">
+                                <Setter Property="behaviors:ItemContainerAccessibilityBehavior.IsEnabled" Value="True"/>
                                 <Setter Property="Padding" Value="0"/>
                                 <Setter Property="Margin" Value="2,0"/>
                                 <Setter Property="Background" Value="Transparent"/>

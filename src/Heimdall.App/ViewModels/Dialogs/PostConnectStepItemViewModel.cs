@@ -14,13 +14,18 @@
  * limitations under the License.
  */
 
+using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Heimdall.App.Localization;
 using Heimdall.Core.Models;
 
 namespace Heimdall.App.ViewModels.Dialogs;
 
-public sealed partial class PostConnectStepItemViewModel : ObservableObject
+public sealed partial class PostConnectStepItemViewModel : ObservableObject, IAccessibleItemViewModel
 {
+    private const string RowNameKey = "A11yPostConnectStepRow";
+    private const string EmptyStepKey = "A11yPostConnectStepEmpty";
+
     [ObservableProperty]
     private string _id = Guid.NewGuid().ToString();
 
@@ -54,15 +59,39 @@ public sealed partial class PostConnectStepItemViewModel : ObservableObject
         ? LinkedActionTitle ?? CommandLibraryId ?? string.Empty
         : Input;
 
-    partial void OnInputChanged(string value) => OnPropertyChanged(nameof(DisplayInput));
+    /// <summary>
+    /// What a screen reader announces for the row: the command, or the library action it is linked
+    /// to, so a list of steps reads as a list of commands rather than as a list of type names.
+    /// </summary>
+    public string AccessibleName
+    {
+        get
+        {
+            string display = string.IsNullOrWhiteSpace(DisplayInput)
+                ? LocalizationSource.Instance[EmptyStepKey]
+                : DisplayInput;
+            return string.Format(CultureInfo.CurrentCulture, LocalizationSource.Instance[RowNameKey], display);
+        }
+    }
+
+    /// <inheritdoc />
+    public string? AccessibleHelpText => null;
+
+    partial void OnInputChanged(string value) => RaiseDisplayInputChanged();
 
     partial void OnCommandLibraryIdChanged(string? value)
     {
         OnPropertyChanged(nameof(IsLinked));
-        OnPropertyChanged(nameof(DisplayInput));
+        RaiseDisplayInputChanged();
     }
 
-    partial void OnLinkedActionTitleChanged(string? value) => OnPropertyChanged(nameof(DisplayInput));
+    partial void OnLinkedActionTitleChanged(string? value) => RaiseDisplayInputChanged();
+
+    private void RaiseDisplayInputChanged()
+    {
+        OnPropertyChanged(nameof(DisplayInput));
+        OnPropertyChanged(nameof(AccessibleName));
+    }
 
     public PostConnectStep ToModel()
     {

@@ -82,7 +82,18 @@ public partial class ScheduledTaskDialog : Window
         if (vm.ValidationError is null)
         {
             DialogResult = true;
+            return;
         }
+
+        // Same as the session dialog: the refusal and the field to fix are not left to be found.
+        UIElement? target = vm.FirstInvalidField switch
+        {
+            ScheduledTaskField.Server => CmbServer,
+            ScheduledTaskField.TimeOfDay => TxtTimeOfDay,
+            ScheduledTaskField.Interval => TxtInterval,
+            _ => null
+        };
+        target?.Focus();
     }
 
     private void OnWindowClosing(object? sender, System.ComponentModel.CancelEventArgs e)

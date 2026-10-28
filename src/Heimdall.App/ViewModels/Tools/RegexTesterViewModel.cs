@@ -373,7 +373,7 @@ public enum RegexHighlightKind
 
 public readonly record struct RegexHighlightSegment(string Text, RegexHighlightKind Kind);
 
-public sealed partial class MatchDisplayItem : ObservableObject
+public sealed partial class MatchDisplayItem : ObservableObject, IAccessibleItemViewModel
 {
     private readonly int _matchDisplayIndex;
     private readonly RegexMatchInfo _matchInfo;
@@ -385,6 +385,17 @@ public sealed partial class MatchDisplayItem : ObservableObject
         _matchDisplayIndex = matchDisplayIndex;
         _matchInfo = matchInfo;
     }
+
+    /// <summary>
+    /// The row as it reads on screen (match, position, value and groups), so a screen reader
+    /// announces the match instead of the type name a list item falls back to.
+    /// </summary>
+    public string AccessibleName => string.IsNullOrWhiteSpace(DisplayText) ? _matchInfo.Value : DisplayText;
+
+    /// <inheritdoc />
+    public string? AccessibleHelpText => null;
+
+    partial void OnDisplayTextChanged(string value) => OnPropertyChanged(nameof(AccessibleName));
 
     public void ApplyLocalization(LocalizationManager? localizer)
     {
