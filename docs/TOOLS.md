@@ -401,13 +401,17 @@ is under the user's local application data in a `TwinShell` directory.
 
 Seed data lives in `data/seed/actions/`. Files whose names start with `_` are
 ignored; the current seed set contains 527 action JSON files. Their text is an
-English pivot with other languages under `translations`, and their categories
-are ASCII keys that the view resolves to localized labels. At startup the seed
+English pivot with other languages under `translations`: French carries every field,
+Spanish carries the title and the description only (the notes and the example
+descriptions fall back to English, an example being keyed by its exact command),
+and `CommandLibraryContentLanguageParityTests` keeps every block in step with the
+pivot. Their categories are ASCII keys that the view resolves to localized labels. At startup the seed
 directory is hashed; when the hash differs from the one recorded in the
 `SeedState` table, the system actions are refreshed in one transaction.
 
 The optional workstation debloat pack lives in `data/packs/`, in the import
-format, and is not seeded.
+format, and is not seeded. Its text is English with `fr` and `es` blocks, read by
+the import door like the seeds.
 
 Key user flows:
 
