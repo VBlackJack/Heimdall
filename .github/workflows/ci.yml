@@ -9,11 +9,27 @@ on:
   # that runs nothing is worse than no pull request: it reads as reviewed.
   pull_request:
 
+# Read-only by default: no job here writes to the repository, so the token a step
+# receives (and any script a step runs) cannot push, tag or edit a release. A job
+# that needs more declares it itself.
+permissions:
+  contents: read
+
+# One run per pull request: a new push to the same pull request replaces the run
+# in progress. A push to a branch is never cancelled (the group is the commit), so
+# the CI conclusion the release preflight reads is always a finished run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build-and-test:
     runs-on: windows-2025-vs2026
+    # The step timeouts below add up to 55 minutes, before the restore and the two
+    # builds; this is the bound for a run that hangs where no step timeout reaches.
+    timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Measures the bytes of the indexed blobs, not only the `i/` column of
       # `git ls-files --eol`: a blob git classes binary from its content (a lone
@@ -159,7 +175,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Setup .NET 10
-        uses: actions/setup-dotnet@v6
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           global-json-file: global.json
 
@@ -272,7 +288,7 @@ jobs:
       # trace apart and glues fragments of one onto another - a failing run
       # then names the wrong test. These stay readable.
       - name: Upload test results
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         continue-on-error: true
         with:
@@ -282,7 +298,7 @@ jobs:
           retention-days: 30
 
       - name: Upload coverage report
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         continue-on-error: true
         with:
