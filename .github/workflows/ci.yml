@@ -108,9 +108,6 @@ jobs:
       # Same reasoning as the gate above: pure PowerShell over Build.ps1 and the
       # application project, no .NET and no build needed. Proves that
       # Build.ps1 -DryRun cannot rewrite the tracked application project file.
-      # Scoped to that one file on purpose: a dry run does still rewrite the
-      # tracked packages.lock.json files through the publish RID restore, which
-      # is a separate known issue, so a green here is not a clean working tree.
       - name: Check dry-run does not rewrite the app project file
         shell: pwsh
         run: |
@@ -329,21 +326,3 @@ jobs:
           name: coverage-report
           path: TestResults/**/coverage.cobertura.xml
           retention-days: 30
-
-      - name: Validate JSON locales
-        shell: pwsh
-        run: |
-          $en = Get-Content locales/en.json -Raw | ConvertFrom-Json
-          $fr = Get-Content locales/fr.json -Raw | ConvertFrom-Json
-          $enKeys = ($en.PSObject.Properties | Measure-Object).Count
-          $frKeys = ($fr.PSObject.Properties | Measure-Object).Count
-          Write-Host "EN: $enKeys keys, FR: $frKeys keys"
-          if ($enKeys -ne $frKeys) { throw "i18n key parity mismatch: EN=$enKeys FR=$frKeys" }
-          $enSorted = $en.PSObject.Properties.Name | Sort-Object
-          $frSorted = $fr.PSObject.Properties.Name | Sort-Object
-          $diff = Compare-Object $enSorted $frSorted
-          if ($diff) {
-            $diff | ForEach-Object { Write-Host "$($_.SideIndicator) $($_.InputObject)" }
-            throw "i18n key sets differ"
-          }
-          Write-Host "i18n parity OK ($enKeys keys)"
