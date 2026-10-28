@@ -109,6 +109,8 @@ $ProjectRoot = $PSScriptRoot
 . (Join-Path $ProjectRoot 'scripts\ReleasePreflight.ps1')
 # Whether the SelfContained edition may bundle runtimes/webview2.
 . (Join-Path $ProjectRoot 'scripts\WebView2RuntimeGate.ps1')
+# The Inno Setup compile, with its output kept for the build to print.
+. (Join-Path $ProjectRoot 'scripts\InnoSetupCompile.ps1')
 # What the informational CI lanes (CIUnstable, RequiresDesktop) reported for the release
 # commit: printed as warnings and written into the release notes, never a gate.
 . (Join-Path $ProjectRoot 'scripts\InformationalLaneReport.ps1')
@@ -603,16 +605,21 @@ if ($Mode -eq 'Release') {
     if ((Test-Path $issFile) -and (Test-Path $iscc)) {
         foreach ($o in $outputs) {
             Write-Host "  Building Inno Setup installer ($($o.Name))..." -ForegroundColor DarkGray
-            & $iscc /DAppVersion="$buildNumber" /DVariant="$($o.Name)" /DSourceDir="$($o.Dir)" /Q $issFile 2>&1 | Out-Null
-            if ($LASTEXITCODE -eq 0) {
+            $compile = Invoke-InnoSetupCompile -IsccPath $iscc -ScriptPath $issFile `
+                -AppVersion $buildNumber -Variant $o.Name -SourceDir $o.Dir
+            if ($compile.ExitCode -eq 0) {
+                foreach ($line in $compile.Lines) { Write-Host "      $line" -ForegroundColor DarkGray }
                 Write-Host "    + Heimdall_${buildNumber}_$($o.Name)_Setup.exe" -ForegroundColor DarkGray
             } elseif ($Mode -eq 'Release') {
+                # The compiler says which line of the script it stopped on: show it.
+                foreach ($line in $compile.Lines) { Write-Host "      $line" -ForegroundColor Red }
                 # Fatal, like a WiX failure below. The Setup.exe is the only asset the
                 # in-app updater can use: a release published without it leaves every
                 # user without in-app updating until the next one.
                 Write-Host "    [!] Inno Setup failed for $($o.Name) - a Release build cannot publish without its installer" -ForegroundColor Red
                 exit 1
             } else {
+                foreach ($line in $compile.Lines) { Write-Host "      $line" -ForegroundColor DarkYellow }
                 Write-Host "    [!] Inno Setup failed for $($o.Name)" -ForegroundColor DarkYellow
             }
         }

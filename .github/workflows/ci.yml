@@ -174,6 +174,14 @@ jobs:
           ./scripts/Test-BatchExitCodes.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      # Pure PowerShell over a stand-in compiler. A failed Inno Setup compile used to be
+      # piped into Out-Null, so the build said it failed and never said why.
+      - name: Check the Inno Setup compile keeps the compiler output
+        shell: pwsh
+        run: |
+          ./scripts/Test-InnoSetupCompile.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       # The verdict of the npm audit step below, on recorded npm audit JSON shapes and
       # on the recorded real report. Pure PowerShell, no network, no node.
       - name: Check the npm audit verdict
