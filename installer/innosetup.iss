@@ -1,4 +1,4 @@
-; Heimdall Inno Setup Script
+﻿; Heimdall Inno Setup Script
 ; Produces a single .exe installer for end-user deployment.
 ; Supports Standard and SelfContained editions via preprocessor defines.
 

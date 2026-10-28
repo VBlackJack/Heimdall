@@ -28,21 +28,29 @@ namespace Heimdall.App.Services;
 /// </summary>
 public static class HtmlReportGenerator
 {
+    /// <summary>The document language written when the caller does not name one.</summary>
+    internal const string DefaultLanguageCode = "en";
+
     /// <summary>
     /// Generates the full HTML report from an <see cref="AuditReport"/>.
     /// All user-supplied data is HTML-encoded to prevent XSS.
     /// </summary>
     /// <param name="report">The completed audit report.</param>
     /// <param name="localize">Optional localization delegate; keys pass through when null.</param>
+    /// <param name="languageCode">
+    /// The language the report text is written in, such as "fr". It becomes the lang attribute of
+    /// the document, so a screen reader and a browser's spell checker and hyphenation follow the
+    /// text. English when null or blank.
+    /// </param>
     /// <returns>A complete HTML document as a string.</returns>
-    public static string Generate(AuditReport report, Func<string, string>? localize = null)
+    public static string Generate(AuditReport report, Func<string, string>? localize = null, string? languageCode = null)
     {
         ArgumentNullException.ThrowIfNull(report);
 
         var l = localize ?? (key => key);
         var sb = new StringBuilder(8192);
         sb.AppendLine("<!DOCTYPE html>");
-        sb.AppendLine("<html lang=\"en\">");
+        sb.Append("<html lang=\"").Append(Encode(string.IsNullOrWhiteSpace(languageCode) ? DefaultLanguageCode : languageCode.Trim())).AppendLine("\">");
         AppendHead(sb, report, l);
         sb.AppendLine("<body>");
         AppendHeader(sb, report, l);

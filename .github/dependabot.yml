@@ -17,6 +17,18 @@ updates:
           - "System.*"
         update-types:
           - "patch"
+    # WiX 7 requires the person running it to accept the Open Source Maintenance Fee
+    # EULA before any command runs. Accepting a license agreement is the owner's decision,
+    # not an automated pull request's, so the major line stays on 6.x. Minor and patch
+    # updates of WiX 6 still arrive. Remove this entry only once the owner has accepted
+    # the EULA and moved .config/dotnet-tools.json to 7.x by hand.
+    ignore:
+      - dependency-name: "wix"
+        update-types:
+          - "version-update:semver-major"
+      - dependency-name: "WixToolset.*"
+        update-types:
+          - "version-update:semver-major"
 
   - package-ecosystem: "github-actions"
     directory: "/"

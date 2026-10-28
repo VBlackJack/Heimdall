@@ -756,7 +756,7 @@ public partial class SecNumCloudAuditView : UserControl, IToolView
 
         try
         {
-            var html = HtmlReportGenerator.Generate(_lastReport, key => L(key));
+            var html = BuildHtmlReport(_lastReport, _localizer);
             File.WriteAllText(dialog.FileName, html, Encoding.UTF8);
             CopyFeedbackHelper.ShowCopyFeedback(sender as Button);
         }
@@ -872,6 +872,10 @@ public partial class SecNumCloudAuditView : UserControl, IToolView
     }
 
     private string L(string key) => _localizer?[key] ?? key;
+
+    /// <summary>The standalone HTML report, written in the interface language and declaring it.</summary>
+    internal static string BuildHtmlReport(AuditReport report, LocalizationManager? localizer) =>
+        HtmlReportGenerator.Generate(report, key => localizer?[key] ?? key, localizer?.CurrentLocale);
 
     /// <summary>The line under the scope box once subnets were detected through a gateway.</summary>
     internal static string DescribeDetectedSubnets(LocalizationManager? localizer, int count, string gatewayName) =>

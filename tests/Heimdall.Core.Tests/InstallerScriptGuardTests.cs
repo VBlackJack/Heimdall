@@ -27,6 +27,8 @@ namespace Heimdall.Core.Tests;
 /// </summary>
 public sealed class InstallerScriptGuardTests
 {
+    private static readonly byte[] Utf8ByteOrderMark = [0xEF, 0xBB, 0xBF];
+
     [Fact]
     public void InnoSetupScript_KeepsThePropertiesTheUpdaterDependsOn()
     {
@@ -37,6 +39,44 @@ public sealed class InstallerScriptGuardTests
         Assert.Contains("PrivilegesRequired=lowest", script, StringComparison.Ordinal);
         Assert.Contains("skipifsilent", script, StringComparison.Ordinal);
         Assert.Contains("WizardSilent()", script, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The script carries accented French text, so it is saved as UTF-8 with a byte order mark.
+    /// </summary>
+    /// <remarks>
+    /// Inno Setup decides the encoding of a script from its first bytes. A file without the
+    /// mark is left to the compiler's own detection, which is a version-dependent guess;
+    /// the mark says UTF-8 outright, so the French upgrade prompt does not depend on which
+    /// compiler builds the installer. Every other text file of the repository is saved
+    /// without a mark, so this one is pinned by name.
+    /// </remarks>
+    [Fact]
+    public void InnoSetupScript_IsSavedAsUtf8WithByteOrderMark()
+    {
+        byte[] bytes = File.ReadAllBytes(Path.Combine(RepositoryRoot(), "installer", "innosetup.iss"));
+
+        Assert.True(
+            bytes.Length >= Utf8ByteOrderMark.Length && bytes.AsSpan(0, Utf8ByteOrderMark.Length).SequenceEqual(Utf8ByteOrderMark),
+            "installer/innosetup.iss holds accented French text and must start with the UTF-8 byte order mark (EF BB BF)");
+    }
+
+    /// <summary>
+    /// Dependabot does not propose a WiX major update.
+    /// </summary>
+    /// <remarks>
+    /// WiX 7 makes the person running it accept the Open Source Maintenance Fee EULA before any
+    /// command, and accepting a license agreement is the owner's call. A pull request that bumps
+    /// the pinned tool would put that acceptance behind a merge button.
+    /// </remarks>
+    [Fact]
+    public void Dependabot_IgnoresMajorUpdatesOfWix()
+    {
+        string config = File.ReadAllText(Path.Combine(RepositoryRoot(), ".github", "dependabot.yml")).ReplaceLineEndings("\n");
+
+        Assert.Matches(
+            "(?m)^    ignore:\n(?:.*\n)*?      - dependency-name: \"wix\"\n        update-types:\n          - \"version-update:semver-major\"\n",
+            config);
     }
 
     /// <summary>
