@@ -61,7 +61,8 @@
                            Style="{StaticResource FieldValidationErrorStyle}"
                            Visibility="{Binding CategoryError, Converter={StaticResource NullToVis}}"/>
 
-                <!-- Platform + Risk (horizontal) -->
+                <!-- Platform + Risk (horizontal). Matched by enum Tag: SelectedIndex cannot bind an
+                     enum, and the combos opened empty when it did. -->
                 <Grid Margin="0,12,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -73,11 +74,12 @@
                         <TextBlock x:Name="LblPlatform" Text="{loc:Translate ToolCmdLibDialogLblPlatform}" Style="{StaticResource DialogLabelStyle}"/>
                         <ComboBox x:Name="CmbPlatform"
                                   AutomationProperties.Name="{loc:Translate ToolCmdLibDialogLblPlatform}"
-                                  SelectedIndex="{Binding Platform}"
+                                  SelectedValuePath="Tag"
+                                  SelectedValue="{Binding Platform}"
                                   Style="{StaticResource DialogFormComboBoxStyle}" TabIndex="2">
-                            <ComboBoxItem x:Name="PlatformWindows" Content="{loc:Translate ToolCmdLibPlatformWindows}"/>
-                            <ComboBoxItem x:Name="PlatformLinux" Content="{loc:Translate ToolCmdLibPlatformLinux}"/>
-                            <ComboBoxItem x:Name="PlatformBoth" Content="{loc:Translate ToolCmdLibPlatformBoth}"/>
+                            <ComboBoxItem x:Name="PlatformWindows" Tag="{x:Static enums:Platform.Windows}" Content="{loc:Translate ToolCmdLibPlatformWindows}"/>
+                            <ComboBoxItem x:Name="PlatformLinux" Tag="{x:Static enums:Platform.Linux}" Content="{loc:Translate ToolCmdLibPlatformLinux}"/>
+                            <ComboBoxItem x:Name="PlatformBoth" Tag="{x:Static enums:Platform.Both}" Content="{loc:Translate ToolCmdLibPlatformBoth}"/>
                         </ComboBox>
                     </StackPanel>
 
@@ -85,11 +87,12 @@
                         <TextBlock x:Name="LblRisk" Text="{loc:Translate ToolCmdLibDialogLblRisk}" Style="{StaticResource DialogLabelStyle}"/>
                         <ComboBox x:Name="CmbRisk"
                                   AutomationProperties.Name="{loc:Translate ToolCmdLibDialogLblRisk}"
-                                  SelectedIndex="{Binding Level}"
+                                  SelectedValuePath="Tag"
+                                  SelectedValue="{Binding Level}"
                                   Style="{StaticResource DialogFormComboBoxStyle}" TabIndex="3">
-                            <ComboBoxItem x:Name="RiskInfo" Content="{loc:Translate ToolCmdLibRiskInfo}"/>
-                            <ComboBoxItem x:Name="RiskRun" Content="{loc:Translate ToolCmdLibRiskRun}"/>
-                            <ComboBoxItem x:Name="RiskDangerous" Content="{loc:Translate ToolCmdLibRiskDangerous}"/>
+                            <ComboBoxItem x:Name="RiskInfo" Tag="{x:Static enums:CriticalityLevel.Info}" Content="{loc:Translate ToolCmdLibRiskInfo}"/>
+                            <ComboBoxItem x:Name="RiskRun" Tag="{x:Static enums:CriticalityLevel.Run}" Content="{loc:Translate ToolCmdLibRiskRun}"/>
+                            <ComboBoxItem x:Name="RiskDangerous" Tag="{x:Static enums:CriticalityLevel.Dangerous}" Content="{loc:Translate ToolCmdLibRiskDangerous}"/>
                         </ComboBox>
                     </StackPanel>
                 </Grid>
