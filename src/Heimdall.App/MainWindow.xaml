@@ -2634,18 +2634,16 @@
                                    BasedOn="{StaticResource ThemedDataGridRowStyle}">
                                 <Setter Property="AutomationProperties.Name">
                                     <Setter.Value>
-                                        <MultiBinding Converter="{StaticResource AccessibleRowNameConverter}">
+                                        <MultiBinding Converter="{StaticResource ScheduledTaskAccessibleRowNameConverter}">
                                             <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[A11yScheduledTaskRow]"/>
                                             <Binding Path="ServerName"/>
                                             <Binding Path="ConnectionType"/>
-                                            <MultiBinding Converter="{StaticResource ScheduledTaskScheduleConverter}">
-                                                <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[ScheduledTaskScheduleEveryNMin]"/>
-                                                <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[ScheduledTaskScheduleDailyAt]"/>
-                                                <Binding Path="ScheduleType"/>
-                                                <Binding Path="IntervalMinutes"/>
-                                                <Binding Path="TimeOfDay"/>
-                                                <Binding Path="Schedule"/>
-                                            </MultiBinding>
+                                            <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[ScheduledTaskScheduleEveryNMin]"/>
+                                            <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[ScheduledTaskScheduleDailyAt]"/>
+                                            <Binding Path="ScheduleType"/>
+                                            <Binding Path="IntervalMinutes"/>
+                                            <Binding Path="TimeOfDay"/>
+                                            <Binding Path="Schedule"/>
                                         </MultiBinding>
                                     </Setter.Value>
                                 </Setter>

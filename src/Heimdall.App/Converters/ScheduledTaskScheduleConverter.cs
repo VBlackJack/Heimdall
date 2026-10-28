@@ -42,7 +42,8 @@ namespace Heimdall.App.Converters;
 /// </remarks>
 public sealed class ScheduledTaskScheduleConverter : IMultiValueConverter
 {
-    private const int ValueCount = 6;
+    /// <summary>How many bound values the converter takes.</summary>
+    public const int ValueCount = 6;
     private const int IntervalFormatIndex = 0;
     private const int DailyFormatIndex = 1;
     private const int ScheduleTypeIndex = 2;

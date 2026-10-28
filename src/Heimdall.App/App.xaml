@@ -32,6 +32,7 @@
             <converters:AccessibleRowNameConverter x:Key="AccessibleRowNameConverter"/>
             <converters:LocalizedFormatConverter x:Key="LocalizedFormatConverter"/>
             <converters:ScheduledTaskScheduleConverter x:Key="ScheduledTaskScheduleConverter"/>
+            <converters:ScheduledTaskAccessibleRowNameConverter x:Key="ScheduledTaskAccessibleRowNameConverter"/>
             <converters:AccessibleStateNameConverter x:Key="AccessibleStateNameConverter"/>
             <converters:BoolToLocalizedKeyConverter x:Key="ShareFolderLabelConverter"
                                                     FalseKey="ToolsShareFolder"
