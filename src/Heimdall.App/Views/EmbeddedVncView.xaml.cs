@@ -33,7 +33,7 @@ namespace Heimdall.App.Views;
 public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwner
 {
     private static readonly WebViewDocumentPolicy VncDocumentPolicy =
-        new("https://heimdall-vnc.local/vnc.html");
+        new(WebSocketVncProxy.PageDocumentUrl);
 
     private VncSessionResult? _session;
     private SessionTabViewModel? _sessionTab;
@@ -59,6 +59,10 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
     // Whether the failure overlay offers to type the password: only after the server asked for
     // one the session could not give, or refused the one it gave.
     private bool _offerPasswordEntry;
+
+    // Why the proxy could not reach the server, in words. The page only learns that its socket
+    // closed and says "connection lost" after it; this keeps the reason the proxy knew.
+    private string? _targetFailureText;
 
     // Whether this view holds a sleep-prevention reference. Watching a remote screen involves no
     // local input, so without one the machine slept under an open VNC session - RDP and SSH
@@ -133,6 +137,28 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
     /// </summary>
     internal Action<string> PageMessageSink { get; set; }
 
+    /// <summary>
+    /// Creates the proxy and starts it. The product opens a real one; a test puts a factory here
+    /// that fails, to see what the view shows when the proxy cannot start.
+    /// </summary>
+    internal Func<string, int, WebSocketVncProxy> ProxyFactory { get; set; } = StartRealProxy;
+
+    private static WebSocketVncProxy StartRealProxy(string host, int port)
+    {
+        WebSocketVncProxy proxy = new(host, port);
+        try
+        {
+            proxy.Start();
+        }
+        catch
+        {
+            proxy.Dispose();
+            throw;
+        }
+
+        return proxy;
+    }
+
     public EmbeddedVncView()
     {
         PageMessageSink = PostToLivePage;
@@ -144,6 +170,9 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
         // and the view could not be constructed at all.
         ScalingSelector.SelectionChanged += OnScalingSelectionChanged;
         QualitySelector.SelectionChanged += OnQualitySelectionChanged;
+
+        // The controls change width when Reconnect appears: the header's own size does not.
+        HeaderControls.SizeChanged += (_, _) => UpdateHeaderLayout();
 
         // Set WebView2 background from theme to avoid flash of wrong color
         if (TryFindResource("BackgroundColor") is System.Windows.Media.Color themeColor)
@@ -181,12 +210,67 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
 
         ApplyLocalization();
 
-        // Start the WebSocket-to-TCP proxy
-        _proxy = new WebSocketVncProxy(session.Host, session.Port);
-        _proxy.Start();
+        // Start the WebSocket-to-TCP proxy. A proxy that cannot start (the port taken between the
+        // probe and the bind, the listener refused) has no session to wait for: say so, instead of
+        // leaving the tab on "Connecting" with nothing behind it.
+        try
+        {
+            _proxy = ProxyFactory(session.Host, session.Port);
+            _proxy.TargetConnectFailed += OnProxyTargetConnectFailed;
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Error($"VNC proxy could not start: {ex}");
+            _proxy = null;
+            EndAttempt(_localizer?.Format("ErrorVncProxyStartFailed", ex.Message) ?? "ErrorVncProxyStartFailed", offerEntry: false);
+            return;
+        }
 
         await InitializeWebViewAsync().ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// The room the title, the endpoint and the status keep before the controls drop under them.
+    /// Below it the status is a few characters and the title is cut, whatever the language.
+    /// </summary>
+    internal const double HeaderInfoMinWidth = 240;
+
+    /// <summary>Whether the controls sit on their own row under the title and the status.</summary>
+    internal bool HeaderControlsBelow { get; private set; }
+
+    private void OnHeaderSizeChanged(object sender, SizeChangedEventArgs e) => UpdateHeaderLayout();
+
+    /// <summary>
+    /// Puts the controls beside the title when both fit, and under it when they do not: in a
+    /// narrow pane (a split, or a long translation) the controls took the whole strip and the
+    /// title and the status vanished.
+    /// </summary>
+    internal void UpdateHeaderLayout()
+    {
+        double available = HeaderLayout.ActualWidth;
+        if (available <= 0)
+        {
+            return;
+        }
+
+        bool below = HeaderControls.DesiredSize.Width + HeaderInfoMinWidth > available;
+        if (below == HeaderControlsBelow)
+        {
+            return;
+        }
+
+        HeaderControlsBelow = below;
+        Grid.SetRow(HeaderControls, below ? 1 : 0);
+        Grid.SetColumn(HeaderControls, below ? 0 : 1);
+        Grid.SetColumnSpan(HeaderControls, below ? 2 : 1);
+        HeaderControls.HorizontalAlignment = below
+            ? System.Windows.HorizontalAlignment.Right
+            : System.Windows.HorizontalAlignment.Stretch;
+        HeaderControls.Margin = below ? new Thickness(0, HeaderRowGap, 0, 0) : new Thickness(0);
+    }
+
+    /// <summary>The gap between the title row and the controls row when the header wraps.</summary>
+    private const double HeaderRowGap = 4;
 
     /// <summary>Hands the keyboard back to the session header: Disconnect while connected, else Split.</summary>
     private void ReleaseFocusToHeader()
@@ -391,7 +475,9 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
             var separator = payload.IndexOf(':', StringComparison.Ordinal);
             var level = separator > 0 ? payload[..separator] : string.Empty;
             var text = separator >= 0 ? payload[(separator + 1)..] : payload;
-            var line = $"VNC console [{level}]: {text}";
+
+            // noVNC logs the URL it connects to, and the token is in it.
+            var line = $"VNC console [{level}]: {WebSocketVncProxy.RedactToken(text, _proxy?.Token)}";
             switch (level)
             {
                 case "error":
@@ -410,7 +496,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
         if (message.StartsWith("disconnect-detail:", StringComparison.Ordinal))
         {
             Core.Logging.FileLogger.Warn(
-                $"VNC disconnect detail: {message["disconnect-detail:".Length..]}");
+                $"VNC disconnect detail: {WebSocketVncProxy.RedactToken(message["disconnect-detail:".Length..], _proxy?.Token)}");
             return;
         }
 
@@ -426,9 +512,9 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
 
             Dispatcher.Invoke(() =>
             {
-                StatusTextBlock.Text = L10n("StatusVncDisconnected");
+                StatusTextBlock.Text = _targetFailureText ?? L10n("StatusVncDisconnected");
                 Behaviors.LiveRegionBehavior.Announce(StatusTextBlock);
-                ShowReconnectOverlay();
+                ShowReconnectOverlay(_targetFailureText);
             });
             return;
         }
@@ -443,17 +529,15 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
             EmitDisconnect("remote");
             ReleaseSleepPrevention();
 
-            Dispatcher.Invoke(() =>
-            {
-                StatusTextBlock.Text = _localizer?.Format("ErrorVncConnectionFailed", errorMsg)
-                    ?? errorMsg;
-                Behaviors.LiveRegionBehavior.Announce(StatusTextBlock);
-            });
+            // The proxy knew why the server could not be reached; the page only knows its socket
+            // closed. Its words must not replace the real reason.
+            string text = _targetFailureText
+                ?? _localizer?.Format("ErrorVncConnectionFailed", errorMsg)
+                ?? errorMsg;
 
-            if (_session?.ServerId is not null)
-            {
-                SessionError?.Invoke(_session.ServerId, errorMsg);
-            }
+            // A failure ends the attempt: the overlay offers Reconnect and the busy bar goes. The
+            // status line used to be the only sign, under a bar that kept running.
+            EndAttempt(text, offerEntry: false);
             return;
         }
 
@@ -653,9 +737,12 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
             return;
         }
 
+        // A new attempt starts without the last one's reason.
+        _targetFailureText = null;
+
         var connectParams = new
         {
-            wsUrl = $"ws://127.0.0.1:{_proxy.ListenPort}",
+            wsUrl = _proxy.WebSocketUrl,
             password = _passwordFlow?.Password,
             viewOnly = _session?.ViewOnly ?? false,
 
@@ -674,6 +761,41 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
     }
 
     private string? PageTextOf(string key) => _localizer?[key];
+
+    /// <summary>The locale key of the message that names <paramref name="failure"/>.</summary>
+    internal static string TargetFailureMessageKey(VncTargetFailure failure) => failure switch
+    {
+        VncTargetFailure.Refused => "ErrorVncTargetRefused",
+        VncTargetFailure.TimedOut => "ErrorVncTargetTimedOut",
+        _ => "ErrorVncTargetUnreachable",
+    };
+
+    private void OnProxyTargetConnectFailed(VncTargetFailure failure)
+    {
+        // Raised on the proxy's thread.
+        Dispatcher.BeginInvoke(() => HandleTargetConnectFailure(failure));
+    }
+
+    /// <summary>
+    /// Ends the attempt with the reason the proxy gave for not reaching the server: each reason
+    /// has its own words, since the fix differs (start the server, wait, or check the address).
+    /// </summary>
+    internal void HandleTargetConnectFailure(VncTargetFailure failure)
+    {
+        if (_disposed || _session is null)
+        {
+            return;
+        }
+
+        string key = TargetFailureMessageKey(failure);
+        string text = _localizer?.Format(
+                key, _session.Host, _session.Port, WebSocketVncProxy.TargetConnectTimeoutSeconds)
+            ?? key;
+
+        _targetFailureText = text;
+        _passwordFlow?.OnAttemptEnded();
+        EndAttempt(text, offerEntry: false);
+    }
 
     private void PostWebMessage(string message) => PageMessageSink(message);
 
@@ -955,6 +1077,8 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
                 ReconnectMessageText.Text = message;
             }
 
+            // Whatever ended the attempt, nothing is loading any more.
+            VncLoadingBar.Visibility = Visibility.Collapsed;
             OverlayEnterPasswordButton.Visibility = _offerPasswordEntry ? Visibility.Visible : Visibility.Collapsed;
             OverlayEditProfileButton.Visibility = EditProfileAvailable?.Invoke() == true ? Visibility.Visible : Visibility.Collapsed;
             ReconnectOverlay.Visibility = Visibility.Visible;
@@ -1023,8 +1147,12 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
             VncWebView.CoreWebView2.NavigationStarting -= OnWebViewNavigationStarting;
         }
 
-        _proxy?.Dispose();
-        _proxy = null;
+        if (_proxy is not null)
+        {
+            _proxy.TargetConnectFailed -= OnProxyTargetConnectFailed;
+            _proxy.Dispose();
+            _proxy = null;
+        }
 
         try
         {

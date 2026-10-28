@@ -18,83 +18,34 @@
         </Grid.RowDefinitions>
 
         <!-- Header strip -->
-        <Border Grid.Row="0"
+        <Border x:Name="SessionHeaderBar"
+                Grid.Row="0"
                 Padding="{StaticResource SessionHeaderPadding}"
                 Background="{DynamicResource SurfaceBrush}"
                 BorderBrush="{DynamicResource BorderBrush}"
-                BorderThickness="0,0,0,1">
-            <DockPanel LastChildFill="True">
-                <Button x:Name="DisconnectButton"
-                        DockPanel.Dock="Right"
-                        Click="OnDisconnectClick"
-                        Style="{DynamicResource SecondaryButtonStyle}"
-                        MinHeight="{StaticResource SessionHeaderMinTarget}"
-                        Padding="8,2"
-                        FontSize="{StaticResource FontSizeCaption}"
-                        Margin="8,0,0,0"/>
+                BorderThickness="0,0,0,1"
+                SizeChanged="OnHeaderSizeChanged">
+            <Grid x:Name="HeaderLayout">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
 
-                <Button x:Name="ReconnectButton"
-                        DockPanel.Dock="Right"
-                        Click="OnReconnectClick"
-                        Style="{DynamicResource PrimaryButtonStyle}"
-                        MinHeight="{StaticResource SessionHeaderMinTarget}"
-                        Padding="8,2"
-                        FontSize="{StaticResource FontSizeCaption}"
-                        Margin="8,0,0,0"
-                        Visibility="Collapsed"/>
-
-                <!-- Display controls. They belong in the header, outside the remote screen: drawn
-                     over the page they took the top right corner of the remote desktop, where
-                     the remote windows keep their minimize, maximize and close buttons. -->
-                <Button x:Name="ClipboardButton"
-                        DockPanel.Dock="Right"
-                        Click="OnClipboardClick"
-                        Style="{DynamicResource SecondaryButtonStyle}"
-                        MinHeight="{StaticResource SessionHeaderMinTarget}"
-                        Padding="8,2"
-                        FontSize="{StaticResource FontSizeCaption}"
-                        Margin="8,0,0,0"
-                        Content="{loc:Translate VncClipboardSync}"
-                        ToolTip="{loc:Translate TooltipVncClipboard}"
-                        AutomationProperties.Name="{loc:Translate A11yVncClipboard}"/>
-
-                <ComboBox x:Name="ScalingSelector"
-                          DockPanel.Dock="Right"
-                          Margin="8,0,0,0"
-                          FontSize="{StaticResource FontSizeCaption}"
-                          VerticalAlignment="Center"
-                          SelectedIndex="1"
-                          ToolTip="{loc:Translate TooltipVncScaling}"
-                          AutomationProperties.Name="{loc:Translate A11yVncScaling}">
-                    <ComboBoxItem Content="{loc:Translate VncScalingRemote}" Tag="remote"/>
-                    <ComboBoxItem Content="{loc:Translate VncScalingScale}" Tag="scale"/>
-                    <ComboBoxItem Content="{loc:Translate VncScalingNone}" Tag="none"/>
-                </ComboBox>
-
-                <ComboBox x:Name="QualitySelector"
-                          DockPanel.Dock="Right"
-                          Margin="8,0,0,0"
-                          FontSize="{StaticResource FontSizeCaption}"
-                          VerticalAlignment="Center"
-                          SelectedIndex="2"
-                          ToolTip="{loc:Translate TooltipVncQuality}"
-                          AutomationProperties.Name="{loc:Translate A11yVncQuality}">
-                    <ComboBoxItem Content="{loc:Translate VncQualityBest}" Tag="best"/>
-                    <ComboBoxItem Content="{loc:Translate VncQualityBalanced}" Tag="balanced"/>
-                    <ComboBoxItem Content="{loc:Translate VncQualityPerformance}" Tag="performance"/>
-                    <ComboBoxItem Content="{loc:Translate VncQualityLowBandwidth}" Tag="low-bandwidth"/>
-                </ComboBox>
-
-                <Button x:Name="SplitButton"
-                        DockPanel.Dock="Right"
-                        Content="&#xE8A9;"
-                        FontFamily="{StaticResource FontFamilyIcons}"
-                        Click="OnSplitClick"
-                        Style="{DynamicResource GhostButtonStyle}"
-                        Padding="6,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0"/>
-
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <!-- Who and how it is going. The status takes the room the title and the endpoint
+                     leave and is trimmed to it: the controls used to take all of a narrow pane. -->
+                <Grid Grid.Row="0" Grid.Column="0" VerticalAlignment="Center">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
                     <TextBlock x:Name="SessionTitleText"
+                               Grid.Column="0"
                                FontSize="{StaticResource FontSizeBody}"
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource TextPrimaryBrush}"
@@ -102,22 +53,97 @@
                                MaxWidth="{StaticResource SessionHeaderTitleMaxWidth}"
                                VerticalAlignment="Center"/>
                     <TextBlock x:Name="EndpointTextBlock"
+                               Grid.Column="1"
                                Margin="8,0,0,0"
                                FontSize="{StaticResource FontSizeCaption}"
                                Foreground="{DynamicResource TextSecondaryBrush}"
                                TextTrimming="CharacterEllipsis"
-                               MaxWidth="{StaticResource SessionHeaderTitleMaxWidth}"
+                               MaxWidth="{StaticResource SessionHeaderEndpointMaxWidth}"
                                VerticalAlignment="Center"/>
-                    <TextBlock Text=" - " Foreground="{DynamicResource TextSecondaryBrush}"
+                    <TextBlock Grid.Column="2"
+                               Text=" - " Foreground="{DynamicResource TextSecondaryBrush}"
                                FontSize="{StaticResource FontSizeCaption}" VerticalAlignment="Center"/>
                     <TextBlock x:Name="StatusTextBlock"
+                               Grid.Column="3"
                                FontSize="{StaticResource FontSizeCaption}"
                                Foreground="{DynamicResource TextPrimaryBrush}"
                                VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis"
                                AutomationProperties.LiveSetting="Polite"
                                behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"/>
+                </Grid>
+
+                <!-- Display controls. They belong in the header, outside the remote screen: drawn
+                     over the page they took the top right corner of the remote desktop, where
+                     the remote windows keep their minimize, maximize and close buttons. Declared
+                     in screen order, left to right, so Tab follows the eye. In a pane too narrow
+                     for both, the header moves them under the title (OnHeaderSizeChanged). -->
+                <StackPanel x:Name="HeaderControls"
+                            Grid.Row="0"
+                            Grid.Column="1"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center">
+                    <Button x:Name="SplitButton"
+                            Content="&#xE8A9;"
+                            FontFamily="{StaticResource FontFamilyIcons}"
+                            Click="OnSplitClick"
+                            Style="{DynamicResource GhostButtonStyle}"
+                            Padding="6,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0"/>
+
+                    <ComboBox x:Name="QualitySelector"
+                              Margin="8,0,0,0"
+                              FontSize="{StaticResource FontSizeCaption}"
+                              VerticalAlignment="Center"
+                              SelectedIndex="2"
+                              ToolTip="{loc:Translate TooltipVncQuality}"
+                              AutomationProperties.Name="{loc:Translate A11yVncQuality}">
+                        <ComboBoxItem Content="{loc:Translate VncQualityBest}" Tag="best"/>
+                        <ComboBoxItem Content="{loc:Translate VncQualityBalanced}" Tag="balanced"/>
+                        <ComboBoxItem Content="{loc:Translate VncQualityPerformance}" Tag="performance"/>
+                        <ComboBoxItem Content="{loc:Translate VncQualityLowBandwidth}" Tag="low-bandwidth"/>
+                    </ComboBox>
+
+                    <ComboBox x:Name="ScalingSelector"
+                              Margin="8,0,0,0"
+                              FontSize="{StaticResource FontSizeCaption}"
+                              VerticalAlignment="Center"
+                              SelectedIndex="1"
+                              ToolTip="{loc:Translate TooltipVncScaling}"
+                              AutomationProperties.Name="{loc:Translate A11yVncScaling}">
+                        <ComboBoxItem Content="{loc:Translate VncScalingRemote}" Tag="remote"/>
+                        <ComboBoxItem Content="{loc:Translate VncScalingScale}" Tag="scale"/>
+                        <ComboBoxItem Content="{loc:Translate VncScalingNone}" Tag="none"/>
+                    </ComboBox>
+
+                    <Button x:Name="ClipboardButton"
+                            Click="OnClipboardClick"
+                            Style="{DynamicResource SecondaryButtonStyle}"
+                            MinHeight="{StaticResource SessionHeaderMinTarget}"
+                            Padding="8,2"
+                            FontSize="{StaticResource FontSizeCaption}"
+                            Margin="8,0,0,0"
+                            Content="{loc:Translate VncClipboardSync}"
+                            ToolTip="{loc:Translate TooltipVncClipboard}"
+                            AutomationProperties.Name="{loc:Translate A11yVncClipboard}"/>
+
+                    <Button x:Name="ReconnectButton"
+                            Click="OnReconnectClick"
+                            Style="{DynamicResource PrimaryButtonStyle}"
+                            MinHeight="{StaticResource SessionHeaderMinTarget}"
+                            Padding="8,2"
+                            FontSize="{StaticResource FontSizeCaption}"
+                            Margin="8,0,0,0"
+                            Visibility="Collapsed"/>
+
+                    <Button x:Name="DisconnectButton"
+                            Click="OnDisconnectClick"
+                            Style="{DynamicResource SecondaryButtonStyle}"
+                            MinHeight="{StaticResource SessionHeaderMinTarget}"
+                            Padding="8,2"
+                            FontSize="{StaticResource FontSizeCaption}"
+                            Margin="8,0,0,0"/>
                 </StackPanel>
-            </DockPanel>
+            </Grid>
         </Border>
 
         <!-- Connection progress indicator -->

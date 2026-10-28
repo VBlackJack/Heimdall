@@ -217,7 +217,9 @@ public sealed class EmbeddedVncPasswordEntryTests
             entry = view.OverlayEnterPasswordButton.Visibility;
         });
 
-        Assert.Equal("VncDisconnectedOverlay", message);
+        // The overlay says what the page reported (it used to fall back to the generic words),
+        // and in either case not the request for the password.
+        Assert.Equal("The VNC connection was lost unexpectedly.", message);
         Assert.Equal(Visibility.Collapsed, entry);
     }
 

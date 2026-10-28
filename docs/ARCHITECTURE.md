@@ -293,7 +293,7 @@ All connection operations return an `ISessionResult` (defined in `Heimdall.Core/
 
 **Problem**: WPF has no native VNC control. VNC (RFB protocol) operates over raw TCP, but noVNC requires a WebSocket transport.
 
-**Solution**: `WebSocketVncProxy` is a lightweight in-process proxy that listens on a random local port, accepts a single WebSocket connection from noVNC, and bidirectionally pipes binary frames to the VNC server's TCP socket. `EmbeddedVncView` hosts noVNC inside a WebView2 control pointing at `ws://localhost:{ListenPort}`. This reuses the same WebView2 infrastructure as the terminal views.
+**Solution**: `WebSocketVncProxy` is a lightweight in-process proxy that listens on a random local port, accepts WebSocket connections from noVNC one at a time, and bidirectionally pipes binary frames to the VNC server's TCP socket. Only a client that holds the proxy's random token (32 bytes, carried as the URL path, valid for the proxy's lifetime) and sends the VNC page's own origin (`https://heimdall-vnc.local`) is served. `EmbeddedVncView` hosts noVNC inside a WebView2 control pointing at `ws://127.0.0.1:{ListenPort}/{token}`. This reuses the same WebView2 infrastructure as the terminal views.
 
 ### 14. Telnet Raw TCP with IAC Negotiation
 
@@ -703,7 +703,7 @@ ConnectionService.ConnectAsync(server)
         +-- VNC?
         |       +-- EmbeddedVncView: WebView2 + noVNC
         |               +-- WebSocketVncProxy: WS-to-TCP bridge on random local port
-        |               +-- noVNC connects to ws://localhost:{port}
+        |               +-- noVNC connects to ws://127.0.0.1:{port}/{token}
         |
         +-- Telnet?
         |       +-- EmbeddedSshView (reused): WebView2 + xterm.js
