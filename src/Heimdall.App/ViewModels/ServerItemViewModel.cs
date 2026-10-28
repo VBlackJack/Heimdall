@@ -390,16 +390,31 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
     /// screen reader does not read.
     /// </para>
     /// </remarks>
-    public string AccessibleName => Format(
-        IsShared ? "SessionTreeServerAccessibleNameShared"
-        : IsFavorite ? "SessionTreeServerAccessibleNameFavorite"
-        : "SessionTreeServerAccessibleName",
-        DisplayName,
-        ProtocolDisplayName,
-        StatusShowsConnectionState
-            ? ConnectionStateDisplayName
-            : HealthTooltipText,
-        SharedSourceName);
+    public string AccessibleName
+    {
+        get
+        {
+            string key = IsShared ? "SessionTreeServerAccessibleNameShared"
+                : IsFavorite ? "SessionTreeServerAccessibleNameFavorite"
+                : "SessionTreeServerAccessibleName";
+
+            // A screen reader must never be handed a locale key. Without the sentence to put the
+            // name in, the row still has its own identity to announce.
+            if (_localizer?.HasKey(key) != true)
+            {
+                return DisplayName;
+            }
+
+            return Format(
+                key,
+                DisplayName,
+                ProtocolDisplayName,
+                StatusShowsConnectionState
+                    ? ConnectionStateDisplayName
+                    : HealthTooltipText,
+                SharedSourceName);
+        }
+    }
 
     /// <summary>Localized keyboard guidance exposed to UI Automation clients.</summary>
     /// <remarks>
@@ -409,7 +424,10 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
     /// Enter, F2 and Shift+F10 are just as invisible. Folders announced their two gestures while
     /// the rows carrying the custom ones announced nothing.
     /// </remarks>
-    public string? AccessibleHelpText => T("SessionTreeServerAccessibleHelp");
+    public string? AccessibleHelpText =>
+        _localizer?.HasKey("SessionTreeServerAccessibleHelp") == true
+            ? _localizer["SessionTreeServerAccessibleHelp"]
+            : null;
 
     /// <summary>
     /// Hover text for the row: its full name, then what the row does not print.

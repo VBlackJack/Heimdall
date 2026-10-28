@@ -52,6 +52,31 @@ public sealed class ServerItemViewModelLocalizationTests
         Assert.Equal("SessionAuthUsername + SessionAuthSshKey + SessionAuthPassword", viewModel.AuthSummary);
     }
 
+    // A screen reader reads whatever this property holds. Without a localizer there is no
+    // sentence to put the name in, but the row still has an identity; it must never announce a
+    // locale key.
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void AccessibleName_WithoutLocalizer_IsTheRowsOwnNameNeverALocaleKey(bool favorite, bool shared)
+    {
+        ServerProfileDto dto = CreateSshServer();
+        if (shared)
+        {
+            dto.Id = SharedSessionIds.PrefixFor("mobaxterm") + "web";
+        }
+
+        ServerItemViewModel viewModel = ServerItemViewModel.FromDto(dto);
+        viewModel.IsFavorite = favorite;
+        viewModel.SharedSourceName = "MobaXterm";
+        Assert.Equal(shared, viewModel.IsShared);
+
+        Assert.Equal(viewModel.DisplayName, viewModel.AccessibleName);
+        Assert.DoesNotContain("SessionTreeServerAccessibleName", viewModel.AccessibleName, StringComparison.Ordinal);
+        Assert.Null(viewModel.AccessibleHelpText);
+    }
+
     [Fact]
     public async Task RefreshLocalizedState_AfterLocaleChange_RecomputesAuthSummary()
     {
