@@ -24,7 +24,8 @@ namespace Heimdall.Core.Configuration;
 /// </summary>
 /// <remarks>
 /// The one rule for Settings > Import and for the shared session sources, so a file reads the same
-/// whichever way it arrives.
+/// whichever way it arrives. The byte order mark itself is not part of the text: left in, it sits
+/// before the first section header and hides it from the parser.
 /// </remarks>
 public static class MobaXtermFileDecoder
 {
@@ -44,7 +45,7 @@ public static class MobaXtermFileDecoder
         ArgumentNullException.ThrowIfNull(bytes);
 
         return HasUtf8Bom(bytes)
-            ? Encoding.UTF8.GetString(bytes)
+            ? Encoding.UTF8.GetString(bytes, Utf8Bom.Length, bytes.Length - Utf8Bom.Length)
             : Encoding.GetEncoding(LegacyCodePage).GetString(bytes);
     }
 

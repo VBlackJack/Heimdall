@@ -256,6 +256,98 @@ public sealed class CommandGeneratorValueShapingTests
         command.Should().Be(expected);
     }
 
+    /// <summary>
+    /// A value that spells another parameter's placeholder is text, not a placeholder: the
+    /// command used to be rescanned after each substitution, so <c>{b}</c> typed into
+    /// <c>{a}</c> was rewritten with the quoting of its new position and the value of
+    /// <c>b</c> reached the shell unquoted (<c>echo ''x; id''</c> runs <c>id</c>).
+    /// </summary>
+    [Theory]
+    [InlineData(Platform.Linux, true)]
+    [InlineData(Platform.Linux, false)]
+    [InlineData(Platform.Windows, true)]
+    [InlineData(Platform.Windows, false)]
+    public void GenerateCommand_ValueNamingAnotherPlaceholder_IsNeverRescanned(Platform platform, bool declaredInPatternOrder)
+    {
+        var a = CommandLibraryTestHelpers.RequiredParameter("a", "A");
+        var b = CommandLibraryTestHelpers.RequiredParameter("b", "B");
+        var template = declaredInPatternOrder
+            ? Template(platform, "echo {a} {b}", a, b)
+            : Template(platform, "echo {a} {b}", b, a);
+
+        var command = CreateService().GenerateCommand(template, Values(("a", "{b}"), ("b", "x; id")));
+
+        command.Should().Be("echo '{b}' 'x; id'");
+    }
+
+    [Theory]
+    [InlineData(Platform.Linux)]
+    [InlineData(Platform.Windows)]
+    public void GenerateCommand_PlaceholderNameInsideAValue_SurvivesVerbatim(Platform platform)
+    {
+        var template = Template(
+            platform,
+            "echo {a} {b} {a}",
+            CommandLibraryTestHelpers.RequiredParameter("a", "A"),
+            CommandLibraryTestHelpers.RequiredParameter("b", "B"));
+
+        var command = CreateService().GenerateCommand(template, Values(("a", "see {b} and {a}"), ("b", "ok")));
+
+        command.Should().Be("echo 'see {b} and {a}' ok 'see {b} and {a}'");
+    }
+
+    /// <summary>
+    /// Dropping an empty optional placeholder reaches the pattern only: it used to be run
+    /// over the partly built command and strip the literal <c>{b}</c> out of a's value.
+    /// </summary>
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void GenerateCommand_EmptyOptionalPlaceholder_DoesNotStripTheSameTextFromAValue(bool declaredInPatternOrder)
+    {
+        var a = CommandLibraryTestHelpers.RequiredParameter("a", "A");
+        var b = CommandLibraryTestHelpers.OptionalParameter("b", "B");
+        var template = declaredInPatternOrder
+            ? Template(Platform.Linux, "echo {a} {b} done", a, b)
+            : Template(Platform.Linux, "echo {a} {b} done", b, a);
+
+        var command = CreateService().GenerateCommand(template, Values(("a", "{b}"), ("b", string.Empty)));
+
+        command.Should().Be("echo '{b}' done");
+    }
+
+    [Fact]
+    public void GenerateCommand_SpaceEndingAnInsertedValue_IsNotEatenByADroppedPlaceholder()
+    {
+        var template = Template(
+            Platform.Linux,
+            "echo \"{a}{b}\"",
+            new TemplateParameter { Name = "a", Label = "A", Type = "string", Required = true, Quoting = QuotingMode.InlineInQuotes },
+            CommandLibraryTestHelpers.OptionalParameter("b", "B"));
+
+        var command = CreateService().GenerateCommand(template, Values(("a", "x "), ("b", string.Empty)));
+
+        command.Should().Be("echo \"x \"");
+    }
+
+    [Fact]
+    public void GenerateCommand_SeveralEmptyOptionalPlaceholders_CollapseTheirSpacesInOnePass()
+    {
+        var template = Template(
+            Platform.Linux,
+            "cmd {a} {b} {c} end {d}",
+            CommandLibraryTestHelpers.OptionalParameter("a", "A"),
+            CommandLibraryTestHelpers.OptionalParameter("b", "B"),
+            CommandLibraryTestHelpers.OptionalParameter("c", "C"),
+            CommandLibraryTestHelpers.OptionalParameter("d", "D"));
+
+        var command = CreateService().GenerateCommand(
+            template,
+            Values(("a", string.Empty), ("b", "mid"), ("c", string.Empty), ("d", string.Empty)));
+
+        command.Should().Be("cmd mid end");
+    }
+
     internal static CommandGeneratorService CreateService() =>
         new(new FakeTwinShellLocalizationService());
 

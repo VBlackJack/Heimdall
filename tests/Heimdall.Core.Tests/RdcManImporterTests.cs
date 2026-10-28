@@ -338,6 +338,122 @@ public class RdcManImporterTests
         var result = RdcManImporter.Parse(rdg);
 
         Assert.Empty(result.Servers);
+        Assert.Equal("Test", Assert.Single(result.SkippedServers).GroupPath);
+    }
+
+    // RDCMan 2.7+ (schemaVersion 3) writes the name of a file, group and server, and the display
+    // name of a server, under a <properties> child; the flat layout above is schema 1.
+    private const string PropertiesLayoutRdg = """
+        <?xml version="1.0" encoding="utf-8"?>
+        <RDCMan programVersion="2.7" schemaVersion="3">
+          <file>
+            <credentialsProfiles />
+            <properties>
+              <expanded>True</expanded>
+              <name>Corp</name>
+            </properties>
+            <group>
+              <properties>
+                <expanded>False</expanded>
+                <name>Production</name>
+              </properties>
+              <logonCredentials inherit="None">
+                <userName>admin</userName>
+                <domain>corp.local</domain>
+              </logonCredentials>
+              <server>
+                <properties>
+                  <displayName>Web Server 01</displayName>
+                  <name>web01.example.com</name>
+                </properties>
+                <connectionSettings inherit="None">
+                  <port>3390</port>
+                </connectionSettings>
+              </server>
+              <server>
+                <properties>
+                  <name>db01.example.com</name>
+                </properties>
+              </server>
+              <group>
+                <properties>
+                  <name>DMZ</name>
+                </properties>
+                <server>
+                  <properties>
+                    <displayName>Firewall 01</displayName>
+                    <name>fw01.example.com</name>
+                  </properties>
+                </server>
+              </group>
+            </group>
+          </file>
+        </RDCMan>
+        """;
+
+    [Fact]
+    public void Parse_PropertiesLayout_ReadsServerNamesAndDisplayNames()
+    {
+        var result = RdcManImporter.Parse(PropertiesLayoutRdg);
+
+        Assert.Equal(3, result.Servers.Count);
+        Assert.Empty(result.Warnings);
+        Assert.Empty(result.SkippedServers);
+
+        var web = result.Servers.Single(s => s.RemoteServer == "web01.example.com");
+        Assert.Equal("Web Server 01", web.DisplayName);
+        Assert.Equal(3390, web.RemotePort);
+        Assert.Equal("admin@corp.local", web.RdpUsername);
+
+        var db = result.Servers.Single(s => s.RemoteServer == "db01.example.com");
+        Assert.Equal("db01.example.com", db.DisplayName);
+
+        var fw = result.Servers.Single(s => s.RemoteServer == "fw01.example.com");
+        Assert.Equal("Firewall 01", fw.DisplayName);
+    }
+
+    [Fact]
+    public void Parse_PropertiesLayout_ReadsFileAndGroupNamesIntoThePath()
+    {
+        var result = RdcManImporter.Parse(PropertiesLayoutRdg);
+
+        Assert.Equal("Corp/Production", result.Servers.Single(s => s.RemoteServer == "web01.example.com").Group);
+        Assert.Equal("Corp/Production/DMZ", result.Servers.Single(s => s.RemoteServer == "fw01.example.com").Group);
+    }
+
+    [Fact]
+    public void Parse_PropertiesLayout_ServerWithNoNameAnywhere_IsSkippedWithAWarning()
+    {
+        var rdg = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <RDCMan programVersion="2.7" schemaVersion="3">
+              <file>
+                <properties>
+                  <name>Corp</name>
+                </properties>
+                <group>
+                  <properties>
+                    <name>Production</name>
+                  </properties>
+                  <server>
+                    <properties>
+                      <displayName>   </displayName>
+                    </properties>
+                  </server>
+                  <server>
+                    <properties>
+                      <name>web01.example.com</name>
+                    </properties>
+                  </server>
+                </group>
+              </file>
+            </RDCMan>
+            """;
+
+        var result = RdcManImporter.Parse(rdg);
+
+        Assert.Equal("web01.example.com", Assert.Single(result.Servers).RemoteServer);
+        Assert.Equal("Corp/Production", Assert.Single(result.SkippedServers).GroupPath);
     }
 
     [Fact]

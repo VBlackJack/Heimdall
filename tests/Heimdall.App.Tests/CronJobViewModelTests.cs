@@ -97,6 +97,30 @@ public sealed class CronJobViewModelTests
         Assert.Contains("202", vm.DetailNextRunsText, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// The preview is computed in the workstation's clock, not in the clock of the server the
+    /// crontab came from, and the detail says so in the user's language.
+    /// </summary>
+    [Theory]
+    [InlineData("en", "local time")]
+    [InlineData("fr", "heure locale")]
+    [InlineData("es", "hora local")]
+    public async Task SelectedCronEntry_NextRunsLabel_SaysTheTimesAreWorkstationLocal(string locale, string expectedWording)
+    {
+        var localizer = await CreateLocalizerAsync(locale);
+        var vm = new CronJobViewModel(new FakeCronJobService())
+        {
+            CrontabInputText = "0 12 * * 1 /backup",
+        };
+        vm.Initialize(localizer);
+        vm.ParseCommand.Execute(null);
+
+        vm.SelectedCronEntry = vm.CronEntries[0];
+
+        string label = vm.DetailNextRunsText[..vm.DetailNextRunsText.IndexOf('\n', StringComparison.Ordinal)];
+        Assert.Contains(expectedWording, label, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void ClearPaste_ResetsPasteState()
     {
