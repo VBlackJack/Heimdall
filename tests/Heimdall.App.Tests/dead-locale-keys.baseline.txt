@@ -358,7 +358,6 @@ ErrorResolutionOutOfRange
 ErrorRestoreSchemaInvalid
 ErrorRestoreServersFailed
 ErrorRestoreSettingsFailed
-ErrorSaveSettings
 ErrorScheduledTaskNameEmpty
 ErrorScheduledTaskServerEmpty
 ErrorScheduledTaskTimeInvalid
