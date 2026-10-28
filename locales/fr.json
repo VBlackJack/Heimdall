@@ -2209,6 +2209,8 @@
   "SftpTransferJobCancelled": "Annul\u00e9",
   "SftpTransferRetry": "R\u00e9essayer",
   "SftpTransferCancelJob": "Annuler ce transfert",
+  "SftpTransferCancelJobNamed": "Annuler le transfert : {0}",
+  "SftpTransferRetryNamed": "R\u00e9essayer le transfert : {0}",
   "SftpTransferClearFinished": "Effacer les termin\u00e9s",
   "SftpStatusTransferQueued": "En attente : {0}",
   "SftpStatusTransferPreparing": "Pr\u00e9paration du transfert...",
