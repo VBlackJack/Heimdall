@@ -2229,8 +2229,6 @@
   "SftpColOwner": "Propri\u00e9taire",
   "SftpDragDropOverlay": "D\u00e9poser les fichiers pour envoyer",
 
-
-
   "TunnelPanelHeader": "Tunnels ({0})",
   "TunnelPanelCollapse": "R\u00e9duire le panneau des tunnels",
   "TunnelPanelToggle": "Afficher/masquer le panneau des tunnels",
@@ -2881,7 +2879,6 @@
   "ServerDialogTelnetOptions": "Options Telnet",
   "ServerDialogTelnetOptionsDesc": "Param\u00e8tres de connexion Telnet.",
   "ServerDialogTelnetSecurityWarning": "Attention : Telnet transmet toutes les donn\u00e9es y compris les identifiants en clair. Utilisez SSH autant que possible pour un acc\u00e8s distant s\u00e9curis\u00e9.",
-
 
   "VncFallbackTitle": "Visionneuse VNC int\u00e9gr\u00e9e indisponible",
   "VncFallbackMessage": "WebView2 n'a pas pu \u00eatre initialis\u00e9 sur cette machine, l'\u00e9cran distant ne peut donc pas s'afficher. Installez Microsoft Edge et red\u00e9marrez Heimdall, ou t\u00e9l\u00e9chargez l'\u00e9dition Self-Contained (https://github.com/VBlackJack/Heimdall/releases), qui embarque tout ce dont elle a besoin.",

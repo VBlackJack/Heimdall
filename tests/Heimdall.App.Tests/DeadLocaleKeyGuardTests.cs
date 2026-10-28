@@ -63,8 +63,7 @@ public sealed class DeadLocaleKeyGuardTests
         Assert.True(
             unexpected.Count == 0,
             $"{unexpected.Count} locale key(s) are translated but referenced nowhere under src/. "
-            + "Either wire them up, or delete them from both locales. If a key really is resolved "
-            + "at runtime, compose it from a literal prefix and the guard exempts its family:"
+            + DeadLocaleKeyDetector.NewDeadKeyAdvice
             + Environment.NewLine
             + string.Join(Environment.NewLine, unexpected.Take(40)));
     }

@@ -133,6 +133,20 @@ public sealed class DeadLocaleKeyDetectorTests
         Assert.Contains("ReportBannerFailed", dead);
     }
 
+    [Fact]
+    public void TheAdviceOfAFailingGuardNamesTheLengthFloor()
+    {
+        string advice = DeadLocaleKeyDetector.NewDeadKeyAdvice;
+
+        Assert.Contains(
+            DeadLocaleKeyDetector.MinComposedPrefixLength.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            + " characters",
+            advice,
+            StringComparison.Ordinal);
+        Assert.Contains("NOT recognised", advice, StringComparison.Ordinal);
+        Assert.Contains("do not delete", advice, StringComparison.Ordinal);
+    }
+
     private static void AssertFamilyAlive(string source)
     {
         List<string> dead = DeadLocaleKeyDetector.FindDeadKeys(s_catalogue, source);

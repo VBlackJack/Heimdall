@@ -43,6 +43,20 @@ internal static class DeadLocaleKeyDetector
     /// </summary>
     internal const int MinComposedPrefixLength = 6;
 
+    /// <summary>
+    /// What a failing guard tells the author of a key that reads as dead. It names the length
+    /// floor, so that nobody deletes a live key composed from a short head just because the guard
+    /// cannot see it.
+    /// </summary>
+    internal static readonly string NewDeadKeyAdvice =
+        "Either wire them up, or delete them from both locales. If a key really is resolved at "
+        + "runtime, give it a literal head of at least "
+        + MinComposedPrefixLength.ToString(System.Globalization.CultureInfo.InvariantCulture)
+        + " characters (for example \"ToolDesc\" + id) and the guard exempts its family. "
+        + "A composed head shorter than that is NOT recognised, so a key built from one reads "
+        + "as dead although it is live: do not delete it, lengthen its head, which is the "
+        + "smallest change.";
+
     /// <summary>The marker that makes a catalogue entry a comment line of the JSON file.</summary>
     internal const string CommentKeyPrefix = "_comment";
 
