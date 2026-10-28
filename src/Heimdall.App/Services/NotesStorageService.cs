@@ -56,6 +56,31 @@ public sealed class NoteTreeNode
         ? string.Join("   ", Note.Tags.Select(tag => $"#{tag}"))
         : string.Empty;
 
+    /// <summary>
+    /// What the row shows besides its title, as plain comma-separated text for a screen reader:
+    /// date, file name and tags, without the pipe and the hash marks that only read well on screen.
+    /// Carries no localized word, so the storage model stays free of the localizer; the word that
+    /// says "note" or "folder" is added by the view, which re-evaluates it on a locale change.
+    /// </summary>
+    public string DisplayDetail
+    {
+        get
+        {
+            if (Note is null)
+            {
+                return string.Empty;
+            }
+
+            string[] parts =
+            [
+                Note.LastModifiedDisplay,
+                Name,
+                string.Join(", ", Note.Tags)
+            ];
+            return string.Join(", ", parts.Where(part => !string.IsNullOrWhiteSpace(part)));
+        }
+    }
+
     public static List<NoteTreeNode> BuildTree(IReadOnlyList<NoteListItem> notes, string notesRootPath)
     {
         var root = new NoteTreeNode { FolderPath = notesRootPath };

@@ -18,7 +18,11 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf">
     <Grid>
-        <wv2:WebView2 x:Name="EditorWebView" Focusable="True"/>
+        <!-- The name belongs to the web view, which is what takes the focus; the host sets it once on
+             this control and it is forwarded here, so the page stays free of the note title. -->
+        <wv2:WebView2 x:Name="EditorWebView"
+                      Focusable="True"
+                      AutomationProperties.Name="{Binding Path=(AutomationProperties.Name), RelativeSource={RelativeSource AncestorType=UserControl}}"/>
 
         <Border x:Name="LoadingPanel"
                 Background="{DynamicResource SurfaceBrush}">

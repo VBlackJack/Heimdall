@@ -46,19 +46,68 @@
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
 
-        <Style x:Key="NotesTagFilterButtonStyle" TargetType="Button" BasedOn="{StaticResource SecondaryButtonStyle}">
+        <!-- The chips' list draws nothing of its own: the wrapping rows are the chips. -->
+        <Style x:Key="NotesTagFilterListStyle" TargetType="ListBox">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="ItemsPanel">
+                <Setter.Value>
+                    <ItemsPanelTemplate>
+                        <WrapPanel/>
+                    </ItemsPanelTemplate>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBox">
+                        <ItemsPresenter SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- A chip. The name is set here, on the container, which is what UI Automation reads. -->
+        <Style x:Key="NotesTagFilterItemStyle" TargetType="ListBoxItem">
+            <Setter Property="FocusVisualStyle" Value="{StaticResource AppFocusVisualStyle}"/>
             <Setter Property="MinHeight" Value="24"/>
             <Setter Property="Padding" Value="8,2"/>
             <Setter Property="Margin" Value="0,0,4,4"/>
             <Setter Property="FontSize" Value="{StaticResource FontSizeCaption}"/>
             <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
-            <Style.Triggers>
-                <DataTrigger Binding="{Binding IsSelected}" Value="True">
-                    <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/>
-                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
-                    <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}"/>
-                </DataTrigger>
-            </Style.Triggers>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="AutomationProperties.Name" Value="{Binding DisplayLabel}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="ChipBorder"
+                                Background="{DynamicResource CardBrush}"
+                                BorderBrush="{DynamicResource InputBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="{StaticResource CornerRadiusMd}"
+                                MinHeight="{TemplateBinding MinHeight}"
+                                Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ChipBorder" Property="Background" Value="{DynamicResource HighlightBrush}"/>
+                                <Setter TargetName="ChipBorder" Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="ChipBorder" Property="Background" Value="{DynamicResource SurfaceBrush}"/>
+                                <Setter TargetName="ChipBorder" Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource AccentTextBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="ChipBorder" Property="BorderBrush" Value="{DynamicResource FocusIndicatorBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
     </UserControl.Resources>
 
@@ -281,27 +330,19 @@
                                    Margin="0"
                                    IsHitTestVisible="False"/>
 
-                        <ItemsControl x:Name="TagFilterWrapPanel"
-                                      Margin="0,0,0,6"
-                                      ItemsSource="{Binding TagFilters}"
-                                      Visibility="{Binding HasTagFilters, Converter={StaticResource BoolToVisibilityConverter}}"
-                                      AutomationProperties.AutomationId="NotesTool.TagFilters"
-                                      AutomationProperties.Name="{loc:Translate ToolNotesTagsLabel}">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <WrapPanel />
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Button Content="{Binding DisplayLabel}"
-                                            Command="{Binding DataContext.SelectTagCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
-                                            CommandParameter="{Binding Value}"
-                                            Style="{StaticResource NotesTagFilterButtonStyle}"
-                                            AutomationProperties.Name="{Binding DisplayLabel}"/>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
+                        <!-- A single-select list, not a row of buttons: the chosen chip is reported
+                             as selected through UI Automation instead of by its colour alone. -->
+                        <ListBox x:Name="TagFilterWrapPanel"
+                                 Margin="0,0,0,6"
+                                 Style="{StaticResource NotesTagFilterListStyle}"
+                                 ItemContainerStyle="{StaticResource NotesTagFilterItemStyle}"
+                                 SelectionMode="Single"
+                                 ItemsSource="{Binding TagFilters}"
+                                 SelectedItem="{Binding SelectedTagFilter, Mode=TwoWay}"
+                                 DisplayMemberPath="DisplayLabel"
+                                 Visibility="{Binding HasTagFilters, Converter={StaticResource BoolToVisibilityConverter}}"
+                                 AutomationProperties.AutomationId="NotesTool.TagFilters"
+                                 AutomationProperties.Name="{loc:Translate ToolNotesTagsLabel}"/>
                     </StackPanel>
 
                     <TreeView x:Name="NotesTreeView"
@@ -463,6 +504,31 @@
                                 <Setter Property="Margin" Value="0"/>
                                 <Setter Property="MinHeight" Value="0"/>
                                 <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                <!-- UI Automation reads the container, never the row template: without a
+                                     name here every row is announced by the node's type name. NoteTreeNode
+                                     is a storage model with no localizer, so the name is built here from
+                                     a localized format (re-evaluated on a locale change) and its values. -->
+                                <Setter Property="AutomationProperties.Name">
+                                    <Setter.Value>
+                                        <MultiBinding Converter="{StaticResource AccessibleRowNameConverter}">
+                                            <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[A11yNoteTreeNoteRow]"/>
+                                            <Binding Path="DisplayTitle"/>
+                                            <Binding Path="DisplayDetail"/>
+                                        </MultiBinding>
+                                    </Setter.Value>
+                                </Setter>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding IsFolder}" Value="True">
+                                        <Setter Property="AutomationProperties.Name">
+                                            <Setter.Value>
+                                                <MultiBinding Converter="{StaticResource AccessibleRowNameConverter}">
+                                                    <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[A11yNoteTreeFolderRow]"/>
+                                                    <Binding Path="Name"/>
+                                                </MultiBinding>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </DataTrigger>
+                                </Style.Triggers>
                             </Style>
                         </TreeView.ItemContainerStyle>
                     </TreeView>
@@ -583,7 +649,14 @@
                         <tools:MilkdownEditorControl x:Name="MilkdownEditor"
                                                      AutomationProperties.AutomationId="NotesTool.MilkdownEditor"
                                                      TabIndex="13"
-                                                     Visibility="Collapsed"/>
+                                                     Visibility="Collapsed">
+                            <AutomationProperties.Name>
+                                <MultiBinding Converter="{StaticResource LocalizedFormatConverter}">
+                                    <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[A11yNoteContent]"/>
+                                    <Binding Path="SelectedNoteTitle"/>
+                                </MultiBinding>
+                            </AutomationProperties.Name>
+                        </tools:MilkdownEditorControl>
 
                         <avalon:TextEditor x:Name="Editor"
                                            FontFamily="{StaticResource FontFamilyMonospace}"
@@ -595,7 +668,14 @@
                                            HorizontalScrollBarVisibility="Auto"
                                            VerticalScrollBarVisibility="Auto"
                                            AutomationProperties.AutomationId="NotesTool.AvalonEditor"
-                                           TabIndex="13"/>
+                                           TabIndex="13">
+                            <AutomationProperties.Name>
+                                <MultiBinding Converter="{StaticResource LocalizedFormatConverter}">
+                                    <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[A11yNoteContent]"/>
+                                    <Binding Path="SelectedNoteTitle"/>
+                                </MultiBinding>
+                            </AutomationProperties.Name>
+                        </avalon:TextEditor>
 
                         <Border x:Name="EditorEmptyStatePanel"
                                 Visibility="{Binding HasSelection, Converter={StaticResource BoolToVisibilityConverter}, ConverterParameter=Invert}"

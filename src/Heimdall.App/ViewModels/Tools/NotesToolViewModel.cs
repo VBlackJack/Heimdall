@@ -39,6 +39,7 @@ internal sealed partial class NotesToolViewModel : ObservableObject, IDisposable
     private bool _initialized;
     private bool _suppressCriteriaReload = false;
     private bool _suppressTagReload;
+    private bool _syncingTagFilter;
 
     [ObservableProperty] private string _searchText = string.Empty;
     [ObservableProperty] private NoteSortOrder _sortOrder = NoteSortOrder.DateDescending;
@@ -54,6 +55,7 @@ internal sealed partial class NotesToolViewModel : ObservableObject, IDisposable
     [ObservableProperty] private bool _canGoForward;
     [ObservableProperty] private bool _hasSelection;
     [ObservableProperty] private bool _hasTagFilters;
+    [ObservableProperty] private NoteTagFilterChip? _selectedTagFilter;
     [ObservableProperty] private string _selectedNoteTitle = string.Empty;
     [ObservableProperty] private string _selectedNotePathDisplay = string.Empty;
     [ObservableProperty] private string _listFooterText = string.Empty;
@@ -495,6 +497,22 @@ internal sealed partial class NotesToolViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>
+    /// The chip list's own selection, written by the list when the user picks a chip. A null is
+    /// not "nothing": a single-select list reports it when the chosen chip is toggled off, and
+    /// the only filter a chip can clear is the one it set, so it reads as the "all" chip.
+    /// </summary>
+    partial void OnSelectedTagFilterChanged(NoteTagFilterChip? value)
+    {
+        if (_syncingTagFilter)
+        {
+            return;
+        }
+
+        SelectTag(value?.Value);
+        SyncSelectedTagFilter();
+    }
+
     partial void OnSelectedTagChanged(string? value)
     {
         RebuildTagFilters();
@@ -578,25 +596,54 @@ internal sealed partial class NotesToolViewModel : ObservableObject, IDisposable
 
     private void RebuildTagFilters()
     {
-        HasTagFilters = AvailableTags.Count > 0;
-        if (!HasTagFilters)
+        // Emptying the collection makes the bound list report a null selection, and refilling it
+        // a pick of its own; neither is the user choosing a chip, and read as one the first would
+        // clear the filter that this rebuild is only redrawing.
+        bool wasSyncing = _syncingTagFilter;
+        _syncingTagFilter = true;
+        try
         {
-            TagFilters.Clear();
-            return;
+            HasTagFilters = AvailableTags.Count > 0;
+            if (!HasTagFilters)
+            {
+                TagFilters.Clear();
+                SelectedTagFilter = null;
+                return;
+            }
+
+            var tagFilters = new List<NoteTagFilterChip>
+            {
+                new(null, L("ToolNotesAllTags"), string.IsNullOrWhiteSpace(SelectedTag))
+            };
+
+            tagFilters.AddRange(AvailableTags.Select(tag =>
+                new NoteTagFilterChip(
+                    tag,
+                    tag,
+                    string.Equals(tag, SelectedTag, StringComparison.OrdinalIgnoreCase))));
+
+            ReplaceCollection(TagFilters, tagFilters);
+            SelectedTagFilter = TagFilters.FirstOrDefault(chip => chip.IsSelected);
         }
-
-        var tagFilters = new List<NoteTagFilterChip>
+        finally
         {
-            new(null, L("ToolNotesAllTags"), string.IsNullOrWhiteSpace(SelectedTag))
-        };
+            _syncingTagFilter = wasSyncing;
+        }
+    }
 
-        tagFilters.AddRange(AvailableTags.Select(tag =>
-            new NoteTagFilterChip(
-                tag,
-                tag,
-                string.Equals(tag, SelectedTag, StringComparison.OrdinalIgnoreCase))));
-
-        ReplaceCollection(TagFilters, tagFilters);
+    /// <summary>Points the chip list's selection back at the chip the active filter names.</summary>
+    private void SyncSelectedTagFilter()
+    {
+        bool wasSyncing = _syncingTagFilter;
+        _syncingTagFilter = true;
+        try
+        {
+            SelectedTagFilter = TagFilters.FirstOrDefault(chip => chip.IsSelected);
+        }
+        finally
+        {
+            _syncingTagFilter = wasSyncing;
+        }
     }
 
     private async Task OpenNoteCoreAsync(string filePath, bool pushCurrentToBackStack)
