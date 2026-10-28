@@ -1622,7 +1622,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
             Core.Logging.FileLogger.Warn($"Unknown tool ID: {toolId}");
             return new TextBlock
             {
-                Text = $"Tool: {toolId}",
+                Text = _localizer.Format("ErrorEmbeddedToolUnknown", toolId),
                 FontSize = (double)Application.Current.FindResource("FontSizeLarge"),
                 HorizontalAlignment = System.Windows.HorizontalAlignment.Center,
                 VerticalAlignment = System.Windows.VerticalAlignment.Center,
