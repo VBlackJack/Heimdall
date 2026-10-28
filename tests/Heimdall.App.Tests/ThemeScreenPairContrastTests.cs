@@ -304,6 +304,79 @@ public sealed class ThemeScreenPairContrastTests
                 && border.Elements(Presentation + "TextBlock").Count() == 1);
 
     /// <summary>
+    /// The Hosts file editor's Problem cell: its text on a normal row (the grid's row and alternating
+    /// row fills) and on a selected row (the selection fill, for every accent). The error brush was
+    /// kept on the selected row and was unreadable there on Magellan; the selected row takes the same
+    /// foreground the shared DataGrid styles give selected-row text.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Themes))]
+    public void TheHostsEditorProblemTextIsReadableOnEveryRow(string theme)
+    {
+        XElement grid = Named("Views/Tools/HostsFileEditorView.xaml", "HostsGrid");
+        XElement style = ProblemTextStyle();
+        XElement selectedTrigger = Assert.Single(
+            style.Elements(Presentation + "Style.Triggers").Elements(Presentation + "DataTrigger"),
+            trigger => ((string?)trigger.Attribute("Binding"))?.Contains("IsSelected", StringComparison.Ordinal) == true);
+        string restText = SetterKey(style, "Foreground");
+        string selectedText = SetterKey(selectedTrigger, "Foreground");
+
+        XElement gridRowStyle = KeyedStyle("Themes/CommonControls.xaml", "ThemedDataGridRowStyle");
+        Assert.Equal(TriggerSetterKey(gridRowStyle, "IsSelected", "Foreground"), selectedText);
+        string selectedFill = TriggerSetterKey(gridRowStyle, "IsSelected", "Background");
+
+        List<string> unreadable = [];
+        foreach (string rowFill in new[] { Key(grid.Attribute("RowBackground")), Key(grid.Attribute("AlternatingRowBackground")) })
+        {
+            AssertOrCollect(unreadable, theme, "problem text on a normal row", restText, [rowFill], MinimumTextContrast);
+        }
+
+        ResourceDictionary palette = ThemeSurfaceTokenContrastTests.Palette(theme);
+        ResourceDictionary colours = ThemeSurfaceTokenContrastTests.ThemeColours(theme);
+        Color text = ThemeSurfaceTokenContrastTests.ColorOf(palette, selectedText);
+        IEnumerable<Color> fills = selectedFill == "AccentBrush"
+            ? AccentFillColours.Select(key => (Color)colours[key])
+            : [ThemeSurfaceTokenContrastTests.ColorOf(palette, selectedFill)];
+        unreadable.AddRange(fills
+            .Where(fill => ThemeSurfaceTokenContrastTests.Contrast(text, fill) < MinimumTextContrast)
+            .Select(fill => Report(theme, $"problem text {selectedText} on a selected row {selectedFill}", text, fill)));
+
+        Assert.True(unreadable.Count == 0, string.Join(Environment.NewLine, unreadable));
+    }
+
+    /// <summary>
+    /// The Problem cell keeps its meaning without the colour: an error glyph, in the icon font set on
+    /// the glyph's own style and not on the cell's root (a font on a parent is inherited by whatever
+    /// it hosts), and hidden when the row has no problem. The glyph takes the same foreground as the
+    /// text, so it stays readable on a selected row.
+    /// </summary>
+    [Fact]
+    public void TheHostsEditorProblemCellMarksTheErrorWithAGlyphThatIsNotColourOnly()
+    {
+        XDocument view = Load(Source("Views/Tools/HostsFileEditorView.xaml"));
+        XElement glyphStyle = Assert.Single(
+            view.Descendants(Presentation + "Style"), style => (string?)style.Attribute(Xaml + "Key") == "HostsProblemGlyphStyle");
+        XElement template = Assert.Single(view.Descendants(Presentation + "DataTemplate"), t => t.Descendants().Any(e => e == glyphStyle));
+        XElement root = template.Elements().Last();
+
+        Assert.Equal("{StaticResource HostsProblemTextStyle}", (string?)glyphStyle.Attribute("BasedOn"));
+        Assert.Equal("FontFamilyIcons", Key(Assert.Single(
+            glyphStyle.Elements(Presentation + "Setter"), setter => (string?)setter.Attribute("Property") == "FontFamily").Attribute("Value")));
+        Assert.Null(root.Attribute("FontFamily"));
+        Assert.Contains(
+            glyphStyle.Descendants(Presentation + "DataTrigger"),
+            trigger => (string?)trigger.Attribute("Value") == "" && ((string?)trigger.Attribute("Binding"))?.Contains("ProblemDisplay", StringComparison.Ordinal) == true);
+        Assert.Contains(
+            root.Elements(Presentation + "TextBlock"),
+            block => (string?)block.Attribute("Style") == "{StaticResource HostsProblemGlyphStyle}");
+    }
+
+    private static XElement ProblemTextStyle() =>
+        Assert.Single(
+            Load(Source("Views/Tools/HostsFileEditorView.xaml")).Descendants(Presentation + "Style"),
+            style => (string?)style.Attribute(Xaml + "Key") == "HostsProblemTextStyle");
+
+    /// <summary>
     /// Text in the Notes tool is not dimmed with Opacity on top of its tier brush. At 0.62 the list
     /// footer's secondary text was 3.22 to 1 on Magellan; the tier brushes carry the emphasis.
     /// </summary>
