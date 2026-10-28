@@ -4,11 +4,9 @@
 
 $ErrorActionPreference = 'Stop'
 
-# Check if already installed
-try {
-    Add-Type -Path (Join-Path $PSScriptRoot 'src\Heimdall.App\lib\webview2\Microsoft.Web.WebView2.Core.dll') -ErrorAction SilentlyContinue
-} catch {}
+. (Join-Path $PSScriptRoot 'scripts\VerifiedInstaller.ps1')
 
+# Check if already installed
 $installed = $false
 try {
     $regPaths = @(
@@ -39,20 +37,27 @@ Write-Host ""
 Write-Host "WebView2 Runtime is required for embedded SSH terminals and VNC sessions." -ForegroundColor White
 Write-Host ""
 
-$bootstrapper = Join-Path ([System.IO.Path]::GetTempPath()) 'MicrosoftEdgeWebview2Setup.exe'
+# A new folder per run: a file at a fixed path can be replaced between the download and the run.
+$downloadFolder = New-PrivateDownloadFolder
+$bootstrapper = Join-Path $downloadFolder 'MicrosoftEdgeWebview2Setup.exe'
 
-Write-Host "[1/2] Downloading WebView2 Evergreen Bootstrapper..." -ForegroundColor Yellow
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile $bootstrapper -UseBasicParsing
+try {
+    Write-Host "[1/2] Downloading WebView2 Evergreen Bootstrapper..." -ForegroundColor Yellow
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    Invoke-WebRequest -Uri 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile $bootstrapper -UseBasicParsing
 
-Write-Host "[2/2] Installing WebView2 Runtime..." -ForegroundColor Yellow
-$proc = Start-Process $bootstrapper -ArgumentList '/silent /install' -Wait -PassThru
-if ($proc.ExitCode -ne 0) {
-    Write-Host "Installation may require elevation. Retrying with admin..." -ForegroundColor DarkYellow
-    Start-Process $bootstrapper -ArgumentList '/silent /install' -Verb RunAs -Wait
+    # Refuse to start anything Microsoft Corporation did not sign; this stops the script with an error.
+    Assert-MicrosoftSignedInstaller -Path $bootstrapper
+
+    Write-Host "[2/2] Installing WebView2 Runtime..." -ForegroundColor Yellow
+    $proc = Start-Process $bootstrapper -ArgumentList '/silent /install' -Wait -PassThru
+    if ($proc.ExitCode -ne 0) {
+        Write-Host "Installation may require elevation. Retrying with admin..." -ForegroundColor DarkYellow
+        Start-Process $bootstrapper -ArgumentList '/silent /install' -Verb RunAs -Wait
+    }
+} finally {
+    Remove-Item $downloadFolder -Recurse -Force -ErrorAction SilentlyContinue
 }
-
-Remove-Item $bootstrapper -Force -ErrorAction SilentlyContinue
 
 # Verify
 $verified = $false
