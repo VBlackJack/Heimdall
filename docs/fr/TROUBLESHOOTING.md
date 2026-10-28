@@ -460,9 +460,9 @@ new SshAgentHostAlgorithm("ssh-rsa", key),
 
 **Cause racine** : SSH.NET attend le blob de signature complet au format SSH : `[4 bytes: algorithm name length][algorithm name][4 bytes: signature length][signature bytes]`. `PageantClient.SignData()` renvoie déjà ce blob complet en provenance de Pageant. Retirer le préfixe d'algorithme, réencapsuler le blob une seconde fois ou ne renvoyer que les octets bruts de signature corrompt la signature.
 
-**Solution** : `SshAgentHostAlgorithm.Sign()` doit renvoyer inchangé le blob issu de `PageantAgentKey.Sign()`. `PageantHostAlgorithmTests.Sign_ReturnsBlobFromAgentUnchanged` fige le même contrat sur le `PageantHostAlgorithm` propre à Pageant.
+**Solution** : `SshAgentHostAlgorithm.Sign()` doit renvoyer inchangé le blob issu de `PageantAgentKey.Sign()`. `SshAgentKeyWrapperTests.RsaAlgorithms_PassExpectedSignFlags` fige ce contrat : la signature renvoyée par la clé de l'agent ressort de `Sign()` inchangée.
 
-**Fichiers** : `Agents/SshAgentHostAlgorithm.cs`, `Pageant/PageantAgentKey.cs`, `Pageant/PageantHostAlgorithm.cs`
+**Fichiers** : `Agents/SshAgentHostAlgorithm.cs`, `Pageant/PageantAgentKey.cs`
 
 ---
 
