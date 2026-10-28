@@ -29,8 +29,10 @@ public sealed class ScheduledTaskDto
     public bool Enabled { get; set; } = true;
 
     /// <summary>
-    /// Human-readable schedule descriptor (e.g., "Daily 08:00", "Every 30 min").
-    /// Kept for display and backward compatibility with existing persisted tasks.
+    /// Legacy schedule text written by earlier versions in English (e.g., "Daily 08:00").
+    /// No longer written and never shown while <see cref="ScheduleType"/>, <see cref="TimeOfDay"/>
+    /// and <see cref="IntervalMinutes"/> describe the schedule: the grid formats those at display
+    /// time in the current language. Still read, so a file saved by an earlier version loads.
     /// </summary>
     public string Schedule { get; set; } = string.Empty;
 

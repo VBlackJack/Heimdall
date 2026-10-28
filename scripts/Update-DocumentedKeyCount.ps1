@@ -3,22 +3,24 @@
     Writes the locale catalogue's key count into the documents that quote it.
 
 .DESCRIPTION
-    LocaleCatalogueParityTests.TheDocumentedKeyCountMatchesTheCatalogue fails as soon as a key
-    is added or removed, and six documents carry the number, three in English and three in
-    French. Fixing them by hand on every pull request that touches a catalogue was a chore that
-    went wrong in its own ways; this script does it.
+    LocaleCatalogueParityTests.TheDocumentedKeyCountMatchesTheCatalogue fails when the figure the
+    documents quote is no longer the catalogue's count rounded DOWN to the hundred, and six
+    documents carry it, three in English and three in French. The figure is a floor, written
+    "7,400+" (English) or "7 400+" (French), so a pull request that adds a few keys leaves it
+    true and touches none of the six; only the key that crosses a hundred does. This script
+    writes the figure when that happens.
 
-    The count is the number of keys in locales/en.json. In each document the number is found
-    as a thousands-grouped figure followed by "keys" or "cles" (accented), with an optional
-    "i18n" between them, so the other figures of the same pages are left alone. A document
-    that holds no such figure, or more than one, is reported and left unchanged, and the run
-    exits 1.
+    The count is the number of keys in locales/en.json, rounded down to the hundred. In each
+    document the figure is found as a thousands-grouped number, with or without the trailing
+    plus sign, followed by "keys" or "cles" (accented), with an optional "i18n" between them,
+    so the other figures of the same pages are left alone. A document that holds no such
+    figure, or more than one, is reported and left unchanged, and the run exits 1.
 
 .PARAMETER Check
     Reports what would change without writing anything. Exits 1 when a document is out of date.
 
 .PARAMETER Count
-    Writes this count instead of the catalogue's. For testing the script.
+    Uses this count instead of the catalogue's, before it is rounded. For testing the script.
 
 .EXAMPLE
     ./scripts/Update-DocumentedKeyCount.ps1
@@ -58,7 +60,10 @@ if ($Count -le 0) {
     $Count = @($catalogue.PSObject.Properties).Count
 }
 
-$grouped = $Count.ToString('#,0', [System.Globalization.CultureInfo]::InvariantCulture)
+# The documents quote a floor, so a few added keys do not make them stale.
+$figureStep = 100
+$rounded = [int]([math]::Floor($Count / $figureStep) * $figureStep)
+$grouped = $rounded.ToString('#,0', [System.Globalization.CultureInfo]::InvariantCulture) + '+'
 # "cles" with its accent, written as a code point so this file stays ASCII.
 $frenchKeys = 'cl' + [char]0x00E9 + 's'
 $utf8 = New-Object System.Text.UTF8Encoding($false)
@@ -72,7 +77,7 @@ foreach ($document in $documents) {
     $text = $utf8.GetString($bytes).TrimStart([char]0xFEFF)
 
     $separator = [regex]::Escape($document.Separator)
-    $pattern = '\d{1,3}(?:' + $separator + '\d{3})+(?=\s+(?:i18n\s+)?(?:keys|' + $frenchKeys + '))'
+    $pattern = '\d{1,3}(?:' + $separator + '\d{3})+\+?(?=\s+(?:i18n\s+)?(?:keys|' + $frenchKeys + '))'
     $found = [regex]::Matches($text, $pattern)
     if ($found.Count -ne 1) {
         Write-Host "SKIP $($document.Path): $($found.Count) key count(s) found, expected exactly one." -ForegroundColor Red

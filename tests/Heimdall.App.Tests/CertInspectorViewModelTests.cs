@@ -114,6 +114,30 @@ public class CertInspectorViewModelTests
         Assert.False(vm.ShowSingleResult);
     }
 
+    /// <summary>
+    /// The reason a probe came back empty is part of the connection error and is worded in the
+    /// language of the session, not left in English inside a translated sentence.
+    /// </summary>
+    [Theory]
+    [InlineData("en", "Connection failed: no certificate was received.")]
+    [InlineData("fr", "\u00c9chec de la connexion : aucun certificat re\u00e7u.")]
+    [InlineData("es", "Fall\u00f3 la conexi\u00f3n: no se recibi\u00f3 ning\u00fan certificado.")]
+    public async Task CheckAsync_SinglePort_ProbeReturnsNull_WordsTheReasonInTheLocale(string locale, string expectedStart)
+    {
+        var localizer = new Heimdall.Core.Localization.LocalizationManager();
+        await localizer.LoadAsync(System.IO.Path.Combine(AppContext.BaseDirectory, "locales"), locale);
+        var vm = new CertInspectorViewModel();
+        vm.Initialize(localizer);
+        vm.SetProber(new FakeProber());
+        vm.Host = "unreachable.example.com";
+        vm.Port = "443";
+
+        await vm.CheckCommand.ExecuteAsync(null);
+
+        Assert.StartsWith(expectedStart, vm.ErrorMessage, StringComparison.Ordinal);
+        Assert.DoesNotContain("No certificate received", vm.ErrorMessage, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task CheckAsync_ScanMode_FindsCerts()
     {
