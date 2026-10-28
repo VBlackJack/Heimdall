@@ -107,6 +107,13 @@ internal static class CredentialProtectorRuntimeGuard
     /// Captures what the guard sees during an action instead of letting it reach the running
     /// test, so a violation can be provoked on purpose without failing the prover.
     /// </summary>
+    /// <remarks>
+    /// An exception the action throws after the observer recorded a violation is swallowed: the
+    /// call under observation is allowed to fail on process-global protector state, such as a
+    /// vault left enabled and locked by a collection member running at the same instant, and
+    /// that failure says nothing about whether the call was seen. An exception thrown with
+    /// nothing recorded still propagates, so a broken action is not mistaken for a quiet one.
+    /// </remarks>
     internal static IReadOnlyList<string> Observing(Action action)
     {
         ArgumentNullException.ThrowIfNull(action);
@@ -118,6 +125,12 @@ internal static class CredentialProtectorRuntimeGuard
         {
             action();
         }
+        catch (Exception) when (HasRecorded(mine))
+        {
+            // The observer runs before the protector decides anything, so the violation is
+            // already on the list; the exception is the protector's reaction to state this
+            // action does not own.
+        }
         finally
         {
             s_currentTestViolations.Value = outer;
@@ -126,6 +139,14 @@ internal static class CredentialProtectorRuntimeGuard
         lock (mine)
         {
             return mine.ToList();
+        }
+    }
+
+    private static bool HasRecorded(List<string> violations)
+    {
+        lock (violations)
+        {
+            return violations.Count > 0;
         }
     }
 
