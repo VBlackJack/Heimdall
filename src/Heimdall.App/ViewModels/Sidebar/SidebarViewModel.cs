@@ -59,6 +59,7 @@ public sealed partial class SidebarViewModel : ObservableObject, IDisposable
     private bool _isToolsPopulated;
     private bool _persistenceEnabled;
     private bool _suppressCategoryExpansionPersistence;
+    private bool _saveFailureNoticeShown;
     private bool _disposed;
 
     /// <summary>
@@ -294,17 +295,47 @@ public sealed partial class SidebarViewModel : ObservableObject, IDisposable
         InvalidateFilter();
     }
 
-    private async void PersistTabChoice(bool isTools)
+    // Event-handler shapes: nothing awaits these, so each only forwards to a Task-returning
+    // method that owns the failure handling. An exception left to escape an async void goes to
+    // the dispatcher as unhandled and was reported to the user as an unexpected error.
+    private async void PersistTabChoice(bool isTools) => await PersistTabChoiceAsync(isTools).ConfigureAwait(true);
+
+    private async void OnCategoryPropertyChanged(object? sender, PropertyChangedEventArgs e) =>
+        await PersistCategoryExpansionAsync(sender, e).ConfigureAwait(true);
+
+    internal async Task PersistTabChoiceAsync(bool isTools)
     {
         if (!_persistenceEnabled) return;
         if (_main.CurrentSettings is null) return;
         if (_main.CurrentSettings.ShowToolsPanel == isTools) return;
 
         _main.CurrentSettings.ShowToolsPanel = isTools;
-        await _configManager.MergeSettingAsync(s => s.ShowToolsPanel = isTools).ConfigureAwait(true);
+        await SaveSettingSafelyAsync(s => s.ShowToolsPanel = isTools).ConfigureAwait(true);
     }
 
-    private async void OnCategoryPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    /// <summary>
+    /// Saves one setting for a handler that has no caller to report to. A refused write is
+    /// logged, and the user is told once per session: the sidebar writes on every tab switch and
+    /// every folder toggle, and the same notice on each would teach them to ignore it.
+    /// </summary>
+    private async Task SaveSettingSafelyAsync(Action<AppSettings> mutate)
+    {
+        try
+        {
+            await _configManager.MergeSettingAsync(mutate).ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Warn($"[Sidebar] settings save failed: {ex.Message}");
+            if (!_saveFailureNoticeShown)
+            {
+                _saveFailureNoticeShown = true;
+                _main.StatusText = _localizer["ErrorSaveSettings"];
+            }
+        }
+    }
+
+    internal async Task PersistCategoryExpansionAsync(object? sender, PropertyChangedEventArgs e)
     {
         if (!string.Equals(e.PropertyName, nameof(SidebarToolCategoryViewModel.IsExpanded), StringComparison.Ordinal))
         {
@@ -325,7 +356,7 @@ public sealed partial class SidebarViewModel : ObservableObject, IDisposable
         }
 
         _main.CurrentSettings.SidebarExpandedCategories[categoryKey] = isExpanded;
-        await _configManager.MergeSettingAsync(
+        await SaveSettingSafelyAsync(
             settings => settings.SidebarExpandedCategories[categoryKey] = isExpanded).ConfigureAwait(true);
     }
 

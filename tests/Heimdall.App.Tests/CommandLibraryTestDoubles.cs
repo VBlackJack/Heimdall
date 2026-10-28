@@ -249,8 +249,6 @@ internal sealed class FakeTwinShellLocalizationService : ILocalizationService
 
     public string GetString(string key) => key;
 
-    public string GetString(string key, string fallback) => fallback;
-
     public string GetFormattedString(string key, params object[] args) =>
         string.Format(CultureInfo.InvariantCulture, key, args);
 }

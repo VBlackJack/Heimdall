@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using Heimdall.App.Tests.TestHelpers;
 using Heimdall.App.ViewModels;
 using Heimdall.Core.Configuration;
 
@@ -100,5 +101,6 @@ public sealed class ServerItemViewModelGatewayBadgeTests
                 ConnectionType = "SSH",
                 SshGatewayId = gatewayId
             },
-            gateways: new SessionGatewayContext(Gateways));
+            gateways: new SessionGatewayContext(Gateways),
+            localizer: EnglishLocalizer.Create());
 }

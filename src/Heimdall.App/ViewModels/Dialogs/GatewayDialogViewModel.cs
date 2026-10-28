@@ -29,6 +29,10 @@ namespace Heimdall.App.ViewModels.Dialogs;
 /// </summary>
 public partial class GatewayDialogViewModel : ObservableValidator
 {
+    // Shared by the [Range] attribute and the unreadable-port path, so the two cannot name
+    // different messages for the same refusal.
+    private const string PortRangeKey = "ValidationGatewayPortRange";
+
     /// <summary>
     /// Localizer for translating validation error messages. Set by the dialog service.
     /// </summary>
@@ -46,25 +50,25 @@ public partial class GatewayDialogViewModel : ObservableValidator
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Required(ErrorMessage = "Gateway name is required.")]
-    [MinLength(1, ErrorMessage = "Gateway name cannot be empty.")]
+    [Required(ErrorMessage = "ValidationGatewayNameRequired")]
+    [MinLength(1, ErrorMessage = "ValidationGatewayNameEmpty")]
     private string _name = "";
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Required(ErrorMessage = "Host address is required.")]
-    [MinLength(1, ErrorMessage = "Host address cannot be empty.")]
+    [Required(ErrorMessage = "ValidationGatewayHostRequired")]
+    [MinLength(1, ErrorMessage = "ValidationGatewayHostEmpty")]
     private string _host = "";
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Range(1, 65535, ErrorMessage = "Port must be between 1 and 65535.")]
+    [Range(1, 65535, ErrorMessage = PortRangeKey)]
     private int _port = 22;
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Required(ErrorMessage = "Username is required.")]
-    [MinLength(1, ErrorMessage = "Username cannot be empty.")]
+    [Required(ErrorMessage = "ValidationUsernameRequired")]
+    [MinLength(1, ErrorMessage = "ValidationUsernameEmpty")]
     private string _user = "";
 
     [ObservableProperty]
@@ -136,7 +140,7 @@ public partial class GatewayDialogViewModel : ObservableValidator
     /// </remarks>
     public void ReportUnreadablePort()
     {
-        PortError = Localizer?["ValidationGatewayPortRange"] ?? "Port must be between 1 and 65535.";
+        PortError = Localizer?[PortRangeKey] ?? PortRangeKey;
         RefreshValidationSummary();
     }
 
@@ -439,31 +443,15 @@ public partial class GatewayDialogViewModel : ObservableValidator
         return vm;
     }
 
-    private static readonly Dictionary<string, string> ValidationKeyMap = new(StringComparer.Ordinal)
-    {
-        ["Gateway name is required."] = "ValidationGatewayNameRequired",
-        ["Gateway name cannot be empty."] = "ValidationGatewayNameEmpty",
-        ["Host address is required."] = "ValidationGatewayHostRequired",
-        ["Host address cannot be empty."] = "ValidationGatewayHostEmpty",
-        ["Port must be between 1 and 65535."] = "ValidationGatewayPortRange",
-        ["Username is required."] = "ValidationUsernameRequired",
-        ["Username cannot be empty."] = "ValidationUsernameEmpty",
-    };
-
     private string? GetLocalizedFieldError(string propertyName)
     {
         var error = GetErrors(propertyName)
             .OfType<System.ComponentModel.DataAnnotations.ValidationResult>()
             .FirstOrDefault();
 
+        // The attribute carries a locale key, not a sentence.
         var message = error?.ErrorMessage;
-        if (message is not null && Localizer is not null
-            && ValidationKeyMap.TryGetValue(message, out var key))
-        {
-            return Localizer[key];
-        }
-
-        return message;
+        return message is not null && Localizer is not null ? Localizer[message] : message;
     }
 }
 

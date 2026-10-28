@@ -424,9 +424,6 @@ public sealed class GitSyncServiceCancellationTests
         public string GetString(string key)
             => key;
 
-        public string GetString(string key, string fallback)
-            => fallback;
-
         public string GetFormattedString(string key, params object[] args)
             => key;
     }

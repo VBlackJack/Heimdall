@@ -15,6 +15,7 @@
  */
 
 using System.Globalization;
+using Heimdall.App.Tests.TestHelpers;
 using Heimdall.App.ViewModels;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.SessionHealth;
@@ -121,13 +122,15 @@ public sealed class PropertiesPanelFieldsTests
         Assert.Equal("", row.LastOpenedText);
     }
 
-    private static ServerItemViewModel Row() => ServerItemViewModel.FromDto(new ServerProfileDto
-    {
-        Id = "srv",
-        DisplayName = "srv",
-        ConnectionType = "SSH",
-        RemoteServer = "host.example.test",
-    });
+    private static ServerItemViewModel Row() => ServerItemViewModel.FromDto(
+        new ServerProfileDto
+        {
+            Id = "srv",
+            DisplayName = "srv",
+            ConnectionType = "SSH",
+            RemoteServer = "host.example.test",
+        },
+        localizer: EnglishLocalizer.Create());
 }
 
 /// <summary>

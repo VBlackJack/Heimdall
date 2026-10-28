@@ -111,7 +111,7 @@ public sealed class ServerDialogDirtyStateTests
     }
 
     [Fact]
-    public void TheAgentChipProbeIsNotAnEdit()
+    public async Task TheAgentChipProbeIsNotAnEdit()
     {
         ServerDialogViewModel vm = ServerDialogViewModel.FromDto(Seed("SSH"));
 
@@ -123,7 +123,7 @@ public sealed class ServerDialogDirtyStateTests
         vm.AgentChipState = SshAgentChipState.Off;
         vm.IsDirty = false;
 
-        vm.RefreshAgentChipCommand.Execute(null);
+        await vm.RefreshAgentChipCommand.ExecuteAsync(null);
 
         Assert.NotEqual("", vm.AgentChipText);
         Assert.False(vm.IsDirty);

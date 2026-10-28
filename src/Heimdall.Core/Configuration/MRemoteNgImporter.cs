@@ -26,6 +26,9 @@ namespace Heimdall.Core.Configuration;
 /// </summary>
 public static class MRemoteNgImporter
 {
+    private const string DefaultProtocol = "RDP";
+    private const string UnknownNodeName = "unknown";
+
     private static readonly Dictionary<string, string> ProtocolMap = new(StringComparer.OrdinalIgnoreCase)
     {
         ["RDP"] = "RDP",
@@ -61,7 +64,7 @@ public static class MRemoteNgImporter
             var fullEncryption = root.Attribute("FullFileEncryption")?.Value;
             if (string.Equals(fullEncryption, "true", StringComparison.OrdinalIgnoreCase))
             {
-                result.Warnings.Add("File is fully encrypted. Decrypt the file in mRemoteNG first (File > Save As with no encryption).");
+                result.Warnings.Add(new ImportWarning(ImportWarningKind.FullFileEncryption));
                 return result;
             }
 
@@ -69,7 +72,7 @@ public static class MRemoteNgImporter
         }
         catch (Exception ex)
         {
-            result.Warnings.Add($"XML parse error: {ex.Message}");
+            result.Warnings.Add(new ImportWarning(ImportWarningKind.ParseError, Detail: ex.Message));
         }
 
         return result;
@@ -93,20 +96,20 @@ public static class MRemoteNgImporter
             {
                 try
                 {
-                    var dto = ParseConnection(node, groupPath);
+                    var dto = ParseConnection(node, groupPath, result);
                     if (dto is not null)
                         result.Servers.Add(dto);
                 }
                 catch (Exception ex)
                 {
-                    var name = node.Attribute("Name")?.Value ?? "unknown";
-                    result.Warnings.Add($"{name}: {ex.Message}");
+                    var name = node.Attribute("Name")?.Value ?? UnknownNodeName;
+                    result.Warnings.Add(new ImportWarning(ImportWarningKind.NodeError, name, ex.Message));
                 }
             }
         }
     }
 
-    private static ServerProfileDto? ParseConnection(XElement node, string groupPath)
+    private static ServerProfileDto? ParseConnection(XElement node, string groupPath, ImportResult result)
     {
         var name = node.Attribute("Name")?.Value?.Trim();
         var hostname = node.Attribute("Hostname")?.Value?.Trim();
@@ -114,11 +117,25 @@ public static class MRemoteNgImporter
         if (string.IsNullOrWhiteSpace(name) && string.IsNullOrWhiteSpace(hostname))
             return null;
 
-        var protocol = node.Attribute("Protocol")?.Value?.Trim() ?? "RDP";
-        if (!ProtocolMap.TryGetValue(protocol, out var connectionType))
-            connectionType = "RDP";
+        // The protocol is resolved first: port and credentials only mean something once the
+        // connection type is known. An entry that inherits it takes the value of the nearest
+        // ancestor that does not, and nothing (so the default) when no ancestor sets one.
+        var protocol = ResolveInherited(node, "Protocol", "InheritProtocol")?.Trim();
+        if (string.IsNullOrEmpty(protocol))
+            protocol = DefaultProtocol;
 
-        var portStr = node.Attribute("Port")?.Value;
+        if (!ProtocolMap.TryGetValue(protocol, out var connectionType))
+        {
+            // A protocol Heimdall has no profile type for used to import as RDP, which could only
+            // fail to connect; the entry is left out and the user is told.
+            result.Warnings.Add(new ImportWarning(
+                ImportWarningKind.UnknownProtocol,
+                name ?? hostname ?? UnknownNodeName,
+                protocol));
+            return null;
+        }
+
+        var portStr = ResolveInherited(node, "Port", "InheritPort");
         int.TryParse(portStr, out var port);
 
         var dto = new ServerProfileDto
@@ -145,8 +162,8 @@ public static class MRemoteNgImporter
         }
 
         // Username / Domain
-        var username = node.Attribute("Username")?.Value?.Trim();
-        var domain = node.Attribute("Domain")?.Value?.Trim();
+        var username = ResolveInherited(node, "Username", "InheritUsername")?.Trim();
+        var domain = ResolveInherited(node, "Domain", "InheritDomain")?.Trim();
 
         if (!string.IsNullOrWhiteSpace(username))
         {
@@ -243,6 +260,26 @@ public static class MRemoteNgImporter
         return dto;
     }
 
+    /// <summary>
+    /// The value of <paramref name="valueAttribute"/> as mRemoteNG applies it: when the node's
+    /// <paramref name="inheritAttribute"/> is true its own value is stale and ignored, and the
+    /// value comes from the nearest ancestor container that does not inherit it in turn.
+    /// Returns <see langword="null"/> when every node up to the top inherits.
+    /// </summary>
+    private static string? ResolveInherited(XElement node, string valueAttribute, string inheritAttribute)
+    {
+        for (XElement? current = node; current is { } && IsNode(current); current = current.Parent)
+        {
+            var inherit = current.Attribute(inheritAttribute)?.Value;
+            if (!string.Equals(inherit, "true", StringComparison.OrdinalIgnoreCase))
+                return current.Attribute(valueAttribute)?.Value;
+        }
+
+        return null;
+    }
+
+    private static bool IsNode(XElement element) => element.Name.LocalName == "Node";
+
     private static void ApplyPortByProtocol(ServerProfileDto dto, string type, int port)
     {
         switch (type)
@@ -285,6 +322,31 @@ public static class MRemoteNgImporter
     public sealed class ImportResult
     {
         public List<ServerProfileDto> Servers { get; } = [];
-        public List<string> Warnings { get; } = [];
+        public List<ImportWarning> Warnings { get; } = [];
     }
+
+    /// <summary>What the parser could not take as it is.</summary>
+    public enum ImportWarningKind
+    {
+        /// <summary>The file is encrypted as a whole and nothing was read.</summary>
+        FullFileEncryption,
+
+        /// <summary>The file is not readable XML.</summary>
+        ParseError,
+
+        /// <summary>One connection node threw while it was read.</summary>
+        NodeError,
+
+        /// <summary>A connection uses a protocol Heimdall has no profile type for; it was skipped.</summary>
+        UnknownProtocol,
+    }
+
+    /// <summary>
+    /// One thing the parser left out or could not read. The text is built by the caller, so the
+    /// parser carries data and never a user-facing sentence.
+    /// </summary>
+    /// <param name="Kind">What happened.</param>
+    /// <param name="NodeName">The connection concerned, empty when the warning is about the file.</param>
+    /// <param name="Detail">The protocol or the exception message, empty when there is none.</param>
+    public sealed record ImportWarning(ImportWarningKind Kind, string NodeName = "", string Detail = "");
 }

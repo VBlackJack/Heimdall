@@ -17,6 +17,7 @@
 using System.IO;
 using System.Xml.Linq;
 using Heimdall.App.Services;
+using Heimdall.App.Tests.TestHelpers;
 using Heimdall.App.ViewModels;
 using Heimdall.Core.Configuration;
 
@@ -108,7 +109,7 @@ public sealed class SessionPropertiesPanelTests
         bool hasPassword,
         string expected)
     {
-        ServerItemViewModel row = ServerItemViewModel.FromDto(Server(connectionType, hasPassword));
+        ServerItemViewModel row = ServerItemViewModel.FromDto(Server(connectionType, hasPassword), localizer: EnglishLocalizer.Create());
 
         row.UsesCredentialProvider = true;
 
@@ -120,14 +121,16 @@ public sealed class SessionPropertiesPanelTests
     [InlineData(null, "No saved credentials")]
     public void TheCredentialProvider_IsNamedForAWebConsoleOnlyWhenItSignsIn(string? username, string expected)
     {
-        ServerItemViewModel row = ServerItemViewModel.FromDto(new ServerProfileDto
-        {
-            Id = "w",
-            DisplayName = "iLO",
-            ConnectionType = "WEB",
-            RemoteServer = "ilo.example.test",
-            WebUsername = username,
-        });
+        ServerItemViewModel row = ServerItemViewModel.FromDto(
+            new ServerProfileDto
+            {
+                Id = "w",
+                DisplayName = "iLO",
+                ConnectionType = "WEB",
+                RemoteServer = "ilo.example.test",
+                WebUsername = username,
+            },
+            localizer: EnglishLocalizer.Create());
 
         row.UsesCredentialProvider = true;
 
@@ -139,7 +142,7 @@ public sealed class SessionPropertiesPanelTests
     {
         ServerProfileDto dto = Server("WINRM", hasPassword: false);
         dto.WinRmIdentityMode = WinRmIdentityMode.CurrentUser;
-        ServerItemViewModel row = ServerItemViewModel.FromDto(dto);
+        ServerItemViewModel row = ServerItemViewModel.FromDto(dto, localizer: EnglishLocalizer.Create());
 
         row.UsesCredentialProvider = true;
 
@@ -149,7 +152,7 @@ public sealed class SessionPropertiesPanelTests
     [Fact]
     public void SwitchingTheCredentialProvider_AnnouncesTheNewAuthenticationLine()
     {
-        ServerItemViewModel row = ServerItemViewModel.FromDto(Server("RDP", hasPassword: false));
+        ServerItemViewModel row = ServerItemViewModel.FromDto(Server("RDP", hasPassword: false), localizer: EnglishLocalizer.Create());
         List<string?> changed = [];
         row.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
 

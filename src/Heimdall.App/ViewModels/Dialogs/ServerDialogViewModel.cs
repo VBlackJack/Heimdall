@@ -239,24 +239,24 @@ public partial class ServerDialogViewModel : ObservableValidator
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Required(ErrorMessage = "Display name is required.")]
-    [MinLength(1, ErrorMessage = "Display name cannot be empty.")]
+    [Required(ErrorMessage = "ValidationDisplayNameRequired")]
+    [MinLength(1, ErrorMessage = "ValidationDisplayNameEmpty")]
     private string _displayName = "";
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Required(ErrorMessage = "Server address is required.")]
-    [MinLength(1, ErrorMessage = "Server address cannot be empty.")]
+    [Required(ErrorMessage = "ValidationServerAddressRequired")]
+    [MinLength(1, ErrorMessage = "ValidationServerAddressEmpty")]
     private string _remoteServer = "";
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Range(1, 65535, ErrorMessage = "Port must be between 1 and 65535.")]
+    [Range(1, 65535, ErrorMessage = "ValidationPortRange")]
     private int _remotePort = DefaultPorts.Rdp;
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Range(1, 65535, ErrorMessage = "Local tunnel port must be between 1 and 65535.")]
+    [Range(1, 65535, ErrorMessage = "ValidationLocalPortRange")]
     private int _localPort = DefaultPorts.RdpTunnel;
 
     [ObservableProperty]
@@ -342,7 +342,7 @@ public partial class ServerDialogViewModel : ObservableValidator
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Range(1, 65535, ErrorMessage = "WinRM port must be between 1 and 65535.")]
+    [Range(1, 65535, ErrorMessage = "ValidationWinRmPortRange")]
     private int _winRmPort = DefaultPorts.WinRmHttp;
 
     [ObservableProperty]
@@ -388,7 +388,7 @@ public partial class ServerDialogViewModel : ObservableValidator
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Range(1, 65535, ErrorMessage = "SSH port must be between 1 and 65535.")]
+    [Range(1, 65535, ErrorMessage = "ValidationSshPortRange")]
     private int _sshPort = DefaultPorts.Ssh;
 
     [ObservableProperty]
@@ -873,54 +873,102 @@ public partial class ServerDialogViewModel : ObservableValidator
     {
     }
 
+    /// <summary>
+    /// Builds the registry the agent chip probes. A seam over
+    /// <see cref="SshAgentRegistry.CreateDefault"/> so a test can stand in for the machine's
+    /// agents, which the real ones answer in their own time (a named pipe, a Pageant window).
+    /// </summary>
+    internal Func<SshAgentPreference, SshAgentRegistry> AgentRegistryFactory { get; set; } =
+        SshAgentRegistry.CreateDefault;
+
+    /// <summary>
+    /// Counts the probes started, so a result that arrives after a newer probe, or after the
+    /// protocol left the SSH family, is recognised as stale and dropped. Read and written on the
+    /// UI thread only.
+    /// </summary>
+    private int _agentProbeGeneration;
+
+    /// <summary>
+    /// Asks the agents what they hold and shows it on the chip. The probe, availability check
+    /// included, runs off the UI thread: an agent that does not answer used to freeze the dialog
+    /// every time it opened, was refreshed or changed protocol.
+    /// </summary>
     [RelayCommand]
-    private void RefreshAgentChip()
+    private async Task RefreshAgentChipAsync()
     {
         if (!IsSshFamilyConnection)
         {
-            AgentChipState = SshAgentChipState.Off;
-            AgentChipText = "";
+            ClearAgentChip();
             return;
         }
 
+        int generation = ++_agentProbeGeneration;
+        SshAgentPreference preference = _sshAgentPreference;
+        Func<SshAgentPreference, SshAgentRegistry> registryFactory = AgentRegistryFactory;
+
+        IReadOnlyList<(string Name, int KeyCount)>? agents;
         try
         {
-            SshAgentRegistry registry = SshAgentRegistry.CreateDefault(_sshAgentPreference);
-            (SshAgentChipState state, string text) = ProbeAgent(registry);
-            AgentChipState = state;
-            AgentChipText = text;
+            agents = await Task.Run(() => ProbeAgents(registryFactory(preference)));
         }
         catch (Exception ex)
         {
             FileLogger.Warn($"[ServerDialog] agent chip probe failed: {ex.Message}");
-            AgentChipState = SshAgentChipState.Off;
-            AgentChipText = L("ServerDialogAgentChipOff");
+            agents = null;
         }
+
+        // Back on the UI thread. A newer probe, or a protocol that left the SSH family while
+        // this one waited, owns the chip now.
+        if (generation != _agentProbeGeneration || !IsSshFamilyConnection)
+        {
+            return;
+        }
+
+        (SshAgentChipState state, string text) = agents is null
+            ? (SshAgentChipState.Off, L("ServerDialogAgentChipOff"))
+            : DescribeAgents(agents);
+        AgentChipState = state;
+        AgentChipText = text;
     }
 
     private void RefreshAgentChipIfNeeded()
     {
         if (IsSshFamilyConnection)
         {
-            RefreshAgentChip();
+            // Not awaited: the callers are property setters. A failure is logged here because
+            // nothing else would ever observe it.
+            _ = RefreshAgentChipAsync().ContinueWith(
+                probe => FileLogger.Warn(
+                    $"[ServerDialog] agent chip refresh failed: {probe.Exception?.GetBaseException().Message}"),
+                CancellationToken.None,
+                TaskContinuationOptions.OnlyOnFaulted,
+                TaskScheduler.Default);
             return;
         }
 
+        ClearAgentChip();
+    }
+
+    private void ClearAgentChip()
+    {
+        _agentProbeGeneration++;
         AgentChipState = SshAgentChipState.Off;
         AgentChipText = "";
     }
 
-    private (SshAgentChipState State, string Text) ProbeAgent(SshAgentRegistry registry)
+    /// <summary>The available agents and how many identities each holds. Blocking; run off the UI thread.</summary>
+    private static IReadOnlyList<(string Name, int KeyCount)> ProbeAgents(SshAgentRegistry registry) =>
+        registry.GetAvailableAgents()
+            .Select(agent => (agent.Name, KeyCount: SafeGetIdentityCount(agent)))
+            .ToList();
+
+    private (SshAgentChipState State, string Text) DescribeAgents(IReadOnlyList<(string Name, int KeyCount)> counts)
     {
-        IReadOnlyList<ISshAgent> availableAgents = registry.GetAvailableAgents();
-        if (availableAgents.Count == 0)
+        if (counts.Count == 0)
         {
             return (SshAgentChipState.Off, L("ServerDialogAgentChipOff"));
         }
 
-        List<(string Name, int KeyCount)> counts = availableAgents
-            .Select(agent => (agent.Name, KeyCount: SafeGetIdentityCount(agent)))
-            .ToList();
         int totalKeys = counts.Sum(agent => agent.KeyCount);
         if (totalKeys == 0)
         {
@@ -991,7 +1039,7 @@ public partial class ServerDialogViewModel : ObservableValidator
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Range(1, 65535, ErrorMessage = "FTP port must be between 1 and 65535.")]
+    [Range(1, 65535, ErrorMessage = "ValidationFtpPortRange")]
     private int _ftpPort = 21;
 
     [ObservableProperty]
@@ -1038,7 +1086,7 @@ public partial class ServerDialogViewModel : ObservableValidator
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Range(1, 65535, ErrorMessage = "VNC port must be between 1 and 65535.")]
+    [Range(1, 65535, ErrorMessage = "ValidationVncPortRange")]
     private int _vncPort = DefaultPorts.Vnc;
 
     [ObservableProperty]
@@ -1170,7 +1218,7 @@ public partial class ServerDialogViewModel : ObservableValidator
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Range(0, 2, ErrorMessage = "Audio mode must be 0 (disabled), 1 (local), or 2 (remote).")]
+    [Range(0, 2, ErrorMessage = "ValidationAudioMode")]
     private int _rdpAudioMode;
 
     [ObservableProperty]
@@ -1188,13 +1236,13 @@ public partial class ServerDialogViewModel : ObservableValidator
     [ObservableProperty]
     [NotifyDataErrorInfo]
     [Range(RdpDisplayLimits.MinimumFixedDimension, RdpDisplayLimits.MaximumFixedWidth,
-        ErrorMessage = RdpDisplayLimits.FixedWidthRangeMessage)]
+        ErrorMessage = "ValidationRdpFixedWidthRange")]
     private int _rdpFixedWidth = DefaultRdpFixedWidth;
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
     [Range(RdpDisplayLimits.MinimumFixedDimension, RdpDisplayLimits.MaximumFixedHeight,
-        ErrorMessage = RdpDisplayLimits.FixedHeightRangeMessage)]
+        ErrorMessage = "ValidationRdpFixedHeightRange")]
     private int _rdpFixedHeight = DefaultRdpFixedHeight;
 
     [ObservableProperty]
@@ -1217,7 +1265,7 @@ public partial class ServerDialogViewModel : ObservableValidator
     [ObservableProperty]
     [NotifyDataErrorInfo]
     [Range(RdpDisplayLimits.MinimumColorDepth, RdpDisplayLimits.MaximumColorDepth,
-        ErrorMessage = RdpDisplayLimits.ColorDepthRangeMessage)]
+        ErrorMessage = "ValidationColorDepth")]
     private int _rdpColorDepth = RdpDisplayLimits.MaximumColorDepth;
 
     [ObservableProperty]
@@ -3001,24 +3049,6 @@ public partial class ServerDialogViewModel : ObservableValidator
         RaiseRdpResolutionProfileStateChanged();
     }
 
-    private static readonly Dictionary<string, string> ValidationKeyMap = new(StringComparer.Ordinal)
-    {
-        ["Display name is required."] = "ValidationDisplayNameRequired",
-        ["Display name cannot be empty."] = "ValidationDisplayNameEmpty",
-        ["Server address is required."] = "ValidationServerAddressRequired",
-        ["Server address cannot be empty."] = "ValidationServerAddressEmpty",
-        ["Port must be between 1 and 65535."] = "ValidationPortRange",
-        ["Local tunnel port must be between 1 and 65535."] = "ValidationLocalPortRange",
-        ["SSH port must be between 1 and 65535."] = "ValidationSshPortRange",
-        ["WinRM port must be between 1 and 65535."] = "ValidationWinRmPortRange",
-        ["Audio mode must be 0 (disabled), 1 (local), or 2 (remote)."] = "ValidationAudioMode",
-        [RdpDisplayLimits.ColorDepthRangeMessage] = "ValidationColorDepth",
-        [RdpDisplayLimits.FixedWidthRangeMessage] = "ValidationRdpFixedWidthRange",
-        [RdpDisplayLimits.FixedHeightRangeMessage] = "ValidationRdpFixedHeightRange",
-        ["FTP port must be between 1 and 65535."] = "ValidationFtpPortRange",
-        ["VNC port must be between 1 and 65535."] = "ValidationVncPortRange",
-    };
-
     /// <summary>
     /// The host field's error. A web host must also form an address with its port and path: a URL
     /// pasted into the host field is the usual way it does not, and is said so here rather than at
@@ -3072,21 +3102,21 @@ public partial class ServerDialogViewModel : ObservableValidator
             .OfType<System.ComponentModel.DataAnnotations.ValidationResult>()
             .FirstOrDefault();
 
+        // The attribute carries a locale key, not a sentence, so the comparison below is by key
+        // and no English text exists to drift from the catalogue.
         string? message = error?.ErrorMessage;
-        if (message is not null && Localizer is not null
-            && ValidationKeyMap.TryGetValue(message, out string? key))
+        if (message is null || Localizer is null)
         {
-            return Localizer[key];
+            return message;
         }
 
-        if (message is not null && Localizer is not null
-            && ValidationKeyByDeclaredSetting.TryGetValue(message, out string? declaredKey))
+        if (ValidationKeyByDeclaredSetting.TryGetValue(message, out string? declaredKey))
         {
             SettingRange range = SettingRanges.Of(message);
             return Localizer.Format(declaredKey, range.Min, range.Max);
         }
 
-        return message;
+        return Localizer[message];
     }
 }
 

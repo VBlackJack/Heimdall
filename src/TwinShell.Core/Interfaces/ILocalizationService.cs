@@ -53,14 +53,6 @@ public interface ILocalizationService
     string GetString(string key);
 
     /// <summary>
-    /// Gets a localized string with fallback
-    /// </summary>
-    /// <param name="key">The resource key</param>
-    /// <param name="fallback">Fallback value if key not found</param>
-    /// <returns>Localized string or fallback</returns>
-    string GetString(string key, string fallback);
-
-    /// <summary>
     /// Gets a formatted localized string with parameters
     /// </summary>
     /// <param name="key">The resource key</param>

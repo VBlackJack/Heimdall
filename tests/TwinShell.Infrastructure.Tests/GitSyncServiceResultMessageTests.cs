@@ -139,9 +139,6 @@ public sealed class GitSyncServiceResultMessageTests
         public string GetString(string key)
             => key;
 
-        public string GetString(string key, string fallback)
-            => key;
-
         public string GetFormattedString(string key, params object[] args)
             => string.Join(
                 ArgumentSeparator,

@@ -390,16 +390,31 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
     /// screen reader does not read.
     /// </para>
     /// </remarks>
-    public string AccessibleName => Format(
-        IsShared ? "SessionTreeServerAccessibleNameShared"
-        : IsFavorite ? "SessionTreeServerAccessibleNameFavorite"
-        : "SessionTreeServerAccessibleName",
-        DisplayName,
-        ProtocolDisplayName,
-        StatusShowsConnectionState
-            ? ConnectionStateDisplayName
-            : HealthTooltipText,
-        SharedSourceName);
+    public string AccessibleName
+    {
+        get
+        {
+            string key = IsShared ? "SessionTreeServerAccessibleNameShared"
+                : IsFavorite ? "SessionTreeServerAccessibleNameFavorite"
+                : "SessionTreeServerAccessibleName";
+
+            // A screen reader must never be handed a locale key. Without the sentence to put the
+            // name in, the row still has its own identity to announce.
+            if (_localizer?.HasKey(key) != true)
+            {
+                return DisplayName;
+            }
+
+            return Format(
+                key,
+                DisplayName,
+                ProtocolDisplayName,
+                StatusShowsConnectionState
+                    ? ConnectionStateDisplayName
+                    : HealthTooltipText,
+                SharedSourceName);
+        }
+    }
 
     /// <summary>Localized keyboard guidance exposed to UI Automation clients.</summary>
     /// <remarks>
@@ -409,7 +424,10 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
     /// Enter, F2 and Shift+F10 are just as invisible. Folders announced their two gestures while
     /// the rows carrying the custom ones announced nothing.
     /// </remarks>
-    public string? AccessibleHelpText => T("SessionTreeServerAccessibleHelp");
+    public string? AccessibleHelpText =>
+        _localizer?.HasKey("SessionTreeServerAccessibleHelp") == true
+            ? _localizer["SessionTreeServerAccessibleHelp"]
+            : null;
 
     /// <summary>
     /// Hover text for the row: its full name, then what the row does not print.
@@ -839,7 +857,7 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
         OnPropertyChanged(nameof(RowTooltipText));
     }
 
-    private string T(string key) => _localizer?.HasKey(key) == true ? _localizer[key] : Fallback(key);
+    private string T(string key) => _localizer?.HasKey(key) == true ? _localizer[key] : key;
 
     private string Format(string key, params object[] args)
     {
@@ -848,48 +866,8 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
             return _localizer.Format(key, args);
         }
 
-        var template = Fallback(key);
-        return string.Format(System.Globalization.CultureInfo.InvariantCulture, template, args);
+        return key;
     }
-
-    private static string Fallback(string key) => key switch
-    {
-        "SessionGatewayBadgeVia" => "via {0}",
-        "SessionGatewayBadgeMissing" => "gateway missing",
-        "SessionGatewayBadgeTooltipVia" => "Routes through SSH gateway {0}.",
-        "SessionGatewayBadgeTooltipMissing" => "This session references missing SSH gateway id {0}.",
-        "SessionGatewayMissingDetail" => "Missing gateway ({0})",
-        "SessionAuthUsername" => "Username",
-        "SessionAuthSshKey" => "SSH key",
-        "SessionAuthPassword" => "Password",
-        "SessionAuthNoneSaved" => "No saved credentials",
-        "SessionAuthCurrentUser" => "Current user",
-        "SessionAuthSshAgent" => "SSH agent",
-        "SessionAuthCredentialProvider" => "Credential provider",
-        "PropertiesLatencyValue" => "{0} ms",
-        "SessionTreeServerAccessibleName" => "{0}, protocol {1}, state {2}",
-        "SessionTreeServerAccessibleNameFavorite" => "{0}, favorite, protocol {1}, state {2}",
-        "SessionTreeServerAccessibleHelp" =>
-            "Session. Enter opens it, F2 renames it, Ctrl+Space adds it to or removes it from the selection, Shift+Up and Shift+Down extend the selection, Ctrl+A selects every visible session, Alt+Up and Alt+Down move it within its folder, Shift+F10 lists the actions.",
-        "SessionTreeRowTooltipHost" => "Host: {0}",
-        "SessionTreeRowTooltipUser" => "User: {0}",
-        "SessionTreeRowTooltipProtocol" => "Protocol: {0}",
-        "SessionTreeRowTooltipGateway" => "Gateway: {0}",
-        "SessionTreeServerAccessibleNameShared" => "{0}, shared from {3}, read-only, protocol {1}, state {2}",
-        "SessionTreeSharedReadOnlyTooltip" => "Read-only: shared from {0}. Edit these sessions in MobaXterm.",
-        "SessionStatusConnected" => "Connected",
-        "SessionStatusConnecting" => "Connecting...",
-        "SessionStatusDisconnected" => "Disconnected",
-        "SessionStatusDisconnecting" => "Disconnecting...",
-        "SessionStatusError" => "Error",
-        "SessionTreeProtocolTool" => "Tool",
-        "SessionTreeSearchContext" => "{0} \u00B7 {1}",
-        "StatusLaunchedExternalClient" => "External client launched",
-        "StatusLaunchedExternalClientTooltip" => "The external client was launched.",
-        "StatusRemoteSessionHandedOff" => "Session started",
-        "StatusRemoteSessionHandedOffTooltip" => "The remote session was handed off to its client.",
-        _ => key
-    };
 
     private string BuildAuthSummary(ServerProfileDto dto)
     {
