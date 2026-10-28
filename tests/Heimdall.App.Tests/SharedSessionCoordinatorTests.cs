@@ -145,7 +145,7 @@ public sealed partial class SessionCoordinatorPreMountTests
         // The approval is the user's, kept locally; the shared profile itself is never written.
         AppSettings saved = await harness.Main.ConfigManager.LoadSettingsAsync();
         Assert.Equal(
-            PostConnectFingerprint.Compute(shared.Profile.PostConnectSteps),
+            SharedPostConnectTrust.ApprovalFingerprint(shared.Profile),
             saved.SharedPostConnectApprovals[shared.Profile.Id]);
         Assert.Empty(await harness.Main.ConfigManager.LoadServersAsync());
     }
