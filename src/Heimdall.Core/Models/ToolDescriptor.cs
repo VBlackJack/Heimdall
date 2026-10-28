@@ -46,4 +46,20 @@ public sealed record ToolDescriptor(
     /// The prefixed tool type string used in connection type fields, e.g. "TOOL:PING".
     /// </summary>
     public string ToolType => $"TOOL:{Id}";
+
+    /// <summary>
+    /// The tool's display name in the language of the session.
+    /// </summary>
+    /// <param name="localize">Resolves a locale key to its text.</param>
+    /// <remarks>
+    /// For a built-in tool <see cref="LabelKey"/> is a locale key. For a tool detected on the
+    /// machine (<see cref="ExternalProviderName"/> set) it is the product's own name, such as
+    /// "Autorunsc", which no locale defines: looked up as a key it would miss, be logged as a
+    /// missing translation, and only then fall back to itself. Such a name is returned as is.
+    /// </remarks>
+    public string ResolveLabel(Func<string, string> localize)
+    {
+        ArgumentNullException.ThrowIfNull(localize);
+        return ExternalProviderName is null ? localize(LabelKey) : LabelKey;
+    }
 }

@@ -1085,7 +1085,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
         }
 
         var descriptor = _toolRegistry.GetById(ToolRegistry.CommandLibraryToolId);
-        string title = descriptor is null ? ToolRegistry.CommandLibraryToolId : _localizer[descriptor.LabelKey];
+        string title = descriptor is null ? ToolRegistry.CommandLibraryToolId : descriptor.ResolveLabel(_localizer.GetString);
         try
         {
             await callback(ToolRegistry.CommandLibraryToolId, title, context);

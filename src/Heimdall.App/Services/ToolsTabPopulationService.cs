@@ -123,7 +123,7 @@ public sealed class ToolsTabPopulationService
         ArgumentNullException.ThrowIfNull(vm);
         ArgumentNullException.ThrowIfNull(descriptor);
 
-        var name = vm.Localize(descriptor.LabelKey);
+        var name = descriptor.ResolveLabel(vm.Localize);
         var aliases = string.Join(' ', descriptor.CommandPrefixes);
         return new SidebarToolItemViewModel
         {
@@ -303,7 +303,7 @@ public sealed class ToolsTabPopulationService
         string? lastCategory = null;
         var sorted = _toolRegistry.All
             .OrderBy(d => d.Category)
-            .ThenBy(d => vm.Localize(d.LabelKey), StringComparer.OrdinalIgnoreCase);
+            .ThenBy(d => d.ResolveLabel(vm.Localize), StringComparer.OrdinalIgnoreCase);
 
         WrapPanel? currentWrap = null;
 
@@ -313,7 +313,7 @@ public sealed class ToolsTabPopulationService
         {
             if (hasFilter)
             {
-                var label = vm.Localize(descriptor.LabelKey);
+                var label = descriptor.ResolveLabel(vm.Localize);
                 var aliases = string.Join(" ", descriptor.CommandPrefixes);
                 var descKey = descriptor.DescriptionKey ?? $"ToolDesc{descriptor.Id}";
                 var descText = vm.Localize(descKey);
@@ -530,7 +530,7 @@ public sealed class ToolsTabPopulationService
 
         var nameBlock = new TextBlock
         {
-            Text = vm.Localize(descriptor.LabelKey),
+            Text = descriptor.ResolveLabel(vm.Localize),
             FontSize = (double)Application.Current.FindResource("FontSizeBody"),
             FontWeight = FontWeights.SemiBold,
             TextTrimming = TextTrimming.CharacterEllipsis
@@ -631,7 +631,7 @@ public sealed class ToolsTabPopulationService
             ToolTip = descBlock.Text.Length > 0 ? descBlock.Text : null,
             Template = btnTemplate
         };
-        AutomationProperties.SetName(launchButton, vm.Localize(descriptor.LabelKey));
+        AutomationProperties.SetName(launchButton, descriptor.ResolveLabel(vm.Localize));
         launchButton.Click += (_, _) => onCardClick(descriptor);
 
         var cardBorder = new Border
@@ -750,6 +750,6 @@ public sealed class ToolsTabPopulationService
             return string.Format(vm.Localize(descriptor.LabelWithArgKey), context.TargetHost);
         }
 
-        return vm.Localize(descriptor.LabelKey);
+        return descriptor.ResolveLabel(vm.Localize);
     }
 }

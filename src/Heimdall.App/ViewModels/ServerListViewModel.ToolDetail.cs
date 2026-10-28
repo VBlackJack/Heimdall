@@ -37,7 +37,7 @@ public partial class ServerListViewModel
 
     /// <summary>The selected tool's display name, or empty when no tool is selected.</summary>
     public string ToolDetailName =>
-        SelectedToolDescriptor is { } tool ? LocalizeOrRaw(tool.LabelKey) : "";
+        SelectedToolDescriptor is { } tool ? tool.ResolveLabel(LocalizeOrRaw) : "";
 
     /// <summary>The selected tool's category label, or empty when no tool is selected.</summary>
     public string ToolDetailCategory =>
