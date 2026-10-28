@@ -70,12 +70,8 @@ Direct references from the shipped projects under `src/`.
 | Microsoft.Extensions.DependencyInjection | 10.0.9 | MIT |
 | Microsoft.Extensions.DependencyInjection.Abstractions | 10.0.9 | MIT |
 | Microsoft.Extensions.Logging.Abstractions | 10.0.9 | MIT |
-| Polly | 8.2.1 | BSD-3-Clause |
 | SQLitePCLRaw.bundle_e_sqlite3 | 3.0.5 | Apache-2.0 |
 | SSH.NET | 2026.0.0 | MIT |
-| Serilog | 3.1.1 | Apache-2.0 |
-| Serilog.Sinks.Console | 5.0.1 | Apache-2.0 |
-| Serilog.Sinks.File | 5.0.0 | Apache-2.0 |
 | System.Management | 10.0.9 | MIT |
 | System.Security.Cryptography.ProtectedData | 10.0.11 | MIT |
 | ThemeForge.Theme | 2.1.0 | Apache-2.0 |
