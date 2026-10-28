@@ -376,7 +376,7 @@ public sealed class DefaultCredentialScanner : ICredentialScanner
                     $"(echo -e \"USER {InputValidator.EscapeForDoubleQuotedString(user)}\\r\\nPASS {InputValidator.EscapeForDoubleQuotedString(pass)}\\r\\nQUIT\\r\\n\" | nc -w 5 {InputValidator.EscapeShellArg(host)} {port} 2>/dev/null)";
                 var result = await ExecuteTunnelCommandAsync(ftpScript, DefaultCredentialEngine.ConnectTimeoutMs, ct)
                     .ConfigureAwait(false);
-                return result.Contains("230", StringComparison.Ordinal);
+                return DefaultCredentialEngine.IsFtpLoginAccepted(result);
             }
 
             using var tcp = new TcpClient();
@@ -395,7 +395,7 @@ public sealed class DefaultCredentialScanner : ICredentialScanner
             var read = await stream.ReadAsync(buffer, linked.Token).ConfigureAwait(false);
             var response = Encoding.ASCII.GetString(buffer, 0, read);
 
-            return response.Contains("230", StringComparison.Ordinal);
+            return DefaultCredentialEngine.IsFtpLoginAccepted(response);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -564,13 +564,7 @@ public sealed class DefaultCredentialScanner : ICredentialScanner
             var buffer = new byte[1024];
             var read = await stream.ReadAsync(buffer, linked.Token).ConfigureAwait(false);
 
-            if (read > 0 && buffer[0] == (byte)'R' && read >= 9)
-            {
-                var authType = System.Net.IPAddress.NetworkToHostOrder(BitConverter.ToInt32(buffer, 5));
-                return authType == 0;
-            }
-
-            return false;
+            return DefaultCredentialEngine.IsPostgresAuthenticationOk(buffer, read);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -691,27 +685,15 @@ public sealed class DefaultCredentialScanner : ICredentialScanner
 
             var buffer = new byte[256];
             var read = await stream.ReadAsync(buffer, linked.Token).ConfigureAwait(false);
-            var version = Encoding.ASCII.GetString(buffer, 0, read);
-            if (!version.StartsWith("RFB", StringComparison.Ordinal))
+            if (!DefaultCredentialEngine.TryParseVncBanner(buffer, read, out var serverMinor))
             {
                 return false;
             }
 
-            await stream.WriteAsync(buffer.AsMemory(0, read), linked.Token).ConfigureAwait(false);
+            await stream.WriteAsync(DefaultCredentialEngine.BuildVncVersionReply(serverMinor), linked.Token)
+                .ConfigureAwait(false);
             read = await stream.ReadAsync(buffer, linked.Token).ConfigureAwait(false);
-            if (read > 0)
-            {
-                var numTypes = buffer[0];
-                for (var i = 1; i <= numTypes && i < read; i++)
-                {
-                    if (buffer[i] == 1)
-                    {
-                        return true;
-                    }
-                }
-            }
-
-            return false;
+            return DefaultCredentialEngine.IsVncNoAuthOffered(buffer, read, serverMinor);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {

@@ -184,6 +184,10 @@ public static class JsonSchemaValidator
             },
             "isHidden": {
                 "type": "boolean"
+            },
+            "modifiedAt": {
+                "type": ["string", "null"],
+                "format": "date-time"
             }
         },
         "additionalProperties": false
@@ -541,6 +545,10 @@ public static class JsonSchemaValidator
                         },
                         "actionId": {
                             "type": ["string", "null"]
+                        },
+                        "actionPublicId": {
+                            "type": ["string", "null"],
+                            "format": "uuid"
                         },
                         "actionTitle": {
                             "type": "string",

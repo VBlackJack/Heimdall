@@ -32,9 +32,30 @@ public static class NtlmProbe
     private const ushort CommandNegotiate = 0x0000;
     private const ushort CommandSessionSetup = 0x0001;
 
+    private const int SmbPort = 445;
+    private const int Smb2HeaderSize = 64;
+    private const uint Smb2StatusSuccess = 0;
+    private const int Smb2StatusOffset = 8;
+    private const ushort Smb2NegotiateStructureSize = 65;
+    private const int MinNegotiateResponseLength = Smb2HeaderSize + 0x40;
+    private const int SecurityBufferOffsetField = 68;
+    private const int SecurityBufferLengthField = 70;
+    private const int MinSessionSetupResponseLength = 73;
+
     // NTLMSSP constants
     private static readonly byte[] NtlmsspSignature =
         [0x4E, 0x54, 0x4C, 0x4D, 0x53, 0x53, 0x50, 0x00]; // "NTLMSSP\0"
+
+    // Type 2 (Challenge) layout: signature(8) type(4) TargetName fields(8) flags(4) challenge(8)
+    // reserved(8) TargetInfo fields(8) version(8) payload.
+    private const uint NtlmMessageTypeChallenge = 2;
+    private const int NtlmMessageTypeField = 8;
+    private const int MinNtlmType2Length = 32;
+    private const int NtlmTargetInfoLengthField = 40;
+    private const int NtlmTargetInfoOffsetField = 44;
+    private const int NtlmTargetInfoFieldsEnd = 48;
+    private const int NtlmVersionField = 48;
+    private const int NtlmVersionEnd = 56;
 
     /// <summary>
     /// Probes a host on port 445 (SMB) to extract NTLM challenge information.
@@ -51,16 +72,26 @@ public static class NtlmProbe
     /// Probes SMB2 and returns both NTLM challenge info and SMB2 Negotiate metadata
     /// (dialect, signing, server GUID, uptime).
     /// </summary>
-    public static async Task<(NtlmInfo? Ntlm, SmbNegotiateInfo? Smb)> ProbeWithSmbInfoAsync(
-        string host, int timeoutMs, CancellationToken ct)
+    public static Task<(NtlmInfo? Ntlm, SmbNegotiateInfo? Smb)> ProbeWithSmbInfoAsync(
+        string host, int timeoutMs, CancellationToken ct) =>
+        ProbeWithSmbInfoOnPortAsync(host, SmbPort, timeoutMs, ct);
+
+    /// <summary>
+    /// The probe against an explicit port, so a test can stand a server up on loopback.
+    /// </summary>
+    internal static async Task<(NtlmInfo? Ntlm, SmbNegotiateInfo? Smb)> ProbeWithSmbInfoOnPortAsync(
+        string host, int port, int timeoutMs, CancellationToken ct)
     {
+        // Declared outside the try: what the Negotiate reply already told us survives a
+        // failure of the Session Setup exchange that follows it.
+        SmbNegotiateInfo? smbInfo = null;
         try
         {
             using var client = new TcpClient();
             using var cts = new CancellationTokenSource(timeoutMs);
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, cts.Token);
 
-            await client.ConnectAsync(host, 445, linked.Token).ConfigureAwait(false);
+            await client.ConnectAsync(host, port, linked.Token).ConfigureAwait(false);
             var stream = client.GetStream();
             stream.ReadTimeout = timeoutMs;
 
@@ -74,7 +105,7 @@ public static class NtlmProbe
             if (negResp[0] != 0xFE || negResp[1] != (byte)'S') return (null, null);
 
             // Parse SMB2 Negotiate Response (body starts at offset 64)
-            var smbInfo = ParseNegotiateResponse(negResp);
+            smbInfo = ParseNegotiateResponse(negResp);
 
             // Step 2: Session Setup with NTLMSSP Type 1
             var ntlmType1 = BuildNtlmsspType1();
@@ -82,27 +113,37 @@ public static class NtlmProbe
             var sessionSetup = BuildSmb2SessionSetup(spnego);
             await SendNetBiosMessage(stream, sessionSetup, linked.Token).ConfigureAwait(false);
             var setupResp = await ReadNetBiosMessage(stream, linked.Token).ConfigureAwait(false);
-            if (setupResp is null || setupResp.Length < 73) return (null, smbInfo);
+            if (setupResp is null) return (null, smbInfo);
 
-            // Extract security buffer from Session Setup response
-            var secBufferOffset = BitConverter.ToUInt16(setupResp, 68);
-            var secBufferLen = BitConverter.ToUInt16(setupResp, 70);
-            if (secBufferOffset + secBufferLen > setupResp.Length) return (null, smbInfo);
-
-            var secBuffer = setupResp.AsSpan(secBufferOffset, secBufferLen);
-
-            // Find NTLMSSP Type 2 inside SPNEGO wrapper
-            var ntlmType2 = FindNtlmsspMessage(secBuffer);
-            if (ntlmType2 is null) return (null, smbInfo);
-
-            return (ParseNtlmType2(ntlmType2), smbInfo);
+            return (ParseSessionSetupResponse(setupResp), smbInfo);
         }
         catch (Exception ex)
         {
             Logging.FileLogger.Log("DEBUG",
                 $"NTLM probe failed for {host}: {ex.GetType().Name}: {ex.Message}");
-            return (null, null);
+            return (null, smbInfo);
         }
+    }
+
+    /// <summary>
+    /// Extracts the NTLMSSP Type 2 message from an SMB2 Session Setup response and parses it.
+    /// Returns null when the response carries no usable challenge.
+    /// </summary>
+    internal static NtlmInfo? ParseSessionSetupResponse(byte[] setupResp)
+    {
+        // Header (64) + fixed body up to and including SecurityBufferLength (8) + 1 buffer byte.
+        if (setupResp.Length < MinSessionSetupResponseLength) return null;
+
+        // Extract security buffer from Session Setup response
+        var secBufferOffset = BitConverter.ToUInt16(setupResp, SecurityBufferOffsetField);
+        var secBufferLen = BitConverter.ToUInt16(setupResp, SecurityBufferLengthField);
+        if (secBufferOffset + secBufferLen > setupResp.Length) return null;
+
+        var secBuffer = setupResp.AsSpan(secBufferOffset, secBufferLen);
+
+        // Find NTLMSSP Type 2 inside SPNEGO wrapper
+        var ntlmType2 = FindNtlmsspMessage(secBuffer);
+        return ntlmType2 is null ? null : ParseNtlmType2(ntlmType2);
     }
 
     private static byte[] BuildSmb2Negotiate()
@@ -270,34 +311,49 @@ public static class NtlmProbe
     /// <summary>
     /// Parses NTLMSSP Type 2 (Challenge) message to extract TargetInfo AV_PAIRs.
     /// </summary>
+    /// <remarks>
+    /// The message comes from the host being probed, so every offset and length in it is hostile
+    /// until bounded. They are read as unsigned and compared in 64 bits: a signed offset let a
+    /// negative value past the bounds check and made the read throw, and the exception discarded
+    /// everything the probe had already learned. A malformed TargetInfo block now costs only that
+    /// block; the OS build from the version field is kept.
+    /// </remarks>
     internal static NtlmInfo? ParseNtlmType2(byte[] data)
     {
         // Minimum Type 2: signature(8) + type(4) + targetNameFields(8) + flags(4) + challenge(8) = 32
-        if (data.Length < 32) return null;
-        if (BitConverter.ToUInt32(data, 8) != 2) return null; // Not Type 2
+        if (data.Length < MinNtlmType2Length) return null;
+        if (!data.AsSpan(0, NtlmsspSignature.Length).SequenceEqual(NtlmsspSignature)) return null;
+        if (BitConverter.ToUInt32(data, NtlmMessageTypeField) != NtlmMessageTypeChallenge) return null; // Not Type 2
 
         // TargetInfo fields at offset 40 (if present)
-        if (data.Length < 48) return new NtlmInfo(null, null, null, null, null, null);
-        var targetInfoLen = BitConverter.ToUInt16(data, 40);
-        var targetInfoOffset = BitConverter.ToInt32(data, 44);
-        if (targetInfoOffset + targetInfoLen > data.Length)
-            return new NtlmInfo(null, null, null, null, null, null);
+        if (data.Length < NtlmTargetInfoFieldsEnd) return new NtlmInfo(null, null, null, null, null, null);
+
+        var osBuild = ReadOsBuild(data);
+        var targetInfoLen = (long)BitConverter.ToUInt16(data, NtlmTargetInfoLengthField);
+        var targetInfoOffset = (long)BitConverter.ToUInt32(data, NtlmTargetInfoOffsetField);
+        var targetInfoEnd = targetInfoOffset + targetInfoLen;
+        if (targetInfoLen == 0
+            || targetInfoOffset < NtlmTargetInfoFieldsEnd
+            || targetInfoEnd > data.Length)
+        {
+            return new NtlmInfo(null, null, null, null, null, osBuild);
+        }
 
         // Parse AV_PAIR structures with strict bounds checking
         string? nbComputer = null, nbDomain = null;
         string? dnsComputer = null, dnsDomain = null, dnsForest = null;
 
-        var offset = targetInfoOffset;
-        var endOffset = targetInfoOffset + targetInfoLen;
-        while (offset + 4 <= endOffset && offset + 4 <= data.Length)
+        var offset = (int)targetInfoOffset;
+        var endOffset = (int)targetInfoEnd;
+        while (offset + 4 <= endOffset)
         {
             var avId = BitConverter.ToUInt16(data, offset);
             var avLen = BitConverter.ToUInt16(data, offset + 2);
             offset += 4;
             if (avId == 0) break; // MsvAvEOL
-            if (avLen > endOffset - offset || offset + avLen > data.Length) break;
+            if (avLen > endOffset - offset) break;
 
-            var value = Encoding.Unicode.GetString(data, offset, avLen);
+            var value = ReplyText.Clean(Encoding.Unicode.GetString(data, offset, avLen));
             switch (avId)
             {
                 case 1: nbComputer = value; break;  // MsvAvNbComputerName
@@ -309,30 +365,38 @@ public static class NtlmProbe
             offset += avLen;
         }
 
-        // Attempt to extract OS build from target name (in the main TargetName field)
-        string? osBuild = null;
-        if (data.Length >= 56)
-        {
-            // Version field at offset 48: Major(1) Minor(1) Build(2) Revision(1) NTLMRevision(1)
-            var major = data[48];
-            var minor = data[49];
-            var build = BitConverter.ToUInt16(data, 50);
-            if (major > 0 && build > 0)
-                osBuild = $"{major}.{minor}.{build}";
-        }
-
         return new NtlmInfo(nbComputer, nbDomain, dnsComputer, dnsDomain, dnsForest, osBuild);
+    }
+
+    /// <summary>
+    /// Reads the OS build from the Version field: Major(1) Minor(1) Build(2) Reserved(3) NTLMRevision(1).
+    /// </summary>
+    private static string? ReadOsBuild(byte[] data)
+    {
+        if (data.Length < NtlmVersionEnd) return null;
+
+        var major = data[NtlmVersionField];
+        var minor = data[NtlmVersionField + 1];
+        var build = BitConverter.ToUInt16(data, NtlmVersionField + 2);
+        return major > 0 && build > 0 ? $"{major}.{minor}.{build}" : null;
     }
 
     /// <summary>
     /// Parses the SMB2 Negotiate Response body to extract dialect, signing,
     /// server GUID, system time, and server start time.
     /// </summary>
-    private static SmbNegotiateInfo? ParseNegotiateResponse(byte[] data)
+    internal static SmbNegotiateInfo? ParseNegotiateResponse(byte[] data)
     {
         // Body starts at offset 64 (SMB2 header size)
-        const int bodyOff = 64;
-        if (data.Length < bodyOff + 0x40) return null;
+        const int bodyOff = Smb2HeaderSize;
+        if (data.Length < MinNegotiateResponseLength) return null;
+
+        // Only a successful SMB2 Negotiate response has this body. An error response (or any
+        // other reply that merely starts with the SMB2 magic) would be read as a GUID,
+        // dialect and signing mode that the host never reported.
+        if (!data.AsSpan(0, Smb2Magic.Length).SequenceEqual(Smb2Magic)) return null;
+        if (BitConverter.ToUInt32(data, Smb2StatusOffset) != Smb2StatusSuccess) return null;
+        if (BitConverter.ToUInt16(data, bodyOff) != Smb2NegotiateStructureSize) return null;
 
         var securityMode = BitConverter.ToUInt16(data, bodyOff + 0x02);
         var dialect = BitConverter.ToUInt16(data, bodyOff + 0x04);

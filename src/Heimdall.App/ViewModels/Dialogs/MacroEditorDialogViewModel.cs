@@ -40,6 +40,15 @@ public sealed record MacroTimeoutActionOption(
     ExpectTimeoutAction Action,
     string Label);
 
+/// <summary>
+/// Why a macro input could not be decoded, as a locale key and the values its text names. The
+/// escaper has no localizer, so it hands the sentence's identity to the caller instead of
+/// writing the sentence in English.
+/// </summary>
+/// <param name="Key">The locale key of the message.</param>
+/// <param name="Arguments">The values the message's format slots take, in slot order.</param>
+public sealed record MacroInputError(string Key, params object[] Arguments);
+
 public partial class MacroEditorDialogViewModel : ObservableObject
 {
     private readonly TerminalMacro _source;
@@ -274,13 +283,15 @@ public partial class MacroEntryEditorViewModel : ObservableObject
 
     public bool TryBuildEntry(out MacroEntry entry, out string? error)
     {
-        if (!MacroInputEscaper.TryDecode(InputText, out var input, out error))
+        if (!MacroInputEscaper.TryDecode(InputText, out var input, out var inputError))
         {
+            error = DescribeInputError(inputError!);
             InputValidationMessage = error;
             entry = new MacroEntry();
             return false;
         }
 
+        error = null;
         InputValidationMessage = null;
 
         if (RegexValidationMessage is { } regexError)
@@ -300,6 +311,19 @@ public partial class MacroEntryEditorViewModel : ObservableObject
             ExpectOnTimeout = ExpectOnTimeout
         };
         return true;
+    }
+
+    private string DescribeInputError(MacroInputError inputError)
+    {
+        var fallback = inputError.Key switch
+        {
+            MacroInputEscaper.TrailingEscapeKey => "Trailing escape marker.",
+            MacroInputEscaper.HexDigitsRequiredKey => @"\x escape requires two hexadecimal digits.",
+            MacroInputEscaper.UnsupportedEscapeKey => @"Unsupported escape sequence: \{0}.",
+            _ => inputError.Key
+        };
+
+        return string.Format(CultureInfo.CurrentCulture, T(inputError.Key, fallback), inputError.Arguments);
     }
 
     partial void OnExpectIsRegexChanged(bool value)
@@ -332,6 +356,10 @@ public partial class MacroEntryEditorViewModel : ObservableObject
 
 public static class MacroInputEscaper
 {
+    internal const string TrailingEscapeKey = "MacroEditorEscapeTrailing";
+    internal const string HexDigitsRequiredKey = "MacroEditorEscapeHexDigitsRequired";
+    internal const string UnsupportedEscapeKey = "MacroEditorEscapeUnsupported";
+
     public static string Encode(string input)
     {
         ArgumentNullException.ThrowIfNull(input);
@@ -371,7 +399,7 @@ public static class MacroInputEscaper
         return builder.ToString();
     }
 
-    public static bool TryDecode(string text, out string decoded, out string? error)
+    public static bool TryDecode(string text, out string decoded, out MacroInputError? error)
     {
         ArgumentNullException.ThrowIfNull(text);
 
@@ -388,7 +416,7 @@ public static class MacroInputEscaper
             if (index == text.Length - 1)
             {
                 decoded = string.Empty;
-                error = "Trailing escape marker.";
+                error = new MacroInputError(TrailingEscapeKey);
                 return false;
             }
 
@@ -411,7 +439,7 @@ public static class MacroInputEscaper
                     if (index + 2 >= text.Length)
                     {
                         decoded = string.Empty;
-                        error = @"\x escape requires two hexadecimal digits.";
+                        error = new MacroInputError(HexDigitsRequiredKey);
                         return false;
                     }
 
@@ -419,7 +447,7 @@ public static class MacroInputEscaper
                     if (!byte.TryParse(hex, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var value))
                     {
                         decoded = string.Empty;
-                        error = @"\x escape requires two hexadecimal digits.";
+                        error = new MacroInputError(HexDigitsRequiredKey);
                         return false;
                     }
 
@@ -428,7 +456,7 @@ public static class MacroInputEscaper
                     break;
                 default:
                     decoded = string.Empty;
-                    error = $"Unsupported escape sequence: \\{next}.";
+                    error = new MacroInputError(UnsupportedEscapeKey, next.ToString());
                     return false;
             }
         }

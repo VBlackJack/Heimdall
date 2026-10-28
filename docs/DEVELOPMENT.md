@@ -20,7 +20,7 @@ temporary workflow notes out of it.
 
 Heimdall is a .NET 10 WPF Windows connection manager for RDP, SSH, SFTP,
 VNC, Telnet, FTP, Citrix, and local shell sessions. The app uses MVVM via
-CommunityToolkit.Mvvm, SSH.NET 2025.1.0 for SSH/SFTP, WebView2 for embedded
+CommunityToolkit.Mvvm, SSH.NET 2026.0.0 for SSH/SFTP, WebView2 for embedded
 terminals and VNC, and DPAPI + HMAC-SHA256 for local credential protection.
 
 The solution file is `Heimdall.slnx`. Source projects live under `src/` and
@@ -208,13 +208,15 @@ inside `Build.ps1 -Mode Release`.
 ## Localization And I18n
 
 The interface ships in English, French and Spanish. Each catalogue under `locales/`
-holds the same 7,423 keys, and `LocaleCatalogueParityTests` enforces that in both
+holds the same 7,400+ keys, and `LocaleCatalogueParityTests` enforces that in both
 directions and across format placeholders. Adding a language is a documented
 checklist in [CONTRIBUTING.md](../CONTRIBUTING.md).
 
-The key count is quoted in six documents, and a test fails as soon as a key is added
-or removed. `scripts/Update-DocumentedKeyCount.ps1` writes the catalogue's count into
-all six; `-Check` only reports.
+The key count is quoted in six documents as a floor, the catalogue's count rounded down
+to the hundred and followed by a plus sign, so adding a few keys leaves them true. A test
+fails once the count crosses a hundred and the quoted figure is no longer that floor.
+`scripts/Update-DocumentedKeyCount.ps1` writes the figure into all six; `-Check` only
+reports.
 
 Key conventions:
 

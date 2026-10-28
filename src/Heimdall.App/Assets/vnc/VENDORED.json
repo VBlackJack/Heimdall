@@ -1,0 +1,28 @@
+{
+  "components": [
+    {
+      "name": "noVNC",
+      "version": "1.5.0",
+      "upstream": "https://github.com/novnc/noVNC",
+      "tree": {
+        "path": "core",
+        "fileCount": 40,
+        "sha256": "880fc73d6cf598548f87fc777c9501a1866dd436d7d75a749127bd400c3d062d"
+      }
+    },
+    {
+      "name": "pako",
+      "version": "1.0.3",
+      "upstream": "https://github.com/nodeca/pako",
+      "tree": {
+        "path": "vendor",
+        "fileCount": 14,
+        "sha256": "d10e78d4b50f0c47a201567cc1489acda8dac3c6031f8a75d1d0c07a93f95843"
+      }
+    }
+  ],
+  "completeDirectories": [
+    "."
+  ],
+  "ownedFiles": []
+}

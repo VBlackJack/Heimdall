@@ -619,6 +619,8 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
 
                     if (commitsMerged > 0)
                     {
+                        Commit preMergeTip = repo.Head.Tip;
+
                         // Pull (fetch + merge) and capture result
                         var mergeResult = Commands.Pull(repo, signature, new PullOptions
                         {
@@ -646,24 +648,25 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
 
                             _logger.LogWarning("Merge conflicts detected in {Count} files: {Files}",
                                 conflictedFiles.Count, string.Join(", ", conflictedFiles));
+
+                            // Left half-done, the next push staged the conflict markers and
+                            // committed a merge that reverted the remote side.
+                            TakeRemoteAfterConflict(repo, preMergeTip);
                         }
                     }
                 }
             }, cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
 
-            // If conflicts were detected, return with conflict information
-            if (hasConflicts && conflictedFiles != null && conflictedFiles.Count > 0)
+            // The branch now sits on the remote side: the import below brings it into the
+            // database (newer wins, a newer local entry is kept), and the export and push after
+            // it put the local entries back on top.
+            bool tookRemote = hasConflicts && conflictedFiles is { Count: > 0 };
+            if (tookRemote)
             {
                 RaiseStatusChanged(
-                    LF(MessageKeys.SyncMergeConflict, conflictedFiles.Count),
+                    LF(MessageKeys.SyncMergeConflict, conflictedFiles!.Count),
                     SyncPhase.DetectingConflicts);
-
-                var conflictResult = GitOperationResult.WithMergeConflicts(
-                    LF(MessageKeys.GitSyncResultMergeConflicts, conflictedFiles.Count),
-                    conflictedFiles);
-                await LogSyncOperationAsync(conflictResult, SyncOperationType.Pull, startedAt);
-                return conflictResult;
             }
 
             // Import YAML files into database
@@ -696,6 +699,29 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
                         Resolution = ConflictResolution.KeepLocal,
                     })
                     .ToList();
+
+                if (tookRemote)
+                {
+                    GitOperationResult pushResult = await ExportAndPushInternalAsync(null, cancellationToken);
+                    var resolvedResult = new GitOperationResult
+                    {
+                        Success = pushResult.Success,
+                        Message = pushResult.Success
+                            ? LF(MessageKeys.GitSyncResultMergeConflicts, conflictedFiles!.Count)
+                            : pushResult.Message,
+                        ErrorCode = pushResult.Success ? GitSyncErrorCode.None : pushResult.ErrorCode,
+                        ErrorDetails = pushResult.Success ? null : pushResult.ErrorDetails,
+                        ItemsImported = totalImported,
+                        ItemsUpdated = importResult.TotalUpdated,
+                        ItemsExported = pushResult.ItemsExported,
+                        CommitsMerged = commitsMerged,
+                        ConflictsDetected = keptLocal.Count,
+                        Conflicts = keptLocal,
+                        ConflictedFiles = conflictedFiles!
+                    };
+                    await LogSyncOperationAsync(resolvedResult, SyncOperationType.Pull, startedAt);
+                    return resolvedResult;
+                }
 
                 var successResult = new GitOperationResult
                 {
@@ -785,6 +811,21 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
             var failResult = GitOperationResult.Fail(
                 L(MessageKeys.GitSyncResultRepositoryNotInitialized),
                 GitSyncErrorCode.RepositoryNotInitialized);
+            await LogSyncOperationAsync(failResult, SyncOperationType.Push, startedAt);
+            return failResult;
+        }
+
+        // A repository in the middle of a merge, a rebase or a cherry-pick holds the other
+        // side's changes in its working tree: staging everything would commit them as ours.
+        CurrentOperation pendingOperation = ReadCurrentOperation(localPath);
+        if (pendingOperation != CurrentOperation.None)
+        {
+            RaiseStatusChanged(L(MessageKeys.GitSyncResultOperationInProgress), SyncPhase.Failed);
+            _logger.LogWarning("Push refused - the repository is in the middle of {Operation}", pendingOperation);
+            var failResult = GitOperationResult.Fail(
+                L(MessageKeys.GitSyncResultOperationInProgress),
+                GitSyncErrorCode.MergeConflict,
+                pendingOperation.ToString());
             await LogSyncOperationAsync(failResult, SyncOperationType.Push, startedAt);
             return failResult;
         }
@@ -1157,6 +1198,28 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
         }
 
         return status;
+    }
+
+    /// <summary>
+    /// After a merge that conflicted: aborts it (back to <paramref name="preMergeTip"/>, merge
+    /// state cleared), then moves the local branch to the remote one.
+    /// </summary>
+    /// <remarks>
+    /// The local commits this drops hold nothing the database does not: every file under the
+    /// sync folder is written by the export from the database, which the pull then re-exports
+    /// on top of the remote side.
+    /// </remarks>
+    private static void TakeRemoteAfterConflict(Repository repo, Commit preMergeTip)
+    {
+        repo.Reset(ResetMode.Hard, preMergeTip);
+        Commit remoteTip = repo.Head.TrackedBranch.Tip;
+        repo.Reset(ResetMode.Hard, remoteTip);
+    }
+
+    private static CurrentOperation ReadCurrentOperation(string localPath)
+    {
+        using Repository repo = new(localPath);
+        return repo.Info.CurrentOperation;
     }
 
     /// <summary>The prefix of a branch in a remote's reference list.</summary>

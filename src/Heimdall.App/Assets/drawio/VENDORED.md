@@ -72,3 +72,10 @@ edits above.
 
 Removing anything else needs a runtime test of the tool: open, edit, save,
 export PNG and SVG, shape picker, image picker, context menu.
+
+## Pinning
+
+Pinned in `VENDORED.json`: `js/app.min.js` individually, and a digest of the whole tree
+(every file except `heimdall-host.html`, which is Heimdall's own). After running
+`scripts/Vendor-DrawIo.ps1`, run `VendoredAssetManifestTests` and copy the values it prints
+into `VENDORED.json`. See "Pinning" in `../Tools/VENDORED.md`.

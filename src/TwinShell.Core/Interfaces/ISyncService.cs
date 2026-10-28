@@ -86,6 +86,9 @@ public sealed class SyncImportResult
     public int CategoriesUpdated { get; set; }
     public int CategoriesSkipped { get; set; }
 
+    /// <summary>Entries deleted here because the folder's tombstones say another install deleted them.</summary>
+    public int EntriesDeleted { get; set; }
+
     public List<string> Errors { get; set; } = new();
     public List<string> Warnings { get; set; } = new();
 

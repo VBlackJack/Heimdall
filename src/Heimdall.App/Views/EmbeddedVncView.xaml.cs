@@ -472,17 +472,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
 
         if (message.StartsWith("clipboard-write:", StringComparison.Ordinal))
         {
-            var b64 = message["clipboard-write:".Length..];
-            try
-            {
-                var text = System.Text.Encoding.UTF8.GetString(
-                    Convert.FromBase64String(b64));
-                Dispatcher.Invoke(() => Clipboard.SetText(text));
-            }
-            catch (FormatException)
-            {
-                // Invalid base64; ignore.
-            }
+            HandleClipboardWrite(message["clipboard-write:".Length..]);
             return;
         }
 
@@ -918,16 +908,28 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
     /// </summary>
     private void SendLocalClipboardToSession()
     {
-        Dispatcher.Invoke(() =>
-        {
-            if (Clipboard.ContainsText())
-            {
-                var text = Clipboard.GetText();
-                var b64 = Convert.ToBase64String(
-                    System.Text.Encoding.UTF8.GetBytes(text));
-                PostWebMessage($"clipboard-paste:{b64}");
-            }
-        });
+        string? text = VncClipboardAccess.TryGetText(Clipboard.ContainsText, Clipboard.GetText, LogClipboardFailure);
+        if (text is null) return;
+
+        var b64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(text));
+        PostWebMessage($"clipboard-paste:{b64}");
+    }
+
+    /// <summary>
+    /// Copies the text the session placed on its clipboard to the local one. Invalid base64 is ignored.
+    /// </summary>
+    private void HandleClipboardWrite(string base64)
+    {
+        string? text = VncClipboardAccess.DecodePayload(base64);
+        if (text is null) return;
+
+        Dispatcher.Invoke(() => VncClipboardAccess.TrySetText(Clipboard.SetText, text, LogClipboardFailure));
+    }
+
+    /// <summary>A clipboard held by another process is logged and nothing more: no dialog.</summary>
+    private static void LogClipboardFailure(Exception ex)
+    {
+        Core.Logging.FileLogger.Warn($"EmbeddedVNC clipboard access failed: {ex.Message}");
     }
 
     /// <summary>Sends the scaling mode the user picked to the page.</summary>

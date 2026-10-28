@@ -28,17 +28,19 @@ namespace TwinShell.Persistence.Seeding;
 /// <param name="Applied">False when the stored hash already matched and nothing was written.</param>
 /// <param name="Inserted">System actions that were not in the database before.</param>
 /// <param name="Updated">System actions rewritten in place from the new seed.</param>
-/// <param name="Removed">System actions the new seed no longer ships.</param>
+/// <param name="Removed">System actions deleted. Always 0 since retiring replaced deleting; kept for the log line's shape.</param>
 /// <param name="FavoritesRemoved">Favorites left pointing at no action, removed.</param>
+/// <param name="Retired">System actions the new seed no longer ships, kept and marked retired.</param>
 public sealed record SeedRefreshResult(
     bool Applied,
     int Inserted,
     int Updated,
     int Removed,
-    int FavoritesRemoved)
+    int FavoritesRemoved,
+    int Retired = 0)
 {
     /// <summary>The result of a refresh that found the seed unchanged.</summary>
-    public static SeedRefreshResult Unchanged { get; } = new(false, 0, 0, 0, 0);
+    public static SeedRefreshResult Unchanged { get; } = new(false, 0, 0, 0, 0, 0);
 }
 
 /// <summary>
@@ -57,9 +59,16 @@ public sealed record SeedRefreshResult(
 /// The replacement has the effect of deleting every action with <c>IsUserCreated = false</c>
 /// and inserting the new seed, but it is done row by row: an action whose id the new seed
 /// still ships is rewritten in place, so its favorites and its command history, which
-/// cascade from the action row, survive. Only an action the seed no longer ships is deleted,
-/// with its translations, its favorites and its history. Its public id and creation date are
-/// kept, because a sync folder knows the action by the former.
+/// cascade from the action row, survive. Its creation date is kept. Its public id, and its
+/// templates', is the one <see cref="SeedPublicIds"/> derives from the seed id, the same on
+/// every install, so a sync folder never sees one copy of the catalogue per teammate.
+/// </para>
+/// <para>
+/// An action the seed no longer ships is never deleted: the row stays, marked
+/// <c>IsRetired</c>, with its translations. Its history cascades from it, and runbook steps
+/// and server post-connect steps name it with no foreign key, so a delete lost the first and
+/// broke the others silently. The library hides it; a lookup by id still finds it. A retired
+/// action that a later seed ships again is rewritten like any other and comes back.
 /// </para>
 /// <para>
 /// User-created actions are never touched, except that one still carrying an old shipped
@@ -73,6 +82,12 @@ public sealed class SystemSeedRefresher
 {
     /// <summary>The <c>SeedState</c> key under which the applied hash is stored.</summary>
     public const string SeedHashKey = "SeedHash";
+
+    /// <summary>
+    /// The <c>SeedState</c> key under which the metadata fingerprint of the seed files is stored,
+    /// next to the hash. See <see cref="SeedCatalogueFingerprint"/>.
+    /// </summary>
+    public const string SeedFingerprintKey = "SeedFingerprint";
 
     private readonly TwinShellDbContext _context;
 
@@ -95,15 +110,50 @@ public sealed class SystemSeedRefresher
     }
 
     /// <summary>
+    /// Returns the metadata fingerprint stored with the applied hash, or null when none was
+    /// recorded (a database last seeded by a build that did not take one).
+    /// </summary>
+    public async Task<string?> ReadAppliedFingerprintAsync(CancellationToken cancellationToken = default)
+    {
+        SeedStateEntity? state = await _context.SeedStates
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Key == SeedFingerprintKey, cancellationToken);
+        return state?.Value;
+    }
+
+    /// <summary>
+    /// Stores <paramref name="seedFingerprint"/> as the fingerprint of the seed that is already
+    /// applied, so the next launch can skip reading the seed files.
+    /// </summary>
+    /// <remarks>
+    /// Only for a seed whose content hash equals the applied one: the pair (hash, fingerprint)
+    /// must always describe the same files. A refresh stores both in its own transaction.
+    /// </remarks>
+    public async Task RecordFingerprintAsync(string seedFingerprint, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(seedFingerprint);
+
+        await WriteStateAsync(SeedFingerprintKey, seedFingerprint, cancellationToken);
+        await _context.SaveChangesAsync(cancellationToken);
+        _context.ChangeTracker.Clear();
+    }
+
+    /// <summary>
     /// Replaces the system actions with <paramref name="seed"/> when
     /// <paramref name="seedHash"/> differs from the hash last applied.
     /// </summary>
     /// <param name="seed">The parsed seed actions, all system actions.</param>
     /// <param name="seedHash">The content hash of the seed directory they came from.</param>
+    /// <param name="seedFingerprint">
+    /// The metadata fingerprint of the same files, stored in the same transaction as the hash; null
+    /// stores none (and a fingerprint left from an earlier seed is dropped, since it no longer
+    /// describes the applied one).
+    /// </param>
     /// <param name="cancellationToken">Cancels before the commit.</param>
     public async Task<SeedRefreshResult> RefreshAsync(
         IReadOnlyList<ActionModel> seed,
         string seedHash,
+        string? seedFingerprint = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(seed);
@@ -120,7 +170,7 @@ public sealed class SystemSeedRefresher
 
         try
         {
-            SeedRefreshResult result = await ReplaceSystemActionsAsync(seed, seedHash, cancellationToken);
+            SeedRefreshResult result = await ReplaceSystemActionsAsync(seed, seedHash, seedFingerprint, cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return result;
         }
@@ -138,6 +188,7 @@ public sealed class SystemSeedRefresher
     private async Task<SeedRefreshResult> ReplaceSystemActionsAsync(
         IReadOnlyList<ActionModel> seed,
         string seedHash,
+        string? seedFingerprint,
         CancellationToken cancellationToken)
     {
         List<ActionEntity> stored = await _context.Actions.ToListAsync(cancellationToken);
@@ -176,13 +227,13 @@ public sealed class SystemSeedRefresher
         foreach (ActionModel action in incoming)
         {
             action.IsUserCreated = false;
+            action.PublicId = SeedPublicIds.ForAction(action.Id);
             ActionEntity entity = ActionMapper.ToEntity(action);
             translations.AddRange(entity.Translations);
             entity.Translations = new();
 
             if (systemActions.TryGetValue(action.Id, out ActionEntity? existing))
             {
-                entity.PublicId = existing.PublicId;
                 entity.CreatedAt = existing.CreatedAt;
                 _context.Entry(existing).CurrentValues.SetValues(entity);
                 updated++;
@@ -197,27 +248,46 @@ public sealed class SystemSeedRefresher
         List<ActionEntity> retired = systemActions.Values
             .Where(a => !incomingIds.Contains(a.Id))
             .ToList();
-        _context.Actions.RemoveRange(retired);
+        foreach (ActionEntity action in retired)
+        {
+            action.IsRetired = true;
+        }
 
-        List<string> touchedIds = systemActions.Keys.Union(incomingIds, StringComparer.Ordinal).ToList();
+        // A retired action keeps its translations: its history is read in the operator's
+        // language like any other.
+        List<string> touchedIds = systemActions.Keys
+            .Union(incomingIds, StringComparer.Ordinal)
+            .Except(retired.Select(a => a.Id), StringComparer.Ordinal)
+            .ToList();
         await _context.ActionTranslations
             .Where(t => touchedIds.Contains(t.ActionId))
             .ExecuteDeleteAsync(cancellationToken);
         _context.ActionTranslations.AddRange(translations);
 
-        await WriteHashAsync(seedHash, cancellationToken);
+        await WriteStateAsync(SeedHashKey, seedHash, cancellationToken);
+        if (seedFingerprint is not null)
+        {
+            await WriteStateAsync(SeedFingerprintKey, seedFingerprint, cancellationToken);
+        }
+        else
+        {
+            await _context.SeedStates
+                .Where(s => s.Key == SeedFingerprintKey)
+                .ExecuteDeleteAsync(cancellationToken);
+        }
+
         await _context.SaveChangesAsync(cancellationToken);
 
         await RemoveOrphanTemplatesAsync(oldSystemTemplateIds, incomingTemplates.Keys, cancellationToken);
         await MigrateUserCategoriesAsync(cancellationToken);
 
-        // The action delete cascades to favorites in the database; this covers a database
-        // whose foreign keys were not enforced when the rows were written.
+        // A favorite whose action is gone; this covers a database whose foreign keys were not
+        // enforced when the rows were written.
         int favoritesRemoved = await _context.UserFavorites
             .Where(f => !_context.Actions.Any(a => a.Id == f.ActionId))
             .ExecuteDeleteAsync(cancellationToken);
 
-        return new SeedRefreshResult(true, inserted, updated, retired.Count, favoritesRemoved);
+        return new SeedRefreshResult(true, inserted, updated, 0, favoritesRemoved, retired.Count);
     }
 
     private async Task UpsertTemplatesAsync(
@@ -231,10 +301,9 @@ public sealed class SystemSeedRefresher
 
         foreach ((string id, CommandTemplateEntity template) in incomingTemplates)
         {
+            template.PublicId = SeedPublicIds.ForTemplate(id);
             if (existing.TryGetValue(id, out CommandTemplateEntity? current))
             {
-                // A sync folder references a template by its public id: keep it.
-                template.PublicId = current.PublicId;
                 _context.Entry(current).CurrentValues.SetValues(template);
             }
             else
@@ -273,17 +342,17 @@ public sealed class SystemSeedRefresher
         }
     }
 
-    private async Task WriteHashAsync(string seedHash, CancellationToken cancellationToken)
+    private async Task WriteStateAsync(string key, string value, CancellationToken cancellationToken)
     {
         SeedStateEntity? state = await _context.SeedStates
-            .FirstOrDefaultAsync(s => s.Key == SeedHashKey, cancellationToken);
+            .FirstOrDefaultAsync(s => s.Key == key, cancellationToken);
         if (state is null)
         {
-            _context.SeedStates.Add(new SeedStateEntity { Key = SeedHashKey, Value = seedHash });
+            _context.SeedStates.Add(new SeedStateEntity { Key = key, Value = value });
         }
         else
         {
-            state.Value = seedHash;
+            state.Value = value;
         }
     }
 }

@@ -16,6 +16,7 @@
 
 using System.Globalization;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace Heimdall.Core.Discovery;
 
@@ -72,6 +73,23 @@ public static class SmbEnumerationEngine
     }
 
     /// <summary>
+    /// The text after the first colon of a <c>label : value</c> line, cleaned; null when the line
+    /// has no colon or nothing after it. Without that a label alone (<c>server_name</c>) was
+    /// returned as the value.
+    /// </summary>
+    private static string? ValueAfterColon(string line)
+    {
+        var colon = line.IndexOf(':');
+        return colon < 0 ? null : ReplyText.Clean(line[(colon + 1)..]);
+    }
+
+    /// <summary>Six hexadecimal pairs separated by hyphens or colons.</summary>
+    private static readonly Regex MacAddressPattern = new(
+        "^([0-9A-Fa-f]{2}[-:]){5}[0-9A-Fa-f]{2}$",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled,
+        TimeSpan.FromMilliseconds(100));
+
+    /// <summary>
     /// Parses the stdout of the three tunnel commands into a structured observation record.
     /// </summary>
     public static SmbTunnelObservations ParseTunnelOutputs(
@@ -101,10 +119,13 @@ public static class SmbEnumerationEngine
                     continue;
                 }
 
-                domain = ExtractBracketedValue(trimmed, "Domain") ?? domain;
-                osInfo = ExtractBracketedValue(trimmed, "OS") ?? osInfo;
-                serverName = ExtractBracketedValue(trimmed, "Server") ?? serverName;
-                hasAnyData = true;
+                var lineDomain = ReplyText.Clean(ExtractBracketedValue(trimmed, "Domain"));
+                var lineOs = ReplyText.Clean(ExtractBracketedValue(trimmed, "OS"));
+                var lineServer = ReplyText.Clean(ExtractBracketedValue(trimmed, "Server"));
+                domain = lineDomain ?? domain;
+                osInfo = lineOs ?? osInfo;
+                serverName = lineServer ?? serverName;
+                hasAnyData |= lineDomain is not null || lineOs is not null || lineServer is not null;
             }
         }
 
@@ -116,14 +137,16 @@ public static class SmbEnumerationEngine
                 var trimmed = line.Trim();
                 if (trimmed.Contains("server_name", StringComparison.OrdinalIgnoreCase))
                 {
-                    rpcServerName = trimmed.Split(':').LastOrDefault()?.Trim() ?? rpcServerName;
-                    hasAnyData = true;
+                    var value = ValueAfterColon(trimmed);
+                    rpcServerName = value ?? rpcServerName;
+                    hasAnyData |= value is not null;
                 }
                 else if (trimmed.Contains("os_version", StringComparison.OrdinalIgnoreCase)
                     || trimmed.Contains("os version", StringComparison.OrdinalIgnoreCase))
                 {
-                    rpcOsVersion = trimmed.Split(':').LastOrDefault()?.Trim() ?? rpcOsVersion;
-                    hasAnyData = true;
+                    var value = ValueAfterColon(trimmed);
+                    rpcOsVersion = value ?? rpcOsVersion;
+                    hasAnyData |= value is not null;
                 }
             }
         }
@@ -137,7 +160,12 @@ public static class SmbEnumerationEngine
                 if (trimmed.Contains("<00>", StringComparison.OrdinalIgnoreCase)
                     && !trimmed.StartsWith("MAC", StringComparison.OrdinalIgnoreCase))
                 {
-                    var namePart = trimmed.Split('<')[0].Trim();
+                    var namePart = ReplyText.Clean(trimmed.Split('<')[0]);
+                    if (namePart is null)
+                    {
+                        continue;
+                    }
+
                     if (trimmed.Contains("<GROUP>", StringComparison.OrdinalIgnoreCase))
                     {
                         netBiosDomain ??= namePart;
@@ -151,8 +179,13 @@ public static class SmbEnumerationEngine
                 }
                 else if (trimmed.StartsWith("MAC Address", StringComparison.OrdinalIgnoreCase))
                 {
-                    macAddress = trimmed.Split('=').LastOrDefault()?.Trim() ?? macAddress;
-                    hasAnyData = true;
+                    var separator = trimmed.IndexOf('=');
+                    var candidate = separator < 0 ? null : trimmed[(separator + 1)..].Trim();
+                    if (candidate is not null && MacAddressPattern.IsMatch(candidate))
+                    {
+                        macAddress = candidate;
+                        hasAnyData = true;
+                    }
                 }
             }
         }

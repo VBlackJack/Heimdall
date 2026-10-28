@@ -226,6 +226,7 @@ public static class MessageKeys
     public const string GitSyncResultRepositoryNotInitialized = "ToolCmdLibSyncResultRepositoryNotInitialized";
     public const string GitSyncResultExportFailed = "ToolCmdLibSyncResultExportFailed";
     public const string GitSyncResultNothingToPush = "ToolCmdLibSyncResultNothingToPush";
+    public const string GitSyncResultOperationInProgress = "ToolCmdLibSyncResultOperationInProgress";
     public const string GitSyncResultPushed = "ToolCmdLibSyncResultPushed";
     public const string GitSyncResultPushRejected = "ToolCmdLibSyncResultPushRejected";
     public const string GitSyncResultPushRejectedDetails = "ToolCmdLibSyncResultPushRejectedDetails";

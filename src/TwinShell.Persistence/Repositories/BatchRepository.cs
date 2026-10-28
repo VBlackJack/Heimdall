@@ -111,6 +111,12 @@ public sealed class BatchRepository : IBatchRepository
 
         if (entity != null)
         {
+            // A user runbook's delete reaches the other installs through its sync tombstone.
+            if (entity.IsUserCreated)
+            {
+                await SyncTombstoneRepository.RecordAsync(_context, entity.PublicId, DateTime.UtcNow);
+            }
+
             _context.CommandBatches.Remove(entity);
             await _context.SaveChangesAsync();
         }

@@ -162,7 +162,7 @@ public sealed partial class CertInspectorViewModel : ObservableObject, IDisposab
             var probeResult = await prober.ProbeAsync(host, port, _cts.Token);
             if (probeResult is null)
             {
-                SetError(string.Format(Lk("ToolCertErrorConnection"), "No certificate received"));
+                SetError(string.Format(Lk("ToolCertErrorConnection"), Lk("ToolCertErrorNoCertificate")));
                 return;
             }
 

@@ -130,7 +130,7 @@ intermittent or permanent.
 
 ## Why these tests are flaky on the runner only
 
-Four distinct root causes share the same symptom (`TaskCanceledException`,
+Five distinct root causes share the same symptom (`TaskCanceledException`,
 `OperationCanceledException`, or `WaitUntil` timeouts):
 
 1. **Named-pipe handshake latency** - `OpenSshPipeAgentTests` create a
@@ -160,10 +160,20 @@ Four distinct root causes share the same symptom (`TaskCanceledException`,
    take longer than the test's timeout to become true (the wait loop polls
    every 10 ms and throws `TimeoutException` past the deadline). Bumping the
    timeout further only delays the failure window without eliminating it.
+5. **Process-spawning timeouts** - `UpdateRelaunchScriptExecutionTests` runs the
+   updater's generated script under Windows PowerShell 5.1 and PowerShell 7, and
+   `WinRmLaunchExitGuardExecutionTests` runs the WinRM launch guard in a
+   pseudo-console. On the runner the updater tests stall intermittently, and the
+   stall ends at the 60-second bound with an empty stdout and an empty stderr.
+   That signature is a Windows PowerShell 5.1 cold start that never gets going,
+   not a failing assertion. The 60-second bound is a backstop paid only on a
+   stall and is not to be widened: a wider bound turns the stall into a slow
+   green run and removes the evidence (see *Reading terminal wait latency in a
+   CI log*). The backlog item BL-0067 exists for this family.
 
 ## Currently tagged `CIUnstable`
 
-There are 11 `[Trait("Category", "CIUnstable")]` sites in the solution: 8 on
+There are 22 `[Trait("Category", "CIUnstable")]` sites in the solution: 19 on
 individual test methods and 3 on whole classes. Every site is listed below.
 
 | Test | File | Categories |
@@ -173,9 +183,20 @@ individual test methods and 3 on whole classes. Every site is listed below.
 | `OpenSshPipeAgentTests.AgentKeySign_SendsFlagsAndReturnsSignature` | `tests/Heimdall.Ssh.Tests/OpenSshPipeAgentTests.cs` | `CIUnstable` |
 | `ConPtySessionTests.StartAsync_LaunchesShell_DeliversInitialTerminalOutput` | `tests/Heimdall.Terminal.Tests/ConPtySessionTests.cs` | `CIUnstable` |
 | `ConPtySessionTests.DataReceived_SubscriberAddedAfterBootstrapOutput_ReplaysBufferedOutput` | `tests/Heimdall.Terminal.Tests/ConPtySessionTests.cs` | `CIUnstable` |
+| `ConPtySessionTests.StartAsync_InteractiveShell_OutlivesTheWindowAndWritesMoreThanThePreamble` | `tests/Heimdall.Terminal.Tests/ConPtySessionTests.cs` | `CIUnstable` |
 | `DnsLookupViewModelTests.CancelCommand_UserCancellation_ClearsStatusWithoutError` | `tests/Heimdall.App.Tests/DnsLookupViewModelTests.cs` | `CIUnstable` |
 | `WhoisLookupViewModelTests.CancelCommand_UserCancellation_ClearsStatusWithoutError` | `tests/Heimdall.App.Tests/WhoisLookupViewModelTests.cs` | `CIUnstable` |
 | `TcpPingViewModelTests.StartCommand_MixedResults_PreservesFailedLineAndSummary` | `tests/Heimdall.App.Tests/TcpPingViewModelTests.cs` | `CIUnstable` |
+| `UpdateRelaunchScriptExecutionTests.Execute_InstallerSucceeds_RunsInstallerAndRelaunches` | `tests/Heimdall.App.Tests/Services/UpdateRelaunchScriptExecutionTests.cs` | `CIUnstable` |
+| `UpdateRelaunchScriptExecutionTests.Execute_StagingDirectoryNotEmpty_IsRemovedAndTheHostExitsCleanly` | `tests/Heimdall.App.Tests/Services/UpdateRelaunchScriptExecutionTests.cs` | `CIUnstable` |
+| `UpdateRelaunchScriptExecutionTests.Execute_ApplicationStillRunning_RefusesToInstallAndRecordsTheStage` | `tests/Heimdall.App.Tests/Services/UpdateRelaunchScriptExecutionTests.cs` | `CIUnstable` |
+| `UpdateRelaunchScriptExecutionTests.Bootstrap_RunsTheEmittedScript_ThroughTheProductionArguments` | `tests/Heimdall.App.Tests/Services/UpdateRelaunchScriptExecutionTests.cs` | `CIUnstable` |
+| `UpdateRelaunchScriptExecutionTests.Bootstrap_ScriptChangedAfterHashing_RefusesAndStillRelaunches` | `tests/Heimdall.App.Tests/Services/UpdateRelaunchScriptExecutionTests.cs` | `CIUnstable` |
+| `UpdateRelaunchScriptExecutionTests.Bootstrap_ScriptThatDoesNotParse_StillRelaunches` | `tests/Heimdall.App.Tests/Services/UpdateRelaunchScriptExecutionTests.cs` | `CIUnstable` |
+| `UpdateRelaunchScriptExecutionTests.Execute_InstallerExitsNonZero_WritesTheFailureRecordAndStillRelaunches` | `tests/Heimdall.App.Tests/Services/UpdateRelaunchScriptExecutionTests.cs` | `CIUnstable` |
+| `UpdateRelaunchScriptExecutionTests.Execute_InstallerSucceeds_WritesNoFailureRecord` | `tests/Heimdall.App.Tests/Services/UpdateRelaunchScriptExecutionTests.cs` | `CIUnstable` |
+| `WinRmLaunchExitGuardExecutionTests.CurrentUserLaunch_EndsAtFirstLocalPrompt` | `tests/Heimdall.App.Tests/WinRmLaunchExitGuardExecutionTests.cs` | `CIUnstable` |
+| `WinRmLaunchExitGuardExecutionTests.CredentialBootstrap_EndsAtFirstLocalPrompt` | `tests/Heimdall.App.Tests/WinRmLaunchExitGuardExecutionTests.cs` | `CIUnstable` |
 | `HmacGeneratorSmokeTests` (class tag, 6 tests) | `tests/Heimdall.App.UiTests/Pilots/HmacGeneratorSmokeTests.cs` | `CIUnstable` + `RequiresDesktop` |
 | `TextDiffSmokeTests` (class tag, 7 tests) | `tests/Heimdall.App.UiTests/Pilots/TextDiffSmokeTests.cs` | `CIUnstable` + `RequiresDesktop` |
 | `HashGeneratorSmokeTests` (class tag, 5 tests) | `tests/Heimdall.App.UiTests/Pilots/HashGeneratorSmokeTests.cs` | `CIUnstable` + `RequiresDesktop` |
@@ -185,10 +206,33 @@ test methods additionally carries `RequiresDesktop`, so they are excluded by
 either half of the blocking filter. The other `Pilots/*SmokeTests` classes carry
 only `RequiresDesktop` and are not part of this inventory.
 
+`UpdateRelaunchScriptExecutionTests` (8 theories, one case per PowerShell host)
+and `WinRmLaunchExitGuardExecutionTests` (2 theories) spawn a real PowerShell
+child and wait for it with a 60-second bound. See root cause 5 below.
+
+`CiUnstableInventoryGuardTests` keeps this table honest: it scans the test
+sources for every `[Trait("Category", "CIUnstable")]` and fails when a tagged
+site is missing from this page or from its French mirror, when this page lists
+a test that is not tagged, when the counts above are wrong, and when the scan
+stops reaching a test project. A new `CIUnstable` tag therefore needs its row
+here in the same commit.
+
 `OpenSshPipeAgentTests.IsAvailable_NoServer_ReturnsFalse` is intentionally
 NOT tagged: it is a negative-path test that asserts a 25 ms
 availability probe fires when no server is listening, and that path is
 not affected by the runner latency.
+
+### The tagged tests still run on the release box
+
+The tag takes a test out of the blocking CI pass, not out of the release.
+`Build.ps1 -Mode Release` runs `dotnet test` over the whole solution with no
+category filter (the guard test above fails if a `--filter` ever appears
+there), so the release box runs every test in this table, and a failure there
+stops the release unless `-SkipTests` was passed. The informational lanes of CI
+and the release box are two different oracles: the first is read for trends and
+never gates, the second gates. The informational lane results of the release
+commit are also written into the generated release notes by the release
+preflight (see `scripts/InformationalLaneReport.ps1`).
 
 ## Flakiness fixed by rewriting instead of tagging
 

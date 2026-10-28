@@ -429,28 +429,29 @@ public static class SnmpCodec
             return (offset - start, null);
         }
 
-        int length;
+        // The declared length is the sender's. It is accumulated in 64 bits and bounded by what is
+        // left in the buffer: as an int it wrapped negative on a four-byte length, and
+        // offset + length wrapped negative with it, so the clamp below never ran and a 64 KB datagram
+        // could ask for a two-gigabyte array.
+        long declared;
         if ((data[offset] & 0x80) == 0)
         {
-            length = data[offset];
+            declared = data[offset];
             offset++;
         }
         else
         {
             var lengthBytes = data[offset] & 0x7F;
             offset++;
-            length = 0;
+            declared = 0;
             for (var i = 0; i < lengthBytes && offset < data.Length; i++)
             {
-                length = (length << 8) | data[offset];
+                declared = Math.Min((declared << 8) | data[offset], int.MaxValue);
                 offset++;
             }
         }
 
-        if (offset + length > data.Length)
-        {
-            length = data.Length - offset;
-        }
+        var length = (int)Math.Min(declared, data.Length - offset);
 
         var value = new byte[length];
         Array.Copy(data, offset, value, 0, length);
