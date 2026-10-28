@@ -3,7 +3,8 @@
 
 cd /d "%~dp0"
 dotnet test Heimdall.slnx --verbosity normal
-if %ERRORLEVEL% NEQ 0 (
+set RC=%ERRORLEVEL%
+if %RC% NEQ 0 (
     echo.
     echo Tests FAILED.
 ) else (
@@ -11,3 +12,4 @@ if %ERRORLEVEL% NEQ 0 (
     echo All tests passed.
 )
 pause
+exit /b %RC%

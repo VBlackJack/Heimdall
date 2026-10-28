@@ -166,6 +166,14 @@ jobs:
           ./scripts/Test-NativeCommandLogging.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      # Pure batch and PowerShell. Build.bat and Test.bat ended in a bare `pause`, which
+      # succeeds, so a red build or test run left them exiting 0 for any caller.
+      - name: Check the batch files pass their failure on
+        shell: pwsh
+        run: |
+          ./scripts/Test-BatchExitCodes.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       # The verdict of the npm audit step below, on recorded npm audit JSON shapes and
       # on the recorded real report. Pure PowerShell, no network, no node.
       - name: Check the npm audit verdict

@@ -3,8 +3,10 @@
 
 cd /d "%~dp0"
 powershell -ExecutionPolicy Bypass -File Build.ps1
-if %ERRORLEVEL% NEQ 0 (
+set RC=%ERRORLEVEL%
+if %RC% NEQ 0 (
     echo.
     echo Build FAILED.
 )
 pause
+exit /b %RC%
