@@ -6127,6 +6127,7 @@
   "PaletteToolNotesWith": "Notes : {0}",
   "ToolNotesTitle": "Notes de Travail",
   "ToolNotesListTitle": "Notes Markdown",
+  "ToolNotesEditorLoading": "Chargement de l'\u00e9diteur...",
   "A11yNoteTreeNoteRow": "Note {0}, {1}",
   "A11yNoteTreeFolderRow": "Dossier {0}",
   "A11yNoteContent": "Contenu de la note : {0}",

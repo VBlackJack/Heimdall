@@ -23,10 +23,11 @@ namespace Heimdall.App.Views.Dialogs;
 
 public partial class MacroEditorDialog : Window
 {
-    private readonly LocalizationManager? _localizer;
+    private readonly LocalizationManager _localizer;
 
-    public MacroEditorDialog(LocalizationManager? localizer = null)
+    public MacroEditorDialog(LocalizationManager localizer)
     {
+        ArgumentNullException.ThrowIfNull(localizer);
         _localizer = localizer;
         InitializeComponent();
         WindowThemeHelper.ApplyCurrentTheme(this);
@@ -49,11 +50,10 @@ public partial class MacroEditorDialog : Window
             return;
         }
 
-        var title = _localizer?["MacroEditorDeleteConfirmTitle"] ?? "Delete macro";
-        var message = _localizer?["MacroEditorDeleteConfirmMessage"]
-            ?? "Delete this macro? This cannot be undone.";
-        var yes = _localizer?["BtnDelete"] ?? "Delete";
-        var no = _localizer?["BtnCancel"] ?? "Cancel";
+        var title = _localizer["MacroEditorDeleteConfirmTitle"];
+        var message = _localizer["MacroEditorDeleteConfirmMessage"];
+        var yes = _localizer["BtnDelete"];
+        var no = _localizer["BtnCancel"];
         if (!MessageDialog.ShowDestructiveConfirm(this, title, message, yes, no))
         {
             return;
