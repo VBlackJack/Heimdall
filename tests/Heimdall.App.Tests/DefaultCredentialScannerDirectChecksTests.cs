@@ -63,6 +63,27 @@ public class DefaultCredentialScannerDirectChecksTests
         Assert.False(listener.Pending(), "a check that tests nothing should send nothing");
     }
 
+    [Theory]
+    [InlineData("MySQL", true)]
+    [InlineData("PostgreSQL", true)]
+    [InlineData("MSSQL", true)]
+    [InlineData("SSH", false)]
+    [InlineData("Redis", false)]
+    public void BuildGatewaySqlCommand_IsBuiltForTheSqlServicesOnly(string service, bool built)
+    {
+        string? command = DefaultCredentialScanner.BuildGatewaySqlCommand(service, "db.example.test", 1433, "sa", "p'w");
+
+        Assert.Equal(built, command is not null);
+    }
+
+    [Fact]
+    public void BuildGatewaySqlCommand_AQuoteInThePassword_StaysInsideItsArgument()
+    {
+        string command = DefaultCredentialScanner.BuildGatewaySqlCommand("MySQL", "h", 3306, "root", "a'; touch /tmp/x; '")!;
+
+        Assert.DoesNotContain("a'; touch", command, StringComparison.Ordinal);
+    }
+
     private static async Task GreetAndRejectAsync(TcpListener listener, CancellationToken ct)
     {
         try

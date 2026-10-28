@@ -62,6 +62,9 @@ public sealed class DefaultCredentialScanner : ICredentialScanner
     private SshClient? _tunnelClient;
     private SemaphoreSlim? _commandLock;
 
+    /// <summary>The result of the query the gateway SQL clients run: a login is proved by it.</summary>
+    private const string GatewaySqlExpectedLine = "1";
+
     public DefaultCredentialScanner(SshGatewayDto? gateway = null)
     {
         _gateway = gateway;
@@ -115,6 +118,22 @@ public sealed class DefaultCredentialScanner : ICredentialScanner
                 await EnsureTunnelAsync(ct).ConfigureAwait(false);
             }
 
+            if (_tunnelClient is not null)
+            {
+                string? gatewayCommand = BuildGatewaySqlCommand(service, host, port, user, pass);
+                if (gatewayCommand is not null)
+                {
+                    return new CredTestResultDto
+                    {
+                        Service = service,
+                        Port = port,
+                        Username = user,
+                        Password = pass,
+                        Status = await TestGatewaySqlAsync(gatewayCommand, ct).ConfigureAwait(false),
+                    };
+                }
+            }
+
             var accepted = service switch
             {
                 "SSH" => await TestSshAsync(host, port, user, pass, ct).ConfigureAwait(false),
@@ -122,9 +141,7 @@ public sealed class DefaultCredentialScanner : ICredentialScanner
                 "HTTP" => await TestHttpBasicAsync(host, port, user, pass, ct).ConfigureAwait(false),
                 "FTP" => await TestFtpAsync(host, port, user, pass, ct).ConfigureAwait(false),
                 "SNMP" => await TestSnmpCommunityAsync(host, user, ct).ConfigureAwait(false),
-                "MySQL" => await TestMySqlAsync(host, port, user, pass, ct).ConfigureAwait(false),
                 "PostgreSQL" => await TestPostgreSqlAsync(host, port, user, pass, ct).ConfigureAwait(false),
-                "MSSQL" => await TestMsSqlAsync(host, port, user, pass, ct).ConfigureAwait(false),
                 "Redis" => await TestRedisAsync(host, port, ct).ConfigureAwait(false),
                 "VNC" => await TestVncAsync(host, port, pass, ct).ConfigureAwait(false),
                 _ => false,
@@ -442,10 +459,7 @@ public sealed class DefaultCredentialScanner : ICredentialScanner
                     DefaultCredentialEngine.ConnectTimeoutMs,
                     ct).ConfigureAwait(false);
 
-                return !result.Contains("incorrect", StringComparison.OrdinalIgnoreCase)
-                    && !result.Contains("failed", StringComparison.OrdinalIgnoreCase)
-                    && !result.Contains("denied", StringComparison.OrdinalIgnoreCase)
-                    && result.Length > 0;
+                return DefaultCredentialEngine.IsTelnetLoginAccepted(result);
             }
 
             using var tcp = new TcpClient();
@@ -471,10 +485,7 @@ public sealed class DefaultCredentialScanner : ICredentialScanner
             var read = await stream.ReadAsync(buffer, linked.Token).ConfigureAwait(false);
             var response = Encoding.ASCII.GetString(buffer, 0, read);
 
-            return !response.Contains("incorrect", StringComparison.OrdinalIgnoreCase)
-                && !response.Contains("failed", StringComparison.OrdinalIgnoreCase)
-                && !response.Contains("denied", StringComparison.OrdinalIgnoreCase)
-                && (response.Contains('$') || response.Contains('#') || response.Contains('>'));
+            return DefaultCredentialEngine.IsTelnetLoginAccepted(response);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -487,46 +498,50 @@ public sealed class DefaultCredentialScanner : ICredentialScanner
     }
 
     /// <summary>
-    /// Tests MySQL credentials through the gateway's mysql client. Without a gateway the check is
-    /// reported as not supported (see <see cref="TestCredentialAsync"/>).
+    /// The client command that logs in to the service from the gateway and selects
+    /// <see cref="GatewaySqlExpectedLine"/>, or null for a service tested another way.
     /// </summary>
-    private async Task<bool> TestMySqlAsync(
-        string host,
-        int port,
-        string user,
-        string pass,
-        CancellationToken ct)
+    internal static string? BuildGatewaySqlCommand(string service, string host, int port, string user, string pass)
     {
-        try
+        string safeHost = InputValidator.EscapeShellArg(host);
+        string safeUser = InputValidator.EscapeShellArg(user);
+        string safePass = InputValidator.EscapeShellArg(pass);
+        return service switch
         {
-            if (_tunnelClient is not null)
-            {
-                var mysqlCmd =
-                    $"mysql -h {InputValidator.EscapeShellArg(host)} -P {port} -u {InputValidator.EscapeShellArg(user)} --password={InputValidator.EscapeShellArg(pass)} -e \"SELECT 1\" 2>&1 | head -1";
-                var result = await ExecuteTunnelCommandAsync(
-                    mysqlCmd,
-                    DefaultCredentialEngine.ConnectTimeoutMs,
-                    ct).ConfigureAwait(false);
-
-                return !result.Contains("ERROR", StringComparison.OrdinalIgnoreCase)
-                    && !result.Contains("denied", StringComparison.OrdinalIgnoreCase);
-            }
-
-            // The direct check never reaches here: TestCredentialAsync reports it as not supported.
-            return false;
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch
-        {
-            return false;
-        }
+            "MySQL" =>
+                $"mysql -h {safeHost} -P {port} -u {safeUser} --password={safePass} -N -B -e \"SELECT {GatewaySqlExpectedLine}\"",
+            "PostgreSQL" =>
+                $"PGPASSWORD={safePass} psql -h {safeHost} -p {port} -U {safeUser} -tA -c \"SELECT {GatewaySqlExpectedLine}\"",
+            "MSSQL" =>
+                $"sqlcmd -S {InputValidator.EscapeShellArg(host + "," + port)} -U {safeUser} -P {safePass} -Q \"SET NOCOUNT ON; SELECT {GatewaySqlExpectedLine}\" -h -1 -W -t 5",
+            _ => null,
+        };
     }
 
     /// <summary>
-    /// Tests PostgreSQL credentials by sending a startup message.
+    /// Runs a gateway SQL client and reads its exit status and result. Default credentials only
+    /// when the client exited 0 and printed the query's result; a client that is not installed on
+    /// the gateway, or printed nothing, is not tested rather than accepted or rejected. A timeout
+    /// surfaces as an error through <see cref="TestCredentialAsync"/>.
+    /// </summary>
+    private async Task<CredTestStatus> TestGatewaySqlAsync(string command, CancellationToken ct)
+    {
+        string output = await ExecuteTunnelCommandAsync(
+            DefaultCredentialEngine.BuildTunnelQueryScript(command),
+            DefaultCredentialEngine.ConnectTimeoutMs,
+            ct).ConfigureAwait(false);
+
+        return DefaultCredentialEngine.ClassifyTunnelQuery(output, GatewaySqlExpectedLine) switch
+        {
+            TunnelQueryOutcome.Accepted => CredTestStatus.Default,
+            TunnelQueryOutcome.Rejected => CredTestStatus.Changed,
+            _ => CredTestStatus.NotSupported,
+        };
+    }
+
+    /// <summary>
+    /// Tests PostgreSQL credentials by sending a startup message. Through a gateway the
+    /// check is <see cref="TestGatewaySqlAsync"/>.
     /// </summary>
     private async Task<bool> TestPostgreSqlAsync(
         string host,
@@ -537,20 +552,6 @@ public sealed class DefaultCredentialScanner : ICredentialScanner
     {
         try
         {
-            if (_tunnelClient is not null)
-            {
-                var pgCmd =
-                    $"PGPASSWORD={InputValidator.EscapeShellArg(pass)} psql -h {InputValidator.EscapeShellArg(host)} -p {port} -U {InputValidator.EscapeShellArg(user)} -c \"SELECT 1\" 2>&1 | head -1";
-                var result = await ExecuteTunnelCommandAsync(
-                    pgCmd,
-                    DefaultCredentialEngine.ConnectTimeoutMs,
-                    ct).ConfigureAwait(false);
-
-                return !result.Contains("FATAL", StringComparison.OrdinalIgnoreCase)
-                    && !result.Contains("error", StringComparison.OrdinalIgnoreCase)
-                    && result.Length > 0;
-            }
-
             using var tcp = new TcpClient();
             using var timeout = new CancellationTokenSource(DefaultCredentialEngine.ConnectTimeoutMs);
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, timeout.Token);
@@ -573,46 +574,6 @@ public sealed class DefaultCredentialScanner : ICredentialScanner
             var read = await stream.ReadAsync(buffer, linked.Token).ConfigureAwait(false);
 
             return DefaultCredentialEngine.IsPostgresAuthenticationOk(buffer, read);
-        }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    /// <summary>
-    /// Tests MSSQL credentials through the gateway's sqlcmd. Without a gateway the check is
-    /// reported as not supported (see <see cref="TestCredentialAsync"/>).
-    /// </summary>
-    private async Task<bool> TestMsSqlAsync(
-        string host,
-        int port,
-        string user,
-        string pass,
-        CancellationToken ct)
-    {
-        try
-        {
-            if (_tunnelClient is not null)
-            {
-                var sqlCmd =
-                    $"sqlcmd -S {InputValidator.EscapeShellArg(host + "," + port)} -U {InputValidator.EscapeShellArg(user)} -P {InputValidator.EscapeShellArg(pass)} -Q \"SELECT 1\" -t 5 2>&1 | head -1";
-                var result = await ExecuteTunnelCommandAsync(
-                    sqlCmd,
-                    DefaultCredentialEngine.ConnectTimeoutMs,
-                    ct).ConfigureAwait(false);
-
-                return !result.Contains("Error", StringComparison.OrdinalIgnoreCase)
-                    && !result.Contains("Login failed", StringComparison.OrdinalIgnoreCase)
-                    && result.Length > 0;
-            }
-
-            // The direct check never reaches here: TestCredentialAsync reports it as not supported.
-            return false;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
