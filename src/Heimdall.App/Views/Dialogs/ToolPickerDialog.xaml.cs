@@ -121,7 +121,7 @@ public partial class ToolPickerDialog : Window
 
     private ToolPickerOption CreateOption(ToolDescriptor descriptor)
     {
-        var label = _localizer[descriptor.LabelKey];
+        var label = descriptor.ResolveLabel(_localizer.GetString);
         var category = _localizer[descriptor.CategoryLabelKey];
         var descKey = $"ToolDesc{descriptor.Id}";
         var description = _localizer[descKey];

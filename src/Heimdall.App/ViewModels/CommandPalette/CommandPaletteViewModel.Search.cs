@@ -136,7 +136,7 @@ public sealed partial class CommandPaletteViewModel
                     initialResults.Add(new ServerItemViewModel
                     {
                         Id = $"tool-{desc.Id.ToLowerInvariant()}",
-                        DisplayName = _localizer[desc.LabelKey],
+                        DisplayName = desc.ResolveLabel(_localizer.GetString),
                         ConnectionType = desc.ToolType,
                         Group = _localizer["PaletteRecentToolsHeader"]
                     });
@@ -373,7 +373,7 @@ public sealed partial class CommandPaletteViewModel
     /// </summary>
     private int ScoreToolDescriptor(ToolDescriptor descriptor, string query)
     {
-        var best = FuzzyScoreString(_localizer[descriptor.LabelKey], query);
+        var best = FuzzyScoreString(descriptor.ResolveLabel(_localizer.GetString), query);
 
         foreach (var prefix in descriptor.CommandPrefixes)
         {
@@ -392,7 +392,7 @@ public sealed partial class CommandPaletteViewModel
     private ServerItemViewModel BuildToolPaletteItem(ToolDescriptor descriptor) => new()
     {
         Id = $"tool-{descriptor.Id.ToLowerInvariant()}",
-        DisplayName = _localizer[descriptor.LabelKey],
+        DisplayName = descriptor.ResolveLabel(_localizer.GetString),
         ConnectionType = descriptor.ToolType,
         Group = _localizer[descriptor.CategoryLabelKey]
     };
