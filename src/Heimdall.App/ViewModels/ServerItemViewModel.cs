@@ -839,7 +839,7 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
         OnPropertyChanged(nameof(RowTooltipText));
     }
 
-    private string T(string key) => _localizer?.HasKey(key) == true ? _localizer[key] : Fallback(key);
+    private string T(string key) => _localizer?.HasKey(key) == true ? _localizer[key] : key;
 
     private string Format(string key, params object[] args)
     {
@@ -848,48 +848,8 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
             return _localizer.Format(key, args);
         }
 
-        var template = Fallback(key);
-        return string.Format(System.Globalization.CultureInfo.InvariantCulture, template, args);
+        return key;
     }
-
-    private static string Fallback(string key) => key switch
-    {
-        "SessionGatewayBadgeVia" => "via {0}",
-        "SessionGatewayBadgeMissing" => "gateway missing",
-        "SessionGatewayBadgeTooltipVia" => "Routes through SSH gateway {0}.",
-        "SessionGatewayBadgeTooltipMissing" => "This session references missing SSH gateway id {0}.",
-        "SessionGatewayMissingDetail" => "Missing gateway ({0})",
-        "SessionAuthUsername" => "Username",
-        "SessionAuthSshKey" => "SSH key",
-        "SessionAuthPassword" => "Password",
-        "SessionAuthNoneSaved" => "No saved credentials",
-        "SessionAuthCurrentUser" => "Current user",
-        "SessionAuthSshAgent" => "SSH agent",
-        "SessionAuthCredentialProvider" => "Credential provider",
-        "PropertiesLatencyValue" => "{0} ms",
-        "SessionTreeServerAccessibleName" => "{0}, protocol {1}, state {2}",
-        "SessionTreeServerAccessibleNameFavorite" => "{0}, favorite, protocol {1}, state {2}",
-        "SessionTreeServerAccessibleHelp" =>
-            "Session. Enter opens it, F2 renames it, Ctrl+Space adds it to or removes it from the selection, Shift+Up and Shift+Down extend the selection, Ctrl+A selects every visible session, Alt+Up and Alt+Down move it within its folder, Shift+F10 lists the actions.",
-        "SessionTreeRowTooltipHost" => "Host: {0}",
-        "SessionTreeRowTooltipUser" => "User: {0}",
-        "SessionTreeRowTooltipProtocol" => "Protocol: {0}",
-        "SessionTreeRowTooltipGateway" => "Gateway: {0}",
-        "SessionTreeServerAccessibleNameShared" => "{0}, shared from {3}, read-only, protocol {1}, state {2}",
-        "SessionTreeSharedReadOnlyTooltip" => "Read-only: shared from {0}. Edit these sessions in MobaXterm.",
-        "SessionStatusConnected" => "Connected",
-        "SessionStatusConnecting" => "Connecting...",
-        "SessionStatusDisconnected" => "Disconnected",
-        "SessionStatusDisconnecting" => "Disconnecting...",
-        "SessionStatusError" => "Error",
-        "SessionTreeProtocolTool" => "Tool",
-        "SessionTreeSearchContext" => "{0} \u00B7 {1}",
-        "StatusLaunchedExternalClient" => "External client launched",
-        "StatusLaunchedExternalClientTooltip" => "The external client was launched.",
-        "StatusRemoteSessionHandedOff" => "Session started",
-        "StatusRemoteSessionHandedOffTooltip" => "The remote session was handed off to its client.",
-        _ => key
-    };
 
     private string BuildAuthSummary(ServerProfileDto dto)
     {

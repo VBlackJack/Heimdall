@@ -239,24 +239,24 @@ public partial class ServerDialogViewModel : ObservableValidator
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Required(ErrorMessage = "Display name is required.")]
-    [MinLength(1, ErrorMessage = "Display name cannot be empty.")]
+    [Required(ErrorMessage = "ValidationDisplayNameRequired")]
+    [MinLength(1, ErrorMessage = "ValidationDisplayNameEmpty")]
     private string _displayName = "";
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Required(ErrorMessage = "Server address is required.")]
-    [MinLength(1, ErrorMessage = "Server address cannot be empty.")]
+    [Required(ErrorMessage = "ValidationServerAddressRequired")]
+    [MinLength(1, ErrorMessage = "ValidationServerAddressEmpty")]
     private string _remoteServer = "";
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Range(1, 65535, ErrorMessage = "Port must be between 1 and 65535.")]
+    [Range(1, 65535, ErrorMessage = "ValidationPortRange")]
     private int _remotePort = DefaultPorts.Rdp;
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Range(1, 65535, ErrorMessage = "Local tunnel port must be between 1 and 65535.")]
+    [Range(1, 65535, ErrorMessage = "ValidationLocalPortRange")]
     private int _localPort = DefaultPorts.RdpTunnel;
 
     [ObservableProperty]
@@ -342,7 +342,7 @@ public partial class ServerDialogViewModel : ObservableValidator
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Range(1, 65535, ErrorMessage = "WinRM port must be between 1 and 65535.")]
+    [Range(1, 65535, ErrorMessage = "ValidationWinRmPortRange")]
     private int _winRmPort = DefaultPorts.WinRmHttp;
 
     [ObservableProperty]
@@ -388,7 +388,7 @@ public partial class ServerDialogViewModel : ObservableValidator
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Range(1, 65535, ErrorMessage = "SSH port must be between 1 and 65535.")]
+    [Range(1, 65535, ErrorMessage = "ValidationSshPortRange")]
     private int _sshPort = DefaultPorts.Ssh;
 
     [ObservableProperty]
@@ -991,7 +991,7 @@ public partial class ServerDialogViewModel : ObservableValidator
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Range(1, 65535, ErrorMessage = "FTP port must be between 1 and 65535.")]
+    [Range(1, 65535, ErrorMessage = "ValidationFtpPortRange")]
     private int _ftpPort = 21;
 
     [ObservableProperty]
@@ -1038,7 +1038,7 @@ public partial class ServerDialogViewModel : ObservableValidator
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Range(1, 65535, ErrorMessage = "VNC port must be between 1 and 65535.")]
+    [Range(1, 65535, ErrorMessage = "ValidationVncPortRange")]
     private int _vncPort = DefaultPorts.Vnc;
 
     [ObservableProperty]
@@ -1170,7 +1170,7 @@ public partial class ServerDialogViewModel : ObservableValidator
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
-    [Range(0, 2, ErrorMessage = "Audio mode must be 0 (disabled), 1 (local), or 2 (remote).")]
+    [Range(0, 2, ErrorMessage = "ValidationAudioMode")]
     private int _rdpAudioMode;
 
     [ObservableProperty]
@@ -1188,13 +1188,13 @@ public partial class ServerDialogViewModel : ObservableValidator
     [ObservableProperty]
     [NotifyDataErrorInfo]
     [Range(RdpDisplayLimits.MinimumFixedDimension, RdpDisplayLimits.MaximumFixedWidth,
-        ErrorMessage = RdpDisplayLimits.FixedWidthRangeMessage)]
+        ErrorMessage = "ValidationRdpFixedWidthRange")]
     private int _rdpFixedWidth = DefaultRdpFixedWidth;
 
     [ObservableProperty]
     [NotifyDataErrorInfo]
     [Range(RdpDisplayLimits.MinimumFixedDimension, RdpDisplayLimits.MaximumFixedHeight,
-        ErrorMessage = RdpDisplayLimits.FixedHeightRangeMessage)]
+        ErrorMessage = "ValidationRdpFixedHeightRange")]
     private int _rdpFixedHeight = DefaultRdpFixedHeight;
 
     [ObservableProperty]
@@ -1217,7 +1217,7 @@ public partial class ServerDialogViewModel : ObservableValidator
     [ObservableProperty]
     [NotifyDataErrorInfo]
     [Range(RdpDisplayLimits.MinimumColorDepth, RdpDisplayLimits.MaximumColorDepth,
-        ErrorMessage = RdpDisplayLimits.ColorDepthRangeMessage)]
+        ErrorMessage = "ValidationColorDepth")]
     private int _rdpColorDepth = RdpDisplayLimits.MaximumColorDepth;
 
     [ObservableProperty]
@@ -3001,24 +3001,6 @@ public partial class ServerDialogViewModel : ObservableValidator
         RaiseRdpResolutionProfileStateChanged();
     }
 
-    private static readonly Dictionary<string, string> ValidationKeyMap = new(StringComparer.Ordinal)
-    {
-        ["Display name is required."] = "ValidationDisplayNameRequired",
-        ["Display name cannot be empty."] = "ValidationDisplayNameEmpty",
-        ["Server address is required."] = "ValidationServerAddressRequired",
-        ["Server address cannot be empty."] = "ValidationServerAddressEmpty",
-        ["Port must be between 1 and 65535."] = "ValidationPortRange",
-        ["Local tunnel port must be between 1 and 65535."] = "ValidationLocalPortRange",
-        ["SSH port must be between 1 and 65535."] = "ValidationSshPortRange",
-        ["WinRM port must be between 1 and 65535."] = "ValidationWinRmPortRange",
-        ["Audio mode must be 0 (disabled), 1 (local), or 2 (remote)."] = "ValidationAudioMode",
-        [RdpDisplayLimits.ColorDepthRangeMessage] = "ValidationColorDepth",
-        [RdpDisplayLimits.FixedWidthRangeMessage] = "ValidationRdpFixedWidthRange",
-        [RdpDisplayLimits.FixedHeightRangeMessage] = "ValidationRdpFixedHeightRange",
-        ["FTP port must be between 1 and 65535."] = "ValidationFtpPortRange",
-        ["VNC port must be between 1 and 65535."] = "ValidationVncPortRange",
-    };
-
     /// <summary>
     /// The host field's error. A web host must also form an address with its port and path: a URL
     /// pasted into the host field is the usual way it does not, and is said so here rather than at
@@ -3072,21 +3054,21 @@ public partial class ServerDialogViewModel : ObservableValidator
             .OfType<System.ComponentModel.DataAnnotations.ValidationResult>()
             .FirstOrDefault();
 
+        // The attribute carries a locale key, not a sentence, so the comparison below is by key
+        // and no English text exists to drift from the catalogue.
         string? message = error?.ErrorMessage;
-        if (message is not null && Localizer is not null
-            && ValidationKeyMap.TryGetValue(message, out string? key))
+        if (message is null || Localizer is null)
         {
-            return Localizer[key];
+            return message;
         }
 
-        if (message is not null && Localizer is not null
-            && ValidationKeyByDeclaredSetting.TryGetValue(message, out string? declaredKey))
+        if (ValidationKeyByDeclaredSetting.TryGetValue(message, out string? declaredKey))
         {
             SettingRange range = SettingRanges.Of(message);
             return Localizer.Format(declaredKey, range.Min, range.Max);
         }
 
-        return message;
+        return Localizer[message];
     }
 }
 

@@ -63,9 +63,9 @@ public static class RdpDisplayLimits
     /// <remarks>
     /// The numbers are spelled out rather than interpolated from the constants
     /// above: a <see langword="const" /> interpolated string accepts only constant
-    /// <see cref="string" /> operands, and these bounds are integers. The message
-    /// must stay a compile-time constant because it is the <c>ErrorMessage</c> of a
-    /// <c>[Range]</c> attribute and the key of the localization lookup that maps it.
+    /// <see cref="string" /> operands, and these bounds are integers. The sentence is
+    /// the English text of a locale key (the dialog's <c>[Range]</c> attribute carries
+    /// the key, not this text), and the application tests pin the two to each other.
     /// <c>RdpDisplayLimitsTests.RangeMessages_QuoteTheEnforcedBounds</c> fails if a
     /// bound changes and the prose does not follow.
     /// </remarks>

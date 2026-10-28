@@ -16,6 +16,7 @@
 
 using System.IO;
 using System.Text.RegularExpressions;
+using Heimdall.App.Tests.TestHelpers;
 using Heimdall.App.ViewModels;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.SessionHealth;
@@ -39,7 +40,8 @@ public sealed class ServerItemRowTooltipTests
             ConnectionType = "SSH",
             SshPort = 2222,
             SshUsername = "operator"
-        });
+        },
+            localizer: EnglishLocalizer.Create());
 
         string tooltip = Assert.IsType<string>(server.RowTooltipText);
 
@@ -64,7 +66,8 @@ public sealed class ServerItemRowTooltipTests
             RemoteServer = "alpha.example.test",
             ConnectionType = "SSH",
             SshPort = 22
-        });
+        },
+            localizer: EnglishLocalizer.Create());
 
         string tooltip = Assert.IsType<string>(server.RowTooltipText);
 
@@ -85,7 +88,8 @@ public sealed class ServerItemRowTooltipTests
             DisplayName = "Base64",
             RemoteServer = "",
             ConnectionType = "tool:base64"
-        });
+        },
+            localizer: EnglishLocalizer.Create());
 
         Assert.Equal("Base64", tool.RowTooltipText);
     }
@@ -106,7 +110,8 @@ public sealed class ServerItemRowTooltipTests
             RemoteServer = "alpha.example.test",
             ConnectionType = "SSH",
             SshPort = 22
-        });
+        },
+            localizer: EnglishLocalizer.Create());
         server.HealthState = new HealthState(
             HealthStatus.Down,
             DateTime.UtcNow,
@@ -130,7 +135,8 @@ public sealed class ServerItemRowTooltipTests
             RemoteServer = "alpha.example.test",
             ConnectionType = "RDP",
             RemotePort = 3389
-        });
+        },
+            localizer: EnglishLocalizer.Create());
         List<string> raised = [];
         server.PropertyChanged += (_, e) => raised.Add(e.PropertyName ?? "");
 

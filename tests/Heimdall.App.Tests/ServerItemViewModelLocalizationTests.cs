@@ -18,6 +18,7 @@ using System.Globalization;
 using System.IO;
 using System.Windows.Media;
 using Heimdall.App.Converters;
+using Heimdall.App.Tests.TestHelpers;
 using Heimdall.App.ViewModels;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
@@ -42,11 +43,13 @@ public sealed class ServerItemViewModelLocalizationTests
     }
 
     [Fact]
-    public void AuthSummary_WithoutLocalizer_UsesEnglishFallbacks()
+    public void AuthSummary_WithoutLocalizer_AnswersWithTheLocaleKeys()
     {
         ServerItemViewModel viewModel = ServerItemViewModel.FromDto(CreateSshServer());
 
-        Assert.Equal("Username + SSH key + Password", viewModel.AuthSummary);
+        // No localizer, no words: the row used to carry an English copy of every label, a second
+        // catalogue that nothing kept in step with the first.
+        Assert.Equal("SessionAuthUsername + SessionAuthSshKey + SessionAuthPassword", viewModel.AuthSummary);
     }
 
     [Fact]
@@ -93,7 +96,7 @@ public sealed class ServerItemViewModelLocalizationTests
         dto.SshKeyPath = hasKey ? @"C:\Keys\configured.ppk" : null;
         dto.SshAgentForwarding = true;
 
-        ServerItemViewModel viewModel = ServerItemViewModel.FromDto(dto);
+        ServerItemViewModel viewModel = ServerItemViewModel.FromDto(dto, localizer: EnglishLocalizer.Create());
 
         Assert.Equal(expected, viewModel.AuthSummary);
     }
@@ -117,7 +120,7 @@ public sealed class ServerItemViewModelLocalizationTests
         dto.SshKeyPath = hasKey ? @"C:\Keys\configured.ppk" : null;
         dto.SshAgentForwarding = true;
 
-        ServerItemViewModel viewModel = ServerItemViewModel.FromDto(dto);
+        ServerItemViewModel viewModel = ServerItemViewModel.FromDto(dto, localizer: EnglishLocalizer.Create());
 
         Assert.Equal(expected, viewModel.AuthSummary);
     }
@@ -133,7 +136,8 @@ public sealed class ServerItemViewModelLocalizationTests
         string expected)
     {
         ServerItemViewModel viewModel = ServerItemViewModel.FromDto(
-            CreateCredentialServer("RDP", hasUsername, hasPassword));
+            CreateCredentialServer("RDP", hasUsername, hasPassword),
+            localizer: EnglishLocalizer.Create());
 
         Assert.Equal(expected, viewModel.AuthSummary);
     }
@@ -151,7 +155,7 @@ public sealed class ServerItemViewModelLocalizationTests
         ServerProfileDto dto = CreateCredentialServer("WINRM", hasUsername, hasPassword);
         dto.WinRmIdentityMode = WinRmIdentityMode.Credential;
 
-        ServerItemViewModel viewModel = ServerItemViewModel.FromDto(dto);
+        ServerItemViewModel viewModel = ServerItemViewModel.FromDto(dto, localizer: EnglishLocalizer.Create());
 
         Assert.Equal(expected, viewModel.AuthSummary);
     }
@@ -162,7 +166,7 @@ public sealed class ServerItemViewModelLocalizationTests
         ServerProfileDto dto = CreateCredentialServer("WINRM", hasUsername: true, hasPassword: true);
         dto.WinRmIdentityMode = WinRmIdentityMode.CurrentUser;
 
-        ServerItemViewModel viewModel = ServerItemViewModel.FromDto(dto);
+        ServerItemViewModel viewModel = ServerItemViewModel.FromDto(dto, localizer: EnglishLocalizer.Create());
 
         Assert.Equal("Current user", viewModel.AuthSummary);
     }
@@ -178,7 +182,8 @@ public sealed class ServerItemViewModelLocalizationTests
         string expected)
     {
         ServerItemViewModel viewModel = ServerItemViewModel.FromDto(
-            CreateCredentialServer("FTP", hasUsername, hasPassword));
+            CreateCredentialServer("FTP", hasUsername, hasPassword),
+            localizer: EnglishLocalizer.Create());
 
         Assert.Equal(expected, viewModel.AuthSummary);
     }
@@ -193,7 +198,8 @@ public sealed class ServerItemViewModelLocalizationTests
         bool hasPassword)
     {
         ServerItemViewModel viewModel = ServerItemViewModel.FromDto(
-            CreateCredentialServer("TELNET", hasUsername, hasPassword));
+            CreateCredentialServer("TELNET", hasUsername, hasPassword),
+            localizer: EnglishLocalizer.Create());
 
         Assert.Equal(string.Empty, viewModel.AuthSummary);
     }
@@ -206,7 +212,8 @@ public sealed class ServerItemViewModelLocalizationTests
         string expected)
     {
         ServerItemViewModel viewModel = ServerItemViewModel.FromDto(
-            CreateCredentialServer("VNC", hasUsername: false, hasPassword));
+            CreateCredentialServer("VNC", hasUsername: false, hasPassword),
+            localizer: EnglishLocalizer.Create());
 
         Assert.Equal(expected, viewModel.AuthSummary);
     }
@@ -232,7 +239,7 @@ public sealed class ServerItemViewModelLocalizationTests
         dto.TelnetPasswordEncrypted = "telnet-password";
         dto.VncPassword = "vnc-password";
 
-        ServerItemViewModel viewModel = ServerItemViewModel.FromDto(dto);
+        ServerItemViewModel viewModel = ServerItemViewModel.FromDto(dto, localizer: EnglishLocalizer.Create());
 
         Assert.Equal(string.Empty, viewModel.AuthSummary);
     }

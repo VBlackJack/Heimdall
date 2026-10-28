@@ -15,6 +15,7 @@
  */
 
 using System.IO;
+using Heimdall.App.Tests.TestHelpers;
 using Heimdall.App.ViewModels;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
@@ -32,9 +33,9 @@ namespace Heimdall.App.Tests;
 public sealed class ServerItemViewModelAccessibleHelpTests
 {
     [Fact]
-    public void AccessibleHelpText_WithoutLocalizer_NamesEveryCustomGesture()
+    public void AccessibleHelpText_WithEnglishLocalizer_NamesEveryCustomGesture()
     {
-        ServerItemViewModel server = CreateServer(localizer: null);
+        ServerItemViewModel server = CreateServer(EnglishLocalizer.Create());
 
         string help = Assert.IsType<string>(server.AccessibleHelpText);
         Assert.Contains("Enter", help, StringComparison.Ordinal);
