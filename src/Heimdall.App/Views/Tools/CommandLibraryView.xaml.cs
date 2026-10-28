@@ -69,10 +69,11 @@ public partial class CommandLibraryView : UserControl, IToolView, ICommandCaptur
         _localizer = localizer;
 
         // Service-locator confined to one line in code-behind: the VM itself
-        // never reaches into Application.Current.Services.
+        // never reaches into Application.Current.Services. The VM is built outside the
+        // container's disposal tracking and owned by this view (see ToolViewModelFactory).
         var services = ((App)System.Windows.Application.Current).Services
             ?? throw new InvalidOperationException("DI container is not initialized.");
-        _viewModel = services.GetRequiredService<CommandLibraryViewModel>();
+        _viewModel = ToolViewModelFactory.Create<CommandLibraryViewModel>(services);
 
         _viewModel.SendCommandHandler = context?.SendCommandAction;
         _viewModel.InsertTextHandler = context?.InsertTextAction;
@@ -130,6 +131,11 @@ public partial class CommandLibraryView : UserControl, IToolView, ICommandCaptur
     {
         if (_viewModel is not null)
         {
+            // Disposed here, with the tool tab, and not on Unloaded: tabs detach and reattach when
+            // they are dragged or split, and a view that comes back needs its VM. The VM is built
+            // outside the container (ToolViewModelFactory), so nothing else will ever dispose it.
+            // The binding source goes first so the primary-action wiring lets go of the VM.
+            DataContext = null;
             _viewModel.LibraryReloaded -= OnLibraryReloaded;
             _viewModel.Dispose();
             _viewModel = null;

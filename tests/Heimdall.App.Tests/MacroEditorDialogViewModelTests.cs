@@ -14,8 +14,10 @@
  * limitations under the License.
  */
 
+using System.IO;
 using System.Text.Json;
 using Heimdall.App.ViewModels.Dialogs;
+using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
 
 namespace Heimdall.App.Tests;
@@ -210,6 +212,46 @@ public sealed class MacroEditorDialogViewModelTests
         Assert.True(parsed);
         Assert.Null(error);
         Assert.Equal(input, decoded);
+    }
+
+    [Theory]
+    [InlineData(@"abc\", "MacroEditorEscapeTrailing", 0)]
+    [InlineData(@"\x4", "MacroEditorEscapeHexDigitsRequired", 0)]
+    [InlineData(@"\xZZ", "MacroEditorEscapeHexDigitsRequired", 0)]
+    [InlineData(@"\q", "MacroEditorEscapeUnsupported", 1)]
+    public void MacroInputEscaper_ReportsAKeyInsteadOfEnglishText(string text, string expectedKey, int expectedArguments)
+    {
+        var parsed = MacroInputEscaper.TryDecode(text, out var decoded, out var error);
+
+        Assert.False(parsed);
+        Assert.Equal(string.Empty, decoded);
+        Assert.NotNull(error);
+        Assert.Equal(expectedKey, error.Key);
+        Assert.Equal(expectedArguments, error.Arguments.Length);
+    }
+
+    [Theory]
+    [InlineData("en", @"abc\", "Trailing escape marker.")]
+    [InlineData("fr", @"abc\", "Marqueur d'\u00e9chappement en fin de texte.")]
+    [InlineData("es", @"abc\", "Marcador de escape al final del texto.")]
+    [InlineData("en", @"\x4", @"\x escape requires two hexadecimal digits.")]
+    [InlineData("fr", @"\x4", "Un \u00e9chappement \\x exige deux chiffres hexad\u00e9cimaux.")]
+    [InlineData("es", @"\x4", "Un escape \\x requiere dos d\u00edgitos hexadecimales.")]
+    [InlineData("en", @"\q", @"Unsupported escape sequence: \q.")]
+    [InlineData("fr", @"\q", "S\u00e9quence d'\u00e9chappement non prise en charge : \\q.")]
+    [InlineData("es", @"\q", @"Secuencia de escape no admitida: \q.")]
+    public async Task TrySave_ExplainsABadEscapeInTheLanguageOfTheLocale(string locale, string input, string expectedMessage)
+    {
+        var localizer = new LocalizationManager();
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), locale);
+        var vm = new MacroEditorDialogViewModel(CreateMacro(), localizer);
+        vm.Entries[0].InputText = input;
+
+        var saved = vm.TrySave();
+
+        Assert.False(saved);
+        Assert.Equal(expectedMessage, vm.Entries[0].InputValidationMessage);
+        Assert.EndsWith(expectedMessage, vm.ValidationError, StringComparison.Ordinal);
     }
 
     private static TerminalMacro CreateMacro()

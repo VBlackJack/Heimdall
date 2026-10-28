@@ -1499,9 +1499,49 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
             _historyCopyTimer = null;
         }
 
+        EndActiveRun();
+        ReleaseViewHandlers();
+
         _sessionScope?.Dispose();
         _sessionScope = null;
         _searchService = null;
         _commandGenerator = null;
+    }
+
+    /// <summary>
+    /// Ends a runbook run still on screen. A run is stepped by the operator, so there is no task
+    /// to cancel: what must stop is its link back to this library (the Stop subscription) and the
+    /// library's hold on it, so a step cannot reach a terminal handler of a closed tab.
+    /// </summary>
+    private void EndActiveRun()
+    {
+        if (ActiveRun is null)
+        {
+            return;
+        }
+
+        ActiveRun.StopRequested -= OnRunbookStopRequested;
+        ActiveRun = null;
+    }
+
+    /// <summary>
+    /// Drops every callback the view installed. They close over the view, and through it over the
+    /// tab's session; a disposed library that kept them would keep all of that reachable for as
+    /// long as anything held the library. The backing fields are cleared directly: the setters
+    /// raise change notifications, which a disposed library has no business doing.
+    /// </summary>
+    private void ReleaseViewHandlers()
+    {
+        _sendCommandHandler = null;
+        _insertTextHandler = null;
+        _canSendToTerminalProbe = null;
+        CommandBroadcaster = null;
+        ShowActionDialogAsync = null;
+        ShowRunbookDialogAsync = null;
+        ShowSaveFileDialog = null;
+        ShowOpenFileDialog = null;
+        SetClipboardText = null;
+        ShowCopyFeedback = null;
+        LibraryReloaded = null;
     }
 }

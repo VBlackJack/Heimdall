@@ -18,6 +18,7 @@ using System.IO;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
+using Heimdall.App.Converters;
 
 namespace Heimdall.App.Tests;
 
@@ -124,6 +125,15 @@ public sealed class DataGridRowNameGuardTests
 
                 string name = key.Groups[1].Value;
                 int supplied = multi.Elements(Xaml + "Binding").Count() - 1;
+
+                // The Scheduled grid names its row from one slot computed out of six bound
+                // values, which cannot be nested (see ScheduledTaskAccessibleRowNameConverter), so
+                // those six count as the one slot they fill.
+                if (markup.Contains(nameof(ScheduledTaskAccessibleRowNameConverter), StringComparison.Ordinal))
+                {
+                    Assert.Equal(ScheduledTaskAccessibleRowNameConverter.ValueCount, supplied + 1);
+                    supplied -= ScheduledTaskScheduleConverter.ValueCount - 1;
+                }
 
                 foreach (var (locale, table) in new[] { ("en", en), ("fr", fr) })
                 {

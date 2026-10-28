@@ -1,0 +1,27 @@
+{
+  "components": [
+    {
+      "name": "draw.io embed",
+      "version": "31.4.5",
+      "upstream": "https://github.com/jgraph/drawio",
+      "files": [
+        {
+          "path": "js/app.min.js",
+          "sha256": "05344dcc120938e295e4b81c9ab3c8ec266a0d0264e59ae28fc54795bd2a3a2b",
+          "versionMarker": "EditorUi.VERSION=\"31.4.5\""
+        }
+      ],
+      "tree": {
+        "path": ".",
+        "fileCount": 2303,
+        "sha256": "fe581bb8125ab4d625076ffe9a0c734ee5209123a260552727ece4c2c69039f2"
+      }
+    }
+  ],
+  "completeDirectories": [
+    "."
+  ],
+  "ownedFiles": [
+    "heimdall-host.html"
+  ]
+}

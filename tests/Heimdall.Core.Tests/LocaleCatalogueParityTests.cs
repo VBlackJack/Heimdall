@@ -16,6 +16,7 @@
 
 using System.IO;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace Heimdall.Core.Tests;
 
@@ -46,6 +47,9 @@ public sealed class LocaleCatalogueParityTests
 
     /// <summary>Number of key names quoted in a failure message before it is truncated.</summary>
     private const int MaxKeysReported = 40;
+
+    /// <summary>The documents quote the key count rounded down to a multiple of this.</summary>
+    private const int DocumentedKeyCountStep = 100;
 
     /// <summary>Every catalogue that is not the reference one.</summary>
     public static TheoryData<string> TranslatedCatalogues()
@@ -164,13 +168,16 @@ public sealed class LocaleCatalogueParityTests
     };
 
     /// <summary>
-    /// A document that quotes a count quotes the count the catalogue actually has.
+    /// A document that quotes a count quotes a true floor of the count the catalogue has: the
+    /// count rounded down to the hundred, followed by a plus sign.
     /// </summary>
     /// <remarks>
     /// Both feature pages claimed 6272 keys and a bilingual interface for four releases after
     /// neither was true. A number in prose has no gate of its own: it is written once, read by
     /// someone deciding whether the project is worth their time, and never measured again. This
-    /// measures it.
+    /// measures it. The exact figure used to be quoted, which made every pull request that added
+    /// a key edit six documents and conflict with every other one that did the same; the floor
+    /// stays true across a few added keys and changes only when the count crosses a hundred.
     /// </remarks>
     [Theory]
     [MemberData(nameof(DocumentsStatingTheKeyCount))]
@@ -182,13 +189,83 @@ public sealed class LocaleCatalogueParityTests
         string path = Path.Combine(FindRepoRoot(), relativePath.Replace('/', Path.DirectorySeparatorChar));
         Assert.True(File.Exists(path), $"Document not found: {path}");
 
-        string written = count.ToString("#,0", System.Globalization.CultureInfo.InvariantCulture)
-            .Replace(",", separator, StringComparison.Ordinal);
+        string? problem = FigureProblem(File.ReadAllText(path), count, separator);
 
         Assert.True(
-            File.ReadAllText(path).Contains(written, StringComparison.Ordinal),
-            $"{relativePath} does not quote the catalogue's {written} keys."
-            + " Run scripts/Update-DocumentedKeyCount.ps1 to write the count into every document.");
+            problem is null,
+            $"{relativePath}: {problem}"
+            + " Run scripts/Update-DocumentedKeyCount.ps1 to write the figure into every document.");
+    }
+
+    [Theory]
+    [InlineData(7421, ",", "7,400+")]
+    [InlineData(7400, ",", "7,400+")]
+    [InlineData(7399, ",", "7,300+")]
+    [InlineData(7421, " ", "7 400+")]
+    [InlineData(10005, ",", "10,000+")]
+    public void TheDocumentedFigureIsTheCountRoundedDownToTheHundred(int count, string separator, string expected)
+    {
+        Assert.Equal(expected, DocumentedFigure(count, separator));
+    }
+
+    /// <summary>
+    /// The check refuses a figure one hundred lower than the floor, and a figure that is exact
+    /// instead of rounded: either is a document the script would rewrite.
+    /// </summary>
+    [Theory]
+    [InlineData("holds 7,300+ i18n keys per language", ",")]
+    [InlineData("holds 7,500+ i18n keys per language", ",")]
+    [InlineData("holds 7,421 i18n keys per language", ",")]
+    [InlineData("holds 7,400 i18n keys per language", ",")]
+    [InlineData("contient 7 300+ cl\u00e9s i18n par langue", " ")]
+    [InlineData("holds no figure at all", ",")]
+    public void AFigureThatIsNotTheFloorIsRefused(string text, string separator)
+    {
+        Assert.NotNull(FigureProblem(text, 7421, separator));
+    }
+
+    [Theory]
+    [InlineData("holds 7,400+ i18n keys per language", ",")]
+    [InlineData("holds 7,400+\nkeys each", ",")]
+    [InlineData("contient 7 400+ cl\u00e9s i18n par langue", " ")]
+    public void TheFloorOfTheCountIsAccepted(string text, string separator)
+    {
+        Assert.Null(FigureProblem(text, 7421, separator));
+    }
+
+    /// <summary>
+    /// The figure as the documents write it: the count rounded down to the hundred, grouped by
+    /// <paramref name="separator"/>, with a trailing plus sign.
+    /// </summary>
+    private static string DocumentedFigure(int count, string separator)
+    {
+        int floor = count / DocumentedKeyCountStep * DocumentedKeyCountStep;
+        return floor.ToString("#,0", System.Globalization.CultureInfo.InvariantCulture)
+            .Replace(",", separator, StringComparison.Ordinal) + "+";
+    }
+
+    /// <summary>
+    /// Finds the figure quoted before the word "keys" (or its accented French counterpart, with
+    /// an optional "i18n" between) and compares it with the expected one. Null when the document
+    /// is right.
+    /// </summary>
+    private static string? FigureProblem(string text, int count, string separator)
+    {
+        string separatorPattern = Regex.Escape(separator);
+        Regex figure = new(
+            @"(?<!\d)\d{1,3}(?:" + separatorPattern + @"\d{3})+\+?(?=\s+(?:i18n\s+)?(?:keys|cl\u00e9s))",
+            RegexOptions.CultureInvariant);
+
+        MatchCollection found = figure.Matches(text);
+        string expected = DocumentedFigure(count, separator);
+        if (found.Count != 1)
+        {
+            return $"{found.Count} key figure(s) found, expected exactly one, {expected}.";
+        }
+
+        return string.Equals(found[0].Value, expected, StringComparison.Ordinal)
+            ? null
+            : $"quotes {found[0].Value} keys, the catalogue's {count} keys round down to {expected}.";
     }
 
     /// <summary>

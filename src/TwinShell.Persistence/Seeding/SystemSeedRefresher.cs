@@ -83,6 +83,12 @@ public sealed class SystemSeedRefresher
     /// <summary>The <c>SeedState</c> key under which the applied hash is stored.</summary>
     public const string SeedHashKey = "SeedHash";
 
+    /// <summary>
+    /// The <c>SeedState</c> key under which the metadata fingerprint of the seed files is stored,
+    /// next to the hash. See <see cref="SeedCatalogueFingerprint"/>.
+    /// </summary>
+    public const string SeedFingerprintKey = "SeedFingerprint";
+
     private readonly TwinShellDbContext _context;
 
     public SystemSeedRefresher(TwinShellDbContext context)
@@ -104,15 +110,50 @@ public sealed class SystemSeedRefresher
     }
 
     /// <summary>
+    /// Returns the metadata fingerprint stored with the applied hash, or null when none was
+    /// recorded (a database last seeded by a build that did not take one).
+    /// </summary>
+    public async Task<string?> ReadAppliedFingerprintAsync(CancellationToken cancellationToken = default)
+    {
+        SeedStateEntity? state = await _context.SeedStates
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Key == SeedFingerprintKey, cancellationToken);
+        return state?.Value;
+    }
+
+    /// <summary>
+    /// Stores <paramref name="seedFingerprint"/> as the fingerprint of the seed that is already
+    /// applied, so the next launch can skip reading the seed files.
+    /// </summary>
+    /// <remarks>
+    /// Only for a seed whose content hash equals the applied one: the pair (hash, fingerprint)
+    /// must always describe the same files. A refresh stores both in its own transaction.
+    /// </remarks>
+    public async Task RecordFingerprintAsync(string seedFingerprint, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(seedFingerprint);
+
+        await WriteStateAsync(SeedFingerprintKey, seedFingerprint, cancellationToken);
+        await _context.SaveChangesAsync(cancellationToken);
+        _context.ChangeTracker.Clear();
+    }
+
+    /// <summary>
     /// Replaces the system actions with <paramref name="seed"/> when
     /// <paramref name="seedHash"/> differs from the hash last applied.
     /// </summary>
     /// <param name="seed">The parsed seed actions, all system actions.</param>
     /// <param name="seedHash">The content hash of the seed directory they came from.</param>
+    /// <param name="seedFingerprint">
+    /// The metadata fingerprint of the same files, stored in the same transaction as the hash; null
+    /// stores none (and a fingerprint left from an earlier seed is dropped, since it no longer
+    /// describes the applied one).
+    /// </param>
     /// <param name="cancellationToken">Cancels before the commit.</param>
     public async Task<SeedRefreshResult> RefreshAsync(
         IReadOnlyList<ActionModel> seed,
         string seedHash,
+        string? seedFingerprint = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(seed);
@@ -129,7 +170,7 @@ public sealed class SystemSeedRefresher
 
         try
         {
-            SeedRefreshResult result = await ReplaceSystemActionsAsync(seed, seedHash, cancellationToken);
+            SeedRefreshResult result = await ReplaceSystemActionsAsync(seed, seedHash, seedFingerprint, cancellationToken);
             await transaction.CommitAsync(cancellationToken);
             return result;
         }
@@ -147,6 +188,7 @@ public sealed class SystemSeedRefresher
     private async Task<SeedRefreshResult> ReplaceSystemActionsAsync(
         IReadOnlyList<ActionModel> seed,
         string seedHash,
+        string? seedFingerprint,
         CancellationToken cancellationToken)
     {
         List<ActionEntity> stored = await _context.Actions.ToListAsync(cancellationToken);
@@ -222,7 +264,18 @@ public sealed class SystemSeedRefresher
             .ExecuteDeleteAsync(cancellationToken);
         _context.ActionTranslations.AddRange(translations);
 
-        await WriteHashAsync(seedHash, cancellationToken);
+        await WriteStateAsync(SeedHashKey, seedHash, cancellationToken);
+        if (seedFingerprint is not null)
+        {
+            await WriteStateAsync(SeedFingerprintKey, seedFingerprint, cancellationToken);
+        }
+        else
+        {
+            await _context.SeedStates
+                .Where(s => s.Key == SeedFingerprintKey)
+                .ExecuteDeleteAsync(cancellationToken);
+        }
+
         await _context.SaveChangesAsync(cancellationToken);
 
         await RemoveOrphanTemplatesAsync(oldSystemTemplateIds, incomingTemplates.Keys, cancellationToken);
@@ -289,17 +342,17 @@ public sealed class SystemSeedRefresher
         }
     }
 
-    private async Task WriteHashAsync(string seedHash, CancellationToken cancellationToken)
+    private async Task WriteStateAsync(string key, string value, CancellationToken cancellationToken)
     {
         SeedStateEntity? state = await _context.SeedStates
-            .FirstOrDefaultAsync(s => s.Key == SeedHashKey, cancellationToken);
+            .FirstOrDefaultAsync(s => s.Key == key, cancellationToken);
         if (state is null)
         {
-            _context.SeedStates.Add(new SeedStateEntity { Key = SeedHashKey, Value = seedHash });
+            _context.SeedStates.Add(new SeedStateEntity { Key = key, Value = value });
         }
         else
         {
-            state.Value = seedHash;
+            state.Value = value;
         }
     }
 }
