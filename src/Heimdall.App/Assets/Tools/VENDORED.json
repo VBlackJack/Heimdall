@@ -1,0 +1,32 @@
+{
+  "components": [
+    {
+      "name": "plink",
+      "version": "0.83",
+      "upstream": "https://www.chiark.greenend.org.uk/~sgtatham/putty/",
+      "files": [
+        {
+          "path": "plink.exe",
+          "sha256": "460e62e304361fb6f73ef215530b93d6f97c263b1442ee48134cdcdf94d3f1de",
+          "fileVersion": "0.83"
+        }
+      ]
+    },
+    {
+      "name": "gsudo",
+      "version": "2.5.1",
+      "upstream": "https://github.com/gerardog/gsudo",
+      "files": [
+        {
+          "path": "gsudo.exe",
+          "sha256": "47d02ca82bc31ae9f4b6cc1e76dceffe610b9b664d3c18a17e0403463c48d749",
+          "fileVersion": "2.5.1"
+        }
+      ]
+    }
+  ],
+  "completeDirectories": [
+    "."
+  ],
+  "ownedFiles": []
+}
