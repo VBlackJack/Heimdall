@@ -698,6 +698,13 @@ public partial class ParameterEntryVm : ObservableObject
     public string? Flag { get; init; }
 
     /// <summary>
+    /// The quoting override the parameter declares for itself (<see cref="TemplateParameter.Quoting"/>).
+    /// The editor shows no field for it; it is carried through so that saving an action does
+    /// not silently change how the generated command quotes this parameter's value.
+    /// </summary>
+    public QuotingMode? Quoting { get; init; }
+
+    /// <summary>
     /// The values a choice offers, as one comma-separated line.
     /// </summary>
     /// <remarks>
@@ -724,7 +731,8 @@ public partial class ParameterEntryVm : ObservableObject
         Required = Required,
         Description = string.IsNullOrWhiteSpace(Description) ? null : Description.Trim(),
         AllowedValues = ParseAllowedValues(AllowedValues),
-        Flag = Flag
+        Flag = Flag,
+        Quoting = Quoting
     };
 
     /// <summary>
@@ -754,7 +762,8 @@ public partial class ParameterEntryVm : ObservableObject
         Required = p.Required,
         Description = p.Description ?? "",
         AllowedValues = p.AllowedValues is null ? "" : string.Join(", ", p.AllowedValues),
-        Flag = p.Flag
+        Flag = p.Flag,
+        Quoting = p.Quoting
     };
 }
 
