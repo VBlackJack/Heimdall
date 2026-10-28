@@ -48,6 +48,9 @@ internal readonly record struct CitrixWindowRecord(
     int Width,
     int Height)
 {
+    /// <summary>The window area in square pixels; zero for a window with no size.</summary>
+    internal long Area => (long)Math.Max(Width, 0) * Math.Max(Height, 0);
+
     /// <summary>The record as one log field list. Carries the title: diagnostic mode only.</summary>
     internal string Describe() => string.Create(
         CultureInfo.InvariantCulture,
@@ -85,21 +88,22 @@ internal sealed record CitrixWindowDiagnosticsOptions(
 }
 
 /// <summary>
-/// Decides whether a window title names a published application.
+/// Decides whether a window title is the anchor title of a published application.
 /// </summary>
 /// <remarks>
-/// Measured with Citrix Workspace 2511: an ICA window title reads
-/// <c>&lt;application&gt;- \\&lt;localized suffix&gt;</c>, for example <c>MobaXterm- \\Distant</c>.
-/// Several applications can share one wfica32 process, so the title, not the process id, tells
-/// them apart. The application name must be followed by the separator or end the title: a bare
-/// prefix test would let <c>MobaXterm</c> claim the window of <c>MobaXterm Pro</c>.
+/// Measured with Citrix Workspace 2511 (Polaris, 2026-10-28): every seamless window title reads
+/// <c>&lt;remote window title&gt;- \\&lt;localized suffix&gt;</c>. The published application owns an
+/// anchor window whose remote title is exactly the application name, <c>MobaXterm- \\Distant</c>,
+/// while its visible window carries the application's own title, <c>MobaXterm Professional-
+/// \\Distant</c>. Matching the name followed by the separator, and nothing else, keeps the
+/// launch window <c>MobaXterm - Citrix Workspace</c> and <c>MobaXterm Pro</c> out.
 /// </remarks>
 internal static class CitrixWindowTitleMatcher
 {
-    /// <summary>The character that ends the application name in an ICA window title.</summary>
-    internal const char ApplicationNameSeparator = '-';
+    /// <summary>What Citrix puts between the remote window title and its localized suffix.</summary>
+    internal const string SeamlessTitleSeparator = "- \\\\";
 
-    /// <summary>True when <paramref name="title"/> is the window of <paramref name="applicationName"/>.</summary>
+    /// <summary>True when <paramref name="title"/> is the anchor title of <paramref name="applicationName"/>.</summary>
     internal static bool IsApplicationWindowTitle(string? title, string? applicationName)
     {
         if (string.IsNullOrWhiteSpace(title) || string.IsNullOrWhiteSpace(applicationName))
@@ -107,31 +111,34 @@ internal static class CitrixWindowTitleMatcher
             return false;
         }
 
-        string trimmedTitle = title.Trim();
-        string trimmedName = applicationName.Trim();
-        if (!trimmedTitle.StartsWith(trimmedName, StringComparison.OrdinalIgnoreCase))
-        {
-            return false;
-        }
-
-        ReadOnlySpan<char> rest = trimmedTitle.AsSpan(trimmedName.Length).TrimStart();
-        return rest.IsEmpty || rest[0] == ApplicationNameSeparator;
+        return title.Trim().StartsWith(applicationName.Trim() + SeamlessTitleSeparator, StringComparison.OrdinalIgnoreCase);
     }
 }
 
 /// <summary>
-/// Picks the ICA window of one published application out of a window survey.
+/// Picks the window of one published application out of a window survey.
 /// </summary>
+/// <remarks>
+/// The application is found by its anchor: an unowned seamless window of a session-host process
+/// titled after the application. The anchor has no size; the window to embed is the largest
+/// visible window it owns. Session-wide helpers (language bar, tooltips) are owned by another
+/// window and never compete.
+/// </remarks>
 internal static class CitrixApplicationWindowSelector
 {
     /// <summary>The processes that host published-application windows, as opposed to the Workspace shell.</summary>
     internal static readonly IReadOnlyList<string> SessionHostProcessNames = ["wfica32", "CDViewer"];
 
+    /// <summary>The class of every seamless application window, the anchor included.</summary>
+    internal const string SeamlessWindowClassName = "Transparent Windows Client";
+
+    // The anchor also owns 1x1 helper windows, which appear a second before the real one.
+    internal const long MinimumWindowAreaPx = 10_000;
+
     /// <summary>
-    /// The visible, new, session-host windows whose title names <paramref name="applicationName"/>,
-    /// in survey order. Empty when none is there yet.
+    /// The anchors of <paramref name="applicationName"/> that appeared after the launch, in survey order.
     /// </summary>
-    internal static IReadOnlyList<CitrixWindowRecord> Select(
+    internal static IReadOnlyList<CitrixWindowRecord> FindAnchors(
         IEnumerable<CitrixWindowRecord> survey,
         IReadOnlySet<IntPtr> preLaunchWindows,
         string? applicationName)
@@ -140,11 +147,46 @@ internal static class CitrixApplicationWindowSelector
         ArgumentNullException.ThrowIfNull(preLaunchWindows);
 
         return survey
-            .Where(window => window.IsVisible
+            .Where(window => window.OwnerHwnd == IntPtr.Zero
                 && !preLaunchWindows.Contains(window.Hwnd)
                 && SessionHostProcessNames.Contains(window.ProcessName, StringComparer.OrdinalIgnoreCase)
+                && string.Equals(window.ClassName, SeamlessWindowClassName, StringComparison.Ordinal)
                 && CitrixWindowTitleMatcher.IsApplicationWindowTitle(window.Title, applicationName))
             .ToList();
+    }
+
+    /// <summary>
+    /// The window to embed for <paramref name="applicationName"/>: the largest visible window owned
+    /// by one of its anchors and not a helper, or null while none is there yet.
+    /// </summary>
+    internal static CitrixWindowRecord? Select(
+        IReadOnlyCollection<CitrixWindowRecord> survey,
+        IReadOnlySet<IntPtr> preLaunchWindows,
+        string? applicationName)
+    {
+        ArgumentNullException.ThrowIfNull(survey);
+
+        HashSet<IntPtr> anchors = FindAnchors(survey, preLaunchWindows, applicationName)
+            .Select(anchor => anchor.Hwnd)
+            .ToHashSet();
+        if (anchors.Count == 0)
+        {
+            return null;
+        }
+
+        CitrixWindowRecord? best = null;
+        foreach (CitrixWindowRecord window in survey)
+        {
+            if (window.IsVisible
+                && anchors.Contains(window.OwnerHwnd)
+                && window.Area >= MinimumWindowAreaPx
+                && (best is null || window.Area > best.Value.Area))
+            {
+                best = window;
+            }
+        }
+
+        return best;
     }
 }
 
@@ -207,6 +249,8 @@ internal static class CitrixWindowSurvey
     private const int GwlStyle = -16;
     private const int GwlExStyle = -20;
     private const uint GwOwner = 4;
+    private const uint GaParent = 1;
+    private const string EmbeddedProcessLabel = "embedded";
     private const int ClassNameCapacity = 256;
 
     private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
@@ -236,6 +280,13 @@ internal static class CitrixWindowSurvey
 
     [DllImport("user32.dll")]
     private static extern IntPtr GetWindow(IntPtr hWnd, uint uCmd);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetAncestor(IntPtr hWnd, uint gaFlags);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsWindow(IntPtr hWnd);
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -281,6 +332,22 @@ internal static class CitrixWindowSurvey
         return windows;
     }
 
+    /// <summary>
+    /// The state of a window embedded in a tab, with its parent, or null when it no longer exists.
+    /// Tells whether Citrix keeps a reparented seamless window where Heimdall put it.
+    /// </summary>
+    internal static string? DescribeEmbedded(IntPtr hwnd)
+    {
+        if (hwnd == IntPtr.Zero || !IsWindow(hwnd))
+        {
+            return null;
+        }
+
+        GetWindowThreadProcessId(hwnd, out uint pid);
+        CitrixWindowRecord window = Read(hwnd, (int)pid, EmbeddedProcessLabel);
+        return $"{window.Describe()} parent=0x{GetAncestor(hwnd, GaParent).ToInt64():X}";
+    }
+
     private static CitrixWindowRecord Read(IntPtr hwnd, int pid, string processName)
     {
         StringBuilder className = new(ClassNameCapacity);
@@ -319,14 +386,22 @@ internal static class CitrixWindowDiagnostics
     internal const string LogPrefix = "Citrix diag:";
 
     /// <summary>Runs the trace. Never throws: a failure ends the trace and is logged.</summary>
-    internal static async Task RunAsync(CitrixWindowDiagnosticsOptions options, CancellationToken cancellationToken)
+    /// <param name="options">Duration and interval.</param>
+    /// <param name="embeddedWindow">The window the tab embeds right now, zero for none.</param>
+    /// <param name="cancellationToken">Cancelled when the tab closes.</param>
+    internal static async Task RunAsync(
+        CitrixWindowDiagnosticsOptions options,
+        Func<IntPtr> embeddedWindow,
+        CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(embeddedWindow);
         ArgumentNullException.ThrowIfNull(options);
 
         Core.Logging.FileLogger.Info(
             $"{LogPrefix} trace started duration={options.TraceDuration.TotalSeconds}s interval={options.TraceInterval.TotalMilliseconds}ms processes={string.Join(',', CitrixWindowSurvey.TracedProcessNames)}");
 
         Dictionary<IntPtr, CitrixWindowRecord> previous = [];
+        string? previousEmbedded = null;
         DateTime deadline = DateTime.UtcNow + options.TraceDuration;
         try
         {
@@ -337,6 +412,15 @@ internal static class CitrixWindowDiagnostics
                 {
                     Core.Logging.FileLogger.Info($"{LogPrefix} {line}");
                 }
+
+                IntPtr embedded = embeddedWindow();
+                string? embeddedState = embedded == IntPtr.Zero ? null : CitrixWindowSurvey.DescribeEmbedded(embedded) ?? CitrixWindowTraceDiff.GoneTag;
+                if (embeddedState is not null && embeddedState != previousEmbedded)
+                {
+                    Core.Logging.FileLogger.Info($"{LogPrefix} embedded {embeddedState}");
+                }
+
+                previousEmbedded = embeddedState;
 
                 await Task.Delay(options.TraceInterval, cancellationToken).ConfigureAwait(false);
             }

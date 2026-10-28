@@ -27,30 +27,39 @@ namespace Heimdall.App.Tests;
 public sealed class CitrixWindowDiagnosticsTests
 {
     private const string Application = "MobaXterm";
-    private const int IcaPid = 5150;
-    private const int WorkspacePid = 6160;
+    private const int IcaPid = 34372;
+    private const int WorkspacePid = 18232;
+    private const string SeamlessClass = CitrixApplicationWindowSelector.SeamlessWindowClassName;
 
-    // The title measured on the test workstation, Citrix Workspace 2511, French locale.
+    // Window titles and handles measured on Polaris, Citrix Workspace 2511, French locale.
     private const string MeasuredTitle = "MobaXterm- \\\\Distant";
+    private const string MeasuredMainTitle = "MobaXterm Professional- \\\\Distant";
+    private const string MeasuredLaunchTitle = "MobaXterm - Citrix Workspace";
+    private const IntPtr AnchorHwnd = 0x4D09C0;
+    private const IntPtr MainHwnd = 0x2F1130;
+    private const IntPtr CommonOwnerHwnd = 0x190FFC;
 
     [Theory]
     [InlineData(MeasuredTitle)]
-    [InlineData("MobaXterm - \\\\Remote")]
+    [InlineData("MobaXterm- \\\\Remote")]
     [InlineData("mobaxterm- \\\\Remoto")]
-    [InlineData("  MobaXterm  ")]
-    public void TitleMatcher_AcceptsTheApplicationWhateverTheLocalizedSuffix(string title)
+    [InlineData("  MobaXterm- \\\\Distant  ")]
+    public void TitleMatcher_AcceptsTheAnchorWhateverTheLocalizedSuffix(string title)
     {
         Assert.True(CitrixWindowTitleMatcher.IsApplicationWindowTitle(title, Application));
     }
 
     [Theory]
-    [InlineData("MobaXterm Pro- \\\\Distant")]
+    [InlineData(MeasuredLaunchTitle)]
+    [InlineData(MeasuredMainTitle)]
     [InlineData("MobaXtermX- \\\\Distant")]
     [InlineData("Notepad- \\\\Distant")]
+    [InlineData("UsrLogon.cmd- \\\\Distant")]
+    [InlineData("MobaXterm")]
     [InlineData("Citrix Workspace")]
     [InlineData("")]
     [InlineData(null)]
-    public void TitleMatcher_RefusesAnotherApplication(string? title)
+    public void TitleMatcher_RefusesEverythingButTheAnchor(string? title)
     {
         Assert.False(CitrixWindowTitleMatcher.IsApplicationWindowTitle(title, Application));
     }
@@ -65,62 +74,74 @@ public sealed class CitrixWindowDiagnosticsTests
     }
 
     [Fact]
-    public void Selector_TwoApplicationsInOneIcaProcess_PicksEachByItsTitle()
+    public void Selector_MeasuredPolarisTree_EmbedsTheWindowOwnedByTheAnchor()
     {
-        CitrixWindowRecord moba = Window(0x10, IcaPid, "wfica32", MeasuredTitle);
-        CitrixWindowRecord notepad = Window(0x20, IcaPid, "wfica32", "Notepad- \\\\Distant");
+        CitrixWindowRecord? selected = CitrixApplicationWindowSelector.Select(MeasuredTree(), new HashSet<IntPtr>(), Application);
 
-        IReadOnlyList<CitrixWindowRecord> forMoba = CitrixApplicationWindowSelector.Select([moba, notepad], new HashSet<IntPtr>(), Application);
-        IReadOnlyList<CitrixWindowRecord> forNotepad = CitrixApplicationWindowSelector.Select([moba, notepad], new HashSet<IntPtr>(), "Notepad");
-
-        Assert.Equal(0x10, Assert.Single(forMoba).Hwnd);
-        Assert.Equal(0x20, Assert.Single(forNotepad).Hwnd);
+        Assert.NotNull(selected);
+        Assert.Equal(MainHwnd, selected.Value.Hwnd);
     }
 
     [Fact]
-    public void Selector_WindowOpenBeforeTheLaunch_IsNotThisLaunchsWindow()
+    public void Selector_AnchorWithoutItsWindowYet_Waits()
     {
-        CitrixWindowRecord earlier = Window(0x10, IcaPid, "wfica32", MeasuredTitle);
+        List<CitrixWindowRecord> tree = MeasuredTree().Where(window => window.Hwnd != MainHwnd).ToList();
 
-        IReadOnlyList<CitrixWindowRecord> matches = CitrixApplicationWindowSelector.Select(
-            [earlier],
-            new HashSet<IntPtr> { 0x10 },
-            Application);
-
-        Assert.Empty(matches);
+        Assert.Null(CitrixApplicationWindowSelector.Select(tree, new HashSet<IntPtr>(), Application));
     }
 
     [Fact]
-    public void Selector_WorkspaceShellWindowNamedLikeTheApplication_IsNeverTheSession()
+    public void Selector_TwoApplicationsInOneIcaProcess_PicksEachByItsAnchor()
     {
-        // The Workspace sign-in window is the one the default capture wrongly embedded. Even
-        // titled like the application, it is not an ICA window.
-        CitrixWindowRecord shell = Window(0x30, WorkspacePid, "SelfService", MeasuredTitle);
+        List<CitrixWindowRecord> tree =
+        [
+            .. MeasuredTree(),
+            Window(0x60, IcaPid, "Notepad- \\\\Distant", 0, 0),
+            Window(0x61, IcaPid, "Untitled - Notepad- \\\\Distant", 640, 480, owner: 0x60),
+        ];
 
-        Assert.Empty(CitrixApplicationWindowSelector.Select([shell], new HashSet<IntPtr>(), Application));
+        Assert.Equal(MainHwnd, CitrixApplicationWindowSelector.Select(tree, new HashSet<IntPtr>(), Application)?.Hwnd);
+        Assert.Equal(0x61, CitrixApplicationWindowSelector.Select(tree, new HashSet<IntPtr>(), "Notepad")?.Hwnd);
     }
 
     [Fact]
-    public void Selector_HiddenWindow_IsNotEmbedded()
+    public void Selector_AnchorOpenBeforeTheLaunch_IsNotThisLaunchsApplication()
     {
-        CitrixWindowRecord hidden = Window(0x10, IcaPid, "wfica32", MeasuredTitle, isVisible: false);
+        Assert.Null(CitrixApplicationWindowSelector.Select(MeasuredTree(), new HashSet<IntPtr> { AnchorHwnd }, Application));
+    }
 
-        Assert.Empty(CitrixApplicationWindowSelector.Select([hidden], new HashSet<IntPtr>(), Application));
+    [Fact]
+    public void Selector_WorkspaceShellTitledLikeTheAnchor_IsNeverTheApplication()
+    {
+        CitrixWindowRecord shell = Window(0x30, WorkspacePid, MeasuredTitle, 0, 0, processName: "SelfService");
+        CitrixWindowRecord shellChild = Window(0x31, WorkspacePid, "Sign in", 800, 600, owner: 0x30, processName: "SelfService");
+
+        Assert.Null(CitrixApplicationWindowSelector.Select([shell, shellChild], new HashSet<IntPtr>(), Application));
+    }
+
+    [Fact]
+    public void Selector_HiddenOwnedWindow_IsNotEmbedded()
+    {
+        List<CitrixWindowRecord> tree = MeasuredTree()
+            .Select(window => window.Hwnd == MainHwnd ? window with { IsVisible = false } : window)
+            .ToList();
+
+        Assert.Null(CitrixApplicationWindowSelector.Select(tree, new HashSet<IntPtr>(), Application));
     }
 
     [Fact]
     public void Selector_WindowNeverAppeared_ReturnsNothing()
     {
-        Assert.Empty(CitrixApplicationWindowSelector.Select([], new HashSet<IntPtr>(), Application));
+        Assert.Null(CitrixApplicationWindowSelector.Select([], new HashSet<IntPtr>(), Application));
     }
 
     [Fact]
     public void TraceDiff_ReportsAppearedChangedAndGone_OncePerWindow()
     {
-        CitrixWindowRecord stays = Window(0x10, IcaPid, "wfica32", MeasuredTitle);
-        CitrixWindowRecord goes = Window(0x20, WorkspacePid, "SelfService", "Citrix Workspace");
+        CitrixWindowRecord stays = Window(0x10, IcaPid, MeasuredTitle);
+        CitrixWindowRecord goes = Window(0x20, WorkspacePid, "Citrix Workspace", processName: "SelfService");
         CitrixWindowRecord retitled = stays with { Title = "MobaXterm- \\\\Distant (2)" };
-        CitrixWindowRecord arrives = Window(0x40, IcaPid, "wfica32", "Dialog");
+        CitrixWindowRecord arrives = Window(0x40, IcaPid, "Dialog");
 
         IReadOnlyList<string> first = CitrixWindowTraceDiff.Compare(
             new Dictionary<IntPtr, CitrixWindowRecord>(),
@@ -184,11 +205,27 @@ public sealed class CitrixWindowDiagnosticsTests
         Assert.Equal(TimeSpan.FromSeconds(waitRange.Max), options.SessionWindowWait);
     }
 
+    // The wfica32 windows of the Polaris launch that matter to the choice, as logged.
+    private static List<CitrixWindowRecord> MeasuredTree() =>
+    [
+        Window(0x850A9A, IcaPid, MeasuredLaunchTitle, 199, 34, className: "wMFService000406F0000"),
+        Window(CommonOwnerHwnd, IcaPid, "TWI Common Owner Window", 166, 47, isVisible: false),
+        Window(0x1B1068, IcaPid, "TF_FloatingLangBar_WndTitle- \\\\Distant", 190, 26, owner: CommonOwnerHwnd),
+        Window(0xC71232, IcaPid, "PuTTY sessions- \\\\Distant", 142, 31, owner: CommonOwnerHwnd),
+        Window(AnchorHwnd, IcaPid, MeasuredTitle, 0, 0),
+        Window(0xC21232, IcaPid, string.Empty, 1, 1, owner: AnchorHwnd),
+        Window(MainHwnd, IcaPid, MeasuredMainTitle, 1136, 663, owner: AnchorHwnd),
+    ];
+
     private static CitrixWindowRecord Window(
         IntPtr hwnd,
         int pid,
-        string processName,
         string title,
-        bool isVisible = true)
-        => new(hwnd, pid, processName, title, "Transparent Windows Client", 0, 0, IntPtr.Zero, isVisible, 800, 600);
+        int width = 800,
+        int height = 600,
+        IntPtr owner = 0,
+        bool isVisible = true,
+        string processName = "wfica32",
+        string className = SeamlessClass)
+        => new(hwnd, pid, processName, title, className, 0, 0, owner, isVisible, width, height);
 }

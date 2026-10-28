@@ -223,7 +223,7 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
         if (Diagnostics.Enabled)
         {
             _diagnosticsCts = new CancellationTokenSource();
-            _ = CitrixWindowDiagnostics.RunAsync(Diagnostics, _diagnosticsCts.Token);
+            _ = CitrixWindowDiagnostics.RunAsync(Diagnostics, () => _capturedHwnd, _diagnosticsCts.Token);
         }
 
         // Attempt to capture the Citrix window asynchronously
@@ -508,24 +508,16 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
                 await ShowExtendedSearchMessageAsync();
             }
 
-            IReadOnlyList<CitrixWindowRecord> matches = CitrixApplicationWindowSelector.Select(
-                CitrixWindowSurvey.Capture(CitrixApplicationWindowSelector.SessionHostProcessNames),
-                preLaunchWindows,
-                applicationName);
-            if (matches.Count == 0)
+            if (CitrixApplicationWindowSelector.Select(
+                    CitrixWindowSurvey.Capture(CitrixApplicationWindowSelector.SessionHostProcessNames),
+                    preLaunchWindows,
+                    applicationName) is not { } match)
             {
                 continue;
             }
 
-            if (matches.Count > 1)
-            {
-                Core.Logging.FileLogger.Info(
-                    $"{CitrixWindowDiagnostics.LogPrefix} {matches.Count} windows match application=\"{applicationName}\"; taking the first");
-            }
-
-            CitrixWindowRecord match = matches[0];
             Core.Logging.FileLogger.Info(
-                $"{CitrixWindowDiagnostics.LogPrefix} embedding title-matched window after {attempt * WindowCapturePollIntervalMs}ms: {match.Describe()}");
+                $"{CitrixWindowDiagnostics.LogPrefix} embedding the window owned by the application anchor after {attempt * WindowCapturePollIntervalMs}ms: {match.Describe()}");
 
             CitrixSessionWindow sessionWindow = new(match.Hwnd, match.ProcessId);
             bool adopted = await Dispatcher.InvokeAsync(() =>
