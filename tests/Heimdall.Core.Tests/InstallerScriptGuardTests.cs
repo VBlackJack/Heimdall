@@ -62,6 +62,24 @@ public sealed class InstallerScriptGuardTests
     }
 
     /// <summary>
+    /// Dependabot does not propose a WiX major update.
+    /// </summary>
+    /// <remarks>
+    /// WiX 7 makes the person running it accept the Open Source Maintenance Fee EULA before any
+    /// command, and accepting a license agreement is the owner's call. A pull request that bumps
+    /// the pinned tool would put that acceptance behind a merge button.
+    /// </remarks>
+    [Fact]
+    public void Dependabot_IgnoresMajorUpdatesOfWix()
+    {
+        string config = File.ReadAllText(Path.Combine(RepositoryRoot(), ".github", "dependabot.yml")).ReplaceLineEndings("\n");
+
+        Assert.Matches(
+            "(?m)^    ignore:\n(?:.*\n)*?      - dependency-name: \"wix\"\n        update-types:\n          - \"version-update:semver-major\"\n",
+            config);
+    }
+
+    /// <summary>
     /// An upgrade does not keep a seed file the new version no longer ships.
     /// </summary>
     /// <remarks>
