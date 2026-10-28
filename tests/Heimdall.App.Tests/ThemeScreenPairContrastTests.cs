@@ -16,8 +16,12 @@
 
 using System.Globalization;
 using System.IO;
+using System.Runtime.ExceptionServices;
 using System.Windows;
+using System.Windows.Automation.Peers;
+using System.Windows.Controls;
 using System.Xml.Linq;
+using Heimdall.App.Controls;
 using Heimdall.App.Tests.Views.EmbeddedRdp;
 using ThemeForge.Theme;
 using Color = System.Windows.Media.Color;
@@ -304,42 +308,51 @@ public sealed class ThemeScreenPairContrastTests
                 && border.Elements(Presentation + "TextBlock").Count() == 1);
 
     /// <summary>
-    /// The Hosts file editor's Problem cell: its text on a normal row (the grid's row and alternating
-    /// row fills) and on a selected row (the selection fill, for every accent). The error brush was
-    /// kept on the selected row and was unreadable there on Magellan; the selected row takes the same
-    /// foreground the shared DataGrid styles give selected-row text.
+    /// The Hosts file editor's cell texts: the IP address, host name, comment and Problem texts at
+    /// rest, on the grid's row and alternating row fills, and on a selected row, on the selection
+    /// fill for every accent. The error brush was kept on a selected row and was unreadable there on
+    /// Magellan, and the other columns kept their own column foreground; every column takes the
+    /// foreground the shared DataGrid styles give selected-row text, through one inherited trigger.
     /// </summary>
     [Theory]
     [MemberData(nameof(Themes))]
-    public void TheHostsEditorProblemTextIsReadableOnEveryRow(string theme)
+    public void TheHostsEditorCellTextsAreReadableOnEveryRow(string theme)
     {
+        XDocument view = Load(Source("Views/Tools/HostsFileEditorView.xaml"));
         XElement grid = Named("Views/Tools/HostsFileEditorView.xaml", "HostsGrid");
-        XElement style = ProblemTextStyle();
-        XElement selectedTrigger = Assert.Single(
-            style.Elements(Presentation + "Style.Triggers").Elements(Presentation + "DataTrigger"),
-            trigger => ((string?)trigger.Attribute("Binding"))?.Contains("IsSelected", StringComparison.Ordinal) == true);
-        string restText = SetterKey(style, "Foreground");
-        string selectedText = SetterKey(selectedTrigger, "Foreground");
-
         XElement gridRowStyle = KeyedStyle("Themes/CommonControls.xaml", "ThemedDataGridRowStyle");
-        Assert.Equal(TriggerSetterKey(gridRowStyle, "IsSelected", "Foreground"), selectedText);
+        string gridSelectedText = TriggerSetterKey(gridRowStyle, "IsSelected", "Foreground");
         string selectedFill = TriggerSetterKey(gridRowStyle, "IsSelected", "Background");
-
-        List<string> unreadable = [];
-        foreach (string rowFill in new[] { Key(grid.Attribute("RowBackground")), Key(grid.Attribute("AlternatingRowBackground")) })
-        {
-            AssertOrCollect(unreadable, theme, "problem text on a normal row", restText, [rowFill], MinimumTextContrast);
-        }
+        string[] normalFills = [Key(grid.Attribute("RowBackground")), Key(grid.Attribute("AlternatingRowBackground"))];
 
         ResourceDictionary palette = ThemeSurfaceTokenContrastTests.Palette(theme);
         ResourceDictionary colours = ThemeSurfaceTokenContrastTests.ThemeColours(theme);
-        Color text = ThemeSurfaceTokenContrastTests.ColorOf(palette, selectedText);
-        IEnumerable<Color> fills = selectedFill == "AccentBrush"
+        IEnumerable<Color> selectedFills = selectedFill == "AccentBrush"
             ? AccentFillColours.Select(key => (Color)colours[key])
             : [ThemeSurfaceTokenContrastTests.ColorOf(palette, selectedFill)];
-        unreadable.AddRange(fills
-            .Where(fill => ThemeSurfaceTokenContrastTests.Contrast(text, fill) < MinimumTextContrast)
-            .Select(fill => Report(theme, $"problem text {selectedText} on a selected row {selectedFill}", text, fill)));
+
+        List<string> unreadable = [];
+        foreach ((string cell, string styleKey) in HostsCellStyleKeys(view))
+        {
+            List<XElement> chain = StyleChain(view, styleKey);
+            string restText = Assert.IsType<string>(InheritedSetterKey(chain, "Foreground"));
+            XElement? selectedTrigger = chain
+                .SelectMany(style => style.Elements(Presentation + "Style.Triggers").Elements(Presentation + "DataTrigger"))
+                .FirstOrDefault(trigger => ((string?)trigger.Attribute("Binding"))?.Contains("IsSelected", StringComparison.Ordinal) == true);
+            Assert.True(selectedTrigger is not null, $"{cell}: its text style has no selected-row trigger");
+            string selectedText = SetterKey(selectedTrigger, "Foreground");
+            Assert.True(gridSelectedText == selectedText, $"{cell}: selected text is {selectedText}, the grid gives {gridSelectedText}");
+
+            foreach (string rowFill in normalFills)
+            {
+                AssertOrCollect(unreadable, theme, $"{cell} text on a normal row", restText, [rowFill], MinimumTextContrast);
+            }
+
+            Color text = ThemeSurfaceTokenContrastTests.ColorOf(palette, selectedText);
+            unreadable.AddRange(selectedFills
+                .Where(fill => ThemeSurfaceTokenContrastTests.Contrast(text, fill) < MinimumTextContrast)
+                .Select(fill => Report(theme, $"{cell} text {selectedText} on a selected row {selectedFill}", text, fill)));
+        }
 
         Assert.True(unreadable.Count == 0, string.Join(Environment.NewLine, unreadable));
     }
@@ -348,7 +361,8 @@ public sealed class ThemeScreenPairContrastTests
     /// The Problem cell keeps its meaning without the colour: an error glyph, in the icon font set on
     /// the glyph's own style and not on the cell's root (a font on a parent is inherited by whatever
     /// it hosts), and hidden when the row has no problem. The glyph takes the same foreground as the
-    /// text, so it stays readable on a selected row.
+    /// text, so it stays readable on a selected row. It is a decorative element, out of the
+    /// automation tree, and the sentence beside it carries the plain text as its automation name.
     /// </summary>
     [Fact]
     public void TheHostsEditorProblemCellMarksTheErrorWithAGlyphThatIsNotColourOnly()
@@ -356,7 +370,9 @@ public sealed class ThemeScreenPairContrastTests
         XDocument view = Load(Source("Views/Tools/HostsFileEditorView.xaml"));
         XElement glyphStyle = Assert.Single(
             view.Descendants(Presentation + "Style"), style => (string?)style.Attribute(Xaml + "Key") == "HostsProblemGlyphStyle");
-        XElement template = Assert.Single(view.Descendants(Presentation + "DataTemplate"), t => t.Descendants().Any(e => e == glyphStyle));
+        XElement template = Assert.Single(
+            view.Descendants(Presentation + "DataTemplate"),
+            t => t.Descendants().Any(e => (string?)e.Attribute("Style") == "{StaticResource HostsProblemGlyphStyle}"));
         XElement root = template.Elements().Last();
 
         Assert.Equal("{StaticResource HostsProblemTextStyle}", (string?)glyphStyle.Attribute("BasedOn"));
@@ -366,15 +382,107 @@ public sealed class ThemeScreenPairContrastTests
         Assert.Contains(
             glyphStyle.Descendants(Presentation + "DataTrigger"),
             trigger => (string?)trigger.Attribute("Value") == "" && ((string?)trigger.Attribute("Binding"))?.Contains("ProblemDisplay", StringComparison.Ordinal) == true);
-        Assert.Contains(
-            root.Elements(Presentation + "TextBlock"),
-            block => (string?)block.Attribute("Style") == "{StaticResource HostsProblemGlyphStyle}");
+
+        XElement glyph = Assert.Single(
+            root.Elements(), element => (string?)element.Attribute("Style") == "{StaticResource HostsProblemGlyphStyle}");
+        Assert.Equal("DecorativeGlyphText", glyph.Name.LocalName);
+        XElement sentence = Assert.Single(
+            root.Elements(Presentation + "TextBlock"), block => ((string?)block.Attribute("Text"))?.Contains("ProblemDisplay", StringComparison.Ordinal) == true);
+        Assert.Equal("{Binding ProblemDisplay}", (string?)sentence.Attribute("AutomationProperties.Name"));
     }
 
-    private static XElement ProblemTextStyle() =>
-        Assert.Single(
-            Load(Source("Views/Tools/HostsFileEditorView.xaml")).Descendants(Presentation + "Style"),
-            style => (string?)style.Attribute(Xaml + "Key") == "HostsProblemTextStyle");
+    /// <summary>Far enough off screen that a test window is never seen.</summary>
+    private const double HiddenWindowOffset = -10000;
+
+    /// <summary>The glyph element is in neither the control nor the content view of UI Automation.</summary>
+    [Fact]
+    public void TheDecorativeGlyphIsLeftOutOfTheAutomationViews()
+    {
+        Exception? failure = null;
+        Thread thread = new(() =>
+        {
+            try
+            {
+                DecorativeGlyphText glyph = new() { Text = "" };
+                TextBlock plain = new() { Text = "x" };
+                Window window = new()
+                {
+                    Content = new StackPanel { Children = { glyph, plain } },
+                    ShowActivated = false,
+                    ShowInTaskbar = false,
+                    WindowStyle = WindowStyle.None,
+                    Left = HiddenWindowOffset,
+                    Top = HiddenWindowOffset,
+                };
+                window.Show();
+                try
+                {
+                    // The control: a plain TextBlock in a shown window is in the control view.
+                    Assert.True(UIElementAutomationPeer.CreatePeerForElement(plain).IsControlElement());
+                    AutomationPeer peer = UIElementAutomationPeer.CreatePeerForElement(glyph);
+                    Assert.NotNull(peer);
+                    Assert.False(peer.IsControlElement());
+                    Assert.False(peer.IsContentElement());
+                }
+                finally
+                {
+                    window.Close();
+                }
+            }
+            catch (Exception exception)
+            {
+                failure = exception;
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+
+        if (failure is not null)
+        {
+            ExceptionDispatchInfo.Capture(failure).Throw();
+        }
+    }
+
+    /// <summary>The (cell, style key) of each text the hosts grid draws, read from its columns and its Problem cell.</summary>
+    private static IEnumerable<(string Cell, string StyleKey)> HostsCellStyleKeys(XDocument view)
+    {
+        foreach (string column in new[] { "ColIpAddress", "ColHostname", "ColComment" })
+        {
+            XElement element = Assert.Single(view.Descendants(), e => (string?)e.Attribute(Xaml + "Name") == column);
+            yield return (column, Key(element.Attribute("ElementStyle")));
+        }
+
+        XElement problem = Assert.Single(view.Descendants(), e => (string?)e.Attribute(Xaml + "Name") == "ColProblem");
+        XElement sentence = Assert.Single(
+            problem.Descendants(Presentation + "TextBlock"), block => ((string?)block.Attribute("Text"))?.Contains("ProblemDisplay", StringComparison.Ordinal) == true);
+        yield return ("ColProblem", Key(sentence.Attribute("Style")));
+    }
+
+    /// <summary>A keyed style of the view followed by the keyed styles it is based on, nearest first.</summary>
+    private static List<XElement> StyleChain(XDocument view, string key)
+    {
+        List<XElement> chain = [];
+        string? next = key;
+        while (next is not null)
+        {
+            XElement style = Assert.Single(
+                view.Descendants(Presentation + "Style"), candidate => (string?)candidate.Attribute(Xaml + "Key") == next);
+            chain.Add(style);
+            string? basedOn = (string?)style.Attribute("BasedOn");
+            next = basedOn is not null && basedOn.StartsWith("{StaticResource ", StringComparison.Ordinal) ? Key(style.Attribute("BasedOn")) : null;
+        }
+
+        return chain;
+    }
+
+    /// <summary>The setter value of the nearest style of the chain that sets the property.</summary>
+    private static string? InheritedSetterKey(List<XElement> chain, string property) =>
+        chain
+            .Select(style => style.Elements(Presentation + "Setter").FirstOrDefault(setter => (string?)setter.Attribute("Property") == property))
+            .Where(setter => setter is not null)
+            .Select(setter => Key(setter!.Attribute("Value")))
+            .FirstOrDefault();
 
     /// <summary>
     /// Text in the Notes tool is not dimmed with Opacity on top of its tier brush. At 0.62 the list
