@@ -205,6 +205,61 @@ public sealed class ReleaseNotesLanguageGuardTests
         Assert.True(pinned >= 20, $"only {pinned} pinned French mirror links were seen, so the scan did not read the notes");
     }
 
+    /// <summary>
+    /// The same dead-link problem is not specific to the French mirror: <c>../CHANGELOG.md</c> in a
+    /// note resolves against the release URL as well. Any relative markdown link in a note, English
+    /// or French, is refused; an in-page anchor <c>](#...)</c> and an absolute URL stay allowed.
+    /// </summary>
+    [Fact]
+    public void ReleaseNotesHaveNoRelativeLinks()
+    {
+        List<string> violations = [];
+        int absolute = 0;
+        int englishFiles = 0;
+        int frenchFiles = 0;
+
+        foreach (string path in ReleaseNotesInBothLanguages())
+        {
+            bool french = path.Replace('\\', '/').Contains("/docs/fr/release-notes/", System.StringComparison.Ordinal);
+            if (french)
+                frenchFiles++;
+            else
+                englishFiles++;
+
+            foreach (Match link in MarkdownLinkTarget.Matches(File.ReadAllText(path)))
+            {
+                string target = link.Groups["target"].Value;
+                if (target.StartsWith('#'))
+                    continue;
+
+                if (target.StartsWith("https://", System.StringComparison.Ordinal)
+                    || target.StartsWith("http://", System.StringComparison.Ordinal)
+                    || target.StartsWith("mailto:", System.StringComparison.Ordinal))
+                {
+                    absolute++;
+                    continue;
+                }
+
+                violations.Add($"{Path.GetFileName(path)} ({(french ? "fr" : "en")}) has the relative link '{target}'; "
+                    + "use https://github.com/VBlackJack/Heimdall/blob/v<version>/<path>");
+            }
+        }
+
+        Assert.True(violations.Count == 0, string.Join("\n", violations));
+        Assert.True(englishFiles >= 80 && frenchFiles >= 30, $"scanned {englishFiles} English and {frenchFiles} French notes");
+        Assert.True(absolute >= 50, $"only {absolute} absolute links were seen, so the scan did not read the notes");
+    }
+
+    private static IReadOnlyList<string> ReleaseNotesInBothLanguages()
+    {
+        string docs = Path.Combine(FindRepoRoot(), "docs");
+        return
+        [
+            .. Directory.EnumerateFiles(Path.Combine(docs, "release-notes"), "*.md", SearchOption.AllDirectories),
+            .. Directory.EnumerateFiles(Path.Combine(docs, "fr", "release-notes"), "*.md", SearchOption.AllDirectories),
+        ];
+    }
+
     private static readonly Regex MarkdownLinkTarget = new(
         @"\]\((?<target>[^)\s]+)\)", RegexOptions.Compiled);
 
