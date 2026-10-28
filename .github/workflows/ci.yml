@@ -46,6 +46,16 @@ jobs:
           ./scripts/Test-InformationalTestFailures.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      # The release-time reader of the same lanes: a release is not refused for them,
+      # but a failure that CI called green is written into the release notes and
+      # printed. Pure PowerShell over recorded gh replies and TRX fixtures; if it
+      # stopped reading, a release would ship a red lane without a word.
+      - name: Check the release reads the informational lanes
+        shell: pwsh
+        run: |
+          ./scripts/Test-InformationalLaneReport.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       # Placed with the other cheap fail-fast gates, before the SDK is even set
       # up: the typography guard is pure PowerShell over docs/release-notes, so it
       # needs no .NET and no build. Running it here reports a bad character in
