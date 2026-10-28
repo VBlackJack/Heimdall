@@ -60,7 +60,20 @@ public sealed class WorkstationDebloatPackTests
         Assert.NotNull(actions);
         Assert.Equal(PackActionCount, actions!.Count);
         Assert.All(actions, action => Assert.Equal(CommandCategories.WindowsDebloat, action.Category));
-        Assert.All(actions, action => Assert.Empty(action.Translations));
+
+        // The base text is English and the import door carries both translation blocks, as it
+        // does for an export of the shipped catalogue.
+        Assert.All(actions, action => Assert.Equal(["fr", "es"], action.Translations.Select(t => t.CultureCode)));
+        Assert.All(actions, action => Assert.All(
+            action.Translations,
+            translation =>
+            {
+                Assert.False(string.IsNullOrWhiteSpace(translation.Title), $"{action.Id}/{translation.CultureCode} title");
+                Assert.False(string.IsNullOrWhiteSpace(translation.Description), $"{action.Id}/{translation.CultureCode} description");
+                Assert.False(string.IsNullOrWhiteSpace(translation.Notes), $"{action.Id}/{translation.CultureCode} notes");
+            }));
+        Assert.All(actions, action => Assert.NotEqual(action.Title, action.Translations[0].Title));
+
         Assert.Equal(actions.Count, actions.Select(action => action.Id).Distinct(StringComparer.Ordinal).Count());
 
         using var document = JsonDocument.Parse(json);
