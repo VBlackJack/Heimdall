@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
+using System.Collections.Concurrent;
 using System.Text.Json;
+using Heimdall.Core.Logging;
 
 namespace Heimdall.Core.Localization;
 
@@ -30,6 +32,7 @@ public sealed class LocalizationManager : ICountLocalizer
     };
 
     private Dictionary<string, string> _strings = new();
+    private readonly ConcurrentDictionary<string, byte> _missedKeys = new(StringComparer.Ordinal);
     private string _currentLocale = "en";
     private string _localesPath = string.Empty;
 
@@ -50,6 +53,22 @@ public sealed class LocalizationManager : ICountLocalizer
     public string this[string key] => GetString(key);
 
     /// <summary>
+    /// Gets the keys looked up in the current locale that it does not define, each once.
+    /// </summary>
+    /// <remarks>
+    /// A lookup that misses returns the key itself, so the screen shows a raw key and nothing
+    /// else says so. This is the list a hand pass reads to find them; the first miss of each
+    /// key is also written to the diagnostic log at debug level. Loading a locale starts the
+    /// list over, because a key one language lacks may be defined in the next.
+    /// </remarks>
+    public IReadOnlyCollection<string> MissedKeys => _missedKeys.Keys.ToArray();
+
+    /// <summary>
+    /// Gets the keys looked up in the current locale that it does not define, counted once each.
+    /// </summary>
+    public int MissedKeyCount => _missedKeys.Count;
+
+    /// <summary>
     /// Gets a localized string by key. Returns the key itself if not found.
     /// </summary>
     /// <param name="key">The locale key (e.g., "StatusReady", "ErrorPlinkNotFound").</param>
@@ -58,7 +77,21 @@ public sealed class LocalizationManager : ICountLocalizer
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
 
-        return _strings.TryGetValue(key, out var value) ? value : key;
+        if (_strings.TryGetValue(key, out var value))
+        {
+            return value;
+        }
+
+        RecordMiss(key);
+        return key;
+    }
+
+    private void RecordMiss(string key)
+    {
+        if (_missedKeys.TryAdd(key, 0))
+        {
+            FileLogger.Debug($"[Localization] No '{key}' key in locale '{_currentLocale}'");
+        }
     }
 
     /// <summary>
@@ -138,6 +171,7 @@ public sealed class LocalizationManager : ICountLocalizer
 
         _strings = parsed ?? new Dictionary<string, string>();
         _currentLocale = locale;
+        _missedKeys.Clear();
         _localesPath = localesPath;
     }
 
