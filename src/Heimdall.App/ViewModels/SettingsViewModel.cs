@@ -3356,6 +3356,15 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         return warnings;
     }
 
+    private string FormatMRemoteNgWarning(MRemoteNgImporter.ImportWarning warning) =>
+        warning.Kind switch
+        {
+            MRemoteNgImporter.ImportWarningKind.FullFileEncryption => _localizer["ImportMRemoteNgWarningFullFileEncryption"],
+            MRemoteNgImporter.ImportWarningKind.ParseError => _localizer.Format("ImportMRemoteNgWarningParseError", warning.Detail),
+            MRemoteNgImporter.ImportWarningKind.UnknownProtocol => _localizer.Format("ImportMRemoteNgWarningUnknownProtocol", warning.NodeName, warning.Detail),
+            _ => _localizer.Format("ImportMRemoteNgWarningNodeError", warning.NodeName, warning.Detail),
+        };
+
     private async Task<(List<ServerProfileDto> Servers, List<string>? Warnings)> ImportXmlAsync(
         string filePath, CancellationToken cancellationToken)
     {
@@ -3364,7 +3373,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             || content.Contains("Type=\"Connection\"", StringComparison.OrdinalIgnoreCase))
         {
             var mrnResult = MRemoteNgImporter.Parse(content);
-            return (mrnResult.Servers, mrnResult.Warnings);
+            return (mrnResult.Servers, mrnResult.Warnings.Select(FormatMRemoteNgWarning).ToList());
         }
 
         var rdcResult = RdcManImporter.Parse(content);

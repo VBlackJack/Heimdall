@@ -3757,6 +3757,50 @@ public sealed partial class SettingsViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task ImportConfigCommand_MRemoteNgUnknownProtocol_IsReportedInTheUsersLanguage()
+    {
+        FakeConfigManager config = new();
+        FakeDialogService dialog = new() { ConfirmResult = true };
+        LocalizationManager localizer = new();
+        await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en");
+        SettingsViewModel viewModel = CreateViewModel(config, dialog, localizer: localizer);
+        string importRoot = Path.Combine(
+            Path.GetTempPath(),
+            "heimdall-settings-import-tests",
+            Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(importRoot);
+        string importPath = Path.Combine(importRoot, "confCons.xml");
+        const string content = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <mrng:Connections xmlns:mrng="http://mremoteng.org" Name="Connections" ConfVersion="2.6">
+              <Node Name="Odd" Type="Connection" Hostname="odd.example.com" Protocol="Gopher" />
+            </mrng:Connections>
+            """;
+
+        try
+        {
+            await File.WriteAllTextAsync(importPath, content);
+            viewModel.ImportFilePathProvider = () => importPath;
+
+            await viewModel.ImportConfigCommand.ExecuteAsync(null);
+
+            Assert.Empty(config.Servers);
+            (string Title, string Message) warning = Assert.Single(dialog.WarningCalls);
+            Assert.Contains(
+                localizer.Format("ImportMRemoteNgWarningUnknownProtocol", "Odd", "Gopher"),
+                warning.Message,
+                StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (Directory.Exists(importRoot))
+            {
+                Directory.Delete(importRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task ImportConfigCommand_MobaXtermStoredCredentials_ShowsDetectedPasswordNotice()
     {
         FakeConfigManager config = new();

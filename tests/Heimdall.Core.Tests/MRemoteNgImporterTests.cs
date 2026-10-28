@@ -222,8 +222,8 @@ public class MRemoteNgImporterTests
         var result = MRemoteNgImporter.Parse(xml);
 
         Assert.Empty(result.Servers);
-        Assert.Single(result.Warnings);
-        Assert.Contains("encrypted", result.Warnings[0], StringComparison.OrdinalIgnoreCase);
+        var warning = Assert.Single(result.Warnings);
+        Assert.Equal(MRemoteNgImporter.ImportWarningKind.FullFileEncryption, warning.Kind);
     }
 
     [Fact]
@@ -312,7 +312,7 @@ public class MRemoteNgImporterTests
     }
 
     [Fact]
-    public void Parse_UnknownProtocol_FallsBackToRdp()
+    public void Parse_UnknownProtocol_IsSkippedWithAWarning()
     {
         var xml = """
             <?xml version="1.0" encoding="utf-8"?>
@@ -327,8 +327,12 @@ public class MRemoteNgImporterTests
 
         var result = MRemoteNgImporter.Parse(xml);
 
-        var server = result.Servers.Single();
-        Assert.Equal("RDP", server.ConnectionType);
+        // It used to import as an RDP profile, which could only fail to connect.
+        Assert.Empty(result.Servers);
+        var warning = Assert.Single(result.Warnings);
+        Assert.Equal(MRemoteNgImporter.ImportWarningKind.UnknownProtocol, warning.Kind);
+        Assert.Equal("Unknown", warning.NodeName);
+        Assert.Equal("SomeNewProtocol", warning.Detail);
     }
 
     [Fact]
@@ -574,5 +578,118 @@ public class MRemoteNgImporterTests
         var server = result.Servers.Single(s => s.DisplayName == "App Server");
 
         Assert.True(server.RdpUseGlobalDefaults);
+    }
+
+    private const string InheritanceXml = """
+        <?xml version="1.0" encoding="utf-8"?>
+        <Connections Name="Test" FullFileEncryption="false" ConfVersion="2.6">
+          <Node Name="Prod" Type="Container" Protocol="SSH2" Port="2222" Username="admin" Domain="corp.local"
+                InheritProtocol="False" InheritPort="False" InheritUsername="False" InheritDomain="False">
+            <Node Name="Direct" Type="Connection" Hostname="direct.example.com" Protocol="RDP" Port="3390"
+                  Username="own" InheritProtocol="False" InheritPort="False" InheritUsername="False" InheritDomain="False" />
+            <Node Name="Child" Type="Connection" Hostname="child.example.com" Protocol="RDP" Port="3389"
+                  Username="stale" Domain="stale.local"
+                  InheritProtocol="True" InheritPort="True" InheritUsername="True" InheritDomain="True" />
+            <Node Name="Inner" Type="Container" Protocol="VNC" Port="5999" Username="stale-inner"
+                  InheritProtocol="True" InheritPort="True" InheritUsername="True" InheritDomain="True">
+              <Node Name="Grandchild" Type="Connection" Hostname="grandchild.example.com" Protocol="RDP"
+                    Port="3389" Username="stale-leaf"
+                    InheritProtocol="True" InheritPort="True" InheritUsername="True" InheritDomain="True" />
+            </Node>
+          </Node>
+          <Node Name="Orphan" Type="Connection" Hostname="orphan.example.com" Protocol="SSH2" Port="2200"
+                Username="stale-root" InheritUsername="True" InheritPort="False" InheritProtocol="False" />
+        </Connections>
+        """;
+
+    [Fact]
+    public void Parse_InheritingConnection_TakesProtocolPortAndUsernameFromItsContainer()
+    {
+        var result = MRemoteNgImporter.Parse(InheritanceXml);
+
+        var child = result.Servers.Single(s => s.DisplayName == "Child");
+
+        // The node's own RDP / 3389 / "stale" are ignored: the container says SSH on 2222.
+        Assert.Equal("SSH", child.ConnectionType);
+        Assert.Equal(2222, child.SshPort);
+        Assert.Equal("admin@corp.local", child.SshUsername);
+        Assert.Null(child.RdpUsername);
+    }
+
+    [Fact]
+    public void Parse_ConnectionThatDoesNotInherit_KeepsItsOwnValues()
+    {
+        var result = MRemoteNgImporter.Parse(InheritanceXml);
+
+        var direct = result.Servers.Single(s => s.DisplayName == "Direct");
+
+        Assert.Equal("RDP", direct.ConnectionType);
+        Assert.Equal(3390, direct.RemotePort);
+        Assert.Equal("own", direct.RdpUsername);
+    }
+
+    [Fact]
+    public void Parse_InheritanceThroughAContainerThatItselfInherits_WalksUpToTheFirstSetter()
+    {
+        var result = MRemoteNgImporter.Parse(InheritanceXml);
+
+        var grandchild = result.Servers.Single(s => s.DisplayName == "Grandchild");
+
+        // "Inner" inherits too, so its own VNC / 5999 / "stale-inner" are as stale as the leaf's:
+        // the answer is "Prod", two levels up.
+        Assert.Equal("SSH", grandchild.ConnectionType);
+        Assert.Equal(2222, grandchild.SshPort);
+        Assert.Equal("admin@corp.local", grandchild.SshUsername);
+    }
+
+    [Fact]
+    public void Parse_InheritingAtTheRoot_LeavesTheValueUnset()
+    {
+        var result = MRemoteNgImporter.Parse(InheritanceXml);
+
+        var orphan = result.Servers.Single(s => s.DisplayName == "Orphan");
+
+        // Nothing above it sets a username, so the stale one is dropped rather than kept.
+        Assert.Null(orphan.SshUsername);
+        Assert.Equal(2200, orphan.SshPort);
+    }
+
+    [Fact]
+    public void Parse_InheritedProtocolThatIsUnknown_SkipsTheConnectionWithItsName()
+    {
+        var xml = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <Connections Name="Test" FullFileEncryption="false" ConfVersion="2.6">
+              <Node Name="Odd" Type="Container" Protocol="Gopher">
+                <Node Name="Leaf" Type="Connection" Hostname="leaf.example.com" Protocol="SSH2"
+                      InheritProtocol="True" />
+              </Node>
+            </Connections>
+            """;
+
+        var result = MRemoteNgImporter.Parse(xml);
+
+        Assert.Empty(result.Servers);
+        var warning = Assert.Single(result.Warnings);
+        Assert.Equal(MRemoteNgImporter.ImportWarningKind.UnknownProtocol, warning.Kind);
+        Assert.Equal("Leaf", warning.NodeName);
+        Assert.Equal("Gopher", warning.Detail);
+    }
+
+    [Fact]
+    public void Parse_UnknownProtocolOnOneNode_DoesNotStopTheOthers()
+    {
+        var xml = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <Connections Name="Test" FullFileEncryption="false" ConfVersion="2.6">
+              <Node Name="Odd" Type="Connection" Hostname="odd.example.com" Protocol="Gopher" />
+              <Node Name="Fine" Type="Connection" Hostname="fine.example.com" Protocol="SSH2" />
+            </Connections>
+            """;
+
+        var result = MRemoteNgImporter.Parse(xml);
+
+        Assert.Equal("Fine", Assert.Single(result.Servers).DisplayName);
+        Assert.Single(result.Warnings);
     }
 }
