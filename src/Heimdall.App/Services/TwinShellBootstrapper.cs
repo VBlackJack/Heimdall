@@ -277,7 +277,6 @@ internal static class TwinShellBootstrapper
         public CultureInfo[] SupportedCultures => [new("en"), new("fr"), new("es")];
 
         public string GetString(string key) => _localizer?[key] ?? key;
-        public string GetString(string key, string fallback) => _localizer?[key] ?? fallback;
 
         public string GetFormattedString(string key, params object[] args)
         {
