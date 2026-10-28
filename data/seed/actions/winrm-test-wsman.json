@@ -77,6 +77,10 @@
         "Test-WSMan -ComputerName SRV-APP01 -UseSSL": "Vérifie l'écouteur HTTPS (port 5986)",
         "Test-WSMan": "Vérifie le service WinRM de cet ordinateur"
       }
+    },
+    "es": {
+      "title": "Probar WinRM en un equipo",
+      "description": "Comprueba que el servicio WinRM de un equipo responde a las solicitudes de WS-Management."
     }
   }
 }

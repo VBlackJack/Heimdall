@@ -127,6 +127,10 @@
         "tree -d /etc": "Afficher uniquement les dossiers",
         "tree -h /var/log": "Afficher les tailles"
       }
+    },
+    "es": {
+      "title": "Mostrar el árbol de carpetas",
+      "description": "Muestra la estructura jerárquica de un directorio."
     }
   }
 }

@@ -47,6 +47,10 @@
         "Install-WindowsUpdate -MicrosoftUpdate -AcceptAll -AutoReboot": "Installe toutes les mises à jour et redémarre automatiquement si nécessaire",
         "Install-WindowsUpdate -Category 'Critical Updates','Security Updates' -AcceptAll -IgnoreReboot": "Installe uniquement les mises à jour critiques et de sécurité sans redémarrer"
       }
+    },
+    "es": {
+      "title": "Instalar todas las actualizaciones de Windows disponibles",
+      "description": "Descarga e instala automáticamente todas las actualizaciones de Windows disponibles"
     }
   }
 }

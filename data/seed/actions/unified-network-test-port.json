@@ -205,6 +205,10 @@
         "nc -zv -w 5 db.example.com 3306": "Tester MySQL avec timeout 5s",
         "timeout 3 bash -c \"echo > /dev/tcp/host/80\"": "Test sans netcat"
       }
+    },
+    "es": {
+      "title": "Comprobar si un puerto TCP está abierto",
+      "description": "Comprueba si un puerto TCP concreto está abierto y es accesible en un host remoto"
     }
   }
 }

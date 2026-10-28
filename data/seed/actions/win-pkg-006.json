@@ -65,6 +65,10 @@
         "winget search vscode": "Recherche tous les packages contenant 'vscode'",
         "winget search --name 'Visual Studio Code'": "Recherche par nom exact"
       }
+    },
+    "es": {
+      "title": "Buscar un paquete de Winget",
+      "description": "Busca paquetes disponibles en los orígenes de Winget configurados."
     }
   }
 }

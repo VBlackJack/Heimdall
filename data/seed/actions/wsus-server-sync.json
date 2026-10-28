@@ -47,6 +47,10 @@
         "(Get-WsusServer).GetSubscription().StartSynchronization()": "Démarre la synchronisation du serveur WSUS (méthode courte)",
         "Start-PSWSUSSync": "Alternative si le module PSWSUS est installé"
       }
+    },
+    "es": {
+      "title": "Sincronizar el servidor WSUS con Microsoft Update",
+      "description": "Inicia la sincronización del servidor WSUS con Microsoft Update para obtener actualizaciones nuevas"
     }
   }
 }

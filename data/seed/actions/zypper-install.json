@@ -71,6 +71,10 @@
         "sudo zypper update": "Mettre à jour les paquets",
         "zypper repos": "Lister les dépôts"
       }
+    },
+    "es": {
+      "title": "Instalar un paquete con Zypper",
+      "description": "Instala un paquete con Zypper (openSUSE/SLES)"
     }
   }
 }

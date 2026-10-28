@@ -66,6 +66,10 @@
         "Get-WsusUpdate -Classification Critical -Approval Unapproved -Status Any | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
         "Get-WsusUpdate -Classification Critical -Approval Unapproved -Status Any | Select-Object Title,Classification,Approval,CreationDate | Format-Table -AutoSize": "Affiche toutes les mises à jour critiques non encore approuvées sur le serveur WSUS."
       }
+    },
+    "es": {
+      "title": "Listar las actualizaciones críticas sin aprobar en WSUS",
+      "description": "Muestra todas las actualizaciones críticas que aún no se han aprobado en el servidor WSUS"
     }
   }
 }

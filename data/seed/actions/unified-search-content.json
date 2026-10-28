@@ -163,6 +163,10 @@
         "grep -rn \"TODO\" --include=\"*.py\"": "Trouve TODO dans les fichiers Python avec numéros de ligne",
         "grep -i \"password\" config.txt": "Recherche insensible à la casse"
       }
+    },
+    "es": {
+      "title": "Buscar en el contenido de los archivos",
+      "description": "Busca una cadena en el contenido de los archivos."
     }
   }
 }

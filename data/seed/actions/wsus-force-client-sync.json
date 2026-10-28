@@ -41,6 +41,10 @@
       "examples": {
         "wuauclt /detectnow /reportnow": "Force la détection et le rapport immédiat au serveur WSUS"
       }
+    },
+    "es": {
+      "title": "Forzar la sincronización de un cliente con WSUS",
+      "description": "Fuerza al cliente de Windows Update a sincronizarse ahora con el servidor WSUS"
     }
   }
 }

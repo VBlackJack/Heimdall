@@ -57,6 +57,10 @@
         "takeown /f \"C:\\LockedFolder\" /r /d O": "Force la propriété récursivement (/r). /d O répond 'Oui' automatiquement aux invites. Indispensable pour supprimer des dossiers fantômes ou verrouillés.",
         "takeown /f \"C:\\Windows\\System32\\drivers\\etc\\hosts\" /a": "Donne la propriété au groupe Administrateurs (/a) plutôt qu'à l'utilisateur courant."
       }
+    },
+    "es": {
+      "title": "Tomar posesión de un archivo o una carpeta (TakeOwn)",
+      "description": "Permite que el administrador se convierta en propietario de un archivo denegado, a menudo un requisito previo antes de usar ICACLS."
     }
   }
 }

@@ -101,6 +101,10 @@
         "yum search php": "Rechercher des paquets PHP",
         "yum list installed | grep mysql": "Lister les paquets MySQL installés"
       }
+    },
+    "es": {
+      "title": "Instalar un paquete con YUM",
+      "description": "Instala un paquete con YUM en RHEL/CentOS (versiones anteriores)"
     }
   }
 }

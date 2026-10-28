@@ -158,6 +158,10 @@
         "mv -i source.txt /dest/": "Demander confirmation si existe",
         "mv -v *.log /archive/": "Mode verbose"
       }
+    },
+    "es": {
+      "title": "Mover o renombrar archivos",
+      "description": "Mueve o renombra archivos y carpetas."
     }
   }
 }

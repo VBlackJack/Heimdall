@@ -54,6 +54,10 @@
         "winrm quickconfig -transport:https": "Crée un écouteur HTTPS (un certificat d'authentification serveur doit être installé)",
         "winrm enumerate winrm/config/listener": "Affiche les écouteurs présents après la configuration"
       }
+    },
+    "es": {
+      "title": "Configurar WinRM con quickconfig",
+      "description": "Inicia WinRM, crea el agente de escucha HTTP y abre la excepción del cortafuegos con la herramienta nativa winrm."
     }
   }
 }

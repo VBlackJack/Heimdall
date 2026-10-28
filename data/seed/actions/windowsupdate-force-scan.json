@@ -41,6 +41,10 @@
       "examples": {
         "usoclient StartScan": "Force la recherche de mises à jour (Windows 10/11)"
       }
+    },
+    "es": {
+      "title": "Forzar una búsqueda inmediata de actualizaciones",
+      "description": "Fuerza a Windows Update a buscar actualizaciones nuevas ahora"
     }
   }
 }

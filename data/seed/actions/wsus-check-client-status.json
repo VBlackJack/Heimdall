@@ -65,6 +65,10 @@
         "$wu = Get-ItemProperty -Path 'HKLM:\\Software\\Policies\\Microsoft\\Windows\\WindowsUpdate' -ErrorAction SilentlyContinue; $au = Get-ItemProperty -Path 'HKLM:\\Software\\Policies\\Microsoft\\Windows\\WindowsUpdate\\AU' -ErrorAction SilentlyContinue; [PSCustomObject]@{WUServer=$wu.WUServer; WUStatusServer=$wu.WUStatusServer; UseWUServer=$au.UseWUServer; TargetGroup=$wu.TargetGroup} | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
         "$wu = Get-ItemProperty -Path 'HKLM:\\Software\\Policies\\Microsoft\\Windows\\WindowsUpdate' -ErrorAction SilentlyContinue; $au = Get-ItemProperty -Path 'HKLM:\\Software\\Policies\\Microsoft\\Windows\\WindowsUpdate\\AU' -ErrorAction SilentlyContinue; [PSCustomObject]@{WUServer=$wu.WUServer; WUStatusServer=$wu.WUStatusServer; UseWUServer=$au.UseWUServer; TargetGroup=$wu.TargetGroup} | Format-List": "Affiche la configuration actuelle du client WSUS en lisant le registre."
       }
+    },
+    "es": {
+      "title": "Comprobar la configuración del cliente WSUS",
+      "description": "Muestra la configuración actual del cliente WSUS leyendo el registro"
     }
   }
 }

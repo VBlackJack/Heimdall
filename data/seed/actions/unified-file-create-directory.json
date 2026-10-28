@@ -122,6 +122,10 @@
         "mkdir -m 755 newfolder": "Crée un dossier avec permissions spécifiques",
         "mkdir -p \"{path}\" -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement."
       }
+    },
+    "es": {
+      "title": "Crear un directorio",
+      "description": "Crea una carpeta nueva, incluidas las carpetas superiores cuando hace falta."
     }
   }
 }

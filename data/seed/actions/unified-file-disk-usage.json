@@ -91,6 +91,10 @@
         "df -T": "Afficher le type de filesystem",
         "df -h --total": "Avec le total global"
       }
+    },
+    "es": {
+      "title": "Comprobar el espacio en disco",
+      "description": "Muestra el uso del espacio en disco de los volúmenes."
     }
   }
 }

@@ -103,6 +103,10 @@
         "ulimit -n": "Limite des fichiers ouverts",
         "ulimit -u": "Limite des processus utilisateur"
       }
+    },
+    "es": {
+      "title": "Mostrar o establecer los límites de recursos",
+      "description": "Muestra o cambia los límites de recursos de los procesos (archivos, memoria, CPU)"
     }
   }
 }

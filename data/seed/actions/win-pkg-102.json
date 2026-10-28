@@ -48,6 +48,10 @@
         "choco list --local-only": "Liste tous les packages Chocolatey installés localement",
         "choco list --local-only --limit-output": "Liste avec sortie simplifiée (nom|version)"
       }
+    },
+    "es": {
+      "title": "Listar los paquetes de Chocolatey instalados",
+      "description": "Muestra la lista de todos los paquetes instalados con Chocolatey."
     }
   }
 }

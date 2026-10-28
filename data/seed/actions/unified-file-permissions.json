@@ -178,6 +178,10 @@
         "chmod -R 644 /var/log/*.log": "Permissions rw-r--r-- pour les fichiers de logs",
         "chmod go-rwx /etc/secrets": "Retire tous les droits pour le groupe et les autres"
       }
+    },
+    "es": {
+      "title": "Cambiar los permisos de un archivo",
+      "description": "Cambia los permisos de un archivo o una carpeta (ACL de NTFS en Windows, bits de modo en Linux)."
     }
   }
 }

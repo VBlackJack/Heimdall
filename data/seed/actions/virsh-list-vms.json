@@ -60,6 +60,10 @@
         "sudo virsh domifaddr web01": "Affiche les adresses IP d'une machine démarrée",
         "sudo virsh list --autostart": "Liste les machines qui démarrent avec l'hôte"
       }
+    },
+    "es": {
+      "title": "Listar las máquinas virtuales KVM",
+      "description": "Lista todas las máquinas virtuales de libvirt del host, estén en ejecución o no, con su estado."
     }
   }
 }

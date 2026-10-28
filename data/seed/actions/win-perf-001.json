@@ -79,6 +79,10 @@
         "Get-NetAdapter | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
         "Get-NetAdapter | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
       }
+    },
+    "es": {
+      "title": "Configurar el DNS de Google (8.8.8.8)",
+      "description": "Configura los servidores DNS de Google (8.8.8.8 y 8.8.4.4) para mejorar la velocidad y la fiabilidad de la resolución DNS."
     }
   }
 }

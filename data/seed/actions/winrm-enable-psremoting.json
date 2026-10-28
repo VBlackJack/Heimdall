@@ -54,6 +54,10 @@
         "Enable-PSRemoting -SkipNetworkProfileCheck -Force": "Active la communication à distance sur un ordinateur dont le profil réseau est Public",
         "Enable-PSRemoting -WhatIf": "Montre ce que la commande modifierait, sans rien appliquer"
       }
+    },
+    "es": {
+      "title": "Habilitar la comunicación remota de PowerShell",
+      "description": "Configura el equipo para recibir comandos remotos de PowerShell mediante WinRM."
     }
   }
 }

@@ -59,6 +59,10 @@
       "examples": {
         "choco upgrade googlechrome -y": "Met à jour Google Chrome vers la dernière version"
       }
+    },
+    "es": {
+      "title": "Actualizar un paquete de Chocolatey",
+      "description": "Actualiza un paquete concreto a su última versión disponible mediante Chocolatey."
     }
   }
 }

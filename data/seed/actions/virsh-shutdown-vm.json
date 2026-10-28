@@ -72,6 +72,10 @@
         "sudo virsh reboot web01": "Redémarre proprement l'invité",
         "sudo virsh destroy web01": "Coupe l'alimentation d'un invité qui ne répond pas, comme débrancher la prise"
       }
+    },
+    "es": {
+      "title": "Apagar una máquina virtual KVM",
+      "description": "Pide al sistema operativo invitado de una máquina virtual de libvirt que se apague de forma limpia."
     }
   }
 }

@@ -48,6 +48,10 @@
         "winget list": "Liste toutes les applications installées",
         "winget list --source winget": "Liste uniquement les applications du store Winget"
       }
+    },
+    "es": {
+      "title": "Listar las aplicaciones instaladas con Winget",
+      "description": "Muestra la lista de todas las aplicaciones instaladas y administradas por Winget."
     }
   }
 }

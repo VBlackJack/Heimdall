@@ -59,6 +59,10 @@
         "DISM /Online /Cleanup-Image /ScanHealth": "Scanne l'image sans réparer (diagnostic uniquement)",
         "Repair-WindowsImage -Online -RestoreHealth -Verbose": "Utilise DISM pour réparer l'image Windows et résoudre les problèmes de Windows Update."
       }
+    },
+    "es": {
+      "title": "Reparar Windows Update con DISM",
+      "description": "Usa DISM para reparar la imagen de Windows y corregir problemas de Windows Update"
     }
   }
 }

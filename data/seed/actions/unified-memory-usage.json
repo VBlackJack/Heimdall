@@ -42,6 +42,10 @@
       "examples": {
         "Get-CimInstance Win32_OperatingSystem | Select-Object TotalVisibleMemorySize,FreePhysicalMemory": "Affiche l'utilisation mémoire sur Windows"
       }
+    },
+    "es": {
+      "title": "Mostrar el uso de memoria",
+      "description": "Muestra el uso de RAM del sistema"
     }
   }
 }

@@ -71,6 +71,10 @@
         "cat /proc/uptime": "Uptime en secondes",
         "cat /proc/loadavg": "Load average brut"
       }
+    },
+    "es": {
+      "title": "Mostrar el tiempo de actividad y la carga del sistema",
+      "description": "Muestra cuánto tiempo lleva en ejecución el sistema y la carga media"
     }
   }
 }

@@ -65,6 +65,10 @@
         "choco install googlechrome -y": "Installe Google Chrome",
         "choco install vscode -y": "Installe Visual Studio Code"
       }
+    },
+    "es": {
+      "title": "Instalar un paquete de Chocolatey",
+      "description": "Instala un paquete de Windows con el administrador Chocolatey."
     }
   }
 }

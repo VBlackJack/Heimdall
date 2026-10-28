@@ -71,6 +71,10 @@
       "examples": {
         "choco source add --name=MyRepo --source=https://packages.example.com/chocolatey": "Ajoute une source personnalisée"
       }
+    },
+    "es": {
+      "title": "Añadir un origen de Chocolatey",
+      "description": "Añade un nuevo origen personalizado de paquetes de Chocolatey."
     }
   }
 }

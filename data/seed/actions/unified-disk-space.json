@@ -74,6 +74,10 @@
         "df -i": "Afficher l'utilisation des inodes",
         "df -h --total": "Avec le total global"
       }
+    },
+    "es": {
+      "title": "Mostrar el espacio en disco disponible",
+      "description": "Muestra el espacio en disco usado y disponible de las particiones"
     }
   }
 }

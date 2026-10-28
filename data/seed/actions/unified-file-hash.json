@@ -158,6 +158,10 @@
         "sha512sum important_file.tar.gz": "Hash SHA512",
         "sha256sum -c checksums.txt": "Vérifier les checksums"
       }
+    },
+    "es": {
+      "title": "Calcular el hash de un archivo",
+      "description": "Calcula la huella criptográfica (hash SHA256) de un archivo para comprobar su integridad."
     }
   }
 }

@@ -99,6 +99,10 @@
         "sudo ufw status numbered": "Liste les règles avec leur numéro",
         "sudo ufw delete allow 8080/tcp": "Supprime une règle ajoutée précédemment"
       }
+    },
+    "es": {
+      "title": "Permitir un puerto en ufw",
+      "description": "Añade una regla de ufw que permite el tráfico entrante en un puerto TCP o UDP, o en un intervalo de puertos."
     }
   }
 }

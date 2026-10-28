@@ -47,6 +47,10 @@
         "dcdiag /test:DNS /DnsBasic /v": "🔥 DNS CHECK : Exécute uniquement les tests DNS approfondis. 90% des problèmes AD sont des problèmes DNS.",
         "dcdiag /a": "Teste TOUS les contrôleurs de domaine du site. Utile pour une vue d'ensemble."
       }
+    },
+    "es": {
+      "title": "Estado de un controlador de dominio (DCDiag)",
+      "description": "Analiza el estado de un controlador de dominio (DNS, replicación, sistema, NetLogon)."
     }
   }
 }

@@ -47,6 +47,10 @@
         "sfc /scannow": "Scanne et répare tous les fichiers système protégés",
         "sfc /verifyonly": "Scanne sans réparer (diagnostic uniquement)"
       }
+    },
+    "es": {
+      "title": "Comprobar la integridad de los archivos del sistema (SFC)",
+      "description": "Ejecuta el Comprobador de archivos de sistema para detectar y reparar archivos de sistema dañados"
     }
   }
 }

@@ -158,6 +158,10 @@
         "rm -v old_file.log": "Supprimer en mode verbose",
         "find /tmp -name \"*.bak\" -delete": "Supprimer par pattern"
       }
+    },
+    "es": {
+      "title": "Eliminar archivos o carpetas",
+      "description": "Elimina archivos o directorios de forma permanente."
     }
   }
 }

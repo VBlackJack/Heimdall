@@ -106,6 +106,10 @@
         "sudo usermod -s /bin/zsh jdupont": "Changer le shell de l'utilisateur",
         "sudo usermod -d /new/home -m user": "Déplacer le home directory"
       }
+    },
+    "es": {
+      "title": "Modificar un usuario existente",
+      "description": "Modifica las propiedades de una cuenta de usuario (grupos, shell, directorio personal, etc.)"
     }
   }
 }

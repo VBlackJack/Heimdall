@@ -59,6 +59,10 @@
       "examples": {
         "choco uninstall googlechrome -y": "Désinstalle Google Chrome"
       }
+    },
+    "es": {
+      "title": "Desinstalar un paquete de Chocolatey",
+      "description": "Desinstala un paquete instalado antes con Chocolatey."
     }
   }
 }

@@ -156,6 +156,10 @@
         "sudo userdel -f lockeduser": "Forcer la suppression même si connecté",
         "sudo userdel -r jdupont": "Avec suppression du home"
       }
+    },
+    "es": {
+      "title": "Eliminar un usuario local",
+      "description": "Elimina una cuenta de usuario local del sistema."
     }
   }
 }

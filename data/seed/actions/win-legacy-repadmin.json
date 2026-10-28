@@ -46,6 +46,10 @@
         "repadmin /syncall /A /e /P": "Force la réplication immédiate de toutes les partitions vers tous les contrôleurs. Utile après une modification urgente (création utilisateur, GPO).",
         "repadmin /kcc": "Force le KCC (Knowledge Consistency Checker) à recalculer la topologie de réplication. Utile si un DC vient d'être ajouté ou supprimé."
       }
+    },
+    "es": {
+      "title": "Diagnóstico de la replicación de AD (RepAdmin)",
+      "description": "Herramienta de línea de comandos para diagnosticar y administrar la replicación de Active Directory."
     }
   }
 }

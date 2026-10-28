@@ -72,6 +72,10 @@
         "Get-ScheduledTask -TaskPath '\\CustomTasks\\' | Unregister-ScheduledTask -Confirm:$false": "Supprime toutes les tâches d'un dossier",
         "Unregister-ScheduledTask -TaskName 'OldTask'": "Supprime avec confirmation interactive"
       }
+    },
+    "es": {
+      "title": "Eliminar una tarea programada",
+      "description": "Elimina una tarea programada del Programador de tareas de Windows"
     }
   }
 }

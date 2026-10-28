@@ -59,6 +59,10 @@
       "examples": {
         "winget uninstall Microsoft.PowerToys --silent": "Désinstalle PowerToys"
       }
+    },
+    "es": {
+      "title": "Desinstalar una aplicación de Winget",
+      "description": "Desinstala una aplicación instalada antes con Winget."
     }
   }
 }
