@@ -16,7 +16,6 @@
 
 using System.IO;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 
 namespace Heimdall.App.Tests;
 
@@ -30,14 +29,15 @@ namespace Heimdall.App.Tests;
 /// and none was visible to the compiler, to the suite, or to a review - only to the second human
 /// who opened the application and looked for the thing the label promised.
 ///
-/// This does not clean the existing rot: 1399 keys, 23 percent of the file, are dead today and sit
-/// frozen in the baseline beside this file. It catches the CLASS from here on. The baseline may
-/// only shrink, which the second test enforces - an allow-list nobody prunes stops being a guard
-/// and becomes a permanent pardon.
+/// The 2026-10-28 clean-up deleted 1304 of the 1332 keys that stood dead (17 percent of the file)
+/// from every locale; the baseline beside this file keeps only the 14 that cannot go, and the reason is
+/// written there. The baseline may only shrink, which the second test enforces - an allow-list
+/// nobody prunes stops being a guard and becomes a permanent pardon.
 ///
 /// <para>
 /// Keys composed at runtime are exempt, and the exempt prefixes are derived from the source rather
-/// than hand-listed, so a new dynamic family teaches the guard about itself. Without that,
+/// than hand-listed, so a new dynamic family teaches the guard about itself (see
+/// <see cref="DeadLocaleKeyDetector"/> for the shapes it recognises). Without that,
 /// <c>ToolDescHTTPHEADERS</c> and 132 siblings read as dead while being resolved every time the
 /// Tools tab is drawn, from the interpolation on descriptor.Id.
 /// </para>
@@ -48,10 +48,6 @@ public sealed class DeadLocaleKeyGuardTests
     // measures nothing, which is a failure mode this repository has already been caught by.
     private const int MinExpectedSourceFiles = 1000;
     private const int MinExpectedKeys = 5000;
-
-    private static readonly Regex s_composedKeyRegex = new(
-        @"\$""([A-Z][A-Za-z0-9]*)\{",
-        RegexOptions.Compiled);
 
     [Fact]
     public void NoLocaleKeyBecomesDeadWithoutBeingDeclaredSo()
@@ -67,8 +63,7 @@ public sealed class DeadLocaleKeyGuardTests
         Assert.True(
             unexpected.Count == 0,
             $"{unexpected.Count} locale key(s) are translated but referenced nowhere under src/. "
-            + "Either wire them up, or delete them from both locales. If a key really is resolved "
-            + "at runtime, compose it from a literal prefix and the guard exempts its family:"
+            + DeadLocaleKeyDetector.NewDeadKeyAdvice
             + Environment.NewLine
             + string.Join(Environment.NewLine, unexpected.Take(40)));
     }
@@ -123,22 +118,9 @@ public sealed class DeadLocaleKeyGuardTests
 
         string source = string.Join("\n", files.Select(File.ReadAllText));
 
-        // Families composed at runtime, learned from the source instead of hand-listed. Kept only
-        // when the prefix actually heads a longer key, so an unrelated interpolation never grants
-        // a blanket exemption.
-        HashSet<string> prefixes = s_composedKeyRegex
-            .Matches(source)
-            .Select(match => match.Groups[1].Value)
-            .Where(prefix => keys.Any(key =>
-                key.Length > prefix.Length && key.StartsWith(prefix, StringComparison.Ordinal)))
-            .ToHashSet(StringComparer.Ordinal);
-
-        List<string> dead = keys
-            .Where(key => !source.Contains(key, StringComparison.Ordinal))
-            .Where(key => !prefixes.Any(prefix =>
-                key.Length > prefix.Length && key.StartsWith(prefix, StringComparison.Ordinal)))
-            .OrderBy(key => key, StringComparer.Ordinal)
-            .ToList();
+        // The detector reads the families composed at runtime from the source itself, so a new
+        // dynamic family teaches the guard about itself instead of being hand-listed.
+        List<string> dead = DeadLocaleKeyDetector.FindDeadKeys(keys, source);
 
         return new Analysis(dead, files.Count, keys.Count);
     }
