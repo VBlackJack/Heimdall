@@ -164,6 +164,52 @@ public sealed class NotesToolViewModelTests
     }
 
     [Fact]
+    public async Task TryApplyEditorMarkdown_WhenTheEditorReportsWhatWasLoaded_KeepsTheNoteClean()
+    {
+        var storage = CreateStorage(Seed("alpha.md", "# Alpha\nalpha"));
+        var vm = await CreateViewModelAsync(storage);
+        var path = storage.Paths.Single();
+
+        await vm.ReloadAsync(path);
+        bool hasEdits = vm.TryApplyEditorMarkdown("# Alpha\nalpha");
+
+        Assert.False(hasEdits);
+        Assert.False(vm.IsDirty);
+        Assert.Equal("# Alpha\nalpha", vm.CurrentMarkdown);
+    }
+
+    [Fact]
+    public async Task TryApplyEditorMarkdown_WhenTheMarkdownDiffers_MarksTheNoteDirtyAndKeepsIt()
+    {
+        var storage = CreateStorage(Seed("alpha.md", "# Alpha\nalpha"));
+        var vm = await CreateViewModelAsync(storage);
+        var path = storage.Paths.Single();
+
+        await vm.ReloadAsync(path);
+        bool hasEdits = vm.TryApplyEditorMarkdown("# Alpha\nalpha edited");
+
+        Assert.True(hasEdits);
+        Assert.True(vm.IsDirty);
+        Assert.Equal("# Alpha\nalpha edited", vm.CurrentMarkdown);
+    }
+
+    [Fact]
+    public async Task TryApplyEditorMarkdown_WhenAlreadyDirty_StaysDirtyEvenIfTheTextReturnsToTheLoadedOne()
+    {
+        var storage = CreateStorage(Seed("alpha.md", "# Alpha\nalpha"));
+        var vm = await CreateViewModelAsync(storage);
+        var path = storage.Paths.Single();
+
+        await vm.ReloadAsync(path);
+        vm.TryApplyEditorMarkdown("# Alpha\nalpha edited");
+        bool hasEdits = vm.TryApplyEditorMarkdown("# Alpha\nalpha");
+
+        Assert.True(hasEdits);
+        Assert.True(vm.IsDirty);
+        Assert.Equal("# Alpha\nalpha", vm.CurrentMarkdown);
+    }
+
+    [Fact]
     public async Task SaveCommand_WhenStorageFails_SurfacesError()
     {
         var storage = CreateStorage(Seed("alpha.md", "# Alpha\nalpha"));

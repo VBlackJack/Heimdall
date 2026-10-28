@@ -14,8 +14,15 @@ Last reviewed: 2026-10-28
 
 ```
 npm ci
+npm test
 npm run build
 ```
+
+`npm test` runs node's own test runner over `test/`: the logic that decides when a note counts
+as edited (`src/user-edit.js`, `src/change-notifier.js`) and how a `[[note link]]` is written back
+to the file (`src/wiki-link-markdown.js`). CI runs it before the .NET tests. The two
+`mdast-util-*` dev dependencies are in the lock only for those tests; the bundle already carries
+the same versions through Milkdown.
 
 Then copy `dist/index.html` to `../milkdown/index.html`, and update the SHA-256 of the three
 files in both `VENDORED.json` files. `VendoredAssetManifestTests` prints the new values.

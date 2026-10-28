@@ -288,10 +288,8 @@ public partial class NotesToolView : UserControl, IToolView
             return;
         }
 
-        if (dirty)
+        if (dirty && _vm.TryApplyEditorMarkdown(markdown))
         {
-            _vm.CurrentMarkdown = markdown;
-            _vm.IsDirty = true;
             _vm.SetStatus(L("ToolNotesStatusModified"));
             _saveTimer.Stop();
             _saveTimer.Start();

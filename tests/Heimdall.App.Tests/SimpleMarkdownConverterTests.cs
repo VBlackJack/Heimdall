@@ -289,6 +289,39 @@ public class SimpleMarkdownConverterTests
         Assert.Contains("Note B", result);
     }
 
+    [Theory]
+    [InlineData(@"See \[\[My Note]]")]
+    [InlineData(@"See \[[My Note]]")]
+    [InlineData(@"See [\[My Note]]")]
+    public void NoteLink_WithEscapedOpeningBrackets_IsAnAnchorWithoutTheBackslashes(string markdown)
+    {
+        // The editor used to save [[X]] as \[\[X]]; those notes must keep linking.
+        var result = SimpleMarkdownConverter.ToHtmlFragment(markdown).Trim();
+
+        Assert.Contains("""<a href="#note:My Note" class="note-link">My Note</a>""", result, StringComparison.Ordinal);
+        Assert.DoesNotContain('\\', result);
+    }
+
+    [Fact]
+    public void NoteLink_NameExcludesTheBackslashesOfAnEscapedLink()
+    {
+        var match = SimpleMarkdownConverter.NoteLinkRegex().Match(@"a \[\[Procedure]] b");
+
+        Assert.True(match.Success);
+        Assert.Equal("Procedure", match.Groups[1].Value);
+        Assert.Equal(@"\[\[Procedure]]", match.Value);
+    }
+
+    [Fact]
+    public void NoteLink_InAnInlineCodeSpan_StaysCode()
+    {
+        var result = SimpleMarkdownConverter.ToHtmlFragment(@"`\[\[X]]` and `[[Y]]`").Trim();
+
+        Assert.DoesNotContain("note-link", result, StringComparison.Ordinal);
+        Assert.Contains(@"<code>\[\[X]]</code>", result, StringComparison.Ordinal);
+        Assert.Contains("<code>[[Y]]</code>", result, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void NestedList_ThreeLevels()
     {

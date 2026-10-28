@@ -127,6 +127,27 @@ internal sealed partial class NotesToolViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>
+    /// Takes the markdown the editor reports for the open note. A note that is not dirty and
+    /// whose reported markdown is exactly what was loaded has nothing to save, so it stays clean:
+    /// the editor reports a change when it only opened the note (a trailing paragraph it adds),
+    /// and saving that would rewrite a file nobody edited.
+    /// </summary>
+    /// <returns>True when the note now has unsaved edits; false when it stays as loaded.</returns>
+    public bool TryApplyEditorMarkdown(string markdown)
+    {
+        ArgumentNullException.ThrowIfNull(markdown);
+
+        if (!IsDirty && string.Equals(markdown, CurrentMarkdown, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        CurrentMarkdown = markdown;
+        IsDirty = true;
+        return true;
+    }
+
     public bool IsUnderNotesRoot(string filePath) => _storage.IsUnderNotesRoot(filePath);
 
     public string GetRelativePath(string filePath) => _storage.GetRelativePath(filePath);

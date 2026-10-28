@@ -221,6 +221,20 @@ jobs:
       - name: Build
         run: dotnet build Heimdall.slnx --no-restore -c Release
 
+      # The logic the committed milkdown bundle is built from (when a note counts as edited,
+      # how a [[note link]] is written back to the file) runs under node's own test runner.
+      # `npm ci` installs the locked packages the tests import and runs no install script.
+      # Before the .NET tests, whose manifest check pins the bundle built from these modules.
+      - name: Test the milkdown editor modules
+        shell: pwsh
+        working-directory: src/Heimdall.App/Assets/milkdown-editor
+        timeout-minutes: 10
+        run: |
+          npm ci --ignore-scripts
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Test with coverage
         timeout-minutes: 25
         run: >
