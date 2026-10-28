@@ -82,6 +82,7 @@ Index of all issues encountered during development and their solutions.
 
 ---
 
+<a id="rdp-embedded-white-screen"></a>
 ## RDP Embedded - White Screen
 
 **Symptom**: RDP ActiveX control connects (OnConnected fires) but the display area stays white.
@@ -110,6 +111,7 @@ WinForms.Application.DoEvents();
 
 ---
 
+<a id="rdp-embedded-disconnect-code-4360"></a>
 ## RDP Embedded - Disconnect Code 4360
 
 **Symptom**: RDP connects then disconnects after a few seconds with reason code 4360.
@@ -134,6 +136,7 @@ _allowResolutionUpdates = true;
 
 ---
 
+<a id="rdp-embedded-com-rcw-crash-on-tab-close"></a>
 ## RDP Embedded - COM RCW Crash on Tab Close
 
 **Symptom**: `COM object that has been separated from its underlying RCW cannot be used` when closing a session tab.
@@ -154,6 +157,7 @@ _rdpHost.Dispose();                           // Finally dispose
 
 ---
 
+<a id="rdp-embedded-resize-hresult-error"></a>
 ## RDP Embedded - Resize HRESULT Error
 
 **Symptom**: `Unexpected HRESULT has been returned from a call to a COM component` during resize.
@@ -166,6 +170,7 @@ _rdpHost.Dispose();                           // Finally dispose
 
 ---
 
+<a id="rdp-credui-autofill-dialog-not-detected"></a>
 ## RDP CredUI Autofill - Dialog Not Detected
 
 **Symptom**: CredUI autofill scans find only 8 top-level windows, never detecting the "Windows Security" credential dialog.
@@ -188,6 +193,7 @@ When autofill silently fails, enable Debug-level logging for `CredentialAutofill
 
 ---
 
+<a id="ssh-pageant-keys-not-recognized"></a>
 ## SSH - Pageant Keys Not Recognized
 
 **Symptom**: `Server rejected the SSH key` or `No suitable authentication method found` even with Pageant running and keys loaded.
@@ -202,6 +208,7 @@ When autofill silently fails, enable Debug-level logging for `CredentialAutofill
 
 ---
 
+<a id="ssh-terminal-arrow-keys-not-working"></a>
 ## SSH Terminal - Arrow Keys Not Working
 
 **Symptom**: Arrow keys don't navigate command history in bash. Pressing Up shows `^[[A` instead.
@@ -221,6 +228,7 @@ bash → ESC[A response → stdout pipe → xterm.js
 
 ---
 
+<a id="ssh-terminal-no-colors-strange-characters"></a>
 ## SSH Terminal - No Colors, Strange Characters
 
 **Symptom**: Terminal shows raw ANSI escape codes like `[?2004h`, `[0;32m` instead of colors. No cursor.
@@ -236,6 +244,7 @@ bash → ESC[A response → stdout pipe → xterm.js
 
 ---
 
+<a id="ssh-terminal-cursor-blinks-too-fast"></a>
 ## SSH Terminal - Cursor Blinks Too Fast
 
 **Symptom**: The xterm.js cursor blinks extremely rapidly, much faster than normal.
@@ -251,6 +260,7 @@ bash → ESC[A response → stdout pipe → xterm.js
 
 ---
 
+<a id="webview2-dll-not-found"></a>
 ## WebView2 - DLL Not Found
 
 **Symptom**: `Unable to load DLL 'WebView2Loader.dll'` at runtime.
@@ -266,6 +276,7 @@ Copy-Item "src\Heimdall.App\lib\webview2\WebView2Loader.dll" $outputDir -Force
 
 ---
 
+<a id="tab-navigation-blocked-by-sessions"></a>
 ## Tab Navigation - Tabs Blocked by Active Sessions
 
 **Symptom**: When an SSH or RDP session is open, clicking Tunnels/Scheduled/Settings tabs does nothing.
@@ -287,6 +298,7 @@ Additional fixes:
 
 ---
 
+<a id="wpf-dynamicresource-in-basedon"></a>
 ## WPF - DynamicResource in BasedOn
 
 **Symptom**: `A 'DynamicResourceExtension' cannot be set on the 'BasedOn' property of type 'Style'`
@@ -297,6 +309,7 @@ Additional fixes:
 
 ---
 
+<a id="wpf-xaml-click-handler-in-style-setter"></a>
 ## WPF - XAML Click Handler in Style Setter
 
 **Symptom**: `Set connectionId threw an exception` when loading a window with a ContextMenu defined inside a Style Setter that uses `Click` event handlers.
@@ -309,6 +322,7 @@ Additional fixes:
 
 ---
 
+<a id="build-version-number-overflow"></a>
 ## Build - Version Number Overflow
 
 **Symptom**: `Arithmetic operation resulted in an overflow` during Win32 resource generation.
@@ -323,6 +337,7 @@ Additional fixes:
 
 ---
 
+<a id="build-ambiguous-type-references"></a>
 ## Build - Ambiguous Type References
 
 **Symptom**: `'Point' is an ambiguous reference between 'System.Drawing.Point' and 'System.Windows.Point'`
@@ -369,6 +384,7 @@ Additional fixes:
 
 ---
 
+<a id="tofu-hostkeyfingerprint-on-pscustomobject"></a>
 ## TOFU - HostKeyFingerprint on PSCustomObject
 
 **Symptom**: `The property 'HostKeyFingerprint' cannot be found on this object` (Heimdall v1 legacy issue).
@@ -387,6 +403,7 @@ $gateway.HostKeyFingerprint = $fingerprint
 
 ---
 
+<a id="passwords-not-saved-after-edit"></a>
 ## Passwords - Not Saved After Edit
 
 **Symptom**: Password field appears empty when re-opening server edit dialog after saving.
@@ -402,6 +419,7 @@ $gateway.HostKeyFingerprint = $fingerprint
 
 ---
 
+<a id="pageant-agent_copydata_id-wrong-value"></a>
 ## Pageant - AGENT_COPYDATA_ID Wrong Value
 
 **Symptom**: `PageantClient` sends a request to Pageant but receives no response. Pageant appears running with keys loaded, but SSH.NET authentication fails with "no suitable method found".
@@ -417,6 +435,7 @@ private const uint AGENT_COPYDATA_ID = 0x804e50ba;
 
 ---
 
+<a id="pageant-rsa-sha2-algorithm-registration"></a>
 ## Pageant - RSA-SHA2 Algorithm Registration
 
 **Symptom**: Pageant keys are loaded into SSH.NET but the server rejects authentication. Server logs show "no matching host key type found" or similar.
@@ -433,6 +452,7 @@ connectionInfo.HostKeyAlgorithms["rsa-sha2-512"] = ...;
 
 ---
 
+<a id="pageant-sign-returns-raw-bytes-instead-of-blob"></a>
 ## Pageant - Sign() Returns Raw Bytes Instead of Blob
 
 **Symptom**: SSH authentication starts (key is offered) but fails during the signature exchange. Server rejects the signature.
@@ -445,6 +465,7 @@ connectionInfo.HostKeyAlgorithms["rsa-sha2-512"] = ...;
 
 ---
 
+<a id="sftp-checkbox-fires-during-xaml-parse"></a>
 ## SFTP - CheckBox Fires During XAML Parse
 
 **Symptom**: `NullReferenceException` on startup when `EmbeddedSftpView` is loaded, originating from a `CheckBox.Checked` event handler.
@@ -464,6 +485,7 @@ private void OnShowHiddenChecked(object sender, RoutedEventArgs e)
 
 ---
 
+<a id="sftp-context-menu-intercepted-by-mainwindow"></a>
 ## SFTP - Context Menu Intercepted by MainWindow
 
 **Symptom**: Right-clicking an SFTP session tab opens the generic session context menu (disconnect/close) instead of the SFTP-specific context menu, or causes unexpected behavior.
@@ -480,6 +502,7 @@ if (sessionTab.ConnectionType == ConnectionType.Sftp)
 
 ---
 
+<a id="citrix-storebrowseexe-not-found"></a>
 ## Citrix - storebrowse.exe Not Found
 
 **Symptom**: Citrix connection fails immediately with an error indicating `storebrowse.exe` cannot be located.
@@ -495,6 +518,7 @@ if (sessionTab.ConnectionType == ConnectionType.Sftp)
 
 ---
 
+<a id="theme-switching-stale-colors-after-swap"></a>
 ## Theme Switching - Stale Colors After Swap
 
 **Symptom**: After switching themes at runtime, some controls appear with incorrect colors, missing borders, or unstyled backgrounds.
@@ -513,6 +537,7 @@ if (sessionTab.ConnectionType == ConnectionType.Sftp)
 
 ---
 
+<a id="multi-exec-broadcast-sends-to-wrong-terminals"></a>
 ## Multi-Exec - Broadcast Sends to Wrong Terminals
 
 **Symptom**: Broadcast keystrokes appear in terminals that should not be receiving them, or do not appear in terminals that are opted in.
@@ -529,6 +554,7 @@ if (sessionTab.ConnectionType == ConnectionType.Sftp)
 
 ---
 
+<a id="quick-connect-ad-hoc-ssh-fails"></a>
 ## Quick Connect - Ad-Hoc SSH Fails
 
 **Symptom**: Quick Connect (Ctrl+K) opens the overlay and parses the connection string, but the SSH connection fails with authentication errors or "no suitable method found".
@@ -545,6 +571,8 @@ if (sessionTab.ConnectionType == ConnectionType.Sftp)
 
 ---
 
+<a id="rdp-resize-still-reconnecting-deltadebounce-tuning"></a>
+<a id="rdp-embedded-resize-flicker"></a>
 ## RDP Resize - Still Reconnecting (Delta/Debounce Tuning)
 
 **Symptom**: Resizing the application window causes the embedded RDP session to briefly disconnect and reconnect, producing a visible flicker or momentary black screen.
@@ -561,7 +589,8 @@ if (sessionTab.ConnectionType == ConnectionType.Sftp)
 
 ---
 
-## 27. VNC - noVNC Library Unavailable {#vnc-novnc-unavailable}
+<a id="vnc-novnc-unavailable"></a>
+## 27. VNC - noVNC Library Unavailable
 
 **Symptom**: VNC tab shows "noVNC Library Unavailable" error instead of the remote desktop.
 
@@ -576,7 +605,8 @@ if (sessionTab.ConnectionType == ConnectionType.Sftp)
 
 ---
 
-## 28. VNC - WebSocket Proxy Port Conflict {#vnc-websocket-port-conflict}
+<a id="vnc-websocket-port-conflict"></a>
+## 28. VNC - WebSocket Proxy Port Conflict
 
 **Symptom**: VNC connection fails with a port binding error.
 
@@ -588,7 +618,8 @@ if (sessionTab.ConnectionType == ConnectionType.Sftp)
 
 ---
 
-## 29. X11 Forwarding - No Display {#x11-no-display}
+<a id="x11-no-display"></a>
+## 29. X11 Forwarding - No Display
 
 **Symptom**: X11 forwarded applications fail with "Cannot open display" or similar errors.
 
@@ -605,7 +636,8 @@ if (sessionTab.ConnectionType == ConnectionType.Sftp)
 
 ---
 
-## 30. Telnet - Connection Hangs {#telnet-connection-hangs}
+<a id="telnet-connection-hangs"></a>
+## 30. Telnet - Connection Hangs
 
 **Symptom**: Telnet connection appears to connect but no prompt appears.
 
@@ -620,7 +652,8 @@ if (sessionTab.ConnectionType == ConnectionType.Sftp)
 
 ---
 
-## 31. FTP - Passive Mode Failures {#ftp-passive-mode}
+<a id="ftp-passive-mode"></a>
+## 31. FTP - Passive Mode Failures
 
 **Symptom**: FTP directory listing works but file transfers fail or time out.
 
@@ -635,7 +668,8 @@ if (sessionTab.ConnectionType == ConnectionType.Sftp)
 
 ---
 
-## 32. Tab Detach - WebView2 Session Lost {#tab-detach-webview2}
+<a id="tab-detach-webview2"></a>
+## 32. Tab Detach - WebView2 Session Lost
 
 **Symptom**: After detaching an SSH tab to a floating window and re-docking it, the terminal may lose its WebView2 state.
 
@@ -650,7 +684,8 @@ if (sessionTab.ConnectionType == ConnectionType.Sftp)
 
 ---
 
-## 33. Ephemeral Server - Port 69 Access Denied {#tftp-port-access-denied}
+<a id="tftp-port-access-denied"></a>
+## 33. Ephemeral Server - Port 69 Access Denied
 
 Before troubleshooting connectivity, ensure TFTP is enabled in Settings > Security > File sharing, and that the change was saved: ticking the box does nothing until Save settings is pressed and its confirmation accepted. TFTP is opt-in since Phase 3.7 and the share runs HTTP-only by default.
 
@@ -667,7 +702,8 @@ Before troubleshooting connectivity, ensure TFTP is enabled in Settings > Securi
 
 ---
 
-## 36. SFTP - Sudo Fallback Permission Denied (Auth Failure) {#sftp-sudo-fallback-auth-failure}
+<a id="sftp-sudo-fallback-auth-failure"></a>
+## 36. SFTP - Sudo Fallback Permission Denied (Auth Failure)
 
 **Symptom**: SFTP operations on root-owned files show "Permission denied" even though sudo fallback should trigger. Log shows `SshAuthenticationException: Permission denied (publickey,password)`.
 
@@ -684,7 +720,8 @@ Before troubleshooting connectivity, ensure TFTP is enabled in Settings > Securi
 
 ---
 
-## 37. SFTP - Sudo ls Parser Shows Empty Directory {#sftp-sudo-ls-parser-empty}
+<a id="sftp-sudo-ls-parser-empty"></a>
+## 37. SFTP - Sudo ls Parser Shows Empty Directory
 
 **Symptom**: Enabling "Browse as root" (sudo mode) shows an empty or nearly-empty directory listing. Only symlinks (like `/bin -> usr/bin`) appear.
 
@@ -702,7 +739,8 @@ The parser used `Split(null, 9)` and checked `parts.Length < 9`, which skipped A
 
 ---
 
-## 38. SFTP - Sudo Fallback Uses Typed Permission Denied Only {#sftp-typed-permission-denied-only}
+<a id="sftp-typed-permission-denied-only"></a>
+## 38. SFTP - Sudo Fallback Uses Typed Permission Denied Only
 
 **Symptom**: Uploading/downloading a root-owned file shows a generic transfer error instead of triggering sudo fallback. The log may show `SshException: Failure`.
 
@@ -716,7 +754,8 @@ The parser used `Split(null, 9)` and checked `parts.Length < 9`, which skipped A
 
 ---
 
-## 39. WebView2 - Side-by-Side Configuration Error (0x800736B1) {#webview2-sxs-error}
+<a id="webview2-sxs-error"></a>
+## 39. WebView2 - Side-by-Side Configuration Error (0x800736B1)
 
 **Symptom**: Embedded SSH terminal shows "WebView2 initialization failed: The application has failed to start because its side-by-side configuration is incorrect (0x800736B1)".
 
@@ -730,7 +769,8 @@ The parser used `Split(null, 9)` and checked `parts.Length < 9`, which skipped A
 
 ---
 
-## 40. HTTP Traversal - Sibling Prefix Bypass {#http-traversal-sibling-prefix}
+<a id="http-traversal-sibling-prefix"></a>
+## 40. HTTP Traversal - Sibling Prefix Bypass
 
 **Symptom**: Security audit found that the EphemeralFileServer `StartsWith` check could be bypassed with sibling directory names. E.g., serving `/data` would also allow access to `/data-other/secret.txt`.
 
@@ -748,7 +788,8 @@ Applied to both HTTP and TFTP handlers.
 
 **Files**: `Services/EphemeralFileServer.cs`
 
-## 41. Tool Tunnel Scan - Few or No Hosts Found {#tool-tunnel-scan-few-hosts}
+<a id="tool-tunnel-scan-few-hosts"></a>
+## 41. Tool Tunnel Scan - Few or No Hosts Found
 
 **Symptom**: Network Cartography (or Port Scanner, Banner Grabber, Firewall Tester, Default Credential Scanner) via "Route via" SSH gateway finds only the gateway host or very few hosts, while a direct scan from the same subnet returns dozens.
 
@@ -770,7 +811,8 @@ Additionally, `/dev/tcp` is a bash-only feature. If the gateway's login shell is
 
 ---
 
-## 42. SSH - TestEnv Gateway Dropdown Empty After Import {#ssh-testenv-gateway-dropdown-empty}
+<a id="ssh-testenv-gateway-dropdown-empty"></a>
+## 42. SSH - TestEnv Gateway Dropdown Empty After Import
 
 **Symptom**: After importing `Heimdall-TestEnv` sessions, editing a tunneled SSH/SFTP/RDP session shows an empty gateway dropdown even though the imported profile has an `SshGatewayId`.
 
@@ -791,7 +833,8 @@ Alternatively, create the gateway manually in Settings > SSH & SFTP > SSH gatewa
 
 ---
 
-## 43. RDP - `IMsRdpExtendedSettings` Not Reachable via `dynamic` Property Access {#rdp-extendedsettings-dynamic-access}
+<a id="rdp-extendedsettings-dynamic-access"></a>
+## 43. RDP - `IMsRdpExtendedSettings` Not Reachable via `dynamic` Property Access
 
 **Symptom**: Code accessing `ax.ExtendedSettings` where `ax` is the AxHost-wrapped OCX throws a runtime binder error similar to:
 
@@ -833,7 +876,8 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 
 ---
 
-## 44. SSH - Host Key Unavailable on Plink Fallback {#ssh-host-key-unavailable-plink}
+<a id="ssh-host-key-unavailable-plink"></a>
+## 44. SSH - Host Key Unavailable on Plink Fallback
 
 **Symptom**: An SSH or tunneled session on the Plink fallback (agent forwarding enabled with Pageant running) fails before launching plink with a localized host-key-unavailable message.
 
@@ -851,7 +895,8 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 
 ---
 
-## 45. SSH/SFTP - Host Key Mismatch Mid-Session {#ssh-sftp-host-key-mismatch-mid-session}
+<a id="ssh-sftp-host-key-mismatch-mid-session"></a>
+## 45. SSH/SFTP - Host Key Mismatch Mid-Session
 
 **Symptom**: An existing SSH/SFTP session disconnects and the UI shows a security warning instead of a generic reconnect prompt. SSH auto-reconnect does not start.
 
@@ -869,7 +914,8 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 
 ---
 
-## 46. FTP - Cleartext Credential Warning {#ftp-cleartext-credential-warning}
+<a id="ftp-cleartext-credential-warning"></a>
+## 46. FTP - Cleartext Credential Warning
 
 **Symptom**: Connecting to FTP succeeds but the status area warns that the channel is cleartext.
 
@@ -887,7 +933,8 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 
 ---
 
-## 47. WinRM Gateway - HTTP 12152 Invalid Server Response {#winrm-gateway-12152}
+<a id="winrm-gateway-12152"></a>
+## 47. WinRM Gateway - HTTP 12152 Invalid Server Response
 
 **Symptom**: A WinRM profile routed through an SSH gateway fails with WinHTTP error `12152` ("the server returned an invalid or unrecognized response"). The Heimdall log shows the tunnel established cleanly; the error surfaces inside the PowerShell terminal.
 
@@ -899,7 +946,8 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 
 ---
 
-## 48. KeePassXC Credential Provider - Common Gotchas {#keepassxc-credential-provider}
+<a id="keepassxc-credential-provider"></a>
+## 48. KeePassXC Credential Provider - Common Gotchas
 
 **Symptom**: The external credential provider returns nothing, reports "not found", or the Settings Test button fails when using KeePassXC.
 
@@ -924,7 +972,8 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 
 ---
 
-## 49. RDP Embedded - Session Cut Off Shortly After Connecting {#rdp-slow-server-cutoff}
+<a id="rdp-slow-server-cutoff"></a>
+## 49. RDP Embedded - Session Cut Off Shortly After Connecting
 
 **Symptom**: A server whose Windows session loads slower than usual is dropped by Heimdall shortly after it has already reported "Connected". The session is visibly up first, then cut on its own.
 
@@ -934,7 +983,8 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 
 **Files**: none until the cause is confirmed.
 
-## 50. Scheduled Task - Ran But Connected Nothing {#scheduled-task-connected-nothing}
+<a id="scheduled-task-connected-nothing"></a>
+## 50. Scheduled Task - Ran But Connected Nothing
 
 **Symptom**: The Scheduled tab shows a recent run for a task, no session was opened, and the log holds a line beginning with `Scheduled task '<name>' (serverId=<id>) connected nothing:`.
 
@@ -946,7 +996,8 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 
 ---
 
-## 51. SSH - Server Asks an Interactive Question This Client Cannot Answer {#ssh-keyboard-interactive-unsupported-prompt}
+<a id="ssh-keyboard-interactive-unsupported-prompt"></a>
+## 51. SSH - Server Asks an Interactive Question This Client Cannot Answer
 
 **Symptom**: Connecting with a password fails with a message saying the server asked an interactive question this client cannot answer, naming the question (for example `Verification code:`).
 
@@ -964,7 +1015,8 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 
 ---
 
-## 52. Tunnel - Plink Fallback Refused for a SOCKS Proxy or Reverse Forward {#tunnel-plink-fallback-forwarding-unsupported}
+<a id="tunnel-plink-fallback-forwarding-unsupported"></a>
+## 52. Tunnel - Plink Fallback Refused for a SOCKS Proxy or Reverse Forward
 
 **Symptom**: A tunneled session whose gateway sign-in was refused by the built-in SSH client fails with a message saying the Plink fallback cannot provide the SOCKS proxy or remote port forward the profile needs.
 
@@ -979,7 +1031,8 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 
 ---
 
-## 53. Update - The Banner Says the Update Did Not Apply {#update-did-not-apply}
+<a id="update-did-not-apply"></a>
+## 53. Update - The Banner Says the Update Did Not Apply
 
 **Symptom**: After accepting an update, Heimdall comes back on the previous version and the banner reports that the update was not applied, was cancelled, or could not start because Heimdall was still running.
 
@@ -995,7 +1048,8 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 
 ---
 
-## 54. SSH Terminal (Plink) - Long Lines Wrap at Column 80 or Overwrite the Prompt {#ssh-plink-terminal-width}
+<a id="ssh-plink-terminal-width"></a>
+## 54. SSH Terminal (Plink) - Long Lines Wrap at Column 80 or Overwrite the Prompt
 
 **Symptom**: On a session that runs through the Plink fallback (agent forwarding enabled on the profile with Pageant running, or the retry after a refused sign-in), bash wraps at column 80 although the terminal is wider, and a long command line overwrites its own beginning.
 
@@ -1011,7 +1065,8 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 
 ---
 
-## 55. WinRM - The Session Ends as Soon as It Opens {#winrm-session-ends-at-sign-in}
+<a id="winrm-session-ends-at-sign-in"></a>
+## 55. WinRM - The Session Ends as Soon as It Opens
 
 **Symptom**: A WinRM tab prints a PowerShell error (access denied, a Kerberos or TrustedHosts error, WinHTTP `12152`, a host that cannot be reached), then `Process exited with code 1`, and offers to reconnect. After `exit` is typed in a working session, or when its connection drops, the tab ends the same way with code 0.
 
@@ -1027,7 +1082,8 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 
 ---
 
-## 56. WinRM - The Execution Policy Refused the Sign-in Script {#winrm-execution-policy-refused}
+<a id="winrm-execution-policy-refused"></a>
+## 56. WinRM - The Execution Policy Refused the Sign-in Script
 
 **Symptom**: A WinRM profile that uses a stored credential ends at once with "The PowerShell execution policy refused the WinRM sign-in script. Your organization may require signed scripts: use the current Windows identity for this host, or ask your administrator."
 
@@ -1043,7 +1099,8 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 
 ---
 
-## 57. SSH - A Host That Does Not Answer Fails After 15 Seconds {#ssh-unresponsive-host-timeout}
+<a id="ssh-unresponsive-host-timeout"></a>
+## 57. SSH - A Host That Does Not Answer Fails After 15 Seconds
 
 **Symptom**: An embedded SSH session to a host that is switched off or filtered reports a network timeout after about 15 seconds. Before the 2026-09-30 audit the same failure took two minutes.
 
@@ -1058,7 +1115,8 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 
 ---
 
-## 58. FTP/SFTP - Uploading a New File Is Refused {#upload-new-file-refused}
+<a id="upload-new-file-refused"></a>
+## 58. FTP/SFTP - Uploading a New File Is Refused
 
 **Symptom**: Uploading a file that does not exist on the server yet fails with "The upload could not be confirmed without replacing a file. Refresh the destination before retrying. Safe creation requires SFTP with a working SSH command channel; FTP cannot guarantee it." Over FTP and FTPS this happened to every new file from v2026.090801 on; over SFTP, on accounts restricted to `internal-sftp`, on Windows OpenSSH and behind SFTP gateways.
 
@@ -1074,7 +1132,8 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 
 ---
 
-## 59. Settings - Save Is Greyed Out, or Refuses to Save {#settings-save-greyed-or-refused}
+<a id="settings-save-greyed-or-refused"></a>
+## 59. Settings - Save Is Greyed Out, or Refuses to Save
 
 **Symptom**: Save settings cannot be clicked, Ctrl+S does nothing, or pressing Save shows a red banner instead of "Settings saved".
 
@@ -1090,7 +1149,8 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 
 ---
 
-## 60. Settings - An Imported Settings File Is Refused or Changes Nothing {#settings-import-refused}
+<a id="settings-import-refused"></a>
+## 60. Settings - An Imported Settings File Is Refused or Changes Nothing
 
 **Symptom**: Import settings... says the file is not a Heimdall settings file, or that it holds the settings you already have; or the imported values disappear.
 
@@ -1106,7 +1166,8 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 
 ---
 
-## 61. Settings - "Configuration restored" at Startup {#settings-restored-from-backup}
+<a id="settings-restored-from-backup"></a>
+## 61. Settings - "Configuration restored" at Startup
 
 **Symptom**: At startup Heimdall shows "Configuration restored": `settings.json` or `servers.json` could not be read and was loaded from its last good copy, and changes saved after that copy was made may be missing.
 
@@ -1122,7 +1183,8 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 
 ---
 
-## 62. Tunnel - "Plink exited before opening the tunnel" {#tunnel-plink-exited-early}
+<a id="tunnel-plink-exited-early"></a>
+## 62. Tunnel - "Plink exited before opening the tunnel"
 
 **Symptom**: A session that runs through a Plink tunnel fails at once with "Plink exited (code N) before opening the tunnel:" followed by a line from plink.
 
@@ -1138,7 +1200,8 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 
 ---
 
-## 63. VNC - The Server Asks for a Username or a Password {#vnc-credentials-required}
+<a id="vnc-credentials-required"></a>
+## 63. VNC - The Server Asks for a Username or a Password
 
 **Symptom**: A VNC tab ends the connection with "This VNC server asks for a username and a password" or "This VNC server asks for a password, and the profile has none", and offers to reconnect. Before, the tab stayed on Connecting.
 
@@ -1153,7 +1216,8 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 
 ---
 
-## 64. WebView2 - The Pointer Disappears When a Terminal Is Closed {#webview2-pointer-hidden-after-close}
+<a id="webview2-pointer-hidden-after-close"></a>
+## 64. WebView2 - The Pointer Disappears When a Terminal Is Closed
 
 **Symptom**: The pointer disappears while typing in an embedded terminal, and closing that tab leaves it invisible over the whole window, including the buttons that would close it. Clicks still land where they are aimed, so the application works, but nothing points at what it is about to click until the pointer moves back over another embedded view.
 
