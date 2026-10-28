@@ -77,6 +77,10 @@
         "sudo sssctl user-checks alice@example.com": "Vérifie qu'un utilisateur du domaine est trouvé et peut se connecter",
         "sudo sss_cache -E": "Vide le cache SSSD après une modification dans l'annuaire"
       }
+    },
+    "es": {
+      "title": "Mostrar el estado de SSSD de un dominio",
+      "description": "Muestra si SSSD está en línea para un dominio y qué controladores de dominio está usando."
     }
   }
 }

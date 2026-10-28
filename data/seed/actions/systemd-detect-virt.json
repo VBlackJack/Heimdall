@@ -72,6 +72,10 @@
         "dmidecode -s system-product-name": "Nom du produit système",
         "hostnamectl | grep Virtualization": "Via hostnamectl"
       }
+    },
+    "es": {
+      "title": "Detectar la virtualización",
+      "description": "Detecta si el sistema se ejecuta en un entorno virtualizado"
     }
   }
 }

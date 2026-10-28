@@ -93,6 +93,10 @@
         "Backup-SqlDatabase -ServerInstance 'localhost' -Database 'MyDB' -BackupFile 'C:\\Backups\\MyDB.bak'": "Sauvegarde complète de MyDB",
         "Invoke-Sqlcmd -Query \"BACKUP DATABASE [MyDB] TO DISK='C:\\Backups\\MyDB.bak' WITH COMPRESSION\"": "Alternative avec T-SQL"
       }
+    },
+    "es": {
+      "title": "Hacer una copia de seguridad de una base de datos de SQL Server",
+      "description": "Realiza una copia de seguridad completa (FULL) de una base de datos de SQL Server en el archivo .bak indicado."
     }
   }
 }

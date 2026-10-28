@@ -53,6 +53,10 @@
         "free -h": "Compare l'occupation du swap à celle de la mémoire",
         "grep -i swap /etc/fstab": "Affiche les zones de swap montées au démarrage"
       }
+    },
+    "es": {
+      "title": "Mostrar las áreas de intercambio",
+      "description": "Muestra cada área de intercambio activa con su tipo, su tamaño, su uso y su prioridad."
     }
   }
 }

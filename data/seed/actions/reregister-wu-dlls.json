@@ -35,6 +35,10 @@
       "examples": {
         "regsvr32 /s wuaueng.dll": "Réenregistre la DLL du moteur Windows Update"
       }
+    },
+    "es": {
+      "title": "Volver a registrar las DLL de Windows Update",
+      "description": "Vuelve a registrar todas las DLL críticas del sistema de Windows Update"
     }
   }
 }

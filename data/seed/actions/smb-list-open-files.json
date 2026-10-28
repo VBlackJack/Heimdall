@@ -55,6 +55,10 @@
         "Get-SmbOpenFile | Where-Object Path -like 'D:\\Shares\\Finance\\*'": "Trouve qui garde un fichier ouvert dans un dossier",
         "Get-SmbOpenFile -CimSession FS01 | Measure-Object": "Compte les fichiers ouverts d'un serveur de fichiers distant"
       }
+    },
+    "es": {
+      "title": "Listar los archivos abiertos por SMB",
+      "description": "Muestra los archivos que los clientes mantienen abiertos en el servidor de archivos, con el usuario y el cliente."
     }
   }
 }

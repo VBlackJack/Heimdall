@@ -114,6 +114,10 @@
         "Set-Service -Name 'wuauserv' -StartupType Automatic -PassThru": "Force la commande à retourner l'objet modifié/créé dans le pipeline. Par défaut, les cmdlets Set-/New- ne retournent rien. -PassThru active le retour pour permettre des opérations en chaîne ou des vérifications immédiates.",
         "Set-Service -Name 'wuauserv' -StartupType Automatic -Verbose": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes."
       }
+    },
+    "es": {
+      "title": "Cambiar el tipo de inicio de un servicio",
+      "description": "Cambia el tipo de inicio de un servicio (Automatic, Manual, Disabled)"
     }
   }
 }

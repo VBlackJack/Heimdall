@@ -95,6 +95,10 @@
         "sudo sysctl -p": "Recharger /etc/sysctl.conf",
         "sysctl -a | head -50": "Tous les paramètres"
       }
+    },
+    "es": {
+      "title": "Mostrar los parámetros del kernel",
+      "description": "Muestra los parámetros del kernel de Linux en tiempo de ejecución. Atención: los ejemplos de sysctl -w y sysctl -p cambian el kernel en ejecución y requieren root."
     }
   }
 }

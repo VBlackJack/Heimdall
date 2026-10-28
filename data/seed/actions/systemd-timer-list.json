@@ -76,6 +76,10 @@
         "systemctl list-timers --all": "Liste tous les timers",
         "systemctl status my-backup.timer": "État d'un timer spécifique"
       }
+    },
+    "es": {
+      "title": "Listar los temporizadores de systemd",
+      "description": "Muestra todos los temporizadores de systemd (alternativa moderna a cron)"
     }
   }
 }

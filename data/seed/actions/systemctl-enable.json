@@ -71,6 +71,10 @@
         "sudo systemctl enable --now nginx": "Active et démarre immédiatement",
         "sudo systemctl enable docker": "Activer Docker au démarrage"
       }
+    },
+    "es": {
+      "title": "Habilitar un servicio en el arranque",
+      "description": "Configura un servicio para que se inicie automáticamente en el arranque"
     }
   }
 }

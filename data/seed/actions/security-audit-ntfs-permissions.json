@@ -60,6 +60,10 @@
       "examples": {
         "Get-Acl C:\\Users | Format-List": "Affiche les permissions du dossier Users"
       }
+    },
+    "es": {
+      "title": "Auditar los permisos NTFS de una carpeta",
+      "description": "Muestra los permisos NTFS detallados de una carpeta o un archivo, con los derechos concedidos a cada usuario o grupo"
     }
   }
 }

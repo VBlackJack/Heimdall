@@ -69,6 +69,10 @@
       "examples": {
         "C:\\Windows\\ccmsetup\\ccmsetup.exe /mp:sccm.contoso.com SMSSITECODE=ABC /forceinstall": "Réinstalle le client SCCM avec le site ABC"
       }
+    },
+    "es": {
+      "title": "Reparar el cliente de SCCM (instalación forzada)",
+      "description": "Inicia una reparación forzada del cliente de Configuration Manager con una reinstalación"
     }
   }
 }

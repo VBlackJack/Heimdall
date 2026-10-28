@@ -52,6 +52,10 @@
         "npm start": "Démarre l'application selon package.json",
         "npm run dev": "Lance le script dev (mode développement)"
       }
+    },
+    "es": {
+      "title": "Iniciar un proyecto npm",
+      "description": "Ejecuta el script de inicio (start) de un proyecto de Node.js."
     }
   }
 }

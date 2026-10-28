@@ -107,6 +107,10 @@
         "ssh-copy-id -i ~/.ssh/id_ed25519.pub -p 2222 deploy@build01": "Installe une clé sur un serveur qui écoute sur le port 2222",
         "ssh-copy-id -n -i ~/.ssh/id_ed25519.pub admin@web01": "Montre les clés qui seraient installées, sans les installer"
       }
+    },
+    "es": {
+      "title": "Instalar una clave pública en un host remoto",
+      "description": "Añade una clave pública SSH local al archivo authorized_keys de una cuenta de un host remoto."
     }
   }
 }

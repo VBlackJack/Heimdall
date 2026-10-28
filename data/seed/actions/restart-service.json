@@ -84,6 +84,10 @@
         "Restart-Service -Name 'wuauserv' -Force -PassThru": "Exécute l'action et retourne l'objet résultant pour vérification immédiate. -PassThru permet de confirmer que l'opération a réussi en affichant le statut final. Utile pour les scripts avec gestion d'erreurs.",
         "Restart-Service -Name 'Spooler' -Force": "Force l'action même en cas de résistance (services dépendants, processus protégés, etc.). -Force contourne certaines sécurités. À utiliser avec précaution après avoir vérifié les dépendances."
       }
+    },
+    "es": {
+      "title": "Reiniciar un servicio de Windows",
+      "description": "Detiene y vuelve a iniciar un servicio de Windows"
     }
   }
 }

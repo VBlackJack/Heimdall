@@ -112,6 +112,10 @@
         "setfacl -b /shared": "Supprimer toutes les ACL",
         "setfacl -R -m u:www-data:rx /var/www": "ACL récursives"
       }
+    },
+    "es": {
+      "title": "Modificar las ACL de un archivo",
+      "description": "Establece o modifica listas de control de acceso (ACL) extendidas"
     }
   }
 }

@@ -90,6 +90,10 @@
         "Get-ScheduledTask -TaskPath '\\' | Where-Object {$_.State -eq 'Ready'} | Start-ScheduledTask": "Démarre toutes les tâches prêtes",
         "Start-ScheduledTask -TaskName 'DailyBackup' \\Microsoft\\Windows\\": "Exemple utilisant le paramètre 'taskpath': Chemin de la tâche (ex: -TaskPath '\\CustomTasks\\'). Remplacez \\Microsoft\\Windows\\ par la valeur appropriée selon votre environnement."
       }
+    },
+    "es": {
+      "title": "Iniciar una tarea programada",
+      "description": "Ejecuta una tarea programada ahora"
     }
   }
 }

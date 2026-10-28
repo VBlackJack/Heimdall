@@ -35,6 +35,10 @@
       "examples": {
         "wuauclt /resetauthorization /detectnow": "Force la détection après réinitialisation de l'ID"
       }
+    },
+    "es": {
+      "title": "Restablecer el ID de cliente de WSUS",
+      "description": "Elimina el SusClientId para que se cree de nuevo en la próxima conexión"
     }
   }
 }

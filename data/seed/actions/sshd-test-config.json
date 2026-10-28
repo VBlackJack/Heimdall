@@ -54,6 +54,10 @@
         "sudo sshd -T | grep -iE 'permitrootlogin|passwordauthentication'": "Affiche les réglages effectifs de connexion root et de mot de passe",
         "sudo sshd -t -f /etc/ssh/sshd_config.new": "Teste un fichier candidat avant de le mettre en place"
       }
+    },
+    "es": {
+      "title": "Probar la configuración del servidor SSH",
+      "description": "Comprueba el archivo de configuración de sshd y las claves de host antes de reiniciar el servidor SSH."
     }
   }
 }

@@ -66,6 +66,10 @@
         "sudo setenforce Permissive": "Passer en mode permissif",
         "sudo ausearch -m avc -ts recent": "Derniers refus"
       }
+    },
+    "es": {
+      "title": "Comprobar el estado de SELinux",
+      "description": "Muestra el estado y el modo de SELinux (Security-Enhanced Linux)"
     }
   }
 }

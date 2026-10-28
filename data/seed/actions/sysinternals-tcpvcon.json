@@ -33,6 +33,10 @@
       "examples": {
         "tcpvcon.exe -a -n -c -AcceptEula": "Affiche toutes les connexions (-a) sans résolution DNS (-n) au format CSV (-c). Idéal pour scripter ou analyser dans Excel."
       }
+    },
+    "es": {
+      "title": "Conexiones TCP detalladas (Tcpvcon)",
+      "description": "Versión de línea de comandos de TCPView. Muestra las conexiones de red con sus procesos."
     }
   }
 }

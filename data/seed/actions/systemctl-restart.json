@@ -64,6 +64,10 @@
         "sudo systemctl restart nginx": "Redémarre nginx (utile après modification de config)",
         "sudo systemctl restart sshd": "Redémarre SSH"
       }
+    },
+    "es": {
+      "title": "Reiniciar un servicio de systemd",
+      "description": "Reinicia un servicio (lo detiene y vuelve a iniciarlo)"
     }
   }
 }

@@ -39,6 +39,10 @@
         "psloggedon.exe -l -AcceptEula": "Affiche uniquement les connexions locales (-l), pas les connexions via partages réseau.",
         "psloggedon.exe \\\\SERVER01": "Vérifie qui est connecté sur un serveur distant."
       }
+    },
+    "es": {
+      "title": "¿Quién ha iniciado sesión? (PsLoggedOn)",
+      "description": "Muestra los usuarios que han iniciado sesión localmente y a través de recursos compartidos."
     }
   }
 }

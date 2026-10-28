@@ -71,6 +71,10 @@
         "sudo exportfs -v": "Sur le serveur, affiche les exports avec leurs options",
         "rpcinfo -p nas01": "Vérifie quels services RPC le serveur propose"
       }
+    },
+    "es": {
+      "title": "Listar las exportaciones de un servidor NFS",
+      "description": "Muestra los directorios que exporta un servidor NFS y los clientes autorizados a montarlos."
     }
   }
 }

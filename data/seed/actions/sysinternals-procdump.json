@@ -75,6 +75,10 @@
         "procdump.exe -h -AcceptEula notepad.exe": "Attend que la fenêtre 'Ne répond pas' (Hung window -h) pour déclencher le dump automatiquement.",
         "procdump.exe -e 1 -f C0000005 -AcceptEula w3wp.exe": "Déclenche un dump dès qu'une exception spécifique (Access Violation C0000005) survient."
       }
+    },
+    "es": {
+      "title": "Capturar un volcado de memoria (ProcDump)",
+      "description": "Crea un volcado de memoria de un proceso para analizarlo (bloqueo, cuelgue, fuga de memoria)."
     }
   }
 }

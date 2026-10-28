@@ -35,6 +35,10 @@
       "examples": {
         "powershell -Command \"Invoke-WmiMethod -Namespace root\\ccm -Class SMS_Client -Name ResetPolicy -ArgumentList 1\"": "Réinitialise toutes les stratégies SCCM"
       }
+    },
+    "es": {
+      "title": "Restablecer las directivas de SCCM",
+      "description": "Elimina todas las directivas de equipo y de usuario del cliente de SCCM"
     }
   }
 }

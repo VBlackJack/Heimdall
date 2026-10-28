@@ -70,6 +70,10 @@
         "sudo systemctl disable --now nginx": "Désactive et arrête immédiatement",
         "sudo systemctl disable apache2": "Désactive apache2 au démarrage"
       }
+    },
+    "es": {
+      "title": "Deshabilitar un servicio en el arranque",
+      "description": "Impide que un servicio se inicie automáticamente en el arranque"
     }
   }
 }

@@ -54,6 +54,10 @@
         "Get-SmbSession | Where-Object Dialect -like '2*'": "Trouve les clients encore en SMB 2",
         "Get-SmbSession -CimSession FS01": "Liste les sessions d'un serveur de fichiers distant"
       }
+    },
+    "es": {
+      "title": "Listar las sesiones SMB",
+      "description": "Muestra los clientes conectados al servidor de archivos con su usuario, su dialecto y sus archivos abiertos."
     }
   }
 }

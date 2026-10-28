@@ -41,6 +41,10 @@
       "examples": {
         "Set-ItemProperty -Path 'HKLM:\\System\\CurrentControlSet\\Control\\Terminal Server' -Name 'fDenyTSConnections' -Value 0": "Active RDP au niveau système (registre)"
       }
+    },
+    "es": {
+      "title": "Habilitar la regla de cortafuegos para RDP",
+      "description": "Habilita la regla del Firewall de Windows que permite las conexiones de Escritorio remoto (RDP)"
     }
   }
 }

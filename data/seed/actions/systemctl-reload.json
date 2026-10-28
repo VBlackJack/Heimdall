@@ -64,6 +64,10 @@
         "sudo systemctl reload nginx": "Recharge la config nginx sans interruption",
         "sudo systemctl reload-or-restart nginx": "Recharge ou redémarre si reload non supporté"
       }
+    },
+    "es": {
+      "title": "Recargar la configuración de un servicio",
+      "description": "Recarga la configuración del servicio sin detenerlo (cuando es compatible)"
     }
   }
 }

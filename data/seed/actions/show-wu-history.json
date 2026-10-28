@@ -41,6 +41,10 @@
         "Get-HotFix | Sort-Object -Property InstalledOn -Descending | Select-Object -First 10": "Affiche les 10 dernières mises à jour installées",
         "powershell -Command \"Get-HotFix | Sort-Object -Property InstalledOn -Descending | Select-Object -First 50 | Format-Table -AutoSize\"": "Liste les 50 dernières mises à jour installées avec leur statut."
       }
+    },
+    "es": {
+      "title": "Mostrar el historial de Windows Update",
+      "description": "Lista las últimas 50 actualizaciones instaladas con su estado"
     }
   }
 }

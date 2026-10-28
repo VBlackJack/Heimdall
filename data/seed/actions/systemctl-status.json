@@ -70,6 +70,10 @@
         "systemctl is-active nginx": "Retourne uniquement active/inactive",
         "systemctl is-enabled nginx": "Vérifie si activé au boot"
       }
+    },
+    "es": {
+      "title": "Comprobar el estado de un servicio",
+      "description": "Muestra el estado detallado de una unidad de systemd (activa, registros recientes, etc.)"
     }
   }
 }

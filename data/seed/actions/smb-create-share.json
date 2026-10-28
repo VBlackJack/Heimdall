@@ -113,6 +113,10 @@
         "New-SmbShare -Name 'Projects' -Path 'D:\\Shares\\Projects' -ChangeAccess 'CONTOSO\\Project Team' -FolderEnumerationMode AccessBased": "Crée un partage qui masque les dossiers qu'un utilisateur ne peut pas ouvrir",
         "New-SmbShare -Name 'Scans' -Path 'D:\\Shares\\Scans' -ChangeAccess 'CONTOSO\\Domain Users' -EncryptData $true": "Crée un partage qui exige le chiffrement SMB"
       }
+    },
+    "es": {
+      "title": "Crear un recurso compartido SMB",
+      "description": "Comparte una carpeta existente mediante SMB con acceso total y de lectura concedido a dos cuentas."
     }
   }
 }

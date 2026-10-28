@@ -69,6 +69,10 @@
         "accesschk.exe -w -s -q -u Users \"C:\\Program Files\"": "🔥 VULN CHECK : Cherche tous les dossiers dans Program Files où le groupe 'Users' a le droit d'écrire (-w). C'est une faille de sécurité classique (Privilege Escalation via DLL Hijacking).",
         "accesschk.exe -c -w -u Users *": "Liste les services Windows modifiables par les utilisateurs simples. Permet de détecter des services mal configurés."
       }
+    },
+    "es": {
+      "title": "Auditar permisos (AccessChk)",
+      "description": "Comprueba los derechos de acceso efectivos de los usuarios sobre archivos, claves del registro o servicios."
     }
   }
 }

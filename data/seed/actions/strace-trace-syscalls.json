@@ -113,6 +113,10 @@
         "strace ls -la": "Tracer la commande ls",
         "strace -o trace.log -f ./script.sh": "Tracer avec enfants"
       }
+    },
+    "es": {
+      "title": "Trazar las llamadas al sistema de un proceso",
+      "description": "Traza todas las llamadas al sistema que realiza un proceso (depuración)"
     }
   }
 }

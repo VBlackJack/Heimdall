@@ -106,6 +106,10 @@
         "ssh-keygen -p -f ~/.ssh/id_ed25519": "Change la phrase de passe d'une clé existante",
         "ssh-keygen -lf ~/.ssh/id_ed25519.pub": "Affiche l'empreinte d'une clé publique"
       }
+    },
+    "es": {
+      "title": "Generar un par de claves SSH",
+      "description": "Crea un par de claves SSH nuevo en ~/.ssh con el tipo de clave y el comentario elegidos."
     }
   }
 }

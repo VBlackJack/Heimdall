@@ -60,6 +60,10 @@
         "Get-SmbShare -Name Data | Format-List *": "Affiche tous les réglages d'un partage",
         "Get-SmbShare -CimSession FS01": "Liste les partages d'un serveur de fichiers distant"
       }
+    },
+    "es": {
+      "title": "Listar los recursos compartidos SMB",
+      "description": "Muestra los recursos compartidos del servidor de archivos con su ruta y los usuarios conectados."
     }
   }
 }

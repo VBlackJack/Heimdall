@@ -81,6 +81,10 @@
         "sestatus": "Affiche le mode actuel et le mode configuré",
         "sudo semanage permissive -a httpd_t": "Rend un seul domaine permissif au lieu de tout le système"
       }
+    },
+    "es": {
+      "title": "Cambiar el modo de SELinux",
+      "description": "Cambia SELinux entre los modos enforcing y permissive hasta el próximo reinicio."
     }
   }
 }

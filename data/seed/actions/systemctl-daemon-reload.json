@@ -47,6 +47,10 @@
         "sudo systemctl daemon-reload": "Recharge la configuration systemd",
         "sudo systemctl daemon-reload && sudo systemctl restart myservice": "Recharge puis redémarre un service"
       }
+    },
+    "es": {
+      "title": "Recargar la configuración de systemd",
+      "description": "Recarga todos los archivos de unidad de systemd tras un cambio"
     }
   }
 }

@@ -60,6 +60,10 @@
         "ss -t state established": "Connexions TCP établies",
         "ss -o state established": "Connexions avec timers"
       }
+    },
+    "es": {
+      "title": "Listar las conexiones establecidas",
+      "description": "Muestra todas las conexiones de red establecidas actualmente"
     }
   }
 }

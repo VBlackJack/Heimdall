@@ -84,6 +84,10 @@
         "ss -ltn sport = :80": "Sockets écoutant sur le port 80",
         "ss -o": "Avec timers"
       }
+    },
+    "es": {
+      "title": "Mostrar los sockets de red (ss)",
+      "description": "Lista los sockets de red activos (sustituto moderno de netstat)"
     }
   }
 }

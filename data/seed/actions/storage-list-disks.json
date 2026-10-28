@@ -60,6 +60,10 @@
         "Get-Disk -Number 1 | Get-Partition": "Affiche les partitions du disque 1",
         "Get-PhysicalDisk | Select-Object FriendlyName,MediaType,HealthStatus": "Affiche le type de support et la santé des disques physiques"
       }
+    },
+    "es": {
+      "title": "Listar los discos",
+      "description": "Muestra los discos del equipo con su estado, su estilo de partición, su tamaño y su estado en línea."
     }
   }
 }

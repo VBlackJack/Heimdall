@@ -115,6 +115,10 @@
         "python3 -m venv venv && source venv/bin/activate": "Créer et activer un venv",
         "python3 -c \"print('Hello')\"": "Exécuter une ligne de code"
       }
+    },
+    "es": {
+      "title": "Ejecutar un script de Python",
+      "description": "Inicia un script de Python."
     }
   }
 }

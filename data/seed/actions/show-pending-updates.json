@@ -35,6 +35,10 @@
       "examples": {
         "powershell -Command \"$UpdateSession = New-Object -ComObject Microsoft.Update.Session; $UpdateSearcher = $UpdateSession.CreateUpdateSearcher(); $SearchResult = $UpdateSearcher.Search('IsInstalled=0'); $SearchResult.Updates.Count\"": "Compte le nombre de mises à jour en attente"
       }
+    },
+    "es": {
+      "title": "Mostrar las actualizaciones pendientes",
+      "description": "Lista todas las actualizaciones disponibles que no están instaladas"
     }
   }
 }
