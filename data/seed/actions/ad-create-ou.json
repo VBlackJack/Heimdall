@@ -39,6 +39,7 @@
         "label": "Description",
         "type": "string",
         "defaultValue": "",
+        "flag": "-Description",
         "required": false,
         "description": "Description of the OU"
       }

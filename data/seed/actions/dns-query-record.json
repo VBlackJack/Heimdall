@@ -46,6 +46,7 @@
           "TXT"
         ],
         "defaultValue": "A",
+        "flag": "-Type",
         "required": false,
         "description": "DNS record type (A, AAAA, MX, TXT and so on)"
       }

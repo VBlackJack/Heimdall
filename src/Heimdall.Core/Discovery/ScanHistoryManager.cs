@@ -52,8 +52,15 @@ public static class ScanHistoryManager
     /// <summary>
     /// Persists a scan snapshot to the history directory as JSON.
     /// Uses atomic temp-file-then-rename to prevent corruption on crash.
-    /// On Windows, applies restrictive ACL via <see cref="Security.SecureFileWriter"/>.
+    /// On Windows, the restrictive ACL is applied to the temp file when it is created and travels
+    /// with the rename (<see cref="Security.SecureFileWriter.WriteAllTextAtomicAsync(string, string, CancellationToken)"/>).
     /// </summary>
+    /// <remarks>
+    /// The file name carries the time to the second, which <see cref="ListSnapshots"/> reads back
+    /// by position, so it is not made unique. Two saves of the same subnet within one second land
+    /// on the same name and the later replaces the earlier: the atomic write makes that a clean
+    /// swap, never a torn file.
+    /// </remarks>
     public static async Task SaveSnapshotAsync(string dir, NetworkScanSnapshot snapshot)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(dir);
@@ -62,7 +69,29 @@ public static class ScanHistoryManager
         var targetPath = Path.Combine(dir, fileName);
         var json = JsonSerializer.Serialize(snapshot, SerializeOptions);
 
-        // Atomic write: write to temp file, then rename
+        if (OperatingSystem.IsWindows())
+        {
+            // Atomic write with the restrictive ACL set when the temp file is created, so the
+            // renamed file is protected from its first byte. The ACL used to be applied by
+            // deleting the file and writing it again, which undid the atomicity: a crash between
+            // the two left no snapshot, and a reader holding the file open failed the save.
+            await Security.SecureFileWriter.WriteAllTextAtomicAsync(targetPath, json).ConfigureAwait(false);
+        }
+        else
+        {
+            await WriteAtomicAsync(targetPath, json).ConfigureAwait(false);
+        }
+
+        // Enforce retention policy
+        EnforceRetentionPolicy(dir);
+    }
+
+    /// <summary>
+    /// Writes <paramref name="json"/> to a temp file beside <paramref name="targetPath"/> and
+    /// renames it over the target, for the platforms without the Windows ACL writer.
+    /// </summary>
+    private static async Task WriteAtomicAsync(string targetPath, string json)
+    {
         var tempPath = targetPath + ".tmp";
         try
         {
@@ -75,16 +104,6 @@ public static class ScanHistoryManager
             try { File.Delete(tempPath); } catch { /* best effort */ }
             throw;
         }
-
-        // Apply restrictive ACL on Windows
-        if (OperatingSystem.IsWindows())
-        {
-            try { Security.SecureFileWriter.WriteAndProtect(targetPath, json); }
-            catch { /* ACL enforcement is best-effort for scan history */ }
-        }
-
-        // Enforce retention policy
-        EnforceRetentionPolicy(dir);
     }
 
     /// <summary>

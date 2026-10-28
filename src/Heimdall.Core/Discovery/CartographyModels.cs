@@ -291,7 +291,17 @@ public sealed record NetworkKnowledgeBase(
     int Version,
     DateTime LastUpdated,
     KnowledgeBaseTtlConfig TtlConfig,
-    Dictionary<string, KnownHost> Hosts);
+    Dictionary<string, KnownHost> Hosts)
+{
+    /// <summary>
+    /// True when this instance stands in for a file that exists but could not be read, so the
+    /// file may still hold what the operator has accumulated. <see cref="KnowledgeBaseManager"/>
+    /// refuses to save such an instance: writing it would replace the file with a near-empty
+    /// one. It is a property of the loaded instance, not of the process, and is never stored.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsReadOnly { get; init; }
+}
 
 /// <summary>
 /// Configurable TTL values (in hours) that control when cached data is

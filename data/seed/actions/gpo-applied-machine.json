@@ -23,6 +23,7 @@
         "label": "Target computer",
         "type": "string",
         "defaultValue": "localhost",
+        "flag": "/S",
         "required": false,
         "description": "Name of the target computer (localhost by default)"
       }

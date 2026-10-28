@@ -24,6 +24,7 @@
         "label": "Service name",
         "type": "string",
         "defaultValue": "",
+        "flag": "-Name",
         "required": false,
         "description": "Service name (e.g. -Name 'wuauserv') or leave empty"
       },

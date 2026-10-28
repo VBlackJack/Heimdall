@@ -251,6 +251,8 @@ public sealed class GitSyncService : IGitSyncService, IDisposable
             entry.ErrorDetails = GitUrlSanitizer.RedactCredentials(entry.ErrorDetails);
 
             await syncHistoryRepository.AddAsync(entry);
+            await syncHistoryRepository.DeleteBeyondNewestPerRemoteAsync(
+                ValidationConstants.MaxSyncHistoryEntriesPerRemote);
         }
         catch (Exception ex)
         {

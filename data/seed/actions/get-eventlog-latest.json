@@ -32,6 +32,7 @@
         "label": "Number of events",
         "type": "number",
         "defaultValue": "20",
+        "flag": "-Newest",
         "required": false,
         "description": "Number of events to show"
       },

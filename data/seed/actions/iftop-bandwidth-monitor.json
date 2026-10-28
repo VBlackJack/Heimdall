@@ -24,6 +24,7 @@
         "label": "Interface",
         "type": "string",
         "defaultValue": "eth0",
+        "flag": "-i",
         "required": false,
         "description": "Network interface to monitor"
       }

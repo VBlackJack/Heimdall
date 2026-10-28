@@ -31,6 +31,7 @@
         "label": "Comment",
         "type": "string",
         "defaultValue": "",
+        "flag": "-Comment",
         "required": false,
         "description": "Description of the GPO"
       }

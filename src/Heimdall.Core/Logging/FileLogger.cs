@@ -26,19 +26,58 @@ namespace Heimdall.Core.Logging;
 /// </summary>
 public sealed class FileLogger : IDisposable
 {
+    /// <summary>How many days a diagnostic log file is kept after it was last written.</summary>
+    internal const int LogRetentionDays = 30;
+
+    /// <summary>The size, in megabytes, past which a day's log continues in a numbered file.</summary>
+    private const int MaxLogFileMegabytes = 10;
+
+    private const long BytesPerMegabyte = 1024 * 1024;
+
+    /// <summary>The size cap of one log file, in bytes.</summary>
+    internal const long MaxLogFileBytes = MaxLogFileMegabytes * BytesPerMegabyte;
+
+    /// <summary>
+    /// The search pattern for the files this logger writes: <c>heimdall_</c>, the day as eight
+    /// characters, then anything up to <c>.log</c> (the <c>.N</c> of an overflow file).
+    /// </summary>
+    /// <remarks>
+    /// Not strict on Windows: there a <c>?</c> may match no character at all, so
+    /// <c>heimdall_notes.log</c> matches it. It only narrows the enumeration;
+    /// <see cref="OwnLogFileName"/> decides.
+    /// </remarks>
+    private const string LogFileSearchPattern = "heimdall_????????*.log";
+
+    /// <summary>
+    /// The exact shape of a file this logger writes: the day's file or one of its numbered
+    /// continuations. Session transcripts and the event and operation logs share the folder and
+    /// must never match it.
+    /// </summary>
+    private static readonly System.Text.RegularExpressions.Regex OwnLogFileName = new(
+        @"^heimdall_\d{8}(?:\.\d+)?\.log\z",
+        System.Text.RegularExpressions.RegexOptions.CultureInvariant | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+    private const string LogFilePrefix = "heimdall_";
+    private const string LogFileDateFormat = "yyyyMMdd";
+    private const string LogFileExtension = ".log";
+
     private static FileLogger? _instance;
     private readonly string _logPath;
+    private readonly long _maxFileBytes;
+    private int _overflowIndex;
+    private string? _aclAppliedPath;
     private readonly ConcurrentQueue<string> _queue = new();
     private readonly Timer _flushTimer;
     private readonly object _writeLock = new();
     private static volatile bool _enabled = true;
     private bool _disposed;
-    private bool _aclApplied;
 
-    private FileLogger(string logDirectory, int flushIntervalMs)
+    private FileLogger(string logDirectory, int flushIntervalMs, long maxFileBytes, int retentionDays)
     {
         Directory.CreateDirectory(logDirectory);
-        _logPath = Path.Combine(logDirectory, $"heimdall_{DateTime.Now:yyyyMMdd}.log");
+        _maxFileBytes = maxFileBytes;
+        _logPath = Path.Combine(logDirectory, $"{LogFilePrefix}{DateTime.Now.ToString(LogFileDateFormat, System.Globalization.CultureInfo.InvariantCulture)}{LogFileExtension}");
+        PurgeExpiredLogs(logDirectory, retentionDays, DateTime.UtcNow, _logPath);
         var interval = TimeSpan.FromMilliseconds(flushIntervalMs);
         _flushTimer = new Timer(_ => FlushInternal(), null, TimeSpan.FromSeconds(1), interval);
     }
@@ -47,9 +86,67 @@ public sealed class FileLogger : IDisposable
     /// Initialize the global logger instance.
     /// </summary>
     public static void Initialize(string logDirectory, int flushIntervalMs = 2000)
+        => Initialize(logDirectory, flushIntervalMs, MaxLogFileBytes, LogRetentionDays);
+
+    /// <summary>
+    /// Initialize with explicit bounds, so a test can use a size cap of a few bytes.
+    /// </summary>
+    internal static void Initialize(string logDirectory, int flushIntervalMs, long maxFileBytes, int retentionDays)
     {
         _instance?.Dispose();
-        _instance = new FileLogger(logDirectory, flushIntervalMs);
+        _instance = new FileLogger(logDirectory, flushIntervalMs, maxFileBytes, retentionDays);
+    }
+
+    /// <summary>
+    /// Deletes the diagnostic log files of <paramref name="logDirectory"/> last written more
+    /// than <paramref name="retentionDays"/> days before <paramref name="nowUtc"/>, and returns
+    /// how many it deleted.
+    /// </summary>
+    /// <remarks>
+    /// Only this logger's own files are candidates: a name searched with
+    /// <see cref="LogFileSearchPattern"/> in the folder itself (no sub-folder) that also has the
+    /// exact shape of <see cref="OwnLogFileName"/>. A session transcript, the event log or
+    /// anything the operator keeps there is never touched, and neither is
+    /// <paramref name="activePath"/>. Best effort: a file that is held or protected stays for
+    /// the next start.
+    /// </remarks>
+    internal static int PurgeExpiredLogs(string logDirectory, int retentionDays, DateTime nowUtc, string? activePath = null)
+    {
+        if (retentionDays <= 0 || !Directory.Exists(logDirectory))
+        {
+            return 0;
+        }
+
+        var cutoff = nowUtc.AddDays(-retentionDays);
+        var deleted = 0;
+        try
+        {
+            foreach (var path in Directory.EnumerateFiles(logDirectory, LogFileSearchPattern, SearchOption.TopDirectoryOnly))
+            {
+                try
+                {
+                    if (string.Equals(path, activePath, StringComparison.OrdinalIgnoreCase)
+                        || !OwnLogFileName.IsMatch(Path.GetFileName(path))
+                        || File.GetLastWriteTimeUtc(path) >= cutoff)
+                    {
+                        continue;
+                    }
+
+                    File.Delete(path);
+                    deleted++;
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    // Held or protected: it stays for the next start.
+                }
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Retention is best effort; the logger must start whatever the folder holds.
+        }
+
+        return deleted;
     }
 
     /// <summary>
@@ -129,17 +226,19 @@ public sealed class FileLogger : IDisposable
 
             if (sb.Length == 0) return;
 
+            var text = sb.ToString();
             int[] retryDelaysMs = [10, 50, 200];
             for (var attempt = 0; attempt <= retryDelaysMs.Length; attempt++)
             {
                 try
                 {
-                    File.AppendAllText(_logPath, sb.ToString(), Encoding.UTF8);
+                    var path = ResolveWritablePath(Encoding.UTF8.GetByteCount(text));
+                    File.AppendAllText(path, text, Encoding.UTF8);
 
-                    if (!_aclApplied && OperatingSystem.IsWindows())
+                    if (!string.Equals(_aclAppliedPath, path, StringComparison.Ordinal) && OperatingSystem.IsWindows())
                     {
-                        AclEnforcer.SetFileAcl(_logPath);
-                        _aclApplied = true;
+                        AclEnforcer.SetFileAcl(path);
+                        _aclAppliedPath = path;
                     }
 
                     return;
@@ -162,6 +261,29 @@ public sealed class FileLogger : IDisposable
                     return;
                 }
             }
+        }
+    }
+
+    /// <summary>
+    /// The file the next <paramref name="incomingBytes"/> go to: the day's file, or the first
+    /// numbered continuation (<c>heimdall_20261027.1.log</c>) with room for them. A file that
+    /// is empty takes whatever arrives, so a single oversized batch is never refused. Called
+    /// with the write lock held.
+    /// </summary>
+    private string ResolveWritablePath(long incomingBytes)
+    {
+        while (true)
+        {
+            var path = _overflowIndex == 0
+                ? _logPath
+                : Path.ChangeExtension(_logPath, null) + "." + _overflowIndex.ToString(System.Globalization.CultureInfo.InvariantCulture) + LogFileExtension;
+            var info = new FileInfo(path);
+            if (!info.Exists || info.Length == 0 || info.Length + incomingBytes <= _maxFileBytes)
+            {
+                return path;
+            }
+
+            _overflowIndex++;
         }
     }
 

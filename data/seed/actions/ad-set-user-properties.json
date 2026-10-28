@@ -31,6 +31,7 @@
         "label": "Department",
         "type": "string",
         "defaultValue": "",
+        "flag": "-Department",
         "required": false,
         "description": "Department of the user"
       },
@@ -39,6 +40,7 @@
         "label": "Title",
         "type": "string",
         "defaultValue": "",
+        "flag": "-Title",
         "required": false,
         "description": "Title or position of the user"
       },
@@ -47,6 +49,7 @@
         "label": "Phone",
         "type": "string",
         "defaultValue": "",
+        "flag": "-OfficePhone",
         "required": false,
         "description": "Phone number"
       },
@@ -55,6 +58,7 @@
         "label": "Email",
         "type": "string",
         "defaultValue": "",
+        "flag": "-EmailAddress",
         "required": false,
         "description": "Email address"
       }

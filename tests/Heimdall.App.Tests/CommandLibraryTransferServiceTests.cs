@@ -379,6 +379,59 @@ public sealed class CommandLibraryTransferServiceTests
         Assert.Equal(QuotingMode.InlineInQuotes, FindParameter(stored.Parameters, "x").Quoting);
     }
 
+    [Fact]
+    public async Task ExportThenImport_KeepsTheFlagAParameterDeclares()
+    {
+        var service = new CommandLibraryTransferService();
+        var action = CommandLibraryTestHelpers.CreateLinuxAction(
+            "flag-1",
+            "Flagged",
+            "tail -n {count} {file}",
+            new TemplateParameter { Name = "count", Label = "Count", Type = "int", Flag = "-n" },
+            CommandLibraryTestHelpers.RequiredParameter("file", "File"));
+        var imported = new FakeActionService([]);
+        var path = Path.GetTempFileName();
+
+        try
+        {
+            await service.ExportAsync([action], path);
+            Assert.Contains("\"flag\": \"-n\"", await File.ReadAllTextAsync(path));
+
+            var result = await service.ImportAsync(imported, path);
+
+            Assert.Equal(1, result.Imported);
+            var saved = (await imported.GetAllActionsAsync()).Single();
+            var parameters = saved.LinuxCommandTemplate!.Parameters;
+            Assert.Equal("-n", FindParameter(parameters, "count").Flag);
+            Assert.Null(FindParameter(parameters, "file").Flag);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task ImportAsync_FileWrittenBeforeTheFlagExisted_LeavesItNull()
+    {
+        var service = new CommandLibraryTransferService();
+        var actionService = new FakeActionService([]);
+        var json = """
+            { "actions": [ { "id": "old-1", "publicId": "11111111-1111-4111-8111-111111111111", "title": "Old", "category": "Net",
+              "linuxCommandTemplate": { "id": "old-1-linux", "name": "Old", "platform": "linux", "commandPattern": "tail -n {count}",
+                "parameters": [ { "name": "count", "label": "Count", "type": "int" } ] } } ] }
+            """;
+
+        await WithTempFileAsync(json, async path =>
+        {
+            var result = await service.ImportAsync(actionService, path);
+
+            Assert.Equal(1, result.Imported);
+            var saved = (await actionService.GetAllActionsAsync()).Single();
+            Assert.Null(FindParameter(saved.LinuxCommandTemplate!.Parameters, "count").Flag);
+        });
+    }
+
     private static async Task<CommandTemplate> ImportSingleTemplateAsync(Platform platform, string pattern)
     {
         var publicId = Guid.NewGuid();

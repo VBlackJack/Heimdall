@@ -35,14 +35,17 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
 {
     private readonly ILocalizationService _localizationService;
 
+    // Every pattern below ends with \z, not $: $ also matches before a final line feed, and a
+    // value that passes here goes into the command bare, so a trailing line feed would
+    // submit the line.
     // BUGFIX: Declare Regex as static readonly for better performance
-    private static readonly Regex HostnameRegex = new Regex(@"^(?!-)([a-zA-Z0-9-]{1,63}(?<!-)\.)*[a-zA-Z0-9-]{1,63}$", RegexOptions.Compiled);
+    private static readonly Regex HostnameRegex = new Regex(@"^(?!-)([a-zA-Z0-9-]{1,63}(?<!-)\.)*[a-zA-Z0-9-]{1,63}\z", RegexOptions.Compiled);
 
-    private static readonly Regex DriveLetterRegex = new Regex(@"^[A-Za-z]$", RegexOptions.Compiled);
+    private static readonly Regex DriveLetterRegex = new Regex(@"^[A-Za-z]\z", RegexOptions.Compiled);
 
     // A value made only of these characters reads the same to bash and PowerShell with or
     // without quotes; see IsSafeBareValue.
-    private static readonly Regex SafeBareValueRegex = new Regex(@"^[A-Za-z0-9._/:=@+,%-]+$", RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly Regex SafeBareValueRegex = new Regex(@"^[A-Za-z0-9._/:=@+,%-]+\z", RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     // BUGFIX: Declare dangerous characters as static readonly for better performance
     private static readonly char[] DangerousChars = { '&', '|', ';', '`', '$', '(', ')', '<', '>', '\n', '\r' };
@@ -86,6 +89,10 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
         // value typed by the operator is never read as pattern text.
         var substitutions = new Dictionary<string, string?>(StringComparer.Ordinal);
 
+        // The flag each optional parameter declares for itself (TemplateParameter.Flag): when
+        // the parameter is dropped, so is that flag.
+        var droppedFlags = new Dictionary<string, string>(StringComparer.Ordinal);
+
         foreach (var parameter in template.Parameters)
         {
             if (parameter == null)
@@ -112,6 +119,11 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
                 // An optional value left empty means "leave the argument out": quoting it
                 // would hand the command an empty argument instead (hostname '').
                 substitutions.TryAdd(placeholder, null);
+                if (!string.IsNullOrEmpty(parameter.Flag))
+                {
+                    droppedFlags.TryAdd(placeholder, parameter.Flag);
+                }
+
                 continue;
             }
 
@@ -134,14 +146,14 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
             substitutions.TryAdd(placeholder, escapedValue);
         }
 
-        return EnforceCommandLength(SubstitutePlaceholders(template.CommandPattern, substitutions));
+        return EnforceCommandLength(SubstitutePlaceholders(template.CommandPattern, substitutions, droppedFlags));
     }
 
     /// <summary>
     /// Builds the command in one pass over <paramref name="pattern"/>: pattern text is copied,
     /// each declared placeholder is replaced by its entry in <paramref name="substitutions"/>,
     /// and an entry of <see langword="null"/> drops the placeholder together with the run of
-    /// spaces it leaves.
+    /// spaces it leaves, and with the flag <paramref name="droppedFlags"/> names for it.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -158,8 +170,18 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
     /// along, so <c>hostname {name}</c> becomes <c>hostname</c>. A space that ends an
     /// inserted value belongs to the value and is left alone.
     /// </para>
+    /// <para>
+    /// A flag is dropped only when it is exactly the token written just before the placeholder
+    /// in the pattern: <c>-Title {title}</c> loses <c>-Title</c>, while a flag that is not
+    /// there, or is glued to the text before it or to a value inserted earlier, leaves the
+    /// command as it was. The pattern is the author's, so a wrong declaration costs a
+    /// dangling flag, never a removed word.
+    /// </para>
     /// </remarks>
-    internal static string SubstitutePlaceholders(string pattern, IReadOnlyDictionary<string, string?> substitutions)
+    internal static string SubstitutePlaceholders(
+        string pattern,
+        IReadOnlyDictionary<string, string?> substitutions,
+        IReadOnlyDictionary<string, string>? droppedFlags = null)
     {
         var result = new StringBuilder(pattern.Length);
 
@@ -182,8 +204,9 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
                     noMoreClosingBrace = closeBrace < 0;
                 }
 
-                if (closeBrace > index
-                    && substitutions.TryGetValue(pattern.Substring(index, closeBrace - index + 1), out var replacement))
+                var placeholderText = closeBrace > index ? pattern.Substring(index, closeBrace - index + 1) : null;
+                if (placeholderText is not null
+                    && substitutions.TryGetValue(placeholderText, out var replacement))
                 {
                     index = closeBrace + 1;
 
@@ -192,6 +215,11 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
                         result.Append(replacement);
                         valueEnd = result.Length;
                         continue;
+                    }
+
+                    if (droppedFlags is not null && droppedFlags.TryGetValue(placeholderText, out var flag))
+                    {
+                        DropTrailingFlag(result, valueEnd, flag);
                     }
 
                     if (result.Length == 0 || (result.Length > valueEnd && result[^1] == ' '))
@@ -219,6 +247,42 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
         }
 
         return result.ToString();
+    }
+
+    /// <summary>
+    /// Removes <paramref name="flag"/> from the end of <paramref name="result"/>, with the
+    /// spaces between it and the placeholder being dropped, when it is the last token of the
+    /// pattern text written after <paramref name="valueEnd"/>.
+    /// </summary>
+    private static void DropTrailingFlag(StringBuilder result, int valueEnd, string flag)
+    {
+        var end = result.Length;
+        while (end > valueEnd && result[end - 1] == ' ')
+        {
+            end--;
+        }
+
+        var start = end - flag.Length;
+        if (flag.Length == 0 || start < valueEnd)
+        {
+            return;
+        }
+
+        for (var offset = 0; offset < flag.Length; offset++)
+        {
+            if (result[start + offset] != flag[offset])
+            {
+                return;
+            }
+        }
+
+        // A token starts the command or follows a space; a flag glued to a value or to other
+        // text is part of something else.
+        var startsToken = start == 0 || (start > valueEnd && result[start - 1] == ' ');
+        if (startsToken)
+        {
+            result.Length = start;
+        }
     }
 
     public Dictionary<string, string> GetDefaultParameterValues(CommandTemplate template)
@@ -313,14 +377,14 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
                 {
                     case TemplateParameterTypes.Int:
                     case TemplateParameterTypes.Integer:
-                        if (!int.TryParse(value, out _))
+                        if (!IsInteger(value))
                         {
                             errors.Add(_localizationService.GetFormattedString(MessageKeys.ValidationParameterMustBeInteger, parameter.Label));
                         }
                         break;
 
                     case TemplateParameterTypes.Number:
-                        if (!double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
+                        if (!IsNumber(value))
                         {
                             errors.Add(_localizationService.GetFormattedString(MessageKeys.ValidationParameterMustBeNumber, parameter.Label));
                         }
@@ -460,7 +524,7 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
         // The same keys ValidateParameters reports, so a refusal reads the same in the
         // operator's language whichever path met it first.
         string? key = null;
-        switch (parameter.Type.ToLower())
+        switch (parameter.Type.ToLowerInvariant())
         {
             case TemplateParameterTypes.Hostname:
                 if (!IsValidHostname(value))
@@ -478,14 +542,14 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
 
             case TemplateParameterTypes.Int:
             case TemplateParameterTypes.Integer:
-                if (!int.TryParse(value, out _))
+                if (!IsInteger(value))
                 {
                     key = MessageKeys.ValidationParameterMustBeInteger;
                 }
                 break;
 
             case TemplateParameterTypes.Number:
-                if (!double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
+                if (!IsNumber(value))
                 {
                     key = MessageKeys.ValidationParameterMustBeNumber;
                 }
@@ -560,7 +624,7 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
     /// </summary>
     private string EscapeParameterValue(string value, string parameterType, Platform platform, QuotingMode? quotingMode, bool everyOccurrenceBare)
     {
-        switch (parameterType.ToLower())
+        switch (parameterType.ToLowerInvariant())
         {
             case TemplateParameterTypes.Hostname:
             case TemplateParameterTypes.IpAddress:
@@ -644,6 +708,34 @@ public sealed class CommandGeneratorService : ICommandGeneratorService
 
         return value.Replace("'", "'\\''");
     }
+
+    /// <summary>
+    /// True when <paramref name="value"/> is a whole number: an optional sign and digits,
+    /// nothing else.
+    /// </summary>
+    /// <remarks>
+    /// The value goes into the command bare, so the parse must not be more generous than the
+    /// shell: <see cref="NumberStyles.Integer"/> would also accept leading and trailing
+    /// white space, a trailing line feed among it. The current culture is not consulted
+    /// either, since the operator's regional settings say nothing about the target shell.
+    /// </remarks>
+    private static bool IsInteger(string value) =>
+        int.TryParse(value, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out _);
+
+    /// <summary>
+    /// True when <paramref name="value"/> is a decimal number: an optional sign, digits, an
+    /// optional decimal point and an optional exponent, with no surrounding white space.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="NumberStyles.Float"/> allows leading and trailing white space, which
+    /// would reach the command bare; see <see cref="IsInteger"/>.
+    /// </remarks>
+    private static bool IsNumber(string value) =>
+        double.TryParse(
+            value,
+            NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint | NumberStyles.AllowExponent,
+            CultureInfo.InvariantCulture,
+            out _);
 
     /// <summary>
     /// Validates hostname according to RFC 1123

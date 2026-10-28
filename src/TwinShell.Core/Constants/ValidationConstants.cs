@@ -78,6 +78,12 @@ public static class ValidationConstants
     public const int HistoryRetentionDays = 90;
 
     /// <summary>
+    /// Maximum number of Git sync history entries kept for one remote (500 entries); the
+    /// oldest are deleted after each sync.
+    /// </summary>
+    public const int MaxSyncHistoryEntriesPerRemote = 500;
+
+    /// <summary>
     /// Maximum file size for imports/exports (10MB).
     /// </summary>
     public const long MaxFileSizeBytes = 10 * 1024 * 1024;
@@ -148,6 +154,12 @@ public static class ValidationConstants
     /// Maximum length for command template pattern (4000 characters).
     /// </summary>
     public const int MaxTemplateCommandPatternLength = 4000;
+
+    /// <summary>
+    /// Maximum length for the flag a template parameter drops with itself (50 characters, the
+    /// bound of a parameter name).
+    /// </summary>
+    public const int MaxParameterFlagLength = 50;
 
     // ===== Service Limits =====
 

@@ -31,6 +31,7 @@
         "label": "Number of packets",
         "type": "int",
         "defaultValue": "4",
+        "flag": "-Count",
         "required": false,
         "description": "Number of ping requests to send"
       }
@@ -56,6 +57,7 @@
         "label": "Number of packets",
         "type": "int",
         "defaultValue": "4",
+        "flag": "-c",
         "required": false,
         "description": "Number of ping requests to send"
       }

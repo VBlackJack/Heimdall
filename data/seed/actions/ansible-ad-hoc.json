@@ -38,6 +38,7 @@
         "label": "Arguments",
         "type": "string",
         "defaultValue": "",
+        "flag": "-a",
         "required": false,
         "description": "Arguments for the module"
       }
@@ -71,6 +72,7 @@
         "label": "Arguments",
         "type": "string",
         "defaultValue": "",
+        "flag": "-a",
         "required": false,
         "description": "Arguments for the module"
       }

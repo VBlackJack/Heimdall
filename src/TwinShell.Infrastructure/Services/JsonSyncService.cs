@@ -237,7 +237,8 @@ public sealed class JsonSyncService : SyncServiceBase
                     Required = p.Required,
                     Description = p.Description,
                     AllowedValues = p.AllowedValues is { Count: > 0 } ? p.AllowedValues.ToList() : null,
-                    Quoting = p.Quoting?.ToString()
+                    Quoting = p.Quoting?.ToString(),
+                    Flag = p.Flag
                 }).ToList();
 
                 var model = new TemplateModel
@@ -1018,7 +1019,8 @@ public sealed class JsonSyncService : SyncServiceBase
                         Required = p.Required,
                         Description = p.Description,
                         AllowedValues = p.AllowedValues is { Count: > 0 } ? p.AllowedValues.ToList() : null,
-                        Quoting = Enum.TryParse<QuotingMode>(p.Quoting, ignoreCase: true, out var quoting) ? quoting : null
+                        Quoting = Enum.TryParse<QuotingMode>(p.Quoting, ignoreCase: true, out var quoting) ? quoting : null,
+                        Flag = p.Flag
                     }).ToList();
 
                 var existing = await _templateRepository.GetByPublicIdAsync(model.Id);
@@ -2019,6 +2021,12 @@ public sealed class JsonSyncService : SyncServiceBase
 
         /// <summary>The quoting override, by <see cref="QuotingMode"/> name; null for the default.</summary>
         public string? Quoting { get; set; }
+
+        /// <summary>
+        /// The flag dropped with the parameter when it is left empty; null when the parameter
+        /// declares none, which is every parameter of a file written before the field existed.
+        /// </summary>
+        public string? Flag { get; set; }
     }
 
     private sealed class ActionModel

@@ -258,7 +258,7 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
             "settings.json",
             "servers.json",
             "password-presets.json",
-            "network-kb.json",
+            AppConstants.NetworkKnowledgeBaseFileName,
             "session-snapshot.json",
             "split-layouts.json"
         ];
