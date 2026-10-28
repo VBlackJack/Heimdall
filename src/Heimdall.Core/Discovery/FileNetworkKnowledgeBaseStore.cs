@@ -22,10 +22,22 @@ namespace Heimdall.Core.Discovery;
 /// </summary>
 public sealed class FileNetworkKnowledgeBaseStore : INetworkKnowledgeBaseStore
 {
+    private readonly string _path;
+
+    /// <summary>
+    /// Creates a store over <paramref name="path"/>; the production caller passes
+    /// <see cref="KnowledgeBaseManager.ResolveDefaultPath"/>.
+    /// </summary>
+    public FileNetworkKnowledgeBaseStore(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        _path = path;
+    }
+
     /// <inheritdoc />
-    public Task<NetworkKnowledgeBase> LoadAsync() => KnowledgeBaseManager.LoadAsync();
+    public Task<NetworkKnowledgeBase> LoadAsync() => KnowledgeBaseManager.LoadAsync(_path);
 
     /// <inheritdoc />
     public Task SaveAsync(NetworkKnowledgeBase knowledgeBase) =>
-        KnowledgeBaseManager.SaveAsync(knowledgeBase);
+        KnowledgeBaseManager.SaveAsync(knowledgeBase, _path);
 }

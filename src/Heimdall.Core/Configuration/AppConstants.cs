@@ -36,6 +36,9 @@ public static class AppConstants
     /// <summary>Writable network-scan history subfolder.</summary>
     public const string NetworkScansDirectoryName = "network-scans";
 
+    /// <summary>Writable file holding the accumulated network knowledge base.</summary>
+    public const string NetworkKnowledgeBaseFileName = "network-kb.json";
+
     /// <summary>Writable subfolder holding the hosts file editor's backups.</summary>
     public const string HostsBackupsDirectoryName = "hosts-backups";
 

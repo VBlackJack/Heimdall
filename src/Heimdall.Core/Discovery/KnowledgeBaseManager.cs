@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.Globalization;
 using System.IO;
 using System.Text.Json;
 using Heimdall.Core.Configuration;
@@ -41,54 +42,146 @@ public static class KnowledgeBaseManager
 
     private const int CurrentVersion = 1;
 
-    internal static string GetKbPath() =>
-        Path.Combine(ApplicationDataPathResolver.Resolve(), "network-kb.json");
+    /// <summary>The UTC stamp appended to the name of a corrupt file that is set aside.</summary>
+    private const string CorruptStampFormat = "yyyyMMddTHHmmssfffZ";
 
     /// <summary>
-    /// Loads the knowledge base from disk. Returns an empty KB if the file
-    /// does not exist or is corrupt.
+    /// The knowledge base file of the current user's profile. Every operation takes its path
+    /// from the caller: a default inside them let a test read and rewrite the developer's own
+    /// knowledge base.
     /// </summary>
-    public static async Task<NetworkKnowledgeBase> LoadAsync()
+    public static string ResolveDefaultPath() =>
+        Path.Combine(ApplicationDataPathResolver.Resolve(), AppConstants.NetworkKnowledgeBaseFileName);
+
+    /// <summary>
+    /// Loads the knowledge base from <paramref name="path"/>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// No file gives an empty knowledge base. A file whose content cannot be parsed is renamed
+    /// to <c>&lt;name&gt;.corrupt-&lt;UTC stamp&gt;</c> beside itself, so the next save does not
+    /// destroy it, and the load starts empty.
+    /// </para>
+    /// <para>
+    /// A file that cannot be read at all (locked, denied, on a share that went away) is not
+    /// known to be corrupt: it gives an empty instance flagged
+    /// <see cref="NetworkKnowledgeBase.IsReadOnly"/>, which <see cref="SaveAsync"/> refuses, so
+    /// a transient failure cannot end with the accumulated data overwritten. The same holds
+    /// when a corrupt file cannot be set aside.
+    /// </para>
+    /// </remarks>
+    public static async Task<NetworkKnowledgeBase> LoadAsync(string path)
     {
-        var path = GetKbPath();
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
         if (!File.Exists(path)) return CreateEmpty();
+
+        string json;
+        try
+        {
+            json = await File.ReadAllTextAsync(path).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Logging.FileLogger.Warn(
+                $"Knowledge base could not be read, it stays untouched and will not be saved over: {ex.Message} (path={path})");
+            return CreateEmpty() with { IsReadOnly = true };
+        }
 
         try
         {
-            var json = await File.ReadAllTextAsync(path).ConfigureAwait(false);
             var kb = JsonSerializer.Deserialize<NetworkKnowledgeBase>(json, DeserializeOptions);
-            return kb ?? CreateEmpty();
+            if (kb?.Hosts is not null && kb.TtlConfig is not null)
+            {
+                return kb;
+            }
         }
-        catch
+        catch (JsonException)
         {
-            Logging.FileLogger.Warn("Knowledge base file is corrupt, starting fresh.");
+            // Falls through to the corrupt-file handling below.
+        }
+
+        return SetCorruptFileAside(path);
+    }
+
+    /// <summary>
+    /// Renames the unparsable file at <paramref name="path"/> out of the way and returns an
+    /// empty knowledge base, or a read-only one when the file could not be moved.
+    /// </summary>
+    private static NetworkKnowledgeBase SetCorruptFileAside(string path)
+    {
+        var aside = $"{path}.corrupt-{DateTime.UtcNow.ToString(CorruptStampFormat, CultureInfo.InvariantCulture)}";
+        try
+        {
+            File.Move(path, aside);
+            Logging.FileLogger.Warn($"Knowledge base file is corrupt, kept as {aside}, starting fresh.");
             return CreateEmpty();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Logging.FileLogger.Warn(
+                $"Knowledge base file is corrupt and could not be set aside, it will not be saved over: {ex.Message} (path={path})");
+            return CreateEmpty() with { IsReadOnly = true };
         }
     }
 
     /// <summary>
-    /// Persists the knowledge base to disk using atomic temp-then-rename.
+    /// Persists the knowledge base to <paramref name="path"/> through the atomic restricted
+    /// writer, unless the instance is <see cref="NetworkKnowledgeBase.IsReadOnly"/>, in which
+    /// case the save is refused and logged.
     /// </summary>
-    public static async Task SaveAsync(NetworkKnowledgeBase kb)
+    public static async Task SaveAsync(NetworkKnowledgeBase kb, string path)
     {
-        var path = GetKbPath();
-        var dir = Path.GetDirectoryName(path)!;
+        ArgumentNullException.ThrowIfNull(kb);
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
+        if (kb.IsReadOnly)
+        {
+            Logging.FileLogger.Warn(
+                $"Knowledge base save refused: the file could not be read when it was loaded (path={path})");
+            return;
+        }
+
+        var dir = Path.GetDirectoryName(Path.GetFullPath(path))!;
         Directory.CreateDirectory(dir);
 
         var updated = kb with { LastUpdated = DateTime.UtcNow };
         var json = JsonSerializer.Serialize(updated, SerializeOptions);
 
-        var tempPath = path + ".tmp";
         try
         {
-            await File.WriteAllTextAsync(tempPath, json).ConfigureAwait(false);
-            File.Move(tempPath, path, overwrite: true);
+            if (OperatingSystem.IsWindows())
+            {
+                await Security.SecureFileWriter.WriteAllTextAtomicAsync(path, json).ConfigureAwait(false);
+            }
+            else
+            {
+                await WriteAtomicAsync(path, json).ConfigureAwait(false);
+            }
+
             Logging.FileLogger.Log("DEBUG",
                 $"Knowledge base saved: {kb.Hosts.Count} hosts, {json.Length} bytes → {path}");
         }
         catch (Exception ex)
         {
             Logging.FileLogger.Warn($"Knowledge base save failed: {ex.Message} (path={path})");
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Writes <paramref name="json"/> to a temp file beside <paramref name="path"/> and renames
+    /// it over the target, for the platforms without the Windows ACL writer.
+    /// </summary>
+    private static async Task WriteAtomicAsync(string path, string json)
+    {
+        var tempPath = path + ".tmp";
+        try
+        {
+            await File.WriteAllTextAsync(tempPath, json).ConfigureAwait(false);
+            File.Move(tempPath, path, overwrite: true);
+        }
+        catch
+        {
             try { File.Delete(tempPath); } catch { /* best effort */ }
             throw;
         }
