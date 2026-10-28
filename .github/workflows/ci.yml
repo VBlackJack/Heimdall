@@ -150,6 +150,14 @@ jobs:
           ./scripts/Test-NativeCommandLogging.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      # The verdict of the npm audit step below, on recorded npm audit JSON shapes and
+      # on the recorded real report. Pure PowerShell, no network, no node.
+      - name: Check the npm audit verdict
+        shell: pwsh
+        run: |
+          ./scripts/Test-NpmAuditVerdict.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v6
         with:
@@ -246,6 +254,17 @@ jobs:
         shell: pwsh
         run: |
           ./scripts/Invoke-VulnerableDependencyCheck.ps1 -Solution Heimdall.slnx
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      # NuGet's scan cannot see the npm dependencies baked into the committed milkdown
+      # bundle (dist/index.html). The audit reads package-lock.json alone, so no install.
+      # Below high it only warns; at high or critical it fails, except for the advisories
+      # that were already in the lock, listed with a reason in npm-audit-baseline.json
+      # next to it. A registry that cannot be reached fails the step: silence is not clean.
+      - name: Audit the milkdown editor npm dependencies
+        shell: pwsh
+        run: |
+          ./scripts/Invoke-NpmAuditCheck.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       # One file per test assembly. The console stream interleaves assemblies
