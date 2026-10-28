@@ -2751,6 +2751,8 @@
   "CredProvTestNotFound": "La commande \"{0}\" n'a pas pu \u00eatre lanc\u00e9e. V\u00e9rifiez que l'outil est install\u00e9 et dans le PATH.",
   "CredProvTestCancelled": "Test annul\u00e9.",
   "ErrorCredentialProviderNotFound": "La commande du fournisseur d'identifiants externe \"{0}\" n'a pas pu \u00eatre lanc\u00e9e. V\u00e9rifiez que l'outil est install\u00e9 et dans le PATH.",
+  "ErrorCredentialProviderArgumentNeedsQuotes": "La commande d'identifiants n'a pas \u00e9t\u00e9 lanc\u00e9e : la valeur de {0} contient une espace, un guillemet double ou un caract\u00e8re de contr\u00f4le, et la commande ne la met pas entre guillemets doubles. Mettez {0} entre guillemets doubles dans la commande, dans Param\u00e8tres > S\u00e9curit\u00e9.",
+  "ErrorCredentialProviderArgumentLeadingDash": "La commande d'identifiants n'a pas \u00e9t\u00e9 lanc\u00e9e : la valeur de {0} commence par '-', et l'outil la lirait comme une option. V\u00e9rifiez le nom de l'entr\u00e9e et les champs du serveur.",
   "A11yBrowseDatabase": "Parcourir pour le fichier de base de donn\u00e9es",
   "A11yBrowseKeyFile": "Parcourir pour le fichier de cl\u00e9",
   "ValidationExtToolNotFound": "Outil externe \"{0}\" : ex\u00e9cutable introuvable \u00e0 \"{1}\". V\u00e9rifiez le chemin ou installez le programme.",

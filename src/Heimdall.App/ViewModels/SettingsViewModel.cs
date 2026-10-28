@@ -4203,6 +4203,11 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             CredentialProviderTestSucceeded = false;
             CredentialProviderTestResult = _localizer.Format("CredProvTestNotFound", ex.Executable);
         }
+        catch (Core.Security.CredentialProviderArgumentException ex)
+        {
+            CredentialProviderTestSucceeded = false;
+            CredentialProviderTestResult = ServerListViewModel.DescribeRefusedArgument(_localizer, ex);
+        }
         catch (OperationCanceledException)
         {
             CredentialProviderTestResult = _localizer["CredProvTestCancelled"];

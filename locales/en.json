@@ -2754,6 +2754,8 @@
   "CredProvTestNotFound": "The command \"{0}\" could not be started. Check that the tool is installed and on the PATH.",
   "CredProvTestCancelled": "Test cancelled.",
   "ErrorCredentialProviderNotFound": "The external credential provider command \"{0}\" could not be started. Check that the tool is installed and on the PATH.",
+  "ErrorCredentialProviderArgumentNeedsQuotes": "The credential command was not run: the value of {0} contains a space, a double quote or a control character, and the command does not put it in double quotes. Put {0} in double quotes in the command in Settings > Security.",
+  "ErrorCredentialProviderArgumentLeadingDash": "The credential command was not run: the value of {0} starts with '-', so the tool would read it as an option. Check the entry name and the server's fields.",
   "A11yBrowseDatabase": "Browse for database file",
   "A11yBrowseKeyFile": "Browse for key file",
   "ValidationExtToolNotFound": "External tool \"{0}\": executable not found at \"{1}\". Check the path or install the program.",

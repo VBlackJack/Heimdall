@@ -479,6 +479,66 @@ public class CommandCredentialProviderTests
     }
 
     // ---------------------------------------------------------------
+    // A value that would not stay one argument is refused, as for the external tools
+    // ---------------------------------------------------------------
+
+    [Fact]
+    public async Task GetCredentialAsync_TitleWithSpaceOutsideQuotes_IsRefusedBeforeTheCommandRuns()
+    {
+        // The tool is not installed: were the command run, the failure would be a launch failure.
+        var provider = CreateProvider("kpscript show {Title}");
+
+        var refused = await Assert.ThrowsAsync<CredentialProviderArgumentException>(
+            () => provider.GetCredentialAsync("host", 22, "user", "a b"));
+
+        Assert.Equal(new ArgumentTemplateRejection("{Title}", ArgumentRejection.NeedsQuotes), refused.Rejection);
+    }
+
+    [Fact]
+    public void FindUnsafeValue_TitleWithSpaceInsideQuotes_IsAccepted()
+    {
+        var provider = CreateProvider("kpscript show \"{Title}\"");
+
+        Assert.Null(provider.FindUnsafeValue("kpscript show \"{Title}\"", "host", 22, "user", "a b"));
+    }
+
+    [Fact]
+    public void FindUnsafeValue_DatabasePathWithSpaceOutsideQuotes_IsRefused()
+    {
+        var provider = CreateProvider("keepassxc-cli show {Database} x", @"C:\my vault\db.kdbx");
+
+        var rejection = provider.FindUnsafeValue("keepassxc-cli show {Database} x", "host", 22, "user", "title");
+
+        Assert.Equal(new ArgumentTemplateRejection("{Database}", ArgumentRejection.NeedsQuotes), rejection);
+    }
+
+    [Fact]
+    public async Task GetCredentialAsync_TitleStartingWithADashWhereAnArgumentBegins_IsRefused()
+    {
+        var provider = CreateProvider("pass show {Title}");
+
+        var refused = await Assert.ThrowsAsync<CredentialProviderArgumentException>(
+            () => provider.GetCredentialAsync("host", 22, "user", "-c"));
+
+        Assert.Equal(new ArgumentTemplateRejection("{Title}", ArgumentRejection.LeadingDash), refused.Rejection);
+    }
+
+    [Fact]
+    public async Task GetCredentialAsync_UsernameCommandRefusedForItsValue_KeepsThePasswordAndFallsBackToTheHint()
+    {
+        // The password command has no placeholder; the username command would split the title.
+        var provider = CreateProvider(
+            "cmd.exe /c echo secret",
+            usernameCommandTemplate: "kpscript user {Title}");
+
+        var result = await provider.GetCredentialAsync("host", 22, null, "a b");
+
+        Assert.NotNull(result);
+        Assert.Equal("secret", result.Password);
+        Assert.Equal(string.Empty, result.Username);
+    }
+
+    // ---------------------------------------------------------------
     // Sanitization — shell metacharacters stripped
     // ---------------------------------------------------------------
 
