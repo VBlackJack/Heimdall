@@ -415,7 +415,7 @@ public sealed class CitrixSessionHandleTests
 
         foreach (string signature in new[]
         {
-            "private async Task TryCaptureWindowAsync(",
+            "private async Task CaptureWindowAsync(",
             "private async Task WatchForSessionAfterAuthAsync("
         })
         {
