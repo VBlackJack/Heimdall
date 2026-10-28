@@ -98,6 +98,10 @@
         "sudo ausearch -m USER_LOGIN --success no --start this-week -i": "Affiche les connexions échouées de la semaine",
         "sudo aureport --summary": "Affiche un rapport de synthèse du journal d'audit"
       }
+    },
+    "es": {
+      "title": "Buscar en el registro de auditoría por clave",
+      "description": "Muestra los eventos de auditoría registrados con una clave de regla desde un momento dado, con los nombres de usuario y de llamadas al sistema resueltos."
     }
   }
 }

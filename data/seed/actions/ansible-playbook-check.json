@@ -133,6 +133,10 @@
         "ansible-playbook update.yml --check -v": "Test avec sortie verbeux",
         "ansible-playbook --check deploy.yml": "Mode check"
       }
+    },
+    "es": {
+      "title": "Ejecutar un playbook en modo de simulación (--check)",
+      "description": "Ejecuta un playbook de Ansible en modo de prueba sin aplicar los cambios"
     }
   }
 }

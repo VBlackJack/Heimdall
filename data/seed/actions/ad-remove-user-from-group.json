@@ -88,6 +88,10 @@
         "Remove-ADGroupMember -Identity 'Groupe_Projet_X' -Members jdupont -WhatIf": "Simulation du retrait avec -WhatIf (dry-run). Affiche ce qui serait fait sans exécuter. Vérifiez toujours avec -WhatIf avant de retirer des membres de groupes sensibles. Retirez -WhatIf après validation.",
         "Get-ADGroupMember -Identity 'IT_Support' | Export-Csv C:\\Temp\\IT_Support_Backup.csv -NoTypeInformation; Remove-ADGroupMember -Identity 'IT_Support' -Members jdupont -Confirm:$false": "Bonne pratique : sauvegarde les membres du groupe avant retrait. L'export CSV permet une restauration facile en cas d'erreur. Les deux commandes sont séparées par un point-virgule pour exécution séquentielle. Toujours sauvegarder avant modifications critiques."
       }
+    },
+    "es": {
+      "title": "Quitar un usuario de un grupo de AD",
+      "description": "Quita un usuario de un grupo de Active Directory."
     }
   }
 }

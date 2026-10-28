@@ -113,6 +113,10 @@
         "atrm 5": "Supprimer la tâche n°5",
         "at now + 1 hour": "Dans 1 heure"
       }
+    },
+    "es": {
+      "title": "Programar una tarea puntual",
+      "description": "Programa un comando para que se ejecute en una fecha y hora concretas (una sola vez)"
     }
   }
 }

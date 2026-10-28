@@ -154,6 +154,10 @@
         "New-ADUser -Name \"Jean Dupont\" -SamAccountName jdupont -UserPrincipalName jdupont@contoso.com -GivenName \"Jean\" -Surname \"Dupont\" -DisplayName \"Jean Dupont\" -Path \"OU=Users,DC=contoso,DC=com\" -AccountPassword (ConvertTo-SecureString \"P@ssw0rd123!\" -AsPlainText -Force) -Enabled $true -PassThru": "Force la commande à retourner l'objet modifié/créé dans le pipeline. Par défaut, les cmdlets Set-/New- ne retournent rien. -PassThru active le retour pour permettre des opérations en chaîne ou des vérifications immédiates.",
         "New-ADUser -Name \"Jean Dupont\" -SamAccountName jdupont -UserPrincipalName jdupont@contoso.com -GivenName \"Jean\" -Surname \"Dupont\" -DisplayName \"Jean Dupont\" -Path \"OU=Users,DC=contoso,DC=com\" -AccountPassword (ConvertTo-SecureString \"P@ssw0rd123!\" -AsPlainText -Force) -Enabled $true -Verbose": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes."
       }
+    },
+    "es": {
+      "title": "Crear un usuario de AD",
+      "description": "Crea una cuenta de usuario en Active Directory con la configuración básica."
     }
   }
 }

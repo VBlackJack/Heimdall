@@ -109,6 +109,10 @@
         "tar -cjvf backup.tar.bz2 /var/www": "Créer une archive bzip2",
         "tar --exclude=\"*.log\" -czvf backup.tar.gz /var": "Archiver en excluant les fichiers .log"
       }
+    },
+    "es": {
+      "title": "Crear un archivo TAR/GZ",
+      "description": "Comprime archivos o carpetas en un archivo tar.gz."
     }
   }
 }

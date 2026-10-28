@@ -97,6 +97,10 @@
         "ansible-galaxy remove ansible.posix": "Supprime la collection posix",
         "ansible-galaxy remove -p ./roles custom_role": "Dans un chemin"
       }
+    },
+    "es": {
+      "title": "Quitar un rol instalado",
+      "description": "Quita un rol de Ansible Galaxy instalado localmente"
     }
   }
 }

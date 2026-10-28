@@ -88,6 +88,10 @@
         "Get-ADUser -Filter {Department -eq 'Finance' -and Enabled -eq $true} | Select-Object Name,SamAccountName | Export-Csv C:\\Temp\\FinanceUsersBeforeDisable.csv -NoTypeInformation; Get-ADUser -Filter {Department -eq 'Finance'} | Disable-ADAccount": "Désactivation massive avec sauvegarde préalable : exporte d'abord la liste des utilisateurs Finance actifs, puis les désactive tous. La sauvegarde CSV permet une restauration en cas d'erreur. Les deux commandes sont séparées par un point-virgule pour exécution séquentielle. Toujours faire une sauvegarde avant une opération de masse.",
         "Get-ADUser -Filter * -Properties Enabled,LastLogonDate | Where-Object {$_.Enabled -eq $false} | Select-Object Name,SamAccountName,Enabled,LastLogonDate | Export-Csv C:\\Temp\\DisabledAccounts.csv -NoTypeInformation": "Exporte un rapport complet de tous les comptes désactivés avec leur dernière connexion. Utile pour les audits de sécurité, l'analyse des comptes dormants et la préparation au nettoyage de l'AD. Effectuez ce rapport trimestriellement pour maintenir un AD propre."
       }
+    },
+    "es": {
+      "title": "Deshabilitar una cuenta de usuario de AD",
+      "description": "Deshabilita una cuenta de usuario de Active Directory sin eliminarla."
     }
   }
 }

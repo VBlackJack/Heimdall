@@ -75,6 +75,10 @@
         "Get-BitLockerVolume | Where-Object {$_.VolumeType -eq 'Data' -and $_.ProtectionStatus -eq 'On'} | ForEach-Object { Lock-BitLocker -MountPoint $_.MountPoint -ForceDismount }": "Verrouille tous les volumes de données chiffrés (sécurité maximale)",
         "Lock-BitLocker -MountPoint \"D:\" -ForceDismount": "Exemple utilisant le paramètre 'driveLetter': Lettre du volume à verrouiller (généralement un disque de données, PAS C:). Remplacez D par la valeur appropriée selon votre environnement."
       }
+    },
+    "es": {
+      "title": "Bloquear un volumen de BitLocker",
+      "description": "Bloquea un volumen de BitLocker al instante (queda inaccesible hasta que se desbloquee)."
     }
   }
 }

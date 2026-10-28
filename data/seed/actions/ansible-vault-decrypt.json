@@ -108,6 +108,10 @@
         "ansible-vault decrypt --output=plain.yml secrets.yml": "Déchiffrer vers un autre fichier",
         "ansible-vault decrypt group_vars/*/vault.yml": "Déchiffrer plusieurs fichiers"
       }
+    },
+    "es": {
+      "title": "Descifrar un archivo de Ansible Vault",
+      "description": "Descifra de forma permanente un archivo cifrado con Ansible Vault"
     }
   }
 }

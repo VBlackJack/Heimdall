@@ -141,6 +141,10 @@
         "ansible webservers -m shell -a 'uptime'": "Exécute la commande uptime sur les serveurs web",
         "ansible *.contoso.com -m pester -a \"-NoProfile -ExecutionPolicy Bypass\"": "Exemple utilisant le paramètre 'args': Arguments pour le module. Remplacez -NoProfile -ExecutionPolicy Bypass par la valeur appropriée selon votre environnement."
       }
+    },
+    "es": {
+      "title": "Ejecutar un comando ad hoc de Ansible",
+      "description": "Ejecuta un comando puntual en un grupo de hosts sin necesidad de un playbook"
     }
   }
 }

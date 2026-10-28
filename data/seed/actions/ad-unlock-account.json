@@ -94,6 +94,10 @@
         "Get-ADUser -Filter {LockedOut -eq $true} -Properties LockedOut,LockoutTime | Select-Object Name,SamAccountName,LockedOut,LockoutTime | Export-Csv C:\\Temp\\LockedAccounts.csv -NoTypeInformation": "Exporte la liste de tous les comptes verrouillés avec l'heure de verrouillage. Utile pour les audits de sécurité, l'analyse des patterns de verrouillage et l'identification de potentielles attaques par force brute. Conservez ces rapports pour la traçabilité.",
         "Unlock-ADAccount -Identity jdupont -PassThru | Select-Object Name,LockedOut": "Déverrouille et affiche immédiatement le statut final du compte. Le switch -PassThru force la cmdlet à retourner l'objet utilisateur modifié dans le pipeline, permettant de vérifier que le déverrouillage a bien fonctionné. Essentiel pour les scripts avec gestion d'erreurs."
       }
+    },
+    "es": {
+      "title": "Desbloquear una cuenta de usuario de AD",
+      "description": "Desbloquea una cuenta de usuario que quedó bloqueada tras intentos de inicio de sesión fallidos."
     }
   }
 }

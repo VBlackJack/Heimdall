@@ -60,6 +60,10 @@
         "sudo auditctl -w /etc/sudoers -p wa -k sudoers": "Surveille les écritures dans /etc/sudoers sous la clé sudoers jusqu'au redémarrage",
         "ls /etc/audit/rules.d/": "Affiche les fichiers de règles chargés au démarrage"
       }
+    },
+    "es": {
+      "title": "Listar las reglas de auditoría",
+      "description": "Lista las reglas de auditoría de Linux cargadas en el kernel, con sus claves."
     }
   }
 }

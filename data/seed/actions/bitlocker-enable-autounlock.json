@@ -93,6 +93,10 @@
         "Enable-BitLockerAutoUnlock -MountPoint \"D:\" -Confirm:$false": "Exécute l'action sans demander de confirmation interactive. -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution : aucun filet de sécurité.",
         "Enable-BitLockerAutoUnlock -MountPoint \"D:\" -Verbose": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes."
       }
+    },
+    "es": {
+      "title": "Habilitar el desbloqueo automático de BitLocker",
+      "description": "Habilita el desbloqueo automático de un volumen de datos de BitLocker (se desbloquea al desbloquear el volumen del sistema)."
     }
   }
 }

@@ -96,6 +96,10 @@
         "ansible-vault view vars/secrets.yml": "Affiche le contenu déchiffré",
         "ansible-vault view group_vars/prod/vault.yml": "Dans group_vars"
       }
+    },
+    "es": {
+      "title": "Ver un archivo cifrado",
+      "description": "Muestra el contenido de un archivo cifrado sin modificarlo"
     }
   }
 }

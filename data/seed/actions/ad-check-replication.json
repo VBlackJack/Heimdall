@@ -41,6 +41,10 @@
       "examples": {
         "repadmin /showrepl": "Affiche l'état de réplication du DC local"
       }
+    },
+    "es": {
+      "title": "Comprobar la replicación de Active Directory",
+      "description": "Comprueba el estado de la replicación entre controladores de dominio."
     }
   }
 }

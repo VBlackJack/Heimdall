@@ -76,6 +76,10 @@
         "Get-ADUser -Identity jdupont -Properties * | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
         "Get-ADUser -Identity jdupont -Properties * | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
       }
+    },
+    "es": {
+      "title": "Mostrar todos los detalles de un usuario de AD",
+      "description": "Muestra todas las propiedades detalladas de un usuario de Active Directory."
     }
   }
 }

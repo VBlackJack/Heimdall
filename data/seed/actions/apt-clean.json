@@ -60,6 +60,10 @@
         "sudo apt clean -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement.",
         "sudo apt clean --dry-run": "Simulation sans exécution réelle (dry-run). --dry-run affiche ce qui serait fait sans appliquer les changements. INDISPENSABLE avant les opérations de masse ou les modifications critiques."
       }
+    },
+    "es": {
+      "title": "Limpiar la caché de APT",
+      "description": "Elimina de la caché local los archivos .deb descargados"
     }
   }
 }

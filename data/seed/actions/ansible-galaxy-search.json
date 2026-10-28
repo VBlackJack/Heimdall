@@ -90,6 +90,10 @@
         "ansible-galaxy search warning": "Exemple Windows utilisant ansible-galaxy. Remplacez les paramètres entre <> par vos valeurs.",
         "ansible-galaxy search --platforms ubuntu": "Pour Ubuntu"
       }
+    },
+    "es": {
+      "title": "Buscar roles de Ansible Galaxy",
+      "description": "Busca los roles disponibles en Ansible Galaxy"
     }
   }
 }

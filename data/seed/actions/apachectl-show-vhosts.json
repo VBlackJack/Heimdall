@@ -61,6 +61,10 @@
         "ls -l /etc/apache2/sites-enabled/": "Affiche les liens des sites activés sur Debian et Ubuntu",
         "sudo a2ensite example.conf": "Active un site sur Debian ou Ubuntu (recharger Apache ensuite)"
       }
+    },
+    "es": {
+      "title": "Mostrar los hosts virtuales de Apache",
+      "description": "Imprime los hosts virtuales que Apache ha analizado, con sus nombres, puertos y archivos de configuración."
     }
   }
 }

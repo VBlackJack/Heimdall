@@ -82,6 +82,10 @@
         "Enable-ADAccount -Identity jdupont -Confirm:$false": "Réactive sans confirmation interactive. Utile dans les scripts automatisés ou les processus de réintégration standardisés. La réactivation est immédiate dès l'exécution.",
         "Get-ADUser -Filter * -Properties Enabled,Description | Where-Object {$_.Enabled -eq $false -and $_.Description -like '*leave*'} | Enable-ADAccount": "Réactive automatiquement les comptes désactivés pour congés (basé sur le champ Description). Utile si votre organisation utilise des conventions de nommage dans Description. Adaptez le filtre selon vos pratiques internes."
       }
+    },
+    "es": {
+      "title": "Habilitar una cuenta de usuario de AD",
+      "description": "Habilita una cuenta de usuario de Active Directory que estaba deshabilitada."
     }
   }
 }

@@ -76,6 +76,10 @@
         "sudo apachectl configtest && sudo systemctl reload apache2": "Recharge Apache sur Debian ou Ubuntu si la configuration est valide",
         "sudo apachectl graceful": "Redémarre en douceur via apachectl, qui teste d'abord la configuration"
       }
+    },
+    "es": {
+      "title": "Recargar Apache tras probar la configuración",
+      "description": "Prueba la configuración de Apache y recarga el servicio solo si la prueba es correcta."
     }
   }
 }

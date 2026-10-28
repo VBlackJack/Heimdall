@@ -70,6 +70,10 @@
       "examples": {
         "Expand-Archive -Path \"backup.zip\" -DestinationPath \"C:\\Restored\"": "Extrait une archive ZIP"
       }
+    },
+    "es": {
+      "title": "Extraer un archivo ZIP",
+      "description": "Extrae el contenido de un archivo ZIP."
     }
   }
 }

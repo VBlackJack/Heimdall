@@ -70,6 +70,10 @@
         "grep \"authentication failure\" /var/log/auth.log": "Recherche tous les échecs d'authentification",
         "grep -c \"failed\" auth.log": "Compter les occurrences"
       }
+    },
+    "es": {
+      "title": "Analizar los fallos de autenticación",
+      "description": "Lista los intentos de inicio de sesión fallidos de /var/log/auth.log"
     }
   }
 }

@@ -53,6 +53,10 @@
         "Test-ComputerSecureChannel -Verbose -WhatIf": "Simulation de l'action avec -WhatIf (dry-run). Affiche ce qui serait fait sans exécuter réellement. Indispensable pour tester les commandes de modification avant exécution. Retirez -WhatIf après validation pour exécuter.",
         "Test-ComputerSecureChannel -Verbose -Confirm:$false": "Exécute l'action sans demander de confirmation interactive. Le paramètre -Confirm:$false supprime les invites de validation. Utile dans les scripts automatisés mais à utiliser avec précaution."
       }
+    },
+    "es": {
+      "title": "Probar la conectividad con Active Directory",
+      "description": "Prueba la conectividad con un controlador de dominio de Active Directory."
     }
   }
 }

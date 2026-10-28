@@ -70,6 +70,10 @@
         "Get-ADComputer -Filter {Enabled -eq $true} -Properties LastLogonDate | Where-Object {$_.LastLogonDate -lt (Get-Date).AddDays(-90)} | Disable-ADAccount -WhatIf": "Simule la désactivation de tous les ordinateurs actifs sans connexion depuis 90 jours ; retirez -WhatIf pour l'exécuter",
         "Disable-ADAccount -Identity 'PC-SALES-01$' -PassThru | Select-Object Name,Enabled": "Désactive le compte ordinateur et affiche son état pour le confirmer"
       }
+    },
+    "es": {
+      "title": "Deshabilitar una cuenta de equipo de AD",
+      "description": "Deshabilita una cuenta de equipo de Active Directory."
     }
   }
 }

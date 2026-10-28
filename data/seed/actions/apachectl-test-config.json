@@ -55,6 +55,10 @@
         "sudo apache2ctl configtest": "Teste la configuration avec le script de contrôle de Debian et Ubuntu",
         "sudo httpd -t -D DUMP_INCLUDES": "Teste la configuration et liste les fichiers inclus"
       }
+    },
+    "es": {
+      "title": "Probar la configuración de Apache",
+      "description": "Comprueba la sintaxis de la configuración de Apache HTTP Server sin tocar el servidor en ejecución."
     }
   }
 }

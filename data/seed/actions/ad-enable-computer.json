@@ -70,6 +70,10 @@
         "Get-ADComputer -Filter {Enabled -eq $false} -SearchBase 'OU=Workstations,DC=contoso,DC=com' | Enable-ADAccount -WhatIf": "Simule l'activation de tous les ordinateurs désactivés de l'OU Workstations ; retirez -WhatIf pour l'exécuter",
         "Enable-ADAccount -Identity 'PC-SALES-01$' -PassThru | Select-Object Name,Enabled": "Active le compte ordinateur et affiche son état pour le confirmer"
       }
+    },
+    "es": {
+      "title": "Habilitar una cuenta de equipo de AD",
+      "description": "Habilita una cuenta de equipo de Active Directory que estaba deshabilitada."
     }
   }
 }

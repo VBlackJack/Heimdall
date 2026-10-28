@@ -109,6 +109,10 @@
         "ansible-vault rekey --new-vault-password-file=.new_vault secrets.yml": "Avec fichier",
         "ansible-vault rekey group_vars/*/vault.yml": "Rekey plusieurs fichiers"
       }
+    },
+    "es": {
+      "title": "Cambiar la contraseña de Vault",
+      "description": "Cambia la contraseña de cifrado de un archivo de Ansible Vault"
     }
   }
 }

@@ -93,6 +93,10 @@
         "$protectors = (Get-BitLockerVolume -MountPoint \"D:\").KeyProtector; $protectors | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
         "$protectors = (Get-BitLockerVolume -MountPoint \"D:\").KeyProtector; $protectors | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
       }
+    },
+    "es": {
+      "title": "Quitar un protector de claves de BitLocker",
+      "description": "Quita un protector de claves concreto (TPM, Password, RecoveryPassword y otros) de un volumen de BitLocker."
     }
   }
 }

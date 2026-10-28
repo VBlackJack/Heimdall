@@ -83,6 +83,10 @@
         "Get-ADUser -Filter * -Properties Department,EmailAddress,Enabled | Export-Csv -Path C:\\Temp\\ADUsers.csv -NoTypeInformation -Encoding UTF8": "Exporte tous les utilisateurs vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées '#TYPE' du CSV. -Encoding UTF8 garantit la compatibilité internationale des caractères accentués. Le fichier CSV peut ensuite être utilisé pour des rapports, des imports ou des analyses tierces.",
         "Get-ADUser -Filter * -ResultSetSize 100 -Properties DisplayName,EmailAddress": "Limite le résultat aux 100 premiers utilisateurs pour un aperçu rapide. Le paramètre -ResultSetSize plafonne le nombre de résultats retournés par le serveur AD, ce qui améliore drastiquement les performances et réduit la consommation mémoire. Idéal pour les tests et les vérifications rapides."
       }
+    },
+    "es": {
+      "title": "Listar todos los usuarios de Active Directory",
+      "description": "Muestra la lista completa de todas las cuentas de usuario de Active Directory con sus propiedades principales."
     }
   }
 }

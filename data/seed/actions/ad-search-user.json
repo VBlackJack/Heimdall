@@ -88,6 +88,10 @@
         "Get-ADUser -Filter \"Department -eq 'IT' -and Enabled -eq $true\" -Properties Department,Title,Manager": "Recherche multicritère : utilisateurs actifs d'un département spécifique. Combine plusieurs conditions pour affiner les résultats. Très utilisé pour créer des listes de diffusion, des rapports par département ou des analyses organisationnelles.",
         "Get-ADUser -Filter \"Description -like '*externe*'\" -Properties Description,Company,Enabled": "Recherche textuelle dans le champ Description. Utile pour identifier des types de comptes spécifiques (consultants, externes, temporaires) si votre organisation utilise des conventions de nommage dans ce champ."
       }
+    },
+    "es": {
+      "title": "Buscar un usuario de AD por nombre",
+      "description": "Busca en Active Directory un usuario concreto por apellido o nombre."
     }
   }
 }

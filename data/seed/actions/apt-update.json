@@ -54,6 +54,10 @@
         "sudo apt update && apt list --upgradable": "Met à jour et liste les paquets pouvant être mis à niveau",
         "sudo apt update -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement."
       }
+    },
+    "es": {
+      "title": "Actualizar la lista de paquetes de APT",
+      "description": "Actualiza la lista de paquetes disponibles a partir de los repositorios configurados (Debian/Ubuntu)"
     }
   }
 }
