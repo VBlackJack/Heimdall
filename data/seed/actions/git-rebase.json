@@ -88,6 +88,10 @@
         "git rebase -i HEAD~5": "Rebase interactif des 5 derniers commits",
         "git rebase main": "Rebase la branche actuelle sur main"
       }
+    },
+    "es": {
+      "title": "Reubicar una rama (rebase)",
+      "description": "Vuelve a aplicar commits sobre una nueva base."
     }
   }
 }

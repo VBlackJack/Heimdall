@@ -82,6 +82,10 @@
         "Remove-GPO -Name \"Security-Baseline\" -Verbose": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes.",
         "Remove-GPO -Name \"Security-Baseline\"": "Exemple utilisant le paramètre 'gpoName': Nom de la GPO à supprimer. Remplacez Security-Baseline par la valeur appropriée selon votre environnement."
       }
+    },
+    "es": {
+      "title": "Eliminar una GPO",
+      "description": "Elimina una directiva de grupo del dominio."
     }
   }
 }

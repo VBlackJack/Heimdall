@@ -74,6 +74,10 @@
         "Get-VM | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
         "Get-VM | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
       }
+    },
+    "es": {
+      "title": "Listar todas las máquinas virtuales de Hyper-V",
+      "description": "Muestra todas las máquinas virtuales configuradas en Hyper-V con su estado, la memoria asignada y la versión de configuración."
     }
   }
 }

@@ -92,6 +92,10 @@
         "git log --graph --all": "Affiche toutes les branches avec un graphe",
         "git log --author=\"John\"": "Filtre par auteur"
       }
+    },
+    "es": {
+      "title": "Mostrar el historial de commits",
+      "description": "Muestra el historial de commits del repositorio."
     }
   }
 }

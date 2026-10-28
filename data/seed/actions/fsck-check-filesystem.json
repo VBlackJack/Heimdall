@@ -89,6 +89,10 @@
         "sudo fsck -n /dev/sdb1": "Dry-run (pas de modification)",
         "sudo xfs_repair /dev/sdc1": "Réparer un filesystem XFS"
       }
+    },
+    "es": {
+      "title": "Comprobar y reparar un sistema de archivos",
+      "description": "Comprueba la integridad de un sistema de archivos e intenta reparar los errores."
     }
   }
 }

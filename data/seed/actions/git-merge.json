@@ -92,6 +92,10 @@
         "git merge --no-ff feature": "Force un commit de merge même si fast-forward possible",
         "git merge feature/new-feature": "Exemple utilisant le paramètre 'branchName': Branche à fusionner. Remplacez feature/new-feature par la valeur appropriée selon votre environnement."
       }
+    },
+    "es": {
+      "title": "Fusionar ramas",
+      "description": "Fusiona una o varias ramas en la rama actual."
     }
   }
 }

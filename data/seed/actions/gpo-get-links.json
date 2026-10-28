@@ -83,6 +83,10 @@
         "(Get-GPO -Name \"Security-Baseline\").GpoLinks | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
         "(Get-GPO -Name \"Security-Baseline\").GpoLinks | Select-Object Target,Enabled,Enforced": "Exemple utilisant le paramètre 'gpoName': Nom de la GPO. Remplacez Security-Baseline par la valeur appropriée selon votre environnement."
       }
+    },
+    "es": {
+      "title": "Listar los vínculos de una GPO",
+      "description": "Muestra todas las OU a las que está vinculada una GPO."
     }
   }
 }

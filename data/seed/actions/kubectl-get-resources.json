@@ -99,6 +99,10 @@
         "kubectl get events -n web --sort-by=.lastTimestamp": "Affiche les derniers événements d'un espace de noms",
         "kubectl get pods -A --field-selector status.phase=Pending": "Trouve les pods bloqués en Pending dans tous les espaces de noms"
       }
+    },
+    "es": {
+      "title": "Listar recursos de Kubernetes de un tipo",
+      "description": "Lista los recursos de Kubernetes de un tipo elegido en un espacio de nombres, con sus columnas ampliadas (wide)."
     }
   }
 }

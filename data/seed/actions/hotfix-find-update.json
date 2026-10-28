@@ -89,6 +89,10 @@
         "Get-HotFix | Where-Object InstalledOn -gt (Get-Date).AddDays(-30)": "Affiche les mises à jour installées au cours des 30 derniers jours",
         "Get-HotFix -Description Security*": "Affiche uniquement les mises à jour de sécurité"
       }
+    },
+    "es": {
+      "title": "Comprobar si una actualización está instalada",
+      "description": "Busca una actualización por su número KB en un equipo."
     }
   }
 }

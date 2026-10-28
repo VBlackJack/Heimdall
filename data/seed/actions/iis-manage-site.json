@@ -76,6 +76,10 @@
       "examples": {
         "Start-WebSite -Name 'Default Web Site'": "Démarre le site web par défaut"
       }
+    },
+    "es": {
+      "title": "Iniciar o detener un sitio de IIS",
+      "description": "Inicia, detiene o reinicia un sitio web de IIS concreto. Útil para tareas de mantenimiento o de resolución de problemas."
     }
   }
 }

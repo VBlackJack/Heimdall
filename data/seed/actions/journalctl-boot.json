@@ -70,6 +70,10 @@
         "journalctl -p 3 -xb": "Affiche uniquement les Erreurs (p 3) survenues depuis le dernier démarrage (boot).",
         "journalctl -n 50": "Affiche les 50 derniers messages du journal systemd. Le flag -n (lines) limite l'output. journalctl est le système de logs central de systemd qui agrège tous les journaux (kernel, services, applications). Première commande pour diagnostiquer n'importe quel problème sous Linux moderne."
       }
+    },
+    "es": {
+      "title": "Mostrar los registros de un arranque concreto",
+      "description": "Lista los registros de una sesión de arranque concreta del sistema."
     }
   }
 }

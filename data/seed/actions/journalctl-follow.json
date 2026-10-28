@@ -88,6 +88,10 @@
         "multitail /var/log/syslog /var/log/auth.log": "Suivre plusieurs fichiers",
         "tail -f /var/log/auth.log": "Logs d'authentification"
       }
+    },
+    "es": {
+      "title": "Seguir los registros del sistema en tiempo real",
+      "description": "Muestra los mensajes nuevos del diario de systemd a medida que llegan (el equivalente de tail -f)."
     }
   }
 }

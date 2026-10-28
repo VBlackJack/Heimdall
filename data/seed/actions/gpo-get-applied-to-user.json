@@ -53,6 +53,10 @@
       "examples": {
         "gpresult /R /USER CONTOSO\\jdupont": "Affiche les GPO appliquées à l'utilisateur jdupont"
       }
+    },
+    "es": {
+      "title": "Listar las GPO aplicadas a un usuario",
+      "description": "Muestra todas las GPO aplicadas a un usuario concreto."
     }
   }
 }

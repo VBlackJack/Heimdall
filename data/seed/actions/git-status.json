@@ -54,6 +54,10 @@
         "git status": "Affiche le statut complet",
         "git status -s": "Affiche le statut en format court"
       }
+    },
+    "es": {
+      "title": "Mostrar el estado de Git",
+      "description": "Muestra el estado de los archivos del directorio de trabajo y del índice."
     }
   }
 }

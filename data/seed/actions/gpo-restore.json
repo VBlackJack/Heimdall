@@ -70,6 +70,10 @@
       "examples": {
         "Restore-GPO -Name \"Default Domain Policy\" -Path \"C:\\GPOBackups\"": "Restaure la Default Domain Policy depuis la sauvegarde"
       }
+    },
+    "es": {
+      "title": "Restaurar una GPO",
+      "description": "Restaura una directiva de grupo a partir de una copia de seguridad."
     }
   }
 }

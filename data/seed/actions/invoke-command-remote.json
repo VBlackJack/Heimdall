@@ -84,6 +84,10 @@
         "Invoke-Command -ComputerName Server01,Server02,Server03 -ScriptBlock { Restart-Service -Name 'wuauserv' }": "Redémarre un service sur plusieurs serveurs",
         "$cred = Get-Credential; Invoke-Command -ComputerName Server01 -Credential $cred -ScriptBlock { Get-Disk }": "Exécute avec identifiants spécifiques"
       }
+    },
+    "es": {
+      "title": "Ejecutar un comando de forma remota",
+      "description": "Ejecuta un comando de PowerShell en uno o varios equipos remotos mediante PSRemoting."
     }
   }
 }

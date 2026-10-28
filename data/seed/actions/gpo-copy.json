@@ -70,6 +70,10 @@
       "examples": {
         "Copy-GPO -SourceName \"Security-Policy-IT\" -TargetName \"Security-Policy-Finance\"": "Copie la GPO IT vers une nouvelle GPO Finance"
       }
+    },
+    "es": {
+      "title": "Copiar una GPO",
+      "description": "Crea una copia de una directiva de grupo existente."
     }
   }
 }

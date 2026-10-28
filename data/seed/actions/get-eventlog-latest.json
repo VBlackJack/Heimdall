@@ -113,6 +113,10 @@
         "Get-EventLog -LogName System -EntryType Error,Warning -Newest 50 | Out-GridView": "Erreurs et avertissements en grille interactive",
         "Get-EventLog -LogName System -After (Get-Date).AddHours(-1)": "Événements de la dernière heure"
       }
+    },
+    "es": {
+      "title": "Ver los eventos recientes de Windows",
+      "description": "Muestra los últimos eventos de un registro de Windows (System, Application, Security)."
     }
   }
 }

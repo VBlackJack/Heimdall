@@ -118,6 +118,10 @@
         "Set-GPPermission -Name \"Security-Baseline\" -TargetName \"TargetServer\" -TargetType User -PermissionLevel FullControl -PassThru": "Force la commande à retourner l'objet modifié/créé dans le pipeline. Par défaut, les cmdlets Set-/New- ne retournent rien. -PassThru active le retour pour permettre des opérations en chaîne ou des vérifications immédiates.",
         "Set-GPPermission -Name \"Security-Baseline\" -TargetName \"TargetServer\" -TargetType User -PermissionLevel FullControl -Verbose": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes."
       }
+    },
+    "es": {
+      "title": "Establecer los permisos de una GPO",
+      "description": "Cambia los permisos de seguridad de una directiva de grupo."
     }
   }
 }

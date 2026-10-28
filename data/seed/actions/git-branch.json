@@ -98,6 +98,10 @@
         "git branch -d old-feature": "Supprime une branche fusionnée",
         "git branch feature/new-feature": "Exemple utilisant le paramètre 'branchName': Nom de la branche (vide pour lister). Remplacez feature/new-feature par la valeur appropriée selon votre environnement."
       }
+    },
+    "es": {
+      "title": "Gestionar ramas de Git",
+      "description": "Crea, lista o elimina ramas."
     }
   }
 }

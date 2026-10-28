@@ -35,6 +35,10 @@
       "examples": {
         "wuauclt /detectnow": "Force uniquement la détection"
       }
+    },
+    "es": {
+      "title": "Forzar la detección de actualizaciones",
+      "description": "Hace que Windows Update busque actualizaciones nuevas de inmediato."
     }
   }
 }

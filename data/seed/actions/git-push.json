@@ -110,6 +110,10 @@
         "git push origin main": "Pousse les commits vers la branche main",
         "git push -u origin feature-branch": "Pousse et configure le tracking de la branche"
       }
+    },
+    "es": {
+      "title": "Enviar commits al repositorio remoto",
+      "description": "Envía los commits locales al repositorio remoto."
     }
   }
 }

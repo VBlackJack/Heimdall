@@ -65,6 +65,10 @@
         "Get-GPO -All | Format-Table -AutoSize": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
         "Get-GPO -All | Where-Object {$_.DisplayName -like '*Admin*'} | Select-Object DisplayName,GpoStatus,CreationTime": "Exemple utilisant le paramètre 'searchTerm': Terme à rechercher dans le nom de la GPO. Remplacez Admin par la valeur appropriée selon votre environnement."
       }
+    },
+    "es": {
+      "title": "Buscar GPO por nombre",
+      "description": "Busca directivas de grupo por su nombre."
     }
   }
 }

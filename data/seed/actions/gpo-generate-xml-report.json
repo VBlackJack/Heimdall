@@ -95,6 +95,10 @@
         "Get-GPOReport -Name \"Security-Baseline\" -ReportType Xml -Path \"C:\\Reports\\output.txt\" | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
         "Get-GPOReport -Name \"Security-Baseline\" -ReportType Xml -Path \"C:\\Reports\\output.txt\"": "Exemple utilisant le paramètre 'gpoName': Nom de la GPO. Remplacez Security-Baseline par la valeur appropriée selon votre environnement."
       }
+    },
+    "es": {
+      "title": "Generar un informe XML de una GPO",
+      "description": "Genera un informe XML detallado de la configuración de una directiva de grupo."
     }
   }
 }

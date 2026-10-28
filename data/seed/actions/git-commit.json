@@ -94,6 +94,10 @@
         "git commit -m \"feat: ajout nouvelle fonctionnalité\"": "Créer un commit",
         "git commit --amend": "Modifie le dernier commit"
       }
+    },
+    "es": {
+      "title": "Crear un commit de Git",
+      "description": "Registra los cambios del índice en el historial del repositorio."
     }
   }
 }

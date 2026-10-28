@@ -88,6 +88,10 @@
         "getfacl -a /etc/passwd": "Uniquement les ACL d'accès",
         "getfacl -d /shared": "ACL par défaut"
       }
+    },
+    "es": {
+      "title": "Mostrar las ACL de un archivo",
+      "description": "Muestra las listas de control de acceso (ACL) extendidas de un archivo."
     }
   }
 }

@@ -53,6 +53,10 @@
       "examples": {
         "gpresult /H \"C:\\GPOReports\\rsop.html\" /F": "Génère un rapport RSoP HTML complet"
       }
+    },
+    "es": {
+      "title": "Obtener el RSoP (Resultant Set of Policy)",
+      "description": "Genera un informe RSoP detallado de las directivas aplicadas a un usuario o a un equipo."
     }
   }
 }

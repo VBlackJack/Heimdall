@@ -58,6 +58,10 @@
       "examples": {
         "Import-Module AdmPwd.PS; Find-AdmPwdExtendedRights -Identity 'OU=Workstations,DC=contoso,DC=com'": "Utilise le module LAPS pour auditer les droits étendus sur une OU"
       }
+    },
+    "es": {
+      "title": "Auditar quién puede leer las contraseñas de LAPS",
+      "description": "Comprueba quién tiene derechos de lectura sobre los atributos de LAPS en Active Directory."
     }
   }
 }

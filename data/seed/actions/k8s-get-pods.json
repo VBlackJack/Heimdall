@@ -49,6 +49,10 @@
         "kubectl get pods -A -o wide": "🔥 VUE D'ENSEMBLE : Liste tous les pods de tous les namespaces (-A) avec détails IP/Node (-o wide). Permet de repérer les pods en erreur.",
         "kubectl get pods --field-selector status.phase!=Running -A": "Affiche uniquement les pods qui ne sont PAS en statut 'Running' (CrashLoop, Pending, Error)."
       }
+    },
+    "es": {
+      "title": "Listar pods (kubectl)",
+      "description": "Muestra los pods de Kubernetes con su estado, su IP y su nodo."
     }
   }
 }

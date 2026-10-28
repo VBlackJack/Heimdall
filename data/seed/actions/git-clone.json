@@ -124,6 +124,10 @@
         "git clone --depth 1 https://github.com/user/repo.git": "Clone uniquement le dernier commit (shallow clone)",
         "git clone https://github.com/contoso/myapp.git D:\\Archive": "Exemple utilisant le paramètre 'destination': Répertoire de destination (optionnel). Remplacez D:\\Archive par la valeur appropriée selon votre environnement."
       }
+    },
+    "es": {
+      "title": "Clonar un repositorio de Git",
+      "description": "Clona un repositorio remoto de Git en un directorio local."
     }
   }
 }

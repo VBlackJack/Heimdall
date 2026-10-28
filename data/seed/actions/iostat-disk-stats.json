@@ -71,6 +71,10 @@
       "examples": {
         "iostat": "Statistiques CPU et disque"
       }
+    },
+    "es": {
+      "title": "Estadísticas de E/S de disco",
+      "description": "Muestra las estadísticas de entrada/salida de discos y particiones."
     }
   }
 }

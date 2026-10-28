@@ -76,6 +76,10 @@
         "journalctl -u nginx.service": "Affiche tous les logs d'un service spécifique (ici nginx). Le flag -u (unit) filtre par unité systemd. Équivalent de consulter /var/log/nginx/* mais via journalctl. Toutes les sorties stdout/stderr du service sont capturées. Parfait pour le troubleshooting service par service.",
         "journalctl -u ssh.service --since \"10 minutes ago\"": "Affiche les logs SSH des 10 dernières minutes. --since accepte des durées relatives (minutes, hours, days ago). Utile pour diagnostiquer un problème de connexion SSH juste après qu'il se soit produit. Adaptez le service et la durée selon vos besoins."
       }
+    },
+    "es": {
+      "title": "Mostrar los registros de un servicio concreto",
+      "description": "Muestra los registros de journald de una unidad de systemd concreta (servicio, temporizador, etc.)."
     }
   }
 }

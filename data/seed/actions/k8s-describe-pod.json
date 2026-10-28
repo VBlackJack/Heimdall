@@ -99,6 +99,10 @@
       "examples": {
         "kubectl describe pod my-app-xyz -n prod": "🔥 POURQUOI ÇA PLANTE ? : Regardez la section 'Events' tout en bas de la sortie. C'est là que K8s explique les erreurs (ImagePullBackOff, OOMKilled, FailedScheduling)."
       }
+    },
+    "es": {
+      "title": "Diagnosticar un pod (kubectl describe)",
+      "description": "Muestra todos los detalles de un pod, incluidos los eventos (Events) que explican por qué no arranca."
     }
   }
 }

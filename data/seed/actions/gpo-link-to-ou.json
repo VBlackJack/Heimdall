@@ -100,6 +100,10 @@
         "New-GPLink -Name \"Security-Baseline\" -Target \"OU=Paris-Users,DC=contoso,DC=com\" -LinkEnabled Yes -Verbose": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes.",
         "New-GPLink -Name \"Security-Baseline\" -Target \"OU=Paris-Users,DC=contoso,DC=com\" -LinkEnabled Yes": "Exemple utilisant le paramètre 'gpoName': Nom de la GPO à lier. Remplacez Security-Baseline par la valeur appropriée selon votre environnement."
       }
+    },
+    "es": {
+      "title": "Vincular una GPO a una OU",
+      "description": "Vincula una directiva de grupo a una unidad organizativa."
     }
   }
 }

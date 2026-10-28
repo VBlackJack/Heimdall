@@ -123,6 +123,10 @@
         "git reset HEAD~1": "Annule le dernier commit en gardant les modifications",
         "git reset --hard origin/main": "Réinitialise complètement au state de origin/main"
       }
+    },
+    "es": {
+      "title": "Restablecer el estado del repositorio",
+      "description": "Restablece HEAD a un estado dado."
     }
   }
 }

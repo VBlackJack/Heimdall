@@ -87,6 +87,10 @@
         "Export-VM -Name 'Production-DB' -Path '\\\\NAS\\VM-Backups' -CaptureLiveState CaptureSavedState": "Exporte avec capture de l'état actuel",
         "Import-VM -Path 'D:\\Backups\\VMs\\Windows11-Dev' -Copy -GenerateNewId": "Importe une VM exportée (avec nouvel ID)"
       }
+    },
+    "es": {
+      "title": "Exportar una máquina virtual",
+      "description": "Exporta una VM de Hyper-V completa (configuración, discos virtuales, instantáneas) a una carpeta para una copia de seguridad o una migración."
     }
   }
 }

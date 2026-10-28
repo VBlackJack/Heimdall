@@ -93,6 +93,10 @@
         "git diff --staged": "Affiche les modifications staged",
         "git diff main..feature": "Compare deux branches"
       }
+    },
+    "es": {
+      "title": "Mostrar diferencias",
+      "description": "Muestra las diferencias entre commits, ramas o archivos."
     }
   }
 }

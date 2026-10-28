@@ -101,6 +101,10 @@
         "kubectl logs deployment/web -n web -c nginx -f": "Suit un conteneur d'un déploiement",
         "kubectl logs -l app=web -n web --since=1h": "Affiche la dernière heure de chaque pod portant un label"
       }
+    },
+    "es": {
+      "title": "Mostrar las últimas líneas de registro de un pod",
+      "description": "Muestra las últimas líneas que un pod escribió en su salida estándar y de error."
     }
   }
 }

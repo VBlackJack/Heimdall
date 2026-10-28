@@ -54,6 +54,10 @@
         "cat /etc/os-release": "Affiche le nom et la version de la distribution",
         "uname -r": "Affiche la version du noyau en cours d'exécution"
       }
+    },
+    "es": {
+      "title": "Mostrar el nombre de host y la identidad del sistema",
+      "description": "Muestra el nombre de host, el sistema operativo, el kernel, el modelo de hardware y el tipo de virtualización."
     }
   }
 }

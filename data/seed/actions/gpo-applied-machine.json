@@ -59,6 +59,10 @@
         "gpresult /R /S PC-PARIS-001": "Affiche les GPO appliquées sur FRPANSI001PC",
         "gpresult /R": "Affiche les GPO appliquées sur la machine locale"
       }
+    },
+    "es": {
+      "title": "Listar las GPO aplicadas a un equipo",
+      "description": "Muestra todas las directivas de grupo aplicadas a un equipo concreto."
     }
   }
 }

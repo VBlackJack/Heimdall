@@ -60,6 +60,10 @@
         "git stash pop": "Restaure les modifications et supprime le stash",
         "git stash list": "Liste tous les stashs"
       }
+    },
+    "es": {
+      "title": "Guardar cambios temporalmente",
+      "description": "Aparta temporalmente los cambios sin confirmar."
     }
   }
 }

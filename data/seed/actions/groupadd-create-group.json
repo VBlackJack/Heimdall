@@ -76,6 +76,10 @@
         "sudo groupadd -r svc-monitor": "Crée un groupe système pour un service",
         "getent group webadmins": "Vérifie que le groupe existe et affiche ses membres"
       }
+    },
+    "es": {
+      "title": "Crear un grupo local",
+      "description": "Crea un grupo local nuevo en el sistema."
     }
   }
 }

@@ -83,6 +83,10 @@
         "sudo hostnamectl set-hostname server01": "Changer le hostname",
         "hostnamectl": "Informations détaillées"
       }
+    },
+    "es": {
+      "title": "Mostrar el nombre de host",
+      "description": "Muestra el nombre de host del sistema. Atención: los ejemplos de hostnamectl set-hostname cambian el nombre del equipo y requieren root."
     }
   }
 }

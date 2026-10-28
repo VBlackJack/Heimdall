@@ -86,6 +86,10 @@
         "git add .": "Ajoute tous les fichiers modifiés",
         "git add src/*.js": "Ajoute tous les fichiers JS du dossier src"
       }
+    },
+    "es": {
+      "title": "Añadir archivos al índice de Git",
+      "description": "Añade los cambios de los archivos al índice (área de preparación o staging)."
     }
   }
 }

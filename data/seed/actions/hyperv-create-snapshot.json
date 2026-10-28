@@ -93,6 +93,10 @@
         "Get-VM 'Production-*' | Checkpoint-VM -SnapshotName 'Weekly-Backup'": "Snapshot de toutes les VMs de production",
         "Restore-VMSnapshot -VMName 'TestVM' -Name 'Before-Updates' -Confirm:$false": "Restaure un snapshot"
       }
+    },
+    "es": {
+      "title": "Crear una instantánea de una VM (punto de control)",
+      "description": "Crea un punto de control (instantánea) de una máquina virtual de Hyper-V, que captura su estado actual para restaurarlo más tarde."
     }
   }
 }
