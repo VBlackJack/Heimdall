@@ -296,6 +296,10 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
             // Block all navigation away from the VNC virtual host
             core.NavigationStarting += OnWebViewNavigationStarting;
 
+            // The page's words must exist before its first script runs: it shows the loading
+            // label at once and reports a failure of its own library before any connect message.
+            await core.AddScriptToExecuteOnDocumentCreatedAsync(VncPageText.BuildBootstrapScript(PageTextOf));
+
             // Load the VNC HTML page via virtual host mapping
             var htmlPath = Path.Combine(AppContext.BaseDirectory, "Assets", "vnc.html");
             if (File.Exists(htmlPath))
@@ -656,12 +660,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
             viewOnly = _session?.ViewOnly ?? false,
 
             // The page shows and reports these; it used to carry its own English ones.
-            text = new
-            {
-                disconnected = _localizer?["StatusVncDisconnected"],
-                connectionLost = _localizer?["ErrorVncConnectionLost"],
-                initFailed = _localizer?["ErrorVncClientInitFailed"],
-            },
+            text = VncPageText.Build(PageTextOf),
         };
 
         var json = JsonSerializer.Serialize(connectParams);
@@ -673,6 +672,8 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
         PostWebMessage(ScalingMessage(SelectedScalingMode()));
         PostWebMessage(QualityMessage(SelectedQualityPreset()));
     }
+
+    private string? PageTextOf(string key) => _localizer?[key];
 
     private void PostWebMessage(string message) => PageMessageSink(message);
 

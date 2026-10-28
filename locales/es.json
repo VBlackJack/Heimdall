@@ -3889,6 +3889,8 @@
   "TooltipWebBack": "Atr\u00e1s",
   "ErrorVncConnectionLost": "La conexión VNC se perdió de forma inesperada.",
   "ErrorVncClientInitFailed": "No se pudo iniciar el cliente VNC.",
+  "ErrorVncLibraryFailedTitle": "No se pudo cargar la biblioteca noVNC",
+  "ErrorVncLibraryFailedMessage": "El visor VNC integrado no pudo iniciarse. Compruebe que la carpeta vnc/core está junto a vnc.html en la carpeta Assets.",
   "ErrorVncUsernameRequired": "Este servidor VNC pide un nombre de usuario y una contraseña. Heimdall no guarda un nombre de usuario VNC, así que no puede iniciar sesión en este servidor.",
   "ErrorVncPasswordRequired": "Este servidor VNC pide una contraseña y el perfil no tiene ninguna. Añada la contraseña al perfil y vuelva a conectarse.",
   "DialogVncPasswordPromptTitle": "Se requiere contrase\u00f1a VNC",
