@@ -109,7 +109,7 @@
                          TabIndex="0"
                          Text="{Binding PatternText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                          Style="{DynamicResource WatermarkTextBoxStyle}"
-                         FontFamily="Consolas"
+                         FontFamily="{StaticResource FontFamilyMonospace}"
                          FontSize="{StaticResource FontSizeBodyLarge}"
                          Background="{DynamicResource SurfaceBrush}"
                          Foreground="{DynamicResource TextPrimaryBrush}"
@@ -268,7 +268,7 @@
                          Foreground="{DynamicResource TextPrimaryBrush}"
                          BorderBrush="{DynamicResource BorderBrush}"
                          BorderThickness="1"
-                         FontFamily="Consolas"
+                         FontFamily="{StaticResource FontFamilyMonospace}"
                          FontSize="{StaticResource FontSizeBodyLarge}"
                          AutomationProperties.Name="{loc:Translate ToolRegexMatchesLabel}">
                     <ListBox.ItemContainerStyle>

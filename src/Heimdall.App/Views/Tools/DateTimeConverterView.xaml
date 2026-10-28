@@ -98,7 +98,7 @@
                              Text="{Binding InputText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                              Style="{DynamicResource WatermarkTextBoxStyle}"
                              AutomationProperties.Name="{loc:Translate ToolDateTimeInputLabel}"
-                             FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas"
+                             FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="{StaticResource FontFamilyMonospace}"
                              Padding="{StaticResource PaddingInput}"
                              Background="{DynamicResource CardBrush}"
                              Foreground="{DynamicResource TextPrimaryBrush}"
@@ -160,7 +160,7 @@
                             TabIndex="2"/>
                     <TextBox Text="{Binding UnixTimestampText, Mode=OneWay}"
                              AutomationProperties.AutomationId="DateTime.UnixOutput"
-                             FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas"
+                             FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="{StaticResource FontFamilyMonospace}"
                              Padding="{StaticResource PaddingInput}" IsReadOnly="True"
                              AutomationProperties.Name="{loc:Translate ToolDateTimeUnixLabel}"
                              Background="{DynamicResource CardBrush}"
@@ -184,7 +184,7 @@
                             TabIndex="3"/>
                     <TextBox Text="{Binding IsoUtcText, Mode=OneWay}"
                              AutomationProperties.AutomationId="DateTime.IsoUtcOutput"
-                             FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas"
+                             FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="{StaticResource FontFamilyMonospace}"
                              Padding="{StaticResource PaddingInput}" IsReadOnly="True"
                              AutomationProperties.Name="{loc:Translate ToolDateTimeIsoUtcLabel}"
                              Background="{DynamicResource CardBrush}"
@@ -208,7 +208,7 @@
                             TabIndex="4"/>
                     <TextBox Text="{Binding IsoLocalText, Mode=OneWay}"
                              AutomationProperties.AutomationId="DateTime.IsoLocalOutput"
-                             FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas"
+                             FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="{StaticResource FontFamilyMonospace}"
                              Padding="{StaticResource PaddingInput}" IsReadOnly="True"
                              AutomationProperties.Name="{loc:Translate ToolDateTimeIsoLocalLabel}"
                              Background="{DynamicResource CardBrush}"
@@ -232,7 +232,7 @@
                             TabIndex="5"/>
                     <TextBox Text="{Binding LocalTimeText, Mode=OneWay}"
                              AutomationProperties.AutomationId="DateTime.LocalTimeOutput"
-                             FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas"
+                             FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="{StaticResource FontFamilyMonospace}"
                              Padding="{StaticResource PaddingInput}" IsReadOnly="True"
                              AutomationProperties.Name="{loc:Translate ToolDateTimeLocalTimeLabel}"
                              Background="{DynamicResource CardBrush}"
@@ -266,7 +266,7 @@
                               BorderBrush="{DynamicResource BorderBrush}"
                               TabIndex="6"/>
                     <TextBox Text="{Binding TimezoneTimeText, Mode=OneWay}"
-                             FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas"
+                             FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="{StaticResource FontFamilyMonospace}"
                              Padding="{StaticResource PaddingInput}" IsReadOnly="True"
                              AutomationProperties.Name="{loc:Translate ToolDateTimeTimezoneLabel}"
                              Background="{DynamicResource CardBrush}"
@@ -279,7 +279,7 @@
                            FontSize="{StaticResource FontSizeBody}" Margin="0,12,0,4"
                            Foreground="{DynamicResource TextSecondaryBrush}"/>
                 <TextBlock Text="{Binding RelativeTimeText}"
-                           FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas"
+                           FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="{StaticResource FontFamilyMonospace}"
                            Foreground="{DynamicResource AccentTextBrush}"
                            Margin="{StaticResource MarginStackItem}"/>
                 </StackPanel>

@@ -35,7 +35,6 @@
                         DockPanel.Dock="Right"
                         Content="?"
                         Command="{Binding ToggleHelpCommand}"
-                        TabIndex="9"
                         Style="{DynamicResource ToolHelpButtonStyle}"
                         Padding="{StaticResource PaddingButtonHelp}"
                         FontSize="{StaticResource FontSizeBody}"
@@ -113,7 +112,6 @@
                                        Width="160"/>
                             <TextBox x:Name="CnInput"
                                      Text="{Binding Cn, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                     TabIndex="0"
                                      Foreground="{DynamicResource TextPrimaryBrush}"
                                      Background="{DynamicResource CardBrush}"
                                      BorderBrush="{DynamicResource BorderBrush}"
@@ -127,7 +125,6 @@
                                        VerticalAlignment="Center"
                                        Width="160"/>
                             <TextBox Text="{Binding Org, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                     TabIndex="1"
                                      Foreground="{DynamicResource TextPrimaryBrush}"
                                      Background="{DynamicResource CardBrush}"
                                      BorderBrush="{DynamicResource BorderBrush}"
@@ -140,7 +137,6 @@
                                        VerticalAlignment="Center"
                                        Width="160"/>
                             <TextBox Text="{Binding Country, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                     TabIndex="2"
                                      Foreground="{DynamicResource TextPrimaryBrush}"
                                      Background="{DynamicResource CardBrush}"
                                      BorderBrush="{DynamicResource BorderBrush}"
@@ -169,7 +165,6 @@
                                        VerticalAlignment="Center"
                                        Width="160"/>
                             <ComboBox SelectedIndex="{Binding KeySizeIndex, Mode=TwoWay}"
-                                      TabIndex="3"
                                       MinWidth="200"
                                       AutomationProperties.Name="{loc:Translate ToolCertGenKeySize}">
                                 <ComboBoxItem Content="{loc:Translate ToolCertGenRsa2048}" Tag="RSA2048"/>
@@ -183,7 +178,6 @@
                                        Width="160"/>
                             <TextBox x:Name="ValidityInput"
                                      Text="{Binding ValidityDaysText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                     TabIndex="4"
                                      Foreground="{DynamicResource TextPrimaryBrush}"
                                      Background="{DynamicResource CardBrush}"
                                      BorderBrush="{DynamicResource BorderBrush}"
@@ -198,7 +192,6 @@
                                        VerticalAlignment="Center"
                                        Width="160"/>
                             <TextBox Text="{Binding SanRaw, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                     TabIndex="5"
                                      Foreground="{DynamicResource TextPrimaryBrush}"
                                      Background="{DynamicResource CardBrush}"
                                      BorderBrush="{DynamicResource BorderBrush}"
@@ -227,13 +220,11 @@
                         <StackPanel Orientation="Horizontal">
                             <RadioButton IsChecked="{Binding IsSelfSigned, Mode=TwoWay}"
                                          Content="{loc:Translate ToolCertGenTypeSelfSigned}"
-                                         TabIndex="6"
                                          Foreground="{DynamicResource TextPrimaryBrush}"
                                          Margin="0,0,20,0"
                                          AutomationProperties.Name="{loc:Translate ToolCertGenTypeSelfSigned}"/>
                             <RadioButton IsChecked="{Binding IsCaLeafMode, Mode=TwoWay}"
                                          Content="{loc:Translate ToolCertGenTypeCaLeaf}"
-                                         TabIndex="7"
                                          Foreground="{DynamicResource TextPrimaryBrush}"
                                          AutomationProperties.Name="{loc:Translate ToolCertGenTypeCaLeaf}"/>
                         </StackPanel>
@@ -244,7 +235,6 @@
                         Grid.Row="3"
                         Content="{loc:Translate ToolCertGenBtnGenerate}"
                         Command="{Binding GenerateCommand}"
-                        TabIndex="8"
                         Style="{DynamicResource PrimaryButtonStyle}"
                         Padding="{StaticResource PaddingButtonPrimary}"
                         Margin="{StaticResource MarginSectionSeparator}"
@@ -284,7 +274,7 @@
                                 ToolTip="{loc:Translate ToolBtnCopyToClipboard}"/>
                         <TextBox Text="{Binding FingerprintText, Mode=OneWay}"
                                  IsReadOnly="True"
-                                 FontFamily="Consolas"
+                                 FontFamily="{StaticResource FontFamilyMonospace}"
                                  FontSize="{StaticResource FontSizeBody}"
                                  Background="Transparent"
                                  Foreground="{DynamicResource TextPrimaryBrush}"
@@ -320,7 +310,7 @@
                         </StackPanel>
                         <TextBox Text="{Binding CurrentCertPem, Mode=OneWay}"
                                  IsReadOnly="True"
-                                 FontFamily="Consolas"
+                                 FontFamily="{StaticResource FontFamilyMonospace}"
                                  FontSize="{StaticResource FontSizeBody}"
                                  TextWrapping="Wrap"
                                  MaxHeight="200"
@@ -364,7 +354,7 @@
                         </StackPanel>
                         <TextBox Text="{Binding DisplayedKeyText, Mode=OneWay}"
                                  IsReadOnly="True"
-                                 FontFamily="Consolas"
+                                 FontFamily="{StaticResource FontFamilyMonospace}"
                                  FontSize="{StaticResource FontSizeBody}"
                                  TextWrapping="Wrap"
                                  MaxHeight="200"
@@ -400,7 +390,7 @@
                         </StackPanel>
                         <TextBox Text="{Binding LeafCertPem, Mode=OneWay}"
                                  IsReadOnly="True"
-                                 FontFamily="Consolas"
+                                 FontFamily="{StaticResource FontFamilyMonospace}"
                                  FontSize="{StaticResource FontSizeBody}"
                                  TextWrapping="Wrap"
                                  MaxHeight="160"
@@ -432,7 +422,7 @@
                         </StackPanel>
                         <TextBox Text="{Binding DisplayedLeafKeyText, Mode=OneWay}"
                                  IsReadOnly="True"
-                                 FontFamily="Consolas"
+                                 FontFamily="{StaticResource FontFamilyMonospace}"
                                  FontSize="{StaticResource FontSizeBody}"
                                  TextWrapping="Wrap"
                                  MaxHeight="160"

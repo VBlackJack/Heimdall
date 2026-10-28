@@ -123,7 +123,7 @@
                                     Binding="{Binding Destination}"
                                     Header="{loc:Translate ToolRouteTableColDest}"
                                     Width="150"
-                                    FontFamily="Consolas">
+                                    FontFamily="{StaticResource FontFamilyMonospace}">
                     <DataGridTextColumn.ElementStyle>
                         <Style TargetType="TextBlock">
                             <Setter Property="FontWeight" Value="SemiBold"/>
@@ -134,17 +134,17 @@
                                     Binding="{Binding Mask}"
                                     Header="{loc:Translate ToolRouteTableColMask}"
                                     Width="150"
-                                    FontFamily="Consolas"/>
+                                    FontFamily="{StaticResource FontFamilyMonospace}"/>
                 <DataGridTextColumn x:Name="ColGateway"
                                     Binding="{Binding Gateway}"
                                     Header="{loc:Translate ToolRouteTableColGateway}"
                                     Width="150"
-                                    FontFamily="Consolas"/>
+                                    FontFamily="{StaticResource FontFamilyMonospace}"/>
                 <DataGridTextColumn x:Name="ColInterface"
                                     Binding="{Binding Interface}"
                                     Header="{loc:Translate ToolRouteTableColInterface}"
                                     Width="150"
-                                    FontFamily="Consolas"/>
+                                    FontFamily="{StaticResource FontFamilyMonospace}"/>
                 <DataGridTextColumn x:Name="ColMetric"
                                     Binding="{Binding Metric}"
                                     Header="{loc:Translate ToolRouteTableColMetric}"

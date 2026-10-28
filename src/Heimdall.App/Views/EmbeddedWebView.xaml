@@ -33,24 +33,6 @@
                 BorderBrush="{DynamicResource BorderBrush}"
                 BorderThickness="0,0,0,1">
             <DockPanel LastChildFill="True">
-                <Button x:Name="SplitButton"
-                        DockPanel.Dock="Right"
-                        Content="&#xE8A9;"
-                        FontFamily="{StaticResource FontFamilyIcons}"
-                        Click="OnSplitClick"
-                        Style="{DynamicResource GhostButtonStyle}"
-                        Padding="6,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0"/>
-
-                <!-- Opens the page with the profile's external program, or the default browser:
-                     the way out when the embedded engine does not render a console well. -->
-                <Button x:Name="OpenExternallyButton"
-                        DockPanel.Dock="Right"
-                        Content="&#xE8A7;"
-                        FontFamily="{StaticResource FontFamilyIcons}"
-                        Click="OnOpenExternallyClick"
-                        Style="{DynamicResource GhostButtonStyle}"
-                        Padding="6,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0"/>
-
                 <Button x:Name="ReloadButton"
                         DockPanel.Dock="Left"
                         Content="&#xE72C;"
@@ -67,6 +49,29 @@
                         IsEnabled="False"
                         Style="{DynamicResource GhostButtonStyle}"
                         Padding="6,2" FontSize="{StaticResource FontSizeBody}" Margin="0,0,4,0"/>
+
+                <!-- The right-hand controls, declared in screen order (left to right) so Tab
+                     follows the eye: a DockPanel stacks right-docked children from the right,
+                     so declaring them one by one made Tab run right to left. -->
+                <StackPanel x:Name="HeaderControls"
+                            DockPanel.Dock="Right"
+                            Orientation="Horizontal">
+                    <!-- Opens the page with the profile's external program, or the default browser:
+                         the way out when the embedded engine does not render a console well. -->
+                    <Button x:Name="OpenExternallyButton"
+                            Content="&#xE8A7;"
+                            FontFamily="{StaticResource FontFamilyIcons}"
+                            Click="OnOpenExternallyClick"
+                            Style="{DynamicResource GhostButtonStyle}"
+                            Padding="6,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0"/>
+
+                    <Button x:Name="SplitButton"
+                            Content="&#xE8A9;"
+                            FontFamily="{StaticResource FontFamilyIcons}"
+                            Click="OnSplitClick"
+                            Style="{DynamicResource GhostButtonStyle}"
+                            Padding="6,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0"/>
+                </StackPanel>
 
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                     <TextBlock x:Name="SessionTitleText"

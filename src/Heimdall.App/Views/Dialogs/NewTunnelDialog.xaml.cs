@@ -32,7 +32,15 @@ public partial class NewTunnelDialog : Window
         InitializeComponent();
         WindowThemeHelper.ApplyCurrentTheme(this);
         DataContextChanged += OnDataContextChanged;
+        Loaded += OnLoaded;
     }
+
+    /// <summary>
+    /// Puts the keyboard on the first field, or on Cancel when there is no gateway to fill the
+    /// form with and the whole form is disabled.
+    /// </summary>
+    private void OnLoaded(object sender, RoutedEventArgs e)
+        => (_viewModel is { HasGateways: false } ? (UIElement)CancelButton : GatewayComboBox).Focus();
 
     private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
     {
@@ -66,6 +74,7 @@ public partial class NewTunnelDialog : Window
         }
 
         DataContextChanged -= OnDataContextChanged;
+        Loaded -= OnLoaded;
         base.OnClosed(e);
     }
 }

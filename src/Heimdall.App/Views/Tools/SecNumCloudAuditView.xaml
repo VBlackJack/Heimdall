@@ -87,7 +87,7 @@
                              Height="60" VerticalScrollBarVisibility="Auto"
                              Style="{StaticResource WatermarkTextBoxStyle}"
                              Tag=""
-                             FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
+                             FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}"
                              Padding="{StaticResource PaddingInput}"
                              Background="{DynamicResource CardBrush}"
                              Foreground="{DynamicResource TextPrimaryBrush}"
@@ -245,7 +245,7 @@
                             Padding="{StaticResource PaddingButtonPrimary}"
                             VerticalAlignment="Center" IsEnabled="False"/>
                 </StackPanel>
-                <TextBlock x:Name="TxtFooterStats" Text="" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
+                <TextBlock x:Name="TxtFooterStats" Text="" FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}"
                            Foreground="{DynamicResource TextSecondaryBrush}"
                            VerticalAlignment="Center"/>
             </DockPanel>

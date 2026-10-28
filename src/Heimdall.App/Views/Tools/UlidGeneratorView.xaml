@@ -113,7 +113,7 @@
                             VerticalAlignment="Stretch" />
                     <TextBox Text="{Binding SingleResult, Mode=OneWay}"
                              FontSize="{StaticResource FontSizeBodyLarge}"
-                             FontFamily="Consolas"
+                             FontFamily="{StaticResource FontFamilyMonospace}"
                              Padding="{StaticResource PaddingInput}"
                              IsReadOnly="True"
                              AutomationProperties.Name="{loc:Translate ToolUlidResult}"
@@ -164,7 +164,7 @@
                         <TextBox Text="{Binding BatchResults, Mode=OneWay}"
                                  AutomationProperties.Name="{loc:Translate ToolUlidBatchResults}"
                                  FontSize="{StaticResource FontSizeBody}"
-                                 FontFamily="Consolas"
+                                 FontFamily="{StaticResource FontFamilyMonospace}"
                                  Padding="{StaticResource PaddingInput}"
                                  MaxHeight="300"
                                  IsReadOnly="True"

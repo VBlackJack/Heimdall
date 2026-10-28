@@ -99,6 +99,59 @@ public sealed class SftpBrowserViewsLoadTests
         Assert.True(failures.Count == 0, string.Join(Environment.NewLine, failures));
     }
 
+    /// <summary>
+    /// Every row of the transfer queue has a Cancel and a Retry button; a screen reader reading the
+    /// bare verb once per row cannot tell which file it would stop or run again.
+    /// </summary>
+    [StaFact]
+    [Trait("Category", "RequiresDesktop")]
+    public void TransferQueueButtons_NameTheTransferTheyAct_On()
+    {
+        WpfTestHost.ResetLocale();
+        const string RunningTitle = "Upload to /srv: report.pdf";
+        const string FailedTitle = "Download to C:/Temp: backup.tar";
+
+        WpfTestHost.Invoke(() =>
+        {
+            EmbeddedSftpView owner = CreateRemoteView(new ListingBrowser());
+            Window window = new() { Content = owner, Width = 900, Height = 600, ShowActivated = false };
+            try
+            {
+                window.Show();
+                EmbeddedSftpViewModel viewModel = Assert.IsType<EmbeddedSftpViewModel>(owner.DataContext);
+                SftpTransferJob running = new(1, RunningTitle, ["C:/report.pdf"], "/srv");
+                SftpTransferJob failed = new(2, FailedTitle, Array.Empty<SftpFileInfo>(), "C:/Temp") { Status = SftpTransferJobStatus.Failed };
+                viewModel.TransferJobs.Add(running);
+                viewModel.TransferJobs.Add(failed);
+                viewModel.HasTransferJobs = true;
+                Pump();
+                owner.UpdateLayout();
+                Pump();
+
+                ItemsControl queue = (ItemsControl)owner.FindName("TransferJobList");
+                List<string> cancelNames = [];
+                List<string> retryNames = [];
+                foreach (Button button in FindVisibleButtons(queue))
+                {
+                    string name = AutomationProperties.GetName(button);
+                    (button.Command == viewModel.CancelJobCommand ? cancelNames : retryNames).Add(name);
+                }
+
+                string cancel = Assert.Single(cancelNames);
+                string retry = Assert.Single(retryNames);
+                Assert.Equal(WpfTestHost.Translate("SftpTransferCancelJobNamed").Replace("{0}", RunningTitle, StringComparison.Ordinal), cancel);
+                Assert.Equal(WpfTestHost.Translate("SftpTransferRetryNamed").Replace("{0}", FailedTitle, StringComparison.Ordinal), retry);
+                Assert.Contains("report.pdf", cancel, StringComparison.Ordinal);
+                Assert.Contains("backup.tar", retry, StringComparison.Ordinal);
+            }
+            finally
+            {
+                window.Close();
+                owner.Dispose();
+            }
+        });
+    }
+
     /// <summary>Positive control: without it a capture that heard nothing would pass every load above.</summary>
     [StaFact]
     [Trait("Category", "RequiresDesktop")]
@@ -243,6 +296,24 @@ public sealed class SftpBrowserViewsLoadTests
             DispatchProxy.Create<IDialogService, QuietProxy>(),
             new HostKeyStore());
         return owner;
+    }
+
+    private static IEnumerable<Button> FindVisibleButtons(DependencyObject root)
+    {
+        int count = System.Windows.Media.VisualTreeHelper.GetChildrenCount(root);
+        for (int index = 0; index < count; index++)
+        {
+            DependencyObject child = System.Windows.Media.VisualTreeHelper.GetChild(root, index);
+            if (child is Button { IsVisible: true } button)
+            {
+                yield return button;
+            }
+
+            foreach (Button nested in FindVisibleButtons(child))
+            {
+                yield return nested;
+            }
+        }
     }
 
     private static void Pump()

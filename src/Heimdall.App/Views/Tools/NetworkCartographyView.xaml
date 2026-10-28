@@ -84,7 +84,7 @@
                     <TextBox x:Name="TxtSubnet" Text="{Binding Subnet, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="180"
                              Style="{StaticResource WatermarkTextBoxStyle}"
                              Tag=""
-                             FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas"
+                             FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="{StaticResource FontFamilyMonospace}"
                              Padding="{StaticResource PaddingInput}"
                              Background="{DynamicResource CardBrush}"
                              Foreground="{DynamicResource TextPrimaryBrush}"
@@ -265,13 +265,13 @@
                 </Grid.RowDefinitions>
 
                 <WrapPanel Grid.Row="0" VerticalAlignment="Center">
-                    <TextBlock x:Name="TxtStats" Text="" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
+                    <TextBlock x:Name="TxtStats" Text="" FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}"
                                Foreground="{DynamicResource TextSecondaryBrush}"
                                VerticalAlignment="Center"/>
                     <TextBlock x:Name="TxtStatsSeparator" Text=" | " Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"
                                FontSize="{StaticResource FontSizeBody}" Margin="4,0"
                                Visibility="Collapsed"/>
-                    <TextBlock x:Name="TxtKbStats" Text="" FontSize="{StaticResource FontSizeCaption}" FontFamily="Consolas"
+                    <TextBlock x:Name="TxtKbStats" Text="" FontSize="{StaticResource FontSizeCaption}" FontFamily="{StaticResource FontFamilyMonospace}"
                                Foreground="{DynamicResource TextSecondaryBrush}"
                                VerticalAlignment="Center"/>
                     <Button x:Name="BtnClearKb" Content="" Click="OnClearKbClick"
@@ -317,7 +317,7 @@
                 Background="{DynamicResource SurfaceBrush}"
                 BorderBrush="{DynamicResource BorderStrongBrush}"
                 BorderThickness="0,1,0,0">
-            <TextBlock x:Name="TxtDiff" Text="" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
+            <TextBlock x:Name="TxtDiff" Text="" FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}"
                        Foreground="{DynamicResource AccentTextBrush}"
                        TextWrapping="Wrap"/>
         </Border>

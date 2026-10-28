@@ -213,27 +213,27 @@
                         AutomationProperties.AutomationId="ServiceStatus.CopyButton"
                         AutomationProperties.Name="{loc:Translate ToolServicesBtnCopy}"/>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock x:Name="LblTotal" Text="{loc:Translate ToolServicesTotal}" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
+                    <TextBlock x:Name="LblTotal" Text="{loc:Translate ToolServicesTotal}" FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}"
                                Foreground="{DynamicResource TextSecondaryBrush}" Margin="{StaticResource MarginInlineXs}"/>
-                    <TextBlock x:Name="TxtTotal" Text="-" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
+                    <TextBlock x:Name="TxtTotal" Text="-" FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}"
                                Foreground="{DynamicResource AccentTextBrush}" FontWeight="SemiBold"
                                AutomationProperties.AutomationId="ServiceStatus.TotalCount"/>
 
                     <TextBlock Text="  |  " FontSize="{StaticResource FontSizeBody}"
                                Foreground="{DynamicResource TextTertiaryBrush}"/>
 
-                    <TextBlock x:Name="LblRunning" Text="{loc:Translate ToolServicesRunningLabel}" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
+                    <TextBlock x:Name="LblRunning" Text="{loc:Translate ToolServicesRunningLabel}" FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}"
                                Foreground="{DynamicResource TextSecondaryBrush}" Margin="{StaticResource MarginInlineXs}"/>
-                    <TextBlock x:Name="TxtRunning" Text="-" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
+                    <TextBlock x:Name="TxtRunning" Text="-" FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}"
                                Foreground="{DynamicResource SuccessTextBrush}" FontWeight="SemiBold"
                                AutomationProperties.AutomationId="ServiceStatus.RunningCount"/>
 
                     <TextBlock Text="  |  " FontSize="{StaticResource FontSizeBody}"
                                Foreground="{DynamicResource TextTertiaryBrush}"/>
 
-                    <TextBlock x:Name="LblStopped" Text="{loc:Translate ToolServicesStoppedLabel}" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
+                    <TextBlock x:Name="LblStopped" Text="{loc:Translate ToolServicesStoppedLabel}" FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}"
                                Foreground="{DynamicResource TextSecondaryBrush}" Margin="{StaticResource MarginInlineXs}"/>
-                    <TextBlock x:Name="TxtStopped" Text="-" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
+                    <TextBlock x:Name="TxtStopped" Text="-" FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}"
                                Foreground="{DynamicResource ErrorTextBrush}" FontWeight="SemiBold"
                                AutomationProperties.AutomationId="ServiceStatus.StoppedCount"/>
                 </StackPanel>

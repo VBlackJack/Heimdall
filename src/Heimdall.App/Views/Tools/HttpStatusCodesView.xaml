@@ -118,7 +118,7 @@
                 <DataTemplate>
                     <DockPanel>
                         <TextBlock Text="{Binding Code}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="Bold"
-                                   FontFamily="Consolas" Width="40"
+                                   FontFamily="{StaticResource FontFamilyMonospace}" Width="40"
                                    Foreground="{Binding CategoryBrush}"
                                    VerticalAlignment="Center"/>
                         <StackPanel Margin="12,0,0,0">

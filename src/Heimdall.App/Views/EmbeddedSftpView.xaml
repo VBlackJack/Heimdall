@@ -860,10 +860,17 @@
                                             MinHeight="{StaticResource SftpFilterClearSize}"
                                             Padding="{StaticResource SftpIconButtonPadding}"
                                             ToolTip="{loc:Translate SftpTransferCancelJob}"
-                                            AutomationProperties.Name="{loc:Translate SftpTransferCancelJob}"
                                             Command="{Binding DataContext.CancelJobCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                             CommandParameter="{Binding}"
-                                            Visibility="{Binding CanCancel, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                            Visibility="{Binding CanCancel, Converter={StaticResource BoolToVisibilityConverter}}">
+                                            <!-- The job title carries the file names: without them every row announces the same button. -->
+                                            <AutomationProperties.Name>
+                                                <MultiBinding Converter="{StaticResource LocalizedFormatConverter}">
+                                                    <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[SftpTransferCancelJobNamed]"/>
+                                                    <Binding Path="Title"/>
+                                                </MultiBinding>
+                                            </AutomationProperties.Name>
+                                        </Button>
                                     <Button DockPanel.Dock="Right"
                                             Content="&#xE72C;"
                                             FontFamily="{StaticResource FontFamilyIcons}"
@@ -872,10 +879,17 @@
                                             MinHeight="{StaticResource SftpFilterClearSize}"
                                             Padding="{StaticResource SftpIconButtonPadding}"
                                             ToolTip="{loc:Translate SftpTransferRetry}"
-                                            AutomationProperties.Name="{loc:Translate SftpTransferRetry}"
                                             Command="{Binding DataContext.RetryJobCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                             CommandParameter="{Binding}"
-                                            Visibility="{Binding CanRetry, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                            Visibility="{Binding CanRetry, Converter={StaticResource BoolToVisibilityConverter}}">
+                                            <!-- The job title carries the file names: without them every row announces the same button. -->
+                                            <AutomationProperties.Name>
+                                                <MultiBinding Converter="{StaticResource LocalizedFormatConverter}">
+                                                    <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[SftpTransferRetryNamed]"/>
+                                                    <Binding Path="Title"/>
+                                                </MultiBinding>
+                                            </AutomationProperties.Name>
+                                        </Button>
                                     <TextBlock x:Name="JobGlyph"
                                                Text="&#xE823;"
                                                FontFamily="{StaticResource FontFamilyIcons}"

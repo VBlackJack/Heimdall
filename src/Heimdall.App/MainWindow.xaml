@@ -2384,7 +2384,7 @@
                                         <DataGridTextColumn x:Name="Mw_TpColLabel" Header="{loc:Translate TunnelPanelColLabel}" Binding="{Binding Label}" Width="90"/>
                                         <DataGridTextColumn x:Name="Mw_TpColLocal" Header="{loc:Translate TunnelPanelColLocal}" Binding="{Binding LocalPort}" Width="60"/>
                                         <DataGridTextColumn x:Name="Mw_TpColRemote" Header="{loc:Translate TunnelPanelColRemote}" Binding="{Binding RemoteHost}" Width="*"/>
-                                        <DataGridTextColumn x:Name="Mw_TpColPort" Header="{loc:Translate TunnelPanelColPort}" Binding="{Binding RemotePort}" Width="50"/>
+                                        <DataGridTextColumn x:Name="Mw_TpColPort" Header="{loc:Translate TunnelPanelColPort}" Binding="{Binding RemotePort}" Width="64"/>
                                         <DataGridTemplateColumn Header="" Width="28">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
@@ -2650,7 +2650,7 @@
                             </Style>
                         </DataGrid.RowStyle>
                         <DataGrid.Columns>
-                            <DataGridCheckBoxColumn x:Name="Mw_ScheduledColEnabled" Header="{loc:Translate ScheduledColEnabled}" Binding="{Binding Enabled, UpdateSourceTrigger=PropertyChanged}" Width="40"/>
+                            <DataGridCheckBoxColumn x:Name="Mw_ScheduledColEnabled" Header="{loc:Translate ScheduledColEnabled}" Binding="{Binding Enabled, UpdateSourceTrigger=PropertyChanged}" Width="60"/>
                             <DataGridTextColumn x:Name="Mw_ScheduledColServer" Header="{loc:Translate ScheduledColServer}" Binding="{Binding ServerName}" Width="*" IsReadOnly="True"/>
                             <DataGridTextColumn x:Name="Mw_ScheduledColType" Header="{loc:Translate ScheduledColType}" Binding="{Binding ConnectionType}" Width="70" IsReadOnly="True"/>
                             <DataGridTextColumn x:Name="Mw_ScheduledColSchedule" Header="{loc:Translate ScheduledColSchedule}" Width="*" IsReadOnly="True">
@@ -5869,7 +5869,7 @@
                                        Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,10"/>
                             <Grid>
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                                 <Grid.RowDefinitions>
@@ -5880,23 +5880,23 @@
                                     <RowDefinition Height="Auto"/>
                                 </Grid.RowDefinitions>
                                 <TextBlock x:Name="Mw_AboutRuntimeLabel" Grid.Row="0" Grid.Column="0" Text="{loc:Translate AboutLabelRuntime}"
-                                           FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,5"/>
+                                           FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,16,5"/>
                                 <TextBlock x:Name="AboutRuntimeText" Grid.Row="0" Grid.Column="1"
                                            FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,5"/>
                                 <TextBlock x:Name="Mw_AboutPlatformLabel" Grid.Row="1" Grid.Column="0" Text="{loc:Translate AboutLabelPlatform}"
-                                           FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,5"/>
+                                           FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,16,5"/>
                                 <TextBlock x:Name="AboutPlatformText" Grid.Row="1" Grid.Column="1"
                                            FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,5"/>
                                 <TextBlock Grid.Row="2" Grid.Column="0" Text="{loc:Translate AboutLabelWebView2}"
-                                           FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,5"/>
+                                           FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,16,5"/>
                                 <TextBlock x:Name="AboutWebView2Text" Grid.Row="2" Grid.Column="1"
                                            FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,5"/>
                                 <TextBlock Grid.Row="3" Grid.Column="0" Text="{loc:Translate AboutLabelSshNet}"
-                                           FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,5"/>
+                                           FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,16,5"/>
                                 <TextBlock x:Name="AboutSshNetText" Grid.Row="3" Grid.Column="1"
                                            FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,5"/>
                                 <TextBlock Grid.Row="4" Grid.Column="0" Text="{loc:Translate AboutLabelBuildDate}"
-                                           FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,0,5"/>
+                                           FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,16,5"/>
                                 <TextBlock x:Name="AboutBuildDateText" Grid.Row="4" Grid.Column="1"
                                            FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,5"/>
                             </Grid>

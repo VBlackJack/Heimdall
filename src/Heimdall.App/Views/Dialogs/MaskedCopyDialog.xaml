@@ -110,7 +110,8 @@
                     Orientation="Horizontal"
                     HorizontalAlignment="Right"
                     Margin="0,16,0,0">
-            <Button Content="{Binding CopyLabel}"
+            <Button x:Name="CopyButton"
+                    Content="{Binding CopyLabel}"
                     Command="{Binding CopyCommand}"
                     IsDefault="True"
                     MinWidth="110"

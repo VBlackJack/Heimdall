@@ -105,7 +105,7 @@
                              Padding="{StaticResource PaddingInput}"
                              Background="{DynamicResource CardBrush}"
                              BorderBrush="{DynamicResource BorderBrush}"
-                             FontFamily="Consolas"
+                             FontFamily="{StaticResource FontFamilyMonospace}"
                              FontSize="{StaticResource FontSizeBodyLarge}"
                              Foreground="{DynamicResource TextPrimaryBrush}"
                              Style="{StaticResource WatermarkTextBoxStyle}"
@@ -201,7 +201,7 @@
                                                        Text="{Binding DisplayName}"/>
                                             <TextBlock Margin="0,2,0,0"
                                                        FontSize="{StaticResource FontSizeCaption}"
-                                                       FontFamily="Consolas"
+                                                       FontFamily="{StaticResource FontFamilyMonospace}"
                                                        Foreground="{DynamicResource TextSecondaryBrush}"
                                                        Text="{Binding DisplayValue}"
                                                        TextWrapping="Wrap"/>
@@ -249,7 +249,7 @@
                                                        Text="{Binding DisplayName}"/>
                                             <TextBlock Margin="0,2,0,0"
                                                        FontSize="{StaticResource FontSizeCaption}"
-                                                       FontFamily="Consolas"
+                                                       FontFamily="{StaticResource FontFamilyMonospace}"
                                                        Foreground="{DynamicResource TextSecondaryBrush}"
                                                        Text="{Binding DisplayValue}"
                                                        TextWrapping="Wrap"/>
@@ -282,7 +282,7 @@
                                      AcceptsReturn="True"
                                      Background="Transparent"
                                      BorderThickness="0"
-                                     FontFamily="Consolas"
+                                     FontFamily="{StaticResource FontFamilyMonospace}"
                                      FontSize="{StaticResource FontSizeCaption}"
                                      Foreground="{DynamicResource TextPrimaryBrush}"
                                      IsReadOnly="True"
@@ -310,7 +310,7 @@
                 BorderBrush="{DynamicResource BorderStrongBrush}"
                 BorderThickness="0,1,0,0">
             <TextBlock x:Name="TxtStatus"
-                       FontFamily="Consolas"
+                       FontFamily="{StaticResource FontFamilyMonospace}"
                        FontSize="{StaticResource FontSizeBody}"
                        Foreground="{DynamicResource TextSecondaryBrush}"/>
         </Border>

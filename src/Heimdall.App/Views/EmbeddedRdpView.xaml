@@ -23,224 +23,15 @@
                 BorderThickness="0,0,0,1"
                 KeyboardNavigation.TabNavigation="Local"
                 KeyboardNavigation.ControlTabNavigation="Local">
-            <DockPanel LastChildFill="True">
-                <Button x:Name="ReconnectButton"
-                        DockPanel.Dock="Right"
-                        TabIndex="0"
-                        Content="{loc:Translate BtnReconnectSession}"
-                        Click="OnHeaderReconnectClick"
-                        ToolTip="{loc:Translate TooltipReconnectSession}"
-                        AutomationProperties.Name="{loc:Translate A11yReconnectSession}"
-                        Visibility="Collapsed"
-                        Style="{DynamicResource SecondaryButtonStyle}"
-                        MinHeight="{StaticResource SessionHeaderMinTarget}"
-                        Padding="8,2"
-                        FontSize="{StaticResource FontSizeCaption}"
-                        Margin="8,0,0,0"/>
-                <Button x:Name="DisconnectButton"
-                        DockPanel.Dock="Right"
-                        TabIndex="0"
-                        Content="{loc:Translate BtnDisconnectSession}"
-                        Click="OnDisconnectClick"
-                        ToolTip="{loc:Translate TooltipDisconnectSession}"
-                        AutomationProperties.Name="{loc:Translate A11yDisconnectSession}"
-                        Visibility="Collapsed"
-                        Style="{DynamicResource SecondaryButtonStyle}"
-                        MinHeight="{StaticResource SessionHeaderMinTarget}"
-                        Padding="8,2"
-                        FontSize="{StaticResource FontSizeCaption}"
-                        Margin="8,0,0,0"/>
-                <Button x:Name="CancelReconnectButton"
-                        DockPanel.Dock="Right"
-                        TabIndex="0"
-                        Content="{loc:Translate BtnCancelReconnect}"
-                        Click="OnCancelReconnectClick"
-                        ToolTip="{loc:Translate TooltipCancelReconnect}"
-                        AutomationProperties.Name="{loc:Translate A11yCancelReconnect}"
-                        Visibility="Collapsed"
-                        Style="{DynamicResource SecondaryButtonStyle}"
-                        MinHeight="{StaticResource SessionHeaderMinTarget}"
-                        Padding="8,2"
-                        FontSize="{StaticResource FontSizeCaption}"
-                        Margin="8,0,0,0"/>
-                <Button x:Name="CancelConnectButton"
-                        DockPanel.Dock="Right"
-                        TabIndex="0"
-                        Content="{loc:Translate BtnCancelConnect}"
-                        Click="OnCancelConnectClick"
-                        ToolTip="{loc:Translate TooltipCancelConnect}"
-                        AutomationProperties.Name="{loc:Translate A11yCancelConnect}"
-                        Visibility="Collapsed"
-                        Style="{DynamicResource SecondaryButtonStyle}"
-                        MinHeight="{StaticResource SessionHeaderMinTarget}"
-                        Padding="8,2"
-                        FontSize="{StaticResource FontSizeCaption}"
-                        Margin="8,0,0,0"/>
-                <Border AutomationProperties.AutomationId="Toolbar.SeparatorA-B"
-                        DockPanel.Dock="Right">
-                    <Border.Style>
-                        <Style TargetType="Border" BasedOn="{StaticResource ToolbarVerticalSeparatorStyle}">
-                            <Setter Property="Visibility" Value="Collapsed"/>
-                            <Style.Triggers>
-                                <DataTrigger Binding="{Binding Visibility, ElementName=DisconnectButton}" Value="Visible">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                </DataTrigger>
-                                <DataTrigger Binding="{Binding Visibility, ElementName=CancelReconnectButton}" Value="Visible">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                </DataTrigger>
-                                <DataTrigger Binding="{Binding Visibility, ElementName=CancelConnectButton}" Value="Visible">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                </DataTrigger>
-                                <DataTrigger Binding="{Binding Visibility, ElementName=ReconnectButton}" Value="Visible">
-                                    <Setter Property="Visibility" Value="Visible"/>
-                                </DataTrigger>
-                            </Style.Triggers>
-                        </Style>
-                    </Border.Style>
-                </Border>
-                <rdp:AutomationStackPanel x:Name="HealthDot"
-                            DockPanel.Dock="Right"
-                            Orientation="Horizontal"
-                            Margin="8,0,4,0"
-                            VerticalAlignment="Center"
-                            ToolTip="{loc:Translate TooltipHealthDot}"
-                            AutomationProperties.Name="{loc:Translate A11yHealthDot}"
-                            AutomationProperties.LiveSetting="Polite"
-                            Focusable="False"
-                            KeyboardNavigation.IsTabStop="False">
-                    <Border x:Name="HealthDotColor"
-                            Width="10"
-                            Height="10"
-                            CornerRadius="5"
-                            VerticalAlignment="Center"
-                            Background="{DynamicResource NeutralIndicatorBrush}"/>
-                    <TextBlock x:Name="HealthDotGlyph"
-                               FontFamily="{StaticResource FontFamilyIcons}"
-                               FontSize="{StaticResource FontSizeCaption}"
-                               Margin="2,0,0,0"
-                               VerticalAlignment="Center"
-                               Foreground="{DynamicResource NeutralIndicatorBrush}"/>
-                </rdp:AutomationStackPanel>
-                <Button x:Name="FullscreenButton"
-                        DockPanel.Dock="Right"
-                        TabIndex="1"
-                        Content="&#xE1D9;"
-                        FontFamily="{StaticResource FontFamilyIcons}"
-                        Click="OnFullscreenButtonClick"
-                        ToolTip="{loc:Translate TooltipFullscreenToggle}"
-                        AutomationProperties.Name="{loc:Translate A11yFullscreenToggle}"
-                        Style="{DynamicResource GhostButtonStyle}"
-                        Padding="6,2" MinWidth="{StaticResource SessionHeaderMinTarget}" MinHeight="{StaticResource SessionHeaderMinTarget}"
-                        FontSize="{StaticResource FontSizeBody}"
-                        Margin="4,0"/>
-                <Button x:Name="SendKeysButton"
-                        DockPanel.Dock="Right"
-                        TabIndex="2"
-                        Content="&#xE92E;"
-                        FontFamily="{StaticResource FontFamilyIcons}"
-                        Click="OnSendKeysButtonClick"
-                        ToolTip="{loc:Translate TooltipSendKeysMenu}"
-                        AutomationProperties.Name="{loc:Translate A11ySendKeysMenu}"
-                        Style="{DynamicResource GhostButtonStyle}"
-                        Padding="6,2" MinWidth="{StaticResource SessionHeaderMinTarget}" MinHeight="{StaticResource SessionHeaderMinTarget}"
-                        FontSize="{StaticResource FontSizeBody}"
-                        Margin="4,0">
-                    <Button.ContextMenu>
-                        <ContextMenu x:Name="SendKeysMenu" FontFamily="Segoe UI">
-                            <MenuItem x:Name="SendKeysCtrlAltDel"
-                                      Header="{loc:Translate RdpSendKeysCtrlAltDel}"
-                                      Click="OnSendKeysCtrlAltDelClick"/>
-                            <Separator/>
-                            <MenuItem x:Name="SendKeysWindows"
-                                      Header="{loc:Translate RdpSendKeysWindows}"
-                                      Click="OnSendKeysWindowsClick"/>
-                            <MenuItem x:Name="SendKeysAltTab"
-                                      Header="{loc:Translate RdpSendKeysAltTab}"
-                                      Click="OnSendKeysAltTabClick"/>
-                            <MenuItem x:Name="SendKeysCtrlEsc"
-                                      Header="{loc:Translate RdpSendKeysCtrlEsc}"
-                                      Click="OnSendKeysCtrlEscClick"/>
-                            <Separator/>
-                            <MenuItem x:Name="SendKeysPrintScreen"
-                                      Header="{loc:Translate RdpSendKeysPrintScreen}"
-                                      Click="OnSendKeysPrintScreenClick"/>
-                            <MenuItem x:Name="SendKeysEscape"
-                                      Header="{loc:Translate RdpSendKeysEscape}"
-                                      Click="OnSendKeysEscapeClick"/>
-                            <MenuItem x:Name="SendKeysF11"
-                                      Header="{loc:Translate RdpSendKeysF11}"
-                                      Click="OnSendKeysF11Click"/>
-                            <Separator/>
-                            <MenuItem x:Name="SendKeysWinL"
-                                      Header="{loc:Translate RdpSendKeysWinL}"
-                                      Click="OnSendKeysWinLClick"/>
-                            <MenuItem x:Name="SendKeysWinD"
-                                      Header="{loc:Translate RdpSendKeysWinD}"
-                                      Click="OnSendKeysWinDClick"/>
-                            <MenuItem x:Name="SendKeysWinE"
-                                      Header="{loc:Translate RdpSendKeysWinE}"
-                                      Click="OnSendKeysWinEClick"/>
-                            <Separator/>
-                            <MenuItem x:Name="SendKeysShortcutsHelp"
-                                      Header="{loc:Translate RdpShortcutsHelpMenuItem}"
-                                      Click="OnSendKeysShortcutsHelpClick"/>
-                        </ContextMenu>
-                    </Button.ContextMenu>
-                </Button>
-                <Button x:Name="SplitButton"
-                        DockPanel.Dock="Right"
-                        TabIndex="3"
-                        Content="&#xE8A9;"
-                        FontFamily="{StaticResource FontFamilyIcons}"
-                        Click="OnSplitClick"
-                        ToolTip="{loc:Translate TooltipSplitSession}"
-                        AutomationProperties.Name="{loc:Translate A11ySplitSession}"
-                        Style="{DynamicResource GhostButtonStyle}"
-                        Padding="6,2" MinWidth="{StaticResource SessionHeaderMinTarget}" MinHeight="{StaticResource SessionHeaderMinTarget}" FontSize="{StaticResource FontSizeBody}" Margin="4,0"/>
-                <Border Style="{StaticResource ToolbarVerticalSeparatorStyle}"
-                        AutomationProperties.AutomationId="Toolbar.SeparatorB-C"
-                        DockPanel.Dock="Right"/>
-                <Button x:Name="ResolutionButton"
-                        DockPanel.Dock="Right"
-                        TabIndex="4"
-                        Content="&#xE740;"
-                        FontFamily="{StaticResource FontFamilyIcons}"
-                        Style="{DynamicResource GhostButtonStyle}"
-                        AutomationProperties.Name="{loc:Translate A11yChangeResolution}"
-                        Padding="6,2" MinWidth="{StaticResource SessionHeaderMinTarget}" MinHeight="{StaticResource SessionHeaderMinTarget}" FontSize="{StaticResource FontSizeBody}" Margin="4,0"
-                        Click="OnResolutionButtonClick">
-                    <Button.ContextMenu>
-                        <ContextMenu x:Name="ResolutionMenu" FontFamily="Segoe UI">
-                            <MenuItem x:Name="ResMenuModeHeader"
-                                      IsEnabled="False"
-                                      IsHitTestVisible="False"
-                                      StaysOpenOnClick="True">
-                                <MenuItem.Header>
-                                    <TextBlock x:Name="ResMenuModeHeaderText"
-                                               FontWeight="SemiBold"
-                                               Foreground="{DynamicResource TextSecondaryBrush}"/>
-                                </MenuItem.Header>
-                            </MenuItem>
-                            <Separator x:Name="ResMenuModeHeaderSeparator"/>
-                            <MenuItem x:Name="ResMenuSkipStabilization"
-                                      Header="{loc:Translate RdpResolutionSkipStabilization}"
-                                      Click="OnSkipStabilizationClick"
-                                      Visibility="Collapsed"/>
-                            <Separator x:Name="ResMenuSkipStabilizationSeparator"
-                                       Visibility="Collapsed"/>
-                            <MenuItem x:Name="ResMenuFit"
-                                      Header="{loc:Translate RdpResolutionFitToWindow}"
-                                      Click="OnResolutionMenuClick"
-                                      Tag="Fit"/>
-                            <Separator x:Name="ResMenuPresetsSeparator"/>
-                            <!-- Preset items populated dynamically by PopulateResolutionMenu()
-                                 from AppSettings.RdpResolutionPresets, with a built-in fallback.
-                                 Everything after ResMenuPresetsSeparator is a preset. -->
-                        </ContextMenu>
-                    </Button.ContextMenu>
-                </Button>
-
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+            <!-- A grid, not a DockPanel: the title side is declared first, then the controls
+                 in screen order (left to right), so Tab follows the eye. A DockPanel stacks
+                 right-docked children from the right, which made Tab run right to left. -->
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                     <TextBlock x:Name="SessionTitleText"
                                FontSize="{StaticResource FontSizeBody}"
                                FontWeight="SemiBold"
@@ -381,7 +172,6 @@
                                 Background="{DynamicResource TextDisabledBrush}"/>
                     </rdp:AutomationStackPanel>
                     <Button x:Name="AntiIdleBadge"
-                            TabIndex="5"
                             Click="OnAntiIdleBadgeClick"
                             ToolTip="{loc:Translate TooltipAntiIdleActive}"
                             AutomationProperties.Name="{loc:Translate A11yAntiIdleActive}"
@@ -479,7 +269,208 @@
                         </StackPanel>
                     </rdp:AutomationBorder>
                 </StackPanel>
-            </DockPanel>
+
+                <StackPanel x:Name="HeaderControls"
+                            Grid.Column="1"
+                            Orientation="Horizontal">
+                    <Button x:Name="ResolutionButton"
+                            Content="&#xE740;"
+                            FontFamily="{StaticResource FontFamilyIcons}"
+                            Style="{DynamicResource GhostButtonStyle}"
+                            AutomationProperties.Name="{loc:Translate A11yChangeResolution}"
+                            Padding="6,2" MinWidth="{StaticResource SessionHeaderMinTarget}" MinHeight="{StaticResource SessionHeaderMinTarget}" FontSize="{StaticResource FontSizeBody}" Margin="4,0"
+                            Click="OnResolutionButtonClick">
+                        <Button.ContextMenu>
+                            <ContextMenu x:Name="ResolutionMenu" FontFamily="Segoe UI">
+                                <MenuItem x:Name="ResMenuModeHeader"
+                                          IsEnabled="False"
+                                          IsHitTestVisible="False"
+                                          StaysOpenOnClick="True">
+                                    <MenuItem.Header>
+                                        <TextBlock x:Name="ResMenuModeHeaderText"
+                                                   FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                    </MenuItem.Header>
+                                </MenuItem>
+                                <Separator x:Name="ResMenuModeHeaderSeparator"/>
+                                <MenuItem x:Name="ResMenuSkipStabilization"
+                                          Header="{loc:Translate RdpResolutionSkipStabilization}"
+                                          Click="OnSkipStabilizationClick"
+                                          Visibility="Collapsed"/>
+                                <Separator x:Name="ResMenuSkipStabilizationSeparator"
+                                           Visibility="Collapsed"/>
+                                <MenuItem x:Name="ResMenuFit"
+                                          Header="{loc:Translate RdpResolutionFitToWindow}"
+                                          Click="OnResolutionMenuClick"
+                                          Tag="Fit"/>
+                                <Separator x:Name="ResMenuPresetsSeparator"/>
+                                <!-- Preset items populated dynamically by PopulateResolutionMenu()
+                                     from AppSettings.RdpResolutionPresets, with a built-in fallback.
+                                     Everything after ResMenuPresetsSeparator is a preset. -->
+                            </ContextMenu>
+                        </Button.ContextMenu>
+                    </Button>
+                    <Border Style="{StaticResource ToolbarVerticalSeparatorStyle}"
+                            AutomationProperties.AutomationId="Toolbar.SeparatorB-C"/>
+                    <Button x:Name="SplitButton"
+                            Content="&#xE8A9;"
+                            FontFamily="{StaticResource FontFamilyIcons}"
+                            Click="OnSplitClick"
+                            ToolTip="{loc:Translate TooltipSplitSession}"
+                            AutomationProperties.Name="{loc:Translate A11ySplitSession}"
+                            Style="{DynamicResource GhostButtonStyle}"
+                            Padding="6,2" MinWidth="{StaticResource SessionHeaderMinTarget}" MinHeight="{StaticResource SessionHeaderMinTarget}" FontSize="{StaticResource FontSizeBody}" Margin="4,0"/>
+                    <Button x:Name="SendKeysButton"
+                            Content="&#xE92E;"
+                            FontFamily="{StaticResource FontFamilyIcons}"
+                            Click="OnSendKeysButtonClick"
+                            ToolTip="{loc:Translate TooltipSendKeysMenu}"
+                            AutomationProperties.Name="{loc:Translate A11ySendKeysMenu}"
+                            Style="{DynamicResource GhostButtonStyle}"
+                            Padding="6,2" MinWidth="{StaticResource SessionHeaderMinTarget}" MinHeight="{StaticResource SessionHeaderMinTarget}"
+                            FontSize="{StaticResource FontSizeBody}"
+                            Margin="4,0">
+                        <Button.ContextMenu>
+                            <ContextMenu x:Name="SendKeysMenu" FontFamily="Segoe UI">
+                                <MenuItem x:Name="SendKeysCtrlAltDel"
+                                          Header="{loc:Translate RdpSendKeysCtrlAltDel}"
+                                          Click="OnSendKeysCtrlAltDelClick"/>
+                                <Separator/>
+                                <MenuItem x:Name="SendKeysWindows"
+                                          Header="{loc:Translate RdpSendKeysWindows}"
+                                          Click="OnSendKeysWindowsClick"/>
+                                <MenuItem x:Name="SendKeysAltTab"
+                                          Header="{loc:Translate RdpSendKeysAltTab}"
+                                          Click="OnSendKeysAltTabClick"/>
+                                <MenuItem x:Name="SendKeysCtrlEsc"
+                                          Header="{loc:Translate RdpSendKeysCtrlEsc}"
+                                          Click="OnSendKeysCtrlEscClick"/>
+                                <Separator/>
+                                <MenuItem x:Name="SendKeysPrintScreen"
+                                          Header="{loc:Translate RdpSendKeysPrintScreen}"
+                                          Click="OnSendKeysPrintScreenClick"/>
+                                <MenuItem x:Name="SendKeysEscape"
+                                          Header="{loc:Translate RdpSendKeysEscape}"
+                                          Click="OnSendKeysEscapeClick"/>
+                                <MenuItem x:Name="SendKeysF11"
+                                          Header="{loc:Translate RdpSendKeysF11}"
+                                          Click="OnSendKeysF11Click"/>
+                                <Separator/>
+                                <MenuItem x:Name="SendKeysWinL"
+                                          Header="{loc:Translate RdpSendKeysWinL}"
+                                          Click="OnSendKeysWinLClick"/>
+                                <MenuItem x:Name="SendKeysWinD"
+                                          Header="{loc:Translate RdpSendKeysWinD}"
+                                          Click="OnSendKeysWinDClick"/>
+                                <MenuItem x:Name="SendKeysWinE"
+                                          Header="{loc:Translate RdpSendKeysWinE}"
+                                          Click="OnSendKeysWinEClick"/>
+                                <Separator/>
+                                <MenuItem x:Name="SendKeysShortcutsHelp"
+                                          Header="{loc:Translate RdpShortcutsHelpMenuItem}"
+                                          Click="OnSendKeysShortcutsHelpClick"/>
+                            </ContextMenu>
+                        </Button.ContextMenu>
+                    </Button>
+                    <Button x:Name="FullscreenButton"
+                            Content="&#xE1D9;"
+                            FontFamily="{StaticResource FontFamilyIcons}"
+                            Click="OnFullscreenButtonClick"
+                            ToolTip="{loc:Translate TooltipFullscreenToggle}"
+                            AutomationProperties.Name="{loc:Translate A11yFullscreenToggle}"
+                            Style="{DynamicResource GhostButtonStyle}"
+                            Padding="6,2" MinWidth="{StaticResource SessionHeaderMinTarget}" MinHeight="{StaticResource SessionHeaderMinTarget}"
+                            FontSize="{StaticResource FontSizeBody}"
+                            Margin="4,0"/>
+                    <rdp:AutomationStackPanel x:Name="HealthDot"
+                                Orientation="Horizontal"
+                                Margin="8,0,4,0"
+                                VerticalAlignment="Center"
+                                ToolTip="{loc:Translate TooltipHealthDot}"
+                                AutomationProperties.Name="{loc:Translate A11yHealthDot}"
+                                AutomationProperties.LiveSetting="Polite"
+                                Focusable="False"
+                                KeyboardNavigation.IsTabStop="False">
+                        <Border x:Name="HealthDotColor"
+                                Width="10"
+                                Height="10"
+                                CornerRadius="5"
+                                VerticalAlignment="Center"
+                                Background="{DynamicResource NeutralIndicatorBrush}"/>
+                        <TextBlock x:Name="HealthDotGlyph"
+                                   FontFamily="{StaticResource FontFamilyIcons}"
+                                   FontSize="{StaticResource FontSizeCaption}"
+                                   Margin="2,0,0,0"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource NeutralIndicatorBrush}"/>
+                    </rdp:AutomationStackPanel>
+                    <Border AutomationProperties.AutomationId="Toolbar.SeparatorA-B">
+                        <Border.Style>
+                            <Style TargetType="Border" BasedOn="{StaticResource ToolbarVerticalSeparatorStyle}">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Visibility, ElementName=DisconnectButton}" Value="Visible">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Visibility, ElementName=CancelReconnectButton}" Value="Visible">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Visibility, ElementName=CancelConnectButton}" Value="Visible">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding Visibility, ElementName=ReconnectButton}" Value="Visible">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                    </Border>
+                    <Button x:Name="CancelConnectButton"
+                            Content="{loc:Translate BtnCancelConnect}"
+                            Click="OnCancelConnectClick"
+                            ToolTip="{loc:Translate TooltipCancelConnect}"
+                            AutomationProperties.Name="{loc:Translate A11yCancelConnect}"
+                            Visibility="Collapsed"
+                            Style="{DynamicResource SecondaryButtonStyle}"
+                            MinHeight="{StaticResource SessionHeaderMinTarget}"
+                            Padding="8,2"
+                            FontSize="{StaticResource FontSizeCaption}"
+                            Margin="8,0,0,0"/>
+                    <Button x:Name="CancelReconnectButton"
+                            Content="{loc:Translate BtnCancelReconnect}"
+                            Click="OnCancelReconnectClick"
+                            ToolTip="{loc:Translate TooltipCancelReconnect}"
+                            AutomationProperties.Name="{loc:Translate A11yCancelReconnect}"
+                            Visibility="Collapsed"
+                            Style="{DynamicResource SecondaryButtonStyle}"
+                            MinHeight="{StaticResource SessionHeaderMinTarget}"
+                            Padding="8,2"
+                            FontSize="{StaticResource FontSizeCaption}"
+                            Margin="8,0,0,0"/>
+                    <Button x:Name="DisconnectButton"
+                            Content="{loc:Translate BtnDisconnectSession}"
+                            Click="OnDisconnectClick"
+                            ToolTip="{loc:Translate TooltipDisconnectSession}"
+                            AutomationProperties.Name="{loc:Translate A11yDisconnectSession}"
+                            Visibility="Collapsed"
+                            Style="{DynamicResource SecondaryButtonStyle}"
+                            MinHeight="{StaticResource SessionHeaderMinTarget}"
+                            Padding="8,2"
+                            FontSize="{StaticResource FontSizeCaption}"
+                            Margin="8,0,0,0"/>
+                    <Button x:Name="ReconnectButton"
+                            Content="{loc:Translate BtnReconnectSession}"
+                            Click="OnHeaderReconnectClick"
+                            ToolTip="{loc:Translate TooltipReconnectSession}"
+                            AutomationProperties.Name="{loc:Translate A11yReconnectSession}"
+                            Visibility="Collapsed"
+                            Style="{DynamicResource SecondaryButtonStyle}"
+                            MinHeight="{StaticResource SessionHeaderMinTarget}"
+                            Padding="8,2"
+                            FontSize="{StaticResource FontSizeCaption}"
+                            Margin="8,0,0,0"/>
+                </StackPanel>
+            </Grid>
         </Border>
 
         <Grid Grid.Row="1">

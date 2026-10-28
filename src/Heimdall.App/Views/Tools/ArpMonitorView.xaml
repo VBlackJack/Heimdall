@@ -254,12 +254,12 @@
                         VerticalAlignment="Center"
                         TabIndex="5"/>
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock x:Name="TxtTotal" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
+                    <TextBlock x:Name="TxtTotal" FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}"
                                Text="{Binding TotalText}"
                                Foreground="{DynamicResource TextSecondaryBrush}"/>
                     <TextBlock Text="  |  " FontSize="{StaticResource FontSizeBody}"
                                Foreground="{DynamicResource TextTertiaryBrush}"/>
-                    <TextBlock x:Name="TxtLastRefresh" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
+                    <TextBlock x:Name="TxtLastRefresh" FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}"
                                Text="{Binding LastRefreshText}"
                                Foreground="{DynamicResource TextSecondaryBrush}"/>
                 </StackPanel>

@@ -62,7 +62,7 @@
                     <TextBox x:Name="TxtHost" Text="" MinWidth="140"
                              Style="{StaticResource WatermarkTextBoxStyle}"
                              Tag=""
-                             FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas"
+                             FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="{StaticResource FontFamilyMonospace}"
                              Padding="{StaticResource PaddingInput}"
                              Background="{DynamicResource CardBrush}"
                              Foreground="{DynamicResource TextPrimaryBrush}"
@@ -79,7 +79,7 @@
                     <TextBox x:Name="TxtPorts" Text="" MinWidth="140"
                              Style="{StaticResource WatermarkTextBoxStyle}"
                              Tag=""
-                             FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas"
+                             FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="{StaticResource FontFamilyMonospace}"
                              Padding="{StaticResource PaddingInput}"
                              Background="{DynamicResource CardBrush}"
                              Foreground="{DynamicResource TextPrimaryBrush}"
@@ -275,21 +275,21 @@
                 </Grid.RowDefinitions>
 
                 <WrapPanel Grid.Row="0" VerticalAlignment="Center">
-                    <TextBlock x:Name="TxtOpen" Text="-" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
+                    <TextBlock x:Name="TxtOpen" Text="-" FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}"
                                Foreground="{DynamicResource SuccessTextBrush}" FontWeight="SemiBold"
                                Margin="{StaticResource MarginInlineXs}"/>
 
                     <TextBlock Text="  |  " FontSize="{StaticResource FontSizeBody}"
                                Foreground="{DynamicResource TextTertiaryBrush}"/>
 
-                    <TextBlock x:Name="TxtClosed" Text="-" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
+                    <TextBlock x:Name="TxtClosed" Text="-" FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}"
                                Foreground="{DynamicResource ErrorTextBrush}" FontWeight="SemiBold"
                                Margin="{StaticResource MarginInlineXs}"/>
 
                     <TextBlock Text="  |  " FontSize="{StaticResource FontSizeBody}"
                                Foreground="{DynamicResource TextTertiaryBrush}"/>
 
-                    <TextBlock x:Name="TxtTotal" Text="-" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
+                    <TextBlock x:Name="TxtTotal" Text="-" FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}"
                                Foreground="{DynamicResource AccentTextBrush}" FontWeight="SemiBold"
                                Margin="{StaticResource MarginInlineXs}"/>
                 </WrapPanel>

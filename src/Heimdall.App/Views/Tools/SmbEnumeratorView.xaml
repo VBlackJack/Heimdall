@@ -87,7 +87,7 @@
                              TabIndex="0"
                              Style="{StaticResource WatermarkTextBoxStyle}"
                              Tag=""
-                             FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas"
+                             FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="{StaticResource FontFamilyMonospace}"
                              Padding="{StaticResource PaddingInput}"
                              Background="{DynamicResource CardBrush}"
                              Foreground="{DynamicResource TextPrimaryBrush}"
@@ -155,43 +155,43 @@
                                            FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2"/>
                                 <TextBlock x:Name="ValComputerName" Grid.Row="0" Grid.Column="1"
                                            Text="{Binding Result.ComputerName, TargetNullValue=-, FallbackValue=-}"
-                                           FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,2"/>
+                                           FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,2"/>
 
                                 <TextBlock x:Name="LblDomain" Grid.Row="1" Grid.Column="0" Text=""
                                            FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2"/>
                                 <TextBlock x:Name="ValDomain" Grid.Row="1" Grid.Column="1"
                                            Text="{Binding Result.Domain, TargetNullValue=-, FallbackValue=-}"
-                                           FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,2"/>
+                                           FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,2"/>
 
                                 <TextBlock x:Name="LblDnsName" Grid.Row="2" Grid.Column="0" Text=""
                                            FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2"/>
                                 <TextBlock x:Name="ValDnsName" Grid.Row="2" Grid.Column="1"
                                            Text="{Binding Result.DnsName, TargetNullValue=-, FallbackValue=-}"
-                                           FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,2" TextWrapping="Wrap"/>
+                                           FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,2" TextWrapping="Wrap"/>
 
                                 <TextBlock x:Name="LblDnsDomain" Grid.Row="3" Grid.Column="0" Text=""
                                            FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2"/>
                                 <TextBlock x:Name="ValDnsDomain" Grid.Row="3" Grid.Column="1"
                                            Text="{Binding Result.DnsDomain, TargetNullValue=-, FallbackValue=-}"
-                                           FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,2" TextWrapping="Wrap"/>
+                                           FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,2" TextWrapping="Wrap"/>
 
                                 <TextBlock x:Name="LblForest" Grid.Row="4" Grid.Column="0" Text=""
                                            FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2"/>
                                 <TextBlock x:Name="ValForest" Grid.Row="4" Grid.Column="1"
                                            Text="{Binding Result.Forest, TargetNullValue=-, FallbackValue=-}"
-                                           FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,2" TextWrapping="Wrap"/>
+                                           FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,2" TextWrapping="Wrap"/>
 
                                 <TextBlock x:Name="LblOsBuild" Grid.Row="5" Grid.Column="0" Text=""
                                            FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2"/>
                                 <TextBlock x:Name="ValOsBuild" Grid.Row="5" Grid.Column="1"
                                            Text="{Binding Result.OsBuild, TargetNullValue=-, FallbackValue=-}"
-                                           FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,2"/>
+                                           FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,2"/>
 
                                 <TextBlock x:Name="LblMac" Grid.Row="6" Grid.Column="0" Text=""
                                            FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2"/>
                                 <TextBlock x:Name="ValMac" Grid.Row="6" Grid.Column="1"
                                            Text="{Binding Result.MacAddress, TargetNullValue=-, FallbackValue=-}"
-                                           FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,2"/>
+                                           FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,2"/>
                             </Grid>
                         </StackPanel>
                     </Border>
@@ -224,31 +224,31 @@
                                            FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2"/>
                                 <TextBlock x:Name="ValDialect" Grid.Row="0" Grid.Column="1"
                                            Text="{Binding Result.Dialect, TargetNullValue=-, FallbackValue=-}"
-                                           FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,2"/>
+                                           FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,2"/>
 
                                 <TextBlock x:Name="LblSigning" Grid.Row="1" Grid.Column="0" Text=""
                                            FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2"/>
                                 <TextBlock x:Name="ValSigning" Grid.Row="1" Grid.Column="1"
                                            Text="{Binding Result.SigningRequired, Converter={StaticResource BoolYesNo}}"
-                                           FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,2"/>
+                                           FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,2"/>
 
                                 <TextBlock x:Name="LblServerGuid" Grid.Row="2" Grid.Column="0" Text=""
                                            FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2"/>
                                 <TextBlock x:Name="ValServerGuid" Grid.Row="2" Grid.Column="1"
                                            Text="{Binding Result.ServerGuid, TargetNullValue=-, FallbackValue=-}"
-                                           FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,2" TextWrapping="Wrap"/>
+                                           FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,2" TextWrapping="Wrap"/>
 
                                 <TextBlock x:Name="LblSystemTime" Grid.Row="3" Grid.Column="0" Text=""
                                            FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2"/>
                                 <TextBlock x:Name="ValSystemTime" Grid.Row="3" Grid.Column="1"
                                            Text="{Binding Result.SystemTime, StringFormat={}{0:yyyy-MM-dd HH:mm:ss UTC}, TargetNullValue=-, FallbackValue=-}"
-                                           FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,2"/>
+                                           FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,2"/>
 
                                 <TextBlock x:Name="LblBootTime" Grid.Row="4" Grid.Column="0" Text=""
                                            FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2"/>
                                 <TextBlock x:Name="ValBootTime" Grid.Row="4" Grid.Column="1"
                                            Text="{Binding Result.BootTime, StringFormat={}{0:yyyy-MM-dd HH:mm:ss UTC}, TargetNullValue=-, FallbackValue=-}"
-                                           FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,2"/>
+                                           FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,2"/>
                             </Grid>
                         </StackPanel>
                     </Border>
@@ -307,7 +307,7 @@
                         Padding="{StaticResource PaddingButtonCopy}" DockPanel.Dock="Right"
                         VerticalAlignment="Center"/>
                 <TextBlock x:Name="TxtStatus" Text=""
-                           FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
+                           FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}"
                            Foreground="{DynamicResource TextSecondaryBrush}"
                            VerticalAlignment="Center"/>
             </DockPanel>

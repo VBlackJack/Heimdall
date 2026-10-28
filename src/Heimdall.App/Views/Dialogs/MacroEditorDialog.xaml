@@ -116,7 +116,7 @@
                                     <TextBox Text="{Binding InputText, UpdateSourceTrigger=PropertyChanged}"
                                              AutomationProperties.Name="{loc:Translate MacroEditorInputLabel}"
                                              Style="{StaticResource DialogFormTextBoxStyle}"
-                                             FontFamily="Consolas"
+                                             FontFamily="{StaticResource FontFamilyMonospace}"
                                              TextWrapping="NoWrap"
                                              HorizontalScrollBarVisibility="Auto"/>
                                     <TextBlock Text="{Binding InputValidationMessage}"
@@ -180,7 +180,7 @@
                                         <TextBox Text="{Binding ExpectPattern, UpdateSourceTrigger=PropertyChanged}"
                                                  AutomationProperties.Name="{loc:Translate MacroEditorExpectPattern}"
                                                  Style="{StaticResource DialogFormTextBoxStyle}"
-                                                 FontFamily="Consolas"/>
+                                                 FontFamily="{StaticResource FontFamilyMonospace}"/>
                                     </StackPanel>
 
                                     <StackPanel Grid.Column="1" Margin="0,0,12,0">

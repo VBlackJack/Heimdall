@@ -36,8 +36,7 @@
                         Click="OnHelpClick"
                         Style="{DynamicResource ToolHelpButtonStyle}"
                         Padding="{StaticResource PaddingButtonHelp}" FontSize="{StaticResource FontSizeBody}" FontWeight="Bold"
-                        Margin="{StaticResource MarginInlineControl}"
-                        TabIndex="11"/>
+                        Margin="{StaticResource MarginInlineControl}"/>
                 <TextBlock x:Name="HeaderTitle" Text=""
                            FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold"
                            Foreground="{DynamicResource TextPrimaryBrush}"
@@ -52,8 +51,7 @@
                         FontFamily="{StaticResource FontFamilyIcons}" FontSize="{StaticResource FontSizeBody}"
                         Click="OnCloseHelpClick"
                         Style="{DynamicResource ToolCloseHelpButtonStyle}"
-                        VerticalAlignment="Top"
-                        TabIndex="12"/>
+                        VerticalAlignment="Top"/>
                 <ScrollViewer MaxHeight="200" VerticalScrollBarVisibility="Auto">
                     <TextBlock x:Name="TxtHelpContent" Text="" TextWrapping="Wrap"
                                FontSize="{StaticResource FontSizeBody}"
@@ -72,28 +70,24 @@
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <Button x:Name="BtnProfileQuick" Click="OnProfileClick" Tag="quick"
                         Style="{DynamicResource PrimaryButtonStyle}"
-                        Padding="{StaticResource PaddingButtonPreset}" Margin="{StaticResource MarginInlineXs}" FontSize="{StaticResource FontSizeCaption}"
-                        TabIndex="4"/>
+                        Padding="{StaticResource PaddingButtonPreset}" Margin="{StaticResource MarginInlineXs}" FontSize="{StaticResource FontSizeCaption}"/>
                 <Button x:Name="BtnProfileExtended" Click="OnProfileClick" Tag="extended"
                         Style="{DynamicResource SecondaryButtonStyle}"
-                        Padding="{StaticResource PaddingButtonPreset}" Margin="{StaticResource MarginInlineXs}" FontSize="{StaticResource FontSizeCaption}"
-                        TabIndex="5"/>
+                        Padding="{StaticResource PaddingButtonPreset}" Margin="{StaticResource MarginInlineXs}" FontSize="{StaticResource FontSizeCaption}"/>
                 <Button x:Name="BtnProfileCustom" Click="OnProfileClick" Tag="custom"
                         Style="{DynamicResource SecondaryButtonStyle}"
-                        Padding="{StaticResource PaddingButtonPreset}" Margin="{StaticResource MarginInlineXs}" FontSize="{StaticResource FontSizeCaption}"
-                        TabIndex="6"/>
+                        Padding="{StaticResource PaddingButtonPreset}" Margin="{StaticResource MarginInlineXs}" FontSize="{StaticResource FontSizeCaption}"/>
                 <TextBox x:Name="TxtCustomPorts" Visibility="Collapsed"
                          Text="{Binding CustomPorts, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                          Width="260"
                          Style="{StaticResource WatermarkTextBoxStyle}"
                          Tag=""
-                         FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas"
+                         FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="{StaticResource FontFamilyMonospace}"
                          Padding="{StaticResource PaddingInput}" Margin="{StaticResource MarginInlineStart}"
                          Background="{DynamicResource CardBrush}"
                          Foreground="{DynamicResource TextPrimaryBrush}"
                          BorderBrush="{DynamicResource BorderBrush}"
-                         VerticalAlignment="Center"
-                         TabIndex="7"/>
+                         VerticalAlignment="Center"/>
             </StackPanel>
         </Border>
 
@@ -123,40 +117,43 @@
                 <TextBlock x:Name="LblHost" Text=""
                            FontSize="{StaticResource FontSizeBody}" Margin="{StaticResource MarginLabelBottom}"
                            Foreground="{DynamicResource TextSecondaryBrush}"/>
-                <DockPanel Margin="{StaticResource MarginStackItem}">
-                    <Button x:Name="BtnCheck" DockPanel.Dock="Right"
-                            Content="" Click="OnCheckClick"
-                            Style="{DynamicResource PrimaryButtonStyle}"
-                            Padding="{StaticResource PaddingButtonPrimary}" Margin="{StaticResource MarginInlineControl}"
-                            VerticalAlignment="Center"
-                            TabIndex="2"/>
-                    <TextBox x:Name="TxtPort" DockPanel.Dock="Right"
-                             Text="{Binding Port, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="70"
-                             Style="{StaticResource WatermarkTextBoxStyle}"
-                             Tag=""
-                             FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas"
-                             Padding="{StaticResource PaddingInput}" Margin="{StaticResource MarginInlineControl}"
-                             Background="{DynamicResource CardBrush}"
-                             Foreground="{DynamicResource TextPrimaryBrush}"
-                             BorderBrush="{DynamicResource BorderBrush}"
-                             VerticalAlignment="Center"
-                             TabIndex="1"/>
-                    <TextBlock DockPanel.Dock="Right" Text=":"
-                               FontSize="{StaticResource FontSizeBodyLarge}" Margin="{StaticResource MarginInlineStart}"
-                               Foreground="{DynamicResource TextSecondaryBrush}"
-                               VerticalAlignment="Center"/>
-                    <TextBox x:Name="TxtHost"
+                <Grid Margin="{StaticResource MarginStackItem}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox Grid.Column="0" x:Name="TxtHost"
                              Text="{Binding Host, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                              Style="{StaticResource WatermarkTextBoxStyle}"
                              Tag=""
-                             FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas"
+                             FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="{StaticResource FontFamilyMonospace}"
                              Padding="{StaticResource PaddingInput}"
                              Background="{DynamicResource CardBrush}"
                              Foreground="{DynamicResource TextPrimaryBrush}"
                              BorderBrush="{DynamicResource BorderBrush}"
-                             VerticalAlignment="Center"
-                             TabIndex="0"/>
-                </DockPanel>
+                             VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1" Text=":"
+                               FontSize="{StaticResource FontSizeBodyLarge}" Margin="{StaticResource MarginInlineStart}"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               VerticalAlignment="Center"/>
+                    <TextBox Grid.Column="2" x:Name="TxtPort"
+                             Text="{Binding Port, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="70"
+                             Style="{StaticResource WatermarkTextBoxStyle}"
+                             Tag=""
+                             FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="{StaticResource FontFamilyMonospace}"
+                             Padding="{StaticResource PaddingInput}" Margin="{StaticResource MarginInlineControl}"
+                             Background="{DynamicResource CardBrush}"
+                             Foreground="{DynamicResource TextPrimaryBrush}"
+                             BorderBrush="{DynamicResource BorderBrush}"
+                             VerticalAlignment="Center"/>
+                    <Button Grid.Column="3" x:Name="BtnCheck"
+                            Content="" Click="OnCheckClick"
+                            Style="{DynamicResource PrimaryButtonStyle}"
+                            Padding="{StaticResource PaddingButtonPrimary}" Margin="{StaticResource MarginInlineControl}"
+                            VerticalAlignment="Center"/>
+                </Grid>
 
                 <!-- Route via gateway -->
                 <DockPanel Margin="{StaticResource MarginStackItem}">
@@ -168,8 +165,7 @@
                               Background="{DynamicResource CardBrush}"
                               Foreground="{DynamicResource TextPrimaryBrush}"
                               BorderBrush="{DynamicResource BorderBrush}"
-                              VerticalAlignment="Center"
-                              TabIndex="3"/>
+                              VerticalAlignment="Center"/>
                 </DockPanel>
 
                 <!-- Error message -->
@@ -237,46 +233,46 @@
                             <TextBlock x:Name="LblSubject" Grid.Row="0" Grid.Column="0" Text=""
                                        FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Top"/>
                             <TextBlock x:Name="TxtSubject" Grid.Row="0" Grid.Column="2" Text=""
-                                       FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas" Foreground="{DynamicResource TextPrimaryBrush}"
+                                       FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="{StaticResource FontFamilyMonospace}" Foreground="{DynamicResource TextPrimaryBrush}"
                                        TextWrapping="Wrap" VerticalAlignment="Center"/>
 
                             <TextBlock x:Name="LblIssuer" Grid.Row="2" Grid.Column="0" Text=""
                                        FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Top"/>
                             <TextBlock x:Name="TxtIssuer" Grid.Row="2" Grid.Column="2" Text=""
-                                       FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas" Foreground="{DynamicResource TextPrimaryBrush}"
+                                       FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="{StaticResource FontFamilyMonospace}" Foreground="{DynamicResource TextPrimaryBrush}"
                                        TextWrapping="Wrap" VerticalAlignment="Center"/>
 
                             <TextBlock x:Name="LblValidFrom" Grid.Row="4" Grid.Column="0" Text=""
                                        FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
                             <TextBlock x:Name="TxtValidFrom" Grid.Row="4" Grid.Column="2" Text=""
-                                       FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                       FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="{StaticResource FontFamilyMonospace}" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
 
                             <TextBlock x:Name="LblValidTo" Grid.Row="6" Grid.Column="0" Text=""
                                        FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
                             <TextBlock x:Name="TxtValidTo" Grid.Row="6" Grid.Column="2" Text=""
-                                       FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                       FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="{StaticResource FontFamilyMonospace}" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
 
                             <TextBlock x:Name="LblSerial" Grid.Row="8" Grid.Column="0" Text=""
                                        FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
                             <TextBlock x:Name="TxtSerial" Grid.Row="8" Grid.Column="2" Text=""
-                                       FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas" Foreground="{DynamicResource TextPrimaryBrush}"
+                                       FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="{StaticResource FontFamilyMonospace}" Foreground="{DynamicResource TextPrimaryBrush}"
                                        TextWrapping="Wrap" VerticalAlignment="Center"/>
 
                             <TextBlock x:Name="LblThumbprint" Grid.Row="10" Grid.Column="0" Text=""
                                        FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
                             <TextBlock x:Name="TxtThumbprint" Grid.Row="10" Grid.Column="2" Text=""
-                                       FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas" Foreground="{DynamicResource TextPrimaryBrush}"
+                                       FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="{StaticResource FontFamilyMonospace}" Foreground="{DynamicResource TextPrimaryBrush}"
                                        TextWrapping="Wrap" VerticalAlignment="Center"/>
 
                             <TextBlock x:Name="LblSigAlg" Grid.Row="12" Grid.Column="0" Text=""
                                        FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
                             <TextBlock x:Name="TxtSigAlg" Grid.Row="12" Grid.Column="2" Text=""
-                                       FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                       FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="{StaticResource FontFamilyMonospace}" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
 
                             <TextBlock x:Name="LblKeySize" Grid.Row="14" Grid.Column="0" Text=""
                                        FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
                             <TextBlock x:Name="TxtKeySize" Grid.Row="14" Grid.Column="2" Text=""
-                                       FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas" Foreground="{DynamicResource AccentTextBrush}"
+                                       FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="{StaticResource FontFamilyMonospace}" Foreground="{DynamicResource AccentTextBrush}"
                                        FontWeight="SemiBold" VerticalAlignment="Center"/>
 
                             <TextBlock x:Name="LblSans" Grid.Row="16" Grid.Column="0" Text=""
@@ -284,7 +280,7 @@
                             <ItemsControl x:Name="SansList" Grid.Row="16" Grid.Column="2">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <TextBlock Text="{Binding}" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
+                                        <TextBlock Text="{Binding}" FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}"
                                                    Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,1"/>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
@@ -304,7 +300,7 @@
                                            FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextSecondaryBrush}"
                                            VerticalAlignment="Center" Width="120"/>
                                 <TextBlock x:Name="TxtTlsVersion" Text=""
-                                           FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas"
+                                           FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="{StaticResource FontFamilyMonospace}"
                                            Foreground="{DynamicResource AccentTextBrush}"
                                            FontWeight="SemiBold" VerticalAlignment="Center"/>
                             </DockPanel>
@@ -334,7 +330,7 @@
                                                 BorderThickness="0,0,0,1"
                                                 Padding="0,4" Margin="{StaticResource MarginLabelBottom}">
                                             <StackPanel>
-                                                <TextBlock Text="{Binding Subject}" FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
+                                                <TextBlock Text="{Binding Subject}" FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}"
                                                            Foreground="{DynamicResource TextPrimaryBrush}" TextWrapping="Wrap"/>
                                                 <TextBlock Text="{Binding Expiry}" FontSize="{StaticResource FontSizeCaption}"
                                                            Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0"/>
@@ -351,8 +347,7 @@
                             Visibility="Collapsed"
                             Style="{DynamicResource SecondaryButtonStyle}"
                             Padding="{StaticResource PaddingButtonCopy}" Margin="{StaticResource MarginSectionTop}"
-                            HorizontalAlignment="Left"
-                            TabIndex="8"/>
+                            HorizontalAlignment="Left"/>
                 </StackPanel>
 
                 <!-- ===== Multi-port scan results ===== -->
@@ -417,42 +412,42 @@
                                             <TextBlock Grid.Row="0" Grid.Column="0" Text="{Binding SubjectLabel}"
                                                        FontSize="{StaticResource FontSizeCaption}" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Top"/>
                                             <TextBlock Grid.Row="0" Grid.Column="2" Text="{Binding Subject}"
-                                                       FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas" Foreground="{DynamicResource TextPrimaryBrush}" TextWrapping="Wrap"/>
+                                                       FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}" Foreground="{DynamicResource TextPrimaryBrush}" TextWrapping="Wrap"/>
 
                                             <TextBlock Grid.Row="2" Grid.Column="0" Text="{Binding IssuerLabel}"
                                                        FontSize="{StaticResource FontSizeCaption}" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Top"/>
                                             <TextBlock Grid.Row="2" Grid.Column="2" Text="{Binding Issuer}"
-                                                       FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas" Foreground="{DynamicResource TextPrimaryBrush}" TextWrapping="Wrap"/>
+                                                       FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}" Foreground="{DynamicResource TextPrimaryBrush}" TextWrapping="Wrap"/>
 
                                             <TextBlock Grid.Row="4" Grid.Column="0" Text="{Binding ValidFromLabel}"
                                                        FontSize="{StaticResource FontSizeCaption}" Foreground="{DynamicResource TextSecondaryBrush}"/>
                                             <TextBlock Grid.Row="4" Grid.Column="2" Text="{Binding ValidFrom}"
-                                                       FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                       FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}" Foreground="{DynamicResource TextPrimaryBrush}"/>
 
                                             <TextBlock Grid.Row="6" Grid.Column="0" Text="{Binding ValidToLabel}"
                                                        FontSize="{StaticResource FontSizeCaption}" Foreground="{DynamicResource TextSecondaryBrush}"/>
                                             <TextBlock Grid.Row="6" Grid.Column="2" Text="{Binding ValidTo}"
-                                                       FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                       FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}" Foreground="{DynamicResource TextPrimaryBrush}"/>
 
                                             <TextBlock Grid.Row="8" Grid.Column="0" Text="{Binding SerialLabel}"
                                                        FontSize="{StaticResource FontSizeCaption}" Foreground="{DynamicResource TextSecondaryBrush}"/>
                                             <TextBlock Grid.Row="8" Grid.Column="2" Text="{Binding Serial}"
-                                                       FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas" Foreground="{DynamicResource TextPrimaryBrush}" TextWrapping="Wrap"/>
+                                                       FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}" Foreground="{DynamicResource TextPrimaryBrush}" TextWrapping="Wrap"/>
 
                                             <TextBlock Grid.Row="10" Grid.Column="0" Text="{Binding ThumbprintLabel}"
                                                        FontSize="{StaticResource FontSizeCaption}" Foreground="{DynamicResource TextSecondaryBrush}"/>
                                             <TextBlock Grid.Row="10" Grid.Column="2" Text="{Binding Thumbprint}"
-                                                       FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas" Foreground="{DynamicResource TextPrimaryBrush}" TextWrapping="Wrap"/>
+                                                       FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}" Foreground="{DynamicResource TextPrimaryBrush}" TextWrapping="Wrap"/>
 
                                             <TextBlock Grid.Row="12" Grid.Column="0" Text="{Binding SigAlgorithmLabel}"
                                                        FontSize="{StaticResource FontSizeCaption}" Foreground="{DynamicResource TextSecondaryBrush}"/>
                                             <TextBlock Grid.Row="12" Grid.Column="2" Text="{Binding SigAlgorithm}"
-                                                       FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas" Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                                       FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}" Foreground="{DynamicResource TextPrimaryBrush}"/>
 
                                             <TextBlock Grid.Row="14" Grid.Column="0" Text="{Binding KeySizeLabel}"
                                                        FontSize="{StaticResource FontSizeCaption}" Foreground="{DynamicResource TextSecondaryBrush}"/>
                                             <TextBlock Grid.Row="14" Grid.Column="2" Text="{Binding KeySizeText}"
-                                                       FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas" Foreground="{DynamicResource AccentTextBrush}" FontWeight="SemiBold"/>
+                                                       FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}" Foreground="{DynamicResource AccentTextBrush}" FontWeight="SemiBold"/>
                                         </Grid>
 
                                         <!-- TLS version + hostname match -->
@@ -461,7 +456,7 @@
                                                        FontSize="{StaticResource FontSizeCaption}" Foreground="{DynamicResource TextSecondaryBrush}"
                                                        VerticalAlignment="Center" Width="90"/>
                                             <TextBlock Text="{Binding TlsVersion}"
-                                                       FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
+                                                       FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}"
                                                        Foreground="{DynamicResource AccentTextBrush}" FontWeight="SemiBold"
                                                        VerticalAlignment="Center"/>
                                         </DockPanel>
@@ -478,7 +473,7 @@
                                             <ItemsControl ItemsSource="{Binding Sans}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
-                                                        <TextBlock Text="{Binding}" FontSize="{StaticResource FontSizeCaption}" FontFamily="Consolas"
+                                                        <TextBlock Text="{Binding}" FontSize="{StaticResource FontSizeCaption}" FontFamily="{StaticResource FontFamilyMonospace}"
                                                                    Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,1"/>
                                                     </DataTemplate>
                                                 </ItemsControl.ItemTemplate>
@@ -496,7 +491,7 @@
                                                         <Border BorderBrush="{DynamicResource BorderBrush}"
                                                                 BorderThickness="0,0,0,1" Padding="0,2" Margin="0,0,0,2">
                                                             <StackPanel>
-                                                                <TextBlock Text="{Binding Subject}" FontSize="{StaticResource FontSizeCaption}" FontFamily="Consolas"
+                                                                <TextBlock Text="{Binding Subject}" FontSize="{StaticResource FontSizeCaption}" FontFamily="{StaticResource FontFamilyMonospace}"
                                                                            Foreground="{DynamicResource TextPrimaryBrush}" TextWrapping="Wrap"/>
                                                                 <TextBlock Text="{Binding Expiry}" FontSize="{StaticResource FontSizeSmallCaption}"
                                                                            Foreground="{DynamicResource TextSecondaryBrush}"/>
@@ -513,22 +508,25 @@
                     </ItemsControl>
 
                     <!-- Footer: summary + actions -->
-                    <DockPanel x:Name="ScanFooterPanel" Visibility="Collapsed" Margin="{StaticResource MarginSectionBottom}">
-                        <Button x:Name="BtnExportCsv" DockPanel.Dock="Right"
-                                Click="OnExportCsvClick"
-                                Style="{DynamicResource SecondaryButtonStyle}"
-                                Padding="{StaticResource PaddingButtonCopy}" Margin="{StaticResource MarginInlineControl}"
-                                TabIndex="10"/>
-                        <Button x:Name="BtnCopyAll" DockPanel.Dock="Right"
-                                Click="OnCopyAllClick"
-                                Style="{DynamicResource SecondaryButtonStyle}"
-                                Padding="{StaticResource PaddingButtonCopy}"
-                                TabIndex="9"/>
-                        <TextBlock x:Name="TxtScanSummary" Text=""
+                    <Grid x:Name="ScanFooterPanel" Visibility="Collapsed" Margin="{StaticResource MarginSectionBottom}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" x:Name="TxtScanSummary" Text=""
                                    FontSize="{StaticResource FontSizeBody}"
                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                    VerticalAlignment="Center"/>
-                    </DockPanel>
+                        <Button Grid.Column="1" x:Name="BtnCopyAll"
+                                Click="OnCopyAllClick"
+                                Style="{DynamicResource SecondaryButtonStyle}"
+                                Padding="{StaticResource PaddingButtonCopy}"/>
+                        <Button Grid.Column="2" x:Name="BtnExportCsv"
+                                Click="OnExportCsvClick"
+                                Style="{DynamicResource SecondaryButtonStyle}"
+                                Padding="{StaticResource PaddingButtonCopy}" Margin="{StaticResource MarginInlineControl}"/>
+                    </Grid>
                 </StackPanel>
 
             </StackPanel>

@@ -72,7 +72,7 @@
                              Background="{DynamicResource CardBrush}"
                              BorderBrush="{DynamicResource BorderBrush}"
                              FontSize="{StaticResource FontSizeBodyLarge}"
-                             FontFamily="Consolas"
+                             FontFamily="{StaticResource FontFamilyMonospace}"
                              Foreground="{DynamicResource TextPrimaryBrush}"
                              Style="{StaticResource WatermarkTextBoxStyle}"
                              TabIndex="0"
@@ -196,7 +196,7 @@
                                                     Grid.Column="0"
                                                     Orientation="Horizontal"
                                                     VerticalAlignment="Center">
-                                            <TextBlock FontFamily="Consolas"
+                                            <TextBlock FontFamily="{StaticResource FontFamilyMonospace}"
                                                        FontSize="{StaticResource FontSizeBodyLarge}"
                                                        FontWeight="Bold"
                                                        Foreground="{DynamicResource TextPrimaryBrush}"
@@ -221,7 +221,7 @@
                                                 CornerRadius="{StaticResource CornerRadiusXs}"
                                                 HorizontalAlignment="Right"
                                                 VerticalAlignment="Center">
-                                            <TextBlock FontFamily="Consolas"
+                                            <TextBlock FontFamily="{StaticResource FontFamilyMonospace}"
                                                        FontSize="{StaticResource FontSizeBody}"
                                                        FontWeight="Bold"
                                                        Foreground="{DynamicResource TextOnAccentBrush}"
@@ -244,7 +244,7 @@
                                                    FontSize="{StaticResource FontSizeCaption}"
                                                    Foreground="{DynamicResource TextSecondaryBrush}">
                                             <Run Text="{Binding AffectedLabel, Mode=OneTime}" />
-                                            <Run FontFamily="Consolas"
+                                            <Run FontFamily="{StaticResource FontFamilyMonospace}"
                                                  Text="{Binding AffectedVersions, Mode=OneTime}" />
                                         </TextBlock>
                                     </Grid>

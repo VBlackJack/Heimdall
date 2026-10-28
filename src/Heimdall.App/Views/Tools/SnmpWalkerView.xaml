@@ -53,7 +53,7 @@
                         <TextBox x:Name="TxtHost" Text="" MinWidth="140"
                                  Style="{StaticResource WatermarkTextBoxStyle}"
                                  Tag=""
-                                 FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas"
+                                 FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="{StaticResource FontFamilyMonospace}"
                                  Padding="{StaticResource PaddingInput}"
                                  Background="{DynamicResource CardBrush}"
                                  Foreground="{DynamicResource TextPrimaryBrush}"
@@ -69,7 +69,7 @@
                         <TextBox x:Name="TxtCommunity" Text="" MinWidth="120"
                                  Style="{StaticResource WatermarkTextBoxStyle}"
                                  Tag=""
-                                 FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas"
+                                 FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="{StaticResource FontFamilyMonospace}"
                                  Padding="{StaticResource PaddingInput}"
                                  Background="{DynamicResource CardBrush}"
                                  Foreground="{DynamicResource TextPrimaryBrush}"
@@ -85,7 +85,7 @@
                         <TextBox x:Name="TxtOid" Text="" MinWidth="140"
                                  Style="{StaticResource WatermarkTextBoxStyle}"
                                  Tag=""
-                                 FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas"
+                                 FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="{StaticResource FontFamilyMonospace}"
                                  Padding="{StaticResource PaddingInput}"
                                  Background="{DynamicResource CardBrush}"
                                  Foreground="{DynamicResource TextPrimaryBrush}"
@@ -255,7 +255,7 @@
                                     Background="{DynamicResource CardBrush}"
                                     BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="{Binding Community}" FontFamily="Consolas"
+                                    <TextBlock Text="{Binding Community}" FontFamily="{StaticResource FontFamilyMonospace}"
                                                FontSize="{StaticResource FontSizeCaption}" FontWeight="SemiBold"
                                                Foreground="{DynamicResource TextPrimaryBrush}" Margin="{StaticResource MarginLabelInline}"/>
                                     <TextBlock Text="{Binding Status}"
@@ -291,7 +291,7 @@
                         VerticalAlignment="Center"
                         TabIndex="13"/>
                 <TextBlock x:Name="TxtStatus" Text=""
-                           FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
+                           FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}"
                            Foreground="{DynamicResource TextSecondaryBrush}"
                            VerticalAlignment="Center"/>
             </DockPanel>

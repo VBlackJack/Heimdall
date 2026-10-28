@@ -16,6 +16,7 @@
 <UserControl x:Class="Heimdall.App.Views.Tools.MilkdownEditorControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:Heimdall.App.Localization"
              xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf">
     <Grid>
         <!-- The name belongs to the web view, which is what takes the focus; the host sets it once on
@@ -26,7 +27,7 @@
 
         <Border x:Name="LoadingPanel"
                 Background="{DynamicResource SurfaceBrush}">
-            <TextBlock Text="..."
+            <TextBlock Text="{loc:Translate ToolNotesEditorLoading}"
                        HorizontalAlignment="Center"
                        VerticalAlignment="Center"
                        Foreground="{DynamicResource TextSecondaryBrush}"

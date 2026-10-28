@@ -73,7 +73,7 @@
                                  Style="{StaticResource WatermarkTextBoxStyle}"
                                  Tag="{Binding HostWatermark}"
                                  Text="{Binding Host, UpdateSourceTrigger=PropertyChanged}"
-                                 FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas"
+                                 FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="{StaticResource FontFamilyMonospace}"
                                  Padding="{StaticResource PaddingInput}"
                                  Background="{DynamicResource CardBrush}"
                                  Foreground="{DynamicResource TextPrimaryBrush}"
@@ -90,7 +90,7 @@
                                    VerticalAlignment="Center" Margin="{StaticResource MarginLabelInline}"/>
                         <TextBox x:Name="TxtPort" Width="70"
                                  Text="{Binding Port, UpdateSourceTrigger=PropertyChanged}"
-                                 FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas"
+                                 FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="{StaticResource FontFamilyMonospace}"
                                  Padding="{StaticResource PaddingInput}"
                                  Background="{DynamicResource CardBrush}"
                                  Foreground="{DynamicResource TextPrimaryBrush}"
@@ -107,7 +107,7 @@
                                    VerticalAlignment="Center" Margin="{StaticResource MarginLabelInline}"/>
                         <TextBox x:Name="TxtCount" Width="50"
                                  Text="{Binding Count, UpdateSourceTrigger=PropertyChanged}"
-                                 FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas"
+                                 FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="{StaticResource FontFamilyMonospace}"
                                  Padding="{StaticResource PaddingInput}"
                                  Background="{DynamicResource CardBrush}"
                                  Foreground="{DynamicResource TextPrimaryBrush}"
@@ -177,7 +177,7 @@
                           Padding="8,4">
                 <TextBox x:Name="TxtResults"
                          Text="{Binding Results}"
-                         FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
+                         FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}"
                          Foreground="{DynamicResource TextPrimaryBrush}"
                          Background="Transparent" BorderThickness="0"
                          IsReadOnly="True" TextWrapping="Wrap"
@@ -194,7 +194,7 @@
                 BorderThickness="0,1,0,0">
             <TextBlock x:Name="TxtSummary"
                        Text="{Binding SummaryText}"
-                       FontSize="{StaticResource FontSizeBody}" FontFamily="Consolas"
+                       FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}"
                        Foreground="{DynamicResource TextSecondaryBrush}"
                        VerticalAlignment="Center"/>
         </Border>

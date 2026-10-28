@@ -90,7 +90,8 @@
             </Grid>
         </ScrollViewer>
 
-        <Button Grid.Row="2"
+        <Button x:Name="CloseButton"
+                Grid.Row="2"
                 Content="{Binding CloseLabel}"
                 IsDefault="True"
                 IsCancel="True"

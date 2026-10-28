@@ -111,7 +111,7 @@
                      AutomationProperties.Name="{loc:Translate ToolDnsBatchInputPlaceholder}"
                      Background="{DynamicResource CardBrush}"
                      BorderBrush="{DynamicResource BorderBrush}"
-                     FontFamily="Consolas"
+                     FontFamily="{StaticResource FontFamilyMonospace}"
                      FontSize="{StaticResource FontSizeBody}"
                      Foreground="{DynamicResource TextPrimaryBrush}"
                      Padding="{StaticResource PaddingInput}"
@@ -222,7 +222,7 @@
                         TabIndex="3"
                         AutomationProperties.Name="{loc:Translate ToolBtnCopyToClipboard}"/>
                 <TextBlock x:Name="TxtStatus"
-                           FontFamily="Consolas"
+                           FontFamily="{StaticResource FontFamilyMonospace}"
                            FontSize="{StaticResource FontSizeBody}"
                            Foreground="{DynamicResource TextSecondaryBrush}"
                            Text="{Binding StatusText}"

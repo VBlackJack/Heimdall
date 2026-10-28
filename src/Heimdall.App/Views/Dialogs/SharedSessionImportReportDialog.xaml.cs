@@ -28,5 +28,6 @@ public partial class SharedSessionImportReportDialog : Window
     {
         InitializeComponent();
         WindowThemeHelper.ApplyCurrentTheme(this);
+        Loaded += (_, _) => CloseButton.Focus();
     }
 }
