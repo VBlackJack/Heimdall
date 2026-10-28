@@ -28,8 +28,19 @@ namespace Heimdall.App.Services;
 public sealed class TaskSchedulerService : IDisposable
 {
     private const int TickIntervalMs = 60_000;
-    private const string ScheduleIntervalFormat = "Every {0} min";
-    private const string ScheduleDailyFormat = "Daily {0}";
+    private const string TimeOfDayFormat = "hh\\:mm";
+
+    /// <summary>
+    /// Interval used when a task of the Interval type records no positive interval. Shared with
+    /// the schedule text so the grid describes the cadence the scheduler actually applies.
+    /// </summary>
+    internal const int DefaultIntervalMinutes = 60;
+
+    /// <summary>
+    /// Time of day used when a Daily task records no parseable time. Shared with the schedule
+    /// text for the same reason as <see cref="DefaultIntervalMinutes"/>.
+    /// </summary>
+    internal const string DefaultTimeOfDay = "08:00";
 
     private readonly System.Threading.Timer _timer;
     private readonly SemaphoreSlim _tickGuard = new(1, 1);
@@ -183,14 +194,13 @@ public sealed class TaskSchedulerService : IDisposable
     {
         if (string.Equals(task.ScheduleType, nameof(ScheduleType.Interval), StringComparison.OrdinalIgnoreCase))
         {
-            var interval = task.IntervalMinutes > 0 ? task.IntervalMinutes : 60;
+            var interval = task.IntervalMinutes > 0 ? task.IntervalMinutes : DefaultIntervalMinutes;
             task.NextRun = fromTime.AddMinutes(interval);
-            task.Schedule = string.Format(CultureInfo.CurrentCulture, ScheduleIntervalFormat, interval);
         }
         else
         {
             // Daily schedule
-            if (TimeSpan.TryParseExact(task.TimeOfDay, "hh\\:mm", CultureInfo.InvariantCulture, out var timeOfDay)
+            if (TimeSpan.TryParseExact(task.TimeOfDay, TimeOfDayFormat, CultureInfo.InvariantCulture, out var timeOfDay)
                 || TimeSpan.TryParse(task.TimeOfDay, CultureInfo.InvariantCulture, out timeOfDay))
             {
                 var candidate = fromTime.Date.Add(timeOfDay);
@@ -202,14 +212,12 @@ public sealed class TaskSchedulerService : IDisposable
                 }
 
                 task.NextRun = candidate;
-                task.Schedule = string.Format(CultureInfo.CurrentCulture, ScheduleDailyFormat, task.TimeOfDay);
             }
             else
             {
                 // Fallback: schedule for next day at 08:00
                 task.NextRun = fromTime.Date.AddDays(1).AddHours(8);
-                task.Schedule = string.Format(CultureInfo.CurrentCulture, ScheduleDailyFormat, "08:00");
-                FileLogger.Warn($"Invalid TimeOfDay '{task.TimeOfDay}' for task '{task.ServerName}', defaulting to 08:00.");
+                FileLogger.Warn($"Invalid TimeOfDay '{task.TimeOfDay}' for task '{task.ServerName}', defaulting to {DefaultTimeOfDay}.");
             }
         }
     }

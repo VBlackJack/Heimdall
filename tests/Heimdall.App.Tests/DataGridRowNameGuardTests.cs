@@ -123,7 +123,11 @@ public sealed class DataGridRowNameGuardTests
                 }
 
                 string name = key.Groups[1].Value;
-                int supplied = multi.Elements(Xaml + "Binding").Count() - 1;
+                // A slot may be filled by a nested MultiBinding (a value computed from several
+                // bindings, such as a schedule described from its type, interval and time), so
+                // both element kinds count as one value each.
+                int supplied = multi.Elements(Xaml + "Binding").Count()
+                    + multi.Elements(Xaml + "MultiBinding").Count() - 1;
 
                 foreach (var (locale, table) in new[] { ("en", en), ("fr", fr) })
                 {

@@ -31,6 +31,7 @@
             <converters:TunnelBadgeStateToBrushConverter x:Key="TunnelBadgeStateToBrushConverter"/>
             <converters:AccessibleRowNameConverter x:Key="AccessibleRowNameConverter"/>
             <converters:LocalizedFormatConverter x:Key="LocalizedFormatConverter"/>
+            <converters:ScheduledTaskScheduleConverter x:Key="ScheduledTaskScheduleConverter"/>
             <converters:AccessibleStateNameConverter x:Key="AccessibleStateNameConverter"/>
             <converters:BoolToLocalizedKeyConverter x:Key="ShareFolderLabelConverter"
                                                     FalseKey="ToolsShareFolder"
