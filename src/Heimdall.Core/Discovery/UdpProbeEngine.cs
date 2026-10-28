@@ -18,6 +18,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using Heimdall.Core.Logging;
+using Heimdall.Core.Network;
 
 namespace Heimdall.Core.Discovery;
 
@@ -186,7 +187,7 @@ public static class UdpProbeEngine
 
         for (var i = 0; i < nameCount && offset + 18 <= data.Length; i++)
         {
-            var entryName = Encoding.ASCII.GetString(data, offset, 15).TrimEnd();
+            var entryName = ReplyText.Clean(Encoding.ASCII.GetString(data, offset, 15));
             var suffix = data[offset + 15];
             var flags = (ushort)((data[offset + 16] << 8) | data[offset + 17]);
             var isGroup = (flags & 0x8000) != 0;
@@ -268,6 +269,9 @@ public static class UdpProbeEngine
             return null;
         }
     }
+
+    /// <summary>sysServices is a seven-bit OSI layer mask (RFC 1213).</summary>
+    private const int MaxSysServices = 127;
 
     // OIDs for system group queries
     private static readonly int[][] SnmpOids =
@@ -373,10 +377,10 @@ public static class UdpProbeEngine
                                     sysObjectId = Asn1DecodeOid(valContent);
                                     break;
                                 case 4 when valueTag == 0x43: // TimeTicks (sysUpTime)
-                                    sysUpTime = Asn1DecodeUnsignedInt(valContent) / 100; // centiseconds → seconds
+                                    sysUpTime = TryDecodeUnsignedInt(valContent, uint.MaxValue) / 100; // centiseconds → seconds
                                     break;
                                 case 5 when valueTag == 0x02: // INTEGER (sysServices)
-                                    sysServices = (int)Asn1DecodeUnsignedInt(valContent);
+                                    sysServices = (int?)TryDecodeUnsignedInt(valContent, MaxSysServices);
                                     break;
                             }
                         }
@@ -883,41 +887,8 @@ public static class UdpProbeEngine
     /// Reads a TLV (Tag-Length-Value) structure from an ASN.1 buffer.
     /// Returns the total consumed length and the value bytes.
     /// </summary>
-    private static (int TotalLength, byte[]? Value) Asn1ReadTlv(byte[] data, int offset)
-    {
-        if (offset >= data.Length) return (0, null);
-
-        var start = offset;
-        offset++; // Skip tag
-
-        if (offset >= data.Length) return (offset - start, null);
-
-        // Read length
-        int length;
-        if ((data[offset] & 0x80) == 0)
-        {
-            length = data[offset];
-            offset++;
-        }
-        else
-        {
-            var numBytes = data[offset] & 0x7F;
-            offset++;
-            length = 0;
-            for (var i = 0; i < numBytes && offset < data.Length; i++)
-            {
-                length = (length << 8) | data[offset];
-                offset++;
-            }
-        }
-
-        if (offset + length > data.Length)
-            length = data.Length - offset;
-
-        var value = new byte[length];
-        Array.Copy(data, offset, value, 0, length);
-        return (offset - start + length, value);
-    }
+    private static (int TotalLength, byte[]? Value) Asn1ReadTlv(byte[] data, int offset) =>
+        SnmpCodec.Asn1ReadTlv(data, offset);
 
     /// <summary>
     /// Decodes a BER-encoded OID value (content bytes only, without tag/length).
@@ -946,15 +917,22 @@ public static class UdpProbeEngine
     }
 
     /// <summary>
-    /// Decodes a BER-encoded unsigned integer (TimeTicks, Counter, Gauge, INTEGER).
+    /// Decodes a BER-encoded unsigned integer (TimeTicks, Counter, Gauge, INTEGER), or null when
+    /// it would wrap around or is larger than <paramref name="max"/>.
     /// </summary>
-    private static long Asn1DecodeUnsignedInt(byte[] content)
+    private static long? TryDecodeUnsignedInt(byte[] content, long max)
     {
         long result = 0;
         foreach (var b in content)
         {
+            if (result > (long.MaxValue >> 8))
+            {
+                return null;
+            }
+
             result = (result << 8) | b;
         }
-        return result;
+
+        return result <= max ? result : null;
     }
 }
