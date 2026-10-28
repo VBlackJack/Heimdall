@@ -120,6 +120,15 @@ jobs:
           ./scripts/Test-WebView2RuntimeGate.ps1
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      # Pure PowerShell over fixture signatures: Setup-WebView2.ps1 runs a downloaded
+      # bootstrapper only from a private folder and only when Microsoft Corporation
+      # signed it.
+      - name: Check the verified installer helpers
+        shell: pwsh
+        run: |
+          ./scripts/Test-VerifiedInstaller.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       # Pure PowerShell over recorded git and gh outputs: a release ships only a
       # clean master that origin and CI agree on, and its tag is pinned.
       - name: Check the release preflight
