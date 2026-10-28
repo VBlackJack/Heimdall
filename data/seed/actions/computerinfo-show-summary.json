@@ -60,6 +60,10 @@
         "Get-ComputerInfo -Property WindowsProductName,WindowsVersion,OsArchitecture": "Affiche l'édition, la version et l'architecture",
         "Get-ComputerInfo": "Collecte toutes les propriétés (prend plusieurs secondes)"
       }
+    },
+    "es": {
+      "title": "Mostrar un resumen del sistema",
+      "description": "Muestra el nombre, la edición, la compilación, el dominio, la memoria, el último arranque y el tiempo de actividad del equipo."
     }
   }
 }

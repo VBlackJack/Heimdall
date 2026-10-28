@@ -75,6 +75,10 @@
       "examples": {
         "sqlcmd -S PROD-SQL-01 -U sa -P Password123 -Q \"SELECT name, state_desc FROM sys.databases\"": "Liste l'état de toutes les bases de données (Online, Recovery, Suspect)."
       }
+    },
+    "es": {
+      "title": "Consultar SQL Server (sqlcmd)",
+      "description": "Ejecuta una consulta T-SQL en un Microsoft SQL Server desde la línea de comandos."
     }
   }
 }

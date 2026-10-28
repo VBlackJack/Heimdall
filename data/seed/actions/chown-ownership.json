@@ -138,6 +138,10 @@
         "sudo chown -h jdupont:users /tmp/mylink": "Changer le propriétaire d'un lien symbolique",
         "sudo chown root:root /etc/cron.d/mycron": "Rend un fichier système à root"
       }
+    },
+    "es": {
+      "title": "Cambiar el propietario de un archivo",
+      "description": "Cambia el propietario (usuario y/o grupo) de un archivo o directorio"
     }
   }
 }

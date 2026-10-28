@@ -111,6 +111,10 @@
         "$cert = Get-ChildItem -Path Cert:\\LocalMachine\\My\\A1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q7R8S9T0; Export-Certificate -Cert $cert -FilePath 'C:\\Export\\certificate.cer' | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
         "$cert = Get-ChildItem -Path Cert:\\LocalMachine\\My\\A1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q7R8S9T0; Export-Certificate -Cert $cert -FilePath 'C:\\Export\\certificate.cer' | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
       }
+    },
+    "es": {
+      "title": "Exportar un certificado",
+      "description": "Exporta un certificado del almacén de Windows a un archivo .cer o .pfx."
     }
   }
 }

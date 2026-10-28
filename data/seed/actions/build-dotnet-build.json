@@ -133,6 +133,10 @@
         "dotnet build": "Compiler le projet",
         "dotnet test": "Exécuter les tests"
       }
+    },
+    "es": {
+      "title": "Compilar un proyecto .NET",
+      "description": "Compila un proyecto o una solución de .NET."
     }
   }
 }

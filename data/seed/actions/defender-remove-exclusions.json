@@ -82,6 +82,10 @@
         "$exclusions = Get-MpPreference | Select-Object -ExpandProperty ExclusionPath; $exclusions": "Liste les exclusions actuelles avant suppression",
         "Remove-MpPreference -ExclusionPath \"C:\\Projects\\MyApp\"": "Exemple utilisant le paramètre 'folderPath': Chemin du dossier à retirer des exclusions. Remplacez C:\\Projects\\MyApp par la valeur appropriée selon votre environnement."
       }
+    },
+    "es": {
+      "title": "Quitar una exclusión de Defender",
+      "description": "Quita una carpeta, un archivo o un proceso de la lista de exclusiones de Windows Defender."
     }
   }
 }

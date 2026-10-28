@@ -105,6 +105,10 @@
         "mysqladmin -u root -p processlist": "Affiche la liste des requêtes en cours d'exécution (équivalent de SHOW PROCESSLIST). Utile pour détecter les blocages.",
         "mysqladmin -u root -p status": "Affiche les statistiques vitales (Uptime, Threads, Slow queries)."
       }
+    },
+    "es": {
+      "title": "Comprobar el estado de MySQL (mysqladmin)",
+      "description": "Comprueba si el servidor MySQL está activo y responde."
     }
   }
 }

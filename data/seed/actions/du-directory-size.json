@@ -107,6 +107,10 @@
         "du -sm /var/* | sort -rn": "Taille en Mo de chaque dossier dans /var",
         "du -sh /var/log/* | sort -hr | head": "Top fichiers"
       }
+    },
+    "es": {
+      "title": "Calcular el tamaño de un directorio",
+      "description": "Calcula el espacio en disco que usa un directorio y sus subdirectorios"
     }
   }
 }

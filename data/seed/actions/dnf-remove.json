@@ -83,6 +83,10 @@
         "sudo dnf remove -y nginx --dry-run": "Simulation sans exécution réelle (dry-run). --dry-run affiche ce qui serait fait sans appliquer les changements. INDISPENSABLE avant les opérations de masse ou les modifications critiques.",
         "sudo dnf remove mariadb": "Désinstaller MariaDB"
       }
+    },
+    "es": {
+      "title": "Desinstalar un paquete con DNF",
+      "description": "Quita un paquete instalado con DNF"
     }
   }
 }

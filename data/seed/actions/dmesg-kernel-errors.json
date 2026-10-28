@@ -106,6 +106,10 @@
         "dmesg | grep -i error": "Filtrer les erreurs",
         "dmesg -l err,warn": "Afficher erreurs et warnings seulement"
       }
+    },
+    "es": {
+      "title": "Mostrar los mensajes del kernel",
+      "description": "Lee los mensajes del kernel de Linux, útil para diagnosticar problemas de hardware y de controladores"
     }
   }
 }

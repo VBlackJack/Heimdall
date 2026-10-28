@@ -78,6 +78,10 @@
         "cat /etc/crontab": "Afficher le crontab système",
         "ls -la /etc/cron.d/": "Fichiers cron.d"
       }
+    },
+    "es": {
+      "title": "Listar las tareas de cron",
+      "description": "Muestra las tareas programadas de cron del usuario"
     }
   }
 }

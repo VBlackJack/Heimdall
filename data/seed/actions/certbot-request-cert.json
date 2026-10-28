@@ -94,6 +94,10 @@
         "sudo certbot certonly --webroot -w /var/www/html -d www.example.com": "Valide via des fichiers déposés dans la racine web",
         "sudo certbot certificates": "Liste les certificats gérés par certbot et leur expiration"
       }
+    },
+    "es": {
+      "title": "Solicitar un certificado de Let's Encrypt",
+      "description": "Obtiene un certificado de Let's Encrypt para un dominio sin cambiar la configuración del servidor web."
     }
   }
 }

@@ -231,6 +231,10 @@
         "dig google.com +trace": "Trace complète de la résolution DNS depuis les root servers. Le flag +trace affiche chaque étape de la récursion DNS : root → TLD (.com) → domaine autoritaire. Extrêmement utile pour diagnostiquer les problèmes de délégation DNS, comprendre la hiérarchie DNS et identifier où une résolution échoue.",
         "dig @8.8.8.8 example.com MX": "Requête MX via DNS Google"
       }
+    },
+    "es": {
+      "title": "Consultar un registro DNS",
+      "description": "Ejecuta una consulta DNS para resolver un nombre de dominio o consultar un tipo de registro concreto."
     }
   }
 }

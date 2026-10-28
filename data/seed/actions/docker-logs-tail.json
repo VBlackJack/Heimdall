@@ -104,6 +104,10 @@
         "docker logs --tail 50 -f web_server": "Suivi en temps réel (-f) des 50 dernières lignes de logs.",
         "docker logs --since 30m db_server": "Affiche uniquement les logs générés depuis 30 minutes."
       }
+    },
+    "es": {
+      "title": "Mostrar los registros de un contenedor (docker logs)",
+      "description": "Muestra los registros de salida estándar (stdout/stderr) de un contenedor."
     }
   }
 }

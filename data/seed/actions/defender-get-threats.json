@@ -53,6 +53,10 @@
         "(Get-MpThreat).Count": "Compte le nombre total de menaces détectées",
         "Get-MpThreatDetection": "Affiche l'historique détaillé de toutes les détections avec actions"
       }
+    },
+    "es": {
+      "title": "Listar las amenazas detectadas por Defender",
+      "description": "Muestra el historial de las amenazas detectadas y bloqueadas por Windows Defender."
     }
   }
 }

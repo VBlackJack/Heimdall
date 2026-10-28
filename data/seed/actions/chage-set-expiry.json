@@ -88,6 +88,10 @@
         "sudo chage -M 90 -W 14 alice": "Impose un nouveau mot de passe tous les 90 jours avec un préavis de 14 jours",
         "sudo chage -d 0 alice": "Force un changement de mot de passe à la prochaine connexion"
       }
+    },
+    "es": {
+      "title": "Establecer la fecha de caducidad de una cuenta",
+      "description": "Establece la fecha a partir de la cual una cuenta local ya no puede iniciar sesión."
     }
   }
 }

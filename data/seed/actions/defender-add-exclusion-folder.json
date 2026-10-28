@@ -94,6 +94,10 @@
         "Get-MpPreference | Select-Object -ExpandProperty ExclusionPath": "Liste toutes les exclusions de dossiers actuelles",
         "Add-MpPreference -ExclusionPath \"C:\\Projects\\MyApp\"": "Exemple utilisant le paramètre 'folderPath': Chemin complet du dossier à exclure. Remplacez C:\\Projects\\MyApp par la valeur appropriée selon votre environnement."
       }
+    },
+    "es": {
+      "title": "Añadir una exclusión de carpeta a Defender",
+      "description": "Excluye una carpeta del análisis en tiempo real de Windows Defender (mejora el rendimiento)."
     }
   }
 }

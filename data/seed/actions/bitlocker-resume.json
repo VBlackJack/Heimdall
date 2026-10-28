@@ -75,6 +75,10 @@
         "Resume-BitLocker -MountPoint C:; Get-BitLockerVolume C: | Select-Object MountPoint,ProtectionStatus": "Réactive BitLocker puis vérifie que la protection est bien active",
         "Resume-BitLocker -MountPoint \"D:\"": "Réactive la protection BitLocker après une suspension temporaire."
       }
+    },
+    "es": {
+      "title": "Reanudar la protección de BitLocker",
+      "description": "Reanuda la protección de BitLocker tras una suspensión temporal."
     }
   }
 }

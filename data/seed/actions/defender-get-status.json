@@ -65,6 +65,10 @@
         "Get-MpComputerStatus | Select-Object QuickScanStartTime,QuickScanEndTime,FullScanStartTime,FullScanEndTime": "Affiche les dates des dernières analyses rapides et complètes",
         "Get-MpComputerStatus | Select-Object AMEngineVersion,AMProductVersion,AMServiceEnabled": "Vérifie les versions du moteur antimalware et du service"
       }
+    },
+    "es": {
+      "title": "Obtener el estado completo de Windows Defender",
+      "description": "Muestra el estado detallado de Windows Defender (protección en tiempo real, definiciones, último análisis y más)."
     }
   }
 }

@@ -58,6 +58,10 @@
         "npm install --production": "Installe uniquement les dépendances de production",
         "npm ci": "Installation propre pour CI/CD"
       }
+    },
+    "es": {
+      "title": "Instalar las dependencias de npm",
+      "description": "Instala las dependencias de Node.js de un proyecto."
     }
   }
 }

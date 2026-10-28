@@ -116,6 +116,10 @@
         "Get-WinEvent -FilterHashtable @{LogName='System'; ProviderName='Microsoft-Windows-GroupPolicy'; Level=2} -MaxEvents 20": "Affiche les 20 dernières erreurs de stratégie de groupe",
         "Get-WinEvent -ListProvider * -ErrorAction SilentlyContinue | Where-Object Name -like '*Dfs*'": "Trouve le nom exact d'un fournisseur"
       }
+    },
+    "es": {
+      "title": "Filtrar eventos por proveedor y nivel",
+      "description": "Muestra los eventos de un proveedor con un nivel de gravedad concreto en un registro durante las últimas horas."
     }
   }
 }

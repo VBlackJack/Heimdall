@@ -59,6 +59,10 @@
         "Update-MpSignature -UpdateSource MMPC": "Met à jour depuis le Microsoft Malware Protection Center (backup)",
         "Update-MpSignature; Get-MpComputerStatus | Select-Object AntivirusSignatureVersion,AntivirusSignatureLastUpdated": "Met à jour puis affiche la version des signatures installées"
       }
+    },
+    "es": {
+      "title": "Actualizar las definiciones de Windows Defender",
+      "description": "Fuerza una actualización inmediata de las firmas del antivirus y del antimalware de Defender."
     }
   }
 }

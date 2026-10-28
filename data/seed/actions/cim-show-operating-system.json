@@ -59,6 +59,10 @@
         "(Get-Date) - (Get-CimInstance -ClassName Win32_OperatingSystem).LastBootUpTime": "Affiche la durée de fonctionnement de cet ordinateur sous forme de durée",
         "Get-CimInstance -ClassName Win32_OperatingSystem | Select-Object CSName,@{Name='FreeMemoryGB';Expression={[math]::Round($_.FreePhysicalMemory/1MB,1)}}": "Affiche la mémoire physique libre en gigaoctets"
       }
+    },
+    "es": {
+      "title": "Mostrar el sistema operativo y el tiempo de actividad",
+      "description": "Muestra la edición, la versión, la compilación, la fecha de instalación, el último arranque y el tiempo de actividad de Windows mediante CIM."
     }
   }
 }

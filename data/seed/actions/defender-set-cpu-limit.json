@@ -81,6 +81,10 @@
         "Set-MpPreference -ScanAvgCPULoadFactor 100": "Pas de limite CPU (scan le plus rapide, PC peut ralentir beaucoup)",
         "Get-MpPreference | Select-Object ScanAvgCPULoadFactor": "Affiche la limite CPU actuelle"
       }
+    },
+    "es": {
+      "title": "Limitar el uso de CPU de Defender",
+      "description": "Establece el uso máximo de CPU para los análisis de Windows Defender."
     }
   }
 }

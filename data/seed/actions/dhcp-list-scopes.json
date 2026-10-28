@@ -77,6 +77,10 @@
         "Get-DhcpServerv4Scope -ComputerName DHCP01 | Where-Object State -eq 'InActive'": "Trouve les étendues désactivées",
         "Get-DhcpServerInDC": "Affiche les serveurs DHCP autorisés dans Active Directory"
       }
+    },
+    "es": {
+      "title": "Listar los ámbitos DHCP",
+      "description": "Muestra los ámbitos IPv4 de un servidor DHCP con su intervalo, la duración de la concesión y su estado."
     }
   }
 }

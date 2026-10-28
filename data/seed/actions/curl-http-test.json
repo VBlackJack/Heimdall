@@ -102,6 +102,10 @@
         "curl -k https://dev-interne.local": "Ignore les erreurs de certificat SSL (-k)",
         "curl -L -v https://google.com": "Suit les redirections (-L) et affiche le détail de la connexion SSL (-v)"
       }
+    },
+    "es": {
+      "title": "Probar una petición HTTP",
+      "description": "Envía una petición HTTP/HTTPS y muestra la respuesta"
     }
   }
 }

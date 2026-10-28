@@ -93,6 +93,10 @@
         "certutil -addstore Root 'C:\\Certs\\rootCA.cer'": "Alternative avec certutil pour certificat racine",
         "Import-Certificate -FilePath 'C:\\Certs\\server.pfx' -CertStoreLocation Cert:\\LocalMachine\\My": "Exemple utilisant le paramètre 'storeName': Nom du magasin (My, Root, CA, TrustedPublisher). Remplacez My par la valeur appropriée selon votre environnement."
       }
+    },
+    "es": {
+      "title": "Importar un certificado",
+      "description": "Importa un certificado (.cer, .pfx, .p12) en un almacén de certificados de Windows concreto."
     }
   }
 }

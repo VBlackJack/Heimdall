@@ -92,6 +92,10 @@
         "docker-compose logs -f": "Suivre les logs de tous les services",
         "docker-compose ps": "État des services"
       }
+    },
+    "es": {
+      "title": "Iniciar una pila de Docker Compose",
+      "description": "Inicia todos los servicios definidos en un archivo docker-compose.yml"
     }
   }
 }

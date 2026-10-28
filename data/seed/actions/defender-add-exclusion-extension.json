@@ -87,6 +87,10 @@
         "Get-MpPreference | Select-Object -ExpandProperty ExclusionExtension": "Liste toutes les exclusions d'extensions actuelles",
         "Add-MpPreference -ExclusionExtension \".txt\"": "Exemple utilisant le paramètre 'extension': Extension à exclure (avec point, ex: .tmp). Remplacez .txt par la valeur appropriée selon votre environnement."
       }
+    },
+    "es": {
+      "title": "Añadir una exclusión de extensión de archivo a Defender",
+      "description": "Excluye de los análisis de Defender todos los archivos con una extensión concreta."
     }
   }
 }

@@ -95,6 +95,10 @@
         "sudo fail2ban-client banned": "Lister les IP bannies",
         "sudo fail2ban-client reload": "Recharger la configuration"
       }
+    },
+    "es": {
+      "title": "Comprobar el estado de Fail2ban",
+      "description": "Muestra el estado de las jaulas (jails) de Fail2ban y de las IP bloqueadas."
     }
   }
 }

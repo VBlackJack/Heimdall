@@ -107,6 +107,10 @@
         "Get-DfsrBacklog -GroupName BranchData -FolderName Projects -SourceComputerName FS02 -DestinationComputerName FS01 -Verbose": "Vérifie l'autre sens",
         "dfsrdiag backlog /rgname:BranchData /rfname:Projects /smem:FS01 /rmem:FS02": "Obtient le nombre de fichiers en retard avec l'outil classique"
       }
+    },
+    "es": {
+      "title": "Mostrar la cola pendiente de Replicación DFS",
+      "description": "Muestra los archivos que esperan replicarse de un miembro a otro en una carpeta replicada."
     }
   }
 }

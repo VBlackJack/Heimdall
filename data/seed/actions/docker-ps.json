@@ -98,6 +98,10 @@
         "docker ps --format \"table {{.Names}}\\t{{.Status}}\"": "Affiche les conteneurs avec un format personnalisé (nom et statut).",
         "docker images": "Lister les images locales"
       }
+    },
+    "es": {
+      "title": "Listar los contenedores de Docker",
+      "description": "Muestra la lista de los contenedores de Docker en ejecución"
     }
   }
 }

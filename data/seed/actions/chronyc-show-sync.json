@@ -83,6 +83,10 @@
         "chronyc sourcestats": "Affiche la dérive et la gigue de chaque source",
         "sudo chronyc makestep": "Corrige l'horloge d'un coup au lieu de la ralentir progressivement"
       }
+    },
+    "es": {
+      "title": "Mostrar el estado de sincronización de chrony",
+      "description": "Muestra cómo mantiene chrony el reloj en hora: el desfase actual, o los orígenes NTP y su calidad."
     }
   }
 }

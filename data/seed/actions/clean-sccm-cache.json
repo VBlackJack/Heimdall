@@ -41,6 +41,10 @@
         "$UIResourceMgr = New-Object -ComObject UIResource.UIResourceMgr; $Cache = $UIResourceMgr.GetCacheInfo(); $Cache.GetCacheElements() | ForEach-Object { $Cache.DeleteCacheElement($_.CacheElementID) }": "Supprime tous les éléments du cache client (la commande de l'action elle-même)",
         "(Get-WmiObject -Namespace root\\ccm\\SoftMgmtAgent -Class CacheInfoEx | Measure-Object -Property ContentSize -Sum).Sum": "Affiche uniquement la taille totale du contenu en cache (somme de ContentSize), sans rien supprimer"
       }
+    },
+    "es": {
+      "title": "Vaciar la caché de SCCM",
+      "description": "Elimina todos los archivos de la caché del cliente de Configuration Manager"
     }
   }
 }

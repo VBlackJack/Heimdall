@@ -92,6 +92,10 @@
         "$daysThreshold = 90; Get-ChildItem -Path Cert:\\LocalMachine\\My | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
         "$daysThreshold = 90; Get-ChildItem -Path Cert:\\LocalMachine\\My | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
       }
+    },
+    "es": {
+      "title": "Comprobar la caducidad de los certificados",
+      "description": "Analiza todos los certificados instalados y encuentra los que han caducado o están a punto de hacerlo (< 30 días)."
     }
   }
 }

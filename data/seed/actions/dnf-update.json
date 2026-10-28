@@ -84,6 +84,10 @@
         "dnf search nodejs": "Rechercher Node.js",
         "dnf list installed | grep kernel": "Lister les kernels installés"
       }
+    },
+    "es": {
+      "title": "Actualizar los paquetes con DNF",
+      "description": "Actualiza todos los paquetes con DNF (RHEL 8+/Fedora)"
     }
   }
 }

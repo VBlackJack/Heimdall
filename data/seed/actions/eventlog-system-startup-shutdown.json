@@ -77,6 +77,10 @@
         "Get-WinEvent -ListLog *": "Liste TOUS les journaux d'événements disponibles sur le système. Retourne le nom, la taille max, le nombre d'enregistrements et le statut (activé/désactivé). Il peut y avoir des centaines de journaux (System, Application, Security + tous les journaux Applications and Services). Utilisez cette commande pour découvrir les journaux disponibles.",
         "Get-WinEvent -LogName 'Microsoft-Windows-PowerShell/Operational' -MaxEvents 20": "Affiche les événements du journal PowerShell. Les journaux Applications and Services ont des noms avec chemins (slashes). Ce journal enregistre toutes les activités PowerShell : commandes exécutées, erreurs, scripts. Essentiel pour l'audit de sécurité et le troubleshooting PowerShell."
       }
+    },
+    "es": {
+      "title": "Historial de inicios y apagados del sistema",
+      "description": "Lista todos los eventos de inicio (EventID 6005) y de apagado (EventID 6006) del sistema."
     }
   }
 }

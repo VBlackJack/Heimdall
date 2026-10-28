@@ -101,6 +101,10 @@
         "sudo nscd -i hosts": "Vider le cache nscd",
         "resolvectl statistics": "Vérifier les statistiques DNS"
       }
+    },
+    "es": {
+      "title": "Vaciar la caché de DNS",
+      "description": "Borra la caché de DNS local para forzar una resolución nueva de los nombres de dominio."
     }
   }
 }

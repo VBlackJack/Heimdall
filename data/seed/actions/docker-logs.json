@@ -129,6 +129,10 @@
         "docker logs -f {container}": "Exemple utilisant le paramètre 'container': nom ou ID du conteneur. Remplacez-le par la valeur appropriée selon votre environnement.",
         "docker logs -f webapp": "Suivre les logs du conteneur webapp"
       }
+    },
+    "es": {
+      "title": "Leer los registros de un contenedor",
+      "description": "Muestra los registros stdout/stderr de un contenedor de Docker"
     }
   }
 }

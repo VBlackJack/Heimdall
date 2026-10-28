@@ -87,6 +87,10 @@
         "Get-MpComputerStatus | Select-Object MAPSReporting,SubmitSamplesConsent": "Vérifie les paramètres actuels de protection cloud",
         "Set-MpPreference -MAPSReporting 2 -SubmitSamplesConsent 1": "Configure protection cloud optimale (reporting avancé + envoi échantillons sûrs)"
       }
+    },
+    "es": {
+      "title": "Configurar la protección en la nube de Defender",
+      "description": "Habilita o configura la protección en la nube de Windows Defender (análisis en la nube de Microsoft)."
     }
   }
 }

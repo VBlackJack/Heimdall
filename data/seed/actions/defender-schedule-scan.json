@@ -93,6 +93,10 @@
         "Get-MpPreference | Select-Object ScanScheduleDay,ScanScheduleTime,ScanParameters": "Affiche la planification actuelle des analyses",
         "Set-MpPreference -ScanScheduleDay 8": "Désactive les analyses planifiées (8=Jamais)"
       }
+    },
+    "es": {
+      "title": "Programar un análisis automático de Defender",
+      "description": "Configura una programación para los análisis automáticos de Windows Defender."
     }
   }
 }
