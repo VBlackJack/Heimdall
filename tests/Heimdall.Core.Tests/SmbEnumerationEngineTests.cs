@@ -94,17 +94,44 @@ public sealed class SmbEnumerationEngineTests
         Assert.False(observations.HasAnyData);
     }
 
+    /// <summary>
+    /// What rpcclient's <c>srvinfo</c> prints (Samba's cmd_srvsvc.c): the server name opens a header
+    /// line with its type flags and comment, then three <c>label : value</c> lines. There is no
+    /// <c>server_name</c> field. Reproduced from the Samba documentation, not captured from a host.
+    /// </summary>
+    private const string SrvInfoSample =
+        "\tHOST01         Wk Sv PrQ Unx NT SNT Samba Server\n"
+        + "\tplatform_id     :\t500\n"
+        + "\tos version      :\t6.1\n"
+        + "\tserver type     :\t0x809a03\n";
+
     [Fact]
-    public void ParseTunnelOutputs_Rpcclient_ExtractsServerNameAndOsVersion()
+    public void ParseTunnelOutputs_Rpcclient_ExtractsServerNameFromTheHeaderLineAndOsVersion()
     {
-        var observations = SmbEnumerationEngine.ParseTunnelOutputs(
-            null,
-            "server_name : HOST01\nos_version : 10.0",
-            null);
+        var observations = SmbEnumerationEngine.ParseTunnelOutputs(null, SrvInfoSample, null);
 
         Assert.True(observations.HasAnyData);
         Assert.Equal("HOST01", observations.RpcServerName);
-        Assert.Equal("10.0", observations.RpcOsVersion);
+        Assert.Equal("6.1", observations.RpcOsVersion);
+    }
+
+    [Fact]
+    public void ParseTunnelOutputs_Rpcclient_NoiseAboveTheHeaderLine_DoesNotBecomeTheName()
+    {
+        var observations = SmbEnumerationEngine.ParseTunnelOutputs(
+            null,
+            "WARNING: something printed first\n" + SrvInfoSample,
+            null);
+
+        Assert.Equal("HOST01", observations.RpcServerName);
+    }
+
+    [Fact]
+    public void ParseTunnelOutputs_Rpcclient_ASyntheticServerNameLine_IsNotAField()
+    {
+        var observations = SmbEnumerationEngine.ParseTunnelOutputs(null, "server_name : HOST01", null);
+
+        Assert.Null(observations.RpcServerName);
     }
 
     [Fact]
