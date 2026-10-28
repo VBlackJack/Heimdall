@@ -8,10 +8,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.14" />
-  </ItemGroup>
-
-  <ItemGroup>
     <!-- For PowerShellSingleQuotedString: one escaper for every PowerShell literal. -->
     <ProjectReference Include="..\Heimdall.Core\Heimdall.Core.csproj" />
   </ItemGroup>
