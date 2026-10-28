@@ -79,18 +79,6 @@ public static class SnippetParameterFactory
         {
             return IPAddress.TryParse(targetHost, out _);
         }
-        return IsHostParameter(parameter.Name, parameter.Type);
-    }
-
-    private static bool IsHostParameter(string name, string? type)
-    {
-        if (string.Equals(type, "hostname", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(type, "ipaddress", StringComparison.OrdinalIgnoreCase))
-            return true;
-
-        var n = name.ToLowerInvariant();
-        return n is "host" or "hostname" or "target" or "targethost"
-            or "computername" or "server" or "ip" or "ipaddress"
-            or "remotehost" or "remotecomputer";
+        return SessionPrefillNames.IsHost(parameter.Name, parameter.Type);
     }
 }

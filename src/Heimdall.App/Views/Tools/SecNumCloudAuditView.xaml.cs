@@ -848,9 +848,8 @@ public partial class SecNumCloudAuditView : UserControl, IToolView
         _ => (Brush)FindResource("ErrorTextBrush"),
     };
 
-    private static string FormatDuration(TimeSpan ts) => ts.TotalMinutes >= 1
-        ? $"{ts.Minutes}m {ts.Seconds}s"
-        : $"{ts.TotalSeconds:F1}s";
+    private string FormatDuration(TimeSpan ts)
+        => DurationFormatter.FormatWithTenths(ts, L, CultureInfo.CurrentCulture);
 
     private void ShowInlineError(string message)
     {

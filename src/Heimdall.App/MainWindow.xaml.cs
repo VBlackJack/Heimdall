@@ -640,13 +640,13 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         }
         catch
         {
-            AboutWebView2Text.Text = "N/A";
+            AboutWebView2Text.Text = LocalizeWindowString("ValueNotAvailable");
         }
 
         // SSH.NET version
         var sshNetAsm = typeof(Renci.SshNet.SshClient).Assembly;
         var sshNetVersion = sshNetAsm.GetName().Version;
-        AboutSshNetText.Text = sshNetVersion is not null ? sshNetVersion.ToString() : "N/A";
+        AboutSshNetText.Text = sshNetVersion is not null ? sshNetVersion.ToString() : LocalizeWindowString("ValueNotAvailable");
 
         // Build date from informational version (format: YYYY.MMDDxx)
         AboutBuildDateText.Text = _appVersionProvider.BuildDate is { } buildDate

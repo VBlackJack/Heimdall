@@ -1430,10 +1430,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     /// parameter type says "user".
     /// </summary>
     internal static bool IsUserParameter(string name)
-    {
-        var n = name.ToLowerInvariant();
-        return n is "user" or "username" or "login" or "account" or "samaccountname";
-    }
+        => SessionPrefillNames.IsUser(name);
 
     private static bool CanPrefillTargetHost(TemplateParameter parameter, string targetHost)
     {
@@ -1445,16 +1442,7 @@ public sealed partial class CommandLibraryViewModel : ObservableObject, IDisposa
     }
 
     internal static bool IsHostParameter(string name, string? type)
-    {
-        if (string.Equals(type, "hostname", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(type, "ipaddress", StringComparison.OrdinalIgnoreCase))
-            return true;
-
-        var n = name.ToLowerInvariant();
-        return n is "host" or "hostname" or "target" or "targethost"
-            or "computername" or "server" or "ip" or "ipaddress"
-            or "remotehost" or "remotecomputer";
-    }
+        => SessionPrefillNames.IsHost(name, type);
 
     // ── Helpers exposed to the entry display models ───────────────
 
