@@ -12,7 +12,7 @@
 
 *Also available in French: [fr/ARCHITECTURE.md](fr/ARCHITECTURE.md).*
 
-Heimdall is a .NET 10 WPF application organized as a multi-project solution with strict dependency boundaries. Supports RDP, SSH, SFTP, FTP, VNC, Telnet, Citrix, and Local Shell connection types with 6,148 i18n keys per locale (EN/FR), 58 built-in sysops tools with contextual help, cross-tool navigation, and 10,801 automated tests (10,670 of them gating in CI and all passing, the remaining 131 in the informational CIUnstable and RequiresDesktop lanes). Health monitor polls in parallel (Task.WhenAll), XML importers hardened against XXE, all Debug.WriteLine replaced with FileLogger. WCAG AA compliant Design System with 45 design tokens (typography min 11px, spacing, corner radius, opacity, icon sizes, font family), micro-animations, FocusIndicatorBrush for keyboard accessibility, unified two-tier icon system (vector geometries + MDL2), per-category tool color coding, declarative i18n via `{loc:Translate}` markup extension, and progressive disclosure ServerDialog.
+Heimdall is a .NET 10 WPF application organized as a multi-project solution with strict dependency boundaries. Supports RDP, SSH, SFTP, FTP, VNC, Telnet, Citrix, and Local Shell connection types with a trilingual interface (EN/FR/ES), 58 built-in sysops tools with contextual help, cross-tool navigation, and an automated test suite (most of it gating in CI, the remainder in the informational CIUnstable and RequiresDesktop lanes). Health monitor polls in parallel (Task.WhenAll), XML importers hardened against XXE, all Debug.WriteLine replaced with FileLogger. WCAG AA compliant Design System with 45 design tokens (typography min 11px, spacing, corner radius, opacity, icon sizes, font family), micro-animations, FocusIndicatorBrush for keyboard accessibility, unified two-tier icon system (vector geometries + MDL2), per-category tool color coding, declarative i18n via `{loc:Translate}` markup extension, and progressive disclosure ServerDialog.
 
 ## Solution Structure
 
@@ -77,7 +77,7 @@ Heimdall.slnx (14 projects)
 
 ### 1. SSH.NET + Plink Dual Strategy
 
-**Problem**: SSH.NET 2025.1.0 has no built-in Pageant agent support. Many enterprise environments use PPK keys loaded exclusively in Pageant.
+**Problem**: SSH.NET 2026.0.0 has no built-in Pageant agent support. Many enterprise environments use PPK keys loaded exclusively in Pageant.
 
 **Solution**: Two-pronged approach:
 
@@ -87,8 +87,8 @@ Heimdall.slnx (14 projects)
 
 **Pageant integration fixes** (3 critical bugs resolved):
 - `AGENT_COPYDATA_ID` must be `0x804e50ba` - any other value causes Pageant to silently ignore the request
-- RSA-SHA2 algorithms (`rsa-sha2-256`, `rsa-sha2-512`) must be registered on the `ConnectionInfo` for modern servers that reject legacy `ssh-rsa`
-- `PageantHostAlgorithm.Sign()` must return the full SSH signature blob (algorithm name length + algorithm name + signature length + signature), not just the raw signature bytes - SSH.NET expects the wire-format blob. `PageantClient.SignData()` already returns this blob unchanged.
+- RSA-SHA2 algorithms (`rsa-sha2-256`, `rsa-sha2-512`) must be offered for every agent RSA key, for modern servers that reject legacy `ssh-rsa`: `SshAgentKeyWrapper` returns the three host algorithms (`rsa-sha2-256`, `rsa-sha2-512`, `ssh-rsa`) for a key of that type
+- `SshAgentHostAlgorithm.Sign()`, which signs through `PageantAgentKey` and `PageantClient.SignData()`, must return the full SSH signature blob (algorithm name length + algorithm name + signature length + signature), not just the raw signature bytes - SSH.NET expects the wire-format blob. `PageantClient.SignData()` already returns this blob unchanged.
 
 ### 2. Pipe Mode for SSH Terminals (NOT ConPTY)
 
@@ -806,7 +806,7 @@ Before the version bump, a Release checks that the whole tree is clean, the bran
 
 ### Test baseline
 
-`dotnet test Heimdall.slnx --no-build` discovers 5,578 tests across the five test projects (`Heimdall.App.Tests`, `Heimdall.App.UiTests`, `Heimdall.Core.Tests`, `Heimdall.Rdp.Tests`, `Heimdall.Ssh.Tests`): 5,578 passing and 0 skipped. Partial per-project TRX files can report smaller counts and be mistaken for a regression - always run the aggregated command for a correct baseline.
+`dotnet test Heimdall.slnx --no-build` runs every test project under `tests/` and reports the aggregate: all passing and 0 skipped. Partial per-project TRX files can report smaller counts and be mistaken for a regression - always run the aggregated command for a correct baseline.
 
 ## Tool Architecture
 
@@ -871,7 +871,7 @@ When opening a tool from a server context menu, all available server metadata is
 - **Recent tools**: Last 5 used tools shown at top of palette when opened
 - **Singleton behavior**: Context-free tools (UUID, Password, Chmod) reuse existing tab
 - **External tools**: Also searchable in Ctrl+K palette
-- **Help system**: "?" button on all 49 tools shows localized description, usage instructions, and examples (i18n key pattern: `ToolHelp<UPPERCASE_ID>`, e.g., `ToolHelpBASE64`)
+- **Help system**: "?" button on every built-in tool shows localized description, usage instructions, and examples (i18n key pattern: `ToolHelp<UPPERCASE_ID>`, e.g., `ToolHelpBASE64`)
 - **Detail panel**: Selecting a tool in TreeView shows dedicated panel (name, category, description, "Open in Tab")
 - **Password presets**: Custom presets saved to `config/password-presets.json`, restored on click, deleted via right-click
 - **Protocol colors**: Theme-aware brushes are defined in `HeimdallThemeBridge.xaml` on ThemeForge slots - resolved through `DynamicResource` where possible and re-evaluated on theme swap via `HeimdallThemeService.ThemeRevision` triggers for converter-based bindings
@@ -976,14 +976,14 @@ Full-page browser on the main navigation rail, independent of the sidebar Tools 
 
 **Design token gotcha**: `SpacingRowGap` is `sys:Double` (for Margin/Height). `RowDefinition.Height` requires `GridLength` - use `SpacingRowGapGrid` for grid row spacers.
 
-### Tool Categories (52 tools)
+### Tool Categories
 
-| Category | Count | Tools |
-|----------|-------|-------|
-| **Network** | 17 | **Network Cartography** (ping sweep, port scan, banner grab, TLS cert inspection, OS fingerprinting from 5 sources (TTL/banner/ports/SNMP/NTLM), **SMB2 NTLM challenge extraction** (hostname/domain/OS build/GUID/uptime), **SSH HASSH fingerprinting**, **Shodan-compatible favicon hashing** (30+ known devices), **HTTP product URL probing** (13 vendor paths), **cookie/error page framework detection**, SNMPv2c 6-OID query + IANA PEN vendor decode, NetBIOS NBSTAT, mDNS/Bonjour, **SSDP + UPnP rootDesc.xml** fetch, 320+ OUI MAC lookup + randomized MAC detection, 50+ role patterns + 100+ banner fingerprints + 6 conflict rules, dynamic CIDR VLAN detection, Draw.io topology export, scan history with typed diff, remote subnet scan via SSH gateway (batched probes), **persistent Knowledge Base with TTL-based cache + KB backfill**, **tunnel scan: ping sweep + ARP discovery + parallel `/dev/tcp` probes with per-probe timeout**), Ping, DNS (custom server, via tunnel), Cert Inspector (chain+TLS, via tunnel), Port Scanner (banner grab, via tunnel), Subnet (IPv4+IPv6), IP Converter, HTTP Status, Whois, HTTP Header Analyzer, Banner Grabber, TCP Traceroute, SNMP Walker, ARP Monitor, Firewall Rule Tester, Network Calculator (supernet+VLAN) |
-| **Security** | 15 | Password (3 modes, crack time, history, custom presets, clipboard auto-clear), SSH Key (RSA+Ed25519), Hash (SHA3+progress), HMAC, JWT (signature verify), Certificate Generator (CA+leaf), TOTP (RFC 6238), Password Policy Checker, SSH Key Auditor, SSL/TLS Auditor, DNS Security Checker (SPF/DKIM/DMARC), SMB Enumerator, Default Credential Scanner, CVE Lookup, **SecNumCloud Audit** (15 checks, 4 chapters, `Func<string,string> localize` constructor, HTML/CSV/Draw.io export) |
-| **Encoding** | 6 | Base64 (URL-safe), URL Encoder, JSON (error position), Regex (match highlight), Text Diff (word-level), Text Case (8 formats) |
-| **System** | 14 | Chmod, Crontab Builder, DateTime (timezone+relative), UUID (v4+v7), ULID, Hosts Editor, SSH Config Generator, Log Viewer/Tail, Cron Job Manager, Service Status Dashboard, **Notes** (Obsidian-style Markdown), **Diagram Editor** (draw.io embedded offline), **Command Library**, **Privilege Launcher** |
+| Category | Tools |
+|----------|-------|
+| **Network** | **Network Cartography** (ping sweep, port scan, banner grab, TLS cert inspection, OS fingerprinting from 5 sources (TTL/banner/ports/SNMP/NTLM), **SMB2 NTLM challenge extraction** (hostname/domain/OS build/GUID/uptime), **SSH HASSH fingerprinting**, **Shodan-compatible favicon hashing** (30+ known devices), **HTTP product URL probing** (13 vendor paths), **cookie/error page framework detection**, SNMPv2c 6-OID query + IANA PEN vendor decode, NetBIOS NBSTAT, mDNS/Bonjour, **SSDP + UPnP rootDesc.xml** fetch, 320+ OUI MAC lookup + randomized MAC detection, 50+ role patterns + 100+ banner fingerprints + 6 conflict rules, dynamic CIDR VLAN detection, Draw.io topology export, scan history with typed diff, remote subnet scan via SSH gateway (batched probes), **persistent Knowledge Base with TTL-based cache + KB backfill**, **tunnel scan: ping sweep + ARP discovery + parallel `/dev/tcp` probes with per-probe timeout**), Ping, DNS (custom server, via tunnel), Cert Inspector (chain+TLS, via tunnel), Port Scanner (banner grab, via tunnel), Subnet (IPv4+IPv6), IP Converter, HTTP Status, Whois, HTTP Header Analyzer, Banner Grabber, TCP Traceroute, SNMP Walker, ARP Monitor, Firewall Rule Tester, Network Calculator (supernet+VLAN) |
+| **Security** | Password (3 modes, crack time, history, custom presets, clipboard auto-clear), SSH Key (RSA+Ed25519), Hash (SHA3+progress), HMAC, JWT (signature verify), Certificate Generator (CA+leaf), TOTP (RFC 6238), Password Policy Checker, SSH Key Auditor, SSL/TLS Auditor, DNS Security Checker (SPF/DKIM/DMARC), SMB Enumerator, Default Credential Scanner, CVE Lookup, **SecNumCloud Audit** (15 checks, 4 chapters, `Func<string,string> localize` constructor, HTML/CSV/Draw.io export) |
+| **Encoding** | Base64 (URL-safe), URL Encoder, JSON (error position), Regex (match highlight), Text Diff (word-level), Text Case (8 formats) |
+| **System** | Chmod, Crontab Builder, DateTime (timezone+relative), UUID (v4+v7), ULID, Hosts Editor, SSH Config Generator, Log Viewer/Tail, Cron Job Manager, Service Status Dashboard, **Notes** (Obsidian-style Markdown), **Diagram Editor** (draw.io embedded offline), **Command Library**, **Privilege Launcher** |
 
 ### Declarative i18n (`{loc:Translate}` Markup Extension)
 

@@ -335,7 +335,8 @@ public partial class TlsAuditView : UserControl, IToolView
             var daysRemaining = (_vm.CertificateSummary.NotAfter - DateTime.UtcNow).Days;
             TxtCertSubject.Text = _vm.CertificateSummary.Subject;
             TxtCertIssuer.Text = _vm.CertificateSummary.Issuer;
-            TxtCertExpiry.Text = $"{_vm.CertificateSummary.NotAfter:yyyy-MM-dd HH:mm:ss UTC} ({daysRemaining}d)";
+            TxtCertExpiry.Text = FormatCertificateExpiry(
+                _vm.CertificateSummary.NotAfter, daysRemaining, L("ToolCertDaysRemaining"));
             TxtCertKeySize.Text = _vm.CertificateSummary.KeySizeBits > 0
                 ? string.Format(L("ToolTlsAuditBits"), _vm.CertificateSummary.KeySizeBits)
                 : "-";
@@ -426,6 +427,13 @@ public partial class TlsAuditView : UserControl, IToolView
     }
 
     public bool CanClose() => !_vm.IsAuditing;
+
+    /// <summary>
+    /// The expiry line of the certificate card: the instant, then the days left worded in the
+    /// current language, as the certificate inspector words the same figure.
+    /// </summary>
+    internal static string FormatCertificateExpiry(DateTime notAfter, int daysRemaining, string daysRemainingLabel)
+        => $"{notAfter:yyyy-MM-dd HH:mm:ss UTC} ({daysRemaining} {daysRemainingLabel})";
 
     private string L(string key) => _localizer?[key] ?? key;
 

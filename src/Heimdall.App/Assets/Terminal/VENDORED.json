@@ -1,0 +1,49 @@
+{
+  "components": [
+    {
+      "name": "xterm.js",
+      "version": "5.5.0",
+      "upstream": "https://github.com/xtermjs/xterm.js",
+      "files": [
+        {
+          "path": "xterm.min.js",
+          "sha256": "4196e242ef1cf4c2adead8d97f4a772a69576076f70b095e004b4abbb049e7bf",
+          "versionMarker": "@xterm/xterm@5.5.0/"
+        },
+        {
+          "path": "xterm.min.css",
+          "sha256": "f7f724aea2bb620a6482bfb8e4bdecfae1152b0c7facef55fbda61f3b6cfedb2",
+          "versionMarker": "@xterm/xterm@5.5.0/"
+        }
+      ]
+    },
+    {
+      "name": "xterm addon-fit",
+      "version": "0.10.0",
+      "upstream": "https://github.com/xtermjs/xterm.js",
+      "files": [
+        {
+          "path": "addon-fit.min.js",
+          "sha256": "a6a7bbb33569f16aa3e18d71425e34d035fc89a0b7e8cba084f8855f91aa38f1",
+          "versionMarker": "@xterm/addon-fit@0.10.0/"
+        }
+      ]
+    },
+    {
+      "name": "xterm addon-webgl",
+      "version": "0.18.0",
+      "upstream": "https://github.com/xtermjs/xterm.js",
+      "files": [
+        {
+          "path": "addon-webgl.min.js",
+          "sha256": "65e1ca073a911a28508b9f1ebbb6143ec23d013d50f7b31f14fff8b86b80e296",
+          "versionMarker": "@xterm/addon-webgl@0.18.0/"
+        }
+      ]
+    }
+  ],
+  "completeDirectories": [
+    "."
+  ],
+  "ownedFiles": []
+}

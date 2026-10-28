@@ -143,7 +143,7 @@ sur le caractère intermittent ou permanent de l'échec.
 
 ## Pourquoi ces tests ne sont instables que sur le runner
 
-Quatre causes racines distinctes partagent le même symptôme
+Cinq causes racines distinctes partagent le même symptôme
 (`TaskCanceledException`, `OperationCanceledException` ou timeouts de
 `WaitUntil`) :
 
@@ -178,10 +178,22 @@ Quatre causes racines distinctes partagent le même symptôme
    toutes les 10 ms et lève une `TimeoutException` passée l'échéance).
    Augmenter encore le timeout ne fait que décaler la fenêtre d'échec sans
    l'éliminer.
+5. **Timeouts de lancement de processus** - `UpdateRelaunchScriptExecutionTests`
+   exécute le script généré par la mise à jour sous Windows PowerShell 5.1 et
+   sous PowerShell 7, et `WinRmLaunchExitGuardExecutionTests` exécute la garde de
+   lancement WinRM dans une pseudo-console. Sur le runner, les tests de mise à
+   jour se bloquent par intermittence, et le blocage se termine à la borne de 60
+   secondes avec une sortie standard et une sortie d'erreur vides. Cette
+   signature est celle d'un démarrage à froid de Windows PowerShell 5.1 qui ne
+   décolle jamais, pas celle d'une assertion qui échoue. La borne de 60 secondes
+   est un filet de sécurité payé uniquement en cas de blocage et ne doit pas être
+   élargie : une borne plus large transforme le blocage en une exécution verte
+   mais lente et supprime la preuve (voir *Lire la latence d'attente du terminal
+   dans un log de CI*). L'item de backlog BL-0067 existe pour cette famille.
 
 ## Tests actuellement marqués `CIUnstable`
 
-La solution comporte 11 emplacements `[Trait("Category", "CIUnstable")]` : 8
+La solution comporte 22 emplacements `[Trait("Category", "CIUnstable")]` : 19
 sur des méthodes de test individuelles et 3 sur des classes entières. Chaque
 emplacement est listé ci-dessous.
 
@@ -192,9 +204,20 @@ emplacement est listé ci-dessous.
 | `OpenSshPipeAgentTests.AgentKeySign_SendsFlagsAndReturnsSignature` | `tests/Heimdall.Ssh.Tests/OpenSshPipeAgentTests.cs` | `CIUnstable` |
 | `ConPtySessionTests.StartAsync_LaunchesShell_DeliversInitialTerminalOutput` | `tests/Heimdall.Terminal.Tests/ConPtySessionTests.cs` | `CIUnstable` |
 | `ConPtySessionTests.DataReceived_SubscriberAddedAfterBootstrapOutput_ReplaysBufferedOutput` | `tests/Heimdall.Terminal.Tests/ConPtySessionTests.cs` | `CIUnstable` |
+| `ConPtySessionTests.StartAsync_InteractiveShell_OutlivesTheWindowAndWritesMoreThanThePreamble` | `tests/Heimdall.Terminal.Tests/ConPtySessionTests.cs` | `CIUnstable` |
 | `DnsLookupViewModelTests.CancelCommand_UserCancellation_ClearsStatusWithoutError` | `tests/Heimdall.App.Tests/DnsLookupViewModelTests.cs` | `CIUnstable` |
 | `WhoisLookupViewModelTests.CancelCommand_UserCancellation_ClearsStatusWithoutError` | `tests/Heimdall.App.Tests/WhoisLookupViewModelTests.cs` | `CIUnstable` |
 | `TcpPingViewModelTests.StartCommand_MixedResults_PreservesFailedLineAndSummary` | `tests/Heimdall.App.Tests/TcpPingViewModelTests.cs` | `CIUnstable` |
+| `UpdateRelaunchScriptExecutionTests.Execute_InstallerSucceeds_RunsInstallerAndRelaunches` | `tests/Heimdall.App.Tests/Services/UpdateRelaunchScriptExecutionTests.cs` | `CIUnstable` |
+| `UpdateRelaunchScriptExecutionTests.Execute_StagingDirectoryNotEmpty_IsRemovedAndTheHostExitsCleanly` | `tests/Heimdall.App.Tests/Services/UpdateRelaunchScriptExecutionTests.cs` | `CIUnstable` |
+| `UpdateRelaunchScriptExecutionTests.Execute_ApplicationStillRunning_RefusesToInstallAndRecordsTheStage` | `tests/Heimdall.App.Tests/Services/UpdateRelaunchScriptExecutionTests.cs` | `CIUnstable` |
+| `UpdateRelaunchScriptExecutionTests.Bootstrap_RunsTheEmittedScript_ThroughTheProductionArguments` | `tests/Heimdall.App.Tests/Services/UpdateRelaunchScriptExecutionTests.cs` | `CIUnstable` |
+| `UpdateRelaunchScriptExecutionTests.Bootstrap_ScriptChangedAfterHashing_RefusesAndStillRelaunches` | `tests/Heimdall.App.Tests/Services/UpdateRelaunchScriptExecutionTests.cs` | `CIUnstable` |
+| `UpdateRelaunchScriptExecutionTests.Bootstrap_ScriptThatDoesNotParse_StillRelaunches` | `tests/Heimdall.App.Tests/Services/UpdateRelaunchScriptExecutionTests.cs` | `CIUnstable` |
+| `UpdateRelaunchScriptExecutionTests.Execute_InstallerExitsNonZero_WritesTheFailureRecordAndStillRelaunches` | `tests/Heimdall.App.Tests/Services/UpdateRelaunchScriptExecutionTests.cs` | `CIUnstable` |
+| `UpdateRelaunchScriptExecutionTests.Execute_InstallerSucceeds_WritesNoFailureRecord` | `tests/Heimdall.App.Tests/Services/UpdateRelaunchScriptExecutionTests.cs` | `CIUnstable` |
+| `WinRmLaunchExitGuardExecutionTests.CurrentUserLaunch_EndsAtFirstLocalPrompt` | `tests/Heimdall.App.Tests/WinRmLaunchExitGuardExecutionTests.cs` | `CIUnstable` |
+| `WinRmLaunchExitGuardExecutionTests.CredentialBootstrap_EndsAtFirstLocalPrompt` | `tests/Heimdall.App.Tests/WinRmLaunchExitGuardExecutionTests.cs` | `CIUnstable` |
 | `HmacGeneratorSmokeTests` (marqueur de classe, 6 tests) | `tests/Heimdall.App.UiTests/Pilots/HmacGeneratorSmokeTests.cs` | `CIUnstable` + `RequiresDesktop` |
 | `TextDiffSmokeTests` (marqueur de classe, 7 tests) | `tests/Heimdall.App.UiTests/Pilots/TextDiffSmokeTests.cs` | `CIUnstable` + `RequiresDesktop` |
 | `HashGeneratorSmokeTests` (marqueur de classe, 5 tests) | `tests/Heimdall.App.UiTests/Pilots/HashGeneratorSmokeTests.cs` | `CIUnstable` + `RequiresDesktop` |
@@ -205,10 +228,36 @@ elles sont donc exclues par l'une comme par l'autre moitié du filtre bloquant.
 Les autres classes `Pilots/*SmokeTests` ne portent que `RequiresDesktop` et ne
 font pas partie de cet inventaire.
 
+`UpdateRelaunchScriptExecutionTests` (8 théories, un cas par hôte PowerShell) et
+`WinRmLaunchExitGuardExecutionTests` (2 théories) lancent un vrai processus
+PowerShell fils et l'attendent avec une borne de 60 secondes. Voir la cause
+racine 5 ci-dessous.
+
+`CiUnstableInventoryGuardTests` garde ce tableau honnête : il parcourt les
+sources de tests à la recherche de chaque `[Trait("Category", "CIUnstable")]` et
+échoue quand un emplacement marqué manque dans cette page ou dans son miroir
+anglais, quand cette page liste un test qui n'est pas marqué, quand les
+nombres ci-dessus sont faux, et quand le parcours cesse d'atteindre un projet
+de tests. Un nouveau marqueur `CIUnstable` exige donc sa ligne ici, dans le même
+commit.
+
 `OpenSshPipeAgentTests.IsAvailable_NoServer_ReturnsFalse` n'est
 intentionnellement PAS marqué : c'est un test de chemin négatif qui vérifie
 qu'une sonde de disponibilité de 25 ms se déclenche lorsqu'aucun serveur
 n'écoute, et ce chemin n'est pas affecté par la latence du runner.
+
+### Les tests marqués s'exécutent quand même sur le poste de release
+
+Le marqueur sort un test de la passe de CI bloquante, pas de la release.
+`Build.ps1 -Mode Release` exécute `dotnet test` sur toute la solution sans
+filtre de catégorie (le test de garde ci-dessus échoue si un `--filter` y
+apparaît un jour). Le poste de release exécute donc chaque test de ce tableau,
+et un échec à cet endroit arrête la release, sauf si `-SkipTests` a été passé.
+Les chaînes informatives de la CI et le poste de release sont deux oracles
+différents : la première se lit pour les tendances et ne bloque jamais, le
+second bloque. Les résultats des chaînes informatives de la CI pour le commit de
+release sont aussi écrits dans les notes de version générées par le
+pré-contrôle de release (voir `scripts/InformationalLaneReport.ps1`).
 
 ## Instabilités corrigées par réécriture plutôt que par marquage
 

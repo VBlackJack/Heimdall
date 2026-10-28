@@ -1728,8 +1728,9 @@ public partial class NotesToolView : UserControl, IToolView
     private static NotesToolViewModel ResolveViewModel()
     {
         var services = (Application.Current as App)?.Services;
-        return services?.GetRequiredService<NotesToolViewModel>()
-            ?? throw new InvalidOperationException("NotesToolViewModel is not registered.");
+        return services is null
+            ? throw new InvalidOperationException("The DI container is not initialized.")
+            : ToolViewModelFactory.Create<NotesToolViewModel>(services);
     }
 
     private sealed class NoteLinkCompletionData : ICSharpCode.AvalonEdit.CodeCompletion.ICompletionData

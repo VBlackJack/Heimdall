@@ -2634,10 +2634,15 @@
                                    BasedOn="{StaticResource ThemedDataGridRowStyle}">
                                 <Setter Property="AutomationProperties.Name">
                                     <Setter.Value>
-                                        <MultiBinding Converter="{StaticResource AccessibleRowNameConverter}">
+                                        <MultiBinding Converter="{StaticResource ScheduledTaskAccessibleRowNameConverter}">
                                             <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[A11yScheduledTaskRow]"/>
                                             <Binding Path="ServerName"/>
                                             <Binding Path="ConnectionType"/>
+                                            <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[ScheduledTaskScheduleEveryNMin]"/>
+                                            <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[ScheduledTaskScheduleDailyAt]"/>
+                                            <Binding Path="ScheduleType"/>
+                                            <Binding Path="IntervalMinutes"/>
+                                            <Binding Path="TimeOfDay"/>
                                             <Binding Path="Schedule"/>
                                         </MultiBinding>
                                     </Setter.Value>
@@ -2648,7 +2653,18 @@
                             <DataGridCheckBoxColumn x:Name="Mw_ScheduledColEnabled" Header="{loc:Translate ScheduledColEnabled}" Binding="{Binding Enabled, UpdateSourceTrigger=PropertyChanged}" Width="40"/>
                             <DataGridTextColumn x:Name="Mw_ScheduledColServer" Header="{loc:Translate ScheduledColServer}" Binding="{Binding ServerName}" Width="*" IsReadOnly="True"/>
                             <DataGridTextColumn x:Name="Mw_ScheduledColType" Header="{loc:Translate ScheduledColType}" Binding="{Binding ConnectionType}" Width="70" IsReadOnly="True"/>
-                            <DataGridTextColumn x:Name="Mw_ScheduledColSchedule" Header="{loc:Translate ScheduledColSchedule}" Binding="{Binding Schedule}" Width="*" IsReadOnly="True"/>
+                            <DataGridTextColumn x:Name="Mw_ScheduledColSchedule" Header="{loc:Translate ScheduledColSchedule}" Width="*" IsReadOnly="True">
+                                <DataGridTextColumn.Binding>
+                                    <MultiBinding Converter="{StaticResource ScheduledTaskScheduleConverter}">
+                                        <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[ScheduledTaskScheduleEveryNMin]"/>
+                                        <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[ScheduledTaskScheduleDailyAt]"/>
+                                        <Binding Path="ScheduleType"/>
+                                        <Binding Path="IntervalMinutes"/>
+                                        <Binding Path="TimeOfDay"/>
+                                        <Binding Path="Schedule"/>
+                                    </MultiBinding>
+                                </DataGridTextColumn.Binding>
+                            </DataGridTextColumn>
                             <DataGridTextColumn x:Name="Mw_ScheduledColLastRun" Header="{loc:Translate ScheduledColLastRun}" Binding="{Binding LastRun, StringFormat=yyyy-MM-dd HH:mm}" Width="130" IsReadOnly="True"/>
                             <DataGridTextColumn x:Name="Mw_ScheduledColNextRun" Header="{loc:Translate ScheduledColNextRun}" Binding="{Binding NextRun, StringFormat=yyyy-MM-dd HH:mm}" Width="130" IsReadOnly="True"/>
                         </DataGrid.Columns>

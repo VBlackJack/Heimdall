@@ -335,14 +335,12 @@ public partial class ScheduledTaskDialogViewModel : ObservableValidator
         {
             dto.ScheduleType = nameof(Core.Models.ScheduleType.Daily);
             dto.TimeOfDay = TimeOfDay;
-            dto.Schedule = $"Daily {TimeOfDay}";
         }
         else
         {
             var minutes = int.TryParse(IntervalMinutes, out var m) ? m : 30;
             dto.ScheduleType = nameof(Core.Models.ScheduleType.Interval);
             dto.IntervalMinutes = minutes;
-            dto.Schedule = $"Every {minutes} min";
         }
 
         return dto;

@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+using System.Buffers.Binary;
+using System.Globalization;
 using System.Text;
 using Heimdall.Core.Localization;
 
@@ -62,9 +64,39 @@ public static class DefaultCredentialEngine
     public const int MaxConcurrentServices = 3;
     public const int PortProbeTimeoutMs = 2000;
 
+    private const string HttpVersionPrefix = "HTTP/";
+    private const int HttpStatusDigits = 3;
+    private const int HttpFirstSuccessStatus = 200;
+    private const int HttpFirstClientErrorStatus = 400;
+
+    private const string FtpLoginAcceptedCode = "230";
+    private const int FtpReplyCodeLength = 3;
+
+    private const byte PostgresAuthenticationMessage = (byte)'R';
+    private const int PostgresAuthenticationMessageLength = 8;
+    private const int PostgresAuthenticationOk = 0;
+    private const int PostgresMinReplyBytes = 9;
+
+    private const int VncBannerLength = 12;
+    private const string VncBannerPrefix = "RFB ";
+    private const int VncSupportedMajor = 3;
+    private const int VncMajorStart = 4;
+    private const int VncVersionDigits = 3;
+    private const int VncDotIndex = 7;
+    private const int VncMinorStart = 8;
+    private const int VncFirstSecurityTypeListMinor = 7;
+    private const int VncFirstVersion38Minor = 8;
+    private const byte VncSecurityTypeNone = 1;
+
     /// <summary>
     /// Checks if an HTTP status line indicates successful authentication.
     /// </summary>
+    /// <remarks>
+    /// The text comes from the scanned host. Only a real status line counts: it starts with
+    /// <c>HTTP/</c> and carries a three-digit code. Before, any line whose second word parsed as
+    /// 200 to 399 passed, so an SSH or FTP banner reading <c>... 200 ...</c>, or a signed number,
+    /// was reported as accepted credentials.
+    /// </remarks>
     public static bool IsHttpSuccessResponse(string responseLine)
     {
         if (string.IsNullOrEmpty(responseLine))
@@ -72,10 +104,144 @@ public static class DefaultCredentialEngine
             return false;
         }
 
-        var parts = responseLine.Split(' ', 3);
-        if (parts.Length >= 2 && int.TryParse(parts[1], out var statusCode))
+        // A buffered read holds the status line, the headers and the start of the body.
+        var lineEnd = responseLine.IndexOfAny(['\r', '\n']);
+        var statusLine = lineEnd < 0 ? responseLine : responseLine[..lineEnd];
+        if (!statusLine.StartsWith(HttpVersionPrefix, StringComparison.Ordinal))
         {
-            return statusCode is >= 200 and < 400;
+            return false;
+        }
+
+        var parts = statusLine.Split(' ', 3);
+        if (parts.Length < 2
+            || parts[1].Length != HttpStatusDigits
+            || !parts[1].All(char.IsAsciiDigit))
+        {
+            return false;
+        }
+
+        var statusCode = int.Parse(parts[1], CultureInfo.InvariantCulture);
+        return statusCode is >= HttpFirstSuccessStatus and < HttpFirstClientErrorStatus;
+    }
+
+    /// <summary>
+    /// Checks whether FTP output holds a "230" (user logged in) reply: a line that starts with the
+    /// code and is followed by a space, a hyphen or the end of the line.
+    /// </summary>
+    /// <remarks>
+    /// A substring search for "230" also matched a refusal that happened to contain the digits
+    /// ("530 Login incorrect ... 2300").
+    /// </remarks>
+    public static bool IsFtpLoginAccepted(string reply)
+    {
+        if (string.IsNullOrEmpty(reply))
+        {
+            return false;
+        }
+
+        foreach (var rawLine in reply.Split('\n'))
+        {
+            var line = rawLine.TrimEnd('\r');
+            if (line.StartsWith(FtpLoginAcceptedCode, StringComparison.Ordinal)
+                && (line.Length == FtpReplyCodeLength || line[FtpReplyCodeLength] is ' ' or '-'))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Checks whether the first bytes a PostgreSQL server sent are an AuthenticationOk message:
+    /// <c>R</c>, a length of 8 and an authentication code of 0.
+    /// </summary>
+    public static bool IsPostgresAuthenticationOk(byte[] reply, int length)
+    {
+        ArgumentNullException.ThrowIfNull(reply);
+        if (length < PostgresMinReplyBytes || length > reply.Length || reply[0] != PostgresAuthenticationMessage)
+        {
+            return false;
+        }
+
+        var messageLength = BinaryPrimitives.ReadInt32BigEndian(reply.AsSpan(1, sizeof(int)));
+        var code = BinaryPrimitives.ReadInt32BigEndian(reply.AsSpan(1 + sizeof(int), sizeof(int)));
+        return messageLength == PostgresAuthenticationMessageLength && code == PostgresAuthenticationOk;
+    }
+
+    /// <summary>
+    /// Reads a VNC protocol banner (<c>RFB 003.008</c> and a line feed). Only the first 12 bytes of
+    /// the read are looked at; whatever follows is not part of the banner.
+    /// </summary>
+    /// <param name="reply">The bytes read from the server.</param>
+    /// <param name="length">How many of them are valid.</param>
+    /// <param name="minor">The minor version when the banner is valid.</param>
+    public static bool TryParseVncBanner(byte[] reply, int length, out int minor)
+    {
+        ArgumentNullException.ThrowIfNull(reply);
+        minor = 0;
+        if (length < VncBannerLength || length > reply.Length)
+        {
+            return false;
+        }
+
+        var banner = Encoding.ASCII.GetString(reply, 0, VncBannerLength);
+        if (!banner.StartsWith(VncBannerPrefix, StringComparison.Ordinal)
+            || banner[VncDotIndex] != '.'
+            || banner[VncBannerLength - 1] != '\n'
+            || banner.AsSpan(VncMajorStart, VncVersionDigits).ContainsAnyExceptInRange('0', '9')
+            || banner.AsSpan(VncMinorStart, VncVersionDigits).ContainsAnyExceptInRange('0', '9'))
+        {
+            return false;
+        }
+
+        var major = int.Parse(banner.AsSpan(VncMajorStart, VncVersionDigits), CultureInfo.InvariantCulture);
+        if (major != VncSupportedMajor)
+        {
+            return false;
+        }
+
+        minor = int.Parse(banner.AsSpan(VncMinorStart, VncVersionDigits), CultureInfo.InvariantCulture);
+        return true;
+    }
+
+    /// <summary>
+    /// The version line a client answers with: the highest one this scanner speaks that the server
+    /// offered, so a server announcing a version it has not been told about is still answered.
+    /// </summary>
+    public static byte[] BuildVncVersionReply(int serverMinor)
+    {
+        var minor = serverMinor >= VncFirstVersion38Minor
+            ? VncFirstVersion38Minor
+            : serverMinor >= VncFirstSecurityTypeListMinor ? VncFirstSecurityTypeListMinor : 3;
+        return Encoding.ASCII.GetBytes($"{VncBannerPrefix}00{VncSupportedMajor}.00{minor}\n");
+    }
+
+    /// <summary>
+    /// Checks whether the security handshake offers "None" (no password). From 3.7 the server sends a
+    /// count and a list of types; 3.3 sends the single chosen type as four bytes.
+    /// </summary>
+    public static bool IsVncNoAuthOffered(byte[] reply, int length, int serverMinor)
+    {
+        ArgumentNullException.ThrowIfNull(reply);
+        if (length < 1 || length > reply.Length)
+        {
+            return false;
+        }
+
+        if (serverMinor < VncFirstSecurityTypeListMinor)
+        {
+            return length >= sizeof(uint)
+                && BinaryPrimitives.ReadUInt32BigEndian(reply.AsSpan(0, sizeof(uint))) == VncSecurityTypeNone;
+        }
+
+        var count = reply[0];
+        for (var index = 1; index <= count && index < length; index++)
+        {
+            if (reply[index] == VncSecurityTypeNone)
+            {
+                return true;
+            }
         }
 
         return false;

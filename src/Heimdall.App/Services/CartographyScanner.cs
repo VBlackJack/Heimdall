@@ -210,7 +210,9 @@ public sealed class CartographyScanner : ICartographyScanner
         var ports = profile.CustomPorts ?? (profile.Depth == ScanDepth.Quick
             ? CartographyEngine.QuickPorts
             : CartographyEngine.StandardPorts);
-        var portList = string.Join(" ", ports.Where(port => port is >= 1 and <= 65535));
+        var probedPortList = ports.Where(port => port is >= 1 and <= 65535).ToArray();
+        var portList = string.Join(" ", probedPortList);
+        var probedPorts = probedPortList.ToHashSet();
 
         HashSet<string> aliveHosts;
 
@@ -278,22 +280,16 @@ public sealed class CartographyScanner : ICartographyScanner
                 command.CommandTimeout = TimeSpan.FromSeconds(Math.Max(MinCommandTimeoutSeconds, ports.Length / 4));
                 var result = await Task.Run(command.Execute, ct).ConfigureAwait(false);
 
-                if (result is not null)
+                foreach (var port in TunnelOutputParser.ParseOpenPorts(result, probedPorts))
                 {
-                    foreach (var line in result.Split('\n', StringSplitOptions.RemoveEmptyEntries))
-                    {
-                        if (int.TryParse(line.Trim(), out var port))
-                        {
-                            var serviceName = RoleClassifier.GetPortServiceName(port);
-                            openServices.Add(new ServiceResult(
-                                port,
-                                true,
-                                serviceName != $"Port-{port}" ? serviceName : null,
-                                null,
-                                null,
-                                0));
-                        }
-                    }
+                    var serviceName = RoleClassifier.GetPortServiceName(port);
+                    openServices.Add(new ServiceResult(
+                        port,
+                        true,
+                        serviceName != $"Port-{port}" ? serviceName : null,
+                        null,
+                        null,
+                        0));
                 }
             }
             catch (OperationCanceledException)
@@ -374,17 +370,7 @@ public sealed class CartographyScanner : ICartographyScanner
             command.CommandTimeout = TimeSpan.FromSeconds(Math.Max(15, ips.Count / 4));
             var result = await Task.Run(command.Execute, ct).ConfigureAwait(false);
 
-            if (result is not null)
-            {
-                foreach (var line in result.Split('\n', StringSplitOptions.RemoveEmptyEntries))
-                {
-                    var ip = line.Trim();
-                    if (System.Net.IPAddress.TryParse(ip, out _))
-                    {
-                        aliveHosts.Add(ip);
-                    }
-                }
-            }
+            aliveHosts.UnionWith(TunnelOutputParser.ParseAliveHosts(result, ips.ToHashSet(StringComparer.OrdinalIgnoreCase)));
         }
         catch (OperationCanceledException)
         {
@@ -417,19 +403,7 @@ public sealed class CartographyScanner : ICartographyScanner
             command.CommandTimeout = TimeSpan.FromSeconds(5);
             var result = await Task.Run(command.Execute, ct).ConfigureAwait(false);
 
-            if (result is not null)
-            {
-                foreach (var line in result.Split('\n', StringSplitOptions.RemoveEmptyEntries))
-                {
-                    var parts = line.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                    if (parts.Length >= 1
-                        && System.Net.IPAddress.TryParse(parts[0], out _)
-                        && subnetSet.Contains(parts[0]))
-                    {
-                        discovered.Add(parts[0]);
-                    }
-                }
-            }
+            discovered.UnionWith(TunnelOutputParser.ParseArpHosts(result, subnetSet));
         }
         catch (OperationCanceledException)
         {
@@ -471,31 +445,9 @@ public sealed class CartographyScanner : ICartographyScanner
             command.CommandTimeout = TimeSpan.FromSeconds(Math.Max(MinCommandTimeoutSeconds, ips.Count));
             var result = await Task.Run(command.Execute, ct).ConfigureAwait(false);
 
-            if (result is not null)
+            foreach (var (ip, hostname) in TunnelOutputParser.ParseReverseDns(result, ips.ToHashSet(StringComparer.OrdinalIgnoreCase)))
             {
-                foreach (var line in result.Split('\n', StringSplitOptions.RemoveEmptyEntries))
-                {
-                    var separator = line.IndexOf('|');
-                    if (separator <= 0)
-                    {
-                        continue;
-                    }
-
-                    var ip = line[..separator].Trim();
-                    var dnsLine = line[(separator + 1)..].Trim();
-                    if (dnsLine.Contains("domain name pointer", StringComparison.Ordinal)
-                        && System.Net.IPAddress.TryParse(ip, out _))
-                    {
-                        var hostname = dnsLine
-                            .Split("domain name pointer", StringSplitOptions.None)[1]
-                            .Trim()
-                            .TrimEnd('.');
-                        if (hostname.Length > 0)
-                        {
-                            dnsMap[ip] = hostname;
-                        }
-                    }
-                }
+                dnsMap[ip] = hostname;
             }
         }
         catch (OperationCanceledException)

@@ -1,0 +1,19 @@
+{
+  "components": [
+    {
+      "name": "milkdown bundle",
+      "version": "7.19.2",
+      "upstream": "https://github.com/Milkdown/milkdown",
+      "files": [
+        {
+          "path": "index.html",
+          "sha256": "768b12554e40624772d05746b11df5ce99da1c08aaab5531c53549d95c587f6b"
+        }
+      ]
+    }
+  ],
+  "completeDirectories": [
+    "."
+  ],
+  "ownedFiles": []
+}
