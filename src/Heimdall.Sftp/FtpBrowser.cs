@@ -35,6 +35,9 @@ public sealed class FtpBrowser : IRemoteBrowser
 {
     private const int DefaultTimeoutMilliseconds = 30_000;
 
+    /// <summary>The directory used when the server's working directory cannot be used as a path.</summary>
+    private const string FallbackInitialDirectory = "/";
+
     /// <summary>Length of a permission string that carries the entry type as its first character.</summary>
     private const int TypedPermissionsLength = 10;
     private const X509ChainStatusFlags NonOverridableChainErrors =
@@ -206,9 +209,11 @@ public sealed class FtpBrowser : IRemoteBrowser
         // connect token: a later validation, on a reconnect, would see a token that is long
         // cancelled or belongs to a call that has returned.
         _certificateValidationToken = ct;
+        string initialDirectory;
         try
         {
             await client.Connect(ct).ConfigureAwait(false);
+            initialDirectory = await ReadInitialDirectoryAsync(client, ct).ConfigureAwait(false);
         }
         catch
         {
@@ -229,8 +234,37 @@ public sealed class FtpBrowser : IRemoteBrowser
         _certificateValidationToken = CancellationToken.None;
         _client = client;
         _connected = true;
-        CurrentDirectory = "/";
+        CurrentDirectory = initialDirectory;
         DirectoryChanged?.Invoke(CurrentDirectory);
+    }
+
+    /// <summary>
+    /// The directory the server put the session in, or the root when it cannot be used. A user who
+    /// is not chrooted usually cannot list "/", and listing it first is the wrong place to start.
+    /// </summary>
+    private static async Task<string> ReadInitialDirectoryAsync(AsyncFtpClient client, CancellationToken ct)
+    {
+        try
+        {
+            string workingDirectory = await client.GetWorkingDirectory(ct).ConfigureAwait(false);
+            return ResolveInitialDirectory(workingDirectory);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            FileLogger.Warn($"FtpBrowser: PWD failed, starting at the root: {ex.Message}");
+            return FallbackInitialDirectory;
+        }
+    }
+
+    /// <summary>
+    /// The initial directory for a server-reported working directory: that directory when it is an
+    /// absolute path ("/..."), else the root. Some Windows servers answer a drive path such as
+    /// "C:\", which the path handling here, forward slashes from a root, cannot use.
+    /// </summary>
+    internal static string ResolveInitialDirectory(string? workingDirectory)
+    {
+        string trimmed = workingDirectory?.Trim() ?? string.Empty;
+        return trimmed.StartsWith('/') ? NormalizePath(trimmed) : FallbackInitialDirectory;
     }
 
     /// <inheritdoc/>
