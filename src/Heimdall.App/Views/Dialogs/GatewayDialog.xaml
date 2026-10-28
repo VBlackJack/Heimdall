@@ -44,7 +44,7 @@
                 <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
                          AutomationProperties.Name="{Binding Text, ElementName=LblName}"
                          Style="{StaticResource DialogFormTextBoxStyle}"
-                         x:Name="TxtName" TabIndex="0"/>
+                         x:Name="TxtName"/>
                 <TextBlock Text="{Binding NameError}"
                            Style="{StaticResource FieldValidationErrorStyle}"
                            Visibility="{Binding NameError, Converter={StaticResource NullToVisibilityConverter}}"/>
@@ -53,7 +53,7 @@
                 <TextBox Text="{Binding Host, UpdateSourceTrigger=PropertyChanged}"
                          AutomationProperties.Name="{Binding Text, ElementName=LblHost}"
                          Style="{StaticResource DialogFormTextBoxStyle}"
-                         x:Name="TxtHost" TabIndex="1"/>
+                         x:Name="TxtHost"/>
                 <TextBlock Text="{Binding HostError}"
                            Style="{StaticResource FieldValidationErrorStyle}"
                            Visibility="{Binding HostError, Converter={StaticResource NullToVisibilityConverter}}"/>
@@ -64,7 +64,7 @@
                          Style="{StaticResource DialogFormTextBoxStyle}"
                          Width="100" HorizontalAlignment="Left"
                          MaxLength="5"
-                         x:Name="TxtPort" TabIndex="2"/>
+                         x:Name="TxtPort"/>
                 <TextBlock Text="{Binding PortError}"
                            Style="{StaticResource FieldValidationErrorStyle}"
                            Visibility="{Binding PortError, Converter={StaticResource NullToVisibilityConverter}}"/>
@@ -73,34 +73,35 @@
                 <TextBox Text="{Binding User, UpdateSourceTrigger=PropertyChanged}"
                          AutomationProperties.Name="{Binding Text, ElementName=LblUsername}"
                          Style="{StaticResource DialogFormTextBoxStyle}"
-                         x:Name="TxtUsername" TabIndex="3"/>
+                         x:Name="TxtUsername"/>
                 <TextBlock Text="{Binding UserError}"
                            Style="{StaticResource FieldValidationErrorStyle}"
                            Visibility="{Binding UserError, Converter={StaticResource NullToVisibilityConverter}}"/>
 
                 <TextBlock x:Name="LblKeyPath" Style="{StaticResource DialogLabelStyle}" Margin="0,12,0,4"/>
-                <DockPanel>
-                    <Button x:Name="BtnBrowse"
-                            DockPanel.Dock="Right"
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox Grid.Column="0" Text="{Binding KeyPath, UpdateSourceTrigger=PropertyChanged}"
+                             AutomationProperties.Name="{Binding Text, ElementName=LblKeyPath}"
+                             Style="{StaticResource DialogFormTextBoxStyle}"
+                             x:Name="TxtKeyPath"/>
+                    <Button Grid.Column="1" x:Name="BtnBrowse"
                             Command="{Binding BrowseKeyCommand}"
                             AutomationProperties.Name="{Binding Content, RelativeSource={RelativeSource Self}}"
                             Style="{DynamicResource SecondaryButtonStyle}"
                             Margin="4,0,0,0"
                             ToolTip=""
-                            TabIndex="5"
                             Click="OnBrowseKeyClick"/>
-                    <TextBox Text="{Binding KeyPath, UpdateSourceTrigger=PropertyChanged}"
-                             AutomationProperties.Name="{Binding Text, ElementName=LblKeyPath}"
-                             Style="{StaticResource DialogFormTextBoxStyle}"
-                             x:Name="TxtKeyPath" TabIndex="4"/>
-                </DockPanel>
+                </Grid>
 
                 <TextBlock x:Name="LblPassword" Text="{Binding GatewayPasswordLabel}" Style="{StaticResource DialogLabelStyle}" Margin="0,12,0,4"/>
                 <PasswordBox x:Name="PasswordBox"
                              AutomationProperties.Name="{Binding Text, ElementName=LblPassword}"
                              Style="{StaticResource DialogFormPasswordBoxStyle}"
-                             PasswordChanged="OnCredentialPasswordChanged"
-                             TabIndex="6"/>
+                             PasswordChanged="OnCredentialPasswordChanged"/>
                 <!-- An empty box keeps what is stored, so emptying it cannot be the gesture that
                      forgets the password. -->
                 <StackPanel Orientation="Horizontal"
@@ -134,8 +135,7 @@
                     <PasswordBox x:Name="KeyPassphraseBox"
                                  AutomationProperties.Name="{Binding Text, ElementName=LblKeyPassphrase}"
                                  Style="{StaticResource DialogFormPasswordBoxStyle}"
-                                 PasswordChanged="OnCredentialPasswordChanged"
-                                 TabIndex="7"/>
+                                 PasswordChanged="OnCredentialPasswordChanged"/>
                     <StackPanel Orientation="Horizontal"
                                 Margin="0,8,0,0"
                                 Visibility="{Binding HasStoredKeyPassphrase, Converter={StaticResource BoolToVisibilityConverter}}">
@@ -170,7 +170,7 @@
                           SelectedValuePath="Id"
                           DisplayMemberPath="DisplayText"
                           Style="{StaticResource DialogFormComboBoxStyle}"
-                          x:Name="CmbParentGateway" TabIndex="8"/>
+                          x:Name="CmbParentGateway"/>
                 <TextBlock Text="{Binding GatewayChainSummary}"
                            Style="{StaticResource DialogHintTextStyle}" Margin="0,4,0,0"
                            Visibility="{Binding GatewayChainSummary, Converter={StaticResource NullToVisibilityConverter}}"/>
@@ -180,8 +180,7 @@
                          AutomationProperties.Name="{Binding Text, ElementName=LblHostKeyFingerprint}"
                          Style="{StaticResource DialogFormTextBoxStyle}"
                          IsReadOnly="True"
-                         x:Name="TxtHostKeyFingerprint"
-                         TabIndex="9"/>
+                         x:Name="TxtHostKeyFingerprint"/>
                 <TextBlock x:Name="LblHostKeyFingerprintHint"
                            Style="{StaticResource DialogHintTextStyle}"
                            Margin="0,4,0,0"

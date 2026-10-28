@@ -38,8 +38,7 @@
                         Click="OnHelpClick"
                         Style="{DynamicResource ToolHelpButtonStyle}"
                         Padding="{StaticResource PaddingButtonHelp}" FontSize="{StaticResource FontSizeBody}" FontWeight="Bold"
-                        Margin="{StaticResource MarginInlineControl}"
-                        TabIndex="5"/>
+                        Margin="{StaticResource MarginInlineControl}"/>
                 <TextBlock x:Name="HeaderTitle"
                            FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold"
                            Foreground="{DynamicResource TextPrimaryBrush}"
@@ -54,8 +53,7 @@
                         FontFamily="{StaticResource FontFamilyIcons}" FontSize="{StaticResource FontSizeBody}"
                         Click="OnCloseHelpClick"
                         Style="{DynamicResource ToolCloseHelpButtonStyle}"
-                        VerticalAlignment="Top"
-                        TabIndex="6"/>
+                        VerticalAlignment="Top"/>
                 <ScrollViewer MaxHeight="200" VerticalScrollBarVisibility="Auto">
                     <TextBlock x:Name="TxtHelpContent" Text="" TextWrapping="Wrap"
                                FontSize="{StaticResource FontSizeBody}"
@@ -89,8 +87,7 @@
                                     Click="OnBrowseClick"
                                     Style="{DynamicResource SecondaryButtonStyle}"
                                     Padding="{StaticResource PaddingButtonCopy}" Margin="{StaticResource MarginInlineControl}"
-                                    VerticalAlignment="Top"
-                                    TabIndex="1"/>
+                                    VerticalAlignment="Top"/>
                             <TextBlock x:Name="InputLabel"
                                        Foreground="{DynamicResource TextSecondaryBrush}"
                                        FontSize="{StaticResource FontSizeCaption}"
@@ -108,8 +105,7 @@
                                  Background="{DynamicResource CardBrush}"
                                  BorderBrush="{DynamicResource BorderBrush}"
                                  Padding="{StaticResource PaddingInput}"
-                                 TextChanged="OnKeyInputTextChanged"
-                                 TabIndex="0"/>
+                                 TextChanged="OnKeyInputTextChanged"/>
                         <!-- File load error (oversized, unreadable or access refused) -->
                         <TextBlock x:Name="FileError"
                                    Text="{Binding FileErrorMessage, Mode=OneWay}"
@@ -208,14 +204,12 @@
                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                    FontWeight="SemiBold" VerticalAlignment="Center"
                                    Margin="{StaticResource MarginDetailRow}"/>
-                        <DockPanel Grid.Row="2" Grid.Column="1" Margin="{StaticResource MarginDetailRow}">
-                            <Button x:Name="BtnCopyFingerprint" DockPanel.Dock="Right"
-                                    Click="OnCopyFingerprintClick"
-                                    Style="{DynamicResource SecondaryButtonStyle}"
-                                    Padding="{StaticResource PaddingButtonCopy}" Margin="{StaticResource MarginInlineControl}"
-                                    VerticalAlignment="Center"
-                                    TabIndex="2"/>
-                            <TextBox x:Name="DetailFingerprintValue"
+                        <Grid Grid.Row="2" Grid.Column="1" Margin="{StaticResource MarginDetailRow}">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBox Grid.Column="0" x:Name="DetailFingerprintValue"
                                      IsReadOnly="True"
                                      Text="{Binding Fingerprint, Mode=OneWay}"
                                      FontFamily="Consolas" FontSize="{StaticResource FontSizeBody}"
@@ -223,7 +217,12 @@
                                      Foreground="{DynamicResource TextPrimaryBrush}"
                                      BorderThickness="0"
                                      VerticalAlignment="Center"/>
-                        </DockPanel>
+                            <Button Grid.Column="1" x:Name="BtnCopyFingerprint"
+                                    Click="OnCopyFingerprintClick"
+                                    Style="{DynamicResource SecondaryButtonStyle}"
+                                    Padding="{StaticResource PaddingButtonCopy}" Margin="{StaticResource MarginInlineControl}"
+                                    VerticalAlignment="Center"/>
+                        </Grid>
 
                         <!-- Format -->
                         <TextBlock x:Name="DetailFormatLabel" Grid.Row="3" Grid.Column="0"

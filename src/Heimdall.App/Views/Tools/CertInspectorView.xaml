@@ -36,8 +36,7 @@
                         Click="OnHelpClick"
                         Style="{DynamicResource ToolHelpButtonStyle}"
                         Padding="{StaticResource PaddingButtonHelp}" FontSize="{StaticResource FontSizeBody}" FontWeight="Bold"
-                        Margin="{StaticResource MarginInlineControl}"
-                        TabIndex="11"/>
+                        Margin="{StaticResource MarginInlineControl}"/>
                 <TextBlock x:Name="HeaderTitle" Text=""
                            FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold"
                            Foreground="{DynamicResource TextPrimaryBrush}"
@@ -52,8 +51,7 @@
                         FontFamily="{StaticResource FontFamilyIcons}" FontSize="{StaticResource FontSizeBody}"
                         Click="OnCloseHelpClick"
                         Style="{DynamicResource ToolCloseHelpButtonStyle}"
-                        VerticalAlignment="Top"
-                        TabIndex="12"/>
+                        VerticalAlignment="Top"/>
                 <ScrollViewer MaxHeight="200" VerticalScrollBarVisibility="Auto">
                     <TextBlock x:Name="TxtHelpContent" Text="" TextWrapping="Wrap"
                                FontSize="{StaticResource FontSizeBody}"
@@ -72,16 +70,13 @@
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <Button x:Name="BtnProfileQuick" Click="OnProfileClick" Tag="quick"
                         Style="{DynamicResource PrimaryButtonStyle}"
-                        Padding="{StaticResource PaddingButtonPreset}" Margin="{StaticResource MarginInlineXs}" FontSize="{StaticResource FontSizeCaption}"
-                        TabIndex="4"/>
+                        Padding="{StaticResource PaddingButtonPreset}" Margin="{StaticResource MarginInlineXs}" FontSize="{StaticResource FontSizeCaption}"/>
                 <Button x:Name="BtnProfileExtended" Click="OnProfileClick" Tag="extended"
                         Style="{DynamicResource SecondaryButtonStyle}"
-                        Padding="{StaticResource PaddingButtonPreset}" Margin="{StaticResource MarginInlineXs}" FontSize="{StaticResource FontSizeCaption}"
-                        TabIndex="5"/>
+                        Padding="{StaticResource PaddingButtonPreset}" Margin="{StaticResource MarginInlineXs}" FontSize="{StaticResource FontSizeCaption}"/>
                 <Button x:Name="BtnProfileCustom" Click="OnProfileClick" Tag="custom"
                         Style="{DynamicResource SecondaryButtonStyle}"
-                        Padding="{StaticResource PaddingButtonPreset}" Margin="{StaticResource MarginInlineXs}" FontSize="{StaticResource FontSizeCaption}"
-                        TabIndex="6"/>
+                        Padding="{StaticResource PaddingButtonPreset}" Margin="{StaticResource MarginInlineXs}" FontSize="{StaticResource FontSizeCaption}"/>
                 <TextBox x:Name="TxtCustomPorts" Visibility="Collapsed"
                          Text="{Binding CustomPorts, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                          Width="260"
@@ -92,8 +87,7 @@
                          Background="{DynamicResource CardBrush}"
                          Foreground="{DynamicResource TextPrimaryBrush}"
                          BorderBrush="{DynamicResource BorderBrush}"
-                         VerticalAlignment="Center"
-                         TabIndex="7"/>
+                         VerticalAlignment="Center"/>
             </StackPanel>
         </Border>
 
@@ -123,29 +117,14 @@
                 <TextBlock x:Name="LblHost" Text=""
                            FontSize="{StaticResource FontSizeBody}" Margin="{StaticResource MarginLabelBottom}"
                            Foreground="{DynamicResource TextSecondaryBrush}"/>
-                <DockPanel Margin="{StaticResource MarginStackItem}">
-                    <Button x:Name="BtnCheck" DockPanel.Dock="Right"
-                            Content="" Click="OnCheckClick"
-                            Style="{DynamicResource PrimaryButtonStyle}"
-                            Padding="{StaticResource PaddingButtonPrimary}" Margin="{StaticResource MarginInlineControl}"
-                            VerticalAlignment="Center"
-                            TabIndex="2"/>
-                    <TextBox x:Name="TxtPort" DockPanel.Dock="Right"
-                             Text="{Binding Port, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="70"
-                             Style="{StaticResource WatermarkTextBoxStyle}"
-                             Tag=""
-                             FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas"
-                             Padding="{StaticResource PaddingInput}" Margin="{StaticResource MarginInlineControl}"
-                             Background="{DynamicResource CardBrush}"
-                             Foreground="{DynamicResource TextPrimaryBrush}"
-                             BorderBrush="{DynamicResource BorderBrush}"
-                             VerticalAlignment="Center"
-                             TabIndex="1"/>
-                    <TextBlock DockPanel.Dock="Right" Text=":"
-                               FontSize="{StaticResource FontSizeBodyLarge}" Margin="{StaticResource MarginInlineStart}"
-                               Foreground="{DynamicResource TextSecondaryBrush}"
-                               VerticalAlignment="Center"/>
-                    <TextBox x:Name="TxtHost"
+                <Grid Margin="{StaticResource MarginStackItem}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox Grid.Column="0" x:Name="TxtHost"
                              Text="{Binding Host, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                              Style="{StaticResource WatermarkTextBoxStyle}"
                              Tag=""
@@ -154,9 +133,27 @@
                              Background="{DynamicResource CardBrush}"
                              Foreground="{DynamicResource TextPrimaryBrush}"
                              BorderBrush="{DynamicResource BorderBrush}"
-                             VerticalAlignment="Center"
-                             TabIndex="0"/>
-                </DockPanel>
+                             VerticalAlignment="Center"/>
+                    <TextBlock Grid.Column="1" Text=":"
+                               FontSize="{StaticResource FontSizeBodyLarge}" Margin="{StaticResource MarginInlineStart}"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               VerticalAlignment="Center"/>
+                    <TextBox Grid.Column="2" x:Name="TxtPort"
+                             Text="{Binding Port, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Width="70"
+                             Style="{StaticResource WatermarkTextBoxStyle}"
+                             Tag=""
+                             FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="Consolas"
+                             Padding="{StaticResource PaddingInput}" Margin="{StaticResource MarginInlineControl}"
+                             Background="{DynamicResource CardBrush}"
+                             Foreground="{DynamicResource TextPrimaryBrush}"
+                             BorderBrush="{DynamicResource BorderBrush}"
+                             VerticalAlignment="Center"/>
+                    <Button Grid.Column="3" x:Name="BtnCheck"
+                            Content="" Click="OnCheckClick"
+                            Style="{DynamicResource PrimaryButtonStyle}"
+                            Padding="{StaticResource PaddingButtonPrimary}" Margin="{StaticResource MarginInlineControl}"
+                            VerticalAlignment="Center"/>
+                </Grid>
 
                 <!-- Route via gateway -->
                 <DockPanel Margin="{StaticResource MarginStackItem}">
@@ -168,8 +165,7 @@
                               Background="{DynamicResource CardBrush}"
                               Foreground="{DynamicResource TextPrimaryBrush}"
                               BorderBrush="{DynamicResource BorderBrush}"
-                              VerticalAlignment="Center"
-                              TabIndex="3"/>
+                              VerticalAlignment="Center"/>
                 </DockPanel>
 
                 <!-- Error message -->
@@ -351,8 +347,7 @@
                             Visibility="Collapsed"
                             Style="{DynamicResource SecondaryButtonStyle}"
                             Padding="{StaticResource PaddingButtonCopy}" Margin="{StaticResource MarginSectionTop}"
-                            HorizontalAlignment="Left"
-                            TabIndex="8"/>
+                            HorizontalAlignment="Left"/>
                 </StackPanel>
 
                 <!-- ===== Multi-port scan results ===== -->
@@ -513,22 +508,25 @@
                     </ItemsControl>
 
                     <!-- Footer: summary + actions -->
-                    <DockPanel x:Name="ScanFooterPanel" Visibility="Collapsed" Margin="{StaticResource MarginSectionBottom}">
-                        <Button x:Name="BtnExportCsv" DockPanel.Dock="Right"
-                                Click="OnExportCsvClick"
-                                Style="{DynamicResource SecondaryButtonStyle}"
-                                Padding="{StaticResource PaddingButtonCopy}" Margin="{StaticResource MarginInlineControl}"
-                                TabIndex="10"/>
-                        <Button x:Name="BtnCopyAll" DockPanel.Dock="Right"
-                                Click="OnCopyAllClick"
-                                Style="{DynamicResource SecondaryButtonStyle}"
-                                Padding="{StaticResource PaddingButtonCopy}"
-                                TabIndex="9"/>
-                        <TextBlock x:Name="TxtScanSummary" Text=""
+                    <Grid x:Name="ScanFooterPanel" Visibility="Collapsed" Margin="{StaticResource MarginSectionBottom}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" x:Name="TxtScanSummary" Text=""
                                    FontSize="{StaticResource FontSizeBody}"
                                    Foreground="{DynamicResource TextSecondaryBrush}"
                                    VerticalAlignment="Center"/>
-                    </DockPanel>
+                        <Button Grid.Column="1" x:Name="BtnCopyAll"
+                                Click="OnCopyAllClick"
+                                Style="{DynamicResource SecondaryButtonStyle}"
+                                Padding="{StaticResource PaddingButtonCopy}"/>
+                        <Button Grid.Column="2" x:Name="BtnExportCsv"
+                                Click="OnExportCsvClick"
+                                Style="{DynamicResource SecondaryButtonStyle}"
+                                Padding="{StaticResource PaddingButtonCopy}" Margin="{StaticResource MarginInlineControl}"/>
+                    </Grid>
                 </StackPanel>
 
             </StackPanel>

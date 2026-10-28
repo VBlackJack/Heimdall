@@ -62,8 +62,7 @@
                              Content="{loc:Translate BulkEditGatewayUseGatewayChoice}"
                              AutomationProperties.Name="{loc:Translate BulkEditGatewayUseGatewayChoice}"
                              IsChecked="{Binding IsGatewayChoiceSelected, Mode=TwoWay}"
-                             Margin="0,6,0,0"
-                             TabIndex="0"/>
+                             Margin="0,6,0,0"/>
 
                 <StackPanel Margin="24,8,0,10"
                             IsEnabled="{Binding IsGatewayPickerEnabled}">
@@ -74,23 +73,20 @@
                               SelectedItem="{Binding SelectedGateway}"
                               DisplayMemberPath="DisplayText"
                               Style="{StaticResource DialogFormComboBoxStyle}"
-                              AutomationProperties.Name="{loc:Translate BulkEditGatewayPickerLabel}"
-                              TabIndex="1"/>
+                              AutomationProperties.Name="{loc:Translate BulkEditGatewayPickerLabel}"/>
                 </StackPanel>
 
                 <RadioButton GroupName="GatewayChoice"
                              Content="{loc:Translate BulkEditGatewayDirectChoice}"
                              AutomationProperties.Name="{loc:Translate BulkEditGatewayDirectChoice}"
                              IsChecked="{Binding IsDirectChoiceSelected, Mode=TwoWay}"
-                             Margin="0,4,0,0"
-                             TabIndex="2"/>
+                             Margin="0,4,0,0"/>
 
                 <RadioButton GroupName="GatewayChoice"
                              Content="{loc:Translate BulkEditGatewayInheritChoice}"
                              AutomationProperties.Name="{loc:Translate BulkEditGatewayInheritChoice}"
                              IsChecked="{Binding IsInheritChoiceSelected, Mode=TwoWay}"
-                             Margin="0,10,0,0"
-                             TabIndex="3"/>
+                             Margin="0,10,0,0"/>
             </StackPanel>
         </Border>
 
@@ -103,16 +99,14 @@
                     IsCancel="True"
                     Style="{StaticResource SecondaryButtonStyle}"
                     MinWidth="88"
-                    Margin="0,0,8,0"
-                    TabIndex="4"/>
+                    Margin="0,0,8,0"/>
             <Button Content="{loc:Translate BtnApply}"
                     AutomationProperties.Name="{loc:Translate BtnApply}"
                     Style="{StaticResource PrimaryButtonStyle}"
                     IsDefault="True"
                     MinWidth="96"
                     IsEnabled="{Binding IsApplyEnabled}"
-                    Click="OnApplyClick"
-                    TabIndex="5"/>
+                    Click="OnApplyClick"/>
         </StackPanel>
     </Grid>
 </Window>

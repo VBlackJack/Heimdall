@@ -15,7 +15,6 @@
  */
 
 using System.Windows;
-using System.Windows.Input;
 using System.Windows.Threading;
 using Heimdall.App.UiTests.Infrastructure;
 using Heimdall.App.Views;
@@ -96,7 +95,7 @@ public sealed class SessionHeaderTabOrderTests
                 Pump();
                 window.UpdateLayout();
 
-                List<FrameworkElement> reached = WalkTab(window, [first, second]);
+                List<FrameworkElement> reached = WalkHeader(window, strip, [first, second]);
 
                 Assert.Equal(2, reached.Count);
                 Assert.True(
@@ -132,12 +131,12 @@ public sealed class SessionHeaderTabOrderTests
                 Pump();
                 window.UpdateLayout();
 
-                List<FrameworkElement> reached = WalkTab(window, controls);
+                List<FrameworkElement> reached = WalkHeader(window, view, controls);
 
                 Assert.True(
                     reached.Count == controls.Count,
                     $"Tab reached {reached.Count} of {controls.Count} header controls: "
-                    + string.Join(", ", reached.Select(NameOf)));
+                    + string.Join(", ", reached.Select(TabWalk.NameOf)));
 
                 double previous = double.NegativeInfinity;
                 foreach (FrameworkElement control in reached)
@@ -145,8 +144,8 @@ public sealed class SessionHeaderTabOrderTests
                     double left = LeftEdge(control, window);
                     Assert.True(
                         left > previous,
-                        $"Tab went to {NameOf(control)} (x={left:F0}) after a control at x={previous:F0}; order: "
-                        + string.Join(" > ", reached.Select(NameOf)));
+                        $"Tab went to {TabWalk.NameOf(control)} (x={left:F0}) after a control at x={previous:F0}; order: "
+                        + string.Join(" > ", reached.Select(TabWalk.NameOf)));
                     previous = left;
                 }
             }
@@ -158,39 +157,14 @@ public sealed class SessionHeaderTabOrderTests
         });
     }
 
-    /// <summary>
-    /// Moves the keyboard focus forward the way the Tab key does and returns, in the order
-    /// reached, the members of <paramref name="controls"/> the walk landed on.
-    /// </summary>
-    private static List<FrameworkElement> WalkTab(Window window, IReadOnlyCollection<FrameworkElement> controls)
-    {
-        List<FrameworkElement> reached = [];
-        window.Activate();
-        window.MoveFocus(new TraversalRequest(FocusNavigationDirection.First));
-
-        for (int step = 0; step < controls.Count + ExtraStepsPastTheHeader; step++)
-        {
-            if (Keyboard.FocusedElement is FrameworkElement focused && controls.Contains(focused) && !reached.Contains(focused))
-            {
-                reached.Add(focused);
-            }
-
-            if (Keyboard.FocusedElement is not UIElement current)
-            {
-                break;
-            }
-
-            current.MoveFocus(new TraversalRequest(FocusNavigationDirection.Next));
-        }
-
-        return reached;
-    }
+    /// <summary>The members of <paramref name="controls"/> the Tab walk reaches, in the order reached.</summary>
+    private static List<FrameworkElement> WalkHeader(Window window, FrameworkElement root, IReadOnlyCollection<FrameworkElement> controls)
+        => TabWalk.Run(window, root, controls.Count + ExtraStepsPastTheHeader)
+            .Where(controls.Contains)
+            .ToList();
 
     private static double LeftEdge(FrameworkElement element, Window window)
         => element.TranslatePoint(new Point(0, 0), window).X;
-
-    private static string NameOf(FrameworkElement element)
-        => string.IsNullOrEmpty(element.Name) ? element.GetType().Name : element.Name;
 
     private static void Pump()
         => Dispatcher.CurrentDispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(() => { }));
