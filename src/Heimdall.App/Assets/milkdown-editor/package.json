@@ -9,11 +9,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@milkdown/core": "^7.19.2",
-    "@milkdown/crepe": "^7.19.2",
-    "@milkdown/kit": "^7.19.2",
-    "@milkdown/plugin-listener": "^7.19.2",
-    "@milkdown/theme-nord": "^7.19.2"
+    "@milkdown/core": "^7.23.0",
+    "@milkdown/crepe": "^7.23.0",
+    "@milkdown/kit": "^7.23.0",
+    "@milkdown/plugin-listener": "^7.23.0",
+    "@milkdown/theme-nord": "^7.23.0"
   },
   "devDependencies": {
     "vite": "^7.1.12",

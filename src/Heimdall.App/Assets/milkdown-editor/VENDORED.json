@@ -2,17 +2,17 @@
   "components": [
     {
       "name": "milkdown",
-      "version": "7.19.2",
+      "version": "7.23.0",
       "upstream": "https://github.com/Milkdown/milkdown",
       "files": [
         {
           "path": "package-lock.json",
-          "sha256": "caaa400dba6bf93d1574b597f566a05428ee4bccd9247793932195cee310ea3f",
-          "versionMarker": "\"resolved\": \"https://registry.npmjs.org/@milkdown/core/-/core-7.19.2.tgz\""
+          "sha256": "c6f5389be35b38361f469daaa336d2c5b9ae6cb5af9c866f8bec709c1eec65f6",
+          "versionMarker": "\"resolved\": \"https://registry.npmjs.org/@milkdown/core/-/core-7.23.0.tgz\""
         },
         {
           "path": "dist/index.html",
-          "sha256": "768b12554e40624772d05746b11df5ce99da1c08aaab5531c53549d95c587f6b"
+          "sha256": "a7c4fa8f9395b124a417ca5a7992ab1982a7d9e080c3e942992e820cbce9923c"
         }
       ]
     }

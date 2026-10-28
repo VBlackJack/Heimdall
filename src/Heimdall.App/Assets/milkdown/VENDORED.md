@@ -6,7 +6,7 @@ of `../milkdown-editor/dist/index.html`; build, version and dependency audit are
 
 | Component | Version | Upstream                              | License |
 |-----------|---------|---------------------------------------|---------|
-| Milkdown  | 7.19.2  | https://github.com/Milkdown/milkdown  | MIT     |
+| Milkdown  | 7.23.0  | https://github.com/Milkdown/milkdown  | MIT     |
 
 Last reviewed: 2026-10-28
 
