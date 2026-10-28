@@ -221,13 +221,15 @@ flèches comprises dans le refus. `scripts/NotesTypographyGuard.ps1` y fait auto
 ## Localisation et i18n
 
 L'interface existe en anglais, en français et en espagnol. Chaque catalogue sous
-`locales/` porte les mêmes 7 421 clés, et `LocaleCatalogueParityTests` l'impose dans
+`locales/` porte les mêmes 7 400+ clés, et `LocaleCatalogueParityTests` l'impose dans
 les deux sens et sur les paramètres de format. Ajouter une langue fait l'objet d'une
 liste de contrôle dans [CONTRIBUTING.fr.md](../../CONTRIBUTING.fr.md).
 
-Le nombre de clés est cité dans six documents, et un test échoue dès qu'une clé est
-ajoutée ou retirée. `scripts/Update-DocumentedKeyCount.ps1` écrit le nombre du
-catalogue dans les six ; `-Check` se contente de signaler.
+Le nombre de clés est cité dans six documents sous forme de plancher, le nombre du
+catalogue arrondi à la centaine inférieure et suivi d'un signe plus : ajouter quelques
+clés le laisse exact. Un test échoue quand le nombre franchit une centaine et que le
+chiffre cité n'est plus ce plancher. `scripts/Update-DocumentedKeyCount.ps1` écrit le
+chiffre dans les six ; `-Check` se contente de signaler.
 
 Conventions de nommage :
 
