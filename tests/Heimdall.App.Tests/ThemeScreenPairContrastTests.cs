@@ -249,6 +249,61 @@ public sealed class ThemeScreenPairContrastTests
     }
 
     /// <summary>
+    /// Every chip of the RDP import dialog: its label on the fill it is drawn on (the section card
+    /// for an outlined chip), and no text brush used as a fill. The chips drew the background colour
+    /// on the raw error, warning and secondary-text fills, measured per theme in this test.
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(Themes))]
+    public void TheRdpImportChipLabelsAreReadableOnTheirFills(string theme)
+    {
+        List<XElement> chips = [.. ChipsOf("Views/Dialogs/RdpImportDialog.xaml")];
+        Assert.True(chips.Count >= 6, $"only {chips.Count} chips found");
+
+        List<string> unreadable = [];
+        foreach (XElement chip in chips)
+        {
+            XElement label = Assert.Single(chip.Elements(Presentation + "TextBlock"));
+            List<string> ground = ["CardBrush"];
+            if (chip.Attribute("Background") is XAttribute fill)
+            {
+                ground.Add(Key(fill));
+            }
+
+            AssertOrCollect(unreadable, theme, $"chip {(string?)label.Attribute("Text")}", Key(label.Attribute("Foreground")), ground, MinimumTextContrast);
+        }
+
+        Assert.True(unreadable.Count == 0, string.Join(Environment.NewLine, unreadable));
+    }
+
+    /// <summary>
+    /// A text brush (TextSecondaryBrush, ErrorTextBrush and the others) is for text: used as a fill it
+    /// is the colour derived to read on a card, so a label on it has nothing to be paired with. The
+    /// unknown-keys chip was filled with TextSecondaryBrush. The chips of the RDP import dialog keep
+    /// to the fill tokens.
+    /// </summary>
+    [Fact]
+    public void NoRdpImportChipIsFilledWithATextBrush()
+    {
+        List<string> misused = [];
+        foreach (XElement chip in ChipsOf("Views/Dialogs/RdpImportDialog.xaml"))
+        {
+            if (chip.Attribute("Background") is XAttribute fill && Key(fill).Contains("Text", StringComparison.Ordinal))
+            {
+                misused.Add(Describe(chip));
+            }
+        }
+
+        Assert.True(misused.Count == 0, "chips filled with a text brush: " + string.Join(", ", misused));
+    }
+
+    /// <summary>The chips of a view: a rounded border that holds one label.</summary>
+    private static IEnumerable<XElement> ChipsOf(string relative) =>
+        Load(Source(relative)).Descendants(Presentation + "Border")
+            .Where(border => (string?)border.Attribute("CornerRadius") == "10"
+                && border.Elements(Presentation + "TextBlock").Count() == 1);
+
+    /// <summary>
     /// Text in the Notes tool is not dimmed with Opacity on top of its tier brush. At 0.62 the list
     /// footer's secondary text was 3.22 to 1 on Magellan; the tier brushes carry the emphasis.
     /// </summary>

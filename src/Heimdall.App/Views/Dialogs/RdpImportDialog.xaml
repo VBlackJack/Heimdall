@@ -199,7 +199,7 @@
                                                     Background="{DynamicResource ErrorBrush}"
                                                     Visibility="{Binding HasParseError, Converter={StaticResource BoolToVisibilityConverter}}">
                                                 <TextBlock Text="{Binding ParseErrorText}"
-                                                           Foreground="{DynamicResource TextOnAccentBrush}"
+                                                           Foreground="{DynamicResource BadgeTextBrush}"
                                                            TextWrapping="Wrap"
                                                            FontSize="{StaticResource FontSizeCaption}"/>
                                             </Border>
@@ -210,7 +210,7 @@
                                                     Background="{DynamicResource WarningBrush}"
                                                     Visibility="{Binding HasPasswordBlob, Converter={StaticResource BoolToVisibilityConverter}}">
                                                 <TextBlock Text="{Binding PasswordText}"
-                                                           Foreground="{DynamicResource TextOnAccentBrush}"
+                                                           Foreground="{DynamicResource BadgeTextBrush}"
                                                            TextWrapping="Wrap"
                                                            FontSize="{StaticResource FontSizeCaption}"/>
                                             </Border>
@@ -232,18 +232,24 @@
                                                     Background="{DynamicResource WarningBrush}"
                                                     Visibility="{Binding HasGateway, Converter={StaticResource BoolToVisibilityConverter}}">
                                                 <TextBlock Text="{Binding GatewayText}"
-                                                           Foreground="{DynamicResource TextOnAccentBrush}"
+                                                           Foreground="{DynamicResource BadgeTextBrush}"
                                                            TextWrapping="Wrap"
                                                            FontSize="{StaticResource FontSizeCaption}"/>
                                             </Border>
+                                            <!-- Outlined like the skipped-mappings chip below: a neutral note is the
+                                                 quieter of the chips, and a text colour used as a fill left no label
+                                                 colour that read on it in every theme (4.2 to 1 on Folio and
+                                                 Parchment on the neutral indicator fill). -->
                                             <Border Margin="0,0,6,4"
                                                     HorizontalAlignment="Left"
-                                                    Padding="6,2"
+                                                    Padding="5,1"
                                                     CornerRadius="10"
-                                                    Background="{DynamicResource TextSecondaryBrush}"
+                                                    BorderBrush="{DynamicResource BorderStrongBrush}"
+                                                    BorderThickness="1"
+                                                    SnapsToDevicePixels="True"
                                                     Visibility="{Binding HasUnknownKeys, Converter={StaticResource BoolToVisibilityConverter}}">
                                                 <TextBlock Text="{Binding UnknownKeysText}"
-                                                           Foreground="{DynamicResource TextOnAccentBrush}"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"
                                                            TextWrapping="Wrap"
                                                            FontSize="{StaticResource FontSizeCaption}"/>
                                             </Border>
