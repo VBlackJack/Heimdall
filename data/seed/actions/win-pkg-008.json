@@ -71,6 +71,10 @@
       "examples": {
         "winget source add --name CustomRepo https://packages.example.com/winget": "Ajoute une source personnalisée"
       }
+    },
+    "es": {
+      "title": "Añadir un origen de Winget",
+      "description": "Añade un nuevo origen personalizado de paquetes de Winget."
     }
   }
 }

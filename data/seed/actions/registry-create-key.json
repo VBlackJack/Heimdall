@@ -71,6 +71,10 @@
         "Test-Path -Path 'HKLM:\\SOFTWARE\\Contoso\\Agent'": "Vérifie si la clé existe déjà",
         "New-Item -Path 'HKCU:\\Software\\Contoso\\Agent'": "Crée une clé pour l'utilisateur courant uniquement"
       }
+    },
+    "es": {
+      "title": "Crear una clave del registro",
+      "description": "Crea una clave del registro nueva bajo una clave principal existente."
     }
   }
 }

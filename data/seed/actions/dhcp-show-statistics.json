@@ -75,6 +75,10 @@
         "Get-DhcpServerv4ScopeStatistics -ComputerName DHCP01 | Sort-Object PercentageInUse -Descending": "Affiche l'utilisation de chaque étendue, la plus pleine en premier",
         "Get-DhcpServerv4ScopeStatistics -ComputerName DHCP01 | Where-Object PercentageInUse -gt 80": "Trouve les étendues remplies à plus de 80 pour cent"
       }
+    },
+    "es": {
+      "title": "Mostrar las estadísticas del servidor DHCP",
+      "description": "Muestra el uso de direcciones y los contadores de peticiones de un servidor DHCP."
     }
   }
 }

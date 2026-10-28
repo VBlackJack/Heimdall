@@ -105,6 +105,10 @@
         "echo 'nas01:/export/data /mnt/nfs nfs defaults,_netdev 0 0' | sudo tee -a /etc/fstab": "Monte le partage à chaque démarrage",
         "sudo umount /mnt/nfs": "Démonte le partage"
       }
+    },
+    "es": {
+      "title": "Montar un recurso compartido NFS",
+      "description": "Monta un directorio exportado por un servidor NFS en un punto de montaje local."
     }
   }
 }

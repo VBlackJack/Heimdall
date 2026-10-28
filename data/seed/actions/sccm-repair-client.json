@@ -41,6 +41,10 @@
       "examples": {
         "& 'C:\\Windows\\CCM\\ccmrepair.exe'": "Alternative: lance l'outil de réparation via l'exécutable"
       }
+    },
+    "es": {
+      "title": "Reparar el cliente de SCCM",
+      "description": "Ejecuta la reparación automática del cliente de SCCM para corregir problemas de comunicación"
     }
   }
 }

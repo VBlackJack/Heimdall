@@ -66,6 +66,10 @@
         "du -sh /home/*": "Taille de chaque home",
         "du -sh * | sort -rh | head -10": "Affiche les 10 plus gros dossiers ou fichiers du répertoire courant, du plus gros au plus petit, pour trouver ce qui remplit le disque"
       }
+    },
+    "es": {
+      "title": "Tamaño de un directorio",
+      "description": "Calcula el tamaño total de un directorio y de su contenido."
     }
   }
 }

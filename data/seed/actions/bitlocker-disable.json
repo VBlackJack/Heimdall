@@ -93,6 +93,10 @@
         "Disable-BitLocker -MountPoint \"D:\" -Verbose": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes.",
         "Disable-BitLocker -MountPoint \"C:\"": "Exemple utilisant le paramètre 'driveLetter': Lettre du volume à déchiffrer (ex: C, D, E). Remplacez D par la valeur appropriée selon votre environnement."
       }
+    },
+    "es": {
+      "title": "Deshabilitar y descifrar BitLocker",
+      "description": "Deshabilita BitLocker por completo y descifra el volumen (operación irreversible)."
     }
   }
 }

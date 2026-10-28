@@ -96,6 +96,10 @@
         "make -j$(nproc)": "Compilation parallèle",
         "make CFLAGS=\"-O2\" all": "Avec flags personnalisés"
       }
+    },
+    "es": {
+      "title": "Compilar con Make",
+      "description": "Ejecuta un Makefile para compilar un proyecto de C/C++."
     }
   }
 }

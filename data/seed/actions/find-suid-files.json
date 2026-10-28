@@ -107,6 +107,10 @@
         "find . -type d -empty": "Trouver les dossiers vides",
         "find /etc -name \"*.conf\" -exec grep -l \"password\" {} \\;": "Fichiers conf contenant \"password\""
       }
+    },
+    "es": {
+      "title": "Buscar archivos SUID/SGID",
+      "description": "Lista todos los archivos que tienen activado el bit SUID o SGID (potencialmente peligrosos)."
     }
   }
 }

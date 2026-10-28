@@ -71,6 +71,10 @@
         "Get-NetIPAddress -AddressFamily IPv4 | Where-Object {$_.PrefixOrigin -eq 'Dhcp'}": "Affiche uniquement les adresses IPv4 obtenues via DHCP. PrefixOrigin indique comment l'IP a été configurée (Dhcp/Manual/WellKnown). Utile pour distinguer les IPs statiques des IPs dynamiques lors du troubleshooting réseau.",
         "Get-NetIPAddress | Export-Csv C:\\Temp\\NetworkConfig.csv -NoTypeInformation": "Exporte toute la configuration IP vers CSV. Utile pour documenter la configuration réseau avant modifications, créer des inventaires ou archiver l'état réseau. Le fichier CSV peut être analysé dans Excel."
       }
+    },
+    "es": {
+      "title": "Listar los adaptadores de red",
+      "description": "Muestra todos los adaptadores de red con su estado, su velocidad y sus direcciones IP."
     }
   }
 }

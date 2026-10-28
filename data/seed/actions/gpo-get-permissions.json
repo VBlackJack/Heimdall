@@ -58,6 +58,10 @@
       "examples": {
         "Get-GPPermission -Name \"Default Domain Policy\" -All | Select-Object Trustee,Permission,Inherited": "Liste toutes les permissions de la Default Domain Policy"
       }
+    },
+    "es": {
+      "title": "Obtener los permisos de una GPO",
+      "description": "Muestra los permisos de seguridad establecidos en una directiva de grupo."
     }
   }
 }

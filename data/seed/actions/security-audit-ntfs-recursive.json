@@ -72,6 +72,10 @@
       "examples": {
         "Get-ChildItem C:\\Shares -Directory -Recurse | ForEach-Object {Get-Acl $_.FullName}": "Audit complet de tous les sous-dossiers de C:\\Shares"
       }
+    },
+    "es": {
+      "title": "Auditar los permisos NTFS de forma recursiva",
+      "description": "Analiza todas las subcarpetas de forma recursiva e informa de sus permisos NTFS"
     }
   }
 }

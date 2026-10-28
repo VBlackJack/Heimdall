@@ -81,6 +81,10 @@
         "Get-VM 'TestVM' | Select-Object Name, CPUUsage, MemoryDemand, Uptime": "Métriques en temps réel d'une VM",
         "Measure-VM -Name 'VM-WEB-01' | Select-Object VMName, AvgCPU, AvgRAM, MaxRAM, TotalDisk, NetworkMeteredTrafficReport | Format-List": "Exemple utilisant le paramètre 'vmName': Nom de la VM à analyser. Remplacez VM-WEB-01 par la valeur appropriée selon votre environnement."
       }
+    },
+    "es": {
+      "title": "Obtener las estadísticas de una VM",
+      "description": "Muestra estadísticas detalladas de uso de recursos (CPU, memoria, disco, red) de una máquina virtual de Hyper-V."
     }
   }
 }

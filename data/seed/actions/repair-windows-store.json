@@ -35,6 +35,10 @@
       "examples": {
         "wsreset.exe": "Réinitialise le cache du Windows Store"
       }
+    },
+    "es": {
+      "title": "Reparar la Tienda de Windows",
+      "description": "Restablece la caché de la Tienda de Windows, que puede afectar a Windows Update"
     }
   }
 }

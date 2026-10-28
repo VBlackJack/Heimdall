@@ -71,6 +71,10 @@
         "sudo chage -l root": "Vérifie si le mot de passe root expire",
         "grep -E '^PASS_(MAX|MIN|WARN)' /etc/login.defs": "Affiche les valeurs de vieillissement appliquées aux nouveaux comptes"
       }
+    },
+    "es": {
+      "title": "Mostrar la antigüedad de la contraseña de una cuenta",
+      "description": "Muestra cuándo se cambió la contraseña de una cuenta local, cuándo caduca y cuándo caduca la cuenta."
     }
   }
 }

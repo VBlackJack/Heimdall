@@ -82,6 +82,10 @@
         "gradle build": "Compile et teste le projet",
         "gradle clean build": "Nettoie puis compile"
       }
+    },
+    "es": {
+      "title": "Compilar un proyecto Gradle",
+      "description": "Compila y empaqueta un proyecto con Gradle."
     }
   }
 }

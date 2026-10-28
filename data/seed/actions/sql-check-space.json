@@ -75,6 +75,10 @@
         "Invoke-Sqlcmd -Query \"SELECT name, (size*8/1024) AS SizeMB FROM sys.master_files\"": "Taille de tous les fichiers SQL Server",
         "Get-ChildItem 'C:\\Program Files\\Microsoft SQL Server\\*\\*.mdf' | Measure-Object -Property Length -Sum": "Taille totale des fichiers .mdf"
       }
+    },
+    "es": {
+      "title": "Comprobar el espacio en disco de las bases de datos SQL",
+      "description": "Analiza el espacio en disco usado y libre de cada base de datos de SQL Server, incluidos los archivos de datos (.mdf) y de registro (.ldf)."
     }
   }
 }

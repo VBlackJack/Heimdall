@@ -82,6 +82,10 @@
         "Get-ADOrganizationalUnit -Identity \"OU=Paris-Users,DC=contoso,DC=com\" -Properties * | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
         "Get-ADOrganizationalUnit -Identity \"OU=Paris-Users,DC=contoso,DC=com\" -Properties *": "Exemple utilisant le paramètre 'ouDN': Distinguished Name de l'OU. Remplacez OU=Paris-Users,DC=contoso,DC=com par la valeur appropriée selon votre environnement."
       }
+    },
+    "es": {
+      "title": "Mostrar los detalles de una OU",
+      "description": "Muestra todas las propiedades detalladas de una unidad organizativa."
     }
   }
 }

@@ -63,6 +63,10 @@
         "$newPin = ConvertTo-SecureString '123456' -AsPlainText -Force; Add-BitLockerKeyProtector -MountPoint C: -TpmAndPinProtector -Pin $newPin": "Ajoute un nouveau protecteur TPM+PIN avec le PIN '123456'",
         "$oldPin = (Get-BitLockerVolume C:).KeyProtector | Where-Object {$_.KeyProtectorType -eq 'TpmPin'}; Remove-BitLockerKeyProtector -MountPoint C: -KeyProtectorId $oldPin.KeyProtectorId": "Supprime l'ancien protecteur TPM+PIN"
       }
+    },
+    "es": {
+      "title": "Cambiar el PIN de BitLocker",
+      "description": "Cambia el PIN que se usa para desbloquear BitLocker al arrancar (TPM+PIN)."
     }
   }
 }

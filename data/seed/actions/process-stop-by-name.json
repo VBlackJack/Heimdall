@@ -77,6 +77,10 @@
         "Get-Process -Name java -IncludeUserName | Where-Object UserName -eq 'CONTOSO\\svc_app' | Stop-Process -Force": "Arrête seulement les processus d'un compte (nécessite une élévation)",
         "Get-Process -Name w3wp | Select-Object Id,StartTime,CPU": "Vérifie quels processus correspondent au nom avant de les arrêter"
       }
+    },
+    "es": {
+      "title": "Detener procesos por nombre",
+      "description": "Fuerza la detención de todos los procesos con un nombre dado."
     }
   }
 }

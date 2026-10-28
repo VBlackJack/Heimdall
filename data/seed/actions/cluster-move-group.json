@@ -95,6 +95,10 @@
         "Move-ClusterGroup -Name FileServer01 -Cluster CLU01": "Déplace le rôle vers le meilleur noeud disponible",
         "Move-ClusterVirtualMachineRole -Name VM01 -Node NODE02 -MigrationType Live -Cluster CLU01": "Migre à chaud une machine virtuelle en cluster"
       }
+    },
+    "es": {
+      "title": "Mover un rol del clúster a otro nodo",
+      "description": "Mueve un rol en clúster (un grupo de recursos) a otro nodo del clúster de conmutación por error."
     }
   }
 }

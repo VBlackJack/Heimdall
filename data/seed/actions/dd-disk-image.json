@@ -113,6 +113,10 @@
         "dd if=/dev/urandom of=random.bin bs=1M count=10": "Fichier aléatoire de 10 Mo",
         "sudo dd if=/backup/sda.img of=/dev/sda bs=4M": "Restaurer une image"
       }
+    },
+    "es": {
+      "title": "Crear una imagen de disco",
+      "description": "Copia bit a bit de datos (discos, particiones, archivos)"
     }
   }
 }

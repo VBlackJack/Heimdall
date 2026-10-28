@@ -65,6 +65,10 @@
         "Get-BitLockerVolume | Where-Object {$_.VolumeStatus -eq 'FullyDecrypted'}": "Liste les volumes non chiffrés (vulnérables)",
         "Get-BitLockerVolume C: | Select-Object *": "Affiche toutes les propriétés détaillées du volume C:"
       }
+    },
+    "es": {
+      "title": "Obtener el estado de BitLocker de todos los discos",
+      "description": "Muestra el estado de cifrado de BitLocker de todos los volúmenes del sistema."
     }
   }
 }

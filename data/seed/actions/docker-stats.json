@@ -93,6 +93,10 @@
         "docker stats --format \"table {{.Name}}\\t{{.CPUPerc}}\\t{{.MemUsage}}\"": "Affiche les stats avec un format personnalisé (nom, CPU, mémoire).",
         "docker stats --no-stream --format \"{{.Name}}: {{.CPUPerc}}\"": "Affiche un snapshot des stats CPU avec format simplifié."
       }
+    },
+    "es": {
+      "title": "Estadísticas de los contenedores de Docker",
+      "description": "Muestra en tiempo real el uso de CPU, memoria, red y E/S de los contenedores"
     }
   }
 }

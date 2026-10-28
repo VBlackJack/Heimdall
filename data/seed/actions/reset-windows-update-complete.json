@@ -36,6 +36,10 @@
       "examples": {
         "net stop wuauserv && net stop cryptSvc && net stop bits && net stop msiserver && ren C:\\Windows\\SoftwareDistribution SoftwareDistribution.old && ren C:\\Windows\\System32\\catroot2 catroot2.old && net start wuauserv && net start cryptSvc && net start bits && net start msiserver": "Arrête les services de mise à jour, renomme les dossiers SoftwareDistribution et catroot2, puis redémarre les services"
       }
+    },
+    "es": {
+      "title": "Restablecer Windows Update por completo",
+      "description": "Detiene los servicios de WU, elimina las cachés SoftwareDistribution y Catroot2 y vuelve a iniciar los servicios"
     }
   }
 }

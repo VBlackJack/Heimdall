@@ -78,6 +78,10 @@ public sealed class SourceTypographyGuardTests
 
     private const string LocalesDirectoryName = "locales";
     private const string SourceDirectoryName = "src";
+    private const string DataDirectoryName = "data";
+
+    /// <summary>Lower bound on the seed action files the data sweep opens.</summary>
+    private const int MinimumSeedFilesScanned = 527;
 
     /// <summary>
     /// Lower bound on the number of source files a healthy sweep opens. Guards the guard: a glob
@@ -232,6 +236,69 @@ public sealed class SourceTypographyGuardTests
             violations.Count == 0,
             $"{violations.Count} typographic substitute(s) in {fileName}:\n"
             + string.Join("\n", violations.Take(MaxViolationsReported)));
+    }
+
+    /// <summary>
+    /// The Command Library content ships as JSON under <c>data/seed</c> and <c>data/packs</c>
+    /// and reaches the user as titles, descriptions, notes and example descriptions in three
+    /// languages. Every string and every property name is compared after JSON unescaping, for
+    /// the same reason as the locale catalogues: <c>—</c> in a file is an em dash on screen.
+    /// </summary>
+    [Fact]
+    public void CommandLibraryDataUsesNoTypographicSubstitutes()
+    {
+        string dataRoot = Path.Combine(FindRepoRoot(), DataDirectoryName);
+        string[] seedFiles = Directory.GetFiles(Path.Combine(dataRoot, "seed"), "*.json", SearchOption.AllDirectories);
+        string[] packFiles = Directory.GetFiles(Path.Combine(dataRoot, "packs"), "*.json", SearchOption.AllDirectories);
+        string[] files = [.. seedFiles, .. packFiles];
+
+        Assert.True(
+            seedFiles.Length >= MinimumSeedFilesScanned,
+            $"only {seedFiles.Length} seed action files were reached by the sweep");
+        Assert.Contains(packFiles, path => path.EndsWith("windows-workstation-debloat.json", System.StringComparison.Ordinal));
+
+        List<string> violations = [];
+        foreach (string path in files)
+        {
+            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(path));
+            ScanJson(document.RootElement, Relative(path), violations);
+        }
+
+        Assert.True(
+            violations.Count == 0,
+            $"{violations.Count} typographic substitute(s) in the Command Library data:\n"
+            + string.Join("\n", violations.Take(MaxViolationsReported)));
+    }
+
+    private static void ScanJson(JsonElement element, string where, List<string> violations)
+    {
+        switch (element.ValueKind)
+        {
+            case JsonValueKind.String:
+                ScanText(element.GetString() ?? string.Empty, where, violations);
+                break;
+            case JsonValueKind.Array:
+                foreach (JsonElement item in element.EnumerateArray())
+                    ScanJson(item, where, violations);
+                break;
+            case JsonValueKind.Object:
+                foreach (JsonProperty property in element.EnumerateObject())
+                {
+                    ScanText(property.Name, where, violations);
+                    ScanJson(property.Value, where + "/" + property.Name, violations);
+                }
+
+                break;
+        }
+    }
+
+    private static void ScanText(string text, string where, List<string> violations)
+    {
+        foreach (char character in text)
+        {
+            if (Refused.TryGetValue(character, out string? remedy))
+                violations.Add($"{where} contains U+{(int)character:X4} ({remedy})");
+        }
     }
 
     /// <summary>

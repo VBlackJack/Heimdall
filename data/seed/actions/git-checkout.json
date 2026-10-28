@@ -96,6 +96,10 @@
         "git checkout -- file.txt": "Restaure un fichier depuis le dernier commit",
         "git checkout main": "Bascule sur la branche main"
       }
+    },
+    "es": {
+      "title": "Cambiar de rama o restaurar archivos",
+      "description": "Cambia a otra rama o restaura archivos del directorio de trabajo."
     }
   }
 }

@@ -87,6 +87,10 @@
         "docker exec -it db_prod mysql -u root -p": "Se connecte directement au client MySQL à l'intérieur du conteneur DB.",
         "docker exec -u 0 -it web_app bash": "Entre dans le conteneur en tant que ROOT (user 0). Utile si l'user par défaut n'a pas les droits d'installation d'outils de debug."
       }
+    },
+    "es": {
+      "title": "Abrir un shell en un contenedor (docker exec)",
+      "description": "Abre un shell interactivo (bash/sh) dentro de un contenedor en ejecución para depurar."
     }
   }
 }

@@ -89,6 +89,10 @@
         "sudo iftop -B": "Afficher en bytes/s",
         "nload": "Alternative nload"
       }
+    },
+    "es": {
+      "title": "Supervisar el ancho de banda de la red",
+      "description": "Muestra en tiempo real el uso del ancho de banda de red por conexión."
     }
   }
 }

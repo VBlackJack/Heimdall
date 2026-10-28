@@ -82,6 +82,10 @@
       "examples": {
         "Import-GPO -BackupId {12345678-1234-1234-1234-123456789012} -TargetName \"New-Policy\" -Path \"C:\\GPOBackups\"": "Importe les paramètres d'une sauvegarde dans New-Policy"
       }
+    },
+    "es": {
+      "title": "Importar la configuración de una GPO",
+      "description": "Importa la configuración de una copia de seguridad de una GPO en una GPO existente o nueva."
     }
   }
 }

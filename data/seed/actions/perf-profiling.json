@@ -95,6 +95,10 @@
         "perf record -g command": "Enregistrer avec call graph",
         "perf list": "Lister les événements disponibles"
       }
+    },
+    "es": {
+      "title": "Perfilar el rendimiento de la CPU",
+      "description": "Analiza el rendimiento de la CPU y encuentra los puntos críticos."
     }
   }
 }

@@ -70,6 +70,10 @@
         "sudo hostnamectl set-hostname web01": "Donne à l'hôte un nom court",
         "grep -n web01 /etc/hosts": "Vérifie que /etc/hosts correspond toujours au nouveau nom"
       }
+    },
+    "es": {
+      "title": "Cambiar el nombre de host",
+      "description": "Establece de forma persistente el nombre de host estático del sistema."
     }
   }
 }

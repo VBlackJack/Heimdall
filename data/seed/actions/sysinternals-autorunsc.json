@@ -40,6 +40,10 @@
         "autorunsc.exe -a * -c -h -AcceptEula > autoruns.csv": "🔥 FORENSIC : Exporte TOUS les points de démarrage (-a *) en format CSV (-c) avec les hashs MD5 (-h). À analyser pour trouver la persistance d'un malware.",
         "autorunsc.exe -v -AcceptEula": "Vérifie les signatures numériques (-v) de Microsoft. Cache les entrées signées par Microsoft pour se concentrer sur les tiers."
       }
+    },
+    "es": {
+      "title": "Listar los programas de inicio (Autoruns)",
+      "description": "Versión de línea de comandos de Autoruns. Lista todo lo que se inicia automáticamente (claves Run, servicios, controladores, tareas programadas)."
     }
   }
 }

@@ -94,6 +94,10 @@
         "sudo ufw deny 3306": "Bloquer MySQL",
         "sudo ufw enable": "Activer le firewall"
       }
+    },
+    "es": {
+      "title": "Comprobar el estado del cortafuegos UFW",
+      "description": "Muestra el estado y las reglas del cortafuegos UFW (Uncomplicated Firewall)"
     }
   }
 }

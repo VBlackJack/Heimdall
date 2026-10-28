@@ -41,6 +41,10 @@
       "examples": {
         "netdom query fsmo": "Affiche tous les détenteurs de rôles FSMO"
       }
+    },
+    "es": {
+      "title": "Comprobar los roles FSMO",
+      "description": "Muestra los controladores de dominio que tienen los roles FSMO (Flexible Single Master Operations)."
     }
   }
 }

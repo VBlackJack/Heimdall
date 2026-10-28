@@ -132,6 +132,10 @@
         "ansible-playbook deploy.yml -i staging --check": "Mode dry-run sur l'environnement de staging",
         "ansible-playbook deploy.yml": "Exécuter un playbook"
       }
+    },
+    "es": {
+      "title": "Ejecutar un playbook de Ansible",
+      "description": "Ejecuta un playbook de Ansible en los hosts definidos en el inventario"
     }
   }
 }

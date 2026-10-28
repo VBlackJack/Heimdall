@@ -77,6 +77,10 @@
         "pkill -9 java": "Forcer l'arrêt des processus Java",
         "pkill -u www-data": "Terminer les processus d'un utilisateur"
       }
+    },
+    "es": {
+      "title": "Terminar procesos por patrón",
+      "description": "Envía una señal a los procesos cuyo nombre coincide con un patrón."
     }
   }
 }

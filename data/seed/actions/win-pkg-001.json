@@ -59,6 +59,10 @@
       "examples": {
         "winget install Microsoft.PowerToys --silent": "Installe PowerToys de manière silencieuse"
       }
+    },
+    "es": {
+      "title": "Instalar una aplicación con Winget",
+      "description": "Instala una aplicación de Windows con el administrador de paquetes Winget."
     }
   }
 }

@@ -108,6 +108,10 @@
         "ansible-vault encrypt --vault-id prod@prompt secrets.yml": "Avec vault ID",
         "ansible-vault encrypt_string 'secret' --name 'password'": "Chiffrer une string"
       }
+    },
+    "es": {
+      "title": "Cifrar un archivo con Ansible Vault",
+      "description": "Cifra con Ansible Vault un archivo que contiene datos sensibles"
     }
   }
 }

@@ -89,6 +89,10 @@
         "openssl s_client -connect mail.example.com:25 -starttls smtp </dev/null": "Teste STARTTLS sur un serveur SMTP",
         "openssl s_client -connect dc01.example.com:636 </dev/null": "Teste le certificat LDAPS d'un contrôleur de domaine"
       }
+    },
+    "es": {
+      "title": "Probar una conexión TLS con un servidor",
+      "description": "Abre una conexión TLS con un host y un puerto con SNI, y muestra la cadena de certificados, el protocolo y el resultado de la verificación."
     }
   }
 }

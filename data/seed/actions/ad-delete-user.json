@@ -83,6 +83,10 @@
         "Remove-ADUser -Identity 'CN=Jean Dupont,OU=Utilisateurs,DC=contoso,DC=com' -Confirm:$false": "Suppression par DistinguishedName (DN) complet. Utile lorsque plusieurs comptes partagent un nom similaire ou lorsque le SamAccountName n'est pas connu. Le DN identifie de manière unique un objet dans l'arborescence AD.",
         "Get-ADUser -Filter {Enabled -eq $false -and LastLogonDate -lt (Get-Date).AddDays(-365)} -Properties LastLogonDate | Select-Object Name,SamAccountName,LastLogonDate | Export-Csv C:\\Temp\\ToDelete.csv -NoTypeInformation": "Identifie les comptes désactivés et inactifs depuis plus d'un an, candidats à la suppression. Exporte la liste pour validation managériale avant suppression. Ne supprime rien automatiquement : vérifiez la liste manuellement avant de procéder avec Remove-ADUser."
       }
+    },
+    "es": {
+      "title": "Eliminar una cuenta de usuario de AD",
+      "description": "Elimina de forma permanente una cuenta de usuario de Active Directory. Irreversible: se pierden el SID, la pertenencia a grupos y los datos asociados."
     }
   }
 }

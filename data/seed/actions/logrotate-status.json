@@ -46,6 +46,10 @@
         "logrotate -d /etc/logrotate.conf": "Test de la configuration logrotate (mode debug)",
         "ls -la /var/log/*.gz": "Logs archivés"
       }
+    },
+    "es": {
+      "title": "Comprobar el estado de la rotación de registros",
+      "description": "Muestra el estado actual de la rotación de registros del sistema."
     }
   }
 }

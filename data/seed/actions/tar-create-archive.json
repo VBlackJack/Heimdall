@@ -101,6 +101,10 @@
         "tar -xzf backup.tar.gz": "Extrait une archive gzip",
         "tar -tjf backup.tar.bz2": "Liste le contenu sans extraire"
       }
+    },
+    "es": {
+      "title": "Crear un archivo tar",
+      "description": "Crea un archivo comprimido de archivos y directorios"
     }
   }
 }

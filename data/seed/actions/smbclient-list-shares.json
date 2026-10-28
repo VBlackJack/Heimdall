@@ -84,6 +84,10 @@
         "smbclient -L //fs01 -N": "Liste les partages de façon anonyme",
         "smbclient //fs01/public -U alice -c 'ls'": "Liste les fichiers à la racine d'un partage"
       }
+    },
+    "es": {
+      "title": "Listar los recursos compartidos de un servidor SMB",
+      "description": "Lista los recursos compartidos que un servidor Windows o Samba ofrece a un usuario dado."
     }
   }
 }

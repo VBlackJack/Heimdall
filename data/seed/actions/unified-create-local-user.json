@@ -145,6 +145,10 @@
         "sudo useradd -m -s /bin/bash jdupont": "Créer un utilisateur avec home et bash",
         "sudo useradd -m -d /opt/app -s /bin/bash appuser": "Utilisateur avec home personnalisé"
       }
+    },
+    "es": {
+      "title": "Crear un usuario local",
+      "description": "Crea una cuenta de usuario local nueva en el sistema."
     }
   }
 }

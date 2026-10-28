@@ -111,6 +111,10 @@
         "git pull origin main": "Récupère et fusionne les changements de main",
         "git pull --rebase": "Récupère et rebase au lieu de merge"
       }
+    },
+    "es": {
+      "title": "Obtener y fusionar desde el repositorio remoto",
+      "description": "Obtiene los cambios del repositorio remoto y los fusiona en la rama local."
     }
   }
 }

@@ -47,6 +47,10 @@
         "Invoke-WmiMethod -Namespace root\\ccm -Class sms_client -Name TriggerSchedule '{00000000-0000-0000-0000-000000000113}'": "Déclenche l'analyse des mises à jour",
         "Invoke-WmiMethod -Namespace root\\ccm -Class sms_client -Name TriggerSchedule '{00000000-0000-0000-0000-000000000114}'": "Déclenche l'évaluation du déploiement des mises à jour"
       }
+    },
+    "es": {
+      "title": "Desencadenar el análisis de actualizaciones de SCCM",
+      "description": "Fuerza al cliente de SCCM a buscar ahora las actualizaciones de software disponibles"
     }
   }
 }

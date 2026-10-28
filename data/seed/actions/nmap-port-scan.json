@@ -118,6 +118,10 @@
         "nmap -O 192.168.1.1": "Détecter l'OS",
         "nmap -A server.com": "Scan complet (OS, version, scripts)"
       }
+    },
+    "es": {
+      "title": "Escanear puertos abiertos",
+      "description": "Escanea los puertos abiertos de un host o de una red con nmap."
     }
   }
 }

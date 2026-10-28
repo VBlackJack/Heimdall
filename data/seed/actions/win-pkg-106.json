@@ -65,6 +65,10 @@
         "choco search chrome": "Recherche tous les packages contenant 'chrome'",
         "choco search --exact googlechrome": "Recherche par nom exact"
       }
+    },
+    "es": {
+      "title": "Buscar un paquete de Chocolatey",
+      "description": "Busca paquetes disponibles en el repositorio de Chocolatey."
     }
   }
 }

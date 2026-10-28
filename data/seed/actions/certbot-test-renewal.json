@@ -54,6 +54,10 @@
         "sudo certbot renew --cert-name www.example.com --dry-run": "Teste le renouvellement d'un seul certificat",
         "systemctl list-timers | grep certbot": "Vérifie que le minuteur de renouvellement automatique est planifié"
       }
+    },
+    "es": {
+      "title": "Probar la renovación de los certificados de Let's Encrypt",
+      "description": "Simula la renovación de todos los certificados contra el servidor de pruebas (staging), sin guardar nada."
     }
   }
 }

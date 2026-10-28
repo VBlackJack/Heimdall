@@ -82,6 +82,10 @@
         "$vol = Enable-BitLocker -MountPoint \"C:\" -RecoveryPasswordProtector -UsedSpaceOnly; $vol.KeyProtector[0].RecoveryPassword": "Active BitLocker et affiche immédiatement le mot de passe de récupération",
         "Enable-BitLocker -MountPoint \"D:\" -RecoveryPasswordProtector -SkipHardwareTest": "Active BitLocker en sautant le test matériel (attention: risque si matériel incompatible)"
       }
+    },
+    "es": {
+      "title": "Habilitar BitLocker con una contraseña de recuperación",
+      "description": "Habilita el cifrado de BitLocker en un volumen protegido por una contraseña de recuperación."
     }
   }
 }

@@ -99,6 +99,10 @@
       "examples": {
         "pg_isready -h 192.168.1.10": "Simple ping PostgreSQL. Retourne 'accepting connections' ou 'no response'."
       }
+    },
+    "es": {
+      "title": "Comprobar el estado de PostgreSQL (pg_isready)",
+      "description": "Comprueba el estado de la conexión con el servidor PostgreSQL."
     }
   }
 }

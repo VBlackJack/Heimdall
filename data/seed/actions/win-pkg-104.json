@@ -48,6 +48,10 @@
         "choco upgrade all -y": "Met à jour tous les packages Chocolatey",
         "choco upgrade all -y --except=\"package1,package2\"": "Met à jour tous sauf certains packages"
       }
+    },
+    "es": {
+      "title": "Actualizar todos los paquetes de Chocolatey",
+      "description": "Actualiza todos los paquetes instalados a su última versión disponible."
     }
   }
 }

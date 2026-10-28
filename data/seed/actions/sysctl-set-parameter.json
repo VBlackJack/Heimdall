@@ -93,6 +93,10 @@
         "echo 'vm.swappiness = 10' | sudo tee /etc/sysctl.d/90-swappiness.conf": "Conserve la valeur après redémarrage",
         "sudo sysctl --system": "Recharge tous les fichiers de /etc/sysctl.d"
       }
+    },
+    "es": {
+      "title": "Cambiar un parámetro del kernel",
+      "description": "Establece un parámetro del kernel en tiempo de ejecución, como el reenvío de IP o el swappiness."
     }
   }
 }

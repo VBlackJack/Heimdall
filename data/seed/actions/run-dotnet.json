@@ -108,6 +108,10 @@
         "dotnet run --project \"./MyApp\"": "Lance un projet .NET depuis un chemin relatif",
         "dotnet restore": "Restaurer les dépendances NuGet"
       }
+    },
+    "es": {
+      "title": "Ejecutar un proyecto .NET",
+      "description": "Inicia un proyecto de .NET en modo de desarrollo."
     }
   }
 }

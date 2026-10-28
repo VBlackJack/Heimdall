@@ -89,6 +89,10 @@
         "sudo firewall-cmd --permanent --zone=public --remove-service=dhcpv6-client": "Retire un service de la zone",
         "sudo firewall-cmd --zone=public --add-service=http --timeout=1h": "Autorise HTTP pendant une heure seulement, sans l'enregistrer"
       }
+    },
+    "es": {
+      "title": "Permitir un servicio en firewalld",
+      "description": "Abre de forma permanente en una zona un servicio predefinido de firewalld, como http o ssh."
     }
   }
 }

@@ -80,6 +80,10 @@
         "lsblk -J": "Sortie en format JSON",
         "lsblk -o NAME,FSTYPE,SIZE,MOUNTPOINT,STATE": "Affichage personnalisé pour voir l'état des disques"
       }
+    },
+    "es": {
+      "title": "Listar discos y particiones",
+      "description": "Muestra todos los dispositivos de bloques (discos, particiones) en forma de árbol."
     }
   }
 }

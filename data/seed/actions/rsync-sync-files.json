@@ -125,6 +125,10 @@
         "rsync -avzn /src/ /dest/": "Dry-run (simulation)",
         "rsync -avz --exclude=\"*.log\" /app/ /backup/": "Exclure les fichiers .log"
       }
+    },
+    "es": {
+      "title": "Sincronizar archivos con rsync",
+      "description": "Sincroniza y copia archivos de forma incremental, en local o hacia un host remoto"
     }
   }
 }

@@ -93,6 +93,10 @@
         "git tag v1.0.0": "Crée un tag léger",
         "git tag -a v1.0.0 -m \"Release 1.0.0\"": "Crée un tag annoté"
       }
+    },
+    "es": {
+      "title": "Gestionar etiquetas de Git",
+      "description": "Crea, lista o elimina etiquetas (versiones)."
     }
   }
 }

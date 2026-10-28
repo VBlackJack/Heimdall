@@ -57,6 +57,10 @@
       "examples": {
         "journalctl -k -n 100": "Affiche les 100 derniers messages du kernel. Le flag -k (kernel) filtre uniquement les messages noyau (équivalent de dmesg). Essentiel pour diagnostiquer les problèmes hardware, drivers, panics kernel, erreurs disque/réseau de bas niveau."
       }
+    },
+    "es": {
+      "title": "Mostrar solo los mensajes del kernel",
+      "description": "Filtra los registros de journald para mostrar solo los mensajes del kernel."
     }
   }
 }

@@ -62,6 +62,10 @@
       "examples": {
         "(Get-Process).Handles | Measure-Object -Sum": "Nombre total de handles système"
       }
+    },
+    "es": {
+      "title": "Analizar los identificadores abiertos por proceso",
+      "description": "Analiza y muestra el número de identificadores (handles: archivos, registro, hilos, etc.) que mantiene abiertos cada proceso. Útil para detectar fugas de recursos."
     }
   }
 }

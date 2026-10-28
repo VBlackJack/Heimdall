@@ -50,6 +50,10 @@
       "examples": {
         "pskill.exe -t -AcceptEula chrome": "Tue toutes les instances de Chrome et toute leur arborescence de processus enfants (-t). Radical pour nettoyer un navigateur planté."
       }
+    },
+    "es": {
+      "title": "Terminar un proceso (PsKill)",
+      "description": "Termina procesos por nombre o ID, en local o de forma remota. Más robusto que taskkill."
     }
   }
 }

@@ -71,6 +71,10 @@
         "Get-ClusterGroup -Cluster CLU01": "Affiche les rôles et le noeud propriétaire de chacun",
         "Get-ClusterResource -Cluster CLU01 -Name 'Cluster IP Address' | Get-ClusterParameter": "Affiche les paramètres privés d'une ressource"
       }
+    },
+    "es": {
+      "title": "Listar los recursos del clúster",
+      "description": "Muestra los recursos de un clúster de conmutación por error con su estado, su rol y su nodo propietario."
     }
   }
 }

@@ -76,6 +76,10 @@
         "Compress-Archive -Path \"C:\\Data\\*\" -DestinationPath \"C:\\Backup\\data.zip\"": "Compresse un dossier entier",
         "Compress-Archive -Path \"*.txt\",\"*.log\" -DestinationPath \"logs.zip\"": "Compresse plusieurs types de fichiers"
       }
+    },
+    "es": {
+      "title": "Crear un archivo ZIP",
+      "description": "Comprime archivos o carpetas en un archivo ZIP."
     }
   }
 }

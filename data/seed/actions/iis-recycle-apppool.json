@@ -92,6 +92,10 @@
         "Import-Module WebAdministration; Restart-WebAppPool -Name 'DefaultAppPool' -Force": "Force l'action même en cas de résistance (services dépendants, processus protégés, etc.). -Force contourne certaines sécurités. À utiliser avec précaution après avoir vérifié les dépendances.",
         "Import-Module WebAdministration; Restart-WebAppPool -Name 'DefaultAppPool'": "Exemple utilisant le paramètre 'appPoolName': Nom du pool d'application à recycler. Remplacez DefaultAppPool par la valeur appropriée selon votre environnement."
       }
+    },
+    "es": {
+      "title": "Reciclar un grupo de aplicaciones de IIS",
+      "description": "Fuerza el reciclado (reinicio) de un grupo de aplicaciones de IIS. Útil para aplicar cambios de configuración o para liberar memoria."
     }
   }
 }

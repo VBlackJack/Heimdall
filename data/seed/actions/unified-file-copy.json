@@ -151,6 +151,10 @@
         "cp -p file.txt /tmp/": "Copier en préservant les attributs",
         "cp -u *.log /archive/": "Copier uniquement les plus récents"
       }
+    },
+    "es": {
+      "title": "Copiar archivos o carpetas",
+      "description": "Copia archivos o directorios con sus subcarpetas."
     }
   }
 }

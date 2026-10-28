@@ -148,6 +148,10 @@
         "ansible-playbook site.yml --tags \"deploy,configure\"": "Exécute uniquement les tâches avec les tags deploy et configure.",
         "ansible-playbook site.yml --skip-tags \"backup\"": "Exécute toutes les tâches sauf celles avec le tag backup."
       }
+    },
+    "es": {
+      "title": "Ejecutar tareas concretas con --tags",
+      "description": "Ejecuta solo las tareas marcadas con etiquetas concretas"
     }
   }
 }

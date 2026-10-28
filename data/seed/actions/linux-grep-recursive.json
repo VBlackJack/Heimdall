@@ -63,6 +63,10 @@
       "examples": {
         "grep -rnw '/var/log' -e 'Exception'": "Cherche 'Exception' récursivement (-r), avec numéro de ligne (-n) et mot entier (-w) dans /var/log."
       }
+    },
+    "es": {
+      "title": "Búsqueda de texto (grep)",
+      "description": "Busca una cadena en el contenido de los archivos."
     }
   }
 }

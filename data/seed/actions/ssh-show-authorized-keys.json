@@ -77,6 +77,10 @@
         "sudo cat /root/.ssh/authorized_keys": "Affiche les clés qui peuvent se connecter sous root",
         "sudo sshd -T | grep -i authorizedkeysfile": "Affiche où sshd cherche les clés autorisées"
       }
+    },
+    "es": {
+      "title": "Mostrar las claves SSH autorizadas de un usuario",
+      "description": "Imprime las claves públicas autorizadas a iniciar sesión como un usuario local dado."
     }
   }
 }

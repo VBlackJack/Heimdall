@@ -100,6 +100,10 @@
         "Add-ADGroupMember -Identity 'Groupe_Projets' -Members (Get-ADGroup 'IT_Team').DistinguishedName": "Ajoute un groupe entier comme membre d'un autre groupe (imbrication). Get-ADGroup récupère l'objet groupe source. L'imbrication permet une gestion hiérarchique : modifier IT_Team impacte automatiquement Groupe_Projets.",
         "Get-ADGroupMember -Identity 'IT_Support' | Select-Object Name,SamAccountName; Add-ADGroupMember -Identity 'IT_Support' -Members jdupont -WhatIf": "Affiche d'abord les membres actuels du groupe, puis simule l'ajout avec -WhatIf. Cette approche prudente permet de vérifier que l'utilisateur n'est pas déjà membre avant l'ajout. Retirez -WhatIf après vérification pour exécuter réellement."
       }
+    },
+    "es": {
+      "title": "Añadir un usuario a un grupo de AD",
+      "description": "Añade un usuario como miembro de un grupo de Active Directory."
     }
   }
 }

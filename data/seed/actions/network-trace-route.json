@@ -127,6 +127,10 @@
         "traceroute -m 15 remote-server.com": "Limiter à 15 sauts maximum",
         "mtr google.com": "Version interactive et continue (mtr)"
       }
+    },
+    "es": {
+      "title": "Trazar la ruta de red",
+      "description": "Muestra la ruta completa de los paquetes de red hasta un destino."
     }
   }
 }

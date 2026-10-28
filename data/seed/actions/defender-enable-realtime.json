@@ -104,6 +104,10 @@
         "Set-MpPreference -DisableRealtimeMonitoring $Enable -PassThru": "Force la commande à retourner l'objet modifié/créé dans le pipeline. Par défaut, les cmdlets Set-/New- ne retournent rien. -PassThru active le retour pour permettre des opérations en chaîne ou des vérifications immédiates.",
         "Set-MpPreference -DisableRealtimeMonitoring $Enable -Verbose": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes."
       }
+    },
+    "es": {
+      "title": "Habilitar o deshabilitar la protección en tiempo real de Defender",
+      "description": "Habilita o deshabilita la protección en tiempo real de Windows Defender."
     }
   }
 }

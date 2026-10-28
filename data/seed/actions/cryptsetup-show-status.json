@@ -77,6 +77,10 @@
         "lsblk -o NAME,TYPE,FSTYPE,MOUNTPOINT": "Trouve les mappages chiffrés et leur point de montage",
         "sudo cryptsetup isLuks /dev/sdb1 && echo LUKS": "Vérifie si un périphérique porte un en-tête LUKS"
       }
+    },
+    "es": {
+      "title": "Mostrar el estado de un volumen cifrado",
+      "description": "Muestra el cifrado, el tamaño de clave, el dispositivo subyacente y el tamaño de una asignación LUKS o dm-crypt abierta."
     }
   }
 }

@@ -36,6 +36,10 @@
       "examples": {
         "gpupdate /force": "Force la mise à jour des GPO sur la machine locale"
       }
+    },
+    "es": {
+      "title": "Forzar la actualización de las directivas de grupo",
+      "description": "Aplica las directivas de grupo de inmediato sin esperar al intervalo de actualización."
     }
   }
 }

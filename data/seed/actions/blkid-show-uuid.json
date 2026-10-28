@@ -82,6 +82,10 @@
         "blkid -o list": "Format liste",
         "blkid -t TYPE=ext4": "Partitions ext4 uniquement"
       }
+    },
+    "es": {
+      "title": "Mostrar los UUID de las particiones",
+      "description": "Muestra los UUID y la información de los dispositivos de bloques"
     }
   }
 }

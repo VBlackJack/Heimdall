@@ -107,6 +107,10 @@
         "vmstat -a": "Mémoire active/inactive",
         "vmstat 1 5": "Stats toutes les secondes, 5 fois"
       }
+    },
+    "es": {
+      "title": "Estadísticas globales del sistema",
+      "description": "Muestra estadísticas de memoria virtual, CPU, E/S y procesos"
     }
   }
 }

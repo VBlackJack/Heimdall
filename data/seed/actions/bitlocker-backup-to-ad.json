@@ -94,6 +94,10 @@
         "$keyProtector = (Get-BitLockerVolume -MountPoint \"D:\").KeyProtector | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
         "$keyProtector = (Get-BitLockerVolume -MountPoint \"D:\").KeyProtector | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
       }
+    },
+    "es": {
+      "title": "Copiar la contraseña de BitLocker a Active Directory",
+      "description": "Copia automáticamente la contraseña de recuperación de BitLocker a Active Directory."
     }
   }
 }

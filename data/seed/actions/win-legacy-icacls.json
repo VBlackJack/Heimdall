@@ -77,6 +77,10 @@
         "icacls \"C:\\BrokenFolder\" /reset /T": "🔥 REPAIR PERMISSIONS : Réinitialise (/reset) les permissions en forçant l'héritage du dossier parent. La commande de secours quand les droits sont corrompus.",
         "icacls \"C:\\Data\" /save \"C:\\Temp\\Acls.txt\" /T /C": "Sauvegarde toutes les permissions dans un fichier texte. Utile avant une migration ou une modification risquée. Restaurer avec /restore."
       }
+    },
+    "es": {
+      "title": "Gestionar permisos NTFS (ICACLS)",
+      "description": "Muestra o cambia las listas de control de acceso (ACL) de archivos y carpetas."
     }
   }
 }

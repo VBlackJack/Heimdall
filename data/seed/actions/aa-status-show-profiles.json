@@ -60,6 +60,10 @@
         "sudo journalctl -k | grep -i 'apparmor=\"DENIED\"'": "Affiche les refus AppArmor dans le journal du noyau",
         "sudo aa-complain /etc/apparmor.d/usr.sbin.mysqld": "Passe un profil en mode complain pour le diagnostiquer"
       }
+    },
+    "es": {
+      "title": "Mostrar el estado de AppArmor",
+      "description": "Muestra los perfiles de AppArmor cargados, su modo y los procesos que confinan."
     }
   }
 }

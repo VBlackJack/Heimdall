@@ -41,6 +41,10 @@
       "examples": {
         "DISM /Online /Cleanup-Image /RestoreHealth && sfc /scannow": "Répare le magasin de composants avec DISM, puis vérifie les fichiers système avec SFC"
       }
+    },
+    "es": {
+      "title": "Reparar la base de datos de Windows Update",
+      "description": "Usa DISM para reparar los componentes dañados de Windows Update"
     }
   }
 }

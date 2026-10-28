@@ -134,6 +134,10 @@
         "systemctl status apache2": "Vérifie le statut du serveur web Apache.",
         "systemctl status cron": "Vérifie le statut du service de tâches planifiées cron."
       }
+    },
+    "es": {
+      "title": "Comprobar el estado de un servicio",
+      "description": "Muestra el estado actual de un servicio de Windows."
     }
   }
 }

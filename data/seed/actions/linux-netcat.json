@@ -76,6 +76,10 @@
         "nc -l 8080": "Mode Serveur (-l) : Écoute sur le port 8080. Utile pour vérifier si le pare-feu laisse passer le trafic entrant.",
         "nc -zv -w 2 google.com 80": "Test avec timeout de 2 secondes (-w 2)."
       }
+    },
+    "es": {
+      "title": "Navaja suiza de red (netcat)",
+      "description": "Herramienta versátil para leer y escribir en conexiones de red TCP/UDP."
     }
   }
 }

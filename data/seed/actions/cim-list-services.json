@@ -103,6 +103,10 @@
         "Get-CimInstance -ClassName Win32_Service -Filter \"Name='Spooler'\" | Select-Object Name,ProcessId,PathName": "Affiche le processus et le binaire d'un service",
         "Get-CimInstance -ClassName Win32_Service -ComputerName SRV-APP01 -Filter \"StartMode='Auto' AND State='Stopped'\"": "Vérifie les services automatiques arrêtés d'un serveur distant"
       }
+    },
+    "es": {
+      "title": "Listar los servicios por modo de inicio y estado",
+      "description": "Muestra los servicios de un modo de inicio y un estado, con su cuenta, su proceso y la ruta del binario."
     }
   }
 }

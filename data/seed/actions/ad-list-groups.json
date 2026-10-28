@@ -76,6 +76,10 @@
         "Get-ADGroup -Filter {GroupCategory -eq 'Distribution'} | Measure-Object": "Compte le nombre de groupes de distribution (listes de diffusion Exchange). Measure-Object retourne le count total. Utile pour les statistiques, la documentation et les audits Exchange.",
         "Get-ADGroup -Filter * -Properties Created | Sort-Object Created -Descending | Select-Object Name,Created -First 20": "Affiche les 20 groupes les plus récemment créés. Sort-Object -Descending trie du plus récent au plus ancien. Utile pour surveiller les créations de groupes, détecter les créations suspectes et suivre les changements organisationnels."
       }
+    },
+    "es": {
+      "title": "Listar todos los grupos de AD",
+      "description": "Muestra la lista de todos los grupos de Active Directory con sus propiedades."
     }
   }
 }

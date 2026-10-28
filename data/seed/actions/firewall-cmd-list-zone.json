@@ -77,6 +77,10 @@
         "sudo firewall-cmd --list-all-zones": "Affiche les règles de toutes les zones",
         "sudo firewall-cmd --permanent --zone=public --list-all": "Affiche les règles enregistrées, qui peuvent différer des règles actives"
       }
+    },
+    "es": {
+      "title": "Mostrar las reglas de firewalld de una zona",
+      "description": "Muestra las interfaces, los servicios, los puertos y las reglas enriquecidas (rich rules) de una zona de firewalld."
     }
   }
 }

@@ -54,6 +54,10 @@
         "sudo nginx -s reload": "Envoie le signal de rechargement directement au processus maître nginx",
         "sudo systemctl status nginx --no-pager": "Vérifie l'état du service après le rechargement"
       }
+    },
+    "es": {
+      "title": "Recargar nginx tras probar la configuración",
+      "description": "Prueba la configuración de nginx y recarga el servicio solo si la prueba es correcta, sin cortar las conexiones abiertas."
     }
   }
 }

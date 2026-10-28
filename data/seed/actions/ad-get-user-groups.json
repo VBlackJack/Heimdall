@@ -114,6 +114,10 @@
         "id jdupont": "UID, GID et groupes",
         "getent group sudo": "Membres du groupe sudo"
       }
+    },
+    "es": {
+      "title": "Listar los grupos de un usuario",
+      "description": "Muestra todos los grupos de Active Directory de los que es miembro un usuario."
     }
   }
 }

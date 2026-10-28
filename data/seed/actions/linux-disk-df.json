@@ -46,6 +46,10 @@
         "df -h .": "Affiche l'espace libre uniquement pour le dossier courant.",
         "df -i": "Affiche l'utilisation des Inodes (parfois le disque est plein d'inodes même s'il reste de la place en Go)."
       }
+    },
+    "es": {
+      "title": "Comprobar el espacio en disco (df)",
+      "description": "Muestra el espacio en disco usado y libre de todos los sistemas de archivos montados."
     }
   }
 }

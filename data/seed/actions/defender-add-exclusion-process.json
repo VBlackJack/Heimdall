@@ -57,6 +57,10 @@
       "examples": {
         "Get-MpPreference | Select-Object -ExpandProperty ExclusionProcess": "Liste toutes les exclusions de processus actuelles"
       }
+    },
+    "es": {
+      "title": "Añadir una exclusión de proceso a Defender",
+      "description": "Excluye un proceso concreto del análisis de Windows Defender (útil para herramientas de desarrollo)."
     }
   }
 }

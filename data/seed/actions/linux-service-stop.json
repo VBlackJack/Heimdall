@@ -59,6 +59,10 @@
         "sudo systemctl stop nginx": "Arrête le service nginx",
         "sudo systemctl stop sshd": "Arrête le serveur SSH : les sessions SSH ouvertes peuvent être coupées, gardez un autre accès"
       }
+    },
+    "es": {
+      "title": "Detener un servicio",
+      "description": "Detiene un servicio de systemd en ejecución."
     }
   }
 }

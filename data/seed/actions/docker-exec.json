@@ -149,6 +149,10 @@
         "docker exec -it {container} {command}": "Exemple utilisant les paramètres 'container' et 'command'. Remplacez-les par les valeurs appropriées selon votre environnement.",
         "docker exec mycontainer ls /var/log": "Exécute une commande simple"
       }
+    },
+    "es": {
+      "title": "Ejecutar un comando en un contenedor",
+      "description": "Ejecuta un comando en un contenedor de Docker en ejecución"
     }
   }
 }

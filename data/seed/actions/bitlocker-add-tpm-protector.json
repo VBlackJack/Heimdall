@@ -75,6 +75,10 @@
         "Add-BitLockerKeyProtector -MountPoint C: -TpmAndStartupKeyProtector -StartupKeyPath 'E:\\'": "Ajoute TPM + clé USB de démarrage (nécessite la clé USB au boot)",
         "(Get-Tpm).TpmReady": "Vérifie si le TPM est prêt et fonctionnel avant d'ajouter le protecteur"
       }
+    },
+    "es": {
+      "title": "Añadir un protector TPM a BitLocker",
+      "description": "Añade la protección TPM (Trusted Platform Module) a un volumen de BitLocker existente."
     }
   }
 }

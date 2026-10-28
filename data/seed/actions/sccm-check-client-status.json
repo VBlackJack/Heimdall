@@ -41,6 +41,10 @@
       "examples": {
         "Get-Service ccmexec | Select-Object Name,Status,StartType": "Vérifie l'état du service client SCCM"
       }
+    },
+    "es": {
+      "title": "Comprobar el estado del cliente de SCCM",
+      "description": "Muestra el estado detallado del cliente de SCCM, incluidas su versión, el sitio asignado y la última comunicación"
     }
   }
 }

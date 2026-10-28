@@ -125,6 +125,10 @@
         "ldapsearch -H ldaps://dc01.example.com -x -D alice@example.com -W -b OU=Servers,DC=example,DC=com '(objectClass=computer)' dNSHostName": "Liste les comptes ordinateur d'une OU",
         "ldapsearch -H ldap://ldap01.example.com -x -s base -b '' namingContexts": "Trouve les contextes de nommage du serveur"
       }
+    },
+    "es": {
+      "title": "Buscar en un directorio LDAP",
+      "description": "Busca en un directorio LDAP o en Active Directory bajo un DN base con un filtro, tras un enlace (bind) simple."
     }
   }
 }

@@ -90,6 +90,10 @@
         "ansible-galaxy install webserver": "Exemple Windows utilisant ansible-galaxy. Remplacez les paramètres entre <> par vos valeurs.",
         "ansible-galaxy install -r requirements.yml": "Installe tous les rôles listés dans requirements.yml"
       }
+    },
+    "es": {
+      "title": "Instalar un rol de Ansible Galaxy",
+      "description": "Descarga e instala un rol desde Ansible Galaxy"
     }
   }
 }

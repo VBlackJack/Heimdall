@@ -100,6 +100,10 @@
         "host -t SRV _ldap._tcp.example.com": "Trouve les serveurs LDAP annoncés par un domaine",
         "host web01.example.com 10.0.0.53": "Interroge un serveur DNS donné au lieu de celui configuré"
       }
+    },
+    "es": {
+      "title": "Consultar un registro DNS con host",
+      "description": "Consulta en el DNS un tipo de registro de un nombre, o el nombre que hay detrás de una dirección IP."
     }
   }
 }

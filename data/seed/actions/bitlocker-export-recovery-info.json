@@ -59,6 +59,10 @@
         "$report = @(); Get-BitLockerVolume | Format-Table -AutoSize": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
         "$report = @(); Get-BitLockerVolume | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
       }
+    },
+    "es": {
+      "title": "Exportar toda la información de recuperación de BitLocker",
+      "description": "Exporta un informe completo de todos los volúmenes de BitLocker con sus contraseñas de recuperación."
     }
   }
 }

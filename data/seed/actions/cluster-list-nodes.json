@@ -71,6 +71,10 @@
         "Get-ClusterNode -Cluster CLU01 | Where-Object State -ne 'Up'": "Trouve les noeuds arrêtés ou suspendus",
         "Get-ClusterNode -Cluster CLU01 -Name NODE02 | Format-List *": "Affiche toutes les propriétés d'un noeud"
       }
+    },
+    "es": {
+      "title": "Listar los nodos del clúster",
+      "description": "Muestra los nodos de un clúster de conmutación por error con su estado y su voto de quórum."
     }
   }
 }

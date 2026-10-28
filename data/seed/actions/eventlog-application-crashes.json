@@ -106,6 +106,10 @@
         "$xml = 'Security,ApplicationSELECT * FROM Users WHERE Active = 1<Select Path=\"System\">*[System[(Level=1 or Level=2) and TimeCreated[timediff(@SystemTime) &lt;= 86400000]]]</Select></Query></QueryList>'; Get-WinEvent -FilterXml $xml": "Filtre avancé avec XPath/XML pour les requêtes complexes. FilterXml permet des filtres impossibles avec FilterHashtable (conditions multiples, OU logiques complexes, filtres sur le contenu du message). Cet exemple récupère Critical OU Error des dernières 24h. Courbe d'apprentissage élevée mais très puissant.",
         "Get-WinEvent -LogName Application -FilterHashtable @{Level=2} | Group-Object ProviderName | Sort-Object Count -Descending | Select-Object Count,Name -First 10": "Analyse statistique : top 10 des sources d'erreurs dans Application. Group-Object agrège par fournisseur. Sort trie par fréquence. Identifie rapidement les applications les plus problématiques pour prioriser les actions de correction."
       }
+    },
+    "es": {
+      "title": "Listar los bloqueos recientes de aplicaciones",
+      "description": "Extrae todos los eventos de bloqueo de aplicaciones (EventID 1000) del registro Application"
     }
   }
 }

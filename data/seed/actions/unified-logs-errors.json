@@ -98,6 +98,10 @@
         "Get-EventLog -LogName System -EntryType Error -Newest 20": "Affiche les 20 dernières erreurs système sur Windows",
         "journalctl -p err -n 20": "Affiche les 20 dernières erreurs sur Linux"
       }
+    },
+    "es": {
+      "title": "Mostrar los errores recientes del sistema",
+      "description": "Muestra los errores recientes del registro del sistema"
     }
   }
 }

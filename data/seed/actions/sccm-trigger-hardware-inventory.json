@@ -41,6 +41,10 @@
       "examples": {
         "Invoke-WmiMethod -Namespace root\\ccm -Class sms_client -Name TriggerSchedule '{00000000-0000-0000-0000-000000000001}'": "Déclenche l'inventaire matériel"
       }
+    },
+    "es": {
+      "title": "Forzar el inventario de hardware de SCCM",
+      "description": "Recopila ahora el inventario de hardware y lo envía al servidor de SCCM"
     }
   }
 }

@@ -35,6 +35,10 @@
       "examples": {
         "powershell -Command \"Invoke-WmiMethod -Namespace root\\ccm -Class SMS_Client -Name TriggerSchedule -ArgumentList '{00000000-0000-0000-0000-000000000113}'\"": "Force le scan des mises à jour SCCM"
       }
+    },
+    "es": {
+      "title": "Desencadenar el análisis de actualizaciones de SCCM",
+      "description": "Fuerza una búsqueda inmediata de las actualizaciones disponibles"
     }
   }
 }

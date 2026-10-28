@@ -89,6 +89,10 @@
         "sudo apt install -y nginx": "Exemple utilisant le paramètre 'package': Nom du paquet à installer (ou liste séparée par espaces). Remplacez nginx par la valeur appropriée selon votre environnement.",
         "sudo apt install nginx -y": "Installer nginx"
       }
+    },
+    "es": {
+      "title": "Instalar un paquete con APT",
+      "description": "Instala uno o varios paquetes con sus dependencias (Debian/Ubuntu)"
     }
   }
 }

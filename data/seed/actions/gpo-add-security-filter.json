@@ -77,6 +77,10 @@
       "examples": {
         "Set-GPPermission -Name \"Security-Baseline\" -TargetName \"IT-Admins\" -TargetType Group -PermissionLevel GpoApply": "Applique la GPO Security-Baseline au groupe IT-Admins"
       }
+    },
+    "es": {
+      "title": "Añadir un filtro de seguridad a una GPO",
+      "description": "Añade un grupo o un usuario al filtrado de seguridad de una GPO."
     }
   }
 }

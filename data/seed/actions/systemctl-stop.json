@@ -70,6 +70,10 @@
         "sudo systemctl stop mysql.service": "Arrête MySQL/MariaDB",
         "sudo systemctl stop mysql": "Arrêter le service MySQL"
       }
+    },
+    "es": {
+      "title": "Detener un servicio de systemd",
+      "description": "Detiene ahora un servicio de systemd en ejecución"
     }
   }
 }

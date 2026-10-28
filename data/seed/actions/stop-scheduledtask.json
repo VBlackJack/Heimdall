@@ -84,6 +84,10 @@
         "Get-ScheduledTask | Where-Object {$_.State -eq 'Running'} | Stop-ScheduledTask": "Arrête toutes les tâches en cours",
         "Stop-ScheduledTask -TaskName 'DailyBackup' \\Microsoft\\Windows\\": "Exemple utilisant le paramètre 'taskpath': Chemin de la tâche. Remplacez \\Microsoft\\Windows\\ par la valeur appropriée selon votre environnement."
       }
+    },
+    "es": {
+      "title": "Detener una tarea programada",
+      "description": "Detiene la instancia en ejecución de una tarea programada"
     }
   }
 }

@@ -60,6 +60,10 @@
         "sudo visudo -f /etc/sudoers.d/custom": "Éditer un fichier sudoers personnalisé",
         "sudo -l -U jdupont": "Afficher les permissions sudo d'un utilisateur"
       }
+    },
+    "es": {
+      "title": "Editar la configuración de sudo",
+      "description": "Edita el archivo sudoers de forma segura para configurar los permisos de sudo"
     }
   }
 }

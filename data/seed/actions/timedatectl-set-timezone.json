@@ -71,6 +71,10 @@
         "sudo timedatectl set-timezone UTC": "Règle le fuseau horaire sur UTC, courant sur les serveurs",
         "timedatectl list-timezones | grep America": "Trouve le nom exact d'un fuseau horaire"
       }
+    },
+    "es": {
+      "title": "Establecer la zona horaria",
+      "description": "Cambia la zona horaria del sistema; el reloj en sí no cambia."
     }
   }
 }

@@ -77,6 +77,10 @@
         "sudo modprobe -n -v nf_conntrack": "Montre ce qui serait chargé, sans le charger",
         "echo br_netfilter | sudo tee /etc/modules-load.d/k8s.conf": "Charge le module à chaque démarrage"
       }
+    },
+    "es": {
+      "title": "Cargar un módulo del kernel",
+      "description": "Carga un módulo del kernel junto con los módulos de los que depende."
     }
   }
 }

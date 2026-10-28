@@ -106,6 +106,10 @@
       "examples": {
         "ansible-pull -U https://github.com/user/repo.git": "Pull et exécuter"
       }
+    },
+    "es": {
+      "title": "Ejecutar Ansible en modo pull",
+      "description": "Configura un sistema para obtener y ejecutar playbooks automáticamente desde un repositorio Git"
     }
   }
 }

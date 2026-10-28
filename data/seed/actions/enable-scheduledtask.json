@@ -102,6 +102,10 @@
         "Enable-ScheduledTask -TaskName 'DailyBackup' \\Microsoft\\Windows\\ -Verbose": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes.",
         "Enable-ScheduledTask -TaskName 'DailyBackup' \\Microsoft\\Windows\\": "Exemple utilisant le paramètre 'taskpath': Chemin de la tâche. Remplacez \\Microsoft\\Windows\\ par la valeur appropriée selon votre environnement."
       }
+    },
+    "es": {
+      "title": "Habilitar una tarea programada",
+      "description": "Habilita una tarea programada deshabilitada para que pueda ejecutarse según su programación"
     }
   }
 }

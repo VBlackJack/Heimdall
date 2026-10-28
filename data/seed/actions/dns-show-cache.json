@@ -35,6 +35,10 @@
       "examples": {
         "ipconfig /displaydns": "Affiche tous les enregistrements en cache DNS"
       }
+    },
+    "es": {
+      "title": "Mostrar la caché de DNS",
+      "description": "Muestra el contenido actual de la caché de DNS local."
     }
   }
 }

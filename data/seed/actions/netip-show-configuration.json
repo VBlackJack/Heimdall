@@ -61,6 +61,10 @@
         "Get-NetIPConfiguration -All": "Inclut les interfaces déconnectées",
         "Get-NetIPConfiguration -CimSession SRV-APP01": "Affiche la configuration d'un serveur distant"
       }
+    },
+    "es": {
+      "title": "Mostrar la configuración IP",
+      "description": "Muestra la dirección, la puerta de enlace y los servidores DNS de cada interfaz conectada."
     }
   }
 }

@@ -94,6 +94,10 @@
         "Remove-GPLink -Name \"Security-Baseline\" -Target \"OU=Paris-Users,DC=contoso,DC=com\" -Verbose": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes.",
         "Remove-GPLink -Name \"Security-Baseline\" -Target \"OU=Paris-Users,DC=contoso,DC=com\"": "Exemple utilisant le paramètre 'gpoName': Nom de la GPO à délier. Remplacez Security-Baseline par la valeur appropriée selon votre environnement."
       }
+    },
+    "es": {
+      "title": "Desvincular una GPO de una OU",
+      "description": "Quita el vínculo entre una GPO y una unidad organizativa."
     }
   }
 }

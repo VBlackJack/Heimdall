@@ -49,6 +49,10 @@
         "docker system prune -a --volumes": "🔥 FREE SPACE : Supprime TOUT ce qui n'est pas utilisé (Images, Conteneurs stoppés, Volumes, Réseaux). Attention : destructif, mais sauve un serveur disque plein.",
         "docker image prune -a": "Supprime uniquement les images inutilisées."
       }
+    },
+    "es": {
+      "title": "Limpieza de disco de Docker (system prune)",
+      "description": "Elimina los datos de Docker sin usar (contenedores detenidos, redes, imágenes sin etiqueta) para liberar espacio."
     }
   }
 }

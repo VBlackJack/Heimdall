@@ -40,6 +40,10 @@
         "rsyslogd -N1": "Vérifie le fichier /etc/rsyslog.conf par défaut. Retourne les erreurs de syntaxe éventuelles.",
         "rsyslogd -N1 -f /etc/rsyslog.d/my-app.conf": "Vérifie un fichier de configuration spécifique."
       }
+    },
+    "es": {
+      "title": "Comprobar la configuración de rsyslog",
+      "description": "Comprueba la sintaxis del archivo de configuración rsyslog.conf sin iniciar el demonio. Ejecútalo siempre después de cada cambio."
     }
   }
 }

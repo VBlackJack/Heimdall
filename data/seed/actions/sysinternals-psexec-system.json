@@ -42,6 +42,10 @@
       "examples": {
         "psexec.exe -i -s -AcceptEula cmd.exe": "🔥 GOD MODE : Ouvre une fenêtre CMD avec les droits SYSTEM. Permet d'accéder aux clés de registre protégées, aux fichiers SAM, et de tuer n'importe quel processus."
       }
+    },
+    "es": {
+      "title": "Abrir un shell como SYSTEM (PsExec)",
+      "description": "Inicia un símbolo del sistema interactivo con privilegios de NT AUTHORITY\\SYSTEM. Es el nivel de privilegio más alto de Windows, por encima de Administrador."
     }
   }
 }

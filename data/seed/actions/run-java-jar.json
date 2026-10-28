@@ -126,6 +126,10 @@
         "java -jar app.jar --spring.profiles.active=prod": "Lance avec des arguments Spring",
         "java -jar \"C:\\Apps\\myapp.jar\"": "Exemple utilisant le paramètre 'jarPath': Chemin du fichier .jar. Remplacez C:\\Apps\\myapp.jar par la valeur appropriée selon votre environnement."
       }
+    },
+    "es": {
+      "title": "Ejecutar un archivo JAR de Java",
+      "description": "Inicia una aplicación Java empaquetada como JAR."
     }
   }
 }

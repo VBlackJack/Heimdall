@@ -77,6 +77,10 @@
         "id -nG alice": "Affiche seulement les noms des groupes de alice",
         "id jdoe@example.com": "Vérifie qu'un utilisateur du domaine est résolu par SSSD"
       }
+    },
+    "es": {
+      "title": "Mostrar la identidad y los grupos de un usuario",
+      "description": "Muestra el UID, el GID principal y todos los grupos de un usuario, local o de un directorio."
     }
   }
 }

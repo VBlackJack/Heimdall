@@ -82,6 +82,10 @@
         "mvn clean install": "Installe dans le repo local",
         "mvn clean package -DskipTests": "Package sans exécuter les tests"
       }
+    },
+    "es": {
+      "title": "Compilar un proyecto Maven",
+      "description": "Compila y empaqueta un proyecto Java con Maven."
     }
   }
 }

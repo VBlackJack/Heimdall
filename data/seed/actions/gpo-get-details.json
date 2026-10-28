@@ -83,6 +83,10 @@
         "Get-GPO -Name \"Security-Baseline\" | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
         "Get-GPO -Name \"Security-Baseline\" | Select-Object *": "Exemple utilisant le paramètre 'gpoName': Nom de la GPO. Remplacez Security-Baseline par la valeur appropriée selon votre environnement."
       }
+    },
+    "es": {
+      "title": "Obtener los detalles de una GPO",
+      "description": "Muestra todas las propiedades detalladas de una directiva de grupo."
     }
   }
 }

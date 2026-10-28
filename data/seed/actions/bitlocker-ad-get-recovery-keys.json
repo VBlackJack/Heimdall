@@ -82,6 +82,10 @@
         "$computer = Get-ADComputer -Identity PC-001; $keys = Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $computer.DistinguishedName -Properties msFVE-RecoveryPassword,msFVE-RecoveryGuid; $keys | Select-Object @{N='Password';E={$_.'msFVE-RecoveryPassword'}},@{N='VolumeGUID';E={$_.'msFVE-RecoveryGuid'}}": "Récupère les clés avec leur GUID de volume (utile si plusieurs volumes chiffrés)",
         "$computer = Get-ADComputer -Identity PC-001; $keys = Get-ADObject -Filter \"objectClass -eq 'msFVE-RecoveryInformation'\" -SearchBase $computer.DistinguishedName -Properties msFVE-RecoveryPassword; $keys.'msFVE-RecoveryPassword' | Out-File \"C:\\BitLocker-Keys-PC-001.txt\"": "Sauvegarde les clés de récupération dans un fichier sécurisé"
       }
+    },
+    "es": {
+      "title": "Obtener las claves de BitLocker de Active Directory",
+      "description": "Obtiene las claves de recuperación de BitLocker almacenadas en Active Directory para un equipo concreto (comando de administrador de dominio)."
     }
   }
 }

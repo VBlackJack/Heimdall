@@ -47,6 +47,10 @@
         "Invoke-WsusServerCleanup -CleanupObsoleteUpdates -CompressUpdates": "Nettoie les mises à jour obsolètes et compresse les révisions",
         "Invoke-WsusServerCleanup -CleanupObsoleteComputers": "Supprime les ordinateurs qui n'ont pas contacté le serveur depuis 30 jours"
       }
+    },
+    "es": {
+      "title": "Ejecutar el mantenimiento del servidor WSUS",
+      "description": "Ejecuta las tareas de mantenimiento de WSUS: eliminación de actualizaciones obsoletas y reemplazadas y de equipos inactivos"
     }
   }
 }

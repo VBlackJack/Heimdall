@@ -59,6 +59,10 @@
       "examples": {
         "winget show Microsoft.PowerToys": "Affiche les détails complets de PowerToys"
       }
+    },
+    "es": {
+      "title": "Mostrar los detalles de un paquete de Winget",
+      "description": "Muestra información detallada de un paquete concreto (versión, editor, descripción, etc.)."
     }
   }
 }

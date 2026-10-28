@@ -64,6 +64,10 @@
         "Show-WindowsUpdate -KBArticleID KB5001234": "Réaffiche la mise à jour KB5001234",
         "Get-WindowsUpdate -IsHidden | Show-WindowsUpdate": "Réaffiche toutes les mises à jour masquées"
       }
+    },
+    "es": {
+      "title": "Mostrar de nuevo una actualización",
+      "description": "Vuelve a mostrar una actualización oculta antes para que pueda instalarse"
     }
   }
 }

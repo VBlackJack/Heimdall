@@ -63,6 +63,10 @@
         "$vol = Get-BitLockerVolume C:; $vol.KeyProtector | Group-Object KeyProtectorType | Select-Object Name,Count": "Compte les protecteurs par type (combien de Recovery, TPM, etc.)",
         "(Get-Tpm).TpmPresent -and (Get-Tpm).TpmReady": "Vérifie que le TPM est présent et opérationnel"
       }
+    },
+    "es": {
+      "title": "Probar los protectores de claves de BitLocker",
+      "description": "Comprueba que todos los protectores de claves de BitLocker de un volumen son válidos y funcionan."
     }
   }
 }

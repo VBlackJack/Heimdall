@@ -41,6 +41,10 @@
       "examples": {
         "journalctl --disk-usage": "Affiche l'espace disque utilisé par les journaux systemd. Les journaux peuvent occuper plusieurs Go sur des systèmes actifs. Utilisez cette commande pour surveiller l'espace et décider si un nettoyage est nécessaire (voir journalctl --vacuum-size ou --vacuum-time)."
       }
+    },
+    "es": {
+      "title": "Comprobar el espacio en disco de los registros de systemd",
+      "description": "Muestra el espacio en disco que usan los diarios de systemd."
     }
   }
 }

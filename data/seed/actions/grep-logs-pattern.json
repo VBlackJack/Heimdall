@@ -124,6 +124,10 @@
         "grep -v \"debug\" app.log": "Exclure les lignes contenant \"debug\"",
         "grep -n \"TODO\" *.py": "Afficher les numéros de ligne"
       }
+    },
+    "es": {
+      "title": "Buscar un patrón en los registros",
+      "description": "Busca un patrón dado en los archivos de registro del sistema."
     }
   }
 }

@@ -148,6 +148,10 @@
         "New-ADGroup -Name \"IT-Admins\" -SamAccountName \"IT-Admins\" -GroupCategory Security -GroupScope Global -DisplayName \"Jean Dupont\" -Path \"OU=Users,DC=contoso,DC=com\" -Description \"Production environment resource\" -Verbose": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes.",
         "New-ADGroup -Name \"IT-Admins\" -SamAccountName \"IT-Admins\" -GroupCategory Security -GroupScope Global -DisplayName \"Jean Dupont\" -Path \"OU=Users,DC=contoso,DC=com\" -Description \"Production environment resource\"": "Exemple utilisant le paramètre 'groupName': Nom du groupe AD. Remplacez IT-Admins par la valeur appropriée selon votre environnement."
       }
+    },
+    "es": {
+      "title": "Crear un grupo de AD",
+      "description": "Crea un grupo de seguridad o de distribución en Active Directory."
     }
   }
 }

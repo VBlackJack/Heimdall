@@ -116,6 +116,10 @@
         "sudo systemctl restart sshd": "Redémarre le service SSH pour appliquer une nouvelle configuration.",
         "sudo systemctl restart apache2": "Redémarre le serveur web Apache."
       }
+    },
+    "es": {
+      "title": "Reiniciar un servicio",
+      "description": "Reinicia un servicio de Windows o una unidad de systemd de Linux."
     }
   }
 }

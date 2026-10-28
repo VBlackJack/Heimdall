@@ -94,6 +94,10 @@
         "Get-Counter -Counter '\\Processor(_Total)\\% Processor Time' -SampleInterval 60 -MaxSamples 10 | Export-Csv C:\\Temp\\Export.csv -NoTypeInformation -Encoding UTF8": "Exporte les résultats vers un fichier CSV exploitable dans Excel. -NoTypeInformation supprime la ligne de métadonnées. -Encoding UTF8 garantit la compatibilité des caractères accentués. Utile pour l'archivage, les rapports et l'analyse externe.",
         "Get-Counter -Counter '\\Processor(_Total)\\% Processor Time' -SampleInterval 60 -MaxSamples 10 | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
       }
+    },
+    "es": {
+      "title": "Supervisar el uso de CPU en tiempo real",
+      "description": "Recopila y muestra el uso del procesador en tiempo real a lo largo de varias muestras."
     }
   }
 }

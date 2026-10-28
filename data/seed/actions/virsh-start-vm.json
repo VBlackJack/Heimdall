@@ -72,6 +72,10 @@
         "sudo virsh autostart web01": "Démarre désormais web01 avec l'hôte",
         "sudo virsh resume web01": "Reprend une machine en pause"
       }
+    },
+    "es": {
+      "title": "Iniciar una máquina virtual KVM",
+      "description": "Inicia una máquina virtual de libvirt que está apagada."
     }
   }
 }

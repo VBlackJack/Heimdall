@@ -41,6 +41,10 @@
       "examples": {
         "Invoke-WmiMethod -Namespace root\\ccm -Class sms_client -Name TriggerSchedule '{00000000-0000-0000-0000-000000000121}'": "Déclenche l'évaluation des déploiements d'applications"
       }
+    },
+    "es": {
+      "title": "Desencadenar la evaluación de la implementación de aplicaciones",
+      "description": "Fuerza la evaluación de todas las implementaciones de aplicaciones de SCCM para detectar las aplicaciones recién disponibles"
     }
   }
 }

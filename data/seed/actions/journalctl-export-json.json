@@ -82,6 +82,10 @@
         "journalctl --since \"2024-01-15 10:00:00\" --until \"2024-01-15 11:00:00\"": "Affiche les logs d'une plage horaire précise. Les flags --since et --until acceptent des dates absolues. Format : 'YYYY-MM-DD HH:MM:SS'. Indispensable pour investiguer un incident survenu à un moment précis. Vous pouvez aussi utiliser des dates relatives : --since \"1 hour ago\".",
         "journalctl -u ssh.service --since \"10 minutes ago\"": "Affiche les logs SSH des 10 dernières minutes. --since accepte des durées relatives (minutes, hours, days ago). Utile pour diagnostiquer un problème de connexion SSH juste après qu'il se soit produit. Adaptez le service et la durée selon vos besoins."
       }
+    },
+    "es": {
+      "title": "Exportar los registros como JSON",
+      "description": "Exporta los registros de systemd como JSON para su análisis."
     }
   }
 }

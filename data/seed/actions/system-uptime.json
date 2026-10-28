@@ -75,6 +75,10 @@
         "uptime -s": "Date et heure du dernier démarrage",
         "w": "Uptime + utilisateurs connectés"
       }
+    },
+    "es": {
+      "title": "Mostrar el tiempo de actividad del sistema",
+      "description": "Muestra cuánto tiempo lleva en ejecución el sistema."
     }
   }
 }

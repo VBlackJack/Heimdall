@@ -74,6 +74,10 @@
         "ansible-galaxy collection list": "Collections uniquement",
         "ls -la ~/.ansible/roles/": "Répertoire des rôles"
       }
+    },
+    "es": {
+      "title": "Listar los roles instalados",
+      "description": "Muestra la lista de todos los roles de Ansible instalados localmente"
     }
   }
 }

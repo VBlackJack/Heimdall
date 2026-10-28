@@ -94,6 +94,10 @@
         "robocopy \"C:\\Source\" \"D:\\Dest\" /E /COPYALL /B /R:1 /W:1": "🔥 FULL BACKUP : Copie tout (/E), avec TOUS les attributs de sécurité/audit (/COPYALL). Le mode /B (Backup Operator) permet de copier des fichiers que l'admin ne peut normalement pas lire.",
         "robocopy \"C:\\Source\" \"D:\\Dest\" /MOVE /E": "DÉPLACEMENT : Déplace les fichiers (supprime de la source après copie). Attention : destructif pour la source."
       }
+    },
+    "es": {
+      "title": "Copia robusta de archivos (Robocopy)",
+      "description": "La herramienta de copia más fiable de Windows. Admite reanudar tras errores, multihilo y conservar atributos y permisos."
     }
   }
 }

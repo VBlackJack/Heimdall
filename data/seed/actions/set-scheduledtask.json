@@ -85,6 +85,10 @@
         "$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-File C:\\Scripts\\new-backup.ps1'; Set-ScheduledTask -TaskName 'Backup' -Action $action": "Change le script exécuté",
         "Set-ScheduledTask -TaskName 'MyTask' -User 'DOMAIN\\ServiceAccount'": "Change le compte d'exécution"
       }
+    },
+    "es": {
+      "title": "Modificar una tarea programada",
+      "description": "Modifica las propiedades de una tarea programada existente"
     }
   }
 }

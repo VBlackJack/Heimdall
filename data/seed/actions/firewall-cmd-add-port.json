@@ -105,6 +105,10 @@
         "sudo firewall-cmd --permanent --zone=public --remove-port=8080/tcp": "Ferme un port ouvert précédemment",
         "sudo firewall-cmd --zone=public --list-ports": "Liste les ports ouverts par la zone"
       }
+    },
+    "es": {
+      "title": "Abrir un puerto en firewalld",
+      "description": "Abre de forma permanente un puerto TCP o UDP, o un intervalo de puertos, en una zona de firewalld."
     }
   }
 }

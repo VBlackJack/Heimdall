@@ -83,6 +83,10 @@
         "sudo iotop -a": "Afficher les I/O accumulés",
         "sudo iotop -P": "Afficher par processus (pas threads)"
       }
+    },
+    "es": {
+      "title": "Supervisar la actividad de E/S de disco",
+      "description": "Muestra en tiempo real qué procesos usan más E/S de disco."
     }
   }
 }

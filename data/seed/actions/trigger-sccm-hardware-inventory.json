@@ -35,6 +35,10 @@
       "examples": {
         "powershell -Command \"Invoke-WmiMethod -Namespace root\\ccm -Class SMS_Client -Name TriggerSchedule -ArgumentList '{00000000-0000-0000-0000-000000000001}'\"": "Lance un inventaire matériel immédiat"
       }
+    },
+    "es": {
+      "title": "Desencadenar el inventario de hardware de SCCM",
+      "description": "Fuerza un ciclo de inventario de hardware inmediato"
     }
   }
 }

@@ -59,6 +59,10 @@
         "Stop-Service -Name wuauserv,bits -Force; Remove-Item -Path C:\\Windows\\SoftwareDistribution\\Download\\* -Recurse -Force -ErrorAction SilentlyContinue; Start-Service -Name wuauserv,bits -Verbose": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes.",
         "Stop-Service -Name wuauserv,bits -Force; Remove-Item -Path C:\\Windows\\SoftwareDistribution\\Download\\* -Recurse -Force -ErrorAction SilentlyContinue; Start-Service -Name wuauserv,bits": "Arrête les services Windows Update et nettoie le dossier SoftwareDistribution pour résoudre les problèmes de mises à jour."
       }
+    },
+    "es": {
+      "title": "Vaciar la caché de Windows Update",
+      "description": "Detiene los servicios de Windows Update y limpia la carpeta SoftwareDistribution para corregir problemas de actualización"
     }
   }
 }

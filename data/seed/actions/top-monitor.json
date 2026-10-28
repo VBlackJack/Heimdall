@@ -108,6 +108,10 @@
         "htop": "Version améliorée et interactive de top",
         "top -o %MEM": "Trier par utilisation mémoire"
       }
+    },
+    "es": {
+      "title": "Supervisar los procesos en tiempo real",
+      "description": "Muestra en tiempo real el uso de CPU y memoria y la lista de procesos"
     }
   }
 }

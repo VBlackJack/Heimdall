@@ -60,6 +60,10 @@
         "modinfo br_netfilter": "Affiche la description, la version et les paramètres d'un module",
         "ls /etc/modules-load.d/": "Affiche les modules chargés à chaque démarrage"
       }
+    },
+    "es": {
+      "title": "Listar los módulos del kernel cargados",
+      "description": "Lista los módulos del kernel cargados actualmente, con su tamaño y los módulos que los usan."
     }
   }
 }

@@ -70,6 +70,10 @@
       "examples": {
         "Backup-GPO -Name \"Default Domain Policy\" -Path \"C:\\GPOBackups\"": "Sauvegarde la Default Domain Policy dans C:\\GPOBackups"
       }
+    },
+    "es": {
+      "title": "Hacer una copia de seguridad de una GPO",
+      "description": "Crea una copia de seguridad de una directiva de grupo concreta."
     }
   }
 }

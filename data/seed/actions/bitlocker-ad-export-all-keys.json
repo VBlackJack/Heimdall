@@ -78,6 +78,10 @@
         "$report = @(); Get-ADComputer -Filter * | Format-Table -AutoSize": "Affiche les résultats dans un tableau optimisé pour la console. Format-Table -AutoSize ajuste automatiquement la largeur des colonnes pour un affichage lisible. Idéal pour visualiser rapidement les données structurées.",
         "$report = @(); Get-ADComputer -Filter * | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats."
       }
+    },
+    "es": {
+      "title": "Exportar todas las claves de BitLocker del dominio",
+      "description": "Exporta un informe CSV de todos los equipos del dominio con sus claves de recuperación de BitLocker (administrador de dominio)."
     }
   }
 }

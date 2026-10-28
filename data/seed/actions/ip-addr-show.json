@@ -102,6 +102,10 @@
         "ip neigh show": "Afficher la table ARP",
         "ip -4 addr": "IPv4 uniquement"
       }
+    },
+    "es": {
+      "title": "Mostrar las direcciones IP",
+      "description": "Muestra todas las interfaces de red y sus direcciones IP."
     }
   }
 }

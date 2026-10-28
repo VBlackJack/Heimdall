@@ -105,6 +105,10 @@
         "Invoke-Sqlcmd -Query \"RESTORE DATABASE [MyDB] FROM DISK='C:\\Backups\\MyDB.bak' WITH REPLACE\"": "Alternative avec T-SQL",
         "Restore-SqlDatabase -ServerInstance 'localhost\\SQLEXPRESS' -Database 'ProductionDB' -BackupFile 'D:\\Backups\\daily' -ReplaceDatabase": "Exemple utilisant le paramètre 'databaseName': Nom de la base de données à restaurer. Remplacez ProductionDB par la valeur appropriée selon votre environnement."
       }
+    },
+    "es": {
+      "title": "Restaurar una base de datos de SQL Server",
+      "description": "Restaura una base de datos de SQL Server a partir de un archivo de copia de seguridad .bak."
     }
   }
 }

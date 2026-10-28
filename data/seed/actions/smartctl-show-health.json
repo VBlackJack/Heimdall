@@ -77,6 +77,10 @@
         "sudo smartctl -t short /dev/sda": "Lance un court autotest en arrière-plan",
         "sudo smartctl --scan": "Liste les périphériques que smartctl peut interroger"
       }
+    },
+    "es": {
+      "title": "Mostrar el estado SMART de un disco",
+      "description": "Muestra la identidad, el veredicto general de estado, los atributos y el registro de errores de un disco."
     }
   }
 }

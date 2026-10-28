@@ -94,6 +94,10 @@
         "Get-ADComputer -Filter * -Properties OperatingSystem,OperatingSystemVersion,Created | Select-Object Name,OperatingSystem,OperatingSystemVersion,Created | Export-Csv C:\\Temp\\ComputerInventory.csv -NoTypeInformation": "Exporte un inventaire complet des ordinateurs avec OS et date de création. Le CSV peut être importé dans Excel pour analyse, reporting ou documentation. Utile pour les audits, la gestion du parc et les statistiques.",
         "Get-ADComputer -Identity WKS-IT-01 -Properties *": "Affiche toutes les informations d'un ordinateur spécifique. -Identity accepte le nom, DN, GUID ou SID. Retourne toutes les propriétés. Utile pour le troubleshooting et la vérification de configuration d'une machine."
       }
+    },
+    "es": {
+      "title": "Buscar equipos de AD",
+      "description": "Busca equipos de Active Directory por nombre o sistema operativo."
     }
   }
 }

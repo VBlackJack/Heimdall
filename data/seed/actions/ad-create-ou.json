@@ -112,6 +112,10 @@
         "New-ADOrganizationalUnit -Name \"Paris-Users\" -Path \"DC=contoso,DC=com\" -Description \"Production environment resource\" -ProtectedFromAccidentalDeletion $true -Verbose": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes.",
         "New-ADOrganizationalUnit -Name \"Paris-Users\" -Path \"DC=contoso,DC=com\" -Description \"Production environment resource\" -ProtectedFromAccidentalDeletion $true": "Exemple utilisant le paramètre 'ouName': Nom de la nouvelle OU. Remplacez Paris-Users par la valeur appropriée selon votre environnement."
       }
+    },
+    "es": {
+      "title": "Crear una unidad organizativa",
+      "description": "Crea una unidad organizativa (OU) en Active Directory."
     }
   }
 }

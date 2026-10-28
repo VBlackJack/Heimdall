@@ -157,6 +157,10 @@
         "find / -name \"config.json\" 2>/dev/null": "Cherche config.json en ignorant les erreurs",
         "find . -type f -mtime -7": "Fichiers modifiés dans les 7 derniers jours"
       }
+    },
+    "es": {
+      "title": "Buscar archivos por nombre",
+      "description": "Busca archivos o carpetas por nombre o patrón."
     }
   }
 }

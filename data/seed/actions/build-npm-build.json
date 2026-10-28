@@ -51,6 +51,10 @@
         "npm run build": "Exécute le script build de package.json",
         "npm run build:prod": "Exécute un script build personnalisé"
       }
+    },
+    "es": {
+      "title": "Compilar un proyecto npm",
+      "description": "Ejecuta el script de compilación definido en package.json."
     }
   }
 }

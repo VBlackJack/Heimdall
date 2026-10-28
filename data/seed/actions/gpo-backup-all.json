@@ -53,6 +53,10 @@
       "examples": {
         "Backup-GPO -All -Path \"C:\\GPOBackups\"": "Sauvegarde toutes les GPO dans C:\\GPOBackups"
       }
+    },
+    "es": {
+      "title": "Hacer una copia de seguridad de todas las GPO",
+      "description": "Crea una copia de seguridad de todas las directivas de grupo del dominio."
     }
   }
 }

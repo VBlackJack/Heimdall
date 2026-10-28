@@ -87,6 +87,10 @@
         "Suspend-BitLocker -MountPoint C: -RebootCount 0": "Suspend BitLocker indéfiniment jusqu'à réactivation manuelle",
         "Get-BitLockerVolume | Where-Object {$_.ProtectionStatus -eq 'On'} | ForEach-Object { Suspend-BitLocker -MountPoint $_.MountPoint -RebootCount 1 }": "Suspend BitLocker sur tous les volumes protégés pour 1 redémarrage"
       }
+    },
+    "es": {
+      "title": "Suspender temporalmente la protección de BitLocker",
+      "description": "Suspende temporalmente la protección de BitLocker (útil para actualizaciones de BIOS o de firmware)."
     }
   }
 }

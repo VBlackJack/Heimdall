@@ -70,6 +70,10 @@
         "sudo systemctl start apache2.service": "Démarre Apache (l'extension .service est optionnelle)",
         "sudo systemctl start apache2": "Démarrer le service Apache"
       }
+    },
+    "es": {
+      "title": "Iniciar un servicio de systemd",
+      "description": "Inicia un servicio de systemd ahora"
     }
   }
 }

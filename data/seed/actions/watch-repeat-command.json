@@ -77,6 +77,10 @@
         "watch \"tail -n 10 /var/log/syslog\"": "Suivre les dernières lignes",
         "watch -c \"ls --color\"": "Garder les couleurs"
       }
+    },
+    "es": {
+      "title": "Repetir un comando periódicamente",
+      "description": "Ejecuta un comando a intervalos regulares y muestra el resultado"
     }
   }
 }

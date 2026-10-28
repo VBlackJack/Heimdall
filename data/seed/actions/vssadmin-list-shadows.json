@@ -72,6 +72,10 @@
         "vssadmin list shadowstorage": "Affiche l'espace réservé et utilisé par les clichés instantanés",
         "vssadmin list writers": "Affiche l'état des enregistreurs VSS quand une sauvegarde échoue"
       }
+    },
+    "es": {
+      "title": "Listar las copias de sombra de un volumen",
+      "description": "Muestra las instantáneas del Servicio de instantáneas de volumen que existen para un volumen."
     }
   }
 }

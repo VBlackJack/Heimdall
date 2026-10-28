@@ -89,6 +89,10 @@
         "Get-DhcpServerv4Lease -ComputerName DHCP01 -ScopeId 10.0.10.0 | Where-Object HostName -like 'PC-*'": "Affiche les baux des postes nommés PC-*",
         "Get-DhcpServerv4Lease -ComputerName DHCP01 -ScopeId 10.0.10.0 -BadLeases": "Affiche les adresses refusées pour cause de conflit"
       }
+    },
+    "es": {
+      "title": "Listar las concesiones de un ámbito DHCP",
+      "description": "Muestra las direcciones concedidas de un ámbito IPv4 con el nombre del cliente y la hora de caducidad."
     }
   }
 }

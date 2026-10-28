@@ -47,6 +47,10 @@
         "Invoke-WmiMethod -Namespace root\\ccm -Class sms_client -Name TriggerSchedule '{00000000-0000-0000-0000-000000000021}'": "Déclenche la récupération de la stratégie machine",
         "Invoke-WmiMethod -Namespace root\\ccm -Class sms_client -Name TriggerSchedule '{00000000-0000-0000-0000-000000000022}'": "Déclenche l'évaluation de la stratégie machine"
       }
+    },
+    "es": {
+      "title": "Desencadenar la recuperación de la directiva de equipo de SCCM",
+      "description": "Fuerza al cliente de SCCM a recuperar y aplicar ahora las directivas de equipo del servidor"
     }
   }
 }

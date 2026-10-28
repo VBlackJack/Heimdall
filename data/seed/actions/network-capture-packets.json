@@ -181,6 +181,10 @@
         "sudo tcpdump -w capture.pcap": "Sauvegarder dans un fichier",
         "tcpdump -r capture.pcap": "Lire un fichier de capture"
       }
+    },
+    "es": {
+      "title": "Capturar el tráfico de red",
+      "description": "Inicia una captura de paquetes de red con netsh trace para analizarla más tarde."
     }
   }
 }

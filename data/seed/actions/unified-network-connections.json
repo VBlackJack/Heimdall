@@ -68,6 +68,10 @@
         "netstat -i": "Statistiques des interfaces",
         "netstat -s": "Statistiques des protocoles"
       }
+    },
+    "es": {
+      "title": "Mostrar las conexiones de red activas",
+      "description": "Muestra los puertos abiertos y las conexiones de red activas"
     }
   }
 }

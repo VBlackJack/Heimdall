@@ -60,6 +60,10 @@
         "Get-DfsnRootTarget -Path '\\\\contoso.com\\Public'": "Affiche les serveurs qui hébergent un espace de noms",
         "Get-DfsnFolder -Path '\\\\contoso.com\\Public\\*'": "Liste les dossiers d'un espace de noms"
       }
+    },
+    "es": {
+      "title": "Listar los espacios de nombres DFS",
+      "description": "Muestra las raíces de los espacios de nombres DFS con su tipo y su estado."
     }
   }
 }

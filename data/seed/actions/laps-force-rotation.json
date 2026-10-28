@@ -70,6 +70,10 @@
         "Reset-AdmPwdPassword -ComputerName PC-001 -WhenEffective (Get-Date)": "Force la rotation immédiate du mot de passe",
         "Reset-AdmPwdPassword -ComputerName PC-001; Start-Sleep 300; Get-AdmPwdPassword -ComputerName PC-001": "Rotation puis récupération du nouveau mot de passe après 5 minutes"
       }
+    },
+    "es": {
+      "title": "Forzar la rotación inmediata de la contraseña de LAPS",
+      "description": "Fuerza la renovación inmediata de la contraseña del administrador local gestionada por LAPS."
     }
   }
 }

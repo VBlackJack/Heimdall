@@ -74,6 +74,10 @@
         "Invoke-Sqlcmd -ServerInstance 'PROD-SQL\\INSTANCE1' -Query \"SELECT * FROM sys.databases\"": "Liste détaillée sur une instance nommée",
         "Invoke-Sqlcmd -ServerInstance 'localhost\\SQLEXPRESS' -Query \"SELECT name AS DatabaseName, database_id AS ID, state_desc AS State, recovery_model_desc AS RecoveryModel, (SELECT SUM(size)*8/1024 FROM sys.master_files WHERE database_id = d.database_id) AS SizeMB FROM sys.databases d ORDER BY name\" | Format-Table -AutoSize": "Affiche la liste complète de toutes les bases de données sur une instance SQL Server avec leur taille, état et mode de récupération."
       }
+    },
+    "es": {
+      "title": "Listar todas las bases de datos de SQL Server",
+      "description": "Muestra la lista completa de bases de datos de una instancia de SQL Server con su tamaño, su estado y su modelo de recuperación."
     }
   }
 }

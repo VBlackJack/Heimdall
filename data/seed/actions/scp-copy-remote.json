@@ -131,6 +131,10 @@
         "scp -P 2222 file.txt user@server:/tmp/": "Utiliser un port SSH non standard",
         "scp -C bigfile.tar.gz user@server:/backup/": "Activer la compression"
       }
+    },
+    "es": {
+      "title": "Copiar archivos por SSH",
+      "description": "Copia archivos de forma segura entre sistemas mediante SSH"
     }
   }
 }

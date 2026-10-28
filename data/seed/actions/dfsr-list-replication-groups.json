@@ -60,6 +60,10 @@
         "Get-DfsrMember -GroupName BranchData": "Liste les serveurs membres d'un groupe",
         "Get-DfsrConnection -GroupName BranchData": "Affiche les connexions de réplication d'un groupe"
       }
+    },
+    "es": {
+      "title": "Listar los grupos de replicación DFS",
+      "description": "Muestra los grupos de Replicación DFS del dominio con su estado."
     }
   }
 }

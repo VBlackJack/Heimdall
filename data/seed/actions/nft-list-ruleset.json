@@ -60,6 +60,10 @@
         "sudo nft -a list ruleset": "Affiche les règles avec les handles nécessaires pour en supprimer une",
         "sudo nft list table inet firewalld": "Affiche la table gérée par firewalld"
       }
+    },
+    "es": {
+      "title": "Mostrar el conjunto de reglas de nftables",
+      "description": "Imprime todas las tablas, cadenas y reglas de nftables cargadas en el kernel."
     }
   }
 }

@@ -54,6 +54,10 @@
         "Get-PSSessionConfiguration -Name Microsoft.PowerShell | Format-List *": "Affiche toutes les propriétés du point de terminaison par défaut",
         "Get-PSSessionConfiguration | Select-Object Name,Permission": "Montre qui peut se connecter à chaque point de terminaison"
       }
+    },
+    "es": {
+      "title": "Listar los puntos de conexión de la comunicación remota de PowerShell",
+      "description": "Muestra las configuraciones de sesión registradas en el equipo y quién puede conectarse a ellas."
     }
   }
 }

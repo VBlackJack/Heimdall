@@ -81,6 +81,10 @@
         "Invoke-Sqlcmd -Database 'msdb' -Query \"EXEC sp_help_job\"": "Utilise la procédure stockée native",
         "Invoke-Sqlcmd -ServerInstance 'localhost\\SQLEXPRESS' -Database 'msdb' -Query \"SELECT j.name AS JobName, j.enabled AS IsEnabled, CASE WHEN ja.run_requested_date IS NOT NULL THEN 'Running' WHEN jh.run_status = 1 THEN 'Success' WHEN jh.run_status = 0 THEN 'Failed' ELSE 'Unknown' END AS LastStatus, jh.run_date AS LastRunDate, jh.run_time AS LastRunTime FROM msdb.dbo.sysjobs j LEFT JOIN msdb.dbo.sysjobactivity ja ON j.job_id = ja.job_id AND ja.run_requested_date IS NOT NULL LEFT JOIN (SELECT job_id, run_status, run_date, run_time, ROW_NUMBER() OVER (PARTITION BY job_id ORDER BY run_date DESC, run_time DESC) AS rn FROM msdb.dbo.sysjobhistory WHERE step_id = 0) jh ON j.job_id = jh.job_id AND jh.rn = 1 ORDER BY j.name\" | Format-Table -AutoSize": "Affiche tous les jobs configurés dans SQL Server Agent avec leur statut, dernière exécution et prochaine planification."
       }
+    },
+    "es": {
+      "title": "Listar los trabajos de SQL Server Agent",
+      "description": "Muestra todos los trabajos configurados en SQL Server Agent con su estado, su última ejecución y su próxima programación."
     }
   }
 }

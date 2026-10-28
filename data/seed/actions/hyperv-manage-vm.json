@@ -94,6 +94,10 @@
         "Suspend-VM -Name 'TestVM'; Resume-VM -Name 'TestVM'": "Pause puis reprend une VM",
         "Restart-VM -Name 'VM-WEB-01'": "Exemple utilisant le paramètre 'vmName': Nom de la machine virtuelle. Remplacez VM-WEB-01 par la valeur appropriée selon votre environnement."
       }
+    },
+    "es": {
+      "title": "Iniciar, detener o suspender una VM",
+      "description": "Controla el estado de una máquina virtual de Hyper-V: iniciar, apagado limpio, apagado forzado, suspender o reanudar."
     }
   }
 }

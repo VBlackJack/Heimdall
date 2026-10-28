@@ -109,6 +109,10 @@
         "ansible-vault edit group_vars/prod/vault.yml": "Éditer dans group_vars",
         "EDITOR=nano ansible-vault edit secrets.yml": "Avec nano"
       }
+    },
+    "es": {
+      "title": "Editar un archivo cifrado con Ansible Vault",
+      "description": "Abre un archivo cifrado en el editor para modificarlo"
     }
   }
 }

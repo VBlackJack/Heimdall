@@ -150,6 +150,10 @@
         "ansible-playbook site.yml --limit \"webservers\"": "Exécute uniquement sur le groupe webservers",
         "ansible-playbook update.yml --limit \"server1.example.com,server2.example.com\"": "Exécute uniquement sur les hôtes spécifiés"
       }
+    },
+    "es": {
+      "title": "Limitar la ejecución a algunos hosts (--limit)",
+      "description": "Ejecuta un playbook solo en un subconjunto de hosts"
     }
   }
 }

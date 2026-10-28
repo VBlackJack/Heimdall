@@ -35,6 +35,10 @@
       "examples": {
         "Get-ItemProperty 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\WindowsUpdate'": "Affiche la configuration WSUS complète"
       }
+    },
+    "es": {
+      "title": "Probar la conexión con el servidor WSUS",
+      "description": "Comprueba la configuración y la conectividad con el servidor WSUS"
     }
   }
 }

@@ -89,6 +89,10 @@
         "Get-Process | Measure-Object": "Compte le nombre total d'objets retournés. Measure-Object retourne Count, Sum, Average, Min, Max selon les propriétés. Utile pour les statistiques rapides et la validation de résultats.",
         "Get-Process | Sort-Object WorkingSet -Descending | Select-Object -First 10 | Select-Object ProcessName,Id,@{Name='Memory_MB';Expression={[math]::Round($_.WorkingSet/1MB,2)}},@{Name='Virtual_MB';Expression={[math]::Round($_.VirtualMemorySize/1MB,2)}},Handles | Format-Table -AutoSize": "Exemple utilisant le paramètre 'topCount': Nombre de processus à afficher."
       }
+    },
+    "es": {
+      "title": "Listar los procesos que más memoria usan",
+      "description": "Muestra los procesos ordenados por uso de memoria (RAM), de mayor a menor."
     }
   }
 }

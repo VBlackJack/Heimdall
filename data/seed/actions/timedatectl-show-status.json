@@ -60,6 +60,10 @@
         "timedatectl show-timesync --all": "Affiche le serveur et les réglages d'interrogation de systemd-timesyncd",
         "sudo timedatectl set-ntp true": "Active la synchronisation NTP"
       }
+    },
+    "es": {
+      "title": "Mostrar el reloj, la zona horaria y el estado de NTP",
+      "description": "Muestra la hora local y UTC, la zona horaria y si el reloj está sincronizado mediante NTP."
     }
   }
 }

@@ -193,6 +193,10 @@
         "ping -q -c 10 google.com": "Mode quiet : n'affiche que les statistiques finales (pas chaque paquet). Le flag -q (quiet) réduit l'output. Utile dans les scripts pour ne récupérer que le résumé (paquets perdus, temps min/max/moy).",
         "ping -f google.com": "Flood ping : envoie des paquets aussi vite que possible (nécessite root). Le flag -f (flood) ne laisse aucun délai entre les paquets. ATTENTION : à utiliser uniquement pour les tests de performance/stress sur VOS propres serveurs. Peut être considéré comme une attaque DoS sur des systèmes tiers."
       }
+    },
+    "es": {
+      "title": "Probar la conectividad de red",
+      "description": "Prueba la conectividad de red con una dirección IP o un nombre de host."
     }
   }
 }

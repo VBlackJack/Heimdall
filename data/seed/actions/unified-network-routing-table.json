@@ -48,6 +48,10 @@
         "route print -4": "🔥 ROUTAGE WINDOWS : Affiche la table de routage IPv4 standard. Plus lisible que Get-NetRoute pour les anciens admins.",
         "Get-NetRoute -AddressFamily IPv4 | Where-Object {$_.NextHop -ne '0.0.0.0'} | Select-Object DestinationPrefix,NextHop,RouteMetric,InterfaceAlias | Sort-Object RouteMetric | Format-Table -AutoSize": "Affiche la table de routage IPv4 sur Windows"
       }
+    },
+    "es": {
+      "title": "Mostrar la tabla de enrutamiento",
+      "description": "Muestra la tabla de enrutamiento IP completa con las rutas predeterminada y estáticas"
     }
   }
 }

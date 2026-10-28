@@ -95,6 +95,10 @@
         "sudo apt remove apache2": "Désinstaller Apache",
         "sudo apt autoremove": "Supprimer les paquets inutilisés"
       }
+    },
+    "es": {
+      "title": "Desinstalar un paquete de APT",
+      "description": "Quita un paquete instalado pero conserva sus archivos de configuración"
     }
   }
 }

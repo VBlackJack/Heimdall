@@ -89,6 +89,10 @@
         "sudo parted -l": "Alternative: lister avec parted",
         "sudo gdisk /dev/sdc": "Gérer les partitions GPT"
       }
+    },
+    "es": {
+      "title": "Gestionar particiones con fdisk",
+      "description": "Herramienta de particionado de discos (MBR/GPT)."
     }
   }
 }

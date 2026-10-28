@@ -95,6 +95,10 @@
         "$WSUSServer = 'wsus.contoso.com'; $WSUSPort = 8530; Set-ItemProperty -Path 'HKLM:\\Software\\Policies\\Microsoft\\Windows\\WindowsUpdate' -Name 'WUServer' -Value \"http://$WSUSServer`:$WSUSPort\" -Type String -Force; Set-ItemProperty -Path 'HKLM:\\Software\\Policies\\Microsoft\\Windows\\WindowsUpdate' -Name 'WUStatusServer' -Value \"http://$WSUSServer`:$WSUSPort\" -Type String -Force; Set-ItemProperty -Path 'HKLM:\\Software\\Policies\\Microsoft\\Windows\\WindowsUpdate\\AU' -Name 'UseWUServer' -Value 1 -Type DWord -Force; Restart-Service wuauserv -Verbose": "Affiche des informations détaillées sur l'exécution de la commande. -Verbose active les messages de débogage pour comprendre précisément ce qui se passe. Essentiel pour le troubleshooting et la compréhension des opérations internes.",
         "$WSUSServer = 'wsus.contoso.com'; $WSUSPort = 8530; Set-ItemProperty -Path 'HKLM:\\Software\\Policies\\Microsoft\\Windows\\WindowsUpdate' -Name 'WUServer' -Value \"http://$WSUSServer`:$WSUSPort\" -Type String -Force; Set-ItemProperty -Path 'HKLM:\\Software\\Policies\\Microsoft\\Windows\\WindowsUpdate' -Name 'WUStatusServer' -Value \"http://$WSUSServer`:$WSUSPort\" -Type String -Force; Set-ItemProperty -Path 'HKLM:\\Software\\Policies\\Microsoft\\Windows\\WindowsUpdate\\AU' -Name 'UseWUServer' -Value 1 -Type DWord -Force; Restart-Service wuauserv": "Exemple utilisant le paramètre 'wsusPort': Port du serveur WSUS (8530 HTTP ou 8531 HTTPS). Remplacez 8530 par la valeur appropriée selon votre environnement."
       }
+    },
+    "es": {
+      "title": "Configurar el cliente WSUS mediante el registro",
+      "description": "Configura los ajustes del cliente WSUS cambiando las claves del registro correspondientes"
     }
   }
 }

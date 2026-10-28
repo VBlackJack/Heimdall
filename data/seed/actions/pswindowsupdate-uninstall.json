@@ -64,6 +64,10 @@
         "Uninstall-WindowsUpdate -KBArticleID KB5001234": "Désinstalle la mise à jour KB5001234",
         "Uninstall-WindowsUpdate -KBArticleID KB5001234 -IgnoreReboot": "Désinstalle sans redémarrer automatiquement"
       }
+    },
+    "es": {
+      "title": "Desinstalar una actualización de Windows",
+      "description": "Desinstala una actualización de Windows concreta por su número KB"
     }
   }
 }

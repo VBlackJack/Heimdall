@@ -118,6 +118,10 @@
         "ansible-inventory --list": "Lister tout",
         "ansible-inventory -i inventory.ini --list": "Inventaire spécifique"
       }
+    },
+    "es": {
+      "title": "Listar el inventario de Ansible",
+      "description": "Muestra la lista completa de hosts del inventario de Ansible"
     }
   }
 }

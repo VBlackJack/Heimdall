@@ -59,6 +59,10 @@
       "examples": {
         "winget upgrade Microsoft.PowerToys --silent": "Met à jour PowerToys vers la dernière version"
       }
+    },
+    "es": {
+      "title": "Actualizar una aplicación de Winget",
+      "description": "Actualiza una aplicación concreta a su última versión disponible mediante Winget."
     }
   }
 }

@@ -98,6 +98,10 @@
         "Get-NetTCPConnection -State TimeWait | Measure-Object": "Compte les connexions en TIME_WAIT, signe d'épuisement des ports quand le nombre grimpe",
         "Get-NetTCPConnection -OwningProcess (Get-Process -Name w3wp).Id": "Affiche les connexions des processus de travail IIS"
       }
+    },
+    "es": {
+      "title": "Buscar conexiones TCP por estado y puerto",
+      "description": "Muestra las conexiones TCP en un estado concreto en un puerto local, con el proceso propietario."
     }
   }
 }

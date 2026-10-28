@@ -69,6 +69,10 @@
         "sdelete.exe -p 3 -s -AcceptEula C:\\Confidential\\*": "Supprime récursivement (-s) tout le contenu du dossier avec 3 passes d'écrasement. Irrécupérable.",
         "sdelete.exe -z C:": "🔥 FREE SPACE WIPE : Nettoie l'espace libre du disque C: (écrit des zéros). Utile avant de cloner un disque virtuel (réduit la taille du VHD) ou avant de rendre un PC."
       }
+    },
+    "es": {
+      "title": "Eliminación segura (SDelete)",
+      "description": "Elimina archivos de forma definitiva o borra el espacio libre para impedir la recuperación de datos (estándar DoD)."
     }
   }
 }

@@ -42,6 +42,10 @@
       "examples": {
         "winget upgrade --all --silent": "Met à jour toutes les applications en mode silencieux"
       }
+    },
+    "es": {
+      "title": "Actualizar todas las aplicaciones de Winget",
+      "description": "Actualiza todas las aplicaciones instaladas a su última versión disponible."
     }
   }
 }

@@ -84,6 +84,10 @@
         "lsof -i -P -n": "Toutes les connexions réseau",
         "lsof +D /tmp": "Fichiers ouverts dans /tmp"
       }
+    },
+    "es": {
+      "title": "Listar los archivos abiertos",
+      "description": "Lista todos los archivos abiertos por los procesos (archivos, sockets, etc.)."
     }
   }
 }

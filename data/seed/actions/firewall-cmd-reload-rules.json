@@ -54,6 +54,10 @@
         "sudo firewall-cmd --runtime-to-permanent": "Enregistre les règles actives comme règles permanentes",
         "sudo firewall-cmd --state": "Vérifie que firewalld fonctionne"
       }
+    },
+    "es": {
+      "title": "Recargar las reglas de firewalld",
+      "description": "Aplica la configuración guardada de firewalld al cortafuegos en ejecución, conservando las conexiones establecidas."
     }
   }
 }

@@ -70,6 +70,10 @@
       "examples": {
         "Move-ADObject -Identity \"CN=Jean Dupont,OU=Users,DC=contoso,DC=com\" -TargetPath \"OU=IT,DC=contoso,DC=com\"": "Déplace Jean Dupont vers l'OU IT"
       }
+    },
+    "es": {
+      "title": "Mover un objeto de AD a otra OU",
+      "description": "Mueve un usuario, un equipo u otro objeto a una unidad organizativa distinta."
     }
   }
 }

@@ -126,6 +126,10 @@
         "sar -b 1 5": "Activité I/O",
         "sar -q": "Charge système (load average)"
       }
+    },
+    "es": {
+      "title": "Informe de actividad del sistema (SAR)",
+      "description": "Recopila y muestra el historial de actividad del sistema (CPU, memoria, E/S, red)"
     }
   }
 }

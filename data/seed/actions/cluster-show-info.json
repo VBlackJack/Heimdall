@@ -77,6 +77,10 @@
         "Get-ClusterQuorum -Cluster CLU01": "Affiche la configuration du quorum",
         "Get-ClusterSharedVolume -Cluster CLU01": "Affiche les volumes partagés de cluster et leur noeud propriétaire"
       }
+    },
+    "es": {
+      "title": "Mostrar un clúster de conmutación por error",
+      "description": "Muestra las propiedades principales de un clúster de conmutación por error."
     }
   }
 }

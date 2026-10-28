@@ -89,6 +89,10 @@
         "Get-Service -Name 'wuauserv'": "Service Windows Update",
         "Get-Service | Where-Object {$_.StartType -eq 'Automatic' -and $_.Status -ne 'Running'}": "Services automatiques arrêtés (problème potentiel)"
       }
+    },
+    "es": {
+      "title": "Listar los servicios de Windows",
+      "description": "Muestra todos los servicios de Windows con su estado (Running, Stopped, etc.)."
     }
   }
 }

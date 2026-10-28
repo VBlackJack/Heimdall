@@ -55,6 +55,10 @@
         "realm discover example.com": "Découvre un domaine avant de le rejoindre",
         "sudo realm permit -g 'linux-admins'": "Autorise un groupe du domaine à se connecter"
       }
+    },
+    "es": {
+      "title": "Mostrar los dominios a los que se ha unido el host",
+      "description": "Muestra los dominios de Active Directory o de IdM a los que está unido el host, con el software cliente y la directiva de inicio de sesión."
     }
   }
 }

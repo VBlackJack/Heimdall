@@ -130,6 +130,10 @@
         "ps auxf": "Afficher l'arborescence des processus",
         "ps aux --sort=-%cpu | head": "Top CPU"
       }
+    },
+    "es": {
+      "title": "Listar los procesos en ejecución",
+      "description": "Muestra todos los procesos en ejecución."
     }
   }
 }

@@ -77,6 +77,10 @@
         "tar -tzf archive.tar.gz": "Liste le contenu sans extraire",
         "tar -xzf \"/tmp/backup.tar.gz\" -C \"/tmp/extracted\" -v": "Exécute la commande en mode verbeux. Le flag -v (verbose) affiche chaque action effectuée en temps réel. Essentiel pour suivre la progression des opérations longues et vérifier que tout se déroule correctement."
       }
+    },
+    "es": {
+      "title": "Extraer un archivo TAR/GZ",
+      "description": "Extrae el contenido de un archivo tar o tar.gz."
     }
   }
 }

@@ -70,6 +70,10 @@
         "systemctl list-units --type=service --state=failed": "Liste les services en échec",
         "systemctl list-unit-files --type=service": "Liste tous les fichiers d'unités service"
       }
+    },
+    "es": {
+      "title": "Listar todos los servicios de systemd",
+      "description": "Muestra la lista de todas las unidades de tipo service"
     }
   }
 }

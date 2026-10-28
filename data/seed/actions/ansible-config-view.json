@@ -74,6 +74,10 @@
         "ansible-config dump": "Configuration actuelle",
         "ansible --version": "Version et config"
       }
+    },
+    "es": {
+      "title": "Mostrar la configuración de Ansible",
+      "description": "Muestra la configuración actual de Ansible con todos sus orígenes"
     }
   }
 }

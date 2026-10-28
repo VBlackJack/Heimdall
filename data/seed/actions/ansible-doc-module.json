@@ -109,6 +109,10 @@
         "ansible-doc -l": "Lister les modules",
         "ansible-doc -s copy": "Snippet du module"
       }
+    },
+    "es": {
+      "title": "Leer la documentación de un módulo",
+      "description": "Muestra la documentación completa de un módulo de Ansible"
     }
   }
 }

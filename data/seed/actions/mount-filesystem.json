@@ -111,6 +111,10 @@
         "mount | grep ext4": "Afficher les montages ext4",
         "sudo mount -a": "Monter tous les systèmes de fichiers de fstab"
       }
+    },
+    "es": {
+      "title": "Montar un sistema de archivos",
+      "description": "Monta una partición o un dispositivo en un punto de montaje."
     }
   }
 }

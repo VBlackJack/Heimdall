@@ -96,6 +96,10 @@
         "getent hosts db01": "Résout un hôte comme le font les applications, fichier hosts compris",
         "getent services 5432": "Indique quel nom de service correspond à un numéro de port"
       }
+    },
+    "es": {
+      "title": "Buscar una entrada en una base de datos del sistema",
+      "description": "Busca un usuario, un grupo o un host a través del Name Service Switch, tal como lo resuelve el propio sistema."
     }
   }
 }

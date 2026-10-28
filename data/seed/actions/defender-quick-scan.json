@@ -65,6 +65,10 @@
         "Start-MpScan -ScanType CustomScan -ScanPath 'D:\\'": "Analyse complète du disque D:",
         "Update-MpSignature; Start-MpScan -ScanType QuickScan": "Met à jour les définitions puis lance une analyse rapide"
       }
+    },
+    "es": {
+      "title": "Iniciar un análisis rápido de Windows Defender",
+      "description": "Inicia un análisis rápido de las áreas críticas del sistema (memoria, inicio, archivos activos)."
     }
   }
 }

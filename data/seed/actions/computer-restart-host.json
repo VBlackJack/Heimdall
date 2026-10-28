@@ -83,6 +83,10 @@
         "shutdown /r /t 300 /c 'Planned maintenance'": "Redémarre dans cinq minutes avec un message aux utilisateurs",
         "shutdown /a": "Annule un redémarrage planifié avec shutdown"
       }
+    },
+    "es": {
+      "title": "Reiniciar un equipo",
+      "description": "Reinicia al instante el equipo local o uno remoto, cerrando las sesiones abiertas."
     }
   }
 }

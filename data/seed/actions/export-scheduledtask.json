@@ -103,6 +103,10 @@
         "Register-ScheduledTask -Xml (Get-Content 'C:\\Backup\\task.xml' | Out-String) -TaskName 'RestoredTask'": "Réimporte une tâche depuis XML",
         "Export-ScheduledTask -TaskName 'DailyBackup' \\Microsoft\\Windows\\ | Out-File 'results.csv'": "Exemple utilisant le paramètre 'taskpath': Chemin de la tâche. Remplacez \\Microsoft\\Windows\\ par la valeur appropriée selon votre environnement."
       }
+    },
+    "es": {
+      "title": "Exportar una tarea programada",
+      "description": "Exporta la definición de una tarea programada como XML para una copia de seguridad o una migración."
     }
   }
 }

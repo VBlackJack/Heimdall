@@ -60,6 +60,10 @@
         "nmcli general status": "Affiche l'état général de NetworkManager",
         "sudo nmcli device reapply eth0": "Applique une connexion modifiée à un périphérique sans le désactiver"
       }
+    },
+    "es": {
+      "title": "Mostrar los dispositivos de red de NetworkManager",
+      "description": "Muestra cada dispositivo de red que conoce NetworkManager, con su tipo, su estado y su conexión activa."
     }
   }
 }

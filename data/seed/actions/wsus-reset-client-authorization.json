@@ -41,6 +41,10 @@
       "examples": {
         "wuauclt /resetauthorization /detectnow": "Réinitialise l'autorisation et force la détection"
       }
+    },
+    "es": {
+      "title": "Restablecer la autorización del cliente WSUS",
+      "description": "Restablece el identificador del cliente WSUS para forzar una nueva autorización en el servidor"
     }
   }
 }

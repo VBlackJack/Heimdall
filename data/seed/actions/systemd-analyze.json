@@ -88,6 +88,10 @@
         "systemd-analyze verify /etc/systemd/system/myapp.service": "Vérifier un service",
         "systemd-analyze time": "Résumé du temps de boot"
       }
+    },
+    "es": {
+      "title": "Analizar el tiempo de arranque",
+      "description": "Analiza y muestra el tiempo de arranque del sistema y de los servicios"
     }
   }
 }

@@ -61,6 +61,10 @@
         "ip -br link": "Affiche une ligne par interface avec son état",
         "ip -br addr": "Affiche une ligne par interface avec ses adresses"
       }
+    },
+    "es": {
+      "title": "Mostrar los contadores de tráfico de las interfaces",
+      "description": "Muestra cada interfaz de red con su estado, su MTU y sus contadores de paquetes, bytes, errores y descartes."
     }
   }
 }
