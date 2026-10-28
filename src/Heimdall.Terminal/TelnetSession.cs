@@ -16,6 +16,7 @@
 
 using System.Net.Sockets;
 using System.Text;
+using System.Threading.Channels;
 
 namespace Heimdall.Terminal;
 
@@ -47,6 +48,15 @@ public sealed class TelnetSession : ITerminalSession
     private const int AbnormalExitCode = 1;
 
     /// <summary>
+    /// Idle time before the first TCP keepalive probe. Without keepalive a session whose path died
+    /// silently (a NAT or firewall dropped its state) stays "connected" until the user types.
+    /// </summary>
+    internal const int KeepAliveTimeSeconds = 60;
+
+    /// <summary>Delay between two unanswered TCP keepalive probes.</summary>
+    internal const int KeepAliveIntervalSeconds = 10;
+
+    /// <summary>
     /// Most bytes kept from one subnegotiation. Nothing reads the payload today; the cap only stops
     /// a peer that never sends IAC SE from growing it for the life of the session.
     /// </summary>
@@ -68,8 +78,16 @@ public sealed class TelnetSession : ITerminalSession
     private readonly List<byte> _sbBuffer = new List<byte>();
 
     private TcpClient? _client;
-    private NetworkStream? _stream;
+    private Stream? _stream;
     private Task? _readLoop;
+    private Task? _writeLoop;
+
+    /// <summary>
+    /// Every byte bound for the peer, in order: user keystrokes, negotiation replies, size reports.
+    /// One reader (<see cref="WriteLoop"/>) drains it, so two producers can never interleave inside
+    /// one frame and a caller on the UI thread never waits on the socket.
+    /// </summary>
+    private Channel<byte[]>? _outbound;
     private CancellationTokenSource? _cts;
     private TelnetParserState _parserState;
     private byte _pendingVerb;
@@ -134,10 +152,8 @@ public sealed class TelnetSession : ITerminalSession
                 CancellationTokenSource.CreateLinkedTokenSource(_cts.Token, cancellationToken);
             connectTimeout.CancelAfter(TimeSpan.FromMilliseconds(_connectTimeoutMs));
             await _client.ConnectAsync(_host, _port, connectTimeout.Token).ConfigureAwait(false);
-            _stream = _client.GetStream();
-
-            _isRunning = true;
-            _readLoop = Task.Run(() => ReadLoop(_cts.Token), _cts.Token);
+            ApplyKeepAlive(_client.Client);
+            BeginIo(_client.GetStream());
         }
         catch
         {
@@ -146,17 +162,95 @@ public sealed class TelnetSession : ITerminalSession
         }
     }
 
-    public void Write(ReadOnlySpan<byte> data)
+    /// <summary>
+    /// Test seam: runs the session over <paramref name="stream"/> instead of a TCP connection, so a
+    /// test controls when a write completes.
+    /// </summary>
+    internal void StartOnStream(Stream stream, int columns = 80, int rows = 24)
     {
-        if (_disposed || _stream is null) return;
+        ArgumentNullException.ThrowIfNull(stream);
+        if (_disposed) throw new ObjectDisposedException(nameof(TelnetSession));
+        if (_stream is not null) throw new InvalidOperationException("Session already started.");
+
+        _columns = columns;
+        _rows = rows;
+        _intentionalClose = false;
+        ResetParser();
+        _cts = new CancellationTokenSource();
+        BeginIo(stream);
+    }
+
+    /// <summary>The connected socket, for the test that reads back the options set on it.</summary>
+    internal Socket? ConnectedSocket => _client?.Client;
+
+    private void BeginIo(Stream stream)
+    {
+        CancellationToken token = _cts!.Token;
+        _stream = stream;
+        _outbound = Channel.CreateUnbounded<byte[]>(new UnboundedChannelOptions
+        {
+            SingleReader = true,
+            SingleWriter = false
+        });
+
+        _isRunning = true;
+        _writeLoop = Task.Run(() => WriteLoop(stream, _outbound.Reader, token), token);
+        _readLoop = Task.Run(() => ReadLoop(token), token);
+    }
+
+    /// <summary>
+    /// Turns on TCP keepalive so a silently dead path is noticed by the read loop within
+    /// <c>KeepAliveTimeSeconds + retries * KeepAliveIntervalSeconds</c> instead of never.
+    /// </summary>
+    private static void ApplyKeepAlive(Socket socket)
+    {
         try
         {
-            _stream.Write(data);
-            _stream.Flush();
+            socket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.KeepAlive, true);
+            socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveTime, KeepAliveTimeSeconds);
+            socket.SetSocketOption(SocketOptionLevel.Tcp, SocketOptionName.TcpKeepAliveInterval, KeepAliveIntervalSeconds);
         }
+        catch (Exception ex) when (ex is SocketException or PlatformNotSupportedException or ObjectDisposedException)
+        {
+            Heimdall.Core.Logging.FileLogger.Warn($"[TelnetSession] Keepalive: {ex.Message}");
+        }
+    }
+
+    public void Write(ReadOnlySpan<byte> data)
+    {
+        Enqueue(data);
+    }
+
+    /// <summary>
+    /// Queues bytes for the write loop. Never blocks: the channel is unbounded and the caller is
+    /// often the UI thread. Once the loop has failed or the session is closed the channel is
+    /// completed and the bytes are dropped.
+    /// </summary>
+    private void Enqueue(ReadOnlySpan<byte> data)
+    {
+        if (_disposed || data.IsEmpty) return;
+        _outbound?.Writer.TryWrite(data.ToArray());
+    }
+
+    /// <summary>
+    /// The only writer to the peer. Ends on cancellation, on channel completion, or on the first
+    /// failed write (the read loop reports the dead connection).
+    /// </summary>
+    private async Task WriteLoop(Stream stream, ChannelReader<byte[]> reader, CancellationToken ct)
+    {
+        try
+        {
+            await foreach (byte[] chunk in reader.ReadAllAsync(ct).ConfigureAwait(false))
+            {
+                await stream.WriteAsync(chunk, ct).ConfigureAwait(false);
+                await stream.FlushAsync(ct).ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException) { /* Expected on session dispose */ }
         catch (Exception ex)
         {
             Heimdall.Core.Logging.FileLogger.Warn($"[TelnetSession] Write: {ex.Message}");
+            _outbound?.Writer.TryComplete();
         }
     }
 
@@ -224,6 +318,8 @@ public sealed class TelnetSession : ITerminalSession
         _cts?.Dispose();
         _cts = null;
         _readLoop = null;
+        _writeLoop = null;
+        _outbound = null;
     }
 
     private void CloseConnection()
@@ -231,6 +327,7 @@ public sealed class TelnetSession : ITerminalSession
         try
         {
             _isRunning = false;
+            _outbound?.Writer.TryComplete();
             _stream?.Close();
             _client?.Close();
         }
@@ -536,12 +633,7 @@ public sealed class TelnetSession : ITerminalSession
 
     private void SendTerminalType()
     {
-        if (_stream is null || _disposed) return;
-        try
-        {
-            _stream.Write(BuildTerminalTypeFrame(TerminalTypeName));
-        }
-        catch (Exception ex) { Heimdall.Core.Logging.FileLogger.Warn($"[TelnetSession] SendTerminalType: {ex.Message}"); }
+        Enqueue(BuildTerminalTypeFrame(TerminalTypeName));
     }
 
     /// <summary>IAC SB TTYPE IS &lt;name&gt; IAC SE (RFC 1091).</summary>
@@ -565,26 +657,12 @@ public sealed class TelnetSession : ITerminalSession
 
     private void SendCommand(byte command, byte option)
     {
-        if (_stream is null || _disposed) return;
-        try
-        {
-            Span<byte> buf = stackalloc byte[3];
-            buf[0] = IAC;
-            buf[1] = command;
-            buf[2] = option;
-            _stream.Write(buf);
-        }
-        catch (Exception ex) { Heimdall.Core.Logging.FileLogger.Warn($"[TelnetSession] SendCommand: {ex.Message}"); }
+        Enqueue(stackalloc byte[] { IAC, command, option });
     }
 
     private void SendNawsSubnegotiation(int columns, int rows)
     {
-        if (_stream is null || _disposed) return;
-        try
-        {
-            _stream.Write(BuildNawsFrame(columns, rows));
-        }
-        catch (Exception ex) { Heimdall.Core.Logging.FileLogger.Warn($"[TelnetSession] SendNawsSubnegotiation: {ex.Message}"); }
+        Enqueue(BuildNawsFrame(columns, rows));
     }
 
     /// <summary>
