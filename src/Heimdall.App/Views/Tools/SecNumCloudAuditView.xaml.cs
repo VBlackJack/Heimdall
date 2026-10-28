@@ -756,7 +756,7 @@ public partial class SecNumCloudAuditView : UserControl, IToolView
 
         try
         {
-            var html = HtmlReportGenerator.Generate(_lastReport, key => L(key));
+            var html = HtmlReportGenerator.Generate(_lastReport, key => L(key), _localizer?.CurrentLocale);
             File.WriteAllText(dialog.FileName, html, Encoding.UTF8);
             CopyFeedbackHelper.ShowCopyFeedback(sender as Button);
         }
