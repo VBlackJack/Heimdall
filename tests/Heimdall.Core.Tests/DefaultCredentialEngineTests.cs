@@ -130,6 +130,15 @@ public class DefaultCredentialEngineTests
         Assert.Equal(expected, DefaultCredentialEngine.IsDirectCheckUnsupported(service));
     }
 
+    [Theory]
+    [InlineData("VNC", true)]
+    [InlineData("SSH", false)]
+    [InlineData("MySQL", false)]
+    public void IsGatewayCheckUnsupported_NamesTheServicesThatOnlyProbeThePortThere(string service, bool expected)
+    {
+        Assert.Equal(expected, DefaultCredentialEngine.IsGatewayCheckUnsupported(service));
+    }
+
     [Fact]
     public void ClassifyTunnelQuery_ExitZeroAndTheQueryResult_IsAccepted()
     {

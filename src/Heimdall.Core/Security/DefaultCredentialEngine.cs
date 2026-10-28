@@ -89,6 +89,12 @@ public static class DefaultCredentialEngine
     /// </summary>
     private static readonly string[] DirectCheckUnsupportedServices = ["MySQL", "MSSQL"];
 
+    /// <summary>
+    /// The services whose login cannot be tested through a gateway: the VNC check there only
+    /// probed the port, and an open port says nothing about a password.
+    /// </summary>
+    private static readonly string[] GatewayCheckUnsupportedServices = ["VNC"];
+
     private const string HttpVersionPrefix = "HTTP/";
     private const int HttpStatusDigits = 3;
     private const int HttpFirstSuccessStatus = 200;
@@ -193,6 +199,13 @@ public static class DefaultCredentialEngine
 
         return TelnetRefusalMarkers.All(marker => !response.Contains(marker, StringComparison.OrdinalIgnoreCase))
             && response.IndexOfAny(TelnetPromptCharacters) >= 0;
+    }
+
+    /// <summary>Whether a check of the service through a gateway has no login behind it.</summary>
+    public static bool IsGatewayCheckUnsupported(string service)
+    {
+        ArgumentNullException.ThrowIfNull(service);
+        return GatewayCheckUnsupportedServices.Contains(service, StringComparer.Ordinal);
     }
 
     /// <summary>Whether a direct (no gateway) check of the service has no login behind it.</summary>

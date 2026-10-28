@@ -97,9 +97,11 @@ public sealed class DefaultCredentialScanner : ICredentialScanner
         string pass,
         CancellationToken ct)
     {
-        // A direct check of these services has no login behind it. It is reported as such, never
-        // as a rejection and never from the greeting alone.
-        if (_gateway is null && DefaultCredentialEngine.IsDirectCheckUnsupported(service))
+        // A check with no login behind it on this route is reported as such, never as a rejection
+        // and never from a greeting or an open port alone. Nothing is sent.
+        if (_gateway is null
+            ? DefaultCredentialEngine.IsDirectCheckUnsupported(service)
+            : DefaultCredentialEngine.IsGatewayCheckUnsupported(service))
         {
             return new CredTestResultDto
             {
@@ -627,7 +629,8 @@ public sealed class DefaultCredentialScanner : ICredentialScanner
     }
 
     /// <summary>
-    /// Tests VNC connectivity and no-auth mode.
+    /// Tests VNC no-auth mode over a direct connection. Through a gateway the check is reported as
+    /// not supported (see <see cref="TestCredentialAsync"/>).
     /// </summary>
     private async Task<bool> TestVncAsync(string host, int port, string pass, CancellationToken ct)
     {
@@ -635,15 +638,7 @@ public sealed class DefaultCredentialScanner : ICredentialScanner
 
         try
         {
-            if (_tunnelClient is not null)
-            {
-                var safeVncHost = InputValidator.EscapeShellArg(host);
-                var vncCheck =
-                    $"timeout 2 bash -c \"echo >/dev/tcp/{safeVncHost}/{port}\" 2>/dev/null && echo OPEN || echo CLOSED";
-                _ = await ExecuteTunnelCommandAsync(vncCheck, 5000, ct).ConfigureAwait(false);
-                return false;
-            }
-
+            // The gateway route never reaches here: TestCredentialAsync reports it as not supported.
             using var tcp = new TcpClient();
             using var timeout = new CancellationTokenSource(DefaultCredentialEngine.ConnectTimeoutMs);
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, timeout.Token);

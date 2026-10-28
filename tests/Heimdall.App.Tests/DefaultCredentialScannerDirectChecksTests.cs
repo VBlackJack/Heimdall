@@ -63,6 +63,27 @@ public class DefaultCredentialScannerDirectChecksTests
         Assert.False(listener.Pending(), "a check that tests nothing should send nothing");
     }
 
+    [Fact]
+    public async Task TestCredentialAsync_VncThroughAGateway_IsNotTestedAndSendsNothing()
+    {
+        // The gateway is never contacted: the result is decided before a tunnel is opened. Were the
+        // check to go on, opening the tunnel would fail and the status would be Error.
+        using var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        int port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        var scanner = new DefaultCredentialScanner(new Heimdall.Core.Configuration.SshGatewayDto
+        {
+            Host = IPAddress.Loopback.ToString(),
+            Port = port,
+        });
+
+        CredTestResultDto result = await scanner.TestCredentialAsync(
+            "10.0.0.5", 5900, "VNC", string.Empty, "password", CancellationToken.None);
+
+        Assert.Equal(CredTestStatus.NotSupported, result.Status);
+        Assert.False(listener.Pending(), "a check that tests nothing should send nothing");
+    }
+
     [Theory]
     [InlineData("MySQL", true)]
     [InlineData("PostgreSQL", true)]
