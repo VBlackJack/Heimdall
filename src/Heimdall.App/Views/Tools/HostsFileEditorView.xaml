@@ -16,9 +16,47 @@
 <UserControl x:Class="Heimdall.App.Views.Tools.HostsFileEditorView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:sys="clr-namespace:System;assembly=System.Runtime"
              xmlns:loc="clr-namespace:Heimdall.App.Localization"
              xmlns:behaviors="clr-namespace:Heimdall.App.Behaviors"
+             xmlns:controls="clr-namespace:Heimdall.App.Controls"
              Background="{DynamicResource BackgroundBrush}">
+    <UserControl.Resources>
+        <sys:String x:Key="HostsProblemGlyph">&#xE783;</sys:String>
+        <!-- The one cell-text style of the grid. A selected row is painted with the selection
+             fill, so its text takes the selected-row foreground of the shared DataGrid styles
+             (the rest color is unreadable on that fill). The column styles below only change the
+             rest color; the trigger is inherited, and wins over a setter of the derived style. -->
+        <Style x:Key="HostsCellTextStyle" TargetType="{x:Type TextBlock}"
+               BasedOn="{x:Static DataGridTextColumn.DefaultElementStyle}">
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType={x:Type DataGridCell}}}" Value="True">
+                    <Setter Property="Foreground" Value="{DynamicResource TextOnAccentBrush}"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="HostsCommentCellTextStyle" TargetType="{x:Type TextBlock}"
+               BasedOn="{StaticResource HostsCellTextStyle}">
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+        </Style>
+        <Style x:Key="HostsProblemTextStyle" TargetType="{x:Type TextBlock}"
+               BasedOn="{StaticResource HostsCellTextStyle}">
+            <Setter Property="Foreground" Value="{DynamicResource ErrorTextBrush}"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="HostsProblemGlyphStyle" TargetType="{x:Type TextBlock}"
+               BasedOn="{StaticResource HostsProblemTextStyle}">
+            <Setter Property="Text" Value="{StaticResource HostsProblemGlyph}"/>
+            <Setter Property="FontFamily" Value="{StaticResource FontFamilyIcons}"/>
+            <Setter Property="Margin" Value="4,0,0,0"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding ProblemDisplay}" Value="">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -135,21 +173,34 @@
             <DataGrid.Columns>
                 <DataGridCheckBoxColumn x:Name="ColEnabled" Binding="{Binding Enabled, UpdateSourceTrigger=PropertyChanged}" Width="60"/>
                 <DataGridTextColumn x:Name="ColIpAddress" Binding="{Binding IpAddress, UpdateSourceTrigger=LostFocus}" Width="180"
-                                    Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                    ElementStyle="{StaticResource HostsCellTextStyle}"/>
                 <DataGridTextColumn x:Name="ColHostname" Binding="{Binding Hostname, UpdateSourceTrigger=LostFocus}" Width="*"
-                                    Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                    ElementStyle="{StaticResource HostsCellTextStyle}"/>
                 <DataGridTextColumn x:Name="ColComment" Binding="{Binding Comment, UpdateSourceTrigger=LostFocus}" Width="200"
-                                    Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                    ElementStyle="{StaticResource HostsCommentCellTextStyle}"/>
                 <!-- Why a row cannot be saved, as words in the row (not a color on an editor
-                     that vanishes with edit mode), and heard when it changes. -->
+                     that vanishes with edit mode), and heard when it changes. On a selected row
+                     the text takes the selected-row foreground of the grid, because the error
+                     brush is unreadable on the selection fill; the error glyph keeps the
+                     meaning without relying on the color, and is left out of the automation
+                     tree so a screen reader says the sentence only. -->
                 <DataGridTemplateColumn x:Name="ColProblem" Width="220" IsReadOnly="True" SortMemberPath="Problem">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <TextBlock Text="{Binding ProblemDisplay, NotifyOnTargetUpdated=True}"
-                                       Foreground="{DynamicResource ErrorTextBrush}"
-                                       TextWrapping="Wrap" VerticalAlignment="Center" Margin="4,0"
-                                       AutomationProperties.LiveSetting="Polite"
-                                       behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <controls:DecorativeGlyphText Style="{StaticResource HostsProblemGlyphStyle}"/>
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding ProblemDisplay, NotifyOnTargetUpdated=True}"
+                                           Style="{StaticResource HostsProblemTextStyle}"
+                                           AutomationProperties.Name="{Binding ProblemDisplay}"
+                                           TextWrapping="Wrap" Margin="4,0"
+                                           AutomationProperties.LiveSetting="Polite"
+                                           behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"/>
+                            </Grid>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
