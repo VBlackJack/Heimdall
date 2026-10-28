@@ -82,6 +82,55 @@ public class DefaultCredentialEngineTests
     }
 
     [Fact]
+    public void BuildSummaryText_NothingDefaultButSomeChecksNotRun_DoesNotClearTheServices()
+    {
+        var results = new List<CredTestResultDto>
+        {
+            MakeResult("SSH", 22, CredTestStatus.Changed),
+            MakeResult("MySQL", 3306, CredTestStatus.NotSupported),
+        };
+
+        var summary = DefaultCredentialEngine.BuildSummaryText(results, Localize);
+
+        Assert.Equal("ToolDefCredNoDefaultsPartial", summary);
+    }
+
+    [Fact]
+    public void BuildSummaryText_DefaultsAndSomeChecksNotRun_SaysSo()
+    {
+        var results = new List<CredTestResultDto>
+        {
+            MakeResult("SSH", 22, CredTestStatus.Default),
+            MakeResult("MSSQL", 1433, CredTestStatus.NotSupported),
+        };
+
+        var summary = DefaultCredentialEngine.BuildSummaryText(results, Localize);
+
+        Assert.Equal("1 default on 1 service ToolDefCredSummaryNotTested", summary);
+    }
+
+    [Fact]
+    public void StatusToLabelAndDetail_NotSupported_AreTheirOwnKeys()
+    {
+        Assert.Equal(
+            "ToolDefCredStatusNotSupported",
+            DefaultCredentialEngine.StatusToLabel(CredTestStatus.NotSupported));
+        Assert.Equal(
+            "ToolDefCredDetailNotSupported",
+            DefaultCredentialEngine.StatusToDetail(CredTestStatus.NotSupported, "MySQL"));
+    }
+
+    [Theory]
+    [InlineData("MySQL", true)]
+    [InlineData("MSSQL", true)]
+    [InlineData("PostgreSQL", false)]
+    [InlineData("SSH", false)]
+    public void IsDirectCheckUnsupported_NamesTheServicesWithoutADirectLogin(string service, bool expected)
+    {
+        Assert.Equal(expected, DefaultCredentialEngine.IsDirectCheckUnsupported(service));
+    }
+
+    [Fact]
     public void BuildReportText_ContainsHeaderAndData()
     {
         var results = new List<CredTestResultDto>
@@ -201,6 +250,8 @@ public class DefaultCredentialEngineTests
             "ToolDefCredSummaryServices" => "{0} services",
             "ToolDefCredSummaryServicesOne" => "{0} service",
             "ToolDefCredNoDefaults" => "No defaults found",
+            "ToolDefCredNoDefaultsPartial" => "ToolDefCredNoDefaultsPartial",
+            "ToolDefCredSummaryNotTested" => "ToolDefCredSummaryNotTested",
             "ToolDefCredColService" => "Service",
             "ToolDefCredColPort" => "Port",
             "ToolDefCredColUser" => "User",

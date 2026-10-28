@@ -94,6 +94,20 @@ public sealed class DefaultCredentialScanner : ICredentialScanner
         string pass,
         CancellationToken ct)
     {
+        // A direct check of these services has no login behind it. It is reported as such, never
+        // as a rejection and never from the greeting alone.
+        if (_gateway is null && DefaultCredentialEngine.IsDirectCheckUnsupported(service))
+        {
+            return new CredTestResultDto
+            {
+                Service = service,
+                Port = port,
+                Username = user,
+                Password = pass,
+                Status = CredTestStatus.NotSupported,
+            };
+        }
+
         try
         {
             if (_gateway is not null)
@@ -473,7 +487,8 @@ public sealed class DefaultCredentialScanner : ICredentialScanner
     }
 
     /// <summary>
-    /// Tests MySQL credentials using a basic connection heuristic.
+    /// Tests MySQL credentials through the gateway's mysql client. Without a gateway the check is
+    /// reported as not supported (see <see cref="TestCredentialAsync"/>).
     /// </summary>
     private async Task<bool> TestMySqlAsync(
         string host,
@@ -497,15 +512,8 @@ public sealed class DefaultCredentialScanner : ICredentialScanner
                     && !result.Contains("denied", StringComparison.OrdinalIgnoreCase);
             }
 
-            using var tcp = new TcpClient();
-            using var timeout = new CancellationTokenSource(DefaultCredentialEngine.ConnectTimeoutMs);
-            using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, timeout.Token);
-            await tcp.ConnectAsync(host, port, linked.Token).ConfigureAwait(false);
-            var stream = tcp.GetStream();
-
-            var buffer = new byte[1024];
-            var read = await stream.ReadAsync(buffer, linked.Token).ConfigureAwait(false);
-            return read > 4 && buffer[4] == 0x0a;
+            // The direct check never reaches here: TestCredentialAsync reports it as not supported.
+            return false;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -577,7 +585,8 @@ public sealed class DefaultCredentialScanner : ICredentialScanner
     }
 
     /// <summary>
-    /// Tests MSSQL credentials.
+    /// Tests MSSQL credentials through the gateway's sqlcmd. Without a gateway the check is
+    /// reported as not supported (see <see cref="TestCredentialAsync"/>).
     /// </summary>
     private async Task<bool> TestMsSqlAsync(
         string host,
@@ -602,10 +611,7 @@ public sealed class DefaultCredentialScanner : ICredentialScanner
                     && result.Length > 0;
             }
 
-            using var tcp = new TcpClient();
-            using var timeout = new CancellationTokenSource(DefaultCredentialEngine.ConnectTimeoutMs);
-            using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct, timeout.Token);
-            await tcp.ConnectAsync(host, port, linked.Token).ConfigureAwait(false);
+            // The direct check never reaches here: TestCredentialAsync reports it as not supported.
             return false;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)

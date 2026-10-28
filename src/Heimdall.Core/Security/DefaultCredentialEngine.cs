@@ -33,7 +33,13 @@ public enum CredTestStatus
     Changed,
 
     /// <summary>Credential test failed due to an operational error.</summary>
-    Error
+    Error,
+
+    /// <summary>
+    /// The check cannot log in to this service from here, so nothing was tested. Neither a
+    /// default credential nor a rejection.
+    /// </summary>
+    NotSupported
 }
 
 /// <summary>
@@ -64,6 +70,12 @@ public static class DefaultCredentialEngine
     public const int MaxConcurrentServices = 3;
     public const int PortProbeTimeoutMs = 2000;
 
+    /// <summary>
+    /// The services whose login cannot be tested over a direct connection: MySQL and MSSQL are
+    /// tested only through a gateway's own client. A greeting alone says nothing about a credential.
+    /// </summary>
+    private static readonly string[] DirectCheckUnsupportedServices = ["MySQL", "MSSQL"];
+
     private const string HttpVersionPrefix = "HTTP/";
     private const int HttpStatusDigits = 3;
     private const int HttpFirstSuccessStatus = 200;
@@ -87,6 +99,13 @@ public static class DefaultCredentialEngine
     private const int VncFirstSecurityTypeListMinor = 7;
     private const int VncFirstVersion38Minor = 8;
     private const byte VncSecurityTypeNone = 1;
+
+    /// <summary>Whether a direct (no gateway) check of the service has no login behind it.</summary>
+    public static bool IsDirectCheckUnsupported(string service)
+    {
+        ArgumentNullException.ThrowIfNull(service);
+        return DirectCheckUnsupportedServices.Contains(service, StringComparer.Ordinal);
+    }
 
     /// <summary>
     /// Checks if an HTTP status line indicates successful authentication.
@@ -270,13 +289,17 @@ public static class DefaultCredentialEngine
             .Distinct(StringComparer.Ordinal)
             .Count();
 
+        bool anyNotTested = results.Any(r => r.Status == CredTestStatus.NotSupported);
         if (defaultCount == 0)
         {
-            return L(localize, "ToolDefCredNoDefaults");
+            // "No defaults" would claim more than was tested when some checks could not run.
+            return anyNotTested
+                ? L(localize, "ToolDefCredNoDefaultsPartial")
+                : L(localize, "ToolDefCredNoDefaults");
         }
 
         ICountLocalizer counts = countLocalizer ?? DelegateCountLocalizer.English(key => L(localize, key));
-        return string.Format(
+        string summary = string.Format(
             L(localize, "ToolDefCredSummary"),
             counts.FormatCount(
                 defaultCount,
@@ -284,6 +307,7 @@ public static class DefaultCredentialEngine
                 "ToolDefCredSummaryCredentials",
                 defaultCount),
             counts.FormatCount(serviceCount, "ToolDefCredSummaryServicesOne", "ToolDefCredSummaryServices", serviceCount));
+        return anyNotTested ? summary + " " + L(localize, "ToolDefCredSummaryNotTested") : summary;
     }
 
     /// <summary>
@@ -373,6 +397,7 @@ public static class DefaultCredentialEngine
             CredTestStatus.Default => L(localize, "ToolDefCredStatusDefault"),
             CredTestStatus.Changed => L(localize, "ToolDefCredStatusChanged"),
             CredTestStatus.Error => L(localize, "ToolDefCredStatusError"),
+            CredTestStatus.NotSupported => L(localize, "ToolDefCredStatusNotSupported"),
             _ => status.ToString()
         };
     }
@@ -394,6 +419,9 @@ public static class DefaultCredentialEngine
                 service),
             CredTestStatus.Changed => string.Format(
                 L(localize, "ToolDefCredDetailRejected"),
+                service),
+            CredTestStatus.NotSupported => string.Format(
+                L(localize, "ToolDefCredDetailNotSupported"),
                 service),
             _ => string.Empty
         };
