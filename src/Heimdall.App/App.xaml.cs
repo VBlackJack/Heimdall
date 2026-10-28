@@ -154,6 +154,10 @@ public partial class App : System.Windows.Application
     /// </summary>
     private static readonly TimeSpan UnhandledExceptionDialogWait = TimeSpan.FromMinutes(1);
 
+    /// <summary>The startup stages timed in the log.</summary>
+    private const string ConfigInitStage = "configuration init";
+    private const string LocalizationLoadStage = "localization load";
+
     /// <summary>The exit tail steps, as the log names them.</summary>
     private const string WindowStatePersistStep = "window state persistence";
     private const string ExitTailStartStep = "session snapshot and close";
@@ -264,15 +268,17 @@ public partial class App : System.Windows.Application
 
             // Initialize core services
             var configManager = _serviceProvider.GetRequiredService<IConfigManager>();
-            await configManager.InitializeAsync();
+            await StartupStageTimer.RunAsync(ConfigInitStage, configManager.InitializeAsync);
 
             var localization = _serviceProvider.GetRequiredService<LocalizationManager>();
             var settings = await LoadStartupSettingsAsync(configManager);
             _notesStoragePath = ResolveNotesStoragePath(settings, _dataRoot);
 
-            await localization.LoadAsync(
-                Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "locales"),
-                settings.DefaultLocale);
+            await StartupStageTimer.RunAsync(
+                LocalizationLoadStage,
+                () => localization.LoadAsync(
+                    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "locales"),
+                    settings.DefaultLocale));
 
             // Bridge the DI LocalizationManager to the WPF binding system
             // so that {loc:Translate} markup extensions can resolve keys
