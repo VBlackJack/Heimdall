@@ -20,6 +20,7 @@ using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
 using Heimdall.Core.Security;
 using Heimdall.Core.StateMachine;
+using Heimdall.Terminal;
 
 namespace Heimdall.App.Services.Handlers;
 
@@ -30,14 +31,28 @@ internal sealed class TelnetHandler : IProtocolHandler
 {
     private readonly ConnectionStateMachine _connectionSm;
     private readonly LocalizationManager _localizer;
+    private readonly Func<string, int, int, ITerminalSession> _sessionFactory;
 
     public TelnetHandler(
         ConnectionStateMachine connectionSm,
         LocalizationManager localizer)
+        : this(connectionSm, localizer, CreateSession)
+    {
+    }
+
+    /// <summary>Lets a test supply the session, so a timeout or a cancel can be made to happen on demand.</summary>
+    internal TelnetHandler(
+        ConnectionStateMachine connectionSm,
+        LocalizationManager localizer,
+        Func<string, int, int, ITerminalSession> sessionFactory)
     {
         _connectionSm = connectionSm;
         _localizer = localizer;
+        _sessionFactory = sessionFactory;
     }
+
+    private static ITerminalSession CreateSession(string host, int port, int connectTimeoutMs)
+        => new TelnetSession(host, port, connectTimeoutMs);
 
     public string Protocol => "TELNET";
 
@@ -73,7 +88,7 @@ internal sealed class TelnetHandler : IProtocolHandler
 
         Core.Logging.FileLogger.Info($"Launching Telnet session: {server.RemoteServer}:{port}");
 
-        Heimdall.Terminal.TelnetSession session = new Heimdall.Terminal.TelnetSession(
+        ITerminalSession session = _sessionFactory(
             server.RemoteServer,
             port,
             settings.TelnetConnectTimeoutMs);
@@ -86,8 +101,20 @@ internal sealed class TelnetHandler : IProtocolHandler
         catch (Exception ex)
         {
             session.Dispose();
-            Core.Logging.FileLogger.Error("Telnet connection failed", ex);
-            string userMsg = _localizer.Format("ErrorTelnetConnectionFailed", ex.Message);
+            TelnetConnectOutcome outcome = TelnetConnectFailureMapper.Classify(ex, ct);
+            if (outcome == TelnetConnectOutcome.Cancelled)
+            {
+                // The user cancelled: not a failure to report. Same contract as SshHandler and FtpHandler.
+                throw;
+            }
+
+            Core.Logging.FileLogger.Error($"Telnet connection failed ({outcome})", ex);
+            string endpoint = $"{server.RemoteServer}:{port.ToString(CultureInfo.InvariantCulture)}";
+            // Only Cancelled has no key, and it was rethrown above.
+            string messageKey = TelnetConnectFailureMapper.MessageKey(outcome)!;
+            string userMsg = _localizer.Format(
+                messageKey,
+                outcome == TelnetConnectOutcome.TimedOut ? endpoint : ex.Message);
             _connectionSm.SetError(server.Id, userMsg);
             return new ConnectionResult(false, userMsg, null);
         }
