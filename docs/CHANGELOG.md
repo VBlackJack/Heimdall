@@ -12,6 +12,140 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-10-29: audit hardening release (v2026.102901)
+
+The full audit of 2026-10-27 (lots A to J, then the P3 lots K to S and the follow-ups F2 to F10),
+merged as #712 to #744 (#732 closed, #737 left open). The user-facing summary and the upgrade notes
+are in the release notes.
+
+### Trust at the import boundary (#716)
+
+- **Citrix ICA path.** `CitrixHandler.TryNormalizeIcaFilePath` refuses a UNC or device path, an
+  alternate data stream and any extension but `.ica` before any file system call;
+  `ProfileExecutionTrust.CarriesLocalExecutionPayload` now covers a Citrix profile with an ICA file,
+  so an imported one asks for confirmation.
+- **Network paths.** `ImportedPathPolicy.IsNetworkOrDevicePath` is the one textual predicate;
+  `ImportedProfileSanitizer` clears such values (SSH key, ICA, local shell, web program, gateway key
+  path) and the import summary lists each dropped field.
+- **External tool values** that would not stay one argument are refused (#716), and so is a
+  credential command value (#740, F3).
+
+### Command Library sync and generator (#714, #718, #731)
+
+- **Deterministic public ids** (UUIDv5 of the seed id) for the shipped catalogue; schema steps 10 to
+  12 add the `SyncTombstones` table, rewrite seed ids and give a lower-case original with an
+  upper-case twin a new id.
+- **Only user content travels** (`SharedLibraryContent.IsShared`); tombstones (`_deleted.json`)
+  replace authoritative orphan removal; templates follow their action; categories are newer-wins;
+  runbook steps are keyed by `actionPublicId`; a conflicted pull takes the remote and a push is
+  refused mid-merge; shipped actions are soft-retired.
+- **Generator.** One pass over the original pattern, so an inserted value is never rescanned (S-04);
+  value regexes end with `\z`, numbers parse under the invariant culture and type names lower-case
+  invariantly (D3-1, D3-2); `TemplateParameter.Flag` drops the flag of an empty optional parameter
+  (D3-3, 29 parameters of 19 shipped actions declare one).
+
+### Persistence and shutdown (#713, #715, #731, #743)
+
+- **`OnExit` is synchronous** and waits for the exit tail in one bounded nested frame
+  (`BoundedDispatcherWait`); logoff defers the window state to that tail. A missing `settings.json`
+  or `servers.json` is restored from a readable `.bak`; a Notes close that cannot take the write lock
+  is refused.
+- **Hosts editor.** The file is a list of lines (`HostsFileDocument`, `HostsFileStore`): comments,
+  aliases and encoding round-trip, backups go under the data root (`hosts-backups`, newest 10 plus
+  `hosts.original`), a changed file is refused by SHA-256, dirty tracking guards Reload and close.
+- **Smaller stores.** Scan history uses the atomic restricted writer, a corrupt network knowledge
+  base is set aside, the diagnostic log is bounded by age and size, and sync history keeps 500
+  entries per remote.
+- **Notes.** The editor reports a change only for a user transaction, `TryApplyEditorMarkdown`
+  refuses identical markdown while clean, `[[links]]` are written unescaped, and the Milkdown bundle
+  is rebuilt with patched npm dependencies (#739).
+
+### Protocols (#717, #727, #729, #740)
+
+- **Telnet.** A server FIN is exit code 0 (no reconnect); a connect timeout is told from a cancel;
+  TCP keepalive and a single ordered write queue; ECHO, SGA and TTYPE are accepted.
+- **FTP** starts in the working directory and classifies connect failures. **VNC** carries clipboard
+  text as UTF-8, requires a per-proxy random token and the exact page origin, types connect failures
+  and survives an aborted upgrade.
+- **Citrix** window capture no longer throws on multi-user hosts.
+- **Credential checks.** Direct MySQL and MSSQL and gateway VNC return `CredTestStatus.NotSupported`
+  ("Not tested") and send nothing; gateway SQL clients print `RC=n` first and are accepted only on
+  exit 0 and the expected result line (`ClassifyTunnelQuery`); Telnet shares `IsTelnetLoginAccepted`;
+  the FTP, HTTP, PostgreSQL and VNC replies are read strictly; the SMB server name is read from the
+  `srvinfo` header line.
+
+### Imports, discovery and cron (#718, #733, #723)
+
+- **Imports.** MobaXterm byte order mark, RDCMan 2.7 names (servers without a name are reported),
+  mRemoteNG inheritance resolved and unknown protocols skipped (D3-7).
+- **Hostile input.** Bounds on the tunnel, NetBIOS, SNMP and NTLM parsers; the SMB info survives a
+  failed probe.
+- **Cron.** Day fields are ORed, `a-b/n` is honoured, month and day names are accepted, and the
+  next-run preview says it is in local time.
+
+### Installer, build and CI (#712, #730, #742, #723, #739, #741)
+
+- **MSI ProductVersion** is `<yy>.<M>.<DD*100+seq>` (`ConvertTo-MsiProductVersion`); the assembly
+  version is unchanged. Per-machine components are keyed under HKLM with new GUIDs.
+- **Release gates.** `ReleasePreflight.ps1` (clean tree, master, HEAD equals origin, green push run),
+  `WebView2RuntimeGate.ps1` (60-day age of the fixed runtime, signed CAB), `-AcceptCiFailure
+  "<reason>"` as the one override, `gh release create --target`, and informational CI lanes appended
+  to the generated notes. The edition is stamped as assembly metadata so a Standard build never uses
+  a leftover runtime.
+- **Inno Setup.** `[InstallDelete]` for each vendored tree, HKCU and HKLM install records,
+  `innosetup.iss` saved as UTF-8 with a byte order mark, compiler output kept on failure.
+- **CI.** Actions pinned to commits, read-only token, job timeouts, a packaging workflow on master,
+  `Test-VerifiedInstaller.ps1` in the blocking lane, an npm audit of the Milkdown bundle, vendored
+  components pinned by version and SHA-256, a `CIUnstable` inventory guard, a blocking test that
+  loads `MainWindow.xaml` whole, Dependabot kept off WiX major updates, `Build.bat` and `Test.bat`
+  exit with the status of what they wrap. Unused Polly, Serilog and Logging.Abstractions references
+  are gone and Microsoft.* and System.* packages are at 10.0.14.
+
+### Security hardening (#728, #729, #730)
+
+- **Password generator** copies through `SetSensitiveText` (history and cloud clipboard excluded),
+  arms the clear for the phonetic copy and finishes a pending clear on close.
+- **Paste staging** folder is created restricted and swept after 24 h; the WebView2 bootstrapper
+  signature is verified before it runs.
+- **`SharedPostConnectTrust`** stores a versioned fingerprint (`v2:`) of the commands plus host,
+  ports and users, so every existing approval is asked once more.
+
+### Accessibility and focus (#720, #734, #725)
+
+- Notes tree, palette, post-connect steps, regex matches, tunnel gateways, RDP chips, tag filters and
+  the batch copy button are named for UIA; a census guard names item containers.
+- Vault dialogs refocus after a failed attempt; five dialogs get an initial focus; save-time
+  validation summaries are live regions; tall dialogs fit a 768 px working area.
+- Tab order of the Web, SSH and RDP headers and of four forms; SFTP queue buttons name their
+  transfer; Spanish columns widened; the hosts editor Problem cell is readable when selected.
+
+### Localization (#719, #722, #724, #735, #736)
+
+- Scheduled-task schedule text, macro escape errors, certificate texts, durations, quick file server
+  pages, runbook variable help and the VNC page read from the catalogue; view model validation
+  carries locale keys.
+- The 527 seed actions have Spanish titles and descriptions and the debloat pack is English with fr
+  and es blocks.
+- 1,304 dead locale keys are deleted; the dead-key detector learned every runtime composition, and a
+  missing lookup is recorded and logged. The documented key count is quoted as a floor rounded down
+  to the hundred.
+
+### Smaller fixes (#721, #738, #744, #742, #733)
+
+- Closed tool tabs release their view model; startup skips hashing the seed files while their
+  metadata is unchanged and logs per-stage timings.
+- The action editor keeps a parameter's quoting mode on save, and its Platform and Risk combos match
+  by `Tag`; a detected tool's name is no longer looked up as a locale key.
+- The HTML audit report writes the interface language in `lang`; Pageant dead code removed; a
+  settings write refused in a sidebar handler is contained; the SSH agent probe runs off the UI
+  thread; converter brushes are cached.
+
+### Documentation (#719, #726)
+
+- Release notes may have an optional French mirror under `docs/fr/release-notes/`, linked by an
+  absolute tag URL; relative links are refused; the typography guards cover own scripts, pages and
+  release notes.
+
 ## 2026-10-27: Command Library finishing touches (v2026.102702)
 
 The rest of the 2026-10-26 UX/UI audit of the Command Library (P2-3, the seven P3, and the
