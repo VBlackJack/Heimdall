@@ -665,6 +665,21 @@ public sealed class CitrixHandlerTests
         Assert.Equal(baseline, session.PreLaunchWindows);
     }
 
+    // The cache launch reports no AppName, yet the ICA window is found by the application's name.
+    [Fact]
+    public async Task ConnectAsync_CacheLaunch_CarriesTheApplicationNameForWindowMatching()
+    {
+        CitrixHandler handler = CreateHandler(static _ => null, static stored => stored);
+        ServerProfileDto server = CreateCacheServer("-qlaunch app=MobaXterm");
+        server.CitrixAppName = "MobaXterm";
+
+        ConnectionResult result = await handler.ConnectAsync(server, new AppSettings(), CancellationToken.None);
+
+        CitrixSessionResult session = Assert.IsType<CitrixSessionResult>(result.Session);
+        Assert.Equal("MobaXterm", session.WindowMatchName);
+        Assert.Null(session.AppName);
+    }
+
     [Theory]
     [InlineData(@"C:\Custom\Citrix\SelfService.exe")]
     [InlineData(@"C:\Custom\Citrix\selfservice.exe")]

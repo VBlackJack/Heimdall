@@ -6168,6 +6168,8 @@
   "SettingsLblCitrixCacheDirectory": "R\u00e9pertoire de cache SelfService (optionnel)",
   "SettingsLblCitrixCacheStorePrefix": "Pr\u00e9fixe de magasin du cache (optionnel)",
   "SettingsHintCitrixCacheStorePrefix": "Si renseign\u00e9 (par exemple store-01-), seuls les fichiers <pr\u00e9fixe>*_Cache.xml sont analys\u00e9s.",
+  "SettingsLabelCitrixWindowDiagnostics": "Diagnostic des fenêtres Citrix (écrit les titres de fenêtre dans le journal)",
+  "SettingsHintCitrixWindowDiagnostics": "Trace les fenêtres Citrix Workspace et ICA après chaque lancement et intègre la fenêtre de l'application trouvée par son titre. Les titres peuvent contenir des noms de serveurs : désactivez ce mode après le test.",
   "SettingsSectionExternalToolProviders": "D\u00e9tection d'outils tiers",
   "SettingsExternalToolProvidersDesc": "Indiquez les r\u00e9pertoires o\u00f9 les outils Sysinternals, NirSoft ou NanaRun sont install\u00e9s. Heimdall d\u00e9tectera et int\u00e9grera les outils CLI disponibles.",
   "TreeCtxDetectedTools": "Outils d\u00e9tect\u00e9s",

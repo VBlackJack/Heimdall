@@ -40,6 +40,9 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
     private const int WindowCaptureMaxAttempts = 60;
     private const int WindowCapturePollIntervalMs = 500;
 
+    // How long the capture searches before the loading text says the search is taking a while.
+    private const int ExtendedSearchMessageDelayMs = 10_000;
+
     // 360 * 500ms gives users roughly three minutes for MFA-backed sign-in.
     private const int AuthWatchMaxAttempts = 360;
     private const int AuthWatchShutdownTimeoutMs = 500;
@@ -121,6 +124,14 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
 
     /// <summary>Per-profile session-logging override. Null means inherit the live global setting.</summary>
     public bool? SessionLoggingOverride { get; set; }
+
+    /// <summary>
+    /// Window diagnostics for this launch, read from the settings when the view is created. Set
+    /// before <see cref="InitializeSession"/>, which starts the trace when they are enabled.
+    /// </summary>
+    internal CitrixWindowDiagnosticsOptions Diagnostics { get; set; } = CitrixWindowDiagnosticsOptions.Disabled;
+
+    private CancellationTokenSource? _diagnosticsCts;
 
     [DllImport("user32.dll")]
     private static extern bool SetForegroundWindow(IntPtr hWnd);
@@ -208,6 +219,12 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
         };
         _healthTimer.Tick += OnHealthTimerTick;
         _healthTimer.Start();
+
+        if (Diagnostics.Enabled)
+        {
+            _diagnosticsCts = new CancellationTokenSource();
+            _ = CitrixWindowDiagnostics.RunAsync(Diagnostics, () => _capturedHwnd, _diagnosticsCts.Token);
+        }
 
         // Attempt to capture the Citrix window asynchronously
         _ = TryCaptureWindowAsync();
@@ -363,6 +380,12 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
         Core.Logging.FileLogger.Info($"Citrix: {preLaunchWindows.Count} visible window(s) before launch");
         _preLaunchOwners = CitrixSessionEnvironment.Default.OwnersOf(preLaunchWindows);
 
+        if (Diagnostics.Enabled && !string.IsNullOrWhiteSpace(_session?.WindowMatchName))
+        {
+            await CaptureApplicationWindowByTitleAsync(preLaunchWindows, _session.WindowMatchName);
+            return;
+        }
+
         bool extendedMessageShown = false;
         for (int attempt = 1; attempt <= WindowCaptureMaxAttempts; attempt++)
         {
@@ -371,14 +394,10 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
             await Task.Delay(WindowCapturePollIntervalMs);
             if (_disposed || !_captureInProgress) return;
 
-            if (!extendedMessageShown && attempt * WindowCapturePollIntervalMs >= 10_000)
+            if (!extendedMessageShown && attempt * WindowCapturePollIntervalMs >= ExtendedSearchMessageDelayMs)
             {
                 extendedMessageShown = true;
-                await Dispatcher.InvokeAsync(() =>
-                {
-                    CaptureLoadingText.Text = L10n("CitrixCaptureSearchingExtended");
-                    Behaviors.LiveRegionBehavior.Announce(CaptureLoadingText);
-                });
+                await ShowExtendedSearchMessageAsync();
             }
 
             CitrixSessionWindow bestWindow = FindNewSessionWindow(preLaunchWindows);
@@ -452,6 +471,78 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
         {
             ShowExternalFallback();
         });
+    }
+
+    private async Task ShowExtendedSearchMessageAsync()
+    {
+        await Dispatcher.InvokeAsync(() =>
+        {
+            CaptureLoadingText.Text = L10n("CitrixCaptureSearchingExtended");
+            Behaviors.LiveRegionBehavior.Announce(CaptureLoadingText);
+        });
+    }
+
+    /// <summary>
+    /// Diagnostic capture: waits for the ICA window whose title names the published application
+    /// and embeds it. The Workspace sign-in window is never a candidate, so it stays outside the
+    /// tab while the user signs in. Falls back to external mode when no such window appears.
+    /// </summary>
+    private async Task CaptureApplicationWindowByTitleAsync(HashSet<IntPtr> preLaunchWindows, string applicationName)
+    {
+        TimeSpan wait = Diagnostics.SessionWindowWait;
+        int maxAttempts = (int)Math.Ceiling(wait.TotalMilliseconds / WindowCapturePollIntervalMs);
+        Core.Logging.FileLogger.Info(
+            $"{CitrixWindowDiagnostics.LogPrefix} title-matched capture waiting for application=\"{applicationName}\" up to {wait.TotalSeconds}s");
+
+        bool extendedMessageShown = false;
+        for (int attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            if (_disposed || !_captureInProgress) return;
+
+            await Task.Delay(WindowCapturePollIntervalMs);
+            if (_disposed || !_captureInProgress) return;
+
+            if (!extendedMessageShown && attempt * WindowCapturePollIntervalMs >= ExtendedSearchMessageDelayMs)
+            {
+                extendedMessageShown = true;
+                await ShowExtendedSearchMessageAsync();
+            }
+
+            if (CitrixApplicationWindowSelector.Select(
+                    CitrixWindowSurvey.Capture(CitrixApplicationWindowSelector.SessionHostProcessNames),
+                    preLaunchWindows,
+                    applicationName) is not { } match)
+            {
+                continue;
+            }
+
+            Core.Logging.FileLogger.Info(
+                $"{CitrixWindowDiagnostics.LogPrefix} embedding the window owned by the application anchor after {attempt * WindowCapturePollIntervalMs}ms: {match.Describe()}");
+
+            CitrixSessionWindow sessionWindow = new(match.Hwnd, match.ProcessId);
+            bool adopted = await Dispatcher.InvokeAsync(() =>
+            {
+                if (!AdoptSessionWindow(sessionWindow))
+                {
+                    return false;
+                }
+
+                _captureInProgress = false;
+                CaptureLoadingPanel.Visibility = Visibility.Collapsed;
+                EmbedWindow(sessionWindow.Hwnd);
+                return true;
+            }).Task;
+
+            if (adopted)
+            {
+                return;
+            }
+        }
+
+        _captureInProgress = false;
+        Core.Logging.FileLogger.Info(
+            $"{CitrixWindowDiagnostics.LogPrefix} no window titled for application=\"{applicationName}\" within {wait.TotalSeconds}s; using external mode");
+        await Dispatcher.InvokeAsync(ShowExternalFallbackUnlessDisposed);
     }
 
     private void StartAuthWatch(HashSet<IntPtr> preLaunchWindows, IntPtr authHwnd)
@@ -1160,6 +1251,12 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
         }
 
         StopAuthWatch();
+
+        // The trace task observes the cancellation and ends on its own; disposing the source while
+        // its delay still holds a registration is safe.
+        _diagnosticsCts?.Cancel();
+        _diagnosticsCts?.Dispose();
+        _diagnosticsCts = null;
 
         if (_healthTimer is not null)
         {

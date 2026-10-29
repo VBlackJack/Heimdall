@@ -464,6 +464,9 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     [ObservableProperty]
     private string _citrixCacheStorePrefix = "";
 
+    [ObservableProperty]
+    private bool _citrixWindowDiagnosticsEnabled;
+
     /// <summary>Checks a file path; replaceable so the "not found" hints can be exercised without a disk.</summary>
     internal Func<string, bool> FileExists { get; set; } = File.Exists;
 
@@ -1844,6 +1847,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             CitrixSelfServicePath = settings.CitrixSelfServicePath ?? "";
             CitrixCacheDirectory = settings.CitrixCacheDirectory ?? "";
             CitrixCacheStorePrefix = settings.CitrixCacheStorePrefix ?? "";
+            CitrixWindowDiagnosticsEnabled = settings.CitrixWindowDiagnosticsEnabled;
 
             // Command Library Git Sync
             CmdLibGitSyncEnabled = settings.CmdLibGitSyncEnabled;
@@ -2324,6 +2328,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         settings.CitrixSelfServicePath = string.IsNullOrWhiteSpace(CitrixSelfServicePath) ? null : CitrixSelfServicePath;
         settings.CitrixCacheDirectory = string.IsNullOrWhiteSpace(CitrixCacheDirectory) ? null : CitrixCacheDirectory;
         settings.CitrixCacheStorePrefix = CitrixCacheScanner.NormalizeStorePrefix(CitrixCacheStorePrefix);
+        settings.CitrixWindowDiagnosticsEnabled = CitrixWindowDiagnosticsEnabled;
 
         // Command Library Git Sync
         settings.CmdLibGitSyncEnabled = CmdLibGitSyncEnabled;
