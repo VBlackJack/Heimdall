@@ -6171,6 +6171,8 @@
   "SettingsLblCitrixCacheDirectory": "SelfService cache directory (optional)",
   "SettingsLblCitrixCacheStorePrefix": "Cache store file prefix (optional)",
   "SettingsHintCitrixCacheStorePrefix": "When set (for example, store-01-), only <prefix>*_Cache.xml files are scanned.",
+  "SettingsLabelCitrixWindowDiagnostics": "Citrix window diagnostics (writes window titles to the log)",
+  "SettingsHintCitrixWindowDiagnostics": "Traces the Citrix Workspace and ICA windows after each launch and embeds the application window found by its title. Window titles can name servers: turn this off once the test is done.",
   "SettingsSectionExternalToolProviders": "Third-Party Tool Detection",
   "SettingsExternalToolProvidersDesc": "Specify directories where Sysinternals, NirSoft, or NanaRun tools are installed. Heimdall will detect and integrate available CLI tools.",
   "TreeCtxDetectedTools": "Detected Tools",

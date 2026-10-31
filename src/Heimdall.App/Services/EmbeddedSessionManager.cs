@@ -547,7 +547,8 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
                 // Read the LIVE global toggle at the seam (mirrors the RDP/VNC wiring), so enabling
                 // session logging takes effect without a restart.
                 SessionLoggingEnabledProvider = () =>
-                    _configManager.CurrentSettings?.SessionLoggingEnabled ?? false
+                    _configManager.CurrentSettings?.SessionLoggingEnabled ?? false,
+                Diagnostics = CitrixWindowDiagnosticsOptions.FromSettings(_configManager.CurrentSettings)
             };
             view.SessionLoggingOverride = citrix.SessionLoggingOverride;
             view.InitializeSession(citrix, sessionTab, displayName, _localizer, _dialogService);

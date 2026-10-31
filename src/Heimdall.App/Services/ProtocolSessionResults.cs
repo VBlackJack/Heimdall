@@ -214,10 +214,15 @@ public enum CitrixLaunchMode
 /// view uses it to tell the new session window from a pre-existing one; taking it after the launch
 /// would race single sign-on and a warm cache, which can surface the session window first.
 /// </param>
+/// <param name="WindowMatchName">
+/// The published application's name, as the ICA window title starts with it. Carried for every
+/// launch mode, unlike <paramref name="AppName"/>, which only the StoreFront launch reports.
+/// </param>
 public sealed record CitrixSessionResult(
     Process? Process,
     string? StoreFrontUrl = null,
     string? AppName = null,
     CitrixLaunchMode Mode = CitrixLaunchMode.Unknown,
     bool? SessionLoggingOverride = null,
-    IReadOnlySet<nint>? PreLaunchWindows = null) : ISessionResult;
+    IReadOnlySet<nint>? PreLaunchWindows = null,
+    string? WindowMatchName = null) : ISessionResult;

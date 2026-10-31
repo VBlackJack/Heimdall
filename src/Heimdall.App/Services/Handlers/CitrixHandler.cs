@@ -316,7 +316,8 @@ internal sealed class CitrixHandler : IProtocolHandler
                     resultAppName,
                     mode,
                     server.SessionLoggingOverride,
-                    PreLaunchWindows: preLaunchWindows)));
+                    PreLaunchWindows: preLaunchWindows,
+                    WindowMatchName: server.CitrixAppName)));
         }
         catch (VaultLockedException)
         {
