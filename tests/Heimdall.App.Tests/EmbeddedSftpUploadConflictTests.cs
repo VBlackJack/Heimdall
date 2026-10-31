@@ -613,11 +613,11 @@ public sealed class EmbeddedSftpUploadConflictTests
         Assert.Equal(FileAttributes.Directory | FileAttributes.ReparsePoint, attributes);
     }
 
-    // A source deleted between the existence probe and the classification stays an ignored
-    // disappearance. It must not be counted as a refused link, which would surface a warning
-    // for a path the user never selected as a link.
+    // A source deleted between the existence probe and the classification is not counted as a
+    // refused link, which would surface a link warning for a path the user never selected as a
+    // link. The caller reports it as an unavailable source instead.
     [Fact]
-    public void ClassifyLocalUploadRoot_VanishedSource_IsIgnoredWithoutBeingCounted()
+    public void ClassifyLocalUploadRoot_VanishedSource_IsNotCountedAsALink()
     {
         const string vanished = @"C:\source\deleted-between-probes.txt";
         List<string> skippedPaths = [];
@@ -663,6 +663,113 @@ public sealed class EmbeddedSftpUploadConflictTests
         {
             Directory.Delete(selectedLink);
         }
+    }
+
+    [Fact]
+    public async Task UploadEntriesAsync_VanishedRootAmongRealFile_UploadsTheFileAndSurfacesTheVanishedRoot()
+    {
+        using TempDirectory temp = new();
+        string realFile = Path.Combine(temp.Path, "real.txt");
+        string vanished = Path.Combine(temp.Path, "vanished.txt");
+        await File.WriteAllTextAsync(realFile, "payload");
+
+        RecordingRemoteBrowser browser = new();
+        RecordingConflictPresenter presenter = new(_ =>
+            throw new InvalidOperationException("The dialog must not be shown."));
+        EmbeddedSftpViewModel viewModel = CreateViewModel(browser, presenter);
+
+        await viewModel.UploadEntriesAsync([realFile, vanished], "/dst");
+
+        Assert.Equal(0, presenter.CallCount);
+        Assert.Contains((realFile, "/dst/real.txt"), browser.UploadCalls);
+        Assert.Single(browser.UploadCalls);
+        Assert.Equal(
+            "WarnUploadSourcesSkippedUnavailable",
+            viewModel.StatusText);
+    }
+
+    [Fact]
+    public async Task UploadEntriesAsync_OnlyVanishedRoots_TransfersNothingAndSurfacesTheWarning()
+    {
+        using TempDirectory temp = new();
+        string firstVanished = Path.Combine(temp.Path, "vanished-one.txt");
+        string secondVanished = Path.Combine(temp.Path, "vanished-two");
+
+        RecordingRemoteBrowser browser = new();
+        RecordingConflictPresenter presenter = new(_ =>
+            throw new InvalidOperationException("The dialog must not be shown."));
+        EmbeddedSftpViewModel viewModel = CreateViewModel(browser, presenter);
+
+        await viewModel.UploadEntriesAsync([firstVanished, secondVanished], "/dst");
+
+        Assert.Equal(0, presenter.CallCount);
+        Assert.Empty(browser.UploadCalls);
+        Assert.Empty(browser.CreateDirectoryCalls);
+        Assert.Equal(
+            "WarnUploadSourcesSkippedUnavailable",
+            viewModel.StatusText);
+        Assert.NotEqual("SftpStatusTransferComplete", viewModel.StatusText);
+    }
+
+    [Fact]
+    public async Task PlanAndUploadEntriesAsync_VanishedRoot_IsReportedAsUnavailableAndNotAsAReparsePoint()
+    {
+        using TempDirectory temp = new();
+        string vanished = Path.Combine(temp.Path, "vanished.txt");
+
+        RecordingRemoteBrowser browser = new();
+        RecordingConflictPresenter presenter = new(_ =>
+            throw new InvalidOperationException("The dialog must not be shown."));
+        EmbeddedSftpViewModel viewModel = CreateViewModel(browser, presenter);
+
+        EmbeddedSftpViewModel.UploadPlanOutcome outcome =
+            await viewModel.PlanAndUploadEntriesAsync([vanished], "/dst", CancellationToken.None);
+
+        Assert.True(outcome.Completed);
+        Assert.Contains(vanished, outcome.SkippedUnavailableSources);
+        Assert.Empty(outcome.SkippedLocalReparsePoints);
+    }
+
+    [Fact]
+    public void IsUnavailableUploadRoot_BothProbesFalse_IsUnavailable()
+    {
+        Assert.True(EmbeddedSftpViewModel.IsUnavailableUploadRoot(
+            directoryExists: false,
+            fileExists: false,
+            FileAttributes.ReparsePoint));
+        Assert.True(EmbeddedSftpViewModel.IsUnavailableUploadRoot(
+            directoryExists: false,
+            fileExists: false,
+            attributes: null));
+    }
+
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public void IsUnavailableUploadRoot_ProbeTrueAndNoAttributes_IsUnavailable(
+        bool directoryExists,
+        bool fileExists)
+    {
+        Assert.True(EmbeddedSftpViewModel.IsUnavailableUploadRoot(
+            directoryExists,
+            fileExists,
+            attributes: null));
+    }
+
+    [Theory]
+    [InlineData(true, false, FileAttributes.Directory)]
+    [InlineData(false, true, FileAttributes.Normal)]
+    [InlineData(true, false, FileAttributes.Directory | FileAttributes.ReparsePoint)]
+    [InlineData(false, true, FileAttributes.Archive | FileAttributes.ReparsePoint)]
+    public void IsUnavailableUploadRoot_ProbeTrueAndAttributesPresent_IsNotUnavailable(
+        bool directoryExists,
+        bool fileExists,
+        FileAttributes attributes)
+    {
+        Assert.False(EmbeddedSftpViewModel.IsUnavailableUploadRoot(
+            directoryExists,
+            fileExists,
+            attributes));
     }
 
     [Fact]

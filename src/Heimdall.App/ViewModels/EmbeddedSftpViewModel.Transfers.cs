@@ -668,6 +668,15 @@ public sealed partial class EmbeddedSftpViewModel
                     "WarnUploadSourcesSkippedReparsePoints",
                     outcome.SkippedLocalReparsePoints.Count));
             }
+
+            if (outcome.Completed && outcome.SkippedUnavailableSources.Count > 0)
+            {
+                pendingOperationWarnings.Add(LFC(
+                    outcome.SkippedUnavailableSources.Count,
+                    "WarnUploadSourcesSkippedUnavailableOne",
+                    "WarnUploadSourcesSkippedUnavailable",
+                    outcome.SkippedUnavailableSources.Count));
+            }
         }
         catch (OperationCanceledException)
         {
