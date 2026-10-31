@@ -71,7 +71,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     internal readonly record struct UploadPlanOutcome(
         bool Completed,
         IReadOnlyList<string> SkippedUnsupportedTargets,
-        IReadOnlyList<string> SkippedLocalReparsePoints);
+        IReadOnlyList<string> SkippedLocalReparsePoints,
+        IReadOnlyList<string> SkippedUnavailableSources);
 
     /// <summary>Identity of the column the listing is sorted by until the user picks another.</summary>
     internal const string SortColumnName = "Name";
@@ -1391,13 +1392,15 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     {
         List<string> skippedUnsupportedTargets = [];
         List<string> skippedLocalReparsePoints = [];
+        List<string> skippedUnavailableSources = [];
 
         if (_browser is null)
         {
             return new UploadPlanOutcome(
                 false,
                 skippedUnsupportedTargets,
-                skippedLocalReparsePoints);
+                skippedLocalReparsePoints,
+                skippedUnavailableSources);
         }
 
         List<LocalUploadEntry> roots = new(localPaths.Count);
@@ -1409,7 +1412,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             // absent is never uploaded, so its type cannot matter, while the probes swallow the
             // access and malformed-path errors that the attribute read raises. Reading it
             // unconditionally would let such a path abort the whole drop instead of being
-            // skipped on its own.
+            // skipped on its own and reported as unavailable.
             FileAttributes? attributes = isDirectory || isFile
                 ? ReadLocalRootAttributesOrNullIfMissing(path, File.GetAttributes)
                 : null;
@@ -1421,8 +1424,21 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 skippedLocalReparsePoints);
             if (root is null)
             {
-                // Skip paths that no longer exist; a drop can race a delete on the source side.
-                // A refused reparse root also lands here, already counted and logged.
+                // A drop can race a delete on the source side, and the probes also report a path
+                // they could not access as absent. Such a root is skipped but reported, so the
+                // job does not end as a plain success. A refused reparse root also lands here,
+                // already counted and logged, and an undetermined type is logged by the classifier.
+                if (IsUnavailableUploadRoot(isDirectory, isFile, attributes))
+                {
+                    skippedUnavailableSources.Add(path);
+                    if (!isDirectory && !isFile)
+                    {
+                        Core.Logging.FileLogger.Warn(
+                            $"EmbeddedSFTP did not upload local root '{path}': it no longer exists " +
+                            "or could not be accessed.");
+                    }
+                }
+
                 continue;
             }
 
@@ -1434,7 +1450,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             return new UploadPlanOutcome(
                 true,
                 skippedUnsupportedTargets,
-                skippedLocalReparsePoints);
+                skippedLocalReparsePoints,
+                skippedUnavailableSources);
         }
 
         // The tree walk is synchronous filesystem work and can be arbitrarily slow on a network
@@ -1471,7 +1488,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             return new UploadPlanOutcome(
                 true,
                 skippedUnsupportedTargets,
-                skippedLocalReparsePoints);
+                skippedLocalReparsePoints,
+                skippedUnavailableSources);
         }
 
         IReadOnlyList<FileConflictAnalysisItem> conflictAnalysis = FileConflictPlanner.Analyze(
@@ -1502,7 +1520,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 return new UploadPlanOutcome(
                     false,
                     skippedUnsupportedTargets,
-                    skippedLocalReparsePoints);
+                    skippedLocalReparsePoints,
+                    skippedUnavailableSources);
             }
 
             decisions = dialogResult.Decisions;
@@ -1585,7 +1604,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         return new UploadPlanOutcome(
             true,
             skippedUnsupportedTargets,
-            skippedLocalReparsePoints);
+            skippedLocalReparsePoints,
+            skippedUnavailableSources);
     }
 
     /// <summary>The size of a local file, or zero when it cannot be read (it is then sent unmeasured).</summary>
@@ -1848,8 +1868,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     /// </summary>
     /// <remarks>
     /// The existence check runs first on purpose. A source that disappeared between the probe
-    /// and this call stays an ignored disappearance rather than a reported refusal, so the
-    /// pre-existing race is preserved and never surfaces as a spurious warning.
+    /// and this call is still not counted as a refused link, so it never surfaces as a spurious
+    /// link warning; the caller reports it as an unavailable source instead.
     /// <para>
     /// Absent attributes mean the type could not be determined, which is not the same as
     /// "not a link". An existence probe that succeeded and an attribute read that did not can
@@ -1893,6 +1913,22 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
         return ToLocalUploadEntry(localPath, directoryExists);
     }
+
+    /// <summary>
+    /// Tells whether <see cref="ClassifyLocalUploadRoot"/> returned no entry because the selected
+    /// root could not be used, as opposed to being refused as a reparse point.
+    /// </summary>
+    /// <remarks>
+    /// Two cases qualify: both existence probes reported absent (the source vanished, or the probes
+    /// swallowed an access or malformed-path error), and a probe succeeded but the attribute read
+    /// then found the source missing. A reparse point has attributes, so it never qualifies and
+    /// stays counted among the refused links instead.
+    /// </remarks>
+    internal static bool IsUnavailableUploadRoot(
+        bool directoryExists,
+        bool fileExists,
+        FileAttributes? attributes)
+        => !(directoryExists || fileExists) || attributes is null;
 
     /// <summary>
     /// Reads the attributes of a selected upload root, reporting a vanished source as no

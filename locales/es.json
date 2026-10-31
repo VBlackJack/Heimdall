@@ -1588,6 +1588,8 @@
   "WarnUploadTargetsSkippedUnsupportedOne": "Se omitió {0} subida: el destino ya existe y no es un archivo normal. Consulta el registro para más detalles.",
   "WarnUploadSourcesSkippedReparsePoints": "Se omitieron {0} enlaces locales, seleccionados como origen de subida o encontrados dentro del árbol seleccionado. Consulta el registro para más detalles.",
   "WarnUploadSourcesSkippedReparsePointsOne": "Se omitió {0} enlace local, seleccionado como origen de subida o encontrado dentro del árbol seleccionado. Consulta el registro para más detalles.",
+  "WarnUploadSourcesSkippedUnavailable": "Se omitieron {0} elementos seleccionados: ya no existen o no se pudo acceder a ellos. Consulta el registro para más detalles.",
+  "WarnUploadSourcesSkippedUnavailableOne": "Se omitió {0} elemento seleccionado: ya no existe o no se pudo acceder a él. Consulta el registro para más detalles.",
   "WarnRemoteReplacementNonAtomic": "El destino \"{0}\" se reemplazó sin garantía atómica.",
   "WarnFtpBackupResidueOriginalMissing": "Heimdall encontró \"{0}\" en el servidor: una copia guardada al reemplazar un archivo, cuyo reemplazo nunca llegó. El archivo del que se hizo no está en esta carpeta, así que esta copia contiene su único contenido. Heimdall la dejó donde estaba.",
   "WarnFtpBackupResidueOriginalPresent": "Heimdall encontró \"{0}\" en el servidor: una copia guardada al reemplazar un archivo, que debería haberse eliminado después. El archivo del que se hizo está en esta carpeta, así que no falta nada; esta copia contiene la versión anterior. Heimdall la dejó donde estaba.",
