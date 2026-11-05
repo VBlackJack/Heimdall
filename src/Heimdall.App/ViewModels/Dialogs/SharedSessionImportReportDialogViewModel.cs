@@ -67,9 +67,10 @@ public sealed partial class SharedSessionImportReportDialogViewModel : Observabl
                 _formatter.GroupHeader(group.Check, group.Entries.Count),
                 SharedSessionReportEntry.SeverityOf(group.Check) == SharedSessionReportSeverity.Warning,
                 [.. group.Entries.Select(entry => new SharedSessionReportRow(
-                    _formatter.FolderLabel(entry.FolderPath),
-                    entry.SessionName,
-                    _formatter.Explain(entry)))]))];
+                    _formatter.EntryFolderLabel(entry),
+                    _formatter.EntrySessionLabel(entry),
+                    _formatter.Explain(entry),
+                    _formatter.ExplainForDisplay(entry)))]))];
     }
 
     /// <summary>The report shown.</summary>
@@ -167,4 +168,10 @@ public sealed record SharedSessionReportSummaryRow(string Label, int Count);
 public sealed record SharedSessionReportGroup(string Header, bool IsWarning, IReadOnlyList<SharedSessionReportRow> Rows);
 
 /// <summary>One finding, as the dialog lists it.</summary>
-public sealed record SharedSessionReportRow(string Folder, string Session, string Explanation);
+/// <param name="Folder">The folder column.</param>
+/// <param name="Session">The session column.</param>
+/// <param name="Explanation">What the finding found, as plain text: what assistive technology reads.</param>
+/// <param name="DisplayExplanation">
+/// <paramref name="Explanation"/> as drawn, with each host and gateway kept on one line.
+/// </param>
+public sealed record SharedSessionReportRow(string Folder, string Session, string Explanation, string DisplayExplanation);

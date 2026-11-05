@@ -55,6 +55,11 @@ public enum SharedSessionSourceStatus
 /// <param name="Report">
 /// What the last successful read of the file found to report, or null when it was never read.
 /// </param>
+/// <param name="Variables">
+/// The <c>[NAME]</c> variables the file's sessions use in a login field, resolved or not, sorted;
+/// a session the parser or the shared filter later refused counts too, since the file still
+/// asks for the variable. Null when the file was never read.
+/// </param>
 public sealed record SharedSessionSourceState(
     string SourceId,
     string Name,
@@ -67,8 +72,12 @@ public sealed record SharedSessionSourceState(
     int DroppedProfileCount,
     string? Notice = null,
     DateTime? OfflineCopyFromUtc = null,
-    SharedSessionImportReport? Report = null)
+    SharedSessionImportReport? Report = null,
+    IReadOnlyList<string>? Variables = null)
 {
+    /// <summary>The variables the file's sessions use; empty when the file was never read.</summary>
+    public IReadOnlyList<string> ReferencedVariables => Variables ?? [];
+
     /// <summary>How many findings the import report holds, information included; zero without a report.</summary>
     public int IssueCount => Report?.Count ?? 0;
 

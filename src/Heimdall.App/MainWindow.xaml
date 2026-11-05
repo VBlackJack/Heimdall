@@ -3313,6 +3313,45 @@
                                                    FontSize="{StaticResource FontSizeCaption}"
                                                    TextWrapping="Wrap"
                                                    Margin="0,0,0,12"/>
+                                        <!-- Variables the enabled shared sources use and no row names: a read-only
+                                             hint with one button per name; adding a row saves nothing. -->
+                                        <StackPanel Margin="0,0,0,12"
+                                                    Visibility="{Binding Settings.HasMissingMobaXtermVariables, Converter={StaticResource BoolToVisibilityConverter}}">
+                                            <TextBlock x:Name="Mw_SettingsMobaXtermVariablesMissing"
+                                                       Text="{Binding Settings.MissingMobaXtermVariablesText}"
+                                                       Foreground="{DynamicResource WarningTextBrush}"
+                                                       FontSize="{StaticResource FontSizeCaption}"
+                                                       TextWrapping="Wrap"/>
+                                            <ItemsControl ItemsSource="{Binding Settings.MissingMobaXtermVariables}"
+                                                          Focusable="False"
+                                                          Margin="0,6,0,0"
+                                                          AutomationProperties.LabeledBy="{x:Reference Mw_SettingsMobaXtermVariablesMissing}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <WrapPanel/>
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Button Content="{Binding AddLabel}"
+                                                                Command="{Binding DataContext.Settings.AddMissingMobaXtermVariableCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                CommandParameter="{Binding}"
+                                                                Style="{DynamicResource SecondaryButtonStyle}"
+                                                                Padding="8,3"
+                                                                Margin="0,0,8,0"
+                                                                FontSize="{StaticResource FontSizeCaption}"
+                                                                AutomationProperties.Name="{Binding AddAccessibleName}"/>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                        <TextBlock Text="{Binding Settings.MobaXtermVariablesStatus, NotifyOnTargetUpdated=True}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   FontSize="{StaticResource FontSizeCaption}"
+                                                   TextWrapping="Wrap"
+                                                   Margin="0,0,0,8"
+                                                   AutomationProperties.LiveSetting="Polite"
+                                                   behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"/>
                                         <Grid Margin="0,0,0,4">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="2*"/>
@@ -3350,6 +3389,7 @@
                                                         </StackPanel>
                                                         <StackPanel Grid.Column="1" Margin="8,0,0,0">
                                                             <TextBox Text="{Binding Value, UpdateSourceTrigger=PropertyChanged}"
+                                                                     behaviors:FocusRequestBehavior.IsRequested="{Binding IsValueFocusRequested, Mode=TwoWay}"
                                                                      FontSize="{StaticResource FontSizeBody}"
                                                                      AutomationProperties.Name="{loc:Translate SettingsMobaXtermVariableColumnValue}"
                                                                      AutomationProperties.HelpText="{Binding ValueError}"/>

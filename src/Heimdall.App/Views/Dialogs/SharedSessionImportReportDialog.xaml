@@ -116,7 +116,12 @@
                                                 </Grid.ColumnDefinitions>
                                                 <TextBlock Grid.Column="0" Text="{Binding Folder}" Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,0,16,0"/>
                                                 <TextBlock Grid.Column="1" Text="{Binding Session}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,16,0"/>
-                                                <TextBlock Grid.Column="2" Text="{Binding Explanation}" Foreground="{DynamicResource TextPrimaryBrush}" TextWrapping="Wrap"/>
+                                                <!-- Drawn with each host and gateway kept on one line; read aloud as plain text. -->
+                                                <TextBlock Grid.Column="2"
+                                                           Text="{Binding DisplayExplanation}"
+                                                           Foreground="{DynamicResource TextPrimaryBrush}"
+                                                           TextWrapping="Wrap"
+                                                           AutomationProperties.Name="{Binding Explanation}"/>
                                             </Grid>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>

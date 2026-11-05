@@ -28,7 +28,10 @@ public enum SharedSessionReportCheck
     /// <summary>A session of the file was not loaded; the entry says why.</summary>
     SkippedSession,
 
-    /// <summary>A <c>[NAME]</c> variable has no value; the session was loaded with the token as written.</summary>
+    /// <summary>
+    /// A <c>[NAME]</c> variable has no value; the sessions using it were loaded with the token as
+    /// written. One finding per variable, listing the sessions.
+    /// </summary>
     UnresolvedVariable,
 
     /// <summary>
@@ -72,6 +75,10 @@ public enum SharedSessionReportSeverity
 /// </param>
 /// <param name="SkipReason">Why the parser skipped a session; null when the shared filter refused it.</param>
 /// <param name="Refusal">Why the shared filter refused a session; null when the parser skipped it.</param>
+/// <param name="Sessions">
+/// The sessions a finding about several of them covers, in folder then name order; null for a
+/// finding about the one session <paramref name="SessionName"/> names.
+/// </param>
 public sealed record SharedSessionReportEntry(
     SharedSessionReportCheck Check,
     string FolderPath,
@@ -79,8 +86,13 @@ public sealed record SharedSessionReportEntry(
     string Detail,
     string Context = "",
     MobaXtermImportWarningKind? SkipReason = null,
-    SharedProfileRefusal? Refusal = null)
+    SharedProfileRefusal? Refusal = null,
+    IReadOnlyList<SharedSessionReportSession>? Sessions = null)
 {
+    /// <summary>The sessions the finding covers: <see cref="Sessions"/>, or the one it names.</summary>
+    public IReadOnlyList<SharedSessionReportSession> AffectedSessions =>
+        Sessions ?? [new SharedSessionReportSession(FolderPath, SessionName)];
+
     /// <summary>How much the finding asks of the file's maintainers.</summary>
     public SharedSessionReportSeverity Severity => SeverityOf(Check);
 
@@ -93,6 +105,11 @@ public sealed record SharedSessionReportEntry(
             ? SharedSessionReportSeverity.Info
             : SharedSessionReportSeverity.Warning;
 }
+
+/// <summary>One session a finding covers.</summary>
+/// <param name="FolderPath">The folder of the session in the file, slash-separated; empty at the top.</param>
+/// <param name="SessionName">The session's name, as written in the file.</param>
+public sealed record SharedSessionReportSession(string FolderPath, string SessionName);
 
 /// <summary>A session of the file the shared filter refused, and why.</summary>
 /// <param name="Profile">The session as the parser read it.</param>

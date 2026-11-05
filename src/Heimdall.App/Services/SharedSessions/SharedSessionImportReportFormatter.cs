@@ -31,6 +31,13 @@ public sealed class SharedSessionImportReportFormatter
     private const string CsvSeparator = ",";
     private const string Quote = "\"";
 
+    /// <summary>
+    /// U+2060 WORD JOINER: no line break on either side, and nothing drawn. Put between the
+    /// characters of a value the dialog shows, it keeps <c>[DAS]@bastion-01.example</c> on one line
+    /// while the sentence around it wraps.
+    /// </summary>
+    private const char WordJoiner = '\u2060';
+
     private readonly LocalizationManager _localizer;
 
     public SharedSessionImportReportFormatter(LocalizationManager localizer)
@@ -65,26 +72,86 @@ public sealed class SharedSessionImportReportFormatter
     public string FolderLabel(string folderPath) =>
         string.IsNullOrWhiteSpace(folderPath) ? _localizer["SharedReportTopFolder"] : folderPath;
 
+    /// <summary>
+    /// The folder column of <paramref name="entry"/>: its folder, or a word for several when the
+    /// sessions it covers sit in different folders.
+    /// </summary>
+    public string EntryFolderLabel(SharedSessionReportEntry entry)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+
+        return entry.AffectedSessions.Select(session => session.FolderPath).Distinct(StringComparer.OrdinalIgnoreCase).Count() > 1
+            ? _localizer["SharedReportSeveralFolders"]
+            : FolderLabel(entry.FolderPath);
+    }
+
+    /// <summary>
+    /// The session column of <paramref name="entry"/>: the session's name, or how many sessions
+    /// it covers when there are several.
+    /// </summary>
+    public string EntrySessionLabel(SharedSessionReportEntry entry)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+
+        int count = entry.AffectedSessions.Count;
+        return count > 1
+            ? _localizer.FormatCount(count, "SharedReportSessionCountOne", "SharedReportSessionCount", count)
+            : entry.SessionName;
+    }
+
     /// <summary>What <paramref name="entry"/> found, in one sentence.</summary>
-    public string Explain(SharedSessionReportEntry entry)
+    public string Explain(SharedSessionReportEntry entry) => Explain(entry, value => value);
+
+    /// <summary>
+    /// <see cref="Explain(SharedSessionReportEntry)"/> for the dialog: every value without a space
+    /// in it (a host, a gateway such as <c>[DAS]@bastion</c>, a session name) is kept on one line,
+    /// and the sentence wraps around it. Never copied or exported: the joiners are for layout only.
+    /// </summary>
+    public string ExplainForDisplay(SharedSessionReportEntry entry) => Explain(entry, KeepOnOneLine);
+
+    /// <summary>
+    /// <paramref name="value"/> with a word joiner between its characters, so a line never breaks
+    /// inside it; a value with a space is left as it is, since it is not one token.
+    /// </summary>
+    public static string KeepOnOneLine(string value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+
+        return value.Length < 2 || value.Any(char.IsWhiteSpace)
+            ? value
+            : string.Join(WordJoiner, value.EnumerateRunes());
+    }
+
+    private string Explain(SharedSessionReportEntry entry, Func<string, string> token)
     {
         ArgumentNullException.ThrowIfNull(entry);
 
         return entry.Check switch
         {
-            SharedSessionReportCheck.SkippedSession => ExplainSkip(entry),
-            SharedSessionReportCheck.UnresolvedVariable => _localizer.Format("SharedReportUnresolvedExplain", entry.Detail),
+            SharedSessionReportCheck.SkippedSession => ExplainSkip(entry, token),
+            SharedSessionReportCheck.UnresolvedVariable => _localizer.FormatCount(
+                entry.AffectedSessions.Count,
+                "SharedReportUnresolvedExplainOne",
+                "SharedReportUnresolvedExplain",
+                token(entry.Detail),
+                entry.AffectedSessions.Count),
             SharedSessionReportCheck.LikelyCopyError => _localizer.Format(
                 "SharedReportCopyErrorExplain",
-                entry.SessionName,
-                entry.Detail,
-                entry.Context),
-            SharedSessionReportCheck.NameHostMismatch => _localizer.Format("SharedReportNameHostExplain", entry.SessionName, entry.Detail),
+                token(entry.SessionName),
+                token(entry.Detail),
+                token(entry.Context)),
+            SharedSessionReportCheck.NameHostMismatch => _localizer.Format(
+                "SharedReportNameHostExplain",
+                token(entry.SessionName),
+                token(entry.Detail)),
             SharedSessionReportCheck.GatewayOutlier => _localizer.Format(
                 "SharedReportGatewayOutlierExplain",
-                RouteLabel(entry.Detail),
-                RouteLabel(entry.Context)),
-            SharedSessionReportCheck.DuplicateHost => _localizer.Format("SharedReportDuplicateHostExplain", entry.Detail, entry.Context),
+                RouteLabel(entry.Detail, token),
+                RouteLabel(entry.Context, token)),
+            SharedSessionReportCheck.DuplicateHost => _localizer.Format(
+                "SharedReportDuplicateHostExplain",
+                token(entry.Detail),
+                token(entry.Context)),
             _ => throw new ArgumentOutOfRangeException(nameof(entry), entry.Check, null),
         };
     }
@@ -111,7 +178,8 @@ public sealed class SharedSessionImportReportFormatter
 
     /// <summary>
     /// The report as plain text: the title, the totals, the counts per check, then every entry by
-    /// check under a heading that names its severity.
+    /// check under a heading that names its severity. An entry about several sessions is followed
+    /// by one line per session.
     /// </summary>
     public string ToPlainText(SharedSessionImportReport report)
     {
@@ -139,9 +207,19 @@ public sealed class SharedSessionImportReportFormatter
             {
                 text.AppendLine(_localizer.Format(
                     "SharedReportPlainTextEntry",
-                    FolderLabel(entry.FolderPath),
-                    entry.SessionName,
+                    EntryFolderLabel(entry),
+                    EntrySessionLabel(entry),
                     Explain(entry)));
+                if (entry.Sessions is { Count: > 1 } sessions)
+                {
+                    foreach (SharedSessionReportSession session in sessions)
+                    {
+                        text.AppendLine(_localizer.Format(
+                            "SharedReportPlainTextSession",
+                            FolderLabel(session.FolderPath),
+                            session.SessionName));
+                    }
+                }
             }
         }
 
@@ -149,9 +227,12 @@ public sealed class SharedSessionImportReportFormatter
     }
 
     /// <summary>
-    /// The report as CSV: one row per entry with its severity, check, folder, session, detail and
-    /// explanation. Every cell is neutralized against formula injection before it is quoted, since
-    /// the file names and hosts come from a file other people edit.
+    /// The report as CSV: one row per session of each entry, with its severity, check, folder,
+    /// session, detail and explanation. An entry about several sessions, such as an unresolved
+    /// variable, gives one row per session with the same explanation, so a spreadsheet can filter
+    /// and sort them; the dialog and the copy count it once. Every cell is neutralized against
+    /// formula injection before it is quoted, since the file names and hosts come from a file other
+    /// people edit.
     /// </summary>
     public string ToCsv(SharedSessionImportReport report)
     {
@@ -168,14 +249,18 @@ public sealed class SharedSessionImportReportFormatter
             _localizer["SharedReportColumnExplanation"]);
         foreach (SharedSessionReportEntry entry in report.Entries)
         {
-            AppendRow(
-                csv,
-                SeverityLabel(entry.Severity),
-                CheckLabel(entry.Check),
-                FolderLabel(entry.FolderPath),
-                entry.SessionName,
-                entry.Detail,
-                Explain(entry));
+            string explanation = Explain(entry);
+            foreach (SharedSessionReportSession session in entry.AffectedSessions)
+            {
+                AppendRow(
+                    csv,
+                    SeverityLabel(entry.Severity),
+                    CheckLabel(entry.Check),
+                    FolderLabel(session.FolderPath),
+                    session.SessionName,
+                    entry.Detail,
+                    explanation);
+            }
         }
 
         return csv.ToString();
@@ -190,27 +275,27 @@ public sealed class SharedSessionImportReportFormatter
     private static string Quoted(string value) =>
         Quote + value.Replace(Quote, Quote + Quote, StringComparison.Ordinal) + Quote;
 
-    private string RouteLabel(string route) =>
-        string.IsNullOrEmpty(route) ? _localizer["SharedReportDirectConnection"] : route;
+    private string RouteLabel(string route, Func<string, string> token) =>
+        string.IsNullOrEmpty(route) ? _localizer["SharedReportDirectConnection"] : token(route);
 
-    private string ExplainSkip(SharedSessionReportEntry entry)
+    private string ExplainSkip(SharedSessionReportEntry entry, Func<string, string> token)
     {
         if (entry.Refusal is { } refusal)
         {
-            return ExplainRefusal(refusal, entry.Detail);
+            return ExplainRefusal(refusal, token(entry.Detail));
         }
 
         return entry.SkipReason switch
         {
             MobaXtermImportWarningKind.MalformedSessionLine => _localizer["SharedReportSkipMalformed"],
             MobaXtermImportWarningKind.UnsupportedSessionType => ExplainUnsupportedType(entry.Detail),
-            MobaXtermImportWarningKind.JumpHostNotSupported => _localizer.Format("SharedReportSkipJumpHost", entry.Detail),
+            MobaXtermImportWarningKind.JumpHostNotSupported => _localizer.Format("SharedReportSkipJumpHost", token(entry.Detail)),
             MobaXtermImportWarningKind.ProxyNotSupported => entry.Detail.Length == 0
                 ? _localizer["SharedReportSkipProxyNoHost"]
-                : _localizer.Format("SharedReportSkipProxy", entry.Detail),
-            MobaXtermImportWarningKind.RdGatewayNotSupported => _localizer.Format("SharedReportSkipRdGateway", entry.Detail),
+                : _localizer.Format("SharedReportSkipProxy", token(entry.Detail)),
+            MobaXtermImportWarningKind.RdGatewayNotSupported => _localizer.Format("SharedReportSkipRdGateway", token(entry.Detail)),
             MobaXtermImportWarningKind.MissingHost => _localizer["SharedReportSkipMissingHost"],
-            MobaXtermImportWarningKind.InvalidGatewayHost => _localizer.Format("SharedReportSkipInvalidGateway", entry.Detail),
+            MobaXtermImportWarningKind.InvalidGatewayHost => _localizer.Format("SharedReportSkipInvalidGateway", token(entry.Detail)),
             MobaXtermImportWarningKind.DuplicateSession => _localizer["SharedReportSkipDuplicate"],
             MobaXtermImportWarningKind.ParseError => _localizer.Format("SharedReportSkipParseError", entry.Detail),
             _ => _localizer["SharedReportSkipRefused"],
