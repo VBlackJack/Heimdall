@@ -89,10 +89,22 @@
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <StackPanel Margin="0,0,0,16">
+                                <!-- The header names the severity in words; a warning is also
+                                     drawn in the warning color, like the tree's badge. -->
                                 <TextBlock Text="{Binding Header}"
                                            FontWeight="SemiBold"
-                                           Foreground="{DynamicResource TextPrimaryBrush}"
-                                           Margin="0,0,0,6"/>
+                                           Margin="0,0,0,6">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsWarning}" Value="True">
+                                                    <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
                                 <ItemsControl ItemsSource="{Binding Rows}" Focusable="False">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>

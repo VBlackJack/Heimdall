@@ -530,16 +530,26 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
       sessions (3 par défaut) où un même chemin (une passerelle, ou une connexion directe) est pris
       par au moins `SharedReportGatewayMajorityPercent` pour cent d'entre elles (60 par défaut), les
       sessions qui prennent un autre chemin ; un dossier sans telle majorité n'en a aucune. Seules
-      comptent les sessions SSH et RDP, les types qui peuvent nommer un rebond dans MobaXterm
+      comptent les sessions SSH et RDP, les types qui peuvent nommer un rebond dans MobaXterm. La
+      passerelle est nommée telle que le fichier l'écrit, variables non résolues (`[DAS]@bastion`,
+      pas l'identifiant qu'elle donne une fois résolue)
     - hôtes en double : deux sessions ou plus d'un même dossier qui joignent le même hôte avec le
       même protocole (une session SSH et une session RDP ou SFTP vers un même hôte ne sont pas des
       doublons)
-  - La racine de la source dans l'arborescence affiche le nombre de problèmes à côté de son nom, et
-    son menu contextuel propose **Afficher le rapport d'import** ; la carte des paramètres a un
-    bouton **Rapport** sur chaque source qui a des constats. Les deux ouvrent la même fenêtre en
-    lecture seule : le nombre de constats par vérification, puis les constats par vérification, avec
-    **Copier** (texte brut) et **Exporter en CSV** (chaque cellule neutralisée contre l'injection de
-    formules). Quand un rechargement change le nombre de problèmes, la ligne d'état l'indique
+    - erreurs de copie probables : une paire en double dont une session ne porte pas le nom de son
+      hôte et l'autre si. Les deux constats décrivent une seule ligne copiée dont l'hôte n'a jamais
+      été changé : le nom et hôte différents et les deux doublons sont signalés une seule fois, sur
+      la session à corriger
+  - Gravité : une passerelle inhabituelle est une information (souvent une session acheminée exprès
+    par un autre bastion) ; tout autre constat est un avertissement
+  - La racine de la source dans l'arborescence affiche le nombre d'avertissements à côté de son nom
+    (aucun pour un rapport qui ne contient que des informations), et son menu contextuel propose
+    **Afficher le rapport d'import** ; la carte des paramètres a un bouton **Rapport** sur chaque
+    source qui a des constats. Les deux ouvrent la même fenêtre en lecture seule : les totaux par
+    gravité, le nombre de constats par vérification, puis les constats par vérification sous un
+    titre qui nomme leur gravité, avec **Copier** (texte brut) et **Exporter en CSV** (une colonne
+    de gravité ; chaque cellule neutralisée contre l'injection de formules). Quand un rechargement
+    change le nombre d'avertissements, la ligne d'état l'indique
   - Les mots de passe sont personnels : un fichier partagé n'en fournit jamais. Quand l'agent SSH ne
     propose aucune clé, ou une fois que le serveur a refusé celles qu'il propose (jusqu'à la
     fermeture de Heimdall), le mot de passe d'un bastion partagé et celui d'une session SSH

@@ -69,18 +69,21 @@ public sealed record SharedSessionSourceState(
     DateTime? OfflineCopyFromUtc = null,
     SharedSessionImportReport? Report = null)
 {
-    /// <summary>How many findings the import report holds; zero without a report.</summary>
+    /// <summary>How many findings the import report holds, information included; zero without a report.</summary>
     public int IssueCount => Report?.Count ?? 0;
+
+    /// <summary>How many findings of the import report are warnings; zero without a report.</summary>
+    public int WarningCount => Report?.WarningCount ?? 0;
 
     /// <summary>Whether the sessions held come from the offline copy rather than the file.</summary>
     public bool IsOfflineCopy => OfflineCopyFromUtc is not null;
 }
 
-/// <summary>A reload of one shared source, and how many findings its report held before it.</summary>
+/// <summary>A reload of one shared source, and how many warnings its report held before it.</summary>
 /// <param name="State">The state the source is in after the reload.</param>
-/// <param name="PreviousIssueCount">How many findings its import report held before.</param>
-public sealed record SharedSessionSourceReload(SharedSessionSourceState State, int PreviousIssueCount)
+/// <param name="PreviousWarningCount">How many warnings its import report held before.</param>
+public sealed record SharedSessionSourceReload(SharedSessionSourceState State, int PreviousWarningCount)
 {
-    /// <summary>Whether the reload changed how many findings the import report holds.</summary>
-    public bool IssueCountChanged => State.IssueCount != PreviousIssueCount;
+    /// <summary>Whether the reload changed how many warnings the import report holds.</summary>
+    public bool WarningCountChanged => State.WarningCount != PreviousWarningCount;
 }

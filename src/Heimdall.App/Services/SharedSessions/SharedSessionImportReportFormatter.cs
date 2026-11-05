@@ -46,10 +46,19 @@ public sealed class SharedSessionImportReportFormatter
     {
         SharedSessionReportCheck.SkippedSession => "SharedReportCheckSkipped",
         SharedSessionReportCheck.UnresolvedVariable => "SharedReportCheckUnresolved",
+        SharedSessionReportCheck.LikelyCopyError => "SharedReportCheckCopyError",
         SharedSessionReportCheck.NameHostMismatch => "SharedReportCheckNameHost",
         SharedSessionReportCheck.GatewayOutlier => "SharedReportCheckGatewayOutlier",
         SharedSessionReportCheck.DuplicateHost => "SharedReportCheckDuplicateHost",
         _ => throw new ArgumentOutOfRangeException(nameof(check), check, null),
+    }];
+
+    /// <summary>The name of <paramref name="severity"/>.</summary>
+    public string SeverityLabel(SharedSessionReportSeverity severity) => _localizer[severity switch
+    {
+        SharedSessionReportSeverity.Warning => "SharedReportSeverityWarning",
+        SharedSessionReportSeverity.Info => "SharedReportSeverityInfo",
+        _ => throw new ArgumentOutOfRangeException(nameof(severity), severity, null),
     }];
 
     /// <summary>The folder of an entry as the report shows it; the top of the file has a name of its own.</summary>
@@ -65,6 +74,11 @@ public sealed class SharedSessionImportReportFormatter
         {
             SharedSessionReportCheck.SkippedSession => ExplainSkip(entry),
             SharedSessionReportCheck.UnresolvedVariable => _localizer.Format("SharedReportUnresolvedExplain", entry.Detail),
+            SharedSessionReportCheck.LikelyCopyError => _localizer.Format(
+                "SharedReportCopyErrorExplain",
+                entry.SessionName,
+                entry.Detail,
+                entry.Context),
             SharedSessionReportCheck.NameHostMismatch => _localizer.Format("SharedReportNameHostExplain", entry.SessionName, entry.Detail),
             SharedSessionReportCheck.GatewayOutlier => _localizer.Format(
                 "SharedReportGatewayOutlierExplain",
@@ -75,14 +89,30 @@ public sealed class SharedSessionImportReportFormatter
         };
     }
 
-    /// <summary>"3 findings": the total of a report, worded by its number.</summary>
+    /// <summary>"2 warnings, 7 info": the total of a report by severity, each worded by its number.</summary>
     public string TotalText(SharedSessionImportReport report)
     {
         ArgumentNullException.ThrowIfNull(report);
-        return _localizer.FormatCount(report.Count, "SharedReportTotalOne", "SharedReportTotal", report.Count);
+
+        int warnings = report.CountOf(SharedSessionReportSeverity.Warning);
+        int info = report.CountOf(SharedSessionReportSeverity.Info);
+        return _localizer.Format(
+            "SharedReportTotalBySeverity",
+            _localizer.FormatCount(warnings, "SharedReportWarningCountOne", "SharedReportWarningCount", warnings),
+            _localizer.FormatCount(info, "SharedReportInfoCountOne", "SharedReportInfoCount", info));
     }
 
-    /// <summary>The report as plain text: the title, the counts per check, then every entry by check.</summary>
+    /// <summary>The heading of the findings of <paramref name="check"/>, with their severity and number.</summary>
+    public string GroupHeader(SharedSessionReportCheck check, int count) => _localizer.Format(
+        "SharedReportGroupHeader",
+        CheckLabel(check),
+        SeverityLabel(SharedSessionReportEntry.SeverityOf(check)),
+        count);
+
+    /// <summary>
+    /// The report as plain text: the title, the totals, the counts per check, then every entry by
+    /// check under a heading that names its severity.
+    /// </summary>
     public string ToPlainText(SharedSessionImportReport report)
     {
         ArgumentNullException.ThrowIfNull(report);
@@ -104,7 +134,7 @@ public sealed class SharedSessionImportReportFormatter
             }
 
             text.AppendLine();
-            text.AppendLine(_localizer.Format("SharedReportSummaryLine", CheckLabel(check), entries.Count));
+            text.AppendLine(GroupHeader(check, entries.Count));
             foreach (SharedSessionReportEntry entry in entries)
             {
                 text.AppendLine(_localizer.Format(
@@ -119,7 +149,7 @@ public sealed class SharedSessionImportReportFormatter
     }
 
     /// <summary>
-    /// The report as CSV: one row per entry with its check, folder, session, detail and
+    /// The report as CSV: one row per entry with its severity, check, folder, session, detail and
     /// explanation. Every cell is neutralized against formula injection before it is quoted, since
     /// the file names and hosts come from a file other people edit.
     /// </summary>
@@ -130,6 +160,7 @@ public sealed class SharedSessionImportReportFormatter
         var csv = new StringBuilder();
         AppendRow(
             csv,
+            _localizer["SharedReportColumnSeverity"],
             _localizer["SharedReportColumnCheck"],
             _localizer["SharedReportColumnFolder"],
             _localizer["SharedReportColumnSession"],
@@ -137,7 +168,14 @@ public sealed class SharedSessionImportReportFormatter
             _localizer["SharedReportColumnExplanation"]);
         foreach (SharedSessionReportEntry entry in report.Entries)
         {
-            AppendRow(csv, CheckLabel(entry.Check), FolderLabel(entry.FolderPath), entry.SessionName, entry.Detail, Explain(entry));
+            AppendRow(
+                csv,
+                SeverityLabel(entry.Severity),
+                CheckLabel(entry.Check),
+                FolderLabel(entry.FolderPath),
+                entry.SessionName,
+                entry.Detail,
+                Explain(entry));
         }
 
         return csv.ToString();

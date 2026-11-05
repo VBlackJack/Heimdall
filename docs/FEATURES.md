@@ -515,14 +515,22 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
       (default 3) where one route (a gateway, or a direct connection) is taken by at least
       `SharedReportGatewayMajorityPercent` percent of them (default 60), the sessions taking another
       route; a folder without such a majority has none. Only SSH and RDP sessions count, the types
-      that can name a jump host in MobaXterm
+      that can name a jump host in MobaXterm. The gateway is named as the file writes it, variables
+      unresolved (`[DAS]@bastion`, not the login it resolves to)
     - duplicate hosts: two or more sessions of the same folder reaching the same host with the same
       protocol (an SSH and an RDP or SFTP session to one host are not duplicates)
-  - The source root in the tree shows the number of issues next to its name, and its context menu
-    has **Show import report**; the Settings card has a **Report** button on each source with
-    findings. Both open the same read-only dialog: the count of each check, then the findings by
-    check, with **Copy** (plain text) and **Export CSV** (every cell neutralized against formula
-    injection). When a reload changes the number of issues, the status line says so
+    - likely copy errors: a duplicate pair where one session's name is not its host's and the
+      other's is. Both findings describe one copied line whose host was never changed, so the
+      mismatch and the two duplicates are reported once, on the session to fix
+  - Severity: a gateway outlier is information (often a session routed through another bastion on
+    purpose); every other finding is a warning
+  - The source root in the tree shows the number of warnings next to its name (none for a report
+    of information only), and its context menu has **Show import report**; the Settings card has a
+    **Report** button on each source with findings. Both open the same read-only dialog: the
+    totals by severity, the count of each check, then the findings by check under a heading that
+    names its severity, with **Copy** (plain text) and **Export CSV** (a severity column; every
+    cell neutralized against formula injection). When a reload changes the number of warnings, the
+    status line says so
   - Passwords are personal: a shared file never provides one. When the SSH agent offers no key, or
     once the server refused the keys it offered (until Heimdall closes), the password of a shared
     bastion and of a shared SSH session is asked before connecting, with

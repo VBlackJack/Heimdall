@@ -44,7 +44,12 @@ namespace Heimdall.App.Services.SharedSessions;
 /// <item>Duplicate host: two or more sessions of the same folder with the same host and the same
 /// protocol, compared case-insensitively, whatever their port. An SSH and an SFTP session to one
 /// host are two ways to use it, not a repetition.</item>
+/// <item>Likely copy error: a duplicate pair where one session's name is not its host's and the
+/// other's is. Both describe one mistake, a line copied without its host being changed, so they
+/// are reported once, on the session to fix (<see cref="CorrelateCopyErrors"/>).</item>
 /// </list>
+/// <para>A gateway outlier is information, every other finding a warning
+/// (<see cref="SharedSessionReportEntry.SeverityOf"/>).</para>
 /// </remarks>
 public static class SharedSessionImportReportBuilder
 {
@@ -78,6 +83,11 @@ public static class SharedSessionImportReportBuilder
     /// <param name="gateways">The gateways loaded, sanitized.</param>
     /// <param name="refused">The parsed sessions the shared filter refused, with why.</param>
     /// <param name="options">The thresholds.</param>
+    /// <param name="gatewayWrittenNames">
+    /// The name of each gateway as the file writes it, variables unresolved, by identifier
+    /// (<see cref="MobaXtermImportResult.GatewayWrittenNames"/>); a gateway missing from it is shown
+    /// by its loaded name.
+    /// </param>
     public static SharedSessionImportReport Build(
         string sourceId,
         string sourceName,
@@ -86,7 +96,8 @@ public static class SharedSessionImportReportBuilder
         IReadOnlyList<ServerProfileDto> loaded,
         IReadOnlyList<SshGatewayDto> gateways,
         IReadOnlyList<SharedRefusedSession> refused,
-        Options options)
+        Options options,
+        IReadOnlyDictionary<string, string>? gatewayWrittenNames = null)
     {
         ArgumentNullException.ThrowIfNull(warnings);
         ArgumentNullException.ThrowIfNull(loaded);
@@ -115,9 +126,8 @@ public static class SharedSessionImportReportBuilder
                 Refusal: session.Reason));
         }
 
-        entries.AddRange(NameHostMismatches(loaded));
-        entries.AddRange(GatewayOutliers(loaded, gateways, options));
-        entries.AddRange(DuplicateHosts(loaded));
+        entries.AddRange(CorrelateCopyErrors([.. NameHostMismatches(loaded), .. DuplicateHosts(loaded)]));
+        entries.AddRange(GatewayOutliers(loaded, gateways, gatewayWrittenNames, options));
 
         return new SharedSessionImportReport(
             sourceId,
@@ -148,6 +158,63 @@ public static class SharedSessionImportReportBuilder
             || string.Equals(name, firstLabel, StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// Folds each copy error of <paramref name="findings"/> into one finding. A copy error is a
+    /// duplicate pair, two sessions of a folder and nothing else on one host, where one session has
+    /// a name and host mismatch and the other is named after the host: its mismatch and both
+    /// duplicate findings become one <see cref="SharedSessionReportCheck.LikelyCopyError"/> on the
+    /// mismatched session, with the other session as its context. Every other finding is returned
+    /// unchanged; the folded ones are appended last.
+    /// </summary>
+    /// <param name="findings">Name and host mismatches and duplicate hosts, as the rules found them.</param>
+    public static IReadOnlyList<SharedSessionReportEntry> CorrelateCopyErrors(IReadOnlyList<SharedSessionReportEntry> findings)
+    {
+        ArgumentNullException.ThrowIfNull(findings);
+
+        List<SharedSessionReportEntry> duplicates = [.. findings.Where(entry => entry.Check == SharedSessionReportCheck.DuplicateHost)];
+        HashSet<SharedSessionReportEntry> folded = new(ReferenceEqualityComparer.Instance);
+        List<SharedSessionReportEntry> copyErrors = [];
+        foreach (SharedSessionReportEntry mismatch in findings.Where(entry => entry.Check == SharedSessionReportCheck.NameHostMismatch))
+        {
+            SharedSessionReportEntry? own = duplicates.FirstOrDefault(entry =>
+                SameSession(entry, mismatch.FolderPath, mismatch.SessionName) && SameHost(entry.Detail, mismatch.Detail));
+            if (own is null)
+            {
+                continue;
+            }
+
+            // A duplicate lists the other sessions on its host as its context: a pair is two
+            // findings that each name the other and only the other.
+            SharedSessionReportEntry? other = duplicates.FirstOrDefault(entry =>
+                SameSession(entry, own.FolderPath, own.Context)
+                && SameHost(entry.Detail, own.Detail)
+                && string.Equals(entry.Context, own.SessionName, StringComparison.OrdinalIgnoreCase));
+            if (other is null || NameMatchesHost(other.SessionName, other.Detail) != true)
+            {
+                continue;
+            }
+
+            folded.Add(mismatch);
+            folded.Add(own);
+            folded.Add(other);
+            copyErrors.Add(new SharedSessionReportEntry(
+                SharedSessionReportCheck.LikelyCopyError,
+                mismatch.FolderPath,
+                mismatch.SessionName,
+                own.Detail,
+                other.SessionName));
+        }
+
+        return [.. findings.Where(entry => !folded.Contains(entry)), .. copyErrors];
+    }
+
+    private static bool SameSession(SharedSessionReportEntry entry, string folderPath, string sessionName) =>
+        string.Equals(entry.FolderPath.Trim(), folderPath.Trim(), StringComparison.OrdinalIgnoreCase)
+        && string.Equals(entry.SessionName, sessionName, StringComparison.OrdinalIgnoreCase);
+
+    private static bool SameHost(string host, string other) =>
+        string.Equals(host.Trim(), other.Trim(), StringComparison.OrdinalIgnoreCase);
+
     private static IEnumerable<SharedSessionReportEntry> NameHostMismatches(IReadOnlyList<ServerProfileDto> loaded) =>
         loaded
             .Where(profile => NameMatchesHost(profile.DisplayName, profile.RemoteServer) == false)
@@ -160,11 +227,19 @@ public static class SharedSessionImportReportBuilder
     private static IEnumerable<SharedSessionReportEntry> GatewayOutliers(
         IReadOnlyList<ServerProfileDto> loaded,
         IReadOnlyList<SshGatewayDto> gateways,
+        IReadOnlyDictionary<string, string>? gatewayWrittenNames,
         Options options)
     {
-        Dictionary<string, SshGatewayDto> gatewaysById = gateways
+        // The name as the file writes it, so a maintainer finds the line: "[DAS]@bastion", not the
+        // login the variable resolved to on this computer.
+        Dictionary<string, string> namesById = gateways
             .GroupBy(gateway => gateway.Id, StringComparer.Ordinal)
-            .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
+            .ToDictionary(
+                group => group.Key,
+                group => gatewayWrittenNames?.GetValueOrDefault(group.Key) is { Length: > 0 } written
+                    ? written
+                    : group.First().Name,
+                StringComparer.Ordinal);
 
         IEnumerable<ServerProfileDto> routable = loaded.Where(profile => MobaXtermImporter.CanCarryGateway(profile.ConnectionType ?? string.Empty));
         foreach (IGrouping<string, ServerProfileDto> folder in routable.GroupBy(FolderOf, StringComparer.OrdinalIgnoreCase))
@@ -186,14 +261,14 @@ public static class SharedSessionImportReportBuilder
                 continue;
             }
 
-            string usualName = RouteName(usual.Key, gatewaysById);
+            string usualName = RouteName(usual.Key, namesById);
             foreach (ServerProfileDto outlier in sessions.Where(session => !string.Equals(RouteOf(session), usual.Key, StringComparison.Ordinal)))
             {
                 yield return new SharedSessionReportEntry(
                     SharedSessionReportCheck.GatewayOutlier,
                     folder.Key,
                     outlier.DisplayName ?? string.Empty,
-                    RouteName(RouteOf(outlier), gatewaysById),
+                    RouteName(RouteOf(outlier), namesById),
                     usualName);
             }
         }
@@ -235,11 +310,11 @@ public static class SharedSessionImportReportBuilder
             : string.Empty;
 
     /// <summary>The name a route is shown with; empty stands for a direct connection.</summary>
-    private static string RouteName(string route, IReadOnlyDictionary<string, SshGatewayDto> gatewaysById) =>
+    private static string RouteName(string route, IReadOnlyDictionary<string, string> namesById) =>
         route.Length == 0
             ? string.Empty
-            : gatewaysById.TryGetValue(route, out SshGatewayDto? gateway) && !string.IsNullOrWhiteSpace(gateway.Name)
-                ? gateway.Name
+            : namesById.TryGetValue(route, out string? name) && !string.IsNullOrWhiteSpace(name)
+                ? name
                 : route;
 
     private static string FolderOf(ServerProfileDto profile) => profile.Group?.Trim() ?? string.Empty;

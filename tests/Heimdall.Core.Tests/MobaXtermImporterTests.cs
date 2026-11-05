@@ -457,6 +457,37 @@ public class MobaXtermImporterTests
         Assert.Empty(result.Warnings);
     }
 
+    // Producer: MobaXtermImporter.ParseContext.GetOrAddGateway. The gateway is keyed and named by
+    // the resolved login; the name as written, variable unresolved, is kept beside it for the
+    // shared import report, which must show the file's line, not this computer's login.
+    [Fact]
+    public void Parse_GatewayWithAVariableLogin_KeepsItsWrittenName_BesideTheResolvedOne()
+    {
+        const string ini = """
+            [Bookmarks]
+            SubRep=
+            ImgNum=42
+            srv-x=#126#0%srv-x.example.invalid%22%user%%0%-1%%gw.example.invalid%22%[DAS]%
+            srv-y=#126#0%srv-y.example.invalid%22%user%%0%-1%%gw.example.invalid%2222% [DAS] %
+            srv-z=#126#0%srv-z.example.invalid%22%user%%0%-1%%gw.example.invalid%22%gwuser%
+            """;
+
+        MobaXtermImportResult result = MobaXtermImporter.Parse(
+            ini,
+            new MobaXtermImportOptions { VariableResolver = ResolveDas });
+
+        Assert.Equal(3, result.Gateways.Count);
+        Assert.Equal(
+            result.Gateways.Select(gateway => gateway.Id).Order(StringComparer.Ordinal),
+            result.GatewayWrittenNames.Keys.Order(StringComparer.Ordinal));
+        SshGatewayDto das = result.Gateways.Single(gateway => gateway.Port == DefaultPorts.Ssh && gateway.User == ResolvedLogin);
+        Assert.Equal(ResolvedLogin + "@gw.example.invalid", das.Name);
+        Assert.Equal("[DAS]@gw.example.invalid", result.GatewayWrittenNames[das.Id]);
+        Assert.Equal("[DAS]@gw.example.invalid:2222", result.GatewayWrittenNames[result.Gateways.Single(gateway => gateway.Port == 2222).Id]);
+        Assert.Equal("gwuser@gw.example.invalid", result.GatewayWrittenNames[result.Gateways.Single(gateway => gateway.User == "gwuser").Id]);
+        Assert.Empty(result.Warnings);
+    }
+
     // --- Basic SSH and RDP mapping ---
 
     [Fact]
