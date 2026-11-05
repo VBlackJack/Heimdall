@@ -5590,6 +5590,9 @@
                                             <TextBox x:Name="Mw_SettingsTxtCitrixCacheStorePrefix" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsLblCitrixCacheStorePrefix}" Text="{Binding Settings.CitrixCacheStorePrefix, UpdateSourceTrigger=LostFocus}" FontSize="{StaticResource FontSizeBody}" ToolTip="{loc:Translate SettingsHintCitrixCacheStorePrefix}"/>
                                             <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[CitrixCacheStorePrefix]}"/>
                                         </StackPanel>
+                                        <CheckBox x:Name="Mw_SettingsCitrixWindowDiagnostics" Content="{loc:Translate SettingsLabelCitrixWindowDiagnostics}" IsChecked="{Binding Settings.CitrixWindowDiagnosticsEnabled}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="{StaticResource SettingsFieldGap}"/>
+                                        <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[CitrixWindowDiagnosticsEnabled]}"/>
+                                        <TextBlock x:Name="Mw_SettingsCitrixWindowDiagnosticsHint" Text="{loc:Translate SettingsHintCitrixWindowDiagnostics}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,4,0,0"/>
                                     </StackPanel>
                                 </Border>
 

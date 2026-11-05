@@ -578,6 +578,26 @@ public sealed class AppSettings
     public string? CitrixCacheDirectory { get; set; }
     public string? CitrixCacheStorePrefix { get; set; }
 
+    /// <summary>Default length (seconds) of the Citrix window diagnostic trace after a launch.</summary>
+    public const int DefaultCitrixWindowDiagnosticsDurationSeconds = 300;
+
+    /// <summary>Default interval (milliseconds) between two Citrix window diagnostic snapshots.</summary>
+    public const int DefaultCitrixWindowDiagnosticsIntervalMs = 1000;
+
+    /// <summary>Default time (seconds) the diagnostic capture waits for the application's window.</summary>
+    public const int DefaultCitrixSessionWindowWaitSeconds = 300;
+
+    // Citrix window diagnostics. Off by default: window titles can name servers, so they reach the
+    // log only while this is on. When on, a launch traces every top-level window of the Workspace
+    // and ICA processes and embeds the ICA window whose title names the published application.
+    public bool CitrixWindowDiagnosticsEnabled { get; set; }
+    [SettingRange(10, 1800)]
+    public int CitrixWindowDiagnosticsDurationSeconds { get; set; } = DefaultCitrixWindowDiagnosticsDurationSeconds;
+    [SettingRange(250, 10000)]
+    public int CitrixWindowDiagnosticsIntervalMs { get; set; } = DefaultCitrixWindowDiagnosticsIntervalMs;
+    [SettingRange(10, 1800)]
+    public int CitrixSessionWindowWaitSeconds { get; set; } = DefaultCitrixSessionWindowWaitSeconds;
+
     // X11 forwarding
     public string? X11ServerPath { get; set; }
     public bool X11AutoStart { get; set; } = true;
