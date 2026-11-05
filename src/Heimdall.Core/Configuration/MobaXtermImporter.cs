@@ -369,10 +369,11 @@ public static partial class MobaXtermImporter
             }
 
             int gatewayPort = ParsePort(FieldAt(line.Fields, gatewaySlot.PortIndex), DefaultPorts.Ssh);
+            string writtenGatewayUser = FieldAt(line.Fields, gatewaySlot.UserIndex);
             string gatewayUser = context
-                .ResolveVariables(section, sessionName, FieldAt(line.Fields, gatewaySlot.UserIndex))
+                .ResolveVariables(section, sessionName, writtenGatewayUser)
                 .Trim();
-            gatewayId = context.GetOrAddGateway(canonicalGatewayHost, gatewayPort, gatewayUser);
+            gatewayId = context.GetOrAddGateway(canonicalGatewayHost, gatewayPort, gatewayUser, writtenGatewayUser.Trim());
         }
 
         string user = layout.UserIndex is int userIndex
@@ -748,9 +749,11 @@ public static partial class MobaXtermImporter
 
         /// <summary>
         /// Returns the gateway for this host, port and user, creating it the first time; the key
-        /// is case-insensitive like the gateway reconciliation that later persists it.
+        /// is case-insensitive like the gateway reconciliation that later persists it. The name
+        /// with the user as the file writes it, variables unresolved, is kept from the first
+        /// session that creates the gateway.
         /// </summary>
-        public string GetOrAddGateway(string host, int port, string user)
+        public string GetOrAddGateway(string host, int port, string user, string writtenUser)
         {
             var key = new GatewayKey(
                 host.ToUpperInvariant(),
@@ -776,6 +779,7 @@ public static partial class MobaXtermImporter
                 Port = port,
                 User = user,
             });
+            Result.GatewayWrittenNames[id] = BuildGatewayName(host, port, writtenUser);
             return id;
         }
 
@@ -891,6 +895,12 @@ public sealed class MobaXtermImportResult
 
     /// <summary>Gateways referenced by <see cref="Servers"/>, deduplicated within the file.</summary>
     public List<SshGatewayDto> Gateways { get; } = [];
+
+    /// <summary>
+    /// The name of each gateway of <see cref="Gateways"/>, by identifier, with its user as the file
+    /// writes it (<c>[DAS]@bastion</c>, not the resolved login): what a report about the file shows.
+    /// </summary>
+    public Dictionary<string, string> GatewayWrittenNames { get; } = new(StringComparer.Ordinal);
 
     /// <summary>Every session skipped and every value left unresolved, with the reason.</summary>
     public List<MobaXtermImportWarning> Warnings { get; } = [];

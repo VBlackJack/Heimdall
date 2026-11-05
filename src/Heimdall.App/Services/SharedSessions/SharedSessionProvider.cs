@@ -197,7 +197,7 @@ public sealed class SharedSessionProvider : ISharedSessionProvider, IDisposable
     public async Task<SharedSessionSourceState?> ReloadSourceAsync(string sourceId, CancellationToken cancellationToken = default)
     {
         SharedSessionSourceState? state = null;
-        int previousIssueCount = 0;
+        int previousWarningCount = 0;
         await _loadGate.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
@@ -216,7 +216,7 @@ public sealed class SharedSessionProvider : ISharedSessionProvider, IDisposable
                 return null;
             }
 
-            previousIssueCount = loads[index].State.IssueCount;
+            previousWarningCount = loads[index].State.WarningCount;
             HashSet<string> seenSourceIds = [.. loads.Where((_, position) => position != index).Select(load => load.State.SourceId)];
             SourceLoad reloaded = await LoadSourceAsync(
                     source,
@@ -238,7 +238,7 @@ public sealed class SharedSessionProvider : ISharedSessionProvider, IDisposable
         Changed?.Invoke();
         if (state is not null)
         {
-            SourceReloaded?.Invoke(new SharedSessionSourceReload(state, previousIssueCount));
+            SourceReloaded?.Invoke(new SharedSessionSourceReload(state, previousWarningCount));
         }
 
         return state;
@@ -506,7 +506,16 @@ public sealed class SharedSessionProvider : ISharedSessionProvider, IDisposable
             gateways,
             result.Warnings,
             refused.Count,
-            SharedSessionImportReportBuilder.Build(sourceId, sourceName, text, result.Warnings, profiles, gateways, refused, reportOptions));
+            SharedSessionImportReportBuilder.Build(
+                sourceId,
+                sourceName,
+                text,
+                result.Warnings,
+                profiles,
+                gateways,
+                refused,
+                reportOptions,
+                result.GatewayWrittenNames));
     }
 
     /// <summary>The value of <paramref name="profile"/> the shared filter refused it for.</summary>

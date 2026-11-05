@@ -64,7 +64,8 @@ public sealed partial class SharedSessionImportReportDialogViewModel : Observabl
             .Select(check => (Check: check, Entries: report.Entries.Where(entry => entry.Check == check).ToList()))
             .Where(group => group.Entries.Count > 0)
             .Select(group => new SharedSessionReportGroup(
-                _localizer.Format("SharedReportSummaryLine", _formatter.CheckLabel(group.Check), group.Entries.Count),
+                _formatter.GroupHeader(group.Check, group.Entries.Count),
+                SharedSessionReportEntry.SeverityOf(group.Check) == SharedSessionReportSeverity.Warning,
                 [.. group.Entries.Select(entry => new SharedSessionReportRow(
                     _formatter.FolderLabel(entry.FolderPath),
                     entry.SessionName,
@@ -160,7 +161,10 @@ public sealed partial class SharedSessionImportReportDialogViewModel : Observabl
 public sealed record SharedSessionReportSummaryRow(string Label, int Count);
 
 /// <summary>The findings of one check.</summary>
-public sealed record SharedSessionReportGroup(string Header, IReadOnlyList<SharedSessionReportRow> Rows);
+/// <param name="Header">The check, its severity and how many findings it has.</param>
+/// <param name="IsWarning">Whether the check warns rather than informs.</param>
+/// <param name="Rows">The findings.</param>
+public sealed record SharedSessionReportGroup(string Header, bool IsWarning, IReadOnlyList<SharedSessionReportRow> Rows);
 
 /// <summary>One finding, as the dialog lists it.</summary>
 public sealed record SharedSessionReportRow(string Folder, string Session, string Explanation);

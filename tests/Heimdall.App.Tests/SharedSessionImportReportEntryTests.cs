@@ -24,15 +24,18 @@ using Heimdall.Core.Configuration;
 namespace Heimdall.App.Tests;
 
 /// <summary>
-/// Where the import report of a shared source shows: the issue count on its root, the root's
+/// Where the import report of a shared source shows: the warning count on its root, the root's
 /// context menu, and the status line of a reload that changes the count.
 /// </summary>
 public sealed partial class SessionCoordinatorPreMountTests
 {
     private const string OtherSourceId = "othersrc1";
 
+    // Producer: ServerListViewModel.SharedSessions, the shared root built from
+    // SharedSessionSourceState.WarningCount: the report holds a mismatch (warning) and a gateway
+    // outlier (information), and the root counts the warning only.
     [Fact]
-    public void SharedRoot_ShowsItsIssueCount_OnlyWhenTheReportFoundSomething()
+    public void SharedRoot_ShowsItsWarningCount_OnlyWhenTheReportFoundAWarning()
     {
         using TestHarness harness = CreateReportHarness(out _, out _);
 
@@ -40,11 +43,28 @@ public sealed partial class SessionCoordinatorPreMountTests
         FolderViewModel clean = SharedRoot(harness, OtherSourceId);
 
         Assert.True(reported.HasIssues);
-        Assert.Equal(2, reported.IssueCount);
-        Assert.Equal(harness.Main.GetLocalizer().FormatCount(2, "SessionTreeSharedRootIssuesOne", "SessionTreeSharedRootIssues", 2), reported.IssueBadgeText);
-        Assert.Equal("2 issues", reported.IssueBadgeText);
+        Assert.Equal(1, reported.IssueCount);
+        Assert.Equal(harness.Main.GetLocalizer().FormatCount(1, "SessionTreeSharedRootIssuesOne", "SessionTreeSharedRootIssues", 1), reported.IssueBadgeText);
+        Assert.Equal("1 warning", reported.IssueBadgeText);
         Assert.False(clean.HasIssues);
         Assert.Equal(string.Empty, clean.IssueBadgeText);
+    }
+
+    [Fact]
+    public void SharedRoot_AReportOfInformationOnly_ShowsNoBadge_AndStillOffersTheReport()
+    {
+        RunOnStaThread(() =>
+        {
+            using TestHarness harness = CreateReportHarness(out _, out _, otherInfoOnly: true);
+            FolderViewModel informed = SharedRoot(harness, OtherSourceId);
+            ContextMenuFactory factory = new(new ExternalToolProviderService());
+
+            Assert.False(informed.HasIssues);
+            Assert.Equal(0, informed.IssueCount);
+            Assert.Equal(string.Empty, informed.IssueBadgeText);
+            ContextMenu menu = factory.CreateTreeContextMenu(informed, harness.Main, new RecordingContextMenuCallbacks());
+            Assert.True(AssertMenuItem(menu, harness.Main.Localize("TreeCtxShowImportReport")).IsEnabled);
+        });
     }
 
     [Fact]
@@ -88,22 +108,23 @@ public sealed partial class SessionCoordinatorPreMountTests
     }
 
     [Fact]
-    public void ReloadStatus_MentionsTheIssueCount_OnlyWhenItChanged()
+    public void ReloadStatus_MentionsTheWarningCount_OnlyWhenItChanged()
     {
         using TestHarness harness = CreateReportHarness(out _, out SharedSessionSourceState state);
         ServerListViewModel list = harness.Main.ServerList;
 
-        string changed = list.DescribeSharedSourceReload(new SharedSessionSourceReload(state, PreviousIssueCount: 5));
-        string unchanged = list.DescribeSharedSourceReload(new SharedSessionSourceReload(state, PreviousIssueCount: 2));
+        string changed = list.DescribeSharedSourceReload(new SharedSessionSourceReload(state, PreviousWarningCount: 5));
+        string unchanged = list.DescribeSharedSourceReload(new SharedSessionSourceReload(state, PreviousWarningCount: 1));
 
-        Assert.Equal("Shared sessions updated: Team, 2 sessions. Import report: 2 issues (was 5).", changed);
+        Assert.Equal("Shared sessions updated: Team, 2 sessions. Import report: 1 warning (was 5).", changed);
         Assert.Equal("Shared sessions updated: Team, 2 sessions", unchanged);
     }
 
     private static TestHarness CreateReportHarness(
         out SharedSessionImportReport report,
         out SharedSessionSourceState state,
-        bool failOther = false)
+        bool failOther = false,
+        bool otherInfoOnly = false)
     {
         SharedSessionTestData data = SharedSessionTestData.Create();
         report = new SharedSessionImportReport(
@@ -114,9 +135,15 @@ public sealed partial class SessionCoordinatorPreMountTests
                 new SharedSessionReportEntry(SharedSessionReportCheck.GatewayOutlier, SharedSessionTestData.SharedFolder, "app04", "gw2", "gw1"),
             ]);
         state = StubSharedSessionProvider.Loaded(SharedSessionTestData.SourceId, "Team", 2) with { Report = report };
+        SharedSessionImportReport otherReport = otherInfoOnly
+            ? new SharedSessionImportReport(
+                OtherSourceId,
+                "Other",
+                [new SharedSessionReportEntry(SharedSessionReportCheck.GatewayOutlier, "", "app09", "[DAS]@gw2.example.invalid", "[DAS]@gw1.example.invalid")])
+            : SharedSessionImportReport.Empty(OtherSourceId, "Other");
         SharedSessionSourceState other = failOther
             ? StubSharedSessionProvider.Failed(OtherSourceId, "Other", "The file was not found.")
-            : StubSharedSessionProvider.Loaded(OtherSourceId, "Other", 0) with { Report = SharedSessionImportReport.Empty(OtherSourceId, "Other") };
+            : StubSharedSessionProvider.Loaded(OtherSourceId, "Other", 0) with { Report = otherReport };
         StubSharedSessionProvider provider = new([data.Profile, data.DirectProfile], [data.Gateway], [state, other]);
 
         TestHarness harness = TestHarness.Create(profileLookupFactory: configManager => new ProfileLookup(configManager, provider));

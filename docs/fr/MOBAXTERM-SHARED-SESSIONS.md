@@ -79,15 +79,20 @@ Après chaque lecture réussie, Heimdall garde une copie du fichier dans son dos
 
 ## 7. Lire le rapport d'import
 
-Chaque lecture vérifie aussi le fichier à la recherche d'erreurs courantes. Quand elle en trouve, la racine de la source affiche un nombre, par exemple `3 problèmes`. Faites un clic droit sur la racine et choisissez **Afficher le rapport d'import**, ou utilisez **Rapport** dans la carte des paramètres. Le rapport liste, par dossier et par session :
+Chaque lecture vérifie aussi le fichier à la recherche d'erreurs courantes. Faites un clic droit sur la racine de la source et choisissez **Afficher le rapport d'import**, ou utilisez **Rapport** dans la carte des paramètres. Le rapport liste, par dossier et par session, deux sortes de constats :
 
-- **Sessions ignorées** : les sessions non chargées, et pourquoi.
-- **Variables non résolues** : un `[NOM]` sans valeur (section 2).
-- **Nom et hôte différents** : une session nommée d'après une machine qui en joint une autre.
-- **Passerelles inhabituelles** : une session qui ne passe pas par le bastion que prend la plupart de son dossier. Seules comptent les sessions dont le type peut nommer un rebond dans MobaXterm, c'est-à-dire SSH et RDP : une session Telnet, VNC ou SFTP est directe quoi que fasse son dossier.
-- **Hôtes en double** : deux sessions d'un même dossier qui joignent le même hôte avec le même protocole. Une session SSH et une session RDP ou SFTP vers un même hôte sont deux façons de s'en servir, pas des doublons ; deux sessions SSH vers cet hôte en sont.
+- **Avertissements**, des erreurs probables qui valent d'être corrigées :
+  - **Sessions ignorées** : les sessions non chargées, et pourquoi.
+  - **Variables non résolues** : un `[NOM]` sans valeur (section 2).
+  - **Erreurs de copie probables** : une session qui joint l'hôte d'une autre session de son dossier, celle qui porte le nom de cet hôte. Par exemple `app01` qui joint `app02`, à côté de la session `app02` : la ligne de `app02` a très probablement été copiée sans que son hôte soit changé. Ce seul constat remplace le nom et hôte différents et les deux hôtes en double que la même erreur donnerait sinon.
+  - **Nom et hôte différents** : une session nommée d'après une machine qui en joint une autre.
+  - **Hôtes en double** : deux sessions d'un même dossier qui joignent le même hôte avec le même protocole. Une session SSH et une session RDP ou SFTP vers un même hôte sont deux façons de s'en servir, pas des doublons ; deux sessions SSH vers cet hôte en sont.
+- **Informations**, inhabituelles mais souvent voulues :
+  - **Passerelles inhabituelles** : une session qui ne passe pas par le bastion que prend la plupart de son dossier, comme une session acheminée exprès par un second bastion. Seules comptent les sessions dont le type peut nommer un rebond dans MobaXterm, c'est-à-dire SSH et RDP : une session Telnet, VNC ou SFTP est directe quoi que fasse son dossier. La passerelle s'affiche telle que le fichier l'écrit, variables non résolues, par exemple `[DAS]@bastion.example.invalid`, pour retrouver la ligne.
 
-Le rapport ne fait qu'informer : chaque session qu'il liste reste chargée telle que le fichier la décrit. **Copier** et **Exporter en CSV** permettent de l'envoyer à qui maintient le fichier.
+La racine de la source ne compte que les avertissements, par exemple `2 avertissements` ; un rapport qui ne contient que des informations n'affiche aucun nombre. L'en-tête du rapport donne les deux totaux, par exemple `2 avertissements, 7 infos`, et le résumé garde un nombre par vérification.
+
+Le rapport ne fait qu'informer : chaque session qu'il liste reste chargée telle que le fichier la décrit. **Copier** et **Exporter en CSV** permettent de l'envoyer à qui maintient le fichier ; les deux portent la gravité de chaque constat, le CSV dans sa propre colonne.
 
 ## 8. Limites connues
 

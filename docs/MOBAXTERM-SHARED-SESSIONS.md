@@ -79,15 +79,20 @@ After each successful read, Heimdall keeps a copy of the file in its data folder
 
 ## 7. Read the import report
 
-Each read also checks the file for common mistakes. When it finds some, the source root shows a count, for example `3 issues`. Right-click the root and choose **Show import report**, or use **Report** in the settings card. The report lists, by folder and session:
+Each read also checks the file for common mistakes. Right-click the source root and choose **Show import report**, or use **Report** in the settings card. The report lists, by folder and session, two kinds of findings:
 
-- **Skipped sessions**: sessions not loaded, and why.
-- **Unresolved variables**: a `[NAME]` with no value (section 2).
-- **Name and host mismatch**: a session named after one machine that reaches another.
-- **Gateway outliers**: a session that does not take the bastion most of its folder takes. Only sessions whose type can name a jump host in MobaXterm count, which means SSH and RDP: a Telnet, VNC or SFTP session is direct whatever its folder does.
-- **Duplicate hosts**: two sessions of one folder reaching the same host with the same protocol. An SSH session and an RDP or SFTP session to one host are two ways to use it, not duplicates; two SSH sessions to it are.
+- **Warnings**, most likely mistakes worth fixing:
+  - **Skipped sessions**: sessions not loaded, and why.
+  - **Unresolved variables**: a `[NAME]` with no value (section 2).
+  - **Likely copy errors**: a session that reaches the host of another session of its folder, the one named after that host. For example `app01` reaching `app02`, next to the session `app02`: the line of `app02` was most likely copied and its host never changed. This one finding replaces the name and host mismatch and the two duplicate hosts the same mistake would otherwise give.
+  - **Name and host mismatch**: a session named after one machine that reaches another.
+  - **Duplicate hosts**: two sessions of one folder reaching the same host with the same protocol. An SSH session and an RDP or SFTP session to one host are two ways to use it, not duplicates; two SSH sessions to it are.
+- **Information**, unusual but often deliberate:
+  - **Gateway outliers**: a session that does not take the bastion most of its folder takes, such as a session routed through a second bastion on purpose. Only sessions whose type can name a jump host in MobaXterm count, which means SSH and RDP: a Telnet, VNC or SFTP session is direct whatever its folder does. The gateway is shown as the file writes it, variables unresolved, for example `[DAS]@bastion.example.invalid`, so you can find the line.
 
-The report only informs: every session it lists is still loaded as the file describes it. **Copy** and **Export CSV** let you send it to whoever maintains the file.
+The source root counts the warnings only, for example `2 warnings`; a report with nothing but information shows no count. The report header gives both totals, for example `2 warnings, 7 info`, and the summary keeps one count per check.
+
+The report only informs: every session it lists is still loaded as the file describes it. **Copy** and **Export CSV** let you send it to whoever maintains the file; both carry the severity of each finding, the CSV in its own column.
 
 ## 8. Known limits
 

@@ -211,16 +211,16 @@ public partial class ServerListViewModel
                 name,
                 state.ProfileCount)
             : _localizer.Format("StatusSharedSourceNotUpdated", name, problem);
-        return reload.IssueCountChanged
+        return reload.WarningCountChanged
             ? _localizer.Format(
                 "StatusSharedSourceWithIssues",
                 message,
                 _localizer.FormatCount(
-                    state.IssueCount,
+                    state.WarningCount,
                     "StatusSharedSourceIssuesChangedOne",
                     "StatusSharedSourceIssuesChanged",
-                    state.IssueCount,
-                    reload.PreviousIssueCount))
+                    state.WarningCount,
+                    reload.PreviousWarningCount))
             : message;
     }
 
@@ -370,14 +370,16 @@ public partial class ServerListViewModel
                     ? _localizer["SharedSessionSourceErrorUnknown"]
                     : source.ErrorMessage;
             }
-            else if (source.IssueCount > 0)
+            else if (source.WarningCount > 0)
             {
-                root.ViewModel!.IssueCount = source.IssueCount;
+                // Warnings only: a report of nothing but information (sessions routed through
+                // another bastion on purpose) does not mark the source as needing a fix.
+                root.ViewModel!.IssueCount = source.WarningCount;
                 root.ViewModel.IssueBadgeText = _localizer.FormatCount(
-                    source.IssueCount,
+                    source.WarningCount,
                     "SessionTreeSharedRootIssuesOne",
                     "SessionTreeSharedRootIssues",
-                    source.IssueCount);
+                    source.WarningCount);
             }
 
             if (source.Status != SharedSessionSourceStatus.Error && source.Notice is not null)

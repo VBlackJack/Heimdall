@@ -117,7 +117,7 @@ public partial class FolderViewModel : ObservableObject, IInlineRenameNode, IAcc
     /// <summary>Whether this shared source root carries a <see cref="Notice"/>.</summary>
     public bool HasNotice => !string.IsNullOrEmpty(Notice);
 
-    /// <summary>How many findings the import report of this shared source root holds.</summary>
+    /// <summary>How many warnings the import report of this shared source root holds; information is not counted.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasIssues))]
     private int _issueCount;
@@ -126,7 +126,7 @@ public partial class FolderViewModel : ObservableObject, IInlineRenameNode, IAcc
     [ObservableProperty]
     private string _issueBadgeText = "";
 
-    /// <summary>Whether the import report of this shared source root found anything.</summary>
+    /// <summary>Whether the import report of this shared source root found a warning.</summary>
     public bool HasIssues => IssueCount > 0;
 
     /// <summary>The read-only notice a shared folder shows on hover and on its lock mark.</summary>

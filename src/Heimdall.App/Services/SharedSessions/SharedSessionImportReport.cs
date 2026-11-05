@@ -19,7 +19,10 @@ using Heimdall.Core.Configuration;
 namespace Heimdall.App.Services.SharedSessions;
 
 /// <summary>What an entry of a shared source's import report found.</summary>
-/// <remarks>The order is the order the report lists the checks in.</remarks>
+/// <remarks>
+/// The order is the order the report lists the checks in: the warnings first, then the
+/// information.
+/// </remarks>
 public enum SharedSessionReportCheck
 {
     /// <summary>A session of the file was not loaded; the entry says why.</summary>
@@ -28,14 +31,30 @@ public enum SharedSessionReportCheck
     /// <summary>A <c>[NAME]</c> variable has no value; the session was loaded with the token as written.</summary>
     UnresolvedVariable,
 
+    /// <summary>
+    /// The session's name is not its host's, and its host is the one of the session of the same
+    /// folder named after it: most likely a line copied without its host being changed.
+    /// </summary>
+    LikelyCopyError,
+
     /// <summary>The session's name is not its host's.</summary>
     NameHostMismatch,
 
-    /// <summary>The session does not go through the gateway most sessions of its folder go through.</summary>
-    GatewayOutlier,
-
     /// <summary>Another session of the same folder reaches the same host.</summary>
     DuplicateHost,
+
+    /// <summary>The session does not go through the gateway most sessions of its folder go through.</summary>
+    GatewayOutlier,
+}
+
+/// <summary>How much a finding of an import report asks of the file's maintainers.</summary>
+public enum SharedSessionReportSeverity
+{
+    /// <summary>Most likely a mistake in the file, worth fixing.</summary>
+    Warning,
+
+    /// <summary>Unusual, and often deliberate: worth a look, not necessarily a fix.</summary>
+    Info,
 }
 
 /// <summary>One finding of an import report.</summary>
@@ -43,12 +62,13 @@ public enum SharedSessionReportCheck
 /// <param name="FolderPath">The folder of the session in the file, slash-separated; empty at the top.</param>
 /// <param name="SessionName">The session's name, as written in the file.</param>
 /// <param name="Detail">
-/// The value the finding is about: the host, the variable, the gateway the session uses, or the
-/// value the parser refused. Empty when there is none.
+/// The value the finding is about: the host, the variable, the gateway the session uses as the file
+/// writes it, or the value the parser refused. Empty when there is none.
 /// </param>
 /// <param name="Context">
 /// What the finding is measured against, when there is something: the folder's usual gateway for an
-/// outlier, the other sessions on the same host for a duplicate. Empty otherwise.
+/// outlier, the other sessions on the same host for a duplicate, the session named after the host
+/// for a likely copy error. Empty otherwise.
 /// </param>
 /// <param name="SkipReason">Why the parser skipped a session; null when the shared filter refused it.</param>
 /// <param name="Refusal">Why the shared filter refused a session; null when the parser skipped it.</param>
@@ -59,7 +79,20 @@ public sealed record SharedSessionReportEntry(
     string Detail,
     string Context = "",
     MobaXtermImportWarningKind? SkipReason = null,
-    SharedProfileRefusal? Refusal = null);
+    SharedProfileRefusal? Refusal = null)
+{
+    /// <summary>How much the finding asks of the file's maintainers.</summary>
+    public SharedSessionReportSeverity Severity => SeverityOf(Check);
+
+    /// <summary>
+    /// The severity of <paramref name="check"/>: a gateway outlier is often a session routed
+    /// through another bastion on purpose, so it informs; every other check warns.
+    /// </summary>
+    public static SharedSessionReportSeverity SeverityOf(SharedSessionReportCheck check) =>
+        check == SharedSessionReportCheck.GatewayOutlier
+            ? SharedSessionReportSeverity.Info
+            : SharedSessionReportSeverity.Warning;
+}
 
 /// <summary>A session of the file the shared filter refused, and why.</summary>
 /// <param name="Profile">The session as the parser read it.</param>
@@ -87,6 +120,12 @@ public sealed record SharedSessionImportReport(
 
     /// <summary>How many findings of <paramref name="check"/> the report holds.</summary>
     public int CountOf(SharedSessionReportCheck check) => Entries.Count(entry => entry.Check == check);
+
+    /// <summary>How many findings of <paramref name="severity"/> the report holds.</summary>
+    public int CountOf(SharedSessionReportSeverity severity) => Entries.Count(entry => entry.Severity == severity);
+
+    /// <summary>How many findings are warnings: what the session tree counts on the source's root.</summary>
+    public int WarningCount => CountOf(SharedSessionReportSeverity.Warning);
 
     /// <summary>The report of <paramref name="sourceId"/> when its file has not been read.</summary>
     public static SharedSessionImportReport Empty(string sourceId, string sourceName) => new(sourceId, sourceName, []);
