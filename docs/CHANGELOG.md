@@ -12,6 +12,33 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-11-05: shared import report and SFTP upload fixes (v2026.110501)
+
+Two fixes, merged as #746 and #747. The user-facing summary and the upgrade notes are in the release
+notes.
+
+### Shared session import report (#747)
+
+- **Likely copy error.** `SharedSessionImportReportBuilder.CorrelateCopyErrors` folds a duplicate
+  pair whose one session is a name and host mismatch and whose other is named after the host into
+  one `LikelyCopyError` on the mismatched session; that mismatch and both duplicates are dropped. A
+  group of three or more, a pair of two mismatches and a plain duplicate are unchanged.
+- **Severity.** `SharedSessionReportEntry.SeverityOf`: `GatewayOutlier` is Info, every other check
+  Warning, and the check order lists the warnings first. `SharedSessionSourceState.WarningCount`
+  drives the tree root badge and the reload status line (`SharedSessionSourceReload.PreviousWarningCount`);
+  the Settings Report button still shows for any finding. The header reads "N warnings, M info",
+  group headings name the severity, and the CSV gains a first Severity column.
+- **Gateway as written.** `MobaXtermImportResult.GatewayWrittenNames` keeps each gateway's name with
+  its login unresolved; the report shows it instead of the resolved name.
+- **Wording.** A duplicate reads "Reaches {host}, same host as session {other}." (en, fr, es).
+
+### SFTP uploads (#746)
+
+- A selected or dropped local root that vanished, or that the existence probes cannot access, is
+  collected in `UploadPlanOutcome.SkippedUnavailableSources`, logged and surfaced as a non-blocking
+  status warning; the job stays Completed, since a retry cannot bring back a missing source. A
+  conflict-dialog Skip is an explicit choice and is not reported.
+
 ## 2026-10-29: audit hardening release (v2026.102901)
 
 The full audit of 2026-10-27 (lots A to J, then the P3 lots K to S and the follow-ups F2 to F10),
