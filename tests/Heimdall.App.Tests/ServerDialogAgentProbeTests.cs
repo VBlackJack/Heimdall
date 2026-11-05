@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.ComponentModel;
 using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.Core.Ssh;
 using Heimdall.Ssh.Agents;
@@ -129,11 +130,43 @@ public sealed class ServerDialogAgentProbeTests
         }
     }
 
+    /// <summary>
+    /// A dialog switched to SSH, whose own probe has already landed on the chip.
+    /// </summary>
+    /// <remarks>
+    /// Switching from the default RDP to SSH starts a probe. In production its continuation is
+    /// queued on the UI thread, behind whatever the test does next. Here there is no UI thread:
+    /// it resumes on the thread pool and may pass its staleness check just before a later switch
+    /// clears the chip, then write "agent off" over the cleared chip. Waiting for it here keeps
+    /// every probe a test observes one that the test started.
+    /// </remarks>
     private static ServerDialogViewModel SshDialog()
     {
         ServerDialogViewModel vm = new();
         vm.AgentRegistryFactory = static _ => new SshAgentRegistry([]);
-        vm.ConnectionType = "SSH";
+
+        // The chip text is the last thing a probe writes, and the empty registry always yields a
+        // non-empty "off" text, so its change marks the end of the setup probe.
+        using ManualResetEventSlim landed = new(false);
+        PropertyChangedEventHandler onChanged = (_, e) =>
+        {
+            if (e.PropertyName == nameof(ServerDialogViewModel.AgentChipText) && vm.AgentChipText.Length > 0)
+            {
+                landed.Set();
+            }
+        };
+
+        vm.PropertyChanged += onChanged;
+        try
+        {
+            vm.ConnectionType = "SSH";
+            Assert.True(landed.Wait(FailureBound), "The setup probe never reached the chip.");
+        }
+        finally
+        {
+            vm.PropertyChanged -= onChanged;
+        }
+
         return vm;
     }
 
