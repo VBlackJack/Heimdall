@@ -730,6 +730,7 @@ public static partial class MobaXtermImporter
             return VariableTokenRegex().Replace(value, match =>
             {
                 string name = match.Groups[1].Value;
+                Result.ReferencedVariables.Add(name);
                 string? resolved = Options.VariableResolver?.Invoke(name);
                 if (!string.IsNullOrEmpty(resolved))
                 {
@@ -901,6 +902,13 @@ public sealed class MobaXtermImportResult
     /// writes it (<c>[DAS]@bastion</c>, not the resolved login): what a report about the file shows.
     /// </summary>
     public Dictionary<string, string> GatewayWrittenNames { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Every <c>[NAME]</c> variable a field of the file uses, resolved or not, compared
+    /// case-insensitively and spelled as first met; what the settings check against the user's
+    /// list of variables.
+    /// </summary>
+    public HashSet<string> ReferencedVariables { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Every session skipped and every value left unresolved, with the reason.</summary>
     public List<MobaXtermImportWarning> Warnings { get; } = [];

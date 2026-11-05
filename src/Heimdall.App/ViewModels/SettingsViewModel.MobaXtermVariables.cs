@@ -19,6 +19,7 @@ using System.Collections.Specialized;
 using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Heimdall.App.Services.SharedSessions;
 using Heimdall.App.ViewModels.Settings;
 using Heimdall.Core.Configuration;
 
@@ -54,6 +55,106 @@ public partial class SettingsViewModel
         MarkEditTheComparisonCannotSee();
     }
 
+    /// <summary>
+    /// The variables the enabled shared sources use that no row names, with the sources using
+    /// each; a read-only hint, refreshed as the rows change and as the sources reload.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasMissingMobaXtermVariables))]
+    [NotifyPropertyChangedFor(nameof(MissingMobaXtermVariablesText))]
+    private IReadOnlyList<MissingMobaXtermVariable> _missingMobaXtermVariables = [];
+
+    public bool HasMissingMobaXtermVariables => MissingMobaXtermVariables.Count > 0;
+
+    /// <summary>"Used by shared sources but not defined: DAS (Team)"; empty when nothing is missing.</summary>
+    public string MissingMobaXtermVariablesText => HasMissingMobaXtermVariables
+        ? _localizer.Format(
+            "SettingsMobaXtermVariablesMissing",
+            string.Join(
+                _localizer["SettingsMobaXtermVariablesMissingSeparator"],
+                MissingMobaXtermVariables.Select(missing => _localizer.Format(
+                    "SettingsMobaXtermVariablesMissingItem",
+                    missing.Name,
+                    string.Join(_localizer["SettingsMobaXtermVariablesMissingSeparator"], missing.Sources)))))
+        : string.Empty;
+
+    /// <summary>What the last row added from the hint came to; announced, never a dialog.</summary>
+    [ObservableProperty]
+    private string _mobaXtermVariablesStatus = string.Empty;
+
+    /// <summary>
+    /// The variables <paramref name="sources"/> use that none of <paramref name="definedNames"/>
+    /// names, compared case-insensitively after trimming, sorted by name. Only sources holding
+    /// sessions count: a disabled source or one that could not be read uses nothing.
+    /// </summary>
+    internal static IReadOnlyList<(string Name, IReadOnlyList<string> Sources)> FindMissingMobaXtermVariables(
+        IEnumerable<SharedSessionSourceState> sources,
+        IEnumerable<string> definedNames)
+    {
+        ArgumentNullException.ThrowIfNull(sources);
+        ArgumentNullException.ThrowIfNull(definedNames);
+
+        HashSet<string> defined = new(
+            definedNames.Select(name => name?.Trim() ?? string.Empty).Where(name => name.Length > 0),
+            StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, (string Name, List<string> Sources)> missing = new(StringComparer.OrdinalIgnoreCase);
+        foreach (SharedSessionSourceState source in sources.Where(source => source.Status == SharedSessionSourceStatus.Loaded))
+        {
+            string sourceName = string.IsNullOrWhiteSpace(source.Name) ? source.SourceId : source.Name;
+            foreach (string variable in source.ReferencedVariables.Where(variable => !defined.Contains(variable)))
+            {
+                if (!missing.TryGetValue(variable, out (string Name, List<string> Sources) found))
+                {
+                    found = (variable, []);
+                    missing[variable] = found;
+                }
+
+                if (!found.Sources.Contains(sourceName, StringComparer.Ordinal))
+                {
+                    found.Sources.Add(sourceName);
+                }
+            }
+        }
+
+        return [.. missing.Values
+            .OrderBy(found => found.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(found => (found.Name, (IReadOnlyList<string>)found.Sources))];
+    }
+
+    /// <summary>Recomputes <see cref="MissingMobaXtermVariables"/> from the sources and the rows.</summary>
+    private void RefreshMissingMobaXtermVariables()
+    {
+        MissingMobaXtermVariables = [.. FindMissingMobaXtermVariables(
+                _sharedSessions?.Sources ?? [],
+                (MobaXtermUserVariables ?? []).Select(row => row.Name))
+            .Select(found => new MissingMobaXtermVariable(
+                found.Name,
+                found.Sources,
+                _localizer.Format("SettingsMobaXtermVariableAddMissing", found.Name),
+                _localizer.Format(
+                    "AccessSettingsMobaXtermVariableAddMissing",
+                    found.Name,
+                    string.Join(_localizer["SettingsMobaXtermVariablesMissingSeparator"], found.Sources))))];
+    }
+
+    /// <summary>
+    /// Adds a row named after a variable the shared sources use, with an empty value for the user
+    /// to fill; nothing is saved until they save.
+    /// </summary>
+    [RelayCommand]
+    private void AddMissingMobaXtermVariable(MissingMobaXtermVariable? missing)
+    {
+        if (missing is null
+            || MobaXtermUserVariables.Any(row => string.Equals(row.Name.Trim(), missing.Name, StringComparison.OrdinalIgnoreCase)))
+        {
+            return;
+        }
+
+        MobaXtermUserVariables.Add(new MobaXtermVariableItemViewModel { Name = missing.Name, IsValueFocusRequested = true });
+        MarkEditTheComparisonCannotSee();
+        MobaXtermVariablesStatus = _localizer.Format("SettingsMobaXtermVariableAddedMissing", missing.Name);
+    }
+
     [RelayCommand]
     private void RemoveMobaXtermVariable(MobaXtermVariableItemViewModel? row)
     {
@@ -76,7 +177,9 @@ public partial class SettingsViewModel
 
         SubscribeMobaXtermVariableTracking();
         _mobaXtermVariablesValidationError = null;
+        MobaXtermVariablesStatus = string.Empty;
         RevalidateMobaXtermVariables();
+        RefreshMissingMobaXtermVariables();
     }
 
     /// <summary>The variables Save writes: the valid rows, trimmed.</summary>
@@ -226,6 +329,7 @@ public partial class SettingsViewModel
     private void OnMobaXtermVariablesEdited()
     {
         RevalidateMobaXtermVariables();
+        RefreshMissingMobaXtermVariables();
         if (_mobaXtermVariablesValidationError is null)
         {
             return;

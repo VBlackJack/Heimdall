@@ -49,6 +49,13 @@ public partial class MobaXtermVariableItemViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsValid))]
     private string? _valueError;
 
+    /// <summary>
+    /// Asks the view to put the keyboard focus in the value field once the row is shown; the view
+    /// clears it when done. Set on a row added for a variable the shared sources use.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isValueFocusRequested;
+
     public bool HasNameError => NameError is not null;
 
     public bool HasValueError => ValueError is not null;

@@ -342,6 +342,8 @@ public partial class SettingsViewModel
                 _ => (_localizer["SettingsSharedSourceStatusDisabled"], false),
             };
         }
+
+        RefreshMissingMobaXtermVariables();
     }
 
     private void SubscribeToSharedSessionProvider()

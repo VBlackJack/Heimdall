@@ -28,6 +28,15 @@ The **Status** column says what the last read found: the number of sessions, or 
 
 MobaXterm files often write the login as a variable, such as `[DAS]`. Heimdall replaces it with the value set in **Settings > General > Settings file & import > MobaXterm import variables**. `DAS` defaults to `%USERNAME%`, your Windows login. If your login on the servers is different, change the value there; the **Resolves to** column shows what it becomes. A variable with no value is listed in the import report (section 7).
 
+**Name** is the word between the brackets in the file, **Value** is what replaces it. For a file that writes `[DAS]` and a login `jdoe`:
+
+| Name | Value | Resolves to |
+|---|---|---|
+| `DAS` | `jdoe` | `jdoe` |
+| `DAS` | `%USERNAME%` | your Windows login |
+
+Typing the login in **Name** (`jdoe`, with `%USERNAME%` as its value) defines a variable called `jdoe` that no file uses, and leaves `[DAS]` without a value. The card then says so: **Used by shared sources but not defined: DAS (Team)**, with an **Add DAS** button that adds the row with an empty value and puts the cursor in it. Nothing is saved until you save.
+
 ## 3. What is read-only, and why
 
 Shared sessions belong to the file, which other people maintain. In Heimdall they cannot be edited, renamed, duplicated, moved, reordered, deleted or marked favorite, and nothing can be dragged into or out of a shared folder. A lock on the row names the source.
@@ -83,7 +92,7 @@ Each read also checks the file for common mistakes. Right-click the source root 
 
 - **Warnings**, most likely mistakes worth fixing:
   - **Skipped sessions**: sessions not loaded, and why.
-  - **Unresolved variables**: a `[NAME]` with no value (section 2).
+  - **Unresolved variables**: a `[NAME]` with no value (section 2). One finding per variable, however many sessions use it, for example `[DAS] has no value in the MobaXterm import variables: 79 sessions loaded with the token as written.` The summary counts variables, not sessions.
   - **Likely copy errors**: a session that reaches the host of another session of its folder, the one named after that host. For example `app01` reaching `app02`, next to the session `app02`: the line of `app02` was most likely copied and its host never changed. This one finding replaces the name and host mismatch and the two duplicate hosts the same mistake would otherwise give.
   - **Name and host mismatch**: a session named after one machine that reaches another.
   - **Duplicate hosts**: two sessions of one folder reaching the same host with the same protocol. An SSH session and an RDP or SFTP session to one host are two ways to use it, not duplicates; two SSH sessions to it are.
@@ -92,7 +101,7 @@ Each read also checks the file for common mistakes. Right-click the source root 
 
 The source root counts the warnings only, for example `2 warnings`; a report with nothing but information shows no count. The report header gives both totals, for example `2 warnings, 7 info`, and the summary keeps one count per check.
 
-The report only informs: every session it lists is still loaded as the file describes it. **Copy** and **Export CSV** let you send it to whoever maintains the file; both carry the severity of each finding, the CSV in its own column.
+The report only informs: every session it lists is still loaded as the file describes it. **Copy** and **Export CSV** let you send it to whoever maintains the file; both carry the severity of each finding, the CSV in its own column. A finding about several sessions, such as an unresolved variable, is followed in the copy by one line per session, and takes one CSV row per session with the same explanation, so a spreadsheet can filter them.
 
 ## 8. Known limits
 

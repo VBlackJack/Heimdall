@@ -28,6 +28,15 @@ La colonne **État** indique ce que la dernière lecture a trouvé : le nombre d
 
 Les fichiers MobaXterm écrivent souvent l'identifiant sous forme de variable, comme `[DAS]`. Heimdall la remplace par la valeur définie dans **Paramètres > Général > Fichier et import > Variables d'import MobaXterm**. `DAS` vaut par défaut `%USERNAME%`, votre identifiant Windows. Si votre identifiant sur les serveurs est différent, changez la valeur à cet endroit ; la colonne **Devient** montre le résultat. Une variable sans valeur apparaît dans le rapport d'import (section 7).
 
+**Nom** est le mot entre crochets dans le fichier, **Valeur** est ce qui le remplace. Pour un fichier qui écrit `[DAS]` et un identifiant `jdoe` :
+
+| Nom | Valeur | Devient |
+|---|---|---|
+| `DAS` | `jdoe` | `jdoe` |
+| `DAS` | `%USERNAME%` | votre identifiant Windows |
+
+Saisir l'identifiant dans **Nom** (`jdoe`, avec `%USERNAME%` comme valeur) définit une variable appelée `jdoe` qu'aucun fichier n'utilise, et laisse `[DAS]` sans valeur. La carte le signale alors : **Utilisées par les sources partagées mais non définies : DAS (Team)**, avec un bouton **Ajouter DAS** qui ajoute la ligne avec une valeur vide et y place le curseur. Rien n'est enregistré tant que vous n'enregistrez pas.
+
 ## 3. Ce qui est en lecture seule, et pourquoi
 
 Les sessions partagées appartiennent au fichier, que d'autres personnes maintiennent. Dans Heimdall, elles ne peuvent être ni modifiées, ni renommées, ni dupliquées, ni déplacées, ni réordonnées, ni supprimées, ni mises en favori, et rien ne se glisse dans un dossier partagé ni hors de lui. Un cadenas sur la ligne nomme la source.
@@ -83,7 +92,7 @@ Chaque lecture vérifie aussi le fichier à la recherche d'erreurs courantes. Fa
 
 - **Avertissements**, des erreurs probables qui valent d'être corrigées :
   - **Sessions ignorées** : les sessions non chargées, et pourquoi.
-  - **Variables non résolues** : un `[NOM]` sans valeur (section 2).
+  - **Variables non résolues** : un `[NOM]` sans valeur (section 2). Un seul constat par variable, quel que soit le nombre de sessions qui l'utilisent, par exemple `[DAS] n'a pas de valeur dans les variables d'import MobaXterm : 79 sessions chargées avec le jeton tel qu'écrit.` Le résumé compte les variables, pas les sessions.
   - **Erreurs de copie probables** : une session qui joint l'hôte d'une autre session de son dossier, celle qui porte le nom de cet hôte. Par exemple `app01` qui joint `app02`, à côté de la session `app02` : la ligne de `app02` a très probablement été copiée sans que son hôte soit changé. Ce seul constat remplace le nom et hôte différents et les deux hôtes en double que la même erreur donnerait sinon.
   - **Nom et hôte différents** : une session nommée d'après une machine qui en joint une autre.
   - **Hôtes en double** : deux sessions d'un même dossier qui joignent le même hôte avec le même protocole. Une session SSH et une session RDP ou SFTP vers un même hôte sont deux façons de s'en servir, pas des doublons ; deux sessions SSH vers cet hôte en sont.
@@ -92,7 +101,7 @@ Chaque lecture vérifie aussi le fichier à la recherche d'erreurs courantes. Fa
 
 La racine de la source ne compte que les avertissements, par exemple `2 avertissements` ; un rapport qui ne contient que des informations n'affiche aucun nombre. L'en-tête du rapport donne les deux totaux, par exemple `2 avertissements, 7 infos`, et le résumé garde un nombre par vérification.
 
-Le rapport ne fait qu'informer : chaque session qu'il liste reste chargée telle que le fichier la décrit. **Copier** et **Exporter en CSV** permettent de l'envoyer à qui maintient le fichier ; les deux portent la gravité de chaque constat, le CSV dans sa propre colonne.
+Le rapport ne fait qu'informer : chaque session qu'il liste reste chargée telle que le fichier la décrit. **Copier** et **Exporter en CSV** permettent de l'envoyer à qui maintient le fichier ; les deux portent la gravité de chaque constat, le CSV dans sa propre colonne. Un constat qui concerne plusieurs sessions, comme une variable non résolue, est suivi dans la copie d'une ligne par session, et donne une ligne CSV par session avec la même explication, pour qu'un tableur puisse les filtrer.
 
 ## 8. Limites connues
 

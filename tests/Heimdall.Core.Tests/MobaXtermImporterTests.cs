@@ -488,6 +488,29 @@ public class MobaXtermImporterTests
         Assert.Empty(result.Warnings);
     }
 
+    // Producer: MobaXtermImporter.ParseContext.ResolveVariables, which records every token it meets,
+    // resolved or not, so the settings can tell which variables a shared file needs.
+    [Fact]
+    public void Parse_RecordsEveryVariableUsed_ResolvedOrNot_OnceInAnyCase()
+    {
+        const string ini = """
+            [Bookmarks]
+            SubRep=
+            ImgNum=42
+            srv-x=#126#0%srv-x.example.invalid%22%adm_[DAS]%%0%-1%%gw.example.invalid%22%[das]%
+            srv-y=#126#0%srv-y.example.invalid%22%[NOPE]%
+            srv-z=#126#0%srv-z.example.invalid%22%plain%
+            """;
+
+        MobaXtermImportResult result = MobaXtermImporter.Parse(
+            ini,
+            new MobaXtermImportOptions { VariableResolver = ResolveDas });
+
+        // Once per name in any case, spelled as first met: the gateway login is read before the
+        // session login, so [das] comes first.
+        Assert.Equal(new[] { "das", "NOPE" }, result.ReferencedVariables.Order(StringComparer.OrdinalIgnoreCase));
+    }
+
     // --- Basic SSH and RDP mapping ---
 
     [Fact]

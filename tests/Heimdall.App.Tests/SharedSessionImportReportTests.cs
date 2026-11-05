@@ -15,6 +15,7 @@
  */
 
 using System.IO;
+using System.Windows.Media;
 using Heimdall.App.Services;
 using Heimdall.App.Services.SharedSessions;
 using Heimdall.App.ViewModels.Dialogs;
@@ -434,6 +435,199 @@ public sealed class SharedSessionImportReportTests : IDisposable
         Assert.Equal(0, report.CountOf(SharedSessionReportCheck.DuplicateHost));
     }
 
+    // --- Unresolved variables, one finding per variable ---
+
+    // Producer: SharedSessionImportReportBuilder.GroupUnresolvedVariables, a pure function over the
+    // findings: the parser warns once per session and variable, the report says it once per variable.
+    [Fact]
+    public void GroupUnresolvedVariables_OneFindingPerVariable_InAnyCase_ListingItsSessions()
+    {
+        SharedSessionReportEntry skipped = new(SharedSessionReportCheck.SkippedSession, "LAB", "wsl01", "14");
+        SharedSessionReportEntry[] findings =
+        [
+            new(SharedSessionReportCheck.UnresolvedVariable, "PROD", "app02", "DAS"),
+            skipped,
+            new(SharedSessionReportCheck.UnresolvedVariable, "LAB", "app09", "das"),
+            new(SharedSessionReportCheck.UnresolvedVariable, "PROD", "app01", "DAS"),
+            new(SharedSessionReportCheck.UnresolvedVariable, "PROD", "app03", "NOPE"),
+        ];
+
+        IReadOnlyList<SharedSessionReportEntry> result = GroupUnresolvedVariables(findings);
+
+        Assert.Equal(3, result.Count);
+        SharedSessionReportEntry das = result[0];
+        Assert.Equal(SharedSessionReportCheck.UnresolvedVariable, das.Check);
+        Assert.Equal("DAS", das.Detail);
+        Assert.Equal(("", ""), (das.FolderPath, das.SessionName));
+        Assert.Equal(
+            new[] { ("LAB", "app09"), ("PROD", "app01"), ("PROD", "app02") },
+            das.AffectedSessions.Select(session => (session.FolderPath, session.SessionName)));
+        Assert.Same(skipped, result[1]);
+        SharedSessionReportEntry nope = result[2];
+        Assert.Equal(("PROD", "app03", "NOPE"), (nope.FolderPath, nope.SessionName, nope.Detail));
+        Assert.Single(nope.AffectedSessions);
+    }
+
+    [Fact]
+    public void GroupUnresolvedVariables_OneFolder_KeepsTheFolder_AndLeavesOtherFindingsAlone()
+    {
+        SharedSessionReportEntry[] findings =
+        [
+            new(SharedSessionReportCheck.UnresolvedVariable, "PROD", "app01", "DAS"),
+            new(SharedSessionReportCheck.UnresolvedVariable, "PROD", "app02", "DAS"),
+        ];
+        SharedSessionReportEntry[] none =
+        [
+            new(SharedSessionReportCheck.NameHostMismatch, "PROD", "app01", "app02.example.invalid"),
+        ];
+
+        SharedSessionReportEntry das = Assert.Single(GroupUnresolvedVariables(findings));
+
+        Assert.Equal(("PROD", ""), (das.FolderPath, das.SessionName));
+        Assert.Equal(2, das.AffectedSessions.Count);
+        Assert.Equal(none, GroupUnresolvedVariables(none));
+        Assert.Empty(GroupUnresolvedVariables([]));
+    }
+
+    // The case that motivated it, anonymized: a login typed as the variable's name left [DAS]
+    // undefined, and every session of the file carried it.
+    [Fact]
+    public void Build_AVariableEverySessionUses_IsOneWarning()
+    {
+        const string content = "[Bookmarks_1]\r\nSubRep=PROD\r\nImgNum=41\r\n[Bookmarks_2]\r\nSubRep=LAB\r\nImgNum=41\r\n";
+        MobaXtermImportWarning[] warnings =
+        [
+            .. Enumerable.Range(1, 40).Select(index => new MobaXtermImportWarning(
+                "Bookmarks_1", "app" + index.ToString("00", System.Globalization.CultureInfo.InvariantCulture), MobaXtermImportWarningKind.UnresolvedVariable, "DAS")),
+            .. Enumerable.Range(1, 39).Select(index => new MobaXtermImportWarning(
+                "Bookmarks_2", "lab" + index.ToString("00", System.Globalization.CultureInfo.InvariantCulture), MobaXtermImportWarningKind.UnresolvedVariable, "DAS")),
+        ];
+
+        SharedSessionImportReport report = Build(SourceId, SourceName, content, warnings, [], [], [], new Options(60, 3));
+
+        SharedSessionReportEntry das = Assert.Single(report.Entries);
+        Assert.Equal(79, das.AffectedSessions.Count);
+        Assert.Equal(1, report.CountOf(SharedSessionReportCheck.UnresolvedVariable));
+        Assert.Equal(1, report.WarningCount);
+    }
+
+    // Producer: the sort in SharedSessionImportReportBuilder.Build. Two variables of several
+    // sessions each tie on folder and session (both empty): the variable name decides.
+    [Fact]
+    public void Build_SeveralGroupedVariables_AreListedByName()
+    {
+        const string content = "[Bookmarks_1]\r\nSubRep=PROD\r\nImgNum=41\r\n[Bookmarks_2]\r\nSubRep=LAB\r\nImgNum=41\r\n";
+        MobaXtermImportWarning[] warnings =
+        [
+            new("Bookmarks_1", "app01", MobaXtermImportWarningKind.UnresolvedVariable, "ZONE"),
+            new("Bookmarks_2", "lab01", MobaXtermImportWarningKind.UnresolvedVariable, "ZONE"),
+            new("Bookmarks_1", "app01", MobaXtermImportWarningKind.UnresolvedVariable, "DAS"),
+            new("Bookmarks_2", "lab01", MobaXtermImportWarningKind.UnresolvedVariable, "DAS"),
+        ];
+
+        SharedSessionImportReport report = Build(SourceId, SourceName, content, warnings, [], [], [], new Options(60, 3));
+
+        Assert.Equal(new[] { "DAS", "ZONE" }, report.Entries.Select(entry => entry.Detail));
+    }
+
+    [Fact]
+    public async Task Formatter_AGroupedVariable_IsWordedOnce_CopiedWithItsSessions_AndExportedPerSession()
+    {
+        LocalizationManager localizer = await LocalizerAsync();
+        var formatter = new SharedSessionImportReportFormatter(localizer);
+        SharedSessionReportEntry das = Assert.Single(GroupUnresolvedVariables(
+        [
+            new(SharedSessionReportCheck.UnresolvedVariable, "PROD", "app01", "DAS"),
+            new(SharedSessionReportCheck.UnresolvedVariable, "LAB", "lab01", "DAS"),
+            new(SharedSessionReportCheck.UnresolvedVariable, "PROD", "app02", "DAS"),
+        ]));
+        SharedSessionReportEntry single = Assert.Single(GroupUnresolvedVariables(
+            [new(SharedSessionReportCheck.UnresolvedVariable, "PROD", "app05", "NOPE")]));
+        SharedSessionImportReport report = new(SourceId, SourceName, [das, single]);
+
+        string explanation = formatter.Explain(das);
+        string plain = formatter.ToPlainText(report);
+        string[] csv = formatter.ToCsv(report).Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
+
+        Assert.Equal("[DAS] has no value in the MobaXterm import variables: 3 sessions loaded with the token as written.", explanation);
+        Assert.Equal("[NOPE] has no value in the MobaXterm import variables: 1 session loaded with the token as written.", formatter.Explain(single));
+        Assert.Equal(("(several folders)", "3 sessions"), (formatter.EntryFolderLabel(das), formatter.EntrySessionLabel(das)));
+        Assert.Equal(("PROD", "app05"), (formatter.EntryFolderLabel(single), formatter.EntrySessionLabel(single)));
+        Assert.Equal("Unresolved variables: 2", plain.Split(Environment.NewLine).Single(line => line.StartsWith("Unresolved variables:", StringComparison.Ordinal)));
+        Assert.Contains("(several folders) / 3 sessions: " + explanation, plain, StringComparison.Ordinal);
+        Assert.Contains("  - LAB / lab01", plain, StringComparison.Ordinal);
+        Assert.Contains("  - PROD / app02", plain, StringComparison.Ordinal);
+        Assert.DoesNotContain("  - PROD / app05", plain, StringComparison.Ordinal);
+        Assert.Equal(5, csv.Length);
+        Assert.Equal(
+            new[] { "lab01", "app01", "app02", "app05" },
+            csv.Skip(1).Select(row => row.Split("\",\"")[3]));
+        Assert.All(csv.Skip(1).Take(3), row => Assert.EndsWith(",\"" + explanation + "\"", row, StringComparison.Ordinal));
+    }
+
+    // --- Values kept on one line in the dialog ---
+
+    [Fact]
+    public void KeepOnOneLine_JoinsTheCharactersOfAToken_AndLeavesASentenceAlone()
+    {
+        string joined = SharedSessionImportReportFormatter.KeepOnOneLine("[DAS]@bastion-01.example.invalid");
+
+        Assert.Equal("[DAS]@bastion-01.example.invalid", joined.Replace("⁠", string.Empty, StringComparison.Ordinal));
+        Assert.Equal(("[DAS]@bastion-01.example.invalid".Length * 2) - 1, joined.Length);
+        Assert.Equal("a direct connection", SharedSessionImportReportFormatter.KeepOnOneLine("a direct connection"));
+        Assert.Equal("x", SharedSessionImportReportFormatter.KeepOnOneLine("x"));
+        Assert.Equal(string.Empty, SharedSessionImportReportFormatter.KeepOnOneLine(string.Empty));
+    }
+
+    [Fact]
+    public async Task ExplainForDisplay_IsTheExplanation_WithJoinersOnly()
+    {
+        var formatter = new SharedSessionImportReportFormatter(await LocalizerAsync());
+        SharedSessionReportEntry outlier = new(
+            SharedSessionReportCheck.GatewayOutlier, "PROD", "app04", "[DAS]@bastion-02.example.invalid", "");
+
+        string display = formatter.ExplainForDisplay(outlier);
+
+        Assert.NotEqual(formatter.Explain(outlier), display);
+        Assert.Equal(formatter.Explain(outlier), display.Replace("⁠", string.Empty, StringComparison.Ordinal));
+        Assert.Contains(SharedSessionImportReportFormatter.KeepOnOneLine("[DAS]@bastion-02.example.invalid"), display, StringComparison.Ordinal);
+    }
+
+    // Measured with WPF's own line breaking: at a width that fits the gateway alone, the plain text
+    // breaks after the hyphen inside it (the control proves the width is tight enough), and the
+    // joined text moves the whole gateway to the next line instead.
+    [Fact]
+    public void KeepOnOneLine_WpfDoesNotBreakInsideTheToken()
+    {
+        const string gateway = "[DAS]@bastion-01.example.invalid";
+        const string sentence = "Goes through ";
+        double tokenWidth = Measure(gateway, double.PositiveInfinity).Width;
+
+        FormattedText plain = Measure(sentence + gateway, tokenWidth + 2);
+        FormattedText joined = Measure(sentence + SharedSessionImportReportFormatter.KeepOnOneLine(gateway), tokenWidth + 2);
+
+        Assert.True(plain.Width < tokenWidth - 1, "Control: the plain gateway was expected to break inside itself.");
+        Assert.True(joined.Width >= tokenWidth - 0.5, "The joined gateway was split across lines.");
+
+        static FormattedText Measure(string text, double maxWidth)
+        {
+            var formatted = new FormattedText(
+                text,
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Windows.FlowDirection.LeftToRight,
+                new Typeface("Segoe UI"),
+                12,
+                Brushes.Black,
+                1.0);
+            if (!double.IsPositiveInfinity(maxWidth))
+            {
+                formatted.MaxTextWidth = maxWidth;
+            }
+
+            return formatted;
+        }
+    }
+
     // --- Severity ---
 
     [Theory]
@@ -696,6 +890,16 @@ public sealed class SharedSessionImportReportTests : IDisposable
 
         // Informational only: every session the parser took is loaded, the reported ones included.
         Assert.Equal(8, state.ProfileCount);
+    }
+
+    // Producer: SharedSessionProvider.TryParse, which carries the parser's ReferencedVariables onto
+    // the source state, sorted: [DAS] is resolved here and [NOPE] is not, and both are listed.
+    [Fact]
+    public async Task Load_TheStateListsTheVariablesTheFileUses()
+    {
+        SharedSessionSourceState state = Assert.Single((await LoadedProviderAsync(OneOfEach)).Sources);
+
+        Assert.Equal(new[] { "DAS", "NOPE" }, state.ReferencedVariables);
     }
 
     [Fact]

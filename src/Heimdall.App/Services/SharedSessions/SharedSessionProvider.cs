@@ -322,7 +322,8 @@ public sealed class SharedSessionProvider : ISharedSessionProvider, IDisposable
                         parsed.Gateways.Count,
                         parsed.Warnings,
                         parsed.Dropped,
-                        Report: parsed.Report),
+                        Report: parsed.Report,
+                        Variables: parsed.Variables),
                     parsed.Profiles,
                     parsed.Gateways);
                 _lastGood[source.Id] = loaded;
@@ -420,7 +421,8 @@ public sealed class SharedSessionProvider : ISharedSessionProvider, IDisposable
                 parsed.Dropped,
                 OfflineNotice(copy.LoadedAtUtc, reason),
                 copy.LoadedAtUtc,
-                parsed.Report),
+                parsed.Report,
+                parsed.Variables),
             parsed.Profiles,
             parsed.Gateways);
     }
@@ -506,6 +508,7 @@ public sealed class SharedSessionProvider : ISharedSessionProvider, IDisposable
             gateways,
             result.Warnings,
             refused.Count,
+            [.. result.ReferencedVariables.Order(StringComparer.OrdinalIgnoreCase)],
             SharedSessionImportReportBuilder.Build(
                 sourceId,
                 sourceName,
@@ -715,6 +718,7 @@ public sealed class SharedSessionProvider : ISharedSessionProvider, IDisposable
         IReadOnlyList<SshGatewayDto> Gateways,
         IReadOnlyList<MobaXtermImportWarning> Warnings,
         int Dropped,
+        IReadOnlyList<string> Variables,
         SharedSessionImportReport Report);
 
     private sealed record SourceLoad(

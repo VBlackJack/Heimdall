@@ -31,7 +31,8 @@ namespace Heimdall.App.Services.SharedSessions;
 /// <para>The rules, each applied to the sessions that were loaded:</para>
 /// <list type="bullet">
 /// <item>Skipped sessions and unresolved variables are the parser's own warnings, plus the sessions
-/// the shared filter refused.</item>
+/// the shared filter refused. An unresolved variable is one finding however many sessions use it
+/// (<see cref="GroupUnresolvedVariables"/>).</item>
 /// <item>Name and host: the session name, compared case-insensitively, must equal either the host or
 /// the host's first label (what precedes the first dot). A host that is an IP address has no name to
 /// compare and is not checked.</item>
@@ -132,10 +133,11 @@ public static class SharedSessionImportReportBuilder
         return new SharedSessionImportReport(
             sourceId,
             sourceName,
-            [.. entries
+            [.. GroupUnresolvedVariables(entries)
                 .OrderBy(entry => entry.Check)
                 .ThenBy(entry => entry.FolderPath, StringComparer.OrdinalIgnoreCase)
-                .ThenBy(entry => entry.SessionName, StringComparer.OrdinalIgnoreCase)]);
+                .ThenBy(entry => entry.SessionName, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(entry => entry.Detail, StringComparer.OrdinalIgnoreCase)]);
     }
 
     /// <summary>
@@ -206,6 +208,55 @@ public static class SharedSessionImportReportBuilder
         }
 
         return [.. findings.Where(entry => !folded.Contains(entry)), .. copyErrors];
+    }
+
+    /// <summary>
+    /// Folds the unresolved variable findings of <paramref name="findings"/> into one per variable,
+    /// compared case-insensitively: a variable missing from the user's list is one thing to fix,
+    /// however many sessions use it. The folded finding lists its sessions in folder then name
+    /// order, keeps the folder and the session name only when they are the same for all, and
+    /// takes the first spelling of the name. Every other finding is returned unchanged, in order;
+    /// a folded one takes the place of the first finding it folds.
+    /// </summary>
+    /// <param name="findings">The findings of one source.</param>
+    public static IReadOnlyList<SharedSessionReportEntry> GroupUnresolvedVariables(IReadOnlyList<SharedSessionReportEntry> findings)
+    {
+        ArgumentNullException.ThrowIfNull(findings);
+
+        Dictionary<string, List<SharedSessionReportEntry>> byVariable = findings
+            .Where(entry => entry.Check == SharedSessionReportCheck.UnresolvedVariable)
+            .GroupBy(entry => entry.Detail, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.ToList(), StringComparer.OrdinalIgnoreCase);
+
+        List<SharedSessionReportEntry> result = [];
+        foreach (SharedSessionReportEntry entry in findings)
+        {
+            if (entry.Check != SharedSessionReportCheck.UnresolvedVariable)
+            {
+                result.Add(entry);
+                continue;
+            }
+
+            if (!byVariable.Remove(entry.Detail, out List<SharedSessionReportEntry>? same))
+            {
+                continue;
+            }
+
+            List<SharedSessionReportSession> sessions = [.. same
+                .SelectMany(finding => finding.AffectedSessions)
+                .DistinctBy(session => (session.FolderPath.ToUpperInvariant(), session.SessionName.ToUpperInvariant()))
+                .OrderBy(session => session.FolderPath, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(session => session.SessionName, StringComparer.OrdinalIgnoreCase)];
+            bool oneFolder = sessions.Select(session => session.FolderPath).Distinct(StringComparer.OrdinalIgnoreCase).Count() == 1;
+            result.Add(new SharedSessionReportEntry(
+                SharedSessionReportCheck.UnresolvedVariable,
+                oneFolder ? sessions[0].FolderPath : string.Empty,
+                sessions.Count == 1 ? sessions[0].SessionName : string.Empty,
+                entry.Detail,
+                Sessions: sessions));
+        }
+
+        return result;
     }
 
     private static bool SameSession(SharedSessionReportEntry entry, string folderPath, string sessionName) =>
