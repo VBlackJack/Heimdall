@@ -12,6 +12,41 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-11-05: missing MobaXterm variables (v2026.110502)
+
+One fix and one test fix, merged as #750 and #749. The user-facing summary and the upgrade notes are
+in the release notes.
+
+### Shared session import report (#750)
+
+- **One finding per unresolved variable.** `SharedSessionImportReportBuilder.GroupUnresolvedVariables`
+  folds the `Unresolved` findings of one source by variable name (case-insensitive) into one Warning
+  whose `SharedSessionReportEntry.Sessions` lists the affected sessions, sorted by folder then name.
+  The folded entry keeps its folder only when every session shares it, and takes the place of the
+  first finding it folds. The badge and the header count variables.
+- **Copy and CSV per session.** Plain text lists each affected session on an indented line; the CSV
+  writes one row per session with the same explanation.
+- **No wrap inside a gateway token.** `SharedSessionImportReportFormatter.KeepOnOneLine` joins the
+  characters of a whitespace-free token with U+2060 for the dialog only (`DisplayExplanation`); Copy,
+  CSV and `AutomationProperties.Name` keep the plain text.
+
+### Settings: MobaXterm import variables (#750)
+
+- `MobaXtermImporter` records every `[NAME]` token met in a login field in
+  `MobaXtermImportResult.ReferencedVariables`, resolved or not; `SharedSessionSourceState.Variables`
+  carries them, sorted.
+- The variables card lists each name an enabled, loaded shared source uses and no row defines
+  (trimmed, case-insensitive), with an Add button per name. The button adds a row with that Name and
+  an empty Value and focuses Value through `FocusRequestBehavior`; nothing is saved, and a polite
+  live-region status says what was added. A row with an empty value counts as defined.
+- `MOBAXTERM-SHARED-SESSIONS.md` (en, fr) explains Name vs Value with the DAS example.
+
+### Tests (#749)
+
+- `ServerDialogAgentProbeTests`: the `SshDialog` helper waits for the probe started by the RDP to SSH
+  switch before returning. Without a UI thread its continuation could write the "agent off" text over
+  a chip the test had just cleared. Test-only; in the app the continuation runs on the UI thread.
+
 ## 2026-11-05: shared import report and SFTP upload fixes (v2026.110501)
 
 Two fixes, merged as #746 and #747. The user-facing summary and the upgrade notes are in the release
