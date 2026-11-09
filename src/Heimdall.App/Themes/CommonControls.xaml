@@ -197,6 +197,28 @@
     <!-- Row heights and the folder icon, so the two row kinds are sized in one place. -->
     <sys:Double x:Key="SessionTreeFolderRowMinHeight">26</sys:Double>
     <sys:Double x:Key="SessionTreeServerRowMinHeight">24</sys:Double>
+    <!-- Row spacing of the session tree. The row templates and the container style read these with
+         DynamicResource. With "compact session tree" on, the window puts the "...Compact" set below
+         over the same keys in the tree's own resources (SessionTreeDensity maps one to the other).
+         Row pitch = 2 x outline + container padding + row margin + row min height:
+         the default is larger (a session row is 30); compact is 4 + 0 + 0 + 20 = 24 for both kinds, the 24 px pointer target floor, which is also the
+         expander hit area (TreeExpanderHitSize), so neighbouring expanders never overlap. -->
+    <Thickness x:Key="SessionTreeFolderRowMargin">0,3,4,1</Thickness>
+    <Thickness x:Key="SessionTreeFolderRowPadding">1,3,6,3</Thickness>
+    <Thickness x:Key="SessionTreeServerRowMargin">0,0,4,0</Thickness>
+    <Thickness x:Key="SessionTreeServerRowPadding">3,2,4,2</Thickness>
+    <Thickness x:Key="SessionTreeItemPadding">1,1</Thickness>
+    <Thickness x:Key="SessionTreeChildrenHostMargin">0,1,0,0</Thickness>
+    <Thickness x:Key="SessionTreeItemsHostMargin">2,1,0,0</Thickness>
+    <Thickness x:Key="SessionTreeFolderRowMarginCompact">0,0,4,0</Thickness>
+    <Thickness x:Key="SessionTreeFolderRowPaddingCompact">1,1,6,1</Thickness>
+    <Thickness x:Key="SessionTreeServerRowMarginCompact">0,0,4,0</Thickness>
+    <Thickness x:Key="SessionTreeServerRowPaddingCompact">3,1,4,1</Thickness>
+    <Thickness x:Key="SessionTreeItemPaddingCompact">1,0</Thickness>
+    <Thickness x:Key="SessionTreeChildrenHostMarginCompact">0</Thickness>
+    <Thickness x:Key="SessionTreeItemsHostMarginCompact">2,0,0,0</Thickness>
+    <sys:Double x:Key="SessionTreeFolderRowMinHeightCompact">20</sys:Double>
+    <sys:Double x:Key="SessionTreeServerRowMinHeightCompact">20</sys:Double>
     <sys:Double x:Key="SessionTreeFolderIconSize">13</sys:Double>
     <sys:Double x:Key="SessionTreeReadOnlyIconSize">10</sys:Double>
     <!-- The "all open tabs" button over the right end of an overflowing session tab strip. -->

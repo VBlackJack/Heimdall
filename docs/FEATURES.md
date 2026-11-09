@@ -300,6 +300,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 
 ### Session Management
 - **Properties panel** under the tree (filter menu, `Settings > General > Appearance > Session tree` or Ctrl+Shift+B): the selected session's protocol, address, authentication, user, SSH key, gateway, folder, environment, tags, latency and last opened time, each copied with a click; a folder under the cursor or a multi-selection is summarized by session count, connected count and protocol
+- **Compact session tree** (`Settings > General > Appearance > Session tree`): 24 px rows, applied at once; off by default
 - Tabbed sessions with drag-to-reorder
 - Tab detach to floating window (Chrome-style drag-out or context menu); a split tab stays in the strip, and the status bar says to unsplit it first
 - Closing the selected tab selects the tab that takes its place, or the one before it when it was the last

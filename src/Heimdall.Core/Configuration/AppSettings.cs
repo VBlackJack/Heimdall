@@ -364,6 +364,13 @@ public sealed class AppSettings
     /// </summary>
     public bool ShowSessionPropertiesPanel { get; set; }
 
+    /// <summary>
+    /// Whether the rows of the session tree sit closer together, for an inventory long enough
+    /// that the default spacing hides most of it. Off by default: the spacing nobody asked to
+    /// change stays as it was.
+    /// </summary>
+    public bool CompactSessionTree { get; set; }
+
     /// <summary>Height of the properties panel under the tree, in device-independent pixels.</summary>
     [SettingRange(120, 2000)]
     public int SessionPropertiesPanelHeight { get; set; } = 240;

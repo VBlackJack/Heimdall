@@ -70,6 +70,13 @@ public partial class ServerListViewModel
     [ObservableProperty]
     private bool _showPropertiesPanel;
 
+    /// <summary>
+    /// Whether the rows of the session tree sit closer together. Persisted; off by default so the
+    /// spacing stays as it was for whoever never asked for it.
+    /// </summary>
+    [ObservableProperty]
+    private bool _compactSessionTree;
+
     /// <summary>The height the properties panel was last dragged to, already clamped.</summary>
     /// <remarks>
     /// Raised, so a height arriving from the settings (an import, a reset) is laid out at once
@@ -223,6 +230,18 @@ public partial class ServerListViewModel
             "properties panel visibility");
     }
 
+    partial void OnCompactSessionTreeChanged(bool value)
+    {
+        if (_applyingPersistedViewPreferences)
+        {
+            return;
+        }
+
+        ViewPreferencePersistence = PersistViewPreferenceAsync(
+            settings => settings.CompactSessionTree = value,
+            "compact session tree preference");
+    }
+
     /// <summary>
     /// Records the height the user dragged the properties panel to and saves it.
     /// </summary>
@@ -252,6 +271,7 @@ public partial class ServerListViewModel
         {
             ShowGatewayBadge = settings.ShowGatewayBadge;
             ShowPropertiesPanel = settings.ShowSessionPropertiesPanel;
+            CompactSessionTree = settings.CompactSessionTree;
             PropertiesPanelHeight = Services.SessionPropertiesPanelLayout.ClampHeight(
                 settings.SessionPropertiesPanelHeight);
             _usesCredentialProvider = settings.UseExternalCredentialProvider;

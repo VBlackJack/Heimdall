@@ -4836,6 +4836,8 @@
   "SettingsSectionSessionTree": "Arborescence des sessions",
   "SettingsShowPropertiesPanel": "Afficher le panneau de propri\u00e9t\u00e9s sous l'arborescence (Ctrl+Maj+B)",
   "SettingsShowPropertiesPanelHint": "Les propri\u00e9t\u00e9s de la session s\u00e9lectionn\u00e9e, en lecture seule, sous l'arborescence et lisibles pendant qu'un onglet est ouvert. Aussi dans le menu de filtre de l'arborescence.",
+  "SettingsCompactSessionTree": "Arborescence des sessions compacte",
+  "SettingsCompactSessionTreeHint": "Lignes plus serr\u00e9es dans l'arborescence des sessions, pour afficher davantage de sessions \u00e0 l'\u00e9cran. D\u00e9sactiv\u00e9 par d\u00e9faut.",
   "PropertiesPanelTitle": "Propri\u00e9t\u00e9s",
   "PropertiesPanelHide": "Masquer le panneau de propri\u00e9t\u00e9s",
   "PropertiesPanelHideToolTip": "Masquer le panneau de propri\u00e9t\u00e9s (Ctrl+Maj+B le r\u00e9affiche)",
