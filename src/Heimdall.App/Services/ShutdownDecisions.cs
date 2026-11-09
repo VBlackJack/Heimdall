@@ -15,6 +15,7 @@
  */
 
 using Heimdall.App.ViewModels;
+using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
 
 namespace Heimdall.App.Services;
@@ -34,6 +35,33 @@ internal static class ShutdownDecisions
 {
     /// <summary>The status a session pane reports while it is connected.</summary>
     private const string ConnectedStatus = "Connected";
+
+    /// <summary>Locale key of the title of the exit confirmation.</summary>
+    private const string ExitConfirmationTitleKey = "ConfirmCloseSessionGroupTitle";
+
+    /// <summary>Locale key of the message of the exit confirmation: open and connected counts.</summary>
+    private const string ExitConfirmationMessageKey = "ConfirmCloseSessionGroupMessage";
+
+    /// <summary>
+    /// The title and message of the question asked on exit while sessions are connected.
+    /// The message carries two numbers, the sessions that will close and the ones still
+    /// connected, and is formatted through the localizer so a mismatch between the template
+    /// and its arguments cannot throw on the close path.
+    /// </summary>
+    /// <param name="localizer">The localizer of the active language.</param>
+    /// <param name="openSessionCount">Every open session, attached and detached alike.</param>
+    /// <param name="connectedSessionCount">The open sessions that are still connected.</param>
+    public static (string Title, string Message) BuildExitConfirmation(
+        LocalizationManager localizer,
+        int openSessionCount,
+        int connectedSessionCount)
+    {
+        ArgumentNullException.ThrowIfNull(localizer);
+
+        return (
+            localizer[ExitConfirmationTitleKey],
+            localizer.Format(ExitConfirmationMessageKey, openSessionCount, connectedSessionCount));
+    }
 
     /// <summary>
     /// Whether a floating window may poll its close guards, which can prompt the user.

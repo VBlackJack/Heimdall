@@ -94,6 +94,10 @@ public sealed class AppExitPathSourceTests
     private const string MainClosingMember = "protected override async void OnClosing(System.ComponentModel.CancelEventArgs e)";
     private const string MainCensusMember = "private int CountConnectedSessionsForClose(MainViewModel vm)";
     private const string MainCensusStatement = "int connectedSessionCount = CountConnectedSessionsForClose(vm);";
+    private const string MainPromptMember = "private Task<bool> PromptCloseConnectedSessionsAsync(MainViewModel vm, int connectedSessionCount)";
+    private const string MainPromptBuildCall = "(string title, string message) = ShutdownDecisions.BuildExitConfirmation(";
+    private const string MainPromptHandOff = "Func<Task<bool>> promptCloseConnectedSessions = () => PromptCloseConnectedSessionsAsync(vm, connectedSessionCount);";
+    private const string StringFormatCall = "string.Format(";
     private const string MainCensusReturn = "return ShutdownDecisions.CountConnectedSessions(vm.Connection.ActiveSessions, _sessionWindowService.DetachedSessions);";
 
     [Fact]
@@ -325,6 +329,17 @@ public sealed class AppExitPathSourceTests
 
         string census = Logic("MainWindow.xaml.cs", MainCensusMember);
         Assert.True(ViewSource.IsStatementOfTheMethodBody(census, MainCensusReturn), "the census does not count detached sessions");
+    }
+
+    [Fact]
+    public void MainWindowClosing_BuildsTheExitConfirmationThroughTheSharedHelper()
+    {
+        string prompt = Logic("MainWindow.xaml.cs", MainPromptMember);
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(prompt, MainPromptBuildCall), "the exit confirmation is not built through the shared helper");
+
+        string closing = Logic("MainWindow.xaml.cs", MainClosingMember);
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(closing, MainPromptHandOff), "the close flow is not handed the shared confirmation prompt");
+        Assert.DoesNotContain(StringFormatCall, closing, StringComparison.Ordinal);
     }
 
     /// <summary>One method of an App source file, with comments and literals blanked.</summary>
