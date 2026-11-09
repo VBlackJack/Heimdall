@@ -4838,6 +4838,8 @@
   "SettingsShowPropertiesPanelHint": "Les propri\u00e9t\u00e9s de la session s\u00e9lectionn\u00e9e, en lecture seule, sous l'arborescence et lisibles pendant qu'un onglet est ouvert. Aussi dans le menu de filtre de l'arborescence.",
   "SettingsCompactSessionTree": "Arborescence des sessions compacte",
   "SettingsCompactSessionTreeHint": "Lignes plus serr\u00e9es dans l'arborescence des sessions, pour afficher davantage de sessions \u00e0 l'\u00e9cran. D\u00e9sactiv\u00e9 par d\u00e9faut.",
+  "SettingsActivateOpenSessionOnTreeClick": "Un clic sur une session ouverte affiche son onglet",
+  "SettingsActivateOpenSessionOnTreeClickHint": "Un simple clic sur une session dont un onglet est d\u00e9j\u00e0 ouvert am\u00e8ne cet onglet au premier plan. Le double-clic et Entr\u00e9e ouvrent toujours un nouvel onglet. D\u00e9sactiv\u00e9 par d\u00e9faut.",
   "PropertiesPanelTitle": "Propri\u00e9t\u00e9s",
   "PropertiesPanelHide": "Masquer le panneau de propri\u00e9t\u00e9s",
   "PropertiesPanelHideToolTip": "Masquer le panneau de propri\u00e9t\u00e9s (Ctrl+Maj+B le r\u00e9affiche)",

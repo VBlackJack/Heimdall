@@ -77,6 +77,13 @@ public partial class ServerListViewModel
     [ObservableProperty]
     private bool _compactSessionTree;
 
+    /// <summary>
+    /// Whether a single click on a session that is already open brings its tab to the front.
+    /// Persisted; off by default so a click keeps only selecting the row.
+    /// </summary>
+    [ObservableProperty]
+    private bool _activateOpenSessionOnTreeClick;
+
     /// <summary>The height the properties panel was last dragged to, already clamped.</summary>
     /// <remarks>
     /// Raised, so a height arriving from the settings (an import, a reset) is laid out at once
@@ -242,6 +249,18 @@ public partial class ServerListViewModel
             "compact session tree preference");
     }
 
+    partial void OnActivateOpenSessionOnTreeClickChanged(bool value)
+    {
+        if (_applyingPersistedViewPreferences)
+        {
+            return;
+        }
+
+        ViewPreferencePersistence = PersistViewPreferenceAsync(
+            settings => settings.ActivateOpenSessionOnTreeClick = value,
+            "activate open session on tree click preference");
+    }
+
     /// <summary>
     /// Records the height the user dragged the properties panel to and saves it.
     /// </summary>
@@ -272,6 +291,7 @@ public partial class ServerListViewModel
             ShowGatewayBadge = settings.ShowGatewayBadge;
             ShowPropertiesPanel = settings.ShowSessionPropertiesPanel;
             CompactSessionTree = settings.CompactSessionTree;
+            ActivateOpenSessionOnTreeClick = settings.ActivateOpenSessionOnTreeClick;
             PropertiesPanelHeight = Services.SessionPropertiesPanelLayout.ClampHeight(
                 settings.SessionPropertiesPanelHeight);
             _usesCredentialProvider = settings.UseExternalCredentialProvider;

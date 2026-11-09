@@ -108,6 +108,49 @@ public sealed partial class ServerListSelectionTests
         Assert.Same(persistenceBefore, fixture.ViewModel.ViewPreferencePersistence);
     }
 
+    [Fact]
+    public async Task TheClickToShowAnOpenSession_IsOffByDefault()
+    {
+        await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync();
+        fixture.LoadServers(await fixture.ConfigManager.LoadSettingsAsync(), CreateServer("alpha", "Alpha", "ops"));
+
+        Assert.False(fixture.ViewModel.ActivateOpenSessionOnTreeClick);
+        Assert.False(new AppSettings().ActivateOpenSessionOnTreeClick);
+        Assert.False((await fixture.ConfigManager.LoadSettingsAsync()).ActivateOpenSessionOnTreeClick);
+    }
+
+    [Fact]
+    public async Task TurningOnTheClickToShowAnOpenSession_ReachesTheSettings_AndOffClearsIt()
+    {
+        await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync();
+        fixture.LoadServers(await fixture.ConfigManager.LoadSettingsAsync(), CreateServer("alpha", "Alpha", "ops"));
+
+        fixture.ViewModel.ActivateOpenSessionOnTreeClick = true;
+        await fixture.ViewModel.ViewPreferencePersistence;
+        Assert.True((await fixture.ConfigManager.LoadSettingsAsync()).ActivateOpenSessionOnTreeClick);
+
+        fixture.ViewModel.ActivateOpenSessionOnTreeClick = false;
+        await fixture.ViewModel.ViewPreferencePersistence;
+        Assert.False((await fixture.ConfigManager.LoadSettingsAsync()).ActivateOpenSessionOnTreeClick);
+    }
+
+    [Fact]
+    public async Task APersistedClickToShowAnOpenSession_IsAppliedOnLoadWithoutBeingWrittenBack()
+    {
+        await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync();
+        List<string?> raised = [];
+        fixture.ViewModel.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        await fixture.ConfigManager.MergeSettingAsync(persisted => persisted.ActivateOpenSessionOnTreeClick = true);
+        AppSettings settings = await fixture.ConfigManager.LoadSettingsAsync();
+        Task persistenceBefore = fixture.ViewModel.ViewPreferencePersistence;
+
+        fixture.LoadServers(settings, CreateServer("alpha", "Alpha", "ops"));
+
+        Assert.True(fixture.ViewModel.ActivateOpenSessionOnTreeClick);
+        Assert.Contains(nameof(fixture.ViewModel.ActivateOpenSessionOnTreeClick), raised);
+        Assert.Same(persistenceBefore, fixture.ViewModel.ViewPreferencePersistence);
+    }
+
     /// <summary>A tool row said "Select a session to see its properties", as if nothing were selected.</summary>
     [Fact]
     public async Task ASelectedTool_IsNamedAsATool_NotAsNothingSelected()

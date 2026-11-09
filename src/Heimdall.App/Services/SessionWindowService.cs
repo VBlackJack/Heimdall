@@ -106,6 +106,38 @@ public sealed class SessionWindowService : ISessionWindowService
         ];
     }
 
+    /// <inheritdoc />
+    public bool BringDetachedSessionToFront(SessionTabViewModel session)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+
+        Views.FloatingSessionWindow? window = System.Windows.Application.Current?.Windows
+            .OfType<Views.FloatingSessionWindow>()
+            .FirstOrDefault(candidate => ReferenceEquals(candidate.Session, session));
+        if (window is null)
+        {
+            return false;
+        }
+
+        // A minimized window is restored without being activated: assigning WindowState would
+        // activate it and take the keyboard from the tree. A visible window is raised through the
+        // topmost flag, which moves it in the z-order without activating it; the flag is put back
+        // to the value the window had.
+        if (window.WindowState == System.Windows.WindowState.Minimized)
+        {
+            IntPtr handle = new System.Windows.Interop.WindowInteropHelper(window).Handle;
+            if (handle != IntPtr.Zero)
+            {
+                WindowNative.ShowWindow(handle, WindowNative.SwShowNoActivate);
+            }
+        }
+
+        bool wasTopmost = window.Topmost;
+        window.Topmost = true;
+        window.Topmost = wasTopmost;
+        return true;
+    }
+
     /// <summary>
     /// Hands a session hosted by a floating window back to the main window, through the window
     /// itself so it lets go of the host control first. False when no window hosts it.

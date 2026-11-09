@@ -371,6 +371,13 @@ public sealed class AppSettings
     /// </summary>
     public bool CompactSessionTree { get; set; }
 
+    /// <summary>
+    /// Whether a single click on a session that already has an open tab brings that tab to the
+    /// front, as in other connection managers. Off by default: a click only selects the row, and
+    /// double click or Enter opens a new tab, which stays true either way.
+    /// </summary>
+    public bool ActivateOpenSessionOnTreeClick { get; set; }
+
     /// <summary>Height of the properties panel under the tree, in device-independent pixels.</summary>
     [SettingRange(120, 2000)]
     public int SessionPropertiesPanelHeight { get; set; } = 240;

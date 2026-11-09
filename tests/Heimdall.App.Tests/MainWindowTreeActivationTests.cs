@@ -17,6 +17,8 @@
 using System.IO;
 using System.Windows.Input;
 using System.Xml.Linq;
+using Heimdall.App.Services;
+using Heimdall.App.Tests.Views.EmbeddedRdp;
 using Heimdall.App.ViewModels;
 using Heimdall.Core.Configuration;
 
@@ -319,6 +321,97 @@ public sealed class MainWindowTreeActivationTests
         Assert.True(handled);
         Assert.Same(server, connected);
         Assert.Null(openedTool);
+    }
+
+    /// <summary>
+    /// With the click-to-show setting on and a tab already open for the session, the click decision
+    /// brings that tab forward, while the activation that double click and Enter use still connects
+    /// and so still opens a new one: that path takes neither the setting nor the open tabs.
+    /// </summary>
+    [Fact]
+    public void RemoteSessionWithAnOpenTab_StillConnectsANewTab_WhateverTheClickDecisionSays()
+    {
+        ServerItemViewModel server = CreateServer("shell", "SSH");
+        var openTab = new SessionTabViewModel
+        {
+            RootContent = new Heimdall.Core.Models.SessionPaneModel { ServerId = "runtime-1", OriginalServerId = "shell" }
+        };
+        TreeClickActivation clickDecision = TreeClickActivationDecision.Resolve(
+            enabled: true,
+            new TreeClickGesture(ModifierKeys.None, ClickCount: 1, Dragged: false, PlainSelectionPress: true),
+            server,
+            server,
+            [openTab],
+            active: null,
+            detached: []);
+        int connects = 0;
+
+        bool handled = MainWindow.ApplyTreeActivation(
+            server,
+            _ => Assert.Fail("A remote session is not a tool."),
+            _ => connects++);
+
+        Assert.Same(openTab, clickDecision.Session);
+        Assert.True(handled);
+        Assert.Equal(1, connects);
+    }
+
+    private const string ReleaseHandlerSignature =
+        "private void OnSessionTreeViewPreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)";
+
+    private const string PressHandlerSignature =
+        "private void OnSessionTreeViewItemPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)";
+
+    private const string ClickActivationCallStatement = "ApplyTreeClickActivation(e);";
+
+    private const string RecordPressStatement = "_treeState.RecordPointerPress(server, !deferSelection, e.ClickCount);";
+
+    /// <summary>
+    /// The release handler applies the click activation as a step of its own body. That no other
+    /// method calls it is not pinned by the text. Reachability past the handler's conditional early returns is not
+    /// established by the text; the decision itself is asserted behaviourally above.
+    /// </summary>
+    [Fact]
+    public void ClickActivation_IsAppliedByTheReleaseHandler()
+    {
+        string source = ViewSource.WithoutCommentsAndLiterals(ReadTreeInteractionsSource());
+        string logic = ViewSource.HandlerBody(source, ReleaseHandlerSignature);
+
+        Assert.True(
+            ViewSource.IsStatementOfTheMethodBody(logic, ClickActivationCallStatement),
+            "OnSessionTreeViewPreviewMouseLeftButtonUp does not apply the click activation as a step.");
+    }
+
+    /// <summary>
+    /// The press is recorded only after the range, toggle and extend gestures have returned, so a
+    /// press with a modifier never becomes a click. Pins the four statements and their order; what
+    /// is not pinned is that each modifier branch really returns.
+    /// </summary>
+    [Fact]
+    public void ThePressIsRecordedAfterTheModifierGestures()
+    {
+        string source = ViewSource.WithoutCommentsAndLiterals(ReadTreeInteractionsSource());
+        string logic = ViewSource.HandlerBody(source, PressHandlerSignature);
+        string[] modifierBranches = ["if (additive)", "if (toggle)", "if (extend)"];
+
+        foreach (string branch in modifierBranches)
+        {
+            Assert.True(
+                ViewSource.IsStatementOfTheMethodBody(logic, branch),
+                $"The press handler no longer has the {branch} branch as a step.");
+        }
+
+        Assert.True(
+            ViewSource.IsStatementOfTheMethodBody(logic, RecordPressStatement),
+            "The press handler does not record the press as a step.");
+
+        int recorded = logic.IndexOf(RecordPressStatement, StringComparison.Ordinal);
+        foreach (string branch in modifierBranches)
+        {
+            Assert.True(
+                logic.IndexOf(branch, StringComparison.Ordinal) < recorded,
+                $"The press is recorded before {branch} has returned.");
+        }
     }
 
     [Fact]
