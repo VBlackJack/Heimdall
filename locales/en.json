@@ -4837,6 +4837,8 @@
   "SettingsSectionSessionTree": "Session tree",
   "SettingsShowPropertiesPanel": "Show the properties panel under the tree (Ctrl+Shift+B)",
   "SettingsShowPropertiesPanelHint": "The read-only properties of the selected session, docked under the tree and readable while a session tab is open. Also in the tree's filter menu.",
+  "SettingsCompactSessionTree": "Compact session tree",
+  "SettingsCompactSessionTreeHint": "Tighter rows in the session tree, so more sessions fit on screen. Off by default.",
   "PropertiesPanelTitle": "Properties",
   "PropertiesPanelHide": "Hide the properties panel",
   "PropertiesPanelHideToolTip": "Hide the properties panel (Ctrl+Shift+B shows it again)",

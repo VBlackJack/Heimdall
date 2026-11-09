@@ -786,9 +786,9 @@
                                 <HierarchicalDataTemplate DataType="{x:Type vm:FolderViewModel}"
                                                           ItemsSource="{Binding Children}">
                                     <Border x:Name="FolderSelectionChrome"
-                                            Margin="0,3,4,1"
-                                            Padding="1,3,6,3"
-                                            MinHeight="{StaticResource SessionTreeFolderRowMinHeight}"
+                                            Margin="{DynamicResource SessionTreeFolderRowMargin}"
+                                            Padding="{DynamicResource SessionTreeFolderRowPadding}"
+                                            MinHeight="{DynamicResource SessionTreeFolderRowMinHeight}"
                                             CornerRadius="{StaticResource CornerRadiusSm}"
                                             BorderThickness="3,0,0,0"
                                             BorderBrush="Transparent"
@@ -911,10 +911,10 @@
                                 <!-- Server leaf node template -->
                                 <DataTemplate DataType="{x:Type vm:ServerItemViewModel}">
                                     <Border x:Name="ServerSelectionChrome"
-                                            Margin="0,0,4,0"
+                                            Margin="{DynamicResource SessionTreeServerRowMargin}"
                                             HorizontalAlignment="Stretch"
-                                            MinHeight="{StaticResource SessionTreeServerRowMinHeight}"
-                                            Padding="3,2,4,2"
+                                            MinHeight="{DynamicResource SessionTreeServerRowMinHeight}"
+                                            Padding="{DynamicResource SessionTreeServerRowPadding}"
                                             CornerRadius="{StaticResource CornerRadiusSm}"
                                             BorderThickness="3,0,0,0"
                                             BorderBrush="Transparent"
@@ -1121,7 +1121,7 @@
                                     <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}"/>
                                     <Setter Property="Focusable" Value="True"/>
                                     <Setter Property="behaviors:ItemContainerAccessibilityBehavior.IsEnabled" Value="True"/>
-                                    <Setter Property="Padding" Value="1,1"/>
+                                    <Setter Property="Padding" Value="{DynamicResource SessionTreeItemPadding}"/>
                                     <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                                     <!-- Stretch, not Left: a row only as wide as its label sent a drop
                                          beside a short name to the root and a right-click there to the
@@ -1170,7 +1170,7 @@
                                                     <Grid x:Name="ChildrenHost"
                                                           Grid.Row="1"
                                                           Grid.Column="1"
-                                                          Margin="0,1,0,0">
+                                                          Margin="{DynamicResource SessionTreeChildrenHostMargin}">
                                                         <Border x:Name="IndentGuide"
                                                                 Width="1"
                                                                 HorizontalAlignment="Left"
@@ -1178,7 +1178,7 @@
                                                                 Background="{DynamicResource TreeViewIndentGuideBrush}"
                                                                 Visibility="Collapsed"/>
                                                         <ItemsPresenter x:Name="ItemsHost"
-                                                                        Margin="2,1,0,0"/>
+                                                                        Margin="{DynamicResource SessionTreeItemsHostMargin}"/>
                                                     </Grid>
                                                 </Grid>
                                                 <ControlTemplate.Triggers>
@@ -3105,6 +3105,13 @@
                                                   Margin="0,6,0,0"
                                                   ToolTip="{loc:Translate FilterShowGatewayBadgeAutomationName}"
                                                   AutomationProperties.HelpText="{loc:Translate FilterShowGatewayBadgeAutomationName}"/>
+                                        <CheckBox x:Name="Mw_SettingsCompactSessionTree"
+                                                  Content="{loc:Translate SettingsCompactSessionTree}"
+                                                  IsChecked="{Binding ServerList.CompactSessionTree, Mode=TwoWay}"
+                                                  Foreground="{DynamicResource TextPrimaryBrush}"
+                                                  Margin="0,6,0,0"
+                                                  ToolTip="{loc:Translate SettingsCompactSessionTreeHint}"
+                                                  AutomationProperties.HelpText="{loc:Translate SettingsCompactSessionTreeHint}"/>
                                     </StackPanel>
                                 </Border>
                                     </StackPanel>

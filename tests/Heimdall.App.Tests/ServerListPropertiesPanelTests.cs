@@ -65,6 +65,49 @@ public sealed partial class ServerListSelectionTests
         Assert.Same(persistenceBefore, fixture.ViewModel.ViewPreferencePersistence);
     }
 
+    [Fact]
+    public async Task TheCompactSessionTree_IsOffByDefault()
+    {
+        await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync();
+        fixture.LoadServers(await fixture.ConfigManager.LoadSettingsAsync(), CreateServer("alpha", "Alpha", "ops"));
+
+        Assert.False(fixture.ViewModel.CompactSessionTree);
+        Assert.False(new AppSettings().CompactSessionTree);
+        Assert.False((await fixture.ConfigManager.LoadSettingsAsync()).CompactSessionTree);
+    }
+
+    [Fact]
+    public async Task TurningOnTheCompactSessionTree_ReachesTheSettings_AndOffClearsIt()
+    {
+        await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync();
+        fixture.LoadServers(await fixture.ConfigManager.LoadSettingsAsync(), CreateServer("alpha", "Alpha", "ops"));
+
+        fixture.ViewModel.CompactSessionTree = true;
+        await fixture.ViewModel.ViewPreferencePersistence;
+        Assert.True((await fixture.ConfigManager.LoadSettingsAsync()).CompactSessionTree);
+
+        fixture.ViewModel.CompactSessionTree = false;
+        await fixture.ViewModel.ViewPreferencePersistence;
+        Assert.False((await fixture.ConfigManager.LoadSettingsAsync()).CompactSessionTree);
+    }
+
+    [Fact]
+    public async Task APersistedCompactSessionTree_IsAppliedOnLoadWithoutBeingWrittenBack()
+    {
+        await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync();
+        List<string?> raised = [];
+        fixture.ViewModel.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+        await fixture.ConfigManager.MergeSettingAsync(persisted => persisted.CompactSessionTree = true);
+        AppSettings settings = await fixture.ConfigManager.LoadSettingsAsync();
+        Task persistenceBefore = fixture.ViewModel.ViewPreferencePersistence;
+
+        fixture.LoadServers(settings, CreateServer("alpha", "Alpha", "ops"));
+
+        Assert.True(fixture.ViewModel.CompactSessionTree);
+        Assert.Contains(nameof(fixture.ViewModel.CompactSessionTree), raised);
+        Assert.Same(persistenceBefore, fixture.ViewModel.ViewPreferencePersistence);
+    }
+
     /// <summary>A tool row said "Select a session to see its properties", as if nothing were selected.</summary>
     [Fact]
     public async Task ASelectedTool_IsNamedAsATool_NotAsNothingSelected()
