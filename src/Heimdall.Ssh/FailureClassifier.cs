@@ -40,6 +40,11 @@ public sealed record SshFailureInfo(
 public static class FailureClassifier
 {
     /// <summary>
+    /// The description OpenSSH sends when a client exhausts the server's MaxAuthTries.
+    /// </summary>
+    private const string TooManyAuthFailuresText = "too many authentication failures";
+
+    /// <summary>
     /// Classify an exception into a structured failure code.
     /// SSH.NET provides typed exceptions for auth, connection, timeout, and proxy errors.
     /// </summary>
@@ -271,8 +276,19 @@ public static class FailureClassifier
 
         // The typed DisconnectReason is preferred over message text, since SSH.NET
         // populates it for every server-sent disconnect and for the transport-level
-        // failures it raises itself. The text heuristic below remains only for
-        // DisconnectReason.None, where SSH.NET provides no typed granularity.
+        // failures it raises itself. Message text is read in two places only: the
+        // heuristic after the switch, for DisconnectReason.None, where SSH.NET provides
+        // no typed granularity; and the one check below, for ProtocolError. OpenSSH
+        // reports an exceeded MaxAuthTries as a disconnect with reason PROTOCOL_ERROR
+        // and the description "Too many authentication failures", so the reason alone
+        // cannot tell that case from a malformed packet. Every other reason keeps its
+        // typed mapping, whatever the text says.
+        if (ex.DisconnectReason is DisconnectReason.ProtocolError or DisconnectReason.None
+            && (ex.Message ?? string.Empty).Contains(TooManyAuthFailuresText, StringComparison.OrdinalIgnoreCase))
+        {
+            return new SshFailureInfo(SshFailureCode.TooManyAuthFailures, "Too many auth failures.", true, ex);
+        }
+
         switch (ex.DisconnectReason)
         {
             case DisconnectReason.ProtocolError:

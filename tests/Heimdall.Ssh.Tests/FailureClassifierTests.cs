@@ -433,6 +433,59 @@ public class FailureClassifierTests
     }
 
     [Fact]
+    public void Classify_ConnectionException_ProtocolErrorWithTooManyAuthFailures_ReturnsTooManyAuthFailures()
+    {
+        // OpenSSH reports an exceeded MaxAuthTries as PROTOCOL_ERROR with this description,
+        // which SSH.NET surfaces as a ProtocolError disconnect.
+        SshConnectionException ex = new SshConnectionException(
+            "The connection was closed by the server: Too many authentication failures (ProtocolError).",
+            DisconnectReason.ProtocolError);
+
+        SshFailureInfo result = FailureClassifier.Classify(ex);
+
+        Assert.Equal(SshFailureCode.TooManyAuthFailures, result.Code);
+        Assert.True(result.IsFatal);
+    }
+
+    [Fact]
+    public void Classify_ConnectionException_NoneWithTooManyAuthFailures_ReturnsTooManyAuthFailures()
+    {
+        // The reason code is not always carried; the description alone must be enough.
+        SshConnectionException ex = new SshConnectionException(
+            "The connection was closed by the server: Too many authentication failures.",
+            DisconnectReason.None);
+
+        SshFailureInfo result = FailureClassifier.Classify(ex);
+
+        Assert.Equal(SshFailureCode.TooManyAuthFailures, result.Code);
+        Assert.True(result.IsFatal);
+    }
+
+    [Fact]
+    public void Classify_ConnectionException_ProtocolErrorWithUnrelatedText_StaysProtocolError()
+    {
+        SshConnectionException ex = new SshConnectionException(
+            "The connection was closed by the server: Bad packet length (ProtocolError).",
+            DisconnectReason.ProtocolError);
+
+        SshFailureInfo result = FailureClassifier.Classify(ex);
+
+        Assert.Equal(SshFailureCode.ProtocolError, result.Code);
+    }
+
+    [Fact]
+    public void Classify_ConnectionException_OtherReasonCarryingTheTooManyAuthText_IsNotReclassified()
+    {
+        SshConnectionException ex = new SshConnectionException(
+            "The connection was closed by the server: Too many authentication failures (ByApplication).",
+            DisconnectReason.ByApplication);
+
+        SshFailureInfo result = FailureClassifier.Classify(ex);
+
+        Assert.Equal(SshFailureCode.SessionDisconnected, result.Code);
+    }
+
+    [Fact]
     public void Classify_ConnectionException_DisconnectReasonMacError_ReturnsProtocolError()
     {
         // Renci.SshNet.Session.TryReadPacket throws this wording, with

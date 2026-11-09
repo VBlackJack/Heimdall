@@ -70,7 +70,8 @@ internal static class WindowClosingFlow
         Func<Task> flushExpandStateAsync,
         Func<Task> persistWindowStateAsync,
         Action warnSaveFailed,
-        Func<Task>? discardSettingsAsync = null)
+        Func<Task>? discardSettingsAsync = null,
+        Action? warnCloseNotConfirmed = null)
     {
         ArgumentNullException.ThrowIfNull(promptSaveDiscardCancelAsync);
         ArgumentNullException.ThrowIfNull(trySaveSettingsAsync);
@@ -123,12 +124,34 @@ internal static class WindowClosingFlow
             catch (Exception ex)
             {
                 FileLogger.Error("Main window session close confirmation failed", ex);
+                NotifyCloseNotConfirmed(warnCloseNotConfirmed);
                 return false;
             }
         }
 
         await PersistCloseStateAsync(flushExpandStateAsync, persistWindowStateAsync);
         return true;
+    }
+
+    /// <summary>
+    /// Tells the user that the close could not be confirmed, so a close that stays refused is
+    /// never silent. A failure to show the warning is logged and cannot escape.
+    /// </summary>
+    private static void NotifyCloseNotConfirmed(Action? warnCloseNotConfirmed)
+    {
+        if (warnCloseNotConfirmed is null)
+        {
+            return;
+        }
+
+        try
+        {
+            warnCloseNotConfirmed();
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Error("Main window close warning could not be shown", ex);
+        }
     }
 
     /// <summary>

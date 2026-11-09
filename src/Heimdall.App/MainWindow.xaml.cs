@@ -4590,6 +4590,20 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             SessionTreeColumn.ActualWidth);
     }
 
+    /// <summary>
+    /// Asks whether to close while sessions are connected. Open sessions are the attached
+    /// ones plus the detached ones: a detached session has left the main collection.
+    /// </summary>
+    private Task<bool> PromptCloseConnectedSessionsAsync(MainViewModel vm, int connectedSessionCount)
+    {
+        int openSessionCount = vm.Connection.ActiveSessions.Count + _sessionWindowService.DetachedSessions.Count;
+        (string title, string message) = ShutdownDecisions.BuildExitConfirmation(
+            vm.GetLocalizer(),
+            openSessionCount,
+            connectedSessionCount);
+        return vm.DialogService.ShowConfirmAsync(title, message, "warning");
+    }
+
     /// <inheritdoc />
     /// <remarks>
     /// <c>async void</c> is intentional and required: <see cref="Window.OnClosing"/>
@@ -4637,6 +4651,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         // Detached sessions too: detaching removes a session from the main collection,
         // and three detached sessions used to produce a count of zero and no question.
         int connectedSessionCount = CountConnectedSessionsForClose(vm);
+        Func<Task<bool>> promptCloseConnectedSessions = () => PromptCloseConnectedSessionsAsync(vm, connectedSessionCount);
 
         _closeInProgress = true;
 
@@ -4649,6 +4664,8 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         {
             string warningTitle = vm.Localize("SettingsCloseSaveFailedTitle");
             string warningMessage = vm.Localize("SettingsCloseSaveFailedMessage");
+            string notConfirmedTitle = vm.Localize("CloseNotConfirmedTitle");
+            string notConfirmedMessage = vm.Localize("CloseNotConfirmedMessage");
             bool prepared = await WindowClosingFlow.TryPrepareCloseAsync(
                 vm.Settings.IsDirty,
                 connectedSessionCount,
@@ -4656,16 +4673,12 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
                     vm.Localize("SettingsUnsavedWarningTitle"),
                     vm.Localize("SettingsUnsavedWarning")),
                 () => vm.Settings.TrySaveAsync(),
-                () => vm.DialogService.ShowConfirmAsync(
-                    vm.Localize("ConfirmCloseAllTabs"),
-                    string.Format(
-                        vm.Localize("ConfirmCloseAllTabsMessage"),
-                        connectedSessionCount),
-                    "warning"),
+                promptCloseConnectedSessions,
                 () => vm.ServerList.FlushExpandStateForCloseAsync(),
                 () => SaveWindowBoundsAsync(vm),
                 () => vm.DialogService.ShowWarning(warningTitle, warningMessage),
-                () => vm.Settings.DiscardChangesAsync());
+                () => vm.Settings.DiscardChangesAsync(),
+                () => vm.DialogService.ShowWarning(notConfirmedTitle, notConfirmedMessage));
 
             if (!prepared)
             {

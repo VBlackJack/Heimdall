@@ -597,6 +597,55 @@ public sealed class WindowClosingFlowTests
     }
 
     [Fact]
+    public async Task Close_SessionConfirmationThrows_StaysOpenWarnsOnceAndDoesNotPersist()
+    {
+        int warnCount = 0;
+        int expandStateFlushCount = 0;
+        int windowBoundsSaveCount = 0;
+
+        bool canClose = await WindowClosingFlow.TryPrepareCloseAsync(
+            settingsDirty: false,
+            connectedSessionCount: 2,
+            () => throw new InvalidOperationException("Settings prompt must not run."),
+            () => throw new InvalidOperationException("Settings save must not run."),
+            () => throw new FormatException("Simulated confirmation failure."),
+            () =>
+            {
+                expandStateFlushCount++;
+                return Task.CompletedTask;
+            },
+            () =>
+            {
+                windowBoundsSaveCount++;
+                return Task.CompletedTask;
+            },
+            () => throw new InvalidOperationException("Save warning must not run."),
+            warnCloseNotConfirmed: () => warnCount++);
+
+        Assert.False(canClose);
+        Assert.Equal(1, warnCount);
+        Assert.Equal(0, expandStateFlushCount);
+        Assert.Equal(0, windowBoundsSaveCount);
+    }
+
+    [Fact]
+    public async Task Close_SessionConfirmationThrowsAndWarningThrows_StillReturnsFalse()
+    {
+        bool canClose = await WindowClosingFlow.TryPrepareCloseAsync(
+            settingsDirty: false,
+            connectedSessionCount: 1,
+            () => throw new InvalidOperationException("Settings prompt must not run."),
+            () => throw new InvalidOperationException("Settings save must not run."),
+            () => throw new FormatException("Simulated confirmation failure."),
+            () => Task.CompletedTask,
+            () => Task.CompletedTask,
+            () => throw new InvalidOperationException("Save warning must not run."),
+            warnCloseNotConfirmed: () => throw new InvalidOperationException("Simulated dialog failure."));
+
+        Assert.False(canClose);
+    }
+
+    [Fact]
     public async Task Close_ExpandStateFlushThrows_StillPersistsBoundsAndCloses()
     {
         int windowBoundsSaveCount = 0;
