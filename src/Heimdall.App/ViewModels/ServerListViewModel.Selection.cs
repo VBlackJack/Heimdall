@@ -270,6 +270,7 @@ public partial class ServerListViewModel : ISessionTreeSelectionHost
     {
         OnPropertyChanged(nameof(ShowSessionDetail));
         OnPropertyChanged(nameof(ShowToolDetail));
+        ResolvePropertiesEditOnSelectionChange();
         NotifyPropertiesPanelMode();
         NotifyToolDetailChanged();
 

@@ -126,6 +126,10 @@ public partial class ServerListViewModel
         OnPropertyChanged(nameof(PropertiesPanelShowsSession));
         OnPropertyChanged(nameof(PropertiesPanelShowsEmpty));
         OnPropertyChanged(nameof(PropertiesPanelShowsTool));
+        OnPropertyChanged(nameof(PropertiesPanelShowsEditor));
+        OnPropertyChanged(nameof(PropertiesPanelShowsActions));
+        OnPropertyChanged(nameof(PropertiesPanelCanEditHere));
+        BeginPropertiesEditCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>
@@ -140,6 +144,7 @@ public partial class ServerListViewModel
         }
 
         RefreshPropertiesSummary();
+        ResolvePropertiesEditOnSelectionChange();
         NotifyPropertiesPanelMode();
     }
 

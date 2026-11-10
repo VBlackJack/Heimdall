@@ -1244,8 +1244,9 @@
 
                             <!-- ============ PROPERTIES PANEL (opt-in) ============ -->
                             <!-- Follows the tree selection whatever the session area shows: the detail
-                                 pane is hidden as soon as a session tab is open. Read-only, and the same
-                                 control as the detail pane so the two list the same fields. -->
+                                 pane is hidden as soon as a session tab is open. The field list is
+                                 read-only and the same control as the detail pane, so the two list the
+                                 same fields; "Edit here" opens a form of the five basic fields above it. -->
                             <GridSplitter x:Name="PropertiesPanelSplitter"
                                           Grid.Row="1"
                                           Height="{x:Static services:SessionPropertiesPanelLayout.SplitterHeight}"
@@ -1302,7 +1303,8 @@
                                                      is open: this is the panel's own way to act on what it shows. -->
                                                 <StackPanel x:Name="Mw_PropertiesPanelActions"
                                                             Orientation="Horizontal"
-                                                            Margin="0,0,0,8">
+                                                            Margin="0,0,0,8"
+                                                            Visibility="{Binding ServerList.PropertiesPanelShowsActions, Converter={StaticResource BoolToVisibilityConverter}}">
                                                     <Button x:Name="Mw_PropertiesPanelConnectBtn"
                                                             Content="{loc:Translate DetailBtnConnect}"
                                                             Command="{Binding ServerList.ConnectCommand}"
@@ -1318,7 +1320,20 @@
                                                             Padding="12,4"
                                                             ToolTip="{loc:Translate TooltipEdit}"
                                                             AutomationProperties.Name="{loc:Translate BtnEdit}"/>
+                                                    <!-- The five basic fields in place; Edit above still opens the whole
+                                                         session dialog. Absent for a shared row, which is read-only. -->
+                                                    <Button x:Name="Mw_PropertiesPanelEditHereBtn"
+                                                            Content="{loc:Translate PropertiesEditHere}"
+                                                            Command="{Binding ServerList.BeginPropertiesEditCommand}"
+                                                            Style="{DynamicResource SecondaryButtonStyle}"
+                                                            Padding="12,4" Margin="8,0,0,0"
+                                                            Visibility="{Binding ServerList.PropertiesPanelCanEditHere, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                            ToolTip="{loc:Translate PropertiesEditHereToolTip}"
+                                                            AutomationProperties.Name="{loc:Translate PropertiesEditHere}"/>
                                                 </StackPanel>
+                                                <controls:SessionPropertiesEditView x:Name="Mw_PropertiesPanelEditor"
+                                                                                    DataContext="{Binding ServerList.PropertiesEdit}"
+                                                                                    Visibility="{Binding DataContext.ServerList.PropertiesPanelShowsEditor, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                                 <controls:SessionPropertiesView x:Name="Mw_PropertiesPanelView"
                                                                                 DataContext="{Binding ServerList.SelectedServer}"/>
                                             </StackPanel>

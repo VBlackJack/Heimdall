@@ -1,0 +1,117 @@
+<!--
+  Copyright 2026 Julien Bombled
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+<!-- The five basic fields of a session, editable in place in the properties panel. The DataContext
+     is a SessionPropertiesEditViewModel. Enter saves when Save is allowed and Escape cancels; every
+     error shows under its own field and is announced as it appears. The read-only list is not
+     part of this control: it stays below it, unchanged. -->
+<UserControl x:Class="Heimdall.App.Controls.SessionPropertiesEditView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:Heimdall.App.Localization"
+             IsTabStop="False"
+             Focusable="False">
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Heimdall;component/Themes/DialogCommonStyles.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+            <Style x:Key="SpeFieldLabelStyle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="{StaticResource FontSizeCaption}"/>
+                <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+                <Setter Property="Margin" Value="0,6,0,2"/>
+            </Style>
+        </ResourceDictionary>
+    </UserControl.Resources>
+    <UserControl.InputBindings>
+        <KeyBinding Key="Return" Command="{Binding SaveCommand}"/>
+        <KeyBinding Key="Escape" Command="{Binding CancelCommand}"/>
+    </UserControl.InputBindings>
+    <StackPanel Margin="0,0,0,8">
+        <TextBlock Text="{loc:Translate ServerDialogLabelDisplayName}" Style="{StaticResource SpeFieldLabelStyle}"/>
+        <TextBox x:Name="Spe_NameBox"
+                 Text="{Binding DisplayName, UpdateSourceTrigger=PropertyChanged}"
+                 AutomationProperties.Name="{loc:Translate ServerDialogLabelDisplayName}"/>
+        <TextBlock x:Name="Spe_NameError"
+                   Text="{Binding DisplayNameError}"
+                   Style="{StaticResource FieldValidationErrorStyle}"
+                   Visibility="{Binding DisplayNameError, Converter={StaticResource NullToVisibilityConverter}}"/>
+
+        <StackPanel Visibility="{Binding HasHost, Converter={StaticResource BoolToVisibilityConverter}}">
+            <TextBlock Text="{loc:Translate ServerDialogLabelServer}" Style="{StaticResource SpeFieldLabelStyle}"/>
+            <TextBox x:Name="Spe_HostBox"
+                     Text="{Binding Host, UpdateSourceTrigger=PropertyChanged}"
+                     AutomationProperties.Name="{loc:Translate ServerDialogLabelServer}"/>
+            <TextBlock x:Name="Spe_HostError"
+                       Text="{Binding HostError}"
+                       Style="{StaticResource FieldValidationErrorStyle}"
+                       Visibility="{Binding HostError, Converter={StaticResource NullToVisibilityConverter}}"/>
+        </StackPanel>
+
+        <StackPanel Visibility="{Binding HasPort, Converter={StaticResource BoolToVisibilityConverter}}">
+            <TextBlock Text="{Binding PortLabel}" Style="{StaticResource SpeFieldLabelStyle}"/>
+            <TextBox x:Name="Spe_PortBox"
+                     Text="{Binding PortText, UpdateSourceTrigger=PropertyChanged}"
+                     AutomationProperties.Name="{Binding PortLabel}"/>
+            <TextBlock x:Name="Spe_PortError"
+                       Text="{Binding PortError}"
+                       Style="{StaticResource FieldValidationErrorStyle}"
+                       Visibility="{Binding PortError, Converter={StaticResource NullToVisibilityConverter}}"/>
+        </StackPanel>
+
+        <StackPanel Visibility="{Binding HasUsername, Converter={StaticResource BoolToVisibilityConverter}}">
+            <TextBlock Text="{loc:Translate ServerDialogLabelUsername}" Style="{StaticResource SpeFieldLabelStyle}"/>
+            <TextBox x:Name="Spe_UsernameBox"
+                     Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}"
+                     AutomationProperties.Name="{loc:Translate ServerDialogLabelUsername}"/>
+            <TextBlock x:Name="Spe_UsernameError"
+                       Text="{Binding UsernameError}"
+                       Style="{StaticResource FieldValidationErrorStyle}"
+                       Visibility="{Binding UsernameError, Converter={StaticResource NullToVisibilityConverter}}"/>
+        </StackPanel>
+
+        <!-- The folder is free text with the existing paths on offer: empty means no folder, and a
+             path that does not exist yet creates it, as in the session dialog. -->
+        <TextBlock Text="{loc:Translate ServerDialogLabelFolder}" Style="{StaticResource SpeFieldLabelStyle}"/>
+        <ComboBox x:Name="Spe_FolderBox"
+                  IsEditable="True"
+                  ItemsSource="{Binding FolderChoices}"
+                  Text="{Binding Folder, UpdateSourceTrigger=PropertyChanged}"
+                  AutomationProperties.Name="{loc:Translate ServerDialogLabelFolder}"/>
+
+        <TextBlock x:Name="Spe_ConnectionNote"
+                   Text="{Binding ConnectionNote}"
+                   FontSize="{StaticResource FontSizeCaption}"
+                   Foreground="{DynamicResource TextSecondaryBrush}"
+                   TextWrapping="Wrap"
+                   Margin="0,6,0,0"
+                   Visibility="{Binding HasConnectionNote, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+            <Button x:Name="Spe_SaveBtn"
+                    Content="{loc:Translate BtnSave}"
+                    Command="{Binding SaveCommand}"
+                    Style="{DynamicResource PrimaryButtonStyle}"
+                    Padding="12,4" Margin="0,0,8,0"
+                    AutomationProperties.Name="{loc:Translate BtnSave}"/>
+            <Button x:Name="Spe_CancelBtn"
+                    Content="{loc:Translate BtnCancel}"
+                    Command="{Binding CancelCommand}"
+                    Style="{DynamicResource SecondaryButtonStyle}"
+                    Padding="12,4"
+                    AutomationProperties.Name="{loc:Translate BtnCancel}"/>
+        </StackPanel>
+    </StackPanel>
+</UserControl>

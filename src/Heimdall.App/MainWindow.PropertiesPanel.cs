@@ -101,6 +101,9 @@ public partial class MainWindow
 
         if (!shown)
         {
+            // The Tools tab hides the panel without turning the preference off: edits left open
+            // are settled the same way as when the panel is closed.
+            viewModel.ServerList.ResolvePropertiesEditOnPanelHidden();
             PropertiesSplitterRow.Height = new GridLength(0d);
             PropertiesPanelRow.Height = new GridLength(0d);
             PropertiesPanelRow.MinHeight = 0d;

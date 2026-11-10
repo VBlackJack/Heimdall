@@ -227,6 +227,11 @@ public partial class ServerListViewModel
 
     partial void OnShowPropertiesPanelChanged(bool value)
     {
+        if (!value)
+        {
+            ResolvePropertiesEditOnPanelHidden();
+        }
+
         if (_applyingPersistedViewPreferences)
         {
             return;

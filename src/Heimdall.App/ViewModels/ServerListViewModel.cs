@@ -427,6 +427,10 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     {
         if (_disposed) return;
         _disposed = true;
+
+        // Closing the application drops unsaved panel edits without a question.
+        _propertiesEdit?.TrySettle();
+        _propertiesEdit = null;
         DetachStableTreeFolderEvents();
         _searchFilterTimer?.Dispose();
         _organizationUndoExpiry?.Dispose();
@@ -2090,15 +2094,32 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             return;
         }
 
+        ApplyEditedProfile(server, result.Server, settings, server.Id);
+    }
+
+    /// <summary>
+    /// Brings a row and the tree up to date with a profile that has just been written: the row
+    /// takes the stored values, the lookups are rebuilt, and the tree regroups.
+    /// </summary>
+    /// <param name="server">The row of the edited profile.</param>
+    /// <param name="profile">The profile as written.</param>
+    /// <param name="settings">The settings the row's project and gateway are resolved against.</param>
+    /// <param name="preferredSelectedServerId">The session to keep selected, or null to leave the selection alone.</param>
+    private void ApplyEditedProfile(
+        ServerItemViewModel server,
+        ServerProfileDto profile,
+        AppSettings settings,
+        string? preferredSelectedServerId)
+    {
         server.UpdateFromDto(
-            result.Server,
-            ResolveProject(BuildProjectMap(settings), result.Server.ProjectId),
+            profile,
+            ResolveProject(BuildProjectMap(settings), profile.ProjectId),
             SessionGatewayContext.FromSettings(settings),
             _localizer);
 
         RefreshLookupCollections(settings);
         RebuildStableTreeProjection();
-        ApplyFilter(server.Id);
+        ApplyFilter(preferredSelectedServerId);
     }
 
     internal async Task<bool> EditServerByIdAsync(string serverId, CancellationToken cancellationToken)
@@ -2899,6 +2920,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             if (wasConnected != isConnected)
             {
                 RefreshPropertiesSummary();
+                _propertiesEdit?.RefreshOpenState();
             }
 
             // Refresh the stable projection exactly once when this server
