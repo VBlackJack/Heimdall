@@ -189,7 +189,14 @@ public partial class FolderViewModel : ObservableObject, IInlineRenameNode, IAcc
             : Format("SessionTreeSharedFolderAccessibleName", Name, SharedSourceName);
 
     /// <summary>Localized keyboard guidance exposed to UI Automation clients.</summary>
-    public string AccessibleHelpText => Translate("SessionTreeFolderAccessibleHelp");
+    /// <remarks>
+    /// Alt+Up and Alt+Down are announced only on a row they move: a shared folder and the
+    /// "no folder" row keep the plain guidance.
+    /// </remarks>
+    public string AccessibleHelpText => Translate(
+        !IsShared && FullPath.Length > 0
+            ? "SessionTreeFolderMovableAccessibleHelp"
+            : "SessionTreeFolderAccessibleHelp");
 
     [ObservableProperty]
     private ObservableCollection<FolderViewModel> _subFolders = [];
@@ -444,6 +451,8 @@ public partial class FolderViewModel : ObservableObject, IInlineRenameNode, IAcc
         "SessionTreeFolderCountFiltered" => "{0}/{1}",
         "SessionTreeFolderAccessibleHelp" =>
             "Folder. Use Left and Right Arrow or Enter to collapse or expand. Press Shift+F10 for actions.",
+        "SessionTreeFolderMovableAccessibleHelp" =>
+            "Folder. Use Left and Right Arrow or Enter to collapse or expand. Alt+Up and Alt+Down move it among its sibling folders. Press Shift+F10 for actions.",
         _ => key
     };
 }

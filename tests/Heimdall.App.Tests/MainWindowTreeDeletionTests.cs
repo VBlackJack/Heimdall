@@ -214,6 +214,25 @@ public sealed class MainWindowTreeDeletionTests
     }
 
     [Fact]
+    public void SessionTreeKeyHandler_HandlesAFolderNudge_BeforeTheSessionNudgeReturnsUnhandled()
+    {
+        string body = ExtractMethodBody(ReadTreeInteractionsSource(), KeyHandlerSignature);
+        string logic = "{" + string.Concat(ViewSource.WithoutCommentsAndLiterals(body)
+            .Where(character => !char.IsWhiteSpace(character))) + "}";
+        string nudgeBlock = ExtractBlockAfter(logic, "if(nudgeDelta!=0");
+        string folderBlock = ExtractBlockAfter(nudgeBlock, "if(nudgedNodeisFolderViewModelnudgedFolder)");
+
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(nudgeBlock,
+            "if(nudgedNodeisFolderViewModelnudgedFolder)"));
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(folderBlock, "e.Handled=true;"));
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(folderBlock,
+            "await((IContextMenuCallbacks)this).NudgeFolderAsync(nudgedFolder,nudgeDelta);"));
+        Assert.True(ViewSource.IsStatementOfTheMethodBody(nudgeBlock,
+            "ServerItemViewModel?nudged=nudgedNodeasServerItemViewModel;"));
+        Assert.Equal("nudged, nudgeDelta", ExtractCallArguments(body, "NudgeServerAsync("));
+    }
+
+    [Fact]
     public void SessionTreeKeyHandler_PassesEditorOwnershipToDeleteResolution()
     {
         string body = ExtractMethodBody(ReadTreeInteractionsSource(), KeyHandlerSignature);
@@ -285,6 +304,35 @@ public sealed class MainWindowTreeDeletionTests
         }
 
         throw new InvalidDataException($"Closing brace was not found for: {signature}");
+    }
+
+    /// <summary>The brace-delimited block that follows the first occurrence of a header.</summary>
+    private static string ExtractBlockAfter(string logic, string header)
+    {
+        int headerIndex = logic.IndexOf(header, StringComparison.Ordinal);
+        Assert.True(headerIndex >= 0, $"Header was not found: {header}");
+
+        int openingBraceIndex = logic.IndexOf('{', headerIndex + header.Length);
+        Assert.True(openingBraceIndex >= 0, $"Opening brace was not found for: {header}");
+
+        int depth = 0;
+        for (int index = openingBraceIndex; index < logic.Length; index++)
+        {
+            if (logic[index] == '{')
+            {
+                depth++;
+            }
+            else if (logic[index] == '}')
+            {
+                depth--;
+                if (depth == 0)
+                {
+                    return logic[openingBraceIndex..(index + 1)];
+                }
+            }
+        }
+
+        throw new InvalidDataException($"Closing brace was not found for: {header}");
     }
 
     private static string ExtractCallArguments(string body, string callPrefix)

@@ -146,6 +146,25 @@ public sealed class FolderDeletionServiceTests
         Assert.True(configManager.Settings.GroupDefaults.ContainsKey("Ops"));
     }
 
+    [Fact]
+    public async Task DeleteAsync_RemovesTheFolderAndItsDescendantsFromTheManualOrder()
+    {
+        RecordingConfigManager configManager = new()
+        {
+            Servers = [CreateServer("target", "Root/Ops"), CreateServer("other", "Root/Ops2")],
+            Settings = new AppSettings
+            {
+                FolderOrder = ["Root/Ops2", "root/ops", "Root/Ops/Child", "Root", "Root/Ops2/Child"]
+            }
+        };
+        FolderDeletionService service = new(configManager);
+
+        FolderDeletionResult result = await service.DeleteAsync("Root/Ops", () => Task.CompletedTask);
+
+        Assert.Equal(["Root/Ops2", "Root", "Root/Ops2/Child"], configManager.Settings.FolderOrder);
+        Assert.Equal(["Root/Ops2", "Root", "Root/Ops2/Child"], result.Settings.FolderOrder);
+    }
+
     private static ServerProfileDto CreateServer(
         string id,
         string group,

@@ -118,6 +118,11 @@ public sealed class ContextMenuFactory
             menu.Items.Add(CreateFavoriteMenuItem(vm, [server]));
             menu.Items.Add(new Separator());
             menu.Items.Add(CreateMoveToGroupMenu(vm, server));
+            AddMoveStepItems(
+                menu.Items,
+                vm,
+                delta => vm.ServerList.CanNudgeServer(server, delta),
+                delta => callbacks.NudgeSessionAsync(server, delta));
         }
 
         menu.Items.Add(new Separator());
@@ -666,6 +671,11 @@ public sealed class ContextMenuFactory
             menu.Items.Add(renameItem);
             menu.Items.Add(CreateFolderColorMenu(vm, folder));
             menu.Items.Add(CreateMoveFolderMenu(vm, folder, callbacks));
+            AddMoveStepItems(
+                menu.Items,
+                vm,
+                delta => vm.ServerList.CanNudgeFolder(folder, delta),
+                delta => callbacks.NudgeFolderAsync(folder, delta));
 
             // Delete folder (move servers to root)
             var deleteItem = new MenuItem
@@ -737,6 +747,56 @@ public sealed class ContextMenuFactory
             vm.StatusText = string.Format(vm.Localize("StatusFolderDeleteFailed"), folder.Name);
         }
     }
+
+    /// <summary>
+    /// Adds the "Move up" and "Move down" entries, the pointer route to what Alt+Up and Alt+Down
+    /// do. An entry is disabled at its edge; a shared row gets none, like every other entry that
+    /// would write it, because the file it comes from orders it.
+    /// </summary>
+    /// <param name="items">The menu level to fill.</param>
+    /// <param name="vm">The shell view model, for the wording.</param>
+    /// <param name="canMove">Whether the row can move in a direction (<c>-1</c> up, <c>+1</c> down).</param>
+    /// <param name="move">Performs the move in a direction.</param>
+    private static void AddMoveStepItems(
+        ItemCollection items,
+        MainViewModel vm,
+        Func<int, bool> canMove,
+        Func<int, Task> move)
+    {
+        items.Add(CreateMoveStepItem(
+            vm.Localize("TreeCtxMoveUp"),
+            vm.Localize("TreeCtxGestureMoveUp"),
+            MoveUpDelta,
+            canMove,
+            move));
+        items.Add(CreateMoveStepItem(
+            vm.Localize("TreeCtxMoveDown"),
+            vm.Localize("TreeCtxGestureMoveDown"),
+            MoveDownDelta,
+            canMove,
+            move));
+    }
+
+    private static MenuItem CreateMoveStepItem(
+        string header,
+        string gesture,
+        int delta,
+        Func<int, bool> canMove,
+        Func<int, Task> move)
+    {
+        MenuItem item = new()
+        {
+            Header = header,
+            InputGestureText = gesture,
+            IsEnabled = canMove(delta)
+        };
+        item.Click += async (_, _) => await move(delta);
+        return item;
+    }
+
+    private const int MoveUpDelta = -1;
+
+    private const int MoveDownDelta = 1;
 
     /// <summary>
     /// Every place a folder can be moved to, the top level first: the keyboard route to what a

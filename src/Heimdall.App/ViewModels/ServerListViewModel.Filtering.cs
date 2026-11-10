@@ -725,7 +725,7 @@ public partial class ServerListViewModel
         }
 
         ProjectSharedSources();
-        SortStableTree(_stableTreeRoot);
+        SortStableTree(_stableTreeRoot, _currentSettings?.FolderOrder);
         _stableServerOrder = _allServers
             .OrderBy(server => SessionOrdering.RankOf(server.SortOrder))
             .ThenBy(server => server.DisplayName, DisplayNameOrdering.Comparer)
@@ -793,7 +793,7 @@ public partial class ServerListViewModel
 
     private void ResortStableTreeProjection()
     {
-        SortStableTree(_stableTreeRoot);
+        SortStableTree(_stableTreeRoot, _currentSettings?.FolderOrder);
         _stableServerOrder = _allServers
             .OrderBy(server => SessionOrdering.RankOf(server.SortOrder))
             .ThenBy(server => server.DisplayName, DisplayNameOrdering.Comparer)
@@ -818,10 +818,13 @@ public partial class ServerListViewModel
         FolderLayoutChanged?.Invoke();
     }
 
-    private static void SortStableTree(StableFolderNode node) =>
-        SortStableTree(node, DisplayNameOrdering.Comparer);
+    private static void SortStableTree(StableFolderNode node, IEnumerable<string>? folderOrder) =>
+        SortStableTree(node, DisplayNameOrdering.Comparer, FolderOrdering.RanksOf(folderOrder));
 
-    private static void SortStableTree(StableFolderNode node, StringComparer names)
+    private static void SortStableTree(
+        StableFolderNode node,
+        StringComparer names,
+        IReadOnlyDictionary<string, int> folderRanks)
     {
         node.Children.Sort((left, right) =>
         {
@@ -838,6 +841,18 @@ public partial class ServerListViewModel
                 return left.SharedOrder.CompareTo(right.SharedOrder);
             }
 
+            // Arranged local folders first, in the order the user chose; a shared folder is the
+            // file's to order and the "no folder" node stands alone in its band.
+            if (!left.IsShared && !left.IsNoGroup && !right.IsShared && !right.IsNoGroup)
+            {
+                int arranged = FolderOrdering.RankOf(folderRanks, left.ViewModel!.FullPath)
+                    .CompareTo(FolderOrdering.RankOf(folderRanks, right.ViewModel!.FullPath));
+                if (arranged != 0)
+                {
+                    return arranged;
+                }
+            }
+
             return names.Compare(
                 left.ViewModel!.Name,
                 right.ViewModel!.Name);
@@ -852,7 +867,7 @@ public partial class ServerListViewModel
 
         foreach (StableFolderNode child in node.Children)
         {
-            SortStableTree(child, names);
+            SortStableTree(child, names, folderRanks);
         }
     }
 

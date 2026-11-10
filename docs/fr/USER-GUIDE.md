@@ -443,7 +443,7 @@ Appuyez sur **F1** à tout moment pour la liste complète. Ceux qui se rentabili
 | Clic du milieu sur un onglet | Fermer cet onglet |
 | `Shift+F10` ou la touche Menu | Sur la barre d'onglets, ouvrir le menu de l'onglet ; dans l'arbre, celui de la session ou du dossier |
 | `Ctrl+A` | Dans l'arborescence, sélectionner toutes les sessions des dossiers ouverts |
-| `Alt+Haut` / `Alt+Bas` | Déplacer la session en surbrillance dans son dossier |
+| `Alt+Haut` / `Alt+Bas` | Déplacer d'un cran la session ou le dossier en surbrillance parmi ses voisins |
 | `F2` | Renommer la session ou le dossier sélectionné |
 
 ---
