@@ -610,11 +610,16 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
 
             if (IsWorkspaceLocked)
             {
+                // The overlay covers the main window only: the floating session windows are
+                // hidden, not closed, so the sessions survive when disconnect-on-lock is off.
+                Connection.SessionWindows.HideDetachedWindows();
+
                 // Reuse the unlock VM for the overlay; in-memory (non-persisted) lockout.
                 LockOverlayViewModel = CreateLockOverlayViewModel();
             }
             else
             {
+                Connection.SessionWindows.ShowDetachedWindows();
                 LockOverlayViewModel = null;
                 Session.ResumeDeferredReconnects();
             }
@@ -641,7 +646,8 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     }
 
     /// <summary>
-    /// Tears every session down because the workspace locked.
+    /// Tears every session down because the workspace locked, the ones detached to their own
+    /// window included.
     /// </summary>
     /// <remarks>
     /// Silent: a lock must actually lock. Prompting would leave a dialog on a workspace the user
@@ -650,7 +656,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     /// </remarks>
     private void DisconnectAllSessionsForLock()
     {
-        foreach (var tab in Connection.ActiveSessions.ToList())
+        foreach (var tab in Connection.AllOpenSessions.ToList())
         {
             Connection.CloseSessionAsync(
                 tab,

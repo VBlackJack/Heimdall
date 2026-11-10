@@ -46,6 +46,60 @@ public sealed class SessionSnapshotServiceTests
         Assert.Equal(secondId, snapshot.Sessions[1].ServerId);
     }
 
+    /// <summary>
+    /// A shared profile's identifier is not a GUID, and its tab must come back at the next launch.
+    /// </summary>
+    [Fact]
+    public async Task SaveAndLoad_KeepsTheSessionOfASharedProfile()
+    {
+        using var fixture = new SnapshotServiceFixture();
+        var service = fixture.CreateService();
+        string sharedId = SharedSessionIds.PrefixFor("a1b2c3") + "9f8e7d";
+        var localId = Guid.NewGuid().ToString();
+
+        await service.SaveAsync(
+        [
+            new SessionSnapshotEntry { ServerId = localId, ConnectionType = "RDP", Order = 0 },
+            new SessionSnapshotEntry { ServerId = sharedId, ConnectionType = "SSH", Order = 1 },
+        ]);
+
+        var snapshot = await service.LoadAsync();
+
+        Assert.NotNull(snapshot);
+        Assert.Equal([localId, sharedId], snapshot!.Sessions.Select(entry => entry.ServerId));
+    }
+
+    [Theory]
+    [InlineData("shared-")]
+    [InlineData("shared--hash")]
+    [InlineData("shared-UPPER-hash")]
+    [InlineData("not-shared-a1b2c3-9f8e7d")]
+    [InlineData("garbage")]
+    public async Task Load_MalformedIdentifier_IsStillDropped(string malformedId)
+    {
+        using var fixture = new SnapshotServiceFixture();
+        var service = fixture.CreateService();
+        Directory.CreateDirectory(fixture.ConfigManager.ConfigPath);
+        var validId = Guid.NewGuid().ToString();
+        await File.WriteAllTextAsync(
+            service.SnapshotPath,
+            $$"""
+            {
+              "schemaVersion": 1,
+              "savedAtUtc": "2026-04-19T12:34:56.0000000Z",
+              "sessions": [
+                { "serverId": "{{malformedId}}", "connectionType": "SSH", "order": 0 },
+                { "serverId": "{{validId}}", "connectionType": "RDP", "order": 1 }
+              ]
+            }
+            """);
+
+        var snapshot = await service.LoadAsync();
+
+        Assert.NotNull(snapshot);
+        Assert.Equal(validId, Assert.Single(snapshot!.Sessions).ServerId);
+    }
+
     [Fact]
     public async Task Load_MissingFile_ReturnsNull()
     {

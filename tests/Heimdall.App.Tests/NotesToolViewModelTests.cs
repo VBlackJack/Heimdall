@@ -228,6 +228,191 @@ public sealed class NotesToolViewModelTests
         Assert.Contains("boom", vm.StatusMessage, StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>
+    /// A save that fails must leave the note open and dirty whatever the user was doing next.
+    /// Carrying on replaced the editor content and cleared the dirty flag over edits that were
+    /// never written.
+    /// </summary>
+    [Fact]
+    public async Task OpenNote_WhenTheSaveFails_KeepsTheCurrentNoteItsContentAndItsDirtyFlag()
+    {
+        var (storage, vm, paths) = await OpenFirstOfTwoNotesWithUnsavedEditsAsync();
+
+        await vm.OpenNoteCommand.ExecuteAsync(paths[1]);
+
+        AssertStillOnUnsavedFirstNote(vm, paths[0]);
+        Assert.Equal("# Alpha\nalpha", await storage.LoadNoteAsync(paths[0]));
+    }
+
+    [Fact]
+    public async Task NewNoteFromTemplate_WhenTheSaveFails_KeepsTheCurrentNoteAndCreatesNothing()
+    {
+        var (storage, vm, paths) = await OpenFirstOfTwoNotesWithUnsavedEditsAsync();
+
+        await vm.NewNoteFromTemplateCommand.ExecuteAsync("Daily");
+
+        AssertStillOnUnsavedFirstNote(vm, paths[0]);
+        Assert.Equal(2, storage.Paths.Count);
+    }
+
+    [Fact]
+    public async Task RenameCurrentNote_WhenTheSaveFails_KeepsTheCurrentNoteAndItsName()
+    {
+        var (storage, vm, paths) = await OpenFirstOfTwoNotesWithUnsavedEditsAsync();
+
+        await vm.RenameCurrentNoteCommand.ExecuteAsync("renamed");
+
+        AssertStillOnUnsavedFirstNote(vm, paths[0]);
+        Assert.Contains(paths[0], storage.Paths);
+    }
+
+    [Fact]
+    public async Task DuplicateCurrentNote_WhenTheSaveFails_KeepsTheCurrentNoteAndCopiesNothing()
+    {
+        var (storage, vm, paths) = await OpenFirstOfTwoNotesWithUnsavedEditsAsync();
+
+        await vm.DuplicateCurrentNoteCommand.ExecuteAsync(null);
+
+        AssertStillOnUnsavedFirstNote(vm, paths[0]);
+        Assert.Equal(2, storage.Paths.Count);
+    }
+
+    [Fact]
+    public async Task GoBack_WhenTheSaveFails_StaysOnTheCurrentNote()
+    {
+        var storage = CreateStorage(
+            Seed("alpha.md", "# Alpha\nalpha"),
+            Seed("beta.md", "# Beta\nbeta"));
+        var vm = await CreateViewModelAsync(storage);
+        var paths = storage.Paths.OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToArray();
+        await vm.ReloadAsync();
+        await vm.OpenNoteCommand.ExecuteAsync(paths[0]);
+        await vm.OpenNoteCommand.ExecuteAsync(paths[1]);
+        vm.CurrentMarkdown = "# Beta\nunsaved";
+        vm.IsDirty = true;
+        storage.SaveFailure = new InvalidOperationException("disk full");
+
+        await vm.GoBackCommand.ExecuteAsync(null);
+
+        Assert.Equal(paths[1], vm.CurrentNotePath);
+        Assert.Equal("# Beta\nunsaved", vm.CurrentMarkdown);
+        Assert.True(vm.IsDirty);
+        Assert.True(vm.CanGoBack);
+        Assert.False(vm.CanGoForward);
+    }
+
+    [Fact]
+    public async Task OpenNote_WhenTheSaveSucceeds_StillSwitchesNote()
+    {
+        var (storage, vm, paths) = await OpenFirstOfTwoNotesWithUnsavedEditsAsync();
+        storage.SaveFailure = null;
+
+        await vm.OpenNoteCommand.ExecuteAsync(paths[1]);
+
+        Assert.Equal(paths[1], vm.CurrentNotePath);
+        Assert.False(vm.IsDirty);
+        Assert.Equal("# Alpha\nunsaved", await storage.LoadNoteAsync(paths[0]));
+    }
+
+    private static async Task<(FakeNotesStorage Storage, NotesToolViewModel Vm, string[] Paths)>
+        OpenFirstOfTwoNotesWithUnsavedEditsAsync(IDialogService? dialogService = null)
+    {
+        var storage = CreateStorage(
+            Seed("alpha.md", "# Alpha\nalpha"),
+            Seed("beta.md", "# Beta\nbeta"));
+        var vm = await CreateViewModelAsync(storage, new FakeUiDispatcher(), dialogService);
+        var paths = storage.Paths.OrderBy(path => path, StringComparer.OrdinalIgnoreCase).ToArray();
+        await vm.ReloadAsync(paths[0]);
+        vm.CurrentMarkdown = "# Alpha\nunsaved";
+        vm.IsDirty = true;
+        storage.SaveFailure = new InvalidOperationException("disk full");
+        return (storage, vm, paths);
+    }
+
+    [Fact]
+    public async Task OpenNote_WhenTheSaveFails_PutsTheTreeSelectionBackOnTheCurrentNote()
+    {
+        var (_, vm, paths) = await OpenFirstOfTwoNotesWithUnsavedEditsAsync();
+        List<string?> raised = [];
+        vm.PropertyChanged += (_, args) => raised.Add(args.PropertyName);
+
+        await vm.OpenNoteCommand.ExecuteAsync(paths[1]);
+
+        Assert.Contains(nameof(NotesToolViewModel.SelectedNote), raised);
+        Assert.Equal(paths[0], vm.SelectedNote?.FilePath);
+    }
+
+    [Fact]
+    public async Task OpenNote_WhenTheSaveFails_AndTheUserDiscards_SwitchesNote()
+    {
+        var dialog = new SessionCoordinatorPreMountTests.FakeDialogService { ConfirmResult = true };
+        var (_, vm, paths) = await OpenFirstOfTwoNotesWithUnsavedEditsAsync(dialog);
+
+        await vm.OpenNoteCommand.ExecuteAsync(paths[1]);
+
+        Assert.Equal(1, dialog.ConfirmCallCount);
+        Assert.Equal(paths[1], vm.CurrentNotePath);
+        Assert.False(vm.IsDirty);
+    }
+
+    [Fact]
+    public async Task OpenNote_WhenTheSaveFails_AndTheUserKeepsTheNote_StaysOpenAndDirty()
+    {
+        var dialog = new SessionCoordinatorPreMountTests.FakeDialogService { ConfirmResult = false };
+        var (_, vm, paths) = await OpenFirstOfTwoNotesWithUnsavedEditsAsync(dialog);
+
+        await vm.OpenNoteCommand.ExecuteAsync(paths[1]);
+
+        Assert.Equal(1, dialog.ConfirmCallCount);
+        AssertStillOnUnsavedFirstNote(vm, paths[0]);
+    }
+
+    [Fact]
+    public async Task ConfirmDiscardUnsavedChanges_ServesTheCloseDecision()
+    {
+        var dialog = new SessionCoordinatorPreMountTests.FakeDialogService { ConfirmResult = false };
+        var (_, vm, _) = await OpenFirstOfTwoNotesWithUnsavedEditsAsync(dialog);
+
+        Assert.False(vm.ConfirmDiscardUnsavedChanges());
+        Assert.True(vm.IsDirty);
+
+        dialog.ConfirmResult = true;
+
+        Assert.True(vm.ConfirmDiscardUnsavedChanges());
+        Assert.False(vm.IsDirty);
+    }
+
+    [Fact]
+    public async Task ConfirmDiscardUnsavedChanges_WithoutADialogService_KeepsTheNote()
+    {
+        var (_, vm, _) = await OpenFirstOfTwoNotesWithUnsavedEditsAsync();
+
+        Assert.False(vm.ConfirmDiscardUnsavedChanges());
+        Assert.True(vm.IsDirty);
+    }
+
+    [Fact]
+    public async Task OpenLinkedNote_WhenTheSaveFails_CreatesNothingAndLeavesTheHistoryAlone()
+    {
+        var (storage, vm, paths) = await OpenFirstOfTwoNotesWithUnsavedEditsAsync();
+        int before = storage.Paths.Count;
+
+        await vm.OpenLinkedNoteAsync("a brand new note");
+
+        AssertStillOnUnsavedFirstNote(vm, paths[0]);
+        Assert.Equal(before, storage.Paths.Count);
+        Assert.False(vm.CanGoBack);
+    }
+
+    private static void AssertStillOnUnsavedFirstNote(NotesToolViewModel vm, string firstPath)
+    {
+        Assert.Equal(firstPath, vm.CurrentNotePath);
+        Assert.Equal("# Alpha\nunsaved", vm.CurrentMarkdown);
+        Assert.True(vm.IsDirty);
+        Assert.True(vm.StatusIsError);
+        Assert.Contains("disk full", vm.StatusMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public async Task TrySaveSynchronously_WhenTheWriteLockTimesOut_KeepsTheNoteDirtyAndRefuses()
     {
@@ -544,9 +729,10 @@ public sealed class NotesToolViewModelTests
 
     private static async Task<NotesToolViewModel> CreateViewModelAsync(
         FakeNotesStorage storage,
-        FakeUiDispatcher dispatcher)
+        FakeUiDispatcher dispatcher,
+        IDialogService? dialogService = null)
     {
-        var vm = new NotesToolViewModel(storage, await CreateLocalizerAsync("en"), dispatcher);
+        var vm = new NotesToolViewModel(storage, await CreateLocalizerAsync("en"), dispatcher, dialogService);
         await vm.InitializeAsync();
         return vm;
     }

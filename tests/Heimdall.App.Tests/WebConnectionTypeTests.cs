@@ -333,6 +333,109 @@ public sealed class WebConnectionTypeTests
     /// the state machine refuses the handler's own transitions, and a state assertion would hold
     /// for nothing.
     /// </summary>
+    private const string BrowserProgram = @"C:\Legacy\firefox.exe";
+
+    [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public async Task AnEmbeddedSession_CarriesWhetherItsProfileWasConfirmed(bool confirmed, bool expectedAsk)
+    {
+        WebHandler handler = CreateHandler(new ConnectionStateMachine(), _ => null);
+        ServerProfileDto profile = Profile();
+        profile.WebOpenExternally = false;
+        profile.WebExternalProgram = BrowserProgram;
+        profile.ExecutionConfirmed = confirmed;
+
+        ConnectionResult result = await handler.ConnectAsync(profile, new AppSettings(), CancellationToken.None);
+
+        WebSessionResult session = Assert.IsType<WebSessionResult>(result.Session);
+        Assert.Equal(expectedAsk, WebExternalLaunch.RequiresConfirmation(session));
+    }
+
+    [Fact]
+    public async Task AnUnconfirmedProfile_DeclinedAtThePrompt_StartsNothing()
+    {
+        WebSessionResult session = UnconfirmedSession();
+        string? shown = null;
+
+        WebExternalLaunch.SessionLaunch launch = await WebExternalLaunch.PrepareForSessionAsync(
+            session,
+            currentPage: null,
+            command => { shown = command; return Task.FromResult(false); });
+
+        Assert.Null(launch.StartInfo);
+        Assert.True(launch.Declined);
+        Assert.Equal(BrowserProgram + " --private {Url}", shown);
+    }
+
+    [Fact]
+    public async Task AnUnconfirmedProfile_AcceptedAtThePrompt_StartsItAndIsNotAskedAgain()
+    {
+        WebSessionResult session = UnconfirmedSession();
+        int asked = 0;
+        Func<string, Task<bool>> accept = _ => { asked++; return Task.FromResult(true); };
+
+        WebExternalLaunch.SessionLaunch first = await WebExternalLaunch.PrepareForSessionAsync(session, null, accept);
+        WebExternalLaunch.SessionLaunch second = await WebExternalLaunch.PrepareForSessionAsync(session, null, accept);
+
+        Assert.Equal(BrowserProgram, first.StartInfo?.FileName);
+        Assert.NotNull(second.StartInfo);
+        Assert.Equal(1, asked);
+    }
+
+    [Fact]
+    public async Task AConfirmedProfile_StartsItsProgramWithoutAsking()
+    {
+        WebSessionResult session = UnconfirmedSession();
+        session.ExternalExecutionConfirmed = true;
+
+        WebExternalLaunch.SessionLaunch launch = await WebExternalLaunch.PrepareForSessionAsync(
+            session,
+            null,
+            _ => throw new InvalidOperationException("must not ask"));
+
+        Assert.Equal(BrowserProgram, launch.StartInfo?.FileName);
+        Assert.False(launch.Declined);
+    }
+
+    [Fact]
+    public async Task AProfileWithoutAProgram_OpensTheDefaultBrowserWithoutAsking()
+    {
+        var session = new WebSessionResult("web-test", new Uri("https://ilo.example.test/"))
+        {
+            ExternalExecutionConfirmed = false,
+        };
+
+        WebExternalLaunch.SessionLaunch launch = await WebExternalLaunch.PrepareForSessionAsync(
+            session,
+            null,
+            _ => throw new InvalidOperationException("must not ask"));
+
+        Assert.False(WebExternalLaunch.RequiresConfirmation(session));
+        Assert.NotNull(launch.StartInfo);
+        Assert.False(launch.Declined);
+    }
+
+    [Fact]
+    public void ASessionBuiltWithoutDecidingTrust_AsksBeforeRunningAProgram()
+    {
+        var session = new WebSessionResult("web-test", new Uri("https://ilo.example.test/"))
+        {
+            ExternalProgram = BrowserProgram,
+        };
+
+        Assert.False(session.ExternalExecutionConfirmed);
+        Assert.True(WebExternalLaunch.RequiresConfirmation(session));
+    }
+
+    private static WebSessionResult UnconfirmedSession() =>
+        new("web-test", new Uri("https://ilo.example.test/"))
+        {
+            ExternalProgram = BrowserProgram,
+            ExternalArguments = "--private {Url}",
+            ExternalExecutionConfirmed = false,
+        };
+
     private static WebHandler CreateHandler(ConnectionStateMachine stateMachine, Func<ProcessStartInfo, Process?> start)
     {
         Assert.True(stateMachine.TryTransition("web-test", ConnectionState.Initializing));

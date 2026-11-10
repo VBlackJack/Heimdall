@@ -44,6 +44,7 @@ public sealed class SessionWindowService : ISessionWindowService
     private readonly Action<SessionTabViewModel, LocalizationManager> _showFloatingWindow;
     private readonly Func<IReadOnlyList<SessionTabViewModel>> _readDetachedSessions;
     private readonly Func<SessionTabViewModel, bool> _reattachDetachedSession;
+    private readonly LockHiddenWindows<Views.FloatingSessionWindow> _lockHidden = new();
 
     /// <summary>
     /// Initialises a new <see cref="SessionWindowService"/>.
@@ -107,6 +108,57 @@ public sealed class SessionWindowService : ISessionWindowService
     }
 
     /// <inheritdoc />
+    public void HideDetachedWindows()
+    {
+        foreach (Views.FloatingSessionWindow window in _lockHidden.BeginLock(
+                     OpenFloatingWindows().Where(static window => window.IsVisible)))
+        {
+            window.Hide();
+        }
+    }
+
+    /// <inheritdoc />
+    public void ShowDetachedWindows()
+    {
+        foreach (Views.FloatingSessionWindow window in _lockHidden.EndLock(OpenFloatingWindows()))
+        {
+            // Shown without taking the keyboard: unlocking happens in the main window, and a
+            // floating window grabbing focus would pull it away from the password the user typed.
+            bool showActivated = window.ShowActivated;
+            window.ShowActivated = false;
+            try
+            {
+                window.Show();
+            }
+            finally
+            {
+                window.ShowActivated = showActivated;
+            }
+        }
+    }
+
+    private static IEnumerable<Views.FloatingSessionWindow> OpenFloatingWindows() =>
+        System.Windows.Application.Current?.Windows.OfType<Views.FloatingSessionWindow>().ToList()
+        ?? [];
+
+    /// <summary>Hides a window opened while the workspace is locked, so unlock reveals it.</summary>
+    private void HoldNewWindowsWhileLocked()
+    {
+        if (!_lockHidden.IsLocked)
+        {
+            return;
+        }
+
+        foreach (Views.FloatingSessionWindow window in OpenFloatingWindows())
+        {
+            if (window.IsVisible && _lockHidden.RegisterNewWindow(window))
+            {
+                window.Hide();
+            }
+        }
+    }
+
+    /// <inheritdoc />
     public bool BringDetachedSessionToFront(SessionTabViewModel session)
     {
         ArgumentNullException.ThrowIfNull(session);
@@ -114,7 +166,7 @@ public sealed class SessionWindowService : ISessionWindowService
         Views.FloatingSessionWindow? window = System.Windows.Application.Current?.Windows
             .OfType<Views.FloatingSessionWindow>()
             .FirstOrDefault(candidate => ReferenceEquals(candidate.Session, session));
-        if (window is null)
+        if (window is null || _lockHidden.IsHeld(window))
         {
             return false;
         }
@@ -226,6 +278,7 @@ public sealed class SessionWindowService : ISessionWindowService
         // Spawn the floating window
         var localizer = vm.GetLocalizer();
         _showFloatingWindow(session, localizer);
+        HoldNewWindowsWhileLocked();
 
         FileLogger.Info(
             string.Format(localizer["LogSessionDetached"], session.Title));

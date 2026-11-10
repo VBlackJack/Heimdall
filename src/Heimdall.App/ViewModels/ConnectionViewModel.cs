@@ -236,6 +236,9 @@ public partial class ConnectionViewModel : ObservableObject
         session.CloseAccessibleName = _localizer.Format("A11yCloseSessionTabNamed", name);
     }
 
+    /// <summary>The service that owns the floating session windows.</summary>
+    internal ISessionWindowService SessionWindows => _sessionWindows;
+
     /// <summary>Every open session: the tabs in the strip and those detached to their own window.</summary>
     internal IEnumerable<SessionTabViewModel> AllOpenSessions =>
         ActiveSessions.Concat(_sessionWindows.DetachedSessions);

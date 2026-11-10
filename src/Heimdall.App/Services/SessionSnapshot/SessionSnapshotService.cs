@@ -167,7 +167,10 @@ public sealed class SessionSnapshotService(IConfigManager configManager) : ISess
             return false;
         }
 
-        if (!Guid.TryParse(entry.ServerId, out _))
+        // A local profile is identified by a GUID; a profile read from a shared source by a
+        // well-formed identifier of the shared namespace. Anything else is refused.
+        if (!Guid.TryParse(entry.ServerId, out _)
+            && SharedSessionIds.SourceIdOf(entry.ServerId) is null)
         {
             return false;
         }

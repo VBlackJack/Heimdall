@@ -72,6 +72,13 @@ public partial class EmbeddedEditorView : UserControl, ICloseGuard
     {
         _localizer = localizer;
         _viewModel = new EmbeddedEditorViewModel(localizer);
+        _viewModel.PropertyChanged += (_, args) =>
+        {
+            if (string.Equals(args.PropertyName, nameof(EmbeddedEditorViewModel.CanSave), StringComparison.Ordinal))
+            {
+                ApplySaveAvailability();
+            }
+        };
         _closeGuard = new EmbeddedEditorCloseGuard(SampleCloseGuardSnapshot, ConfirmCloseAsync);
         InitializeComponent();
         DataContext = _viewModel;
@@ -131,7 +138,10 @@ public partial class EmbeddedEditorView : UserControl, ICloseGuard
     {
         var content = await _viewModel.LoadFileAsync(filePath);
         _viewModel.SyntaxName = ResolveSyntaxName(Path.GetExtension(filePath));
-        SetEditorText(content ?? BuildLoadErrorText());
+        // Only a file that cannot be saved shows the error as its text, read-only. A file that is
+        // merely missing opens empty so a save cannot write an error message into it.
+        SetEditorText(content ?? (_viewModel.CanSave ? string.Empty : BuildLoadErrorText()));
+        ApplySaveAvailability();
         ApplySyntaxHighlighting();
         _viewModel.UpdateCursorPosition(Editor.TextArea.Caret.Line, Editor.TextArea.Caret.Column);
     }
@@ -143,6 +153,7 @@ public partial class EmbeddedEditorView : UserControl, ICloseGuard
     {
         _viewModel.LoadContent(fileName, ResolveSyntaxName(Path.GetExtension(fileName), syntaxName));
         SetEditorText(content);
+        ApplySaveAvailability();
         ApplySyntaxHighlighting();
         _viewModel.UpdateCursorPosition(Editor.TextArea.Caret.Line, Editor.TextArea.Caret.Column);
     }
@@ -204,6 +215,12 @@ public partial class EmbeddedEditorView : UserControl, ICloseGuard
             _localizer?[titleKey] ?? titleKey,
             _localizer?[messageKey] ?? messageKey,
             "warning").ConfigureAwait(true);
+    }
+
+    private void ApplySaveAvailability()
+    {
+        Editor.IsReadOnly = !_viewModel.CanSave;
+        BtnSave.IsEnabled = _viewModel.CanSave;
     }
 
     private async void OnSaveClick(object sender, RoutedEventArgs e)

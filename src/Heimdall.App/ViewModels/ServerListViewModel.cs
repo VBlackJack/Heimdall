@@ -1014,7 +1014,9 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(originalServerId);
 
-        var server = Servers.FirstOrDefault(
+        // The full inventory, not the filtered projection: a reconnect has already closed the tab,
+        // and a profile hidden by the search or a filter would otherwise be lost with it.
+        var server = _allServers.FirstOrDefault(
             candidate => string.Equals(candidate.Id, originalServerId, StringComparison.OrdinalIgnoreCase))
             ?? await FindSharedServerItemAsync(originalServerId);
 

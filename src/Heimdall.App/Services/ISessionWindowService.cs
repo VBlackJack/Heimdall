@@ -50,6 +50,15 @@ public interface ISessionWindowService
     /// <returns>False when no floating window hosts the session.</returns>
     bool BringDetachedSessionToFront(SessionTabViewModel session);
 
+    /// <summary>
+    /// Hides every floating session window without closing it, so the sessions they host survive.
+    /// Used while the workspace is locked: the lock overlay covers the main window only.
+    /// </summary>
+    void HideDetachedWindows();
+
+    /// <summary>Shows again the floating windows that <see cref="HideDetachedWindows"/> hid.</summary>
+    void ShowDetachedWindows();
+
     /// <summary>Detaches a session tab into a standalone floating window.</summary>
     void DetachSessionToFloatingWindow(SessionTabViewModel session, MainViewModel vm);
 

@@ -168,6 +168,14 @@ public sealed record WebSessionResult(
     public string? DisplayName { get; init; }
 
     /// <summary>
+    /// Whether the user has confirmed that this profile may start a local program. Decided when
+    /// the session is built and false until a builder says otherwise, so a session whose builder
+    /// forgot to decide asks rather than runs. It is mutable state of the tab and takes part in
+    /// the record's generated equality; no caller compares sessions, which is why that is left.
+    /// </summary>
+    public bool ExternalExecutionConfirmed { get; set; }
+
+    /// <summary>
     /// Whether the tab may offer to open the console outside it. Not through a gateway: an
     /// external program would not use the tunnel, which is why opening externally through one
     /// is refused at connect time too.

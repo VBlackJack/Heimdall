@@ -669,6 +669,16 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     public bool ShowFloorNotice => !string.IsNullOrEmpty(FloorNoticeText);
 
     /// <summary>
+    /// Says that the saved presets could not be read and that nothing will be written over them,
+    /// so the operator knows why a preset or a setting they change does not survive.
+    /// </summary>
+    public string PresetsUnreadableNotice =>
+        _cachedStore is { IsUnreadable: true } ? L("ToolPwdGenPresetsUnreadable") : string.Empty;
+
+    /// <summary>True when <see cref="PresetsUnreadableNotice"/> has something to say.</summary>
+    public bool ShowPresetsUnreadableNotice => !string.IsNullOrEmpty(PresetsUnreadableNotice);
+
+    /// <summary>
     /// What asking for a minimum did to the settings, or why it could not.
     /// </summary>
     /// <remarks>
@@ -790,6 +800,8 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         // Where the tool was left, when it was told to remember. Applied before the first draw so
         // that the password on screen is the one these settings make, not one from the defaults.
         var store = LoadStore();
+        OnPropertyChanged(nameof(PresetsUnreadableNotice));
+        OnPropertyChanged(nameof(ShowPresetsUnreadableNotice));
         if (store.RememberSettings)
         {
             RememberSettings = true;

@@ -123,6 +123,19 @@ public sealed partial class EmbeddedEditorViewModel : ObservableObject
     public string? LoadErrorMessage { get; private set; }
 
     /// <summary>
+    /// Gets a value indicating whether a save may write to the current local file. False after a
+    /// load that failed for any reason other than the file not existing yet: the buffer then holds
+    /// an error message, and writing it would replace the real file.
+    /// </summary>
+    public bool CanSave
+    {
+        get => _canSave;
+        private set => SetProperty(ref _canSave, value);
+    }
+
+    private bool _canSave = true;
+
+    /// <summary>
     /// Requests durable persistence of the current remote content.
     /// </summary>
     public event Func<string, string, Task<bool>>? SaveRequested;
@@ -164,6 +177,8 @@ public sealed partial class EmbeddedEditorViewModel : ObservableObject
         IsRemote = false;
         IsModified = false;
         LoadErrorMessage = null;
+        CanSave = true;
+        NoticeText = string.Empty;
         UpdateDisplayTitle();
 
         try
@@ -172,6 +187,7 @@ public sealed partial class EmbeddedEditorViewModel : ObservableObject
             if (length > MaxLocalFileBytes)
             {
                 _localDocument = null;
+                CanSave = false;
                 LoadErrorMessage = string.Format(L("EditorFileTooLarge"), Path.GetFileName(filePath));
                 Heimdall.Core.Logging.FileLogger.Warn(
                     $"EmbeddedEditor refused to open {filePath}: {length} bytes exceeds the {MaxLocalFileBytes} byte ceiling.");
@@ -189,8 +205,16 @@ public sealed partial class EmbeddedEditorViewModel : ObservableObject
         catch (Exception ex)
         {
             _localDocument = null;
+            CanSave = ex is FileNotFoundException or DirectoryNotFoundException;
             SyntaxName = "Plain Text";
             LoadErrorMessage = ex.Message;
+            if (CanSave)
+            {
+                // A file that does not exist yet opens as an empty buffer: the reason is said in
+                // the notice area, never put in the text a save would write into the new file.
+                NoticeText = string.Format(L("EditorLoadErrorBody"), ex.Message);
+            }
+
             Heimdall.Core.Logging.FileLogger.Warn($"EmbeddedEditor failed to open: {ex.Message}");
             return null;
         }
@@ -206,6 +230,7 @@ public sealed partial class EmbeddedEditorViewModel : ObservableObject
         Interlocked.Increment(ref _contentRevision);
         FilePath = fileName;
         IsRemote = true;
+        CanSave = true;
         IsModified = false;
         LoadErrorMessage = null;
         SyntaxName = string.IsNullOrWhiteSpace(syntaxOverride) ? "Plain Text" : syntaxOverride;
@@ -230,6 +255,11 @@ public sealed partial class EmbeddedEditorViewModel : ObservableObject
 
         string filePath = currentFilePath;
         bool isRemote = IsRemote;
+        if (!isRemote && !CanSave)
+        {
+            NoticeText = L("EditorSaveUnavailableNotice");
+            return false;
+        }
 
         // Captured with the other state, before the gate, so a load running concurrently cannot swap
         // the encoding under a save already in flight.

@@ -32,15 +32,57 @@ internal static class WebExternalLaunch
     /// <summary>The placeholder replaced with the whole address.</summary>
     public const string UrlPlaceholder = "{Url}";
 
+    /// <summary>The outcome of preparing the external launch of a console already open in a tab.</summary>
+    /// <param name="StartInfo">What to start; null when nothing may be started.</param>
+    /// <param name="ErrorKey">The localization key of why it cannot be built, when it cannot.</param>
+    /// <param name="Declined">True when the user was asked and refused.</param>
+    public readonly record struct SessionLaunch(ProcessStartInfo? StartInfo, string? ErrorKey, bool Declined);
+
     /// <summary>
-    /// Builds the start information, or returns the localization key of the reason it cannot.
+    /// Whether starting the session's external program needs the user's confirmation first: it
+    /// names a program, and its profile has not been confirmed. The default browser runs nothing
+    /// the profile chose, so it never asks.
     /// </summary>
-    /// <remarks>
-    /// A shell interpreter is refused as the program, as it is for external tools: the host and
-    /// the path come from a profile that may have been imported, and cmd.exe or PowerShell would
-    /// read their metacharacters. The address itself is a <see cref="Uri"/> built by
-    /// <see cref="WebAddress"/>, whose escaped form carries no quote or space to split on.
-    /// </remarks>
+    public static bool RequiresConfirmation(WebSessionResult session)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        return !string.IsNullOrWhiteSpace(session.ExternalProgram) && !session.ExternalExecutionConfirmed;
+    }
+
+    /// <summary>The program and arguments the confirmation shows, as the connect path shows them.</summary>
+    public static string DescribeCommand(WebSessionResult session)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        return $"{session.ExternalProgram} {session.ExternalArguments}".Trim();
+    }
+
+    /// <summary>
+    /// Prepares the external launch, asking <paramref name="confirmAsync"/> (given the command to
+    /// show) first when <see cref="RequiresConfirmation"/> says so. A refusal starts nothing; an
+    /// acceptance is remembered on the session so the tab does not ask twice.
+    /// </summary>
+    public static async Task<SessionLaunch> PrepareForSessionAsync(
+        WebSessionResult session,
+        string? currentPage,
+        Func<string, Task<bool>> confirmAsync)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(confirmAsync);
+
+        if (RequiresConfirmation(session))
+        {
+            if (!await confirmAsync(DescribeCommand(session)).ConfigureAwait(true))
+            {
+                return new SessionLaunch(null, null, Declined: true);
+            }
+
+            session.ExternalExecutionConfirmed = true;
+        }
+
+        ProcessStartInfo? startInfo = TryCreateForSession(session, currentPage, out string? errorKey);
+        return new SessionLaunch(startInfo, errorKey, Declined: false);
+    }
+
     /// <summary>
     /// The start information for a console already open in a tab: the program its profile names,
     /// or the default browser, on the page the tab shows when it is one of the console's own.
@@ -73,6 +115,15 @@ internal static class WebExternalLaunch
         return TryCreate(profile, address, out errorKey);
     }
 
+    /// <summary>
+    /// Builds the start information, or returns the localization key of the reason it cannot.
+    /// </summary>
+    /// <remarks>
+    /// A shell interpreter is refused as the program, as it is for external tools: the host and
+    /// the path come from a profile that may have been imported, and cmd.exe or PowerShell would
+    /// read their metacharacters. The address itself is a <see cref="Uri"/> built by
+    /// <see cref="WebAddress"/>, whose escaped form carries no quote or space to split on.
+    /// </remarks>
     public static ProcessStartInfo? TryCreate(ServerProfileDto profile, Uri address, out string? errorKey)
     {
         ArgumentNullException.ThrowIfNull(profile);

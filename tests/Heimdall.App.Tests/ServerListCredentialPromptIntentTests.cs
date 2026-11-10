@@ -74,6 +74,37 @@ public sealed class ServerListCredentialPromptIntentTests
             "a session reconnecting on its own must fail quietly");
     }
 
+    /// <summary>
+    /// A reconnect closes the tab first, so a profile that the tree's search filter hides must
+    /// still be found, or the tab vanishes and nothing replaces it.
+    /// </summary>
+    [Fact]
+    public async Task RestoreServerAsync_FindsAProfileTheSearchFilterHides()
+    {
+        await using Fixture fixture = await Fixture.CreateAsync();
+        await fixture.SeedServerAsync();
+        fixture.ViewModel.SearchText = "no-profile-carries-this-text";
+
+        // The search filter is debounced: wait until it has taken the profile out of the tree.
+        DateTime deadline = DateTime.UtcNow.AddSeconds(5);
+        while (fixture.ViewModel.Servers.Any(
+                   candidate => string.Equals(candidate.Id, Fixture.ServerId, StringComparison.Ordinal))
+               && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(25);
+        }
+
+        Assert.DoesNotContain(
+            fixture.ViewModel.Servers,
+            candidate => string.Equals(candidate.Id, Fixture.ServerId, StringComparison.Ordinal));
+
+        bool restored = await fixture.ViewModel.RestoreServerAsync(Fixture.ServerId, CancellationToken.None);
+
+        Assert.Single(fixture.Handler.Dispatched);
+        Assert.Equal(Fixture.ServerId, fixture.Handler.Dispatched[0].Id);
+        Assert.False(restored, "the recording handler reports a failed connection");
+    }
+
     /// <summary>Records the profile each connection is dispatched with.</summary>
     private sealed class RecordingSftpHandler : IProtocolHandler
     {
