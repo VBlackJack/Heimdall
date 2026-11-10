@@ -223,6 +223,17 @@
     <sys:Double x:Key="SessionTreeReadOnlyIconSize">10</sys:Double>
     <!-- The "all open tabs" button over the right end of an overflowing session tab strip. -->
     <sys:Double x:Key="SessionTabListButtonWidth">32</sys:Double>
+    <!-- Height of a session tab, and the vertical parts that add up to it:
+         1 (top border of the tab) + 2 + 2 (item padding) + 3 + 3 (header padding) + 24 (close
+         button, the pointer target floor) + 2 (folder bar under the header) = 37. The item
+         padding is the session strip's own: it does not inherit ThemedTabItemStyle's 14,8, which
+         the server dialog's tabs keep. The list button of an overflowing strip stretches to the
+         tab, so it follows. -->
+    <sys:Double x:Key="SessionTabHeight">37</sys:Double>
+    <Thickness x:Key="SessionTabItemPadding">10,2</Thickness>
+    <Thickness x:Key="SessionTabHeaderPadding">8,3</Thickness>
+    <!-- Smallest pointer target inside a tab header (the folder chip); the close button is 24 too. -->
+    <sys:Double x:Key="SessionTabPointerTargetSize">24</sys:Double>
     <!-- Close button of a tab neither hovered nor selected. 0.3 measured 2.37:1 against the strip
          in the default dark theme, under the 3:1 a control needs (WCAG 1.4.11); 0.5 measures 4.19:1. -->
     <sys:Double x:Key="TabCloseButtonIdleOpacity">0.5</sys:Double>
