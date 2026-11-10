@@ -162,6 +162,12 @@ public partial class ConnectionViewModel : ObservableObject
             }
         }
 
+        if (IsTabGroupRowActive
+            && e.PropertyName is null or nameof(SessionTabViewModel.HeaderState))
+        {
+            RefreshTabGroupAttention();
+        }
+
         if (e.PropertyName is null
             or nameof(SessionTabViewModel.Title)
             or nameof(SessionTabViewModel.CustomTitle)

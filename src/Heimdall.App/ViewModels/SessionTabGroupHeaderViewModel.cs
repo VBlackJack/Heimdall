@@ -18,6 +18,19 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace Heimdall.App.ViewModels;
 
+/// <summary>What a hidden folder's tabs have to say, the worst of them winning.</summary>
+public enum SessionTabGroupAttention
+{
+    /// <summary>Nothing to report, or the folder is shown.</summary>
+    None,
+
+    /// <summary>A tab lost its connection.</summary>
+    Disconnected,
+
+    /// <summary>A tab failed.</summary>
+    Failed,
+}
+
 /// <summary>
 /// One folder on the row of folders above the session tab strip: its name, colour, how many tabs
 /// it holds, and whether its tabs are the ones shown. Created and kept up to date by
@@ -51,6 +64,25 @@ public sealed partial class SessionTabGroupHeaderViewModel : ObservableObject
     /// <summary>True when the tabs of this folder are the ones shown in the strip.</summary>
     [ObservableProperty]
     private bool _isShown;
+
+    /// <summary>
+    /// The worst state among the tabs of a folder that is not shown, so the header says what the
+    /// hidden strip cannot. <see cref="SessionTabGroupAttention.None"/> while the folder is shown.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(NeedsAttention))]
+    [NotifyPropertyChangedFor(nameof(HasFailedTab))]
+    [NotifyPropertyChangedFor(nameof(HasDisconnectedTab))]
+    private SessionTabGroupAttention _attention;
+
+    /// <summary>True when a tab of the hidden folder failed or lost its connection.</summary>
+    public bool NeedsAttention => Attention != SessionTabGroupAttention.None;
+
+    /// <summary>True when the worst state is a failure: drawn as the strip draws it, a red triangle.</summary>
+    public bool HasFailedTab => Attention == SessionTabGroupAttention.Failed;
+
+    /// <summary>True when the worst state is a lost connection: drawn as the strip draws it, a grey ring.</summary>
+    public bool HasDisconnectedTab => Attention == SessionTabGroupAttention.Disconnected;
 
     /// <summary>What a screen reader reads for the header, state and tab count included.</summary>
     [ObservableProperty]

@@ -1660,7 +1660,7 @@
                                                 <Setter Property="AutomationProperties.Name" Value="{Binding AccessibleName}"/>
                                                 <Style.Triggers>
                                                     <DataTrigger Binding="{Binding IsShown}" Value="True">
-                                                        <Setter Property="Background" Value="{DynamicResource CardBrush}"/>
+                                                        <Setter Property="Background" Value="{DynamicResource TreeRowSelectedBrush}"/>
                                                         <Setter Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
                                                     </DataTrigger>
                                                 </Style.Triggers>
@@ -1719,6 +1719,25 @@
                                                        Foreground="{DynamicResource TextSecondaryBrush}"
                                                        VerticalAlignment="Center"
                                                        Margin="{StaticResource SessionTabGroupHeaderCountMargin}"/>
+                                            <!-- A hidden folder holding a failed or dropped session: the strip cannot show it. -->
+                                            <!-- The same two marks as the strip: a grey ring for a dropped session,
+                                                 a red triangle for a failed one, the failure winning. -->
+                                            <Ellipse x:Name="Mw_SessionTabGroupHeaderDisconnected"
+                                                     Width="{StaticResource SessionTabStateMarkSize}"
+                                                     Height="{StaticResource SessionTabStateMarkSize}"
+                                                     Stroke="{DynamicResource TextSecondaryBrush}"
+                                                     StrokeThickness="{StaticResource SessionTabStateRingThickness}"
+                                                     VerticalAlignment="Center"
+                                                     Margin="{StaticResource SessionTabGroupHeaderCountMargin}"
+                                                     Visibility="{Binding HasDisconnectedTab, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                            <TextBlock x:Name="Mw_SessionTabGroupHeaderFailed"
+                                                       Text="{StaticResource SessionTabFailedGlyph}"
+                                                       FontFamily="{StaticResource FontFamilyIcons}"
+                                                       FontSize="{StaticResource SessionTabStateGlyphFontSize}"
+                                                       Foreground="{DynamicResource ErrorTextBrush}"
+                                                       VerticalAlignment="Center"
+                                                       Margin="{StaticResource SessionTabGroupHeaderCountMargin}"
+                                                       Visibility="{Binding HasFailedTab, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                         </StackPanel>
                                     </Button>
                                 </DataTemplate>

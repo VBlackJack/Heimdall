@@ -187,7 +187,9 @@ button per folder with its colour, name and tab count, and the strip shows only 
 folder you are working in. Click a folder to go back to the tab you last used in it, and the strip
 switches to that folder's tabs. Pinned tabs and tabs outside any folder stay visible. Ctrl+Tab
 cycles the visible tabs only, and the folders' own collapse commands are no longer offered. After
-a restart, the folder of the last restored tab is the one shown.
+a restart, the folder of the last restored tab is the one shown. A hidden folder holding a session
+that failed shows the red warning mark of the tab strip on its button, and one holding a dropped
+connection shows its grey ring, so you can spot it without opening the folder.
 
 ## Where your passwords are kept
 

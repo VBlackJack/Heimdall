@@ -207,7 +207,9 @@ Cliquez sur un dossier pour revenir à l'onglet que vous y avez utilisé en dern
 aux onglets de ce dossier. Les onglets épinglés et ceux hors de tout dossier restent visibles.
 Ctrl+Tab ne parcourt que les onglets visibles, et les commandes de repli propres aux dossiers ne
 sont plus proposées. Après un redémarrage, c'est le dossier du dernier onglet restauré qui est
-affiché.
+affiché. Un dossier masqué qui contient une session en échec affiche sur son bouton la marque
+rouge d'avertissement de la barre d'onglets, et celui qui contient une connexion perdue affiche
+son anneau gris, pour le repérer sans ouvrir le dossier.
 
 ## Où vivent vos mots de passe
 

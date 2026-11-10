@@ -95,6 +95,57 @@ public sealed class SessionTabGroupRowMarkupTests
     }
 
     [Fact]
+    public void TheShownHeaderHasATintedSurfaceAndABoldLabel()
+    {
+        XElement button = Named(MainWindow(), "Mw_SessionTabGroupHeader");
+
+        XElement buttonTrigger = ShownTrigger(button, "Button");
+        Assert.Equal("{DynamicResource TreeRowSelectedBrush}", SetterValue(buttonTrigger, "Background"));
+        Assert.Equal("{DynamicResource AccentBorderBrush}", SetterValue(buttonTrigger, "BorderBrush"));
+
+        XElement labelTrigger = ShownTrigger(button, "TextBlock");
+        Assert.Equal("SemiBold", SetterValue(labelTrigger, "FontWeight"));
+        XElement labelStyle = Assert.IsType<XElement>(labelTrigger.Parent?.Parent);
+        Assert.Equal("Normal", SetterValue(labelStyle, "FontWeight"));
+        Assert.Equal(
+            "{StaticResource AppFocusVisualStyle}",
+            SetterValue(ShownTrigger(button, "Button").Parent!.Parent!, "FocusVisualStyle"));
+    }
+
+    [Fact]
+    public void TheAttentionMarksAreTheStripsOwn_EachBoundToItsState()
+    {
+        XDocument doc = MainWindow();
+        XElement failed = Named(doc, "Mw_SessionTabGroupHeaderFailed");
+        XElement ring = Named(doc, "Mw_SessionTabGroupHeaderDisconnected");
+
+        Assert.StartsWith("{Binding HasFailedTab", (string?)failed.Attribute("Visibility"), StringComparison.Ordinal);
+        Assert.Equal("{DynamicResource ErrorTextBrush}", (string?)failed.Attribute("Foreground"));
+        Assert.StartsWith("{Binding HasDisconnectedTab", (string?)ring.Attribute("Visibility"), StringComparison.Ordinal);
+        Assert.Equal("{DynamicResource TextSecondaryBrush}", (string?)ring.Attribute("Stroke"));
+        Assert.Equal(
+            (string?)Named(doc, "TabStateDroppedRing").Attribute("StrokeThickness"),
+            (string?)ring.Attribute("StrokeThickness"));
+    }
+
+    private static XElement ShownTrigger(XElement button, string targetType)
+    {
+        XElement style = Assert.Single(
+            button.Descendants(),
+            e => e.Name.LocalName == "Style" && (string?)e.Attribute("TargetType") == targetType);
+        return Assert.Single(
+            style.Descendants(),
+            e => e.Name.LocalName == "DataTrigger" && (string?)e.Attribute("Binding") == "{Binding IsShown}");
+    }
+
+    private static string? SetterValue(XElement owner, string property) =>
+        (string?)Assert.Single(
+            owner.Descendants(),
+            e => e.Name.LocalName == "Setter" && (string?)e.Attribute("Property") == property
+                && (e.Parent == owner || e.Parent?.Parent == owner))
+            .Attribute("Value");
+
+    [Fact]
     public void TheChipIsDrawnOnlyWhenTheTabShowsIt_AndStaysOutOfTheTabOrder()
     {
         XElement chip = Named(MainWindow(), "Mw_SessionTabGroupChip");

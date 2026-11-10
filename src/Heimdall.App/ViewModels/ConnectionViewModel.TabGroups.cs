@@ -44,6 +44,10 @@ public partial class ConnectionViewModel
 
     private const string TabGroupHeaderShownKey = "SessionTabGroupHeaderShownA11y";
     private const string TabGroupHeaderHiddenKey = "SessionTabGroupHeaderHiddenA11y";
+    private const string TabGroupHeaderHiddenFailedKey = "SessionTabGroupHeaderHiddenFailedA11y";
+    private const string TabGroupHeaderHiddenFailedOneKey = "SessionTabGroupHeaderHiddenFailedOneA11y";
+    private const string TabGroupHeaderHiddenDisconnectedKey = "SessionTabGroupHeaderHiddenDisconnectedA11y";
+    private const string TabGroupHeaderHiddenDisconnectedOneKey = "SessionTabGroupHeaderHiddenDisconnectedOneA11y";
     private const string TabGroupHeaderShownOneKey = "SessionTabGroupHeaderShownOneA11y";
     private const string TabGroupHeaderHiddenOneKey = "SessionTabGroupHeaderHiddenOneA11y";
 
@@ -583,6 +587,81 @@ public partial class ConnectionViewModel
     }
 
     /// <summary>
+    /// Sets the attention and the announced name of a header from the worst state among its tabs
+    /// (<paramref name="worst"/>). Touches nothing else: tabs are neither reordered nor refolded.
+    /// </summary>
+    private void ApplyHeaderAttention(
+        SessionTabGroupHeaderViewModel header,
+        int count,
+        bool shown,
+        SessionTabGroupAttention worst)
+    {
+        SessionTabGroupAttention attention = shown ? SessionTabGroupAttention.None : worst;
+        header.Attention = attention;
+
+        string key = header.Key;
+        header.AccessibleName = attention switch
+        {
+            _ when shown => _localizer.FormatCount(count, TabGroupHeaderShownOneKey, TabGroupHeaderShownKey, key, count),
+            SessionTabGroupAttention.Failed => _localizer.FormatCount(
+                count, TabGroupHeaderHiddenFailedOneKey, TabGroupHeaderHiddenFailedKey, key, count),
+            SessionTabGroupAttention.Disconnected => _localizer.FormatCount(
+                count, TabGroupHeaderHiddenDisconnectedOneKey, TabGroupHeaderHiddenDisconnectedKey, key, count),
+            _ => _localizer.FormatCount(count, TabGroupHeaderHiddenOneKey, TabGroupHeaderHiddenKey, key, count),
+        };
+    }
+
+    /// <summary>The worst tab state of each folder, in one pass over the strip. Empty outside the own-row mode.</summary>
+    private Dictionary<string, SessionTabGroupAttention> WorstTabStateByGroup()
+    {
+        var worst = new Dictionary<string, SessionTabGroupAttention>(StringComparer.OrdinalIgnoreCase);
+        if (!IsTabGroupRowActive)
+        {
+            return worst;
+        }
+
+        foreach (SessionTabViewModel tab in ActiveSessions)
+        {
+            if (tab.TabGroupKey is not { } key)
+            {
+                continue;
+            }
+
+            SessionTabGroupAttention state = tab.HeaderState switch
+            {
+                SessionTabHeaderState.Failed => SessionTabGroupAttention.Failed,
+                SessionTabHeaderState.Disconnected => SessionTabGroupAttention.Disconnected,
+                _ => SessionTabGroupAttention.None,
+            };
+            if (!worst.TryGetValue(key, out SessionTabGroupAttention current) || state > current)
+            {
+                worst[key] = state;
+            }
+        }
+
+        return worst;
+    }
+
+    /// <summary>Recomputes only the attention of the headers, after a tab changed state.</summary>
+    private void RefreshTabGroupAttention()
+    {
+        if (!IsTabGroupRowActive || TabGroupHeaders.Count == 0)
+        {
+            return;
+        }
+
+        Dictionary<string, SessionTabGroupAttention> worst = WorstTabStateByGroup();
+        foreach (SessionTabGroupHeaderViewModel header in TabGroupHeaders)
+        {
+            ApplyHeaderAttention(
+                header,
+                header.TabCount,
+                header.IsShown,
+                worst.GetValueOrDefault(header.Key));
+        }
+    }
+
+    /// <summary>
     /// Brings <see cref="TabGroupHeaders"/> in line with the folders present in the strip, in place
     /// and by key: the same instance survives an update, a move or a neighbour's removal.
     /// </summary>
@@ -611,6 +690,7 @@ public partial class ConnectionViewModel
             }
         }
 
+        Dictionary<string, SessionTabGroupAttention> worst = WorstTabStateByGroup();
         for (int position = 0; position < desired.Count; position++)
         {
             (string key, SessionTabViewModel head, int count) = desired[position];
@@ -644,9 +724,7 @@ public partial class ConnectionViewModel
             header.Color = head.TabGroupColor;
             header.TabCount = count;
             header.IsShown = shown;
-            header.AccessibleName = shown
-                ? _localizer.FormatCount(count, TabGroupHeaderShownOneKey, TabGroupHeaderShownKey, key, count)
-                : _localizer.FormatCount(count, TabGroupHeaderHiddenOneKey, TabGroupHeaderHiddenKey, key, count);
+            ApplyHeaderAttention(header, count, shown, worst.GetValueOrDefault(key));
         }
 
         while (TabGroupHeaders.Count > desired.Count)

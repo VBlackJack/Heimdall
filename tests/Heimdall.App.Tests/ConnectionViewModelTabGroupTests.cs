@@ -604,6 +604,170 @@ public sealed class ConnectionViewModelTabGroupTests
     }
 
     [Fact]
+    public void OwnRow_HiddenFolderWithAFailedTab_NeedsAttention()
+    {
+        ConnectionViewModel sut = CreateViewModel(groupByFolder: true, ownRow: true);
+        SessionTabViewModel ops1 = Open(sut, "ops-1");
+        Open(sut, "lab-1");
+
+        ops1.Status = "Failed";
+
+        Assert.Equal(SessionTabHeaderState.Failed, ops1.HeaderState);
+        SessionTabGroupHeaderViewModel header = sut.TabGroupHeaders.Single(h => h.Key == Ops);
+        Assert.Equal(SessionTabGroupAttention.Failed, header.Attention);
+        Assert.True(header.HasFailedTab);
+        Assert.False(header.HasDisconnectedTab);
+    }
+
+    [Fact]
+    public void OwnRow_HiddenFolderWithADisconnectedTab_NeedsAttention()
+    {
+        ConnectionViewModel sut = CreateViewModel(groupByFolder: true, ownRow: true);
+        SessionTabViewModel ops1 = Open(sut, "ops-1");
+        Open(sut, "lab-1");
+
+        ops1.Status = "Disconnected";
+
+        Assert.Equal(SessionTabHeaderState.Disconnected, ops1.HeaderState);
+        SessionTabGroupHeaderViewModel header = sut.TabGroupHeaders.Single(h => h.Key == Ops);
+        Assert.Equal(SessionTabGroupAttention.Disconnected, header.Attention);
+        Assert.True(header.HasDisconnectedTab);
+        Assert.False(header.HasFailedTab);
+    }
+
+    [Fact]
+    public void OwnRow_ShownFolder_NeverNeedsAttention()
+    {
+        ConnectionViewModel sut = CreateViewModel(groupByFolder: true, ownRow: true);
+        SessionTabViewModel ops1 = Open(sut, "ops-1");
+
+        ops1.Status = "Failed";
+
+        Assert.True(sut.TabGroupHeaders.Single().IsShown);
+        Assert.False(sut.TabGroupHeaders.Single().NeedsAttention);
+    }
+
+    [Fact]
+    public void OwnRow_AttentionFollowsTheTabState_WithoutAStripChange()
+    {
+        ConnectionViewModel sut = CreateViewModel(groupByFolder: true, ownRow: true);
+        SessionTabViewModel ops1 = Open(sut, "ops-1");
+        Open(sut, "lab-1");
+        SessionTabGroupHeaderViewModel header = sut.TabGroupHeaders.Single(h => h.Key == Ops);
+        Assert.False(header.NeedsAttention);
+
+        ops1.Status = "Failed";
+        Assert.True(header.NeedsAttention);
+
+        ops1.Status = "Connected";
+        Assert.Equal(SessionTabGroupAttention.None, header.Attention);
+        Assert.Same(header, sut.TabGroupHeaders.Single(h => h.Key == Ops));
+    }
+
+    [Fact]
+    public async Task OwnRow_AttentionAccessibleName_SaysSo()
+    {
+        LocalizationManager localizer = new();
+        await localizer.LoadAsync(Path.Combine(ViewSource.RepoRoot(), "locales"), "en");
+        ConnectionViewModel sut = new(
+            localizer,
+            new ConnectionViewModelCloseTests.TrackingDialogService(true),
+            new ConnectionViewModelCloseTests.TrackingSplitService(),
+            new PaneCloseArbiter(),
+            new SessionWindowService(static (_, _) => { }))
+        {
+            GroupTabsByFolder = true,
+            TabGroupsOnOwnRow = true,
+            TabGroupResolver = profileId => _folderByProfile.TryGetValue(profileId, out string? folder)
+                ? new SessionTabGroupInfo(folder, folder + " label", "")
+                : null,
+        };
+        SessionTabViewModel ops1 = Open(sut, "ops-1");
+        SessionTabViewModel ops2 = Open(sut, "ops-2");
+        Open(sut, "lab-1");
+        SessionTabGroupHeaderViewModel ops = sut.TabGroupHeaders.Single(h => h.Key == Ops);
+
+        ops1.Status = "Failed";
+        Assert.Equal("Folder Ops, 2 tabs, hidden; at least one tab failed, select to show them", ops.AccessibleName);
+
+        ops1.Status = "Disconnected";
+        Assert.Equal("Folder Ops, 2 tabs, hidden; at least one tab is disconnected, select to show them", ops.AccessibleName);
+
+        sut.ActiveSessions.Remove(ops2);
+        Assert.Equal("Folder Ops, 1 tab, hidden; it is disconnected, select to show it", ops.AccessibleName);
+
+        ops1.Status = "Failed";
+        Assert.Equal("Folder Ops, 1 tab, hidden; it failed, select to show it", ops.AccessibleName);
+    }
+
+    [Fact]
+    public void OwnRow_FailedWinsOverDisconnected()
+    {
+        ConnectionViewModel sut = CreateViewModel(groupByFolder: true, ownRow: true);
+        SessionTabViewModel ops1 = Open(sut, "ops-1");
+        SessionTabViewModel ops2 = Open(sut, "ops-2");
+        Open(sut, "lab-1");
+        SessionTabGroupHeaderViewModel header = sut.TabGroupHeaders.Single(h => h.Key == Ops);
+
+        ops1.Status = "Disconnected";
+        ops2.Status = "Failed";
+        Assert.Equal(SessionTabGroupAttention.Failed, header.Attention);
+
+        ops2.Status = "Connected";
+        Assert.Equal(SessionTabGroupAttention.Disconnected, header.Attention);
+    }
+
+    [Fact]
+    public void OwnRow_AttentionClears_WhenTheFolderBecomesShown()
+    {
+        ConnectionViewModel sut = CreateViewModel(groupByFolder: true, ownRow: true);
+        SessionTabViewModel ops1 = Open(sut, "ops-1");
+        Open(sut, "lab-1");
+        ops1.Status = "Failed";
+        SessionTabGroupHeaderViewModel header = sut.TabGroupHeaders.Single(h => h.Key == Ops);
+        Assert.True(header.NeedsAttention);
+
+        sut.ShowTabGroupCommand.Execute(Ops);
+
+        Assert.True(header.IsShown);
+        Assert.Equal(SessionTabGroupAttention.None, header.Attention);
+    }
+
+    [Fact]
+    public void OwnRow_AttentionClears_WhenTheFailedTabIsClosed()
+    {
+        ConnectionViewModel sut = CreateViewModel(groupByFolder: true, ownRow: true);
+        SessionTabViewModel ops1 = Open(sut, "ops-1");
+        Open(sut, "ops-2");
+        Open(sut, "lab-1");
+        ops1.Status = "Failed";
+        SessionTabGroupHeaderViewModel header = sut.TabGroupHeaders.Single(h => h.Key == Ops);
+        Assert.True(header.NeedsAttention);
+
+        sut.RemoveFromStrip(ops1);
+
+        Assert.Equal(SessionTabGroupAttention.None, header.Attention);
+    }
+
+    [Fact]
+    public void OwnRow_AttentionClears_WhenTheFailedTabMovesToAnotherFolder()
+    {
+        ConnectionViewModel sut = CreateViewModel(groupByFolder: true, ownRow: true);
+        SessionTabViewModel ops1 = Open(sut, "ops-1");
+        Open(sut, "ops-2");
+        Open(sut, "lab-1");
+        ops1.Status = "Failed";
+        SessionTabGroupHeaderViewModel opsHeader = sut.TabGroupHeaders.Single(h => h.Key == Ops);
+        Assert.True(opsHeader.NeedsAttention);
+
+        _folderByProfile["ops-1"] = Lab;
+        sut.RefreshTabGroups();
+
+        Assert.Equal(Lab, ops1.TabGroupKey);
+        Assert.Equal(SessionTabGroupAttention.None, opsHeader.Attention);
+    }
+
+    [Fact]
     public void OwnRow_ShowTabGroup_SelectsLastActiveTabOfThatGroup()
     {
         ConnectionViewModel sut = CreateViewModel(groupByFolder: true, ownRow: true);
