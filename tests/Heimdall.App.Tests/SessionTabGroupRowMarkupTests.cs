@@ -100,11 +100,12 @@ public sealed class SessionTabGroupRowMarkupTests
         XElement button = Named(MainWindow(), "Mw_SessionTabGroupHeader");
 
         XElement buttonTrigger = ShownTrigger(button, "Button");
-        Assert.Equal("{DynamicResource TreeRowSelectedBrush}", SetterValue(buttonTrigger, "Background"));
+        Assert.Equal("{DynamicResource AccentHoverFillBrush}", SetterValue(buttonTrigger, "Background"));
         Assert.Equal("{DynamicResource AccentBorderBrush}", SetterValue(buttonTrigger, "BorderBrush"));
 
-        XElement labelTrigger = ShownTrigger(button, "TextBlock");
+        XElement labelTrigger = ShownTrigger(button, "TextBlock", "FontWeight");
         Assert.Equal("SemiBold", SetterValue(labelTrigger, "FontWeight"));
+        Assert.Equal("{DynamicResource TextOnAccentBrush}", SetterValue(labelTrigger, "Foreground"));
         XElement labelStyle = Assert.IsType<XElement>(labelTrigger.Parent?.Parent);
         Assert.Equal("Normal", SetterValue(labelStyle, "FontWeight"));
         Assert.Equal(
@@ -128,11 +129,56 @@ public sealed class SessionTabGroupRowMarkupTests
             (string?)ring.Attribute("StrokeThickness"));
     }
 
-    private static XElement ShownTrigger(XElement button, string targetType)
+    [Fact]
+    public void TheStripClosesUpOnTheHeaderRow_OnlyWhileItIsVisible()
+    {
+        XDocument doc = MainWindow();
+        XElement strip = Named(doc, "SessionTabControl");
+        XElement style = Assert.Single(
+            strip.Elements().Single(e => e.Name.LocalName == "TabControl.Style").Elements(),
+            e => e.Name.LocalName == "Style");
+        Assert.Equal("{StaticResource HeaderOnlyTabControlStyle}", (string?)style.Attribute("BasedOn"));
+        Assert.Null(strip.Attribute("Style"));
+        Assert.Equal("{StaticResource SessionTabStripPaddingUnderGroupRow}", ShowRowSetter(style, "Padding"));
+
+        XElement panel = Assert.IsType<XElement>(Named(doc, "Mw_SessionTabListButton").Parent);
+        Assert.Null(panel.Attribute("Margin"));
+        XElement panelStyle = Assert.Single(
+            panel.Elements().Single(e => e.Name.LocalName == "StackPanel.Style").Elements(),
+            e => e.Name.LocalName == "Style");
+        Assert.Equal("{StaticResource SessionTabListButtonRowMargin}", SetterValue(panelStyle, "Margin"));
+        Assert.Equal("{StaticResource SessionTabListButtonRowMarginUnderGroupRow}", ShowRowSetter(panelStyle, "Margin"));
+
+        XDocument common = XDocument.Load(
+            Path.Combine(ViewSource.RepoRoot(), "src", "Heimdall.App", "Themes", "CommonControls.xaml"));
+        string Resource(string key) => Assert.Single(
+            common.Descendants(), e => (string?)e.Attribute(Xaml + "Key") == key).Value;
+        Assert.Equal("8,8,8,0", Resource("SessionTabStripPadding"));
+        Assert.Equal("8,2,8,0", Resource("SessionTabStripPaddingUnderGroupRow"));
+        Assert.Equal("0,8,1,1", Resource("SessionTabListButtonRowMargin"));
+        Assert.Equal("0,2,1,1", Resource("SessionTabListButtonRowMarginUnderGroupRow"));
+    }
+
+    private static string? ShowRowSetter(XElement style, string property)
+    {
+        XElement trigger = Assert.Single(
+            style.Descendants(),
+            e => e.Name.LocalName == "DataTrigger"
+                && (string?)e.Attribute("Binding") == "{Binding Connection.ShowTabGroupRow}");
+        return (string?)Assert.Single(
+            trigger.Elements(),
+            e => e.Name.LocalName == "Setter" && (string?)e.Attribute("Property") == property)
+            .Attribute("Value");
+    }
+
+    private static XElement ShownTrigger(XElement button, string targetType, string? stylesProperty = null)
     {
         XElement style = Assert.Single(
             button.Descendants(),
-            e => e.Name.LocalName == "Style" && (string?)e.Attribute("TargetType") == targetType);
+            e => e.Name.LocalName == "Style"
+                && (string?)e.Attribute("TargetType") == targetType
+                && (stylesProperty is null || e.Descendants().Any(
+                    s => s.Name.LocalName == "Setter" && (string?)s.Attribute("Property") == stylesProperty)));
         return Assert.Single(
             style.Descendants(),
             e => e.Name.LocalName == "DataTrigger" && (string?)e.Attribute("Binding") == "{Binding IsShown}");
