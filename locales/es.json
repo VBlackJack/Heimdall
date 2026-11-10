@@ -4864,6 +4864,7 @@
   "PropertiesPanelToolSelected": "Una herramienta no tiene propiedades de sesión. Seleccione una sesión para ver sus propiedades.",
   "PropertiesEditHere": "Editar aquí",
   "PropertiesEditHereToolTip": "Editar el nombre, la dirección, el puerto, el usuario y la carpeta en este panel",
+  "PropertiesEditFullDialogToolTip": "Abrir el cuadro completo de la sesión (Ctrl+E)",
   "PropertiesEditConnectedNote": "Esta sesión está abierta. El cambio surte efecto en la próxima conexión y la pestaña abierta no se modifica.",
   "PropertiesEditUnsavedTitle": "Cambios sin guardar",
   "PropertiesEditUnsavedMessage": "¿Guardar los cambios de {0}?",

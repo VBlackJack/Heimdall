@@ -1318,7 +1318,7 @@
                                                             CommandParameter="{Binding ServerList.SelectedServer}"
                                                             Style="{DynamicResource SecondaryButtonStyle}"
                                                             Padding="12,4"
-                                                            ToolTip="{loc:Translate TooltipEdit}"
+                                                            ToolTip="{loc:Translate PropertiesEditFullDialogToolTip}"
                                                             AutomationProperties.Name="{loc:Translate BtnEdit}"/>
                                                     <!-- The five basic fields in place; Edit above still opens the whole
                                                          session dialog. Absent for a shared row, which is read-only. -->
@@ -1334,8 +1334,10 @@
                                                 <controls:SessionPropertiesEditView x:Name="Mw_PropertiesPanelEditor"
                                                                                     DataContext="{Binding ServerList.PropertiesEdit}"
                                                                                     Visibility="{Binding DataContext.ServerList.PropertiesPanelShowsEditor, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                                <!-- The read-only summary repeats the fields the form edits: hidden while it is open. -->
                                                 <controls:SessionPropertiesView x:Name="Mw_PropertiesPanelView"
-                                                                                DataContext="{Binding ServerList.SelectedServer}"/>
+                                                                                DataContext="{Binding ServerList.SelectedServer}"
+                                                                                Visibility="{Binding DataContext.ServerList.PropertiesPanelShowsActions, RelativeSource={RelativeSource AncestorType=Window}, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                             </StackPanel>
                                             <TextBlock x:Name="Mw_PropertiesPanelEmpty"
                                                        Text="{loc:Translate PropertiesPanelEmpty}"

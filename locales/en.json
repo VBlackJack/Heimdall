@@ -4864,6 +4864,7 @@
   "PropertiesPanelToolSelected": "A tool has no session properties. Select a session to see its properties.",
   "PropertiesEditHere": "Edit here",
   "PropertiesEditHereToolTip": "Edit the name, address, port, username and folder in this panel",
+  "PropertiesEditFullDialogToolTip": "Open the full session dialog (Ctrl+E)",
   "PropertiesEditConnectedNote": "This session is open. The change takes effect at the next connection, and the open tab is not touched.",
   "PropertiesEditUnsavedTitle": "Unsaved changes",
   "PropertiesEditUnsavedMessage": "Save changes to {0}?",
