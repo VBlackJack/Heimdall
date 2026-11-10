@@ -17,6 +17,7 @@
 using System.IO;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 using Heimdall.App.ViewModels.Tools;
 using Heimdall.Core.Logging;
@@ -41,6 +42,14 @@ internal sealed class PasswordGeneratorStore
 
     /// <summary>Where it was left, written only while <see cref="RememberSettings"/> is on.</summary>
     public PasswordGeneratorViewModel.PasswordPreset? Settings { get; set; }
+
+    /// <summary>
+    /// True when the file exists but could not be read or unsealed, so this store is an empty
+    /// stand-in rather than what the file holds. A save is refused while it is set: writing the
+    /// stand-in would replace the operator's real presets with nothing.
+    /// </summary>
+    [JsonIgnore]
+    public bool IsUnreadable { get; init; }
 }
 
 internal interface IPasswordPresetStorage
@@ -107,7 +116,7 @@ internal sealed class PasswordPresetStorage : IPasswordPresetStorage
                     "[PasswordGenerator] The saved presets could not be unsealed and were left "
                     + "untouched. This happens when the file was written by another Windows "
                     + "account, or on another machine.");
-                return new PasswordGeneratorStore();
+                return new PasswordGeneratorStore { IsUnreadable = true };
             }
 
             var store = Parse(json);
@@ -123,14 +132,21 @@ internal sealed class PasswordPresetStorage : IPasswordPresetStorage
         }
         catch (Exception ex)
         {
-            FileLogger.Warn($"[PasswordGenerator] Failed to read the saved presets: {ex.Message}");
-            return new PasswordGeneratorStore();
+            FileLogger.Warn(
+                $"[PasswordGenerator] Failed to read the saved presets, the file is left untouched: {ex.Message}");
+            return new PasswordGeneratorStore { IsUnreadable = true };
         }
     }
 
     public void Save(PasswordGeneratorStore store)
     {
         ArgumentNullException.ThrowIfNull(store);
+
+        if (store.IsUnreadable)
+        {
+            FileLogger.Warn("[PasswordGenerator] The saved presets could not be read, so nothing is written over them.");
+            return;
+        }
 
         try
         {

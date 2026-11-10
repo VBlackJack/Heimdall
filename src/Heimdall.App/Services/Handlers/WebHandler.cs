@@ -131,6 +131,7 @@ internal sealed class WebHandler : IProtocolHandler
             ProxyPort = proxyPort,
             ExternalProgram = server.WebExternalProgram,
             ExternalArguments = server.WebExternalArguments,
+            ExternalExecutionConfirmed = server.ExecutionConfirmed,
             DisplayName = server.DisplayName,
         };
         return new ConnectionResult(true, null, session);

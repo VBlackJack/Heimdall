@@ -28,6 +28,7 @@ using Heimdall.Core.Codecs;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Logging;
 using Heimdall.Core.Models;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Web.WebView2.Core;
 
 namespace Heimdall.App.Views;
@@ -44,6 +45,7 @@ public partial class EmbeddedWebView : UserControl, IDisposable, ISessionPaneOwn
     private readonly HashSet<string> _rejectedCertificates = new(StringComparer.Ordinal);
 
     private WebSessionResult? _session;
+    private bool _externalOpenPending;
     private SessionTabViewModel? _sessionTab;
     private LocalizationManager? _localizer;
     private SessionPaneModel? _ownerPane;
@@ -574,17 +576,70 @@ public partial class EmbeddedWebView : UserControl, IDisposable, ISessionPaneOwn
         }
     }
 
-    private void OnOpenExternallyClick(object sender, RoutedEventArgs e)
+    /// <summary>
+    /// Asks the question the connect path asks for an unconfirmed profile, naming the program and
+    /// its arguments. Without a dialog service nothing can be confirmed, so the answer is no.
+    /// </summary>
+    private Task<bool> ConfirmExternalProgramAsync(string command)
     {
-        if (_session is not { CanOpenExternally: true } session)
+        IDialogService? dialogs = (Application.Current as App)?.Services?.GetService<IDialogService>();
+        if (dialogs is null || _localizer is null)
+        {
+            return Task.FromResult(false);
+        }
+
+        return dialogs.ShowConfirmAsync(
+            _localizer["ConfirmWebExternalProgramTitle"],
+            _localizer.Format("ConfirmWebExternalProgramBody", _session?.DisplayName ?? string.Empty, command),
+            "warning");
+    }
+
+    private async void OnOpenExternallyClick(object sender, RoutedEventArgs e)
+    {
+        // A second click while the prompt is open would stack a second prompt.
+        if (_externalOpenPending || _session is not { CanOpenExternally: true } session)
         {
             return;
         }
 
-        System.Diagnostics.ProcessStartInfo? startInfo = WebExternalLaunch.TryCreateForSession(
+        _externalOpenPending = true;
+        SetOpenExternallyEnabled(false);
+        try
+        {
+            await OpenExternallyAsync(session);
+        }
+        catch (Exception ex)
+        {
+            // An async void handler must not let anything escape: that would end the process.
+            FileLogger.Warn($"Web console external open failed unexpectedly: {ex.GetType().Name}");
+            StatusTextBlock.Text = Text("ErrorWebExternalLaunchFailed");
+        }
+        finally
+        {
+            _externalOpenPending = false;
+            SetOpenExternallyEnabled(true);
+        }
+    }
+
+    private void SetOpenExternallyEnabled(bool enabled)
+    {
+        OpenExternallyButton.IsEnabled = enabled;
+        FallbackOpenExternallyButton.IsEnabled = enabled;
+    }
+
+    private async Task OpenExternallyAsync(WebSessionResult session)
+    {
+        WebExternalLaunch.SessionLaunch launch = await WebExternalLaunch.PrepareForSessionAsync(
             session,
             ConsoleWebView.CoreWebView2?.Source,
-            out string? errorKey);
+            ConfirmExternalProgramAsync);
+        if (launch.Declined)
+        {
+            return;
+        }
+
+        System.Diagnostics.ProcessStartInfo? startInfo = launch.StartInfo;
+        string? errorKey = launch.ErrorKey;
         if (startInfo is null)
         {
             StatusTextBlock.Text = Text(errorKey ?? "ErrorWebExternalLaunchFailed");

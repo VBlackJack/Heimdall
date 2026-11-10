@@ -30,6 +30,7 @@ internal sealed partial class NotesToolViewModel : ObservableObject, IDisposable
     private readonly INotesStorageService _storage;
     private readonly LocalizationManager _localizer;
     private readonly IUiDispatcher _uiDispatcher;
+    private readonly IDialogService? _dialogService;
     private readonly Stack<string> _backStack = new();
     private readonly Stack<string> _forwardStack = new();
     private IReadOnlyList<NoteListItem> _allNotes = Array.Empty<NoteListItem>();
@@ -71,8 +72,10 @@ internal sealed partial class NotesToolViewModel : ObservableObject, IDisposable
     public NotesToolViewModel(
         INotesStorageService storage,
         LocalizationManager localizer,
-        IUiDispatcher uiDispatcher)
+        IUiDispatcher uiDispatcher,
+        IDialogService? dialogService = null)
     {
+        _dialogService = dialogService;
         _storage = storage;
         _localizer = localizer;
         _uiDispatcher = uiDispatcher;
@@ -226,6 +229,13 @@ internal sealed partial class NotesToolViewModel : ObservableObject, IDisposable
     {
         ThrowIfDisposed();
 
+        // The current note is written first: a link followed from an unsaved note must neither
+        // create the target nor move the history when that write fails.
+        if (!await TrySaveOrConfirmDiscardAsync().ConfigureAwait(true))
+        {
+            return;
+        }
+
         var notePath = await _storage.ResolveOrCreateNoteAsync(noteReference).ConfigureAwait(true);
         if (string.Equals(CurrentNotePath, notePath, StringComparison.OrdinalIgnoreCase))
         {
@@ -268,7 +278,11 @@ internal sealed partial class NotesToolViewModel : ObservableObject, IDisposable
         try
         {
             IsBusy = true;
-            await SaveAsync().ConfigureAwait(true);
+            if (!await TrySaveOrConfirmDiscardAsync().ConfigureAwait(true))
+            {
+                return;
+            }
+
             var notePath = await _storage.CreateNoteAsync(kind, _context, _localizer).ConfigureAwait(true);
             await ReloadAsync(notePath).ConfigureAwait(true);
         }
@@ -286,13 +300,67 @@ internal sealed partial class NotesToolViewModel : ObservableObject, IDisposable
     private Task OpenNoteAsync(string path) => OpenNoteCoreAsync(path, pushCurrentToBackStack: true);
 
     [RelayCommand]
-    private async Task SaveAsync()
+    private async Task SaveAsync() => await TrySaveCurrentNoteAsync().ConfigureAwait(true);
+
+    /// <summary>
+    /// Writes the open note when it has unsaved edits.
+    /// </summary>
+    /// <returns>
+    /// True when there was nothing to save or the note was written. False when the write failed:
+    /// the note is still dirty then, the status line says why, and a caller about to replace the
+    /// editor content must stop, or the edits are lost.
+    /// </returns>
+    private async Task<bool> TrySaveOrConfirmDiscardAsync()
+    {
+        if (await TrySaveCurrentNoteAsync().ConfigureAwait(true))
+        {
+            return true;
+        }
+
+        // No dead end: a note that cannot be written would otherwise hold the user in it for
+        // good. They may give the edits up, or keep the note open and dirty.
+        return ConfirmDiscardUnsavedChanges();
+    }
+
+    /// <summary>
+    /// Asks whether the unsaved edits of the open note may be given up after a save failed.
+    /// True means they were discarded and the caller may carry on; false keeps the note open and
+    /// dirty. Without a dialog service nothing can be asked, so the answer is no.
+    /// </summary>
+    /// <remarks>
+    /// Synchronous because the tab and application close paths are: the shell's confirm dialog
+    /// is modal and returns an already completed task, so reading its result cannot block.
+    /// </remarks>
+    public bool ConfirmDiscardUnsavedChanges()
+    {
+        if (_dialogService is null || !IsDirty)
+        {
+            return false;
+        }
+
+        bool discard = _dialogService.ShowConfirmAsync(
+                L("ToolNotesDiscardTitle"),
+                string.Format(L("ToolNotesDiscardBody"), SelectedNoteTitle),
+                "warning",
+                L("ToolNotesDiscardConfirm"),
+                L("ToolNotesDiscardKeep"))
+            .GetAwaiter()
+            .GetResult();
+        if (discard)
+        {
+            IsDirty = false;
+        }
+
+        return discard;
+    }
+
+    private async Task<bool> TrySaveCurrentNoteAsync()
     {
         ThrowIfDisposed();
 
         if (!IsDirty || CurrentNotePath is null)
         {
-            return;
+            return true;
         }
 
         try
@@ -302,10 +370,12 @@ internal sealed partial class NotesToolViewModel : ObservableObject, IDisposable
             await _storage.SaveNoteAsync(CurrentNotePath, CurrentMarkdown).ConfigureAwait(true);
             IsDirty = false;
             SetStatus(string.Format(L("ToolNotesStatusSaved"), DateTime.Now.ToString("HH:mm:ss")));
+            return true;
         }
         catch (Exception ex)
         {
-            SetStatus(string.Format(L("ToolNotesStatusError"), ex.Message), isError: true);
+            SetStatus(string.Format(L("ToolNotesStatusSaveFailed"), ex.Message), isError: true);
+            return false;
         }
         finally
         {
@@ -355,7 +425,11 @@ internal sealed partial class NotesToolViewModel : ObservableObject, IDisposable
         try
         {
             IsBusy = true;
-            await SaveAsync().ConfigureAwait(true);
+            if (!await TrySaveOrConfirmDiscardAsync().ConfigureAwait(true))
+            {
+                return;
+            }
+
             var newPath = await _storage.RenameNoteAsync(CurrentNotePath, newName).ConfigureAwait(true);
             CurrentNotePath = newPath;
             await ReloadAsync(newPath).ConfigureAwait(true);
@@ -384,7 +458,11 @@ internal sealed partial class NotesToolViewModel : ObservableObject, IDisposable
         try
         {
             IsBusy = true;
-            await SaveAsync().ConfigureAwait(true);
+            if (!await TrySaveOrConfirmDiscardAsync().ConfigureAwait(true))
+            {
+                return;
+            }
+
             var copyPath = await _storage
                 .DuplicateNoteAsync(CurrentNotePath, L("ToolNotesDuplicateSuffix"))
                 .ConfigureAwait(true);
@@ -468,7 +546,10 @@ internal sealed partial class NotesToolViewModel : ObservableObject, IDisposable
             return;
         }
 
-        await SaveAsync().ConfigureAwait(true);
+        if (!await TrySaveOrConfirmDiscardAsync().ConfigureAwait(true))
+        {
+            return;
+        }
 
         if (CurrentNotePath is not null)
         {
@@ -490,7 +571,10 @@ internal sealed partial class NotesToolViewModel : ObservableObject, IDisposable
             return;
         }
 
-        await SaveAsync().ConfigureAwait(true);
+        if (!await TrySaveOrConfirmDiscardAsync().ConfigureAwait(true))
+        {
+            return;
+        }
 
         if (CurrentNotePath is not null)
         {
@@ -684,7 +768,15 @@ internal sealed partial class NotesToolViewModel : ObservableObject, IDisposable
             return;
         }
 
-        await SaveAsync().ConfigureAwait(true);
+        if (!await TrySaveOrConfirmDiscardAsync().ConfigureAwait(true))
+        {
+            // The tree already moved to the note that was clicked; the open note is still this
+            // one, so the selection goes back to it. Raised by hand because the value did not
+            // change, and the view only re-reads the selection when told.
+            SelectedNote = FindNodeByPath(Notes, CurrentNotePath);
+            OnPropertyChanged(nameof(SelectedNote));
+            return;
+        }
 
         try
         {

@@ -3079,6 +3079,57 @@ public sealed class PasswordGeneratorViewModelTests : IDisposable
     }
 
     /// <summary>
+    /// A preset file that could not be read is left exactly as it was: the empty store handed back
+    /// in its place must never be written over it when the tool is put away.
+    /// </summary>
+    [Theory]
+    [InlineData("{ this is not json")]
+    [InlineData("[1, 2")]
+    [InlineData("QUJDRA==not-a-sealed-blob")]
+    public void AUnreadablePresetFile_IsNotOverwrittenWhenTheToolIsPutAway(string content)
+    {
+        Directory.CreateDirectory(_presetsDirectoryPath);
+        string file = Path.Combine(_presetsDirectoryPath, "password-presets.json");
+        File.WriteAllText(file, content);
+        byte[] before = File.ReadAllBytes(file);
+
+        var sut = CreateInitializedVm();
+        sut.RememberSettings = true;
+        sut.PersistSettingsIfRemembering();
+
+        Assert.Equal(before, File.ReadAllBytes(file));
+    }
+
+    [Fact]
+    public void AnUnreadablePresetFile_IsSaidInAStatusLine_AndAHealthyOneIsNot()
+    {
+        var healthy = CreateInitializedVm();
+        Assert.False(healthy.ShowPresetsUnreadableNotice);
+
+        Directory.CreateDirectory(_presetsDirectoryPath);
+        File.WriteAllText(Path.Combine(_presetsDirectoryPath, "password-presets.json"), "{ this is not json");
+
+        var sut = CreateInitializedVm();
+
+        Assert.True(sut.ShowPresetsUnreadableNotice);
+        Assert.False(string.IsNullOrEmpty(sut.PresetsUnreadableNotice));
+    }
+
+    [Fact]
+    public void AnAbsentPresetFile_IsCreatedWhenTheToolIsToldToRemember()
+    {
+        string file = Path.Combine(_presetsDirectoryPath, "password-presets.json");
+        Assert.False(File.Exists(file));
+
+        var sut = CreateInitializedVm();
+        sut.RememberSettings = true;
+        sut.PersistSettingsIfRemembering();
+
+        Assert.True(File.Exists(file));
+        Assert.True(new PasswordPresetStorage(_presetsDirectoryPath).Load().RememberSettings);
+    }
+
+    /// <summary>
     /// Saved presets are shown for the mode they belong to, and the ones that belong elsewhere are
     /// counted rather than hidden.
     /// </summary>

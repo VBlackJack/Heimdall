@@ -121,6 +121,13 @@ public partial class NotesToolView : UserControl, IToolView
         _saveTimer.Stop();
         bool saved = _vm.TrySaveSynchronously();
 
+        // A note that cannot be written must not hold its tab (or the application) open for good:
+        // the user may give the edits up, or keep the note.
+        if (!saved && _vm.ConfirmDiscardUnsavedChanges())
+        {
+            saved = true;
+        }
+
         // This tool refuses for one reason only: the note could not be written.
         // That was reported as the tool being busy, so the close was withheld AND
         // the failure that withheld it was never named.

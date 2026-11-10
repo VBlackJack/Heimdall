@@ -277,7 +277,9 @@ public sealed partial class SessionCoordinatorPreMountTests : IDisposable
             ISessionRestoreCoordinator? sessionRestore = null,
             ICommandPaletteViewModelFactory? paletteFactory = null,
             Func<IConfigManager, IProfileLookup>? profileLookupFactory = null,
-            Func<string, LocalizationManager, SharedCredentialApplier>? sharedCredentialsFactory = null)
+            Func<string, LocalizationManager, SharedCredentialApplier>? sharedCredentialsFactory = null,
+            ISessionWindowService? sessionWindows = null,
+            Heimdall.App.Services.WorkspaceLockService? workspaceLock = null)
         {
             string rootPath = Path.Combine(
                 Path.GetTempPath(),
@@ -328,7 +330,7 @@ public sealed partial class SessionCoordinatorPreMountTests : IDisposable
                 dialogService,
                 splitService,
                 closeArbiter,
-                new SessionWindowService(static (_, _) => { }));
+                sessionWindows ?? new SessionWindowService(static (_, _) => { }));
             ServerListViewModel serverList = new ServerListViewModel(
                 configManager,
                 localizer,
@@ -386,7 +388,7 @@ public sealed partial class SessionCoordinatorPreMountTests : IDisposable
                 new ToolsTabPopulationService(toolRegistry),
                 new FakeToolContextProvider(),
                 dispatcher,
-                new Heimdall.App.Services.WorkspaceLockService(
+                workspaceLock ?? new Heimdall.App.Services.WorkspaceLockService(
                     new Heimdall.Core.Security.Vault.VaultLifecycleService(configManager)),
                 serverList,
                 connection,

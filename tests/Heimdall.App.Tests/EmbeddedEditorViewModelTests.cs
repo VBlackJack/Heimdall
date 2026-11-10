@@ -261,6 +261,167 @@ public sealed class EmbeddedEditorViewModelTests
         }
     }
 
+    /// <remarks>
+    /// The error text shown in place of an unreadable file must never be written back over it.
+    /// </remarks>
+    [Fact]
+    public async Task SaveAsync_AfterALoadRefusedForSize_WritesNothing()
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"heimdall-editor-huge-save-{Guid.NewGuid():N}.log");
+        using (FileStream stream = new(path, FileMode.CreateNew, FileAccess.Write))
+        {
+            stream.SetLength(EmbeddedEditorViewModel.MaxLocalFileBytes + 1);
+        }
+
+        try
+        {
+            EmbeddedEditorViewModel viewModel = new();
+            Assert.Null(await viewModel.LoadFileAsync(path));
+            Assert.False(viewModel.CanSave);
+
+            bool saved = await viewModel.SaveAsync("error text shown in the buffer");
+
+            Assert.False(saved);
+            Assert.Equal(EmbeddedEditorViewModel.MaxLocalFileBytes + 1, new FileInfo(path).Length);
+            Assert.Equal(0, (await File.ReadAllBytesAsync(path))[0]);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task SaveAsync_AfterALoadThatCouldNotReadTheFile_WritesNothing()
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"heimdall-editor-locked-{Guid.NewGuid():N}.txt");
+        byte[] original = [0x6F, 0x72, 0x69, 0x67];
+        await File.WriteAllBytesAsync(path, original);
+
+        try
+        {
+            EmbeddedEditorViewModel viewModel = new();
+            using (new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+            {
+                Assert.Null(await viewModel.LoadFileAsync(path));
+            }
+
+            Assert.False(string.IsNullOrEmpty(viewModel.LoadErrorMessage));
+            Assert.False(viewModel.CanSave);
+
+            bool saved = await viewModel.SaveAsync("error text shown in the buffer");
+
+            Assert.False(saved);
+            Assert.Equal(original, await File.ReadAllBytesAsync(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task LoadFileAsync_MissingFile_StaysSavable()
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"heimdall-editor-missing-{Guid.NewGuid():N}.txt");
+        EmbeddedEditorViewModel viewModel = new();
+
+        Assert.Null(await viewModel.LoadFileAsync(path));
+
+        Assert.True(viewModel.CanSave);
+    }
+
+    [Fact]
+    public async Task LoadFileAsync_MissingFile_SaysWhyInTheNoticeArea()
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"heimdall-editor-notice-{Guid.NewGuid():N}.txt");
+        EmbeddedEditorViewModel viewModel = new();
+
+        Assert.Null(await viewModel.LoadFileAsync(path));
+
+        Assert.True(viewModel.HasNotice);
+    }
+
+    [Fact]
+    public async Task CanSave_RaisesChangeNotification_WhenALoadMakesItFalse()
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"heimdall-editor-notify-{Guid.NewGuid():N}.log");
+        using (FileStream stream = new(path, FileMode.CreateNew, FileAccess.Write))
+        {
+            stream.SetLength(EmbeddedEditorViewModel.MaxLocalFileBytes + 1);
+        }
+
+        try
+        {
+            EmbeddedEditorViewModel viewModel = new();
+            List<string?> raised = [];
+            viewModel.PropertyChanged += (_, args) => raised.Add(args.PropertyName);
+
+            await viewModel.LoadFileAsync(path);
+
+            Assert.Contains(nameof(EmbeddedEditorViewModel.CanSave), raised);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task SaveAsync_WhenSavingIsUnavailable_SaysSoInTheNoticeArea()
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"heimdall-editor-savenotice-{Guid.NewGuid():N}.log");
+        using (FileStream stream = new(path, FileMode.CreateNew, FileAccess.Write))
+        {
+            stream.SetLength(EmbeddedEditorViewModel.MaxLocalFileBytes + 1);
+        }
+
+        try
+        {
+            EmbeddedEditorViewModel viewModel = new();
+            await viewModel.LoadFileAsync(path);
+            viewModel.NoticeText = string.Empty;
+
+            Assert.False(await viewModel.SaveAsync("text"));
+
+            Assert.True(viewModel.HasNotice);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task LoadFileAsync_AfterAFailedLoad_ASuccessfulLoadSavesAgain()
+    {
+        string blocked = Path.Combine(Path.GetTempPath(), $"heimdall-editor-reopen-a-{Guid.NewGuid():N}.txt");
+        string healthy = Path.Combine(Path.GetTempPath(), $"heimdall-editor-reopen-b-{Guid.NewGuid():N}.txt");
+        await File.WriteAllTextAsync(blocked, "x");
+        await File.WriteAllTextAsync(healthy, "y");
+
+        try
+        {
+            EmbeddedEditorViewModel viewModel = new();
+            using (new FileStream(blocked, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+            {
+                Assert.Null(await viewModel.LoadFileAsync(blocked));
+            }
+
+            Assert.False(viewModel.CanSave);
+
+            Assert.Equal("y", await viewModel.LoadFileAsync(healthy));
+
+            Assert.True(viewModel.CanSave);
+            Assert.True(await viewModel.SaveAsync("z"));
+        }
+        finally
+        {
+            File.Delete(blocked);
+            File.Delete(healthy);
+        }
+    }
+
     [Fact]
     public void ModifiedTransitions_MoveOnEveryChangeOfIsModified()
     {
