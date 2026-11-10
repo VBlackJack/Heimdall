@@ -1279,6 +1279,23 @@ public sealed partial class ServerListSelectionTests(ITestOutputHelper output)
     {
         public Task<bool> ShowConfirmAsync(string title, string message, string severity = "info") => Task.FromResult(false);
 
+        /// <summary>What the confirmation with named answers returns; false is the decline answer.</summary>
+        public bool NamedConfirmAnswer { get; set; }
+
+        /// <summary>The confirmations with named answers that were asked: message, confirm label, decline label.</summary>
+        public List<(string Message, string ConfirmLabel, string DeclineLabel)> NamedConfirmations { get; } = [];
+
+        public Task<bool> ShowConfirmAsync(
+            string title,
+            string message,
+            string severity,
+            string confirmLabel,
+            string declineLabel)
+        {
+            NamedConfirmations.Add((message, confirmLabel, declineLabel));
+            return Task.FromResult(NamedConfirmAnswer);
+        }
+
         public Task<bool?> ShowSaveDiscardCancelAsync(string title, string message) => Task.FromResult<bool?>(null);
 
         public Task<string?> ShowInputAsync(string title, string prompt, string? defaultValue = null) => Task.FromResult<string?>(null);

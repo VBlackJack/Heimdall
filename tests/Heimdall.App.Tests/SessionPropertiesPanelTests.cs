@@ -384,6 +384,40 @@ public sealed class SessionPropertiesPanelTests
         Assert.Equal("{Binding ServerList.SelectedServer}", (string?)button.Attribute("CommandParameter"));
     }
 
+    /// <summary>
+    /// The read-only summary repeats the fields the inline form edits, so it is shown only while
+    /// the form is not (the same flag that shows Connect, Edit and Edit here), under the title.
+    /// </summary>
+    [Fact]
+    public void TheReadOnlySummary_IsHiddenWhileTheEditFormIsOpen()
+    {
+        XDocument window = LoadXaml("MainWindow.xaml");
+        XElement session = FindNamed(window, "Mw_PropertiesPanelSession");
+        XElement summary = FindNamed(window, "Mw_PropertiesPanelView");
+
+        Assert.Same(session, summary.Parent);
+        Assert.StartsWith(
+            "{Binding DataContext.ServerList.PropertiesPanelShowsActions",
+            (string?)summary.Attribute("Visibility"),
+            StringComparison.Ordinal);
+        Assert.NotNull(FindNamed(window, "Mw_PropertiesPanelName"));
+        Assert.Same(session, FindNamed(window, "Mw_PropertiesPanelName").Parent);
+    }
+
+    /// <summary>Edit and Edit here sit side by side: each says what it opens.</summary>
+    [Fact]
+    public void TheTwoEditButtons_SayWhatTheyOpen()
+    {
+        XDocument window = LoadXaml("MainWindow.xaml");
+
+        Assert.Equal(
+            "{loc:Translate PropertiesEditFullDialogToolTip}",
+            (string?)FindNamed(window, "Mw_PropertiesPanelEditBtn").Attribute("ToolTip"));
+        Assert.Equal(
+            "{loc:Translate PropertiesEditHereToolTip}",
+            (string?)FindNamed(window, "Mw_PropertiesPanelEditHereBtn").Attribute("ToolTip"));
+    }
+
     /// <summary>Closed by mistake, the panel came back only from the tree's filter menu or Settings.</summary>
     [Fact]
     public void TheCloseButtonTooltip_SaysHowToBringThePanelBack()
