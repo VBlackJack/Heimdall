@@ -568,6 +568,7 @@ public sealed partial class SessionCoordinatorPreMountTests
             using TestHarness harness = TestHarness.Create();
             harness.Main.Connection.GroupTabsByFolder = true;
             harness.Main.Connection.TabGroupsOnOwnRow = true;
+            AwaitTabGroupPreferences(harness, ownRow: true);
             SessionTabViewModel ops = CreateSession("ops", "SSH");
             SessionTabViewModel lab = CreateSession("lab", "SSH");
             harness.Main.Connection.ActiveSessions.Add(ops);
@@ -582,6 +583,7 @@ public sealed partial class SessionCoordinatorPreMountTests
             Assert.Null(FindMenuItem(CreateSessionTabMenu(harness.Main, ops), collapseOthers));
 
             harness.Main.Connection.TabGroupsOnOwnRow = false;
+            AwaitTabGroupPreferences(harness, ownRow: false);
             ops.TabGroupKey = "Ops";
             lab.TabGroupKey = "Lab";
             Assert.NotNull(FindMenuItem(CreateSessionTabMenu(harness.Main, ops), collapse));
@@ -824,6 +826,29 @@ public sealed partial class SessionCoordinatorPreMountTests
             Assert.Same(harness.Main.Connection.CollapseOtherTabGroupsCommand, item.Command);
             Assert.Same(ops, item.CommandParameter);
         });
+    }
+
+    // Writing a tab grouping preference saves the settings, and the save publishes them back: the
+    // view model then re-applies what it read from a pooled thread. A toggle made while an earlier
+    // write is still on its way is overwritten by that stale echo, so the test waits until the
+    // stored choice and the view model agree, and stay agreed, before it reads anything.
+    private static void AwaitTabGroupPreferences(TestHarness harness, bool ownRow)
+    {
+        const int settleAttempts = 400;
+        const int settlePollMilliseconds = 25;
+        const int stablePollsRequired = 6;
+
+        int stablePolls = 0;
+        for (int attempt = 0; attempt < settleAttempts && stablePolls < stablePollsRequired; attempt++)
+        {
+            AppSettings stored = harness.Main.ConfigManager.LoadSettingsAsync().GetAwaiter().GetResult();
+            bool settled = stored.SessionTabGroupsOnOwnRow == ownRow
+                && harness.Main.Connection.TabGroupsOnOwnRow == ownRow;
+            stablePolls = settled ? stablePolls + 1 : 0;
+            Thread.Sleep(settlePollMilliseconds);
+        }
+
+        Assert.Equal(ownRow, harness.Main.Connection.TabGroupsOnOwnRow);
     }
 
     private static SessionTabViewModel CreateSession(string serverId, string connectionType)
