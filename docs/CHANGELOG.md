@@ -12,6 +12,53 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-11-10: close fix, session tree and tab strip ergonomics (v2026.111001)
+
+Two fixes and six ergonomics changes from discussion #500, merged as #752 to #758. The user-facing
+summary and the upgrade notes are in the release notes.
+
+### Fixes (#752)
+
+- **Exit confirmation.** `MainWindow.OnClosing` formatted `ConfirmCloseAllTabsMessage` with one
+  argument for two placeholders; the `FormatException` cancelled the close. The prompt is now built
+  by `ShutdownDecisions.BuildExitConfirmation` from `ConfirmCloseSessionGroupTitle` and
+  `ConfirmCloseSessionGroupMessage`. `WindowClosingFlow.TryPrepareCloseAsync` reports a prompt that
+  throws through `CloseNotConfirmedTitle` / `CloseNotConfirmedMessage`.
+- **SSH.** `FailureClassifier.ClassifyConnectionException` maps a disconnect whose reason is
+  `ProtocolError` or `None` and whose message carries "too many authentication failures" to
+  `TooManyAuthFailures`. `ErrorSshTooManyAuthFailures` mentions agent keys.
+
+### Session tree (#753, #754, #755)
+
+- `AppSettings.CompactSessionTree` (default false): row metrics are named resources applied by
+  `SessionTreeDensity`; the row pitch goes from 30 (session) and 36 or 37 (folder) to 24 pixels.
+- `AppSettings.ActivateOpenSessionOnTreeClick` (default false): `TreeClickActivationDecision`
+  resolves a plain click released on the row it was pressed on; a detached tab is raised through
+  `ISessionWindowService.BringDetachedSessionToFront`.
+- `AppSettings.FolderOrder`: a flat list of local folder paths whose position is the rank, compared
+  ignoring case. `FolderOrdering` sorts siblings; Alt+Up, Alt+Down, `TreeCtxMoveUp` and
+  `TreeCtxMoveDown` nudge a folder or a session. Rename and delete rewrite the list. Known limits: an
+  undo of a move does not restore the rank, and a nudge under a filter can swap with a hidden
+  sibling.
+
+### Tab strip (#756, #758)
+
+- The strip is 37 pixels high instead of 55 (`SessionTabHeight`, `SessionTabItemPadding`,
+  `SessionTabHeaderPadding`); pointer targets stay at 24 pixels. `ThemedTabItemStyle` is unchanged.
+- `AppSettings.SessionTabGroupsOnOwnRow` (default false), effective with tab grouping on:
+  `ConnectionViewModel.TabGroupHeaders` feeds a header row above the strip. The shown folder is
+  recomputed on every refresh from the selected tab; every other folder is collapsed, its head
+  included. Each folder remembers its last selected tab for the life of the window. A hidden folder
+  carries `SessionTabGroupAttention` (Disconnected or Failed, Failed wins). Closing the last tab of
+  the shown folder selects a visible tab. The row is one tab stop with arrow navigation.
+
+### Properties panel (#757)
+
+- `SessionPropertiesEditViewModel` edits display name, host, port, username and folder in the panel.
+  The save re-finds the profile by id, refuses when the connection type changed meanwhile, validates
+  the merge of typed and stored values, and writes only the changed fields. The read-only summary is
+  hidden while the form is open.
+
 ## 2026-11-05: missing MobaXterm variables (v2026.110502)
 
 One fix and one test fix, merged as #750 and #749. The user-facing summary and the upgrade notes are
