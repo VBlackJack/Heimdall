@@ -252,6 +252,8 @@
          padding, a header's margin and padding, the gap after its colour dot, and the gap before
          its tab count. -->
     <sys:Double x:Key="SessionTabGroupDotSize">8</sys:Double>
+    <!-- Outline of the shown folder header's dot, drawn inside the dot's own box so its size holds. -->
+    <sys:Double x:Key="SessionTabGroupDotOutlineThickness">1</sys:Double>
     <!-- Space above the tabs, and above the list button that mirrors it: the strip's own 8, or 2
          while the row of folder headers sits right above it so the two rows read as one block. -->
     <Thickness x:Key="SessionTabStripPadding">8,8,8,0</Thickness>

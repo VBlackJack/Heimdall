@@ -114,6 +114,24 @@ public sealed class SessionTabGroupRowMarkupTests
     }
 
     [Fact]
+    public void TheShownHeadersDotIsOutlinedInTheLabelBrush_WithoutChangingItsBox()
+    {
+        XElement button = Named(MainWindow(), "Mw_SessionTabGroupHeader");
+        XElement dot = Assert.Single(
+            button.Descendants(),
+            e => e.Name.LocalName == "Ellipse" && (string?)e.Attribute("Width") == "{StaticResource SessionTabGroupDotSize}");
+        XElement style = Assert.Single(dot.Descendants(), e => e.Name.LocalName == "Style");
+        XElement shown = Assert.Single(
+            style.Descendants(),
+            e => e.Name.LocalName == "DataTrigger" && (string?)e.Attribute("Binding") == "{Binding IsShown}");
+
+        Assert.Equal("{DynamicResource TextOnAccentBrush}", SetterValue(shown, "Stroke"));
+        Assert.Equal("{StaticResource SessionTabGroupDotOutlineThickness}", SetterValue(shown, "StrokeThickness"));
+        Assert.Null(dot.Attribute("Stroke"));
+        Assert.Equal("{StaticResource SessionTabGroupDotSize}", (string?)dot.Attribute("Height"));
+    }
+
+    [Fact]
     public void TheAttentionMarksAreTheStripsOwn_EachBoundToItsState()
     {
         XDocument doc = MainWindow();

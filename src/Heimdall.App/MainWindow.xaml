@@ -1693,6 +1693,12 @@
                                                             <DataTrigger Binding="{Binding HasColor}" Value="True">
                                                                 <Setter Property="Fill" Value="{Binding Color, Converter={StaticResource StringToBrushConverter}}"/>
                                                             </DataTrigger>
+                                                            <!-- On the accent fill of the shown header the dot gets an outline in the
+                                                                 label's brush; the box is fixed, so nothing shifts. -->
+                                                            <DataTrigger Binding="{Binding IsShown}" Value="True">
+                                                                <Setter Property="Stroke" Value="{DynamicResource TextOnAccentBrush}"/>
+                                                                <Setter Property="StrokeThickness" Value="{StaticResource SessionTabGroupDotOutlineThickness}"/>
+                                                            </DataTrigger>
                                                         </Style.Triggers>
                                                     </Style>
                                                 </Ellipse.Style>
