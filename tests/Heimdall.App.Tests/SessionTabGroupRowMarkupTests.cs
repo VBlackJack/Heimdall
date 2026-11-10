@@ -1,0 +1,135 @@
+/*
+ * Copyright 2026 Julien Bombled
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+using System.IO;
+using System.Xml.Linq;
+using Heimdall.App.Tests.Views.EmbeddedRdp;
+
+namespace Heimdall.App.Tests;
+
+/// <summary>
+/// The folders' own row sits above the session tab strip, in a row of the same host, so the strip
+/// and its list button keep sharing one row and the content area keeps the rest.
+/// </summary>
+public sealed class SessionTabGroupRowMarkupTests
+{
+    private static readonly XNamespace Xaml = "http://schemas.microsoft.com/winfx/2006/xaml";
+
+    [Fact]
+    public void TheHeaderRowIsAboveTheStrip_AndTheContentIsBelowIt()
+    {
+        XDocument doc = MainWindow();
+        XElement host = Named(doc, "SessionDragDropHost");
+        List<XElement> rows = host.Elements()
+            .Single(e => e.Name.LocalName == "Grid.RowDefinitions")
+            .Elements()
+            .ToList();
+
+        Assert.Equal(3, rows.Count);
+        Assert.Equal("Auto", (string?)rows[0].Attribute("Height"));
+        Assert.Equal("Auto", (string?)rows[1].Attribute("Height"));
+        Assert.Equal("*", (string?)rows[2].Attribute("Height"));
+        Assert.Equal("0", GridRow(Named(doc, "Mw_SessionTabGroupRow")));
+        Assert.Equal("1", GridRow(Named(doc, "SessionTabControl")));
+        Assert.Equal("2", GridRow(Named(doc, "SessionContentHost")));
+        Assert.All(
+            new[] { "Mw_SessionTabGroupRow", "SessionTabControl", "SessionContentHost" },
+            name => Assert.Same(host, Named(doc, name).Parent));
+    }
+
+    [Fact]
+    public void TheListButtonSharesTheStripsRow()
+    {
+        XDocument doc = MainWindow();
+        XElement button = Named(doc, "Mw_SessionTabListButton");
+        XElement panel = Assert.IsType<XElement>(button.Parent);
+
+        Assert.Same(Named(doc, "SessionDragDropHost"), panel.Parent);
+        Assert.Equal(GridRow(Named(doc, "SessionTabControl")), GridRow(panel));
+    }
+
+    [Fact]
+    public void TheHeaderRowIsOneTabStopWithArrowNavigation_AndIsNamed()
+    {
+        XElement row = Named(MainWindow(), "Mw_SessionTabGroupRow");
+
+        Assert.Equal("False", (string?)row.Attribute("Focusable"));
+        Assert.Equal("Once", (string?)row.Attribute("KeyboardNavigation.TabNavigation"));
+        Assert.Equal("Cycle", (string?)row.Attribute("KeyboardNavigation.DirectionalNavigation"));
+        Assert.False(string.IsNullOrWhiteSpace((string?)row.Attribute("AutomationProperties.Name")));
+    }
+
+    [Fact]
+    public void TheHeaderButtonIsAPointerTargetBoundToTheShowCommand()
+    {
+        XElement button = Named(MainWindow(), "Mw_SessionTabGroupHeader");
+
+        Assert.Equal("{StaticResource SessionTabPointerTargetSize}", (string?)button.Attribute("MinHeight"));
+        Assert.Null(button.Attribute("Width"));
+        Assert.Null(button.Attribute("Height"));
+        Assert.Null(button.Attribute("Focusable"));
+        Assert.StartsWith(
+            "{Binding DataContext.Connection.ShowTabGroupCommand",
+            (string?)button.Attribute("Command"),
+            StringComparison.Ordinal);
+        Assert.Equal("{Binding Key}", (string?)button.Attribute("CommandParameter"));
+        XElement style = Assert.Single(
+            button.Descendants(), e => e.Name.LocalName == "Style" && (string?)e.Attribute("TargetType") == "Button");
+        XElement name = Assert.Single(
+            style.Elements(),
+            e => e.Name.LocalName == "Setter" && (string?)e.Attribute("Property") == "AutomationProperties.Name");
+        Assert.Equal("{Binding AccessibleName}", (string?)name.Attribute("Value"));
+    }
+
+    [Fact]
+    public void TheChipIsDrawnOnlyWhenTheTabShowsIt_AndStaysOutOfTheTabOrder()
+    {
+        XElement chip = Named(MainWindow(), "Mw_SessionTabGroupChip");
+
+        Assert.StartsWith(
+            "{Binding ShowsTabGroupChip",
+            (string?)chip.Attribute("Visibility"),
+            StringComparison.Ordinal);
+        Assert.Equal("False", (string?)chip.Attribute("Focusable"));
+    }
+
+    [Fact]
+    public void TheHeaderSpacingIsNamedResources()
+    {
+        XDocument common = XDocument.Load(
+            Path.Combine(ViewSource.RepoRoot(), "src", "Heimdall.App", "Themes", "CommonControls.xaml"));
+        string[] keys =
+        [
+            "SessionTabGroupDotSize",
+            "SessionTabGroupRowPadding",
+            "SessionTabGroupHeaderMargin",
+            "SessionTabGroupHeaderPadding",
+            "SessionTabGroupHeaderDotMargin",
+            "SessionTabGroupHeaderCountMargin",
+        ];
+
+        Assert.All(keys, key =>
+            Assert.Single(common.Descendants(), e => (string?)e.Attribute(Xaml + "Key") == key));
+    }
+
+    private static string? GridRow(XElement element) => (string?)element.Attribute("Grid.Row");
+
+    private static XElement Named(XDocument document, string name) =>
+        Assert.Single(document.Descendants(), e => (string?)e.Attribute(Xaml + "Name") == name);
+
+    private static XDocument MainWindow() =>
+        XDocument.Load(Path.Combine(ViewSource.RepoRoot(), "src", "Heimdall.App", "MainWindow.xaml"));
+}

@@ -137,6 +137,13 @@ public partial class SessionTabViewModel : ObservableObject
     [ObservableProperty]
     private bool _isTabGroupHead;
 
+    /// <summary>
+    /// True when this tab draws the folder chip: it heads its group and the folders are not on
+    /// their own row, where the header row draws them instead.
+    /// </summary>
+    [ObservableProperty]
+    private bool _showsTabGroupChip;
+
     /// <summary>True when this tab's group is collapsed.</summary>
     [ObservableProperty]
     private bool _isTabGroupCollapsed;

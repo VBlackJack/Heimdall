@@ -199,6 +199,16 @@ est conservé.
   d'outils, les connexions rapides et les sessions rangées hors de tout dossier ne sont jamais
   rangés ainsi.
 
+Pour garder la barre courte, cochez **Afficher les dossiers sur leur propre ligne**, juste en
+dessous (disponible tant que les onglets sont groupés par dossier). Les dossiers se placent alors
+sur une ligne à part au-dessus de la barre, un bouton par dossier avec sa couleur, son nom et son
+nombre d'onglets, et la barre n'affiche que les onglets du dossier dans lequel vous travaillez.
+Cliquez sur un dossier pour revenir à l'onglet que vous y avez utilisé en dernier : la barre passe
+aux onglets de ce dossier. Les onglets épinglés et ceux hors de tout dossier restent visibles.
+Ctrl+Tab ne parcourt que les onglets visibles, et les commandes de repli propres aux dossiers ne
+sont plus proposées. Après un redémarrage, c'est le dossier du dernier onglet restauré qui est
+affiché.
+
 ## Où vivent vos mots de passe
 
 Les mots de passe enregistrés dans une session sont chiffrés sur votre propre machine, liés à votre

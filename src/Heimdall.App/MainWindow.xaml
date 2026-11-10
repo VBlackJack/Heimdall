@@ -1615,12 +1615,118 @@
                           Grid.Row="0"
                           Visibility="{Binding Connection.HasActiveSessions, Converter={StaticResource BoolToVisibilityConverter}}">
                         <Grid.RowDefinitions>
+                            <!-- Row 0: folder headers (folders on their own row), empty otherwise -->
                             <RowDefinition Height="Auto"/>
+                            <!-- Row 1: the tab strip and its list button -->
+                            <RowDefinition Height="Auto"/>
+                            <!-- Row 2: the session content -->
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
 
+                        <!-- Folders on their own row: one header per folder with a tab open, above the strip,
+                             which then shows the tabs of the selected tab's folder only. Selecting a header
+                             selects the tab last used in that folder. One Tab stop for the row, arrows move
+                             between headers. Not a drop target: a tab let go over it is not detached. -->
+                        <ItemsControl x:Name="Mw_SessionTabGroupRow"
+                                      Grid.Row="0"
+                                      ItemsSource="{Binding Connection.TabGroupHeaders}"
+                                      Padding="{StaticResource SessionTabGroupRowPadding}"
+                                      Background="{DynamicResource BackgroundBrush}"
+                                      Visibility="{Binding Connection.ShowTabGroupRow, Converter={StaticResource BoolToVisibilityConverter}}"
+                                      Focusable="False"
+                                      KeyboardNavigation.TabNavigation="Once"
+                                      KeyboardNavigation.DirectionalNavigation="Cycle"
+                                      AutomationProperties.Name="{loc:Translate SessionTabGroupRowA11y}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel Orientation="Horizontal"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate DataType="{x:Type vm:SessionTabGroupHeaderViewModel}">
+                                    <Button x:Name="Mw_SessionTabGroupHeader"
+                                            Margin="{StaticResource SessionTabGroupHeaderMargin}"
+                                            MinHeight="{StaticResource SessionTabPointerTargetSize}"
+                                            Command="{Binding DataContext.Connection.ShowTabGroupCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                            CommandParameter="{Binding Key}"
+                                            ToolTip="{Binding AccessibleName}">
+                                        <!-- The folder being shown: raised surface and an accent frame, so the
+                                             state is not carried by the text weight alone. -->
+                                        <Button.Style>
+                                            <Style TargetType="Button">
+                                                <Setter Property="Background" Value="{DynamicResource SurfaceBrush}"/>
+                                                <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+                                                <Setter Property="FocusVisualStyle" Value="{StaticResource AppFocusVisualStyle}"/>
+                                                <Setter Property="AutomationProperties.Name" Value="{Binding AccessibleName}"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding IsShown}" Value="True">
+                                                        <Setter Property="Background" Value="{DynamicResource CardBrush}"/>
+                                                        <Setter Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Button.Style>
+                                        <Button.Template>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border x:Name="HeaderBorder"
+                                                        CornerRadius="{StaticResource CornerRadiusSm}"
+                                                        BorderThickness="1"
+                                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                                        Background="{TemplateBinding Background}"
+                                                        Padding="{StaticResource SessionTabGroupHeaderPadding}">
+                                                    <ContentPresenter VerticalAlignment="Center"/>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="HeaderBorder" Property="BorderBrush" Value="{DynamicResource BorderStrongBrush}"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Button.Template>
+                                        <StackPanel Orientation="Horizontal">
+                                            <Ellipse Width="{StaticResource SessionTabGroupDotSize}" Height="{StaticResource SessionTabGroupDotSize}" VerticalAlignment="Center"
+                                                     Margin="{StaticResource SessionTabGroupHeaderDotMargin}">
+                                                <Ellipse.Style>
+                                                    <Style TargetType="Ellipse">
+                                                        <Setter Property="Fill" Value="{DynamicResource InfoIndicatorBrush}"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding HasColor}" Value="True">
+                                                                <Setter Property="Fill" Value="{Binding Color, Converter={StaticResource StringToBrushConverter}}"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </Ellipse.Style>
+                                            </Ellipse>
+                                            <TextBlock Text="{Binding Label}"
+                                                       FontSize="{StaticResource FontSizeSmallCaption}"
+                                                       VerticalAlignment="Center"
+                                                       TextTrimming="CharacterEllipsis" MaxWidth="{StaticResource SessionTabGroupLabelMaxWidth}">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}"/>
+                                                        <Setter Property="FontWeight" Value="Normal"/>
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding IsShown}" Value="True">
+                                                                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                                                                <Setter Property="FontWeight" Value="SemiBold"/>
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                            <TextBlock Text="{Binding TabCount}"
+                                                       FontSize="{StaticResource FontSizeSmallCaption}"
+                                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                                       VerticalAlignment="Center"
+                                                       Margin="{StaticResource SessionTabGroupHeaderCountMargin}"/>
+                                        </StackPanel>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
                         <TabControl x:Name="SessionTabControl"
-                                    Grid.Row="0"
+                                    Grid.Row="1"
                                     ItemsSource="{Binding Connection.ActiveSessions}"
                                     SelectedItem="{Binding Connection.ActiveSession}"
                                     AllowDrop="True"
@@ -1648,7 +1754,9 @@
                                     <Setter Property="AutomationProperties.Name"
                                             Value="{Binding AccessibleName}"/>
                                     <!-- A tab folded away in a collapsed folder group leaves the strip;
-                                         the group head stays to carry the chip that opens it again. -->
+                                         the group head stays to carry the chip that opens it again.
+                                         On the folders' own row the head folds away too: the header row
+                                         carries the folder. -->
                                     <Style.Triggers>
                                         <DataTrigger Binding="{Binding IsHiddenInCollapsedGroup}" Value="True">
                                             <Setter Property="Visibility" Value="Collapsed"/>
@@ -1677,7 +1785,7 @@
                                                     Padding="0" BorderThickness="0" Background="Transparent"
                                                     MinHeight="{StaticResource SessionTabPointerTargetSize}"
                                                     Focusable="False"
-                                                    Visibility="{Binding IsTabGroupHead, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                    Visibility="{Binding ShowsTabGroupChip, Converter={StaticResource BoolToVisibilityConverter}}"
                                                     Command="{Binding DataContext.Connection.ToggleTabGroupCollapsedCommand, RelativeSource={RelativeSource AncestorType=TabControl}}"
                                                     CommandParameter="{Binding}"
                                                     ToolTip="{Binding TabGroupAccessibleName}"
@@ -1697,7 +1805,7 @@
                                                         Background="{DynamicResource SurfaceBrush}"
                                                         Padding="6,1">
                                                     <StackPanel Orientation="Horizontal">
-                                                        <Ellipse x:Name="TabGroupChipDot" Width="8" Height="8"
+                                                        <Ellipse x:Name="TabGroupChipDot" Width="{StaticResource SessionTabGroupDotSize}" Height="{StaticResource SessionTabGroupDotSize}"
                                                                  VerticalAlignment="Center" Margin="0,0,5,0">
                                                             <Ellipse.Style>
                                                                 <Style TargetType="Ellipse">
@@ -1966,7 +2074,7 @@
                              included, shown only while the tabs overflow. Drawn over the strip, which
                              makes room for it so the selected tab never sits underneath
                              (UpdateTabStripOverflow). -->
-                        <StackPanel Grid.Row="0"
+                        <StackPanel Grid.Row="1"
                                     Orientation="Horizontal"
                                     HorizontalAlignment="Right"
                                     Margin="0,8,1,1">
@@ -1990,7 +2098,7 @@
                         </StackPanel>
 
                         <Grid x:Name="SessionContentHost"
-                              Grid.Row="1"
+                              Grid.Row="2"
                               Background="Transparent"
                               ClipToBounds="True"
                               AllowDrop="True"

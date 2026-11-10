@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
@@ -31,6 +32,9 @@ namespace Heimdall.App.ViewModels;
 /// <para>Pinned tabs stay out of every group, as in a browser: they keep the front of the strip
 /// and a group may not reach into it.</para>
 /// <para>Collapsing is a view state for the lifetime of the window, like pinning.</para>
+/// <para>With <see cref="TabGroupsOnOwnRow"/> the folders sit on a row of their own and the strip
+/// shows the tabs of one folder at a time: the folder of the selected tab. Which folders are
+/// folded is then derived from the selection on every refresh, never toggled by hand.</para>
 /// </remarks>
 public partial class ConnectionViewModel
 {
@@ -38,7 +42,22 @@ public partial class ConnectionViewModel
     private const string TabGroupChipCollapsedKey = "SessionTabGroupChipCollapsedA11y";
     private const string TabGroupChipLoneKey = "SessionTabGroupChipLoneA11y";
 
+    private const string TabGroupHeaderShownKey = "SessionTabGroupHeaderShownA11y";
+    private const string TabGroupHeaderHiddenKey = "SessionTabGroupHeaderHiddenA11y";
+    private const string TabGroupHeaderShownOneKey = "SessionTabGroupHeaderShownOneA11y";
+    private const string TabGroupHeaderHiddenOneKey = "SessionTabGroupHeaderHiddenOneA11y";
+
     private readonly HashSet<string> _collapsedTabGroups = new(StringComparer.OrdinalIgnoreCase);
+
+    // Own-row mode only: the tab last selected in each folder, so showing a folder again goes back
+    // to where the user was in it.
+    private readonly Dictionary<string, SessionTabViewModel> _lastActiveTabByGroup = new(StringComparer.OrdinalIgnoreCase);
+
+    // Own-row mode only: the folder shown while the selected tab is in none (a pinned tab, a tab
+    // outside any folder), so selecting one does not fold every folder away.
+    private string? _lastShownTabGroup;
+
+    private bool _wasTabGroupRowActive;
 
     private Func<string, SessionTabGroupInfo?>? _tabGroupResolver;
 
@@ -46,7 +65,28 @@ public partial class ConnectionViewModel
     /// True when the session tabs are grouped by the folder of their profile.
     /// </summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsTabGroupRowActive))]
     private bool _groupTabsByFolder;
+
+    /// <summary>
+    /// True when the folders are drawn on a row of their own and the strip shows one folder's tabs
+    /// at a time. Only takes effect while <see cref="GroupTabsByFolder"/> is on.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsTabGroupRowActive))]
+    private bool _tabGroupsOnOwnRow;
+
+    /// <summary>True when the folders are on their own row: grouping on and the option chosen.</summary>
+    public bool IsTabGroupRowActive => GroupTabsByFolder && TabGroupsOnOwnRow;
+
+    /// <summary>One header per folder present in the strip, in strip order. Empty outside the own-row mode.</summary>
+    public ObservableCollection<SessionTabGroupHeaderViewModel> TabGroupHeaders { get; } = [];
+
+    /// <summary>True when <see cref="TabGroupHeaders"/> holds at least one header.</summary>
+    public bool HasTabGroupHeaders => TabGroupHeaders.Count > 0;
+
+    /// <summary>True when the row of folder headers is drawn.</summary>
+    public bool ShowTabGroupRow => IsTabGroupRowActive && HasTabGroupHeaders;
 
     /// <summary>
     /// Answers the folder group of a profile id, or null when the profile is in no folder or is
@@ -65,12 +105,43 @@ public partial class ConnectionViewModel
     /// <summary>The folder groups currently collapsed. Exposed for tests.</summary>
     internal IReadOnlyCollection<string> CollapsedTabGroups => _collapsedTabGroups;
 
-    partial void OnGroupTabsByFolderChanged(bool value) => RefreshTabGroups();
+    partial void OnGroupTabsByFolderChanged(bool value)
+    {
+        LeaveTabGroupRowModeIfEnded();
+        RefreshTabGroups();
+    }
+
+    partial void OnTabGroupsOnOwnRowChanged(bool value)
+    {
+        LeaveTabGroupRowModeIfEnded();
+        RefreshTabGroupFlags();
+    }
+
+    // When the folders leave their own row every folder unfolds, and what the mode remembered goes.
+    private void LeaveTabGroupRowModeIfEnded()
+    {
+        bool active = IsTabGroupRowActive;
+        if (_wasTabGroupRowActive && !active)
+        {
+            _collapsedTabGroups.Clear();
+            _lastActiveTabByGroup.Clear();
+            _lastShownTabGroup = null;
+        }
+
+        _wasTabGroupRowActive = active;
+    }
 
     // A tab that becomes the selected one is never left folded away: selecting it, from the
-    // keyboard, the tree or a new connection, opens its group.
+    // keyboard, the tree or a new connection, opens its group. On the own row the whole fold
+    // state follows the selection, so it is recomputed whatever the tab.
     partial void OnActiveSessionChanged(SessionTabViewModel? value)
     {
+        if (IsTabGroupRowActive)
+        {
+            RefreshTabGroupFlags();
+            return;
+        }
+
         if (value?.TabGroupKey is { } key && _collapsedTabGroups.Remove(key))
         {
             RefreshTabGroupFlags();
@@ -100,7 +171,10 @@ public partial class ConnectionViewModel
     [RelayCommand]
     private void ToggleTabGroupCollapsed(SessionTabViewModel? session)
     {
-        if (session?.TabGroupKey is not { } key || !ActiveSessions.Contains(session))
+        // On the own row the selection decides what is folded; a hand toggle would be undone.
+        if (IsTabGroupRowActive
+            || session?.TabGroupKey is not { } key
+            || !ActiveSessions.Contains(session))
         {
             return;
         }
@@ -136,7 +210,9 @@ public partial class ConnectionViewModel
     [RelayCommand]
     private void CollapseOtherTabGroups(SessionTabViewModel? session)
     {
-        if (session?.TabGroupKey is not { } key || !ActiveSessions.Contains(session))
+        if (IsTabGroupRowActive
+            || session?.TabGroupKey is not { } key
+            || !ActiveSessions.Contains(session))
         {
             return;
         }
@@ -157,6 +233,31 @@ public partial class ConnectionViewModel
         }
 
         RefreshTabGroupFlags();
+    }
+
+    /// <summary>
+    /// Shows the folder <paramref name="key"/> on the own row: selects the tab last selected in it,
+    /// or its first tab when none is remembered. The fold state then follows the selection.
+    /// </summary>
+    [RelayCommand]
+    private void ShowTabGroup(string? key)
+    {
+        if (!IsTabGroupRowActive || string.IsNullOrEmpty(key))
+        {
+            return;
+        }
+
+        SessionTabViewModel? target =
+            _lastActiveTabByGroup.TryGetValue(key, out SessionTabViewModel? remembered)
+            && ActiveSessions.Contains(remembered)
+            && IsInTabGroup(remembered, key)
+                ? remembered
+                : ActiveSessions.FirstOrDefault(tab => IsInTabGroup(tab, key));
+
+        if (target is not null)
+        {
+            ActiveSession = target;
+        }
     }
 
     /// <summary>True when the strip holds a folder group other than the one of <paramref name="session"/>.</summary>
@@ -386,16 +487,36 @@ public partial class ConnectionViewModel
 
     /// <summary>
     /// Recomputes which tab heads each group, which are folded away, and what the chip announces.
-    /// Touches no collection, so it is safe from inside a collection-change notification.
+    /// Touches no tab collection, so it is safe from inside a collection-change notification; the
+    /// header list it reconciles is not the one the strip is bound to.
     /// </summary>
     private void RefreshTabGroupFlags()
     {
+        bool ownRow = IsTabGroupRowActive;
+        _wasTabGroupRowActive = ownRow;
+
+        var present = new List<string>();
+        var presentSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (SessionTabViewModel session in ActiveSessions)
+        {
+            if (session.TabGroupKey is { } groupKey && presentSet.Add(groupKey))
+            {
+                present.Add(groupKey);
+            }
+        }
+
+        if (ownRow)
+        {
+            ApplyOwnRowFoldState(present, presentSet);
+        }
+
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (SessionTabViewModel session in ActiveSessions)
         {
             if (session.TabGroupKey is not { } key)
             {
                 session.IsTabGroupHead = false;
+                session.ShowsTabGroupChip = false;
                 session.IsTabGroupCollapsed = false;
                 session.IsHiddenInCollapsedGroup = false;
                 session.TabGroupAccessibleName = string.Empty;
@@ -405,8 +526,10 @@ public partial class ConnectionViewModel
             bool head = seen.Add(key);
             bool collapsed = _collapsedTabGroups.Contains(key);
             session.IsTabGroupHead = head;
+            session.ShowsTabGroupChip = head && !ownRow;
             session.IsTabGroupCollapsed = collapsed;
-            session.IsHiddenInCollapsedGroup = collapsed && !head;
+            // On the own row the head folds away with its group: the header row carries the folder.
+            session.IsHiddenInCollapsedGroup = collapsed && (ownRow || !head);
             // The same test the toggle makes: with no tab left to select outside the group, a
             // click on the chip leaves it open, and the chip used to give no reason why.
             string chipKey = collapsed
@@ -418,5 +541,120 @@ public partial class ConnectionViewModel
         // A group that no longer has a tab forgets it was collapsed: the next tab of that folder
         // opens it afresh rather than arriving folded away.
         _collapsedTabGroups.RemoveWhere(key => !seen.Contains(key));
+
+        ReconcileTabGroupHeaders(ownRow);
+    }
+
+    /// <summary>
+    /// The own-row invariant, recomputed on every refresh rather than driven by events: the folder
+    /// shown is that of the selected tab when it is in the strip, else the one last shown while
+    /// it is still there, else none; every other folder present is folded.
+    /// </summary>
+    private void ApplyOwnRowFoldState(List<string> present, HashSet<string> presentSet)
+    {
+        foreach (string stale in _lastActiveTabByGroup
+            .Where(entry => !ActiveSessions.Contains(entry.Value) || !IsInTabGroup(entry.Value, entry.Key))
+            .Select(entry => entry.Key)
+            .ToList())
+        {
+            _lastActiveTabByGroup.Remove(stale);
+        }
+
+        string? shown = null;
+        if (ActiveSession is { } active && active.TabGroupKey is { } activeKey && ActiveSessions.Contains(active))
+        {
+            shown = activeKey;
+            _lastActiveTabByGroup[activeKey] = active;
+        }
+        else if (_lastShownTabGroup is { } last && presentSet.Contains(last))
+        {
+            shown = last;
+        }
+
+        _lastShownTabGroup = shown;
+        _collapsedTabGroups.Clear();
+        foreach (string key in present)
+        {
+            if (shown is null || !string.Equals(key, shown, StringComparison.OrdinalIgnoreCase))
+            {
+                _collapsedTabGroups.Add(key);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Brings <see cref="TabGroupHeaders"/> in line with the folders present in the strip, in place
+    /// and by key: the same instance survives an update, a move or a neighbour's removal.
+    /// </summary>
+    private void ReconcileTabGroupHeaders(bool ownRow)
+    {
+        var desired = new List<(string Key, SessionTabViewModel Head, int Count)>();
+        if (ownRow)
+        {
+            var indexByKey = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (SessionTabViewModel session in ActiveSessions)
+            {
+                if (session.TabGroupKey is not { } key)
+                {
+                    continue;
+                }
+
+                if (indexByKey.TryGetValue(key, out int index))
+                {
+                    desired[index] = (desired[index].Key, desired[index].Head, desired[index].Count + 1);
+                }
+                else
+                {
+                    indexByKey[key] = desired.Count;
+                    desired.Add((key, session, 1));
+                }
+            }
+        }
+
+        for (int position = 0; position < desired.Count; position++)
+        {
+            (string key, SessionTabViewModel head, int count) = desired[position];
+            int current = -1;
+            for (int index = position; index < TabGroupHeaders.Count; index++)
+            {
+                if (string.Equals(TabGroupHeaders[index].Key, key, StringComparison.OrdinalIgnoreCase))
+                {
+                    current = index;
+                    break;
+                }
+            }
+
+            SessionTabGroupHeaderViewModel header;
+            if (current < 0)
+            {
+                header = new SessionTabGroupHeaderViewModel(key);
+                TabGroupHeaders.Insert(position, header);
+            }
+            else
+            {
+                header = TabGroupHeaders[current];
+                if (current != position)
+                {
+                    TabGroupHeaders.Move(current, position);
+                }
+            }
+
+            bool shown = !_collapsedTabGroups.Contains(key);
+            header.Label = head.TabGroupLabel;
+            header.Color = head.TabGroupColor;
+            header.TabCount = count;
+            header.IsShown = shown;
+            header.AccessibleName = shown
+                ? _localizer.FormatCount(count, TabGroupHeaderShownOneKey, TabGroupHeaderShownKey, key, count)
+                : _localizer.FormatCount(count, TabGroupHeaderHiddenOneKey, TabGroupHeaderHiddenKey, key, count);
+        }
+
+        while (TabGroupHeaders.Count > desired.Count)
+        {
+            TabGroupHeaders.RemoveAt(TabGroupHeaders.Count - 1);
+        }
+
+        OnPropertyChanged(nameof(HasTabGroupHeaders));
+        OnPropertyChanged(nameof(ShowTabGroupRow));
     }
 }

@@ -248,6 +248,15 @@
     <!-- Widths a tab title and a folder chip label are cut at, with an ellipsis. -->
     <sys:Double x:Key="SessionTabTitleMaxWidth">160</sys:Double>
     <sys:Double x:Key="SessionTabGroupLabelMaxWidth">120</sys:Double>
+    <!-- The row of folder headers above the session tab strip (folders on their own row): the row's
+         padding, a header's margin and padding, the gap after its colour dot, and the gap before
+         its tab count. -->
+    <sys:Double x:Key="SessionTabGroupDotSize">8</sys:Double>
+    <Thickness x:Key="SessionTabGroupRowPadding">8,4,8,0</Thickness>
+    <Thickness x:Key="SessionTabGroupHeaderMargin">0,0,6,4</Thickness>
+    <Thickness x:Key="SessionTabGroupHeaderPadding">8,2</Thickness>
+    <Thickness x:Key="SessionTabGroupHeaderDotMargin">0,0,5,0</Thickness>
+    <Thickness x:Key="SessionTabGroupHeaderCountMargin">6,0,0,0</Thickness>
     <!-- The small marks of a tab header: protocol icon box, broadcast box, and their glyphs. -->
     <sys:Double x:Key="SessionTabIconBoxSize">14</sys:Double>
     <sys:Double x:Key="SessionTabChevronFontSize">8</sys:Double>

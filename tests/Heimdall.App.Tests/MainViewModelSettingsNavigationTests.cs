@@ -351,6 +351,30 @@ public sealed class MainViewModelSettingsNavigationTests : IDisposable
         Assert.False(harness.Config.MergeStarted.Task.IsCompleted);
     }
 
+    [Fact]
+    public async Task TabGroupsOnOwnRow_ChosenFromTheTabStrip_IsSaved()
+    {
+        using TestHarness harness = await TestHarness.CreateAsync(MergeBehavior.ImmediateSuccess);
+
+        harness.Main.Connection.TabGroupsOnOwnRow = true;
+
+        await harness.Config.MergeStarted.Task.WaitAsync(TestTimeout);
+        Assert.True((await harness.Config.LoadSettingsAsync()).SessionTabGroupsOnOwnRow);
+    }
+
+    [Fact]
+    public async Task TabGroupsOnOwnRow_TakenFromTheSettings_IsAppliedAndNotWrittenBack()
+    {
+        using TestHarness harness = await TestHarness.CreateAsync(MergeBehavior.ImmediateSuccess);
+
+        await harness.Config.SaveSettingsAsync(
+            new AppSettings { GroupSessionTabsByFolder = true, SessionTabGroupsOnOwnRow = true });
+
+        Assert.True(harness.Main.Connection.TabGroupsOnOwnRow);
+        Assert.True(harness.Main.Connection.IsTabGroupRowActive);
+        Assert.False(harness.Config.MergeStarted.Task.IsCompleted);
+    }
+
     private enum MergeBehavior
     {
         ImmediateSuccess,
