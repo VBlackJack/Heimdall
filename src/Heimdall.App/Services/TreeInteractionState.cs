@@ -77,6 +77,12 @@ public sealed class TreeFolderDragPayload
     public FolderViewModel Folder { get; }
 }
 
+/// <summary>The left press on a session row that a later release may complete into a click.</summary>
+/// <param name="Server">The session under the pointer.</param>
+/// <param name="PlainSelection">Whether the press selected the row on its own.</param>
+/// <param name="ClickCount">The click count of the press.</param>
+internal readonly record struct TreePointerPress(ServerItemViewModel Server, bool PlainSelection, int ClickCount);
+
 /// <summary>
 /// Holds transient state for the session <see cref="TreeView"/> interactions
 /// in <c>MainWindow</c>: drag-drop tracking and right-click /
@@ -90,6 +96,7 @@ public sealed class TreeInteractionState
     private TreeViewItem? _dragSourceContainer;
     private object? _dragSourceItem;
     private ServerItemViewModel? _deferredSingleSelection;
+    private TreePointerPress? _pointerPress;
 
     /// <summary>Mouse position captured on left button down - start of a potential drag.</summary>
     public System.Windows.Point DragStartPoint { get; set; }
@@ -165,6 +172,7 @@ public sealed class TreeInteractionState
         sourceContainer = _dragSourceContainer;
         sourceItem = _dragSourceItem;
         DragInProgress = true;
+        _pointerPress = null;
         return true;
     }
 
@@ -190,6 +198,39 @@ public sealed class TreeInteractionState
         return server is not null;
     }
 
+    /// <summary>
+    /// Records the session row a left press landed on, so the release can tell whether it ended the
+    /// same click.
+    /// </summary>
+    /// <param name="server">The session under the pointer when the button went down.</param>
+    /// <param name="plainSelection">Whether the press selected the row on its own, which a press
+    /// deferred inside a multi-selection did not.</param>
+    /// <param name="clickCount">The click count of the press.</param>
+    internal void RecordPointerPress(ServerItemViewModel server, bool plainSelection, int clickCount)
+    {
+        ArgumentNullException.ThrowIfNull(server);
+        _pointerPress = new TreePointerPress(server, plainSelection, clickCount);
+    }
+
+    /// <summary>
+    /// Hands back the recorded press once, and only once.
+    /// </summary>
+    /// <param name="press">The press the release belongs to, when there is one.</param>
+    /// <returns><see langword="true"/> when a press was recorded and no drag began since.</returns>
+    internal bool TryTakePointerPress(out TreePointerPress press)
+    {
+        press = _pointerPress ?? default;
+        bool recorded = _pointerPress is not null;
+        _pointerPress = null;
+        return recorded;
+    }
+
+    /// <summary>
+    /// Forgets the recorded press, for a release that can no longer reach the tree: the pointer left
+    /// it, the capture was lost, or the window was deactivated.
+    /// </summary>
+    internal void ClearPointerPress() => _pointerPress = null;
+
     /// <summary>Clears every transient value associated with a pointer drag.</summary>
     /// <remarks>
     /// The deferred selection is cleared here, alongside the drag candidate, because every caller
@@ -205,6 +246,7 @@ public sealed class TreeInteractionState
         _dragSourceContainer = null;
         _dragSourceItem = null;
         _deferredSingleSelection = null;
+        _pointerPress = null;
     }
 
     /// <summary>

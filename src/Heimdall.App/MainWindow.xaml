@@ -764,6 +764,8 @@
                                   PreviewMouseLeftButtonDown="OnTreeViewDragStart"
                                   PreviewMouseLeftButtonUp="OnSessionTreeViewPreviewMouseLeftButtonUp"
                                   PreviewMouseMove="OnTreeViewDragMove"
+                                  MouseLeave="OnSessionTreeViewPointerLost"
+                                  LostMouseCapture="OnSessionTreeViewPointerLost"
                                   DragOver="OnTreeViewDragOver"
                                   DragLeave="OnTreeViewDragLeave"
                                   Drop="OnTreeViewDrop"
@@ -3112,6 +3114,13 @@
                                                   Margin="0,6,0,0"
                                                   ToolTip="{loc:Translate SettingsCompactSessionTreeHint}"
                                                   AutomationProperties.HelpText="{loc:Translate SettingsCompactSessionTreeHint}"/>
+                                        <CheckBox x:Name="Mw_SettingsActivateOpenSessionOnTreeClick"
+                                                  Content="{loc:Translate SettingsActivateOpenSessionOnTreeClick}"
+                                                  IsChecked="{Binding ServerList.ActivateOpenSessionOnTreeClick, Mode=TwoWay}"
+                                                  Foreground="{DynamicResource TextPrimaryBrush}"
+                                                  Margin="0,6,0,0"
+                                                  ToolTip="{loc:Translate SettingsActivateOpenSessionOnTreeClickHint}"
+                                                  AutomationProperties.HelpText="{loc:Translate SettingsActivateOpenSessionOnTreeClickHint}"/>
                                     </StackPanel>
                                 </Border>
                                     </StackPanel>

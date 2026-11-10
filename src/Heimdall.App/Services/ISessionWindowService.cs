@@ -43,6 +43,13 @@ public interface ISessionWindowService
     /// </remarks>
     IReadOnlyList<SessionTabViewModel> DetachedSessions { get; }
 
+    /// <summary>
+    /// Raises the floating window hosting <paramref name="session"/> above the other windows
+    /// without giving it the keyboard focus.
+    /// </summary>
+    /// <returns>False when no floating window hosts the session.</returns>
+    bool BringDetachedSessionToFront(SessionTabViewModel session);
+
     /// <summary>Detaches a session tab into a standalone floating window.</summary>
     void DetachSessionToFloatingWindow(SessionTabViewModel session, MainViewModel vm);
 

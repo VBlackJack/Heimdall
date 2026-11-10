@@ -301,6 +301,7 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
 ### Gestion des sessions
 - **Panneau de propriétés** sous l'arborescence (menu de filtre, `Paramètres > Général > Apparence > Arborescence des sessions` ou Ctrl+Maj+B) : protocole, adresse, authentification, utilisateur, clé SSH, passerelle, dossier, environnement, étiquettes, latence et date de dernière ouverture de la session sélectionnée, chacun copié d'un clic ; un dossier sous le curseur ou une multi-sélection est résumé par nombre de sessions, nombre de connectées et protocole
 - **Arborescence des sessions compacte** (`Paramètres > Général > Apparence > Arborescence des sessions`) : lignes de 24 px, appliquée immédiatement ; désactivée par défaut
+- **Cliquer sur une session ouverte affiche son onglet** (`Paramètres > Général > Apparence > Arborescence des sessions`) : un simple clic sur une session dont un onglet est déjà ouvert l'amène au premier plan, volets scindés et fenêtres détachées compris ; le double-clic et Entrée ouvrent toujours un nouvel onglet ; désactivé par défaut
 - Sessions à onglets avec réorganisation par glisser-déposer
 - Détachement d'un onglet vers une fenêtre flottante (glisser-sortir façon Chrome ou menu contextuel) ; un onglet scindé reste dans la barre d'onglets, et la barre d'état indique d'annuler d'abord la division
 - Fermer l'onglet sélectionné sélectionne l'onglet qui prend sa place, ou celui qui le précède s'il était le dernier

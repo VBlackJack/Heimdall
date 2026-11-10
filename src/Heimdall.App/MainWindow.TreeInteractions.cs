@@ -458,10 +458,12 @@ public partial class MainWindow
             return;
         }
 
+        bool deferSelection = vm.ServerList.ShouldDeferSingleSelection(server);
+        _treeState.RecordPointerPress(server, !deferSelection, e.ClickCount);
         if (ApplyTreePlainPress(
                 _treeState,
                 server,
-                vm.ServerList.ShouldDeferSingleSelection(server),
+                deferSelection,
                 vm.ServerList.SelectSingle))
         {
             // Consumed so the native TreeView never moves its selection onto the row: doing so
@@ -604,6 +606,8 @@ public partial class MainWindow
             clickVm.ServerList.PropertiesFolder = clicked;
         }
 
+        ApplyTreeClickActivation(e);
+
         if (DataContext is not MainViewModel vm
             || !_treeState.TryTakeDeferredSingleSelection(out ServerItemViewModel? server)
             || server is null)
@@ -633,6 +637,54 @@ public partial class MainWindow
         }
 
         ShowTreeSelection(vm, server);
+    }
+
+    /// <summary>
+    /// A press whose release can no longer reach the tree must not complete into a click later.
+    /// </summary>
+    private void OnSessionTreeViewPointerLost(object sender, System.Windows.Input.MouseEventArgs e)
+        => _treeState.ClearPointerPress();
+
+    /// <inheritdoc />
+    protected override void OnDeactivated(EventArgs e)
+    {
+        _treeState.ClearPointerPress();
+        base.OnDeactivated(e);
+    }
+
+    /// <summary>
+    /// Brings the tab of an already-open session to the front when the release completes a plain
+    /// click on its row and the user turned that on. The row is selected as it always was, and the
+    /// keyboard focus stays in the tree.
+    /// </summary>
+    private void ApplyTreeClickActivation(MouseButtonEventArgs e)
+    {
+        if (!_treeState.TryTakePointerPress(out TreePointerPress press)
+            || DataContext is not MainViewModel vm
+            || !vm.ServerList.ActivateOpenSessionOnTreeClick)
+        {
+            return;
+        }
+
+        object? releasedTarget = FindAncestor<TreeViewItem>(e.OriginalSource as DependencyObject)?.DataContext;
+        TreeClickActivation activation = TreeClickActivationDecision.Resolve(
+            enabled: true,
+            new TreeClickGesture(Keyboard.Modifiers, press.ClickCount, _treeState.DragInProgress, press.PlainSelection),
+            press.Server,
+            releasedTarget,
+            vm.Connection.ActiveSessions,
+            vm.Connection.ActiveSession,
+            _sessionWindowService.DetachedSessions);
+
+        switch (activation.Kind)
+        {
+            case TreeClickActivationKind.AttachedTab:
+                vm.Connection.ActiveSession = activation.Session;
+                break;
+            case TreeClickActivationKind.DetachedWindow:
+                _sessionWindowService.BringDetachedSessionToFront(activation.Session!);
+                break;
+        }
     }
 
     /// <summary>

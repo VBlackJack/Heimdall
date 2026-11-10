@@ -4839,6 +4839,8 @@
   "SettingsShowPropertiesPanelHint": "The read-only properties of the selected session, docked under the tree and readable while a session tab is open. Also in the tree's filter menu.",
   "SettingsCompactSessionTree": "Compact session tree",
   "SettingsCompactSessionTreeHint": "Tighter rows in the session tree, so more sessions fit on screen. Off by default.",
+  "SettingsActivateOpenSessionOnTreeClick": "A click on an open session shows its tab",
+  "SettingsActivateOpenSessionOnTreeClickHint": "A single click on a session that already has a tab open brings that tab to the front. Double click and Enter still open a new tab. Off by default.",
   "PropertiesPanelTitle": "Properties",
   "PropertiesPanelHide": "Hide the properties panel",
   "PropertiesPanelHideToolTip": "Hide the properties panel (Ctrl+Shift+B shows it again)",

@@ -58,9 +58,9 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
     private const uint WsPopup = 0x80000000;
     private const uint WsCaption = 0x00C00000;
     private const uint WsThickframe = 0x00040000;
-    private const int SwShowNormal = 1;
-    private const int SwRestore = 9;
-    private const int SwMaximize = 3;
+    private const int SwShowNormal = WindowNative.SwShowNormal;
+    private const int SwRestore = WindowNative.SwRestore;
+    private const int SwMaximize = WindowNative.SwMaximize;
 
     private CitrixSessionResult? _session;
 
@@ -127,9 +127,6 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
 
     [DllImport("user32.dll")]
     private static extern IntPtr GetForegroundWindow();
-
-    [DllImport("user32.dll")]
-    private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
     [DllImport("user32.dll")]
     private static extern bool IsIconic(IntPtr hWnd);
@@ -816,7 +813,7 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
 
             // Resize to fill
             ResizeCapturedWindow();
-            ShowWindow(hwnd, SwMaximize);
+            WindowNative.ShowWindow(hwnd, SwMaximize);
 
             Core.Logging.FileLogger.Info($"Citrix: window embedded successfully (hwnd=0x{hwnd.ToInt64():X})");
         }
@@ -893,7 +890,7 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
         try
         {
             if (IsIconic(hWnd))
-                ShowWindow(hWnd, SwRestore);
+                WindowNative.ShowWindow(hWnd, SwRestore);
 
             SetForegroundWindow(hWnd);
         }
@@ -1131,7 +1128,7 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
 
                 // Reparent back to desktop
                 SetParent(_capturedHwnd, IntPtr.Zero);
-                ShowWindow(_capturedHwnd, SwShowNormal);
+                WindowNative.ShowWindow(_capturedHwnd, SwShowNormal);
             }
             catch (Exception ex) { Core.Logging.FileLogger.Warn($"[EmbeddedCitrixView] window release: {ex.Message}"); }
         }

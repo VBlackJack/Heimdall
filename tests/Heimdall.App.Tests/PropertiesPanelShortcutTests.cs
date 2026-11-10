@@ -72,6 +72,7 @@ public sealed class PropertiesPanelShortcutTests
     [InlineData("Mw_SettingsShowPropertiesPanel", "{Binding ServerList.ShowPropertiesPanel, Mode=TwoWay}")]
     [InlineData("Mw_SettingsShowGatewayBadge", "{Binding ServerList.ShowGatewayBadge, Mode=TwoWay}")]
     [InlineData("Mw_SettingsCompactSessionTree", "{Binding ServerList.CompactSessionTree, Mode=TwoWay}")]
+    [InlineData("Mw_SettingsActivateOpenSessionOnTreeClick", "{Binding ServerList.ActivateOpenSessionOnTreeClick, Mode=TwoWay}")]
     public void TheSettingsToggle_IsTheLivePreference(string name, string binding)
     {
         XElement checkBox = FindNamed(name);

@@ -4839,6 +4839,8 @@
   "SettingsShowPropertiesPanelHint": "Las propiedades de la sesi\u00f3n seleccionada, de solo lectura, bajo el \u00e1rbol y legibles mientras hay una pesta\u00f1a abierta. Tambi\u00e9n en el men\u00fa de filtro del \u00e1rbol.",
   "SettingsCompactSessionTree": "Árbol de sesiones compacto",
   "SettingsCompactSessionTreeHint": "Filas más juntas en el árbol de sesiones, para que quepan más sesiones en pantalla. Desactivado de forma predeterminada.",
+  "SettingsActivateOpenSessionOnTreeClick": "Un clic en una sesión abierta muestra su pestaña",
+  "SettingsActivateOpenSessionOnTreeClickHint": "Un solo clic en una sesión que ya tiene una pestaña abierta trae esa pestaña al frente. El doble clic e Intro siguen abriendo una pestaña nueva. Desactivado de forma predeterminada.",
   "PropertiesPanelTitle": "Propiedades",
   "PropertiesPanelHide": "Ocultar el panel de propiedades",
   "PropertiesPanelHideToolTip": "Ocultar el panel de propiedades (Ctrl+Mayús+B lo vuelve a mostrar)",
