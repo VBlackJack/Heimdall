@@ -23,6 +23,10 @@ namespace Heimdall.Ssh.Agents;
 /// <summary>
 /// Wraps an SSH-agent identity as an SSH.NET private key source.
 /// </summary>
+/// <remarks>
+/// Production now builds <see cref="SshAgentAlgorithmSource"/> instead, one source per
+/// attempt so the attempts can be ordered across keys. This type is kept for its tests.
+/// </remarks>
 internal class SshAgentKeyWrapper : IPrivateKeySource
 {
     private readonly IReadOnlyCollection<HostAlgorithm> _algorithms;

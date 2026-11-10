@@ -79,6 +79,7 @@ Index of all issues encountered during development and their solutions.
 62. [Tunnel - "Plink exited before opening the tunnel"](#tunnel-plink-exited-early)
 63. [VNC - The Server Asks for a Username or a Password](#vnc-credentials-required)
 64. [WebView2 - The Pointer Disappears When a Terminal Is Closed](#webview2-pointer-hidden-after-close)
+65. [SSH - "Too many authentication failures"](#ssh-too-many-authentication-failures)
 
 ---
 
@@ -1231,3 +1232,21 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 3. A pointer already lost comes back as soon as it moves over another embedded view. The application needs no restart and no session is lost.
 
 **Files**: `Services/WebView2Helper.cs`
+
+---
+
+<a id="ssh-too-many-authentication-failures"></a>
+## 65. SSH - "Too many authentication failures"
+
+**Symptom**: Connecting to a server fails with "Too many authentication failures", although the right key is loaded in Pageant or in the Windows OpenSSH Agent. The message says how many keys the agent offered when that number is known.
+
+**Root cause**: The server limits how many sign-in attempts one connection may make (`MaxAuthTries` in `sshd_config`, 6 by default, often lowered to 3) and closes the connection when the limit is reached. Every key an agent offers that the server does not accept spends at least one attempt, and an RSA key spends up to three: Heimdall offers it as `rsa-sha2-512`, then `rsa-sha2-256`, then `ssh-rsa`, because servers differ on which of these they accept. Heimdall tries the first choice of every key before the second choice of any key, so a wrong RSA key at the head of the agent no longer uses up the budget before the later keys are tried, but an agent holding many keys can still reach the limit. A password or a key file stored on the session is tried before the agent and also counts against the limit.
+
+**Solution**:
+
+1. Load fewer keys in the agent: remove the keys the server does not know.
+2. Give the session its own key file in the session dialog, so the agent is not needed for that server.
+3. If the server is yours, raise `MaxAuthTries` in `sshd_config` and reload `sshd`.
+4. If the session also stores a password, check that it is the right one: a refused password spends at least one attempt before the agent keys are tried.
+
+**Files**: `Heimdall.Ssh/Agents/SshAgentAlgorithmSource.cs`, `Heimdall.Ssh/SshConnectionFactory.cs` (`TryCreateAgentAuth`), `Heimdall.Ssh/FailureClassifier.cs`

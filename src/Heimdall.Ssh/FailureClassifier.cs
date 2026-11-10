@@ -109,7 +109,15 @@ public static class FailureClassifier
     /// <param name="localizer">Function that maps i18n keys to localized strings (returns null if not found).</param>
     /// <param name="gatewayName">Optional gateway name prefix for multi-hop context.</param>
     /// <returns>Formatted message string.</returns>
-    public static string FormatMessage(SshFailureInfo info, Func<string, string?> localizer, string? gatewayName = null)
+    /// <param name="agentKeyCountAtDial">
+    /// How many agent keys were offered when the dial was made, when known. Selects the
+    /// counted variant of the too-many-failures message; ignored for every other code.
+    /// </param>
+    public static string FormatMessage(
+        SshFailureInfo info,
+        Func<string, string?> localizer,
+        string? gatewayName = null,
+        int? agentKeyCountAtDial = null)
     {
         ArgumentNullException.ThrowIfNull(info);
         ArgumentNullException.ThrowIfNull(localizer);
@@ -123,6 +131,10 @@ public static class FailureClassifier
                 or SshFailureCode.TunnelPortNotListening
                 or SshFailureCode.TunnelPortOwnershipIndeterminate
                 => "ErrorSshTunnelPortOwnershipUnattested",
+            SshFailureCode.TooManyAuthFailures when agentKeyCountAtDial is 1
+                => SshAuthFailureLocaleKeys.TooManyAuthFailuresOneAgentKey,
+            SshFailureCode.TooManyAuthFailures when agentKeyCountAtDial > 1
+                => SshAuthFailureLocaleKeys.TooManyAuthFailuresAgentKeys,
             _ => $"ErrorSsh{info.Code}"
         };
         var localized = localizer(key);

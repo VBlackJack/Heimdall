@@ -1050,12 +1050,11 @@ public static class SshConnectionFactory
                 Heimdall.Core.Logging.FileLogger.Info(
                     $"SSH agent {agent.Name}: using {keys.Count} key(s): {string.Join(", ", keys.Select(k => k.KeyType))}");
 
-                var keyWrappers = keys
-                    .Select(k => new SshAgentKeyWrapper(k))
-                    .Cast<IPrivateKeySource>()
-                    .ToArray();
+                // Algorithm-major order: a refused key costs one attempt per pass, not
+                // three in a row, so a server that counts attempts reaches the later keys.
+                var keySources = SshAgentAlgorithmSource.BuildSources(keys);
 
-                return new PrivateKeyAuthenticationMethod(username, keyWrappers);
+                return new PrivateKeyAuthenticationMethod(username, keySources);
             }
             catch (Exception ex)
             {

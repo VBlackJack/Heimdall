@@ -813,6 +813,65 @@ public class FailureClassifierTests
         Assert.Equal("gw-prod: Connexion refusee.", result);
     }
 
+    [Theory]
+    [InlineData(1, SshAuthFailureLocaleKeys.TooManyAuthFailuresOneAgentKey)]
+    [InlineData(2, SshAuthFailureLocaleKeys.TooManyAuthFailuresAgentKeys)]
+    [InlineData(7, SshAuthFailureLocaleKeys.TooManyAuthFailuresAgentKeys)]
+    public void FormatMessage_TooManyAuthFailures_KnownAgentKeyCount_UsesCountedKey(int count, string expectedKey)
+    {
+        var info = new SshFailureInfo(SshFailureCode.TooManyAuthFailures, "Too many auth failures.", true);
+        var requestedKeys = new List<string>();
+
+        FailureClassifier.FormatMessage(
+            info,
+            key =>
+            {
+                requestedKeys.Add(key);
+                return key;
+            },
+            agentKeyCountAtDial: count);
+
+        Assert.Equal([expectedKey], requestedKeys);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(0)]
+    public void FormatMessage_TooManyAuthFailures_UnknownOrZeroAgentKeyCount_UsesPlainKey(int? count)
+    {
+        var info = new SshFailureInfo(SshFailureCode.TooManyAuthFailures, "Too many auth failures.", true);
+        var requestedKeys = new List<string>();
+
+        FailureClassifier.FormatMessage(
+            info,
+            key =>
+            {
+                requestedKeys.Add(key);
+                return key;
+            },
+            agentKeyCountAtDial: count);
+
+        Assert.Equal(["ErrorSshTooManyAuthFailures"], requestedKeys);
+    }
+
+    [Fact]
+    public void FormatMessage_OtherCode_IgnoresAgentKeyCount()
+    {
+        var info = new SshFailureInfo(SshFailureCode.AuthRejected, "Rejected.", true);
+        var requestedKeys = new List<string>();
+
+        FailureClassifier.FormatMessage(
+            info,
+            key =>
+            {
+                requestedKeys.Add(key);
+                return key;
+            },
+            agentKeyCountAtDial: 5);
+
+        Assert.Equal(["ErrorSshAuthRejected"], requestedKeys);
+    }
+
     [Fact]
     public void FormatMessage_NoLocalization_FallsBackToRawMessage()
     {

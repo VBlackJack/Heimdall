@@ -316,6 +316,19 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
             SetStatusText?.Invoke(_localizer[capabilityNotice.StatusLocalizationKey]);
         }
 
+        // Read before the dial: the too-many-failures message states what was offered, and
+        // agents read after the refusal could hold keys loaded while it was in flight.
+        int? agentKeysAtDial = null;
+        try
+        {
+            agentKeysAtDial = agentRegistry.Observe().OfferableIdentityCount;
+        }
+        catch (Exception ex)
+        {
+            // The count only refines a failure message: the connection proceeds without it.
+            Core.Logging.FileLogger.Debug("SSH agent key count unavailable at dial", ex);
+        }
+
         var session = new SshShellSession();
         try
         {
@@ -382,7 +395,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
             promptLifetime.Cancel();
             session.Dispose();
             var failure = FailureClassifier.Classify(ex, sshParams);
-            SshFailureInfo localizedFailure = LocalizeFailure(failure, targetHost);
+            SshFailureInfo localizedFailure = LocalizeFailure(failure, targetHost, agentKeysAtDial);
 
             if (!sshParams.KeyboardInteractive.HasInteractiveAnswer
                 && SshPlinkRetryPolicy.AllowsPlinkRetry(failure.Code))
@@ -452,8 +465,11 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
     /// the same thing. Kept here as a delegating wrapper: its two call sites and every
     /// existing test are then untouched by the move.
     /// </remarks>
-    private SshFailureInfo LocalizeFailure(SshFailureInfo failure, string targetHost) =>
-        SshFailureLocalizer.Localize(failure, _localizer, targetHost);
+    private SshFailureInfo LocalizeFailure(
+        SshFailureInfo failure,
+        string targetHost,
+        int? agentKeyCountAtDial = null) =>
+        SshFailureLocalizer.Localize(failure, _localizer, targetHost, agentKeyCountAtDial);
 
     private static Task ConnectShellSessionAsync(
         SshShellSession session,
