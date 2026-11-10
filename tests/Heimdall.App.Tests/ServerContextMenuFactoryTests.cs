@@ -371,6 +371,8 @@ public sealed partial class SessionCoordinatorPreMountTests
                     harness.Main.Localize("TreeCtxFavoriteAdd"),
                     "<separator>",
                     harness.Main.Localize("TreeCtxMoveToGroup"),
+                    harness.Main.Localize("TreeCtxMoveUp"),
+                    harness.Main.Localize("TreeCtxMoveDown"),
                     "<separator>",
                     harness.Main.Localize("TreeCtxCopyHostname"),
                     harness.Main.Localize("TreeCtxCopyUsername"),
@@ -395,6 +397,8 @@ public sealed partial class SessionCoordinatorPreMountTests
                     harness.Main.Localize("TreeCtxRename"),
                     harness.Main.Localize("TreeCtxFolderColor"),
                     harness.Main.Localize("TreeCtxMoveFolderTo"),
+                    harness.Main.Localize("TreeCtxMoveUp"),
+                    harness.Main.Localize("TreeCtxMoveDown"),
                     harness.Main.Localize("TreeCtxDeleteGroup")
                 ],
                 GetTopLevelMenuShape(folderMenu));
@@ -582,6 +586,20 @@ public sealed partial class SessionCoordinatorPreMountTests
     private sealed class RecordingContextMenuCallbacks : IContextMenuCallbacks
     {
         public object? RenamedNode { get; private set; }
+
+        public List<(object Node, int Delta)> Nudges { get; } = [];
+
+        public Task NudgeFolderAsync(FolderViewModel folder, int delta)
+        {
+            Nudges.Add((folder, delta));
+            return Task.CompletedTask;
+        }
+
+        public Task NudgeSessionAsync(ServerItemViewModel server, int delta)
+        {
+            Nudges.Add((server, delta));
+            return Task.CompletedTask;
+        }
 
         public void OpenNotesForServer(ServerItemViewModel server, NoteTemplateKind templateKind)
         {

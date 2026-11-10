@@ -153,6 +153,7 @@ public sealed class FolderRenameService
     {
         StagePathList(settings.EmptyGroups, plan);
         StagePathList(settings.TreeExpandedNodes, plan);
+        StagePathList(settings.FolderOrder, plan);
 
         Dictionary<string, GroupDefaultsDto> stagedDefaults =
             new(settings.GroupDefaults, StringComparer.Ordinal);
@@ -187,6 +188,7 @@ public sealed class FolderRenameService
     {
         settings.EmptyGroups = RewritePathList(settings.EmptyGroups, plan);
         settings.TreeExpandedNodes = RewritePathList(settings.TreeExpandedNodes, plan);
+        settings.FolderOrder = RewriteFolderOrder(settings.FolderOrder, plan);
 
         Dictionary<string, GroupDefaultsDto> finalizedDefaults = new(StringComparer.Ordinal);
         KeyValuePair<string, GroupDefaultsDto>[] entries = settings.GroupDefaults.ToArray();
@@ -208,6 +210,41 @@ public sealed class FolderRenameService
         }
 
         settings.GroupDefaults = finalizedDefaults;
+    }
+
+    /// <summary>
+    /// Rewrites the manual folder order for a rename or a move, keeping each path's place in the
+    /// list.
+    /// </summary>
+    /// <remarks>
+    /// A folder kept under the same parent keeps its rank, and so does everything beneath it. A
+    /// folder moved under another parent drops its own entry: its place among the old siblings
+    /// means nothing among the new ones, so it joins them alphabetically like a new folder. Its
+    /// descendants keep their ranks among each other, rewritten to the new prefix. The staged
+    /// alias sits behind the original entry, so the first occurrence is the one that stays.
+    /// </remarks>
+    private static List<string> RewriteFolderOrder(
+        IEnumerable<string> order,
+        FolderRenamePlan plan)
+    {
+        bool reparented = !string.Equals(
+            FolderPath.ParentOf(plan.OldPath),
+            FolderPath.ParentOf(plan.NewPath),
+            StringComparison.OrdinalIgnoreCase);
+
+        // An entry already under the new path that is not under the old one is stale (or a staged
+        // alias, whose original is rewritten anyway): left in, it would come first and give the
+        // renamed folder its rank. A case-only rename keeps its entries, which are under both.
+        IEnumerable<string> live = order.Where(path =>
+            !FolderPath.IsSelfOrDescendant(path, plan.NewPath)
+            || FolderPath.IsSelfOrDescendant(path, plan.OldPath));
+
+        return RewritePathList(
+            reparented
+                ? live.Where(path =>
+                    !string.Equals(path, plan.OldPath, StringComparison.OrdinalIgnoreCase))
+                : live,
+            plan);
     }
 
     private static List<string> RewritePathList(

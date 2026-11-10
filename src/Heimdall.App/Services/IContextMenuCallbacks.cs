@@ -71,4 +71,16 @@ public interface IContextMenuCallbacks
     /// that is null, reporting refusals to the user.
     /// </summary>
     Task MoveFolderAsync(FolderViewModel folder, string? targetParentPath) => Task.CompletedTask;
+
+    /// <summary>
+    /// Moves a local folder one step among its siblings (<c>-1</c> up, <c>+1</c> down), keeps it
+    /// selected and in view, and reports a failure to the user.
+    /// </summary>
+    Task NudgeFolderAsync(FolderViewModel folder, int delta) => Task.CompletedTask;
+
+    /// <summary>
+    /// Moves a local session one step among its siblings (<c>-1</c> up, <c>+1</c> down), keeps it
+    /// selected and in view, and reports a failure to the user.
+    /// </summary>
+    Task NudgeSessionAsync(ServerItemViewModel server, int delta) => Task.CompletedTask;
 }

@@ -426,6 +426,20 @@ public sealed class AppSettings
     public List<string> EmptyGroups { get; set; } = new();
 
     /// <summary>
+    /// The manual order of local folders among their siblings: folder paths, in the order the
+    /// user arranged them. A folder listed here ranks before every sibling that is not, and
+    /// the unlisted siblings follow alphabetically; an empty list leaves every folder
+    /// alphabetical.
+    /// </summary>
+    /// <remarks>
+    /// One flat list rather than a number per folder: a folder has no profile of its own to
+    /// carry a sort order, and the list is rewritten with the same path rewrite as
+    /// <see cref="EmptyGroups"/> when a folder is renamed or moved. A path that no longer
+    /// names a folder is ignored by the tree and dropped on the next write.
+    /// </remarks>
+    public List<string> FolderOrder { get; set; } = new();
+
+    /// <summary>
     /// Values for the <c>[NAME]</c> variables MobaXterm session files carry in their login fields.
     /// Key: the variable name without brackets, matched case-insensitively. Value: the login,
     /// with environment variables such as <c>%USERNAME%</c> expanded when the file is read.

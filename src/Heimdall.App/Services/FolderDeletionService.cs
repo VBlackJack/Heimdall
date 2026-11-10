@@ -85,6 +85,8 @@ internal sealed class FolderDeletionService
             path => IsFolderMetadataPath(path, folderPath));
         settings.TreeExpandedNodes.RemoveAll(
             path => IsFolderMetadataPath(path, folderPath));
+        settings.FolderOrder.RemoveAll(
+            path => IsFolderMetadataPath(path, folderPath));
 
         string[] deletedDefaultPaths = settings.GroupDefaults.Keys
             .Where(path => IsFolderMetadataPath(path, folderPath))

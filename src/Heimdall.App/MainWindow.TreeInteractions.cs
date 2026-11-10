@@ -862,9 +862,18 @@ public partial class MainWindow
             && DataContext is MainViewModel nudgeViewModel
             && !IsInlineRenameEditorSource(e.OriginalSource as DependencyObject))
         {
-            ServerItemViewModel? nudged =
-                FindAncestor<TreeViewItem>(Keyboard.FocusedElement as DependencyObject)?.DataContext
-                    as ServerItemViewModel;
+            object? nudgedNode =
+                FindAncestor<TreeViewItem>(Keyboard.FocusedElement as DependencyObject)?.DataContext;
+
+            // A folder row takes the same keys; a shared one is refused with the read-only line.
+            if (nudgedNode is FolderViewModel nudgedFolder)
+            {
+                e.Handled = true;
+                await ((IContextMenuCallbacks)this).NudgeFolderAsync(nudgedFolder, nudgeDelta);
+                return;
+            }
+
+            ServerItemViewModel? nudged = nudgedNode as ServerItemViewModel;
             if (nudged is null)
             {
                 return;
@@ -1622,6 +1631,76 @@ public partial class MainWindow
                 container.BringIntoView();
                 container.Focus();
             }));
+    }
+
+    /// <summary>
+    /// Selects a folder's row and puts keyboard focus back on it after a rebuild replaced its
+    /// container.
+    /// </summary>
+    private void RefocusFolderRow(string folderPath)
+    {
+        _ = Dispatcher.BeginInvoke(
+            DispatcherPriority.Input,
+            new Action(() =>
+            {
+                if (DataContext is not MainViewModel vm
+                    || FindFolderByPath(vm.ServerList.GroupedServers, folderPath) is not { } folder
+                    || GetOrRealizeSessionTreeItem(folder) is not { } container)
+                {
+                    return;
+                }
+
+                container.IsSelected = true;
+                container.BringIntoView();
+                container.Focus();
+            }));
+    }
+
+    /// <inheritdoc />
+    async Task IContextMenuCallbacks.NudgeFolderAsync(FolderViewModel folder, int delta)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
+        if (DataContext is not MainViewModel vm)
+        {
+            return;
+        }
+
+        try
+        {
+            string path = folder.FullPath;
+            if (await vm.ServerList.NudgeFolderAsync(folder, delta))
+            {
+                RefocusFolderRow(path);
+            }
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Error("Folder reorder failed", ex);
+            vm.StatusText = string.Format(vm.Localize("StatusTreeMoveFailed"), folder.Name);
+        }
+    }
+
+    /// <inheritdoc />
+    async Task IContextMenuCallbacks.NudgeSessionAsync(ServerItemViewModel server, int delta)
+    {
+        ArgumentNullException.ThrowIfNull(server);
+        if (DataContext is not MainViewModel vm)
+        {
+            return;
+        }
+
+        try
+        {
+            if (await vm.ServerList.NudgeServerAsync(server, delta))
+            {
+                RefocusSessionRow(server);
+            }
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Error("Session reorder failed", ex);
+            vm.StatusText = string.Format(vm.Localize("StatusTreeMoveFailed"), server.DisplayName);
+        }
     }
 
     private TreeViewItem? GetOrRealizeSessionTreeItem(object? item)

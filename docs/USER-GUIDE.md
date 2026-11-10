@@ -410,7 +410,7 @@ Press **F1** at any time for the full list. The ones that pay for themselves imm
 | Middle click on a tab | Close that tab |
 | `Shift+F10` or the Menu key | On the tab strip, open the tab's menu; in the tree, the session or folder menu |
 | `Ctrl+A` | In the sessions tree, select every session in the open folders |
-| `Alt+Up` / `Alt+Down` | Move the focused session within its folder |
+| `Alt+Up` / `Alt+Down` | Move the focused session or folder one step among its siblings |
 | `F2` | Rename the selected session or folder |
 
 ---
