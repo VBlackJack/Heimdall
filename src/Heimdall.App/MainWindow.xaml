@@ -1643,6 +1643,8 @@
                             <TabControl.ItemContainerStyle>
                                 <Style TargetType="{x:Type TabItem}"
                                        BasedOn="{StaticResource ThemedTabItemStyle}">
+                                    <Setter Property="Padding" Value="{StaticResource SessionTabItemPadding}"/>
+                                    <Setter Property="MinHeight" Value="{StaticResource SessionTabHeight}"/>
                                     <Setter Property="AutomationProperties.Name"
                                             Value="{Binding AccessibleName}"/>
                                     <!-- A tab folded away in a collapsed folder group leaves the strip;
@@ -1659,7 +1661,7 @@
                                     <!-- The tooltip is written as it opens (OnSessionTabToolTipOpening): full
                                          title, endpoint, user, folder and state. The bound value only
                                          makes it open; the title alone was all it used to say. -->
-                                    <Border x:Name="TabHeaderBorder" Padding="10,6" Background="Transparent"
+                                    <Border x:Name="TabHeaderBorder" Padding="{StaticResource SessionTabHeaderPadding}" Background="Transparent"
                                             BorderThickness="0,0,0,2" BorderBrush="Transparent"
                                             ToolTip="{Binding HeaderToolTip}"
                                             ToolTipOpening="OnSessionTabToolTipOpening">
@@ -1673,6 +1675,7 @@
                                             <Button x:Name="Mw_SessionTabGroupChip"
                                                     VerticalAlignment="Center" Margin="0,0,8,0"
                                                     Padding="0" BorderThickness="0" Background="Transparent"
+                                                    MinHeight="{StaticResource SessionTabPointerTargetSize}"
                                                     Focusable="False"
                                                     Visibility="{Binding IsTabGroupHead, Converter={StaticResource BoolToVisibilityConverter}}"
                                                     Command="{Binding DataContext.Connection.ToggleTabGroupCollapsedCommand, RelativeSource={RelativeSource AncestorType=TabControl}}"
@@ -1680,8 +1683,12 @@
                                                     ToolTip="{Binding TabGroupAccessibleName}"
                                                     AutomationProperties.Name="{Binding TabGroupAccessibleName}">
                                                 <Button.Template>
+                                                    <!-- The transparent border is the hit area: as tall as a pointer target,
+                                                         while the chip drawn in it keeps its own height, so the tab does not grow. -->
                                                     <ControlTemplate TargetType="Button">
-                                                        <ContentPresenter/>
+                                                        <Border Background="Transparent">
+                                                            <ContentPresenter VerticalAlignment="Center"/>
+                                                        </Border>
                                                     </ControlTemplate>
                                                 </Button.Template>
                                                 <Border CornerRadius="{StaticResource CornerRadiusSm}"
