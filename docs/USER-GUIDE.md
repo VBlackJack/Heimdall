@@ -181,6 +181,16 @@ line under each of them. The choice is remembered.
 - Pinned tabs stay at the front of the strip, outside any folder's tabs. Tool tabs, quick
   connections and sessions outside any folder are never arranged.
 
+To keep the strip short, tick **Show folders on their own row** just under it (available while
+the tabs are arranged by folder). The folders then sit on a row of their own above the strip, one
+button per folder with its colour, name and tab count, and the strip shows only the tabs of the
+folder you are working in. Click a folder to go back to the tab you last used in it, and the strip
+switches to that folder's tabs. Pinned tabs and tabs outside any folder stay visible. Ctrl+Tab
+cycles the visible tabs only, and the folders' own collapse commands are no longer offered. After
+a restart, the folder of the last restored tab is the one shown. A hidden folder holding a session
+that failed shows the red warning mark of the tab strip on its button, and one holding a dropped
+connection shows its grey ring, so you can spot it without opening the folder.
+
 ## Where your passwords are kept
 
 Passwords you save in a session are encrypted on your own machine, tied to your Windows account.

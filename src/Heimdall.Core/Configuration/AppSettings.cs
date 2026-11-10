@@ -388,6 +388,14 @@ public sealed class AppSettings
     /// strip, which nobody should find done to them.
     /// </summary>
     public bool GroupSessionTabsByFolder { get; set; }
+
+    /// <summary>
+    /// Whether, with the tabs arranged by folder, the folders sit on a row of their own above the
+    /// strip and only the tabs of the folder being worked in are shown. Off by default: it hides
+    /// tabs, which nobody should find done to them. Has no effect while
+    /// <see cref="GroupSessionTabsByFolder"/> is off.
+    /// </summary>
+    public bool SessionTabGroupsOnOwnRow { get; set; }
     public Dictionary<string, bool> SidebarExpandedCategories { get; set; } = new();
     public List<string> FavoriteToolIds { get; set; } = new();
     public bool OnboardingCompleted { get; set; }

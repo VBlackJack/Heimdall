@@ -162,6 +162,12 @@ public partial class ConnectionViewModel : ObservableObject
             }
         }
 
+        if (IsTabGroupRowActive
+            && e.PropertyName is null or nameof(SessionTabViewModel.HeaderState))
+        {
+            RefreshTabGroupAttention();
+        }
+
         if (e.PropertyName is null
             or nameof(SessionTabViewModel.Title)
             or nameof(SessionTabViewModel.CustomTitle)
@@ -665,8 +671,36 @@ public partial class ConnectionViewModel : ObservableObject
         {
             ActiveSession = ActiveSessions.Count == 0
                 ? null
-                : ActiveSessions[Math.Min(index, ActiveSessions.Count - 1)];
+                : IsTabGroupRowActive
+                    ? NeighbourToSelectAfterRemoval(index)
+                    : ActiveSessions[Math.Min(index, ActiveSessions.Count - 1)];
         }
+    }
+
+    /// <summary>
+    /// On the folders' own row: the tab that takes the removed tab's place when it is shown, else
+    /// the nearest shown neighbour (after it first, then before), else that tab anyway. Selecting
+    /// a tab folded away would swap the folder shown, which closing a tab should not do.
+    /// </summary>
+    private SessionTabViewModel NeighbourToSelectAfterRemoval(int removedIndex)
+    {
+        int preferred = Math.Min(removedIndex, ActiveSessions.Count - 1);
+        for (int distance = 0; distance < ActiveSessions.Count; distance++)
+        {
+            int after = preferred + distance;
+            if (after < ActiveSessions.Count && !ActiveSessions[after].IsHiddenInCollapsedGroup)
+            {
+                return ActiveSessions[after];
+            }
+
+            int before = preferred - distance;
+            if (before >= 0 && !ActiveSessions[before].IsHiddenInCollapsedGroup)
+            {
+                return ActiveSessions[before];
+            }
+        }
+
+        return ActiveSessions[preferred];
     }
 
     /// <summary>

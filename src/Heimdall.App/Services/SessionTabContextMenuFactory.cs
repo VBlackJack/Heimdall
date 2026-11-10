@@ -307,6 +307,17 @@ public sealed class SessionTabContextMenuFactory
         groupItem.Unchecked += (_, _) => vm.Connection.GroupTabsByFolder = false;
         menu.Items.Add(groupItem);
 
+        var ownRowItem = new MenuItem
+        {
+            Header = vm.Localize("SessionTabGroupsOnOwnRow"),
+            IsCheckable = true,
+            IsChecked = vm.Connection.TabGroupsOnOwnRow,
+            IsEnabled = vm.Connection.GroupTabsByFolder
+        };
+        ownRowItem.Checked += (_, _) => vm.Connection.TabGroupsOnOwnRow = true;
+        ownRowItem.Unchecked += (_, _) => vm.Connection.TabGroupsOnOwnRow = false;
+        menu.Items.Add(ownRowItem);
+
         if (vm.Connection.HasRecentlyClosedTab)
         {
             int closedCount = vm.Connection.MostRecentlyClosedCount;
@@ -321,7 +332,8 @@ public sealed class SessionTabContextMenuFactory
             menu.Items.Add(reopenItem);
         }
 
-        if (!session.HasTabGroup)
+        // On the folders' own row the selection decides what is folded: nothing to collapse by hand.
+        if (!session.HasTabGroup || vm.Connection.IsTabGroupRowActive)
         {
             return;
         }

@@ -223,6 +223,17 @@
     <sys:Double x:Key="SessionTreeReadOnlyIconSize">10</sys:Double>
     <!-- The "all open tabs" button over the right end of an overflowing session tab strip. -->
     <sys:Double x:Key="SessionTabListButtonWidth">32</sys:Double>
+    <!-- Height of a session tab, and the vertical parts that add up to it:
+         1 (top border of the tab) + 2 + 2 (item padding) + 3 + 3 (header padding) + 24 (close
+         button, the pointer target floor) + 2 (folder bar under the header) = 37. The item
+         padding is the session strip's own: it does not inherit ThemedTabItemStyle's 14,8, which
+         the server dialog's tabs keep. The list button of an overflowing strip stretches to the
+         tab, so it follows. -->
+    <sys:Double x:Key="SessionTabHeight">37</sys:Double>
+    <Thickness x:Key="SessionTabItemPadding">10,2</Thickness>
+    <Thickness x:Key="SessionTabHeaderPadding">8,3</Thickness>
+    <!-- Smallest pointer target inside a tab header (the folder chip); the close button is 24 too. -->
+    <sys:Double x:Key="SessionTabPointerTargetSize">24</sys:Double>
     <!-- Close button of a tab neither hovered nor selected. 0.3 measured 2.37:1 against the strip
          in the default dark theme, under the 3:1 a control needs (WCAG 1.4.11); 0.5 measures 4.19:1. -->
     <sys:Double x:Key="TabCloseButtonIdleOpacity">0.5</sys:Double>
@@ -237,6 +248,23 @@
     <!-- Widths a tab title and a folder chip label are cut at, with an ellipsis. -->
     <sys:Double x:Key="SessionTabTitleMaxWidth">160</sys:Double>
     <sys:Double x:Key="SessionTabGroupLabelMaxWidth">120</sys:Double>
+    <!-- The row of folder headers above the session tab strip (folders on their own row): the row's
+         padding, a header's margin and padding, the gap after its colour dot, and the gap before
+         its tab count. -->
+    <sys:Double x:Key="SessionTabGroupDotSize">8</sys:Double>
+    <!-- Outline of the shown folder header's dot, drawn inside the dot's own box so its size holds. -->
+    <sys:Double x:Key="SessionTabGroupDotOutlineThickness">1</sys:Double>
+    <!-- Space above the tabs, and above the list button that mirrors it: the strip's own 8, or 2
+         while the row of folder headers sits right above it so the two rows read as one block. -->
+    <Thickness x:Key="SessionTabStripPadding">8,8,8,0</Thickness>
+    <Thickness x:Key="SessionTabStripPaddingUnderGroupRow">8,2,8,0</Thickness>
+    <Thickness x:Key="SessionTabListButtonRowMargin">0,8,1,1</Thickness>
+    <Thickness x:Key="SessionTabListButtonRowMarginUnderGroupRow">0,2,1,1</Thickness>
+    <Thickness x:Key="SessionTabGroupRowPadding">8,4,8,0</Thickness>
+    <Thickness x:Key="SessionTabGroupHeaderMargin">0,0,6,4</Thickness>
+    <Thickness x:Key="SessionTabGroupHeaderPadding">8,2</Thickness>
+    <Thickness x:Key="SessionTabGroupHeaderDotMargin">0,0,5,0</Thickness>
+    <Thickness x:Key="SessionTabGroupHeaderCountMargin">6,0,0,0</Thickness>
     <!-- The small marks of a tab header: protocol icon box, broadcast box, and their glyphs. -->
     <sys:Double x:Key="SessionTabIconBoxSize">14</sys:Double>
     <sys:Double x:Key="SessionTabChevronFontSize">8</sys:Double>
@@ -1212,6 +1240,7 @@
     <Style x:Key="HeaderOnlyTabControlStyle"
            TargetType="{x:Type TabControl}"
            BasedOn="{StaticResource ThemedTabControlStyle}">
+        <Setter Property="Padding" Value="{StaticResource SessionTabStripPadding}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type TabControl}">
@@ -1227,7 +1256,7 @@
                                 BorderBrush="{DynamicResource BorderBrush}"
                                 BorderThickness="0,0,0,1"
                                 CornerRadius="12,12,0,0"
-                                Padding="8,8,8,0">
+                                Padding="{TemplateBinding Padding}">
                             <!-- No scroll bar: the strip scrolls to the selected tab, follows the
                                  mouse wheel, and the window adds a list of every open tab when the
                                  tabs overflow. The name lets the window find this viewer. -->
