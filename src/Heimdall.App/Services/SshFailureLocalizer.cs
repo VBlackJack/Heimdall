@@ -34,6 +34,9 @@ public static class SshFailureLocalizer
     /// <summary>Returns the failure with its message localized, or unchanged if no key matches.</summary>
     /// <param name="failure">The classified failure.</param>
     /// <param name="localizer">The active catalogue.</param>
+    /// <param name="agentKeyCountAtDial">
+    /// Agent keys offered when the dial was made, read before it, or null when unknown.
+    /// </param>
     /// <param name="targetHost">
     /// Interpolated into the network-level messages, which are the only ones that name a
     /// host.
@@ -41,7 +44,8 @@ public static class SshFailureLocalizer
     public static SshFailureInfo Localize(
         SshFailureInfo failure,
         LocalizationManager localizer,
-        string targetHost)
+        string targetHost,
+        int? agentKeyCountAtDial = null)
     {
         ArgumentNullException.ThrowIfNull(failure);
         ArgumentNullException.ThrowIfNull(localizer);
@@ -60,8 +64,14 @@ public static class SshFailureLocalizer
                     or SshFailureCode.NetworkReset
                     ? targetHost
                     : failure.Message;
+                if (failure.Code is SshFailureCode.TooManyAuthFailures && agentKeyCountAtDial is { } count)
+                {
+                    formatArgument = count;
+                }
+
                 return localizer.Format(key, formatArgument);
-            });
+            },
+            agentKeyCountAtDial: agentKeyCountAtDial);
 
         return new SshFailureInfo(
             failure.Code,

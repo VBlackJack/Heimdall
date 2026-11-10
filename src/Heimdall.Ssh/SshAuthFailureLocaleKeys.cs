@@ -48,4 +48,16 @@ public static class SshAuthFailureLocaleKeys
     /// as <c>{0}</c>.
     /// </summary>
     public const string ManyAgentKeysRefused = "ErrorSshAuthContextAgentKeysRefused";
+
+    /// <summary>
+    /// The attempt limit was reached after an agent offered exactly one key. Used
+    /// instead of the plain too-many-failures message when the count is known.
+    /// </summary>
+    public const string TooManyAuthFailuresOneAgentKey = "ErrorSshTooManyAuthFailuresOneAgentKey";
+
+    /// <summary>
+    /// The attempt limit was reached after an agent offered several keys. Carries
+    /// the count as <c>{0}</c>.
+    /// </summary>
+    public const string TooManyAuthFailuresAgentKeys = "ErrorSshTooManyAuthFailuresAgentKeys";
 }

@@ -97,6 +97,8 @@
   "DialogSshPasswordPromptMessage": "Enter the SSH password for {0}.",
   "ErrorSshProtocolError": "SSH protocol error. The server may use an incompatible protocol version.",
   "ErrorSshTooManyAuthFailures": "Too many authentication failures. An SSH agent offering many keys can cause this: load fewer keys in the agent, or point this session at its own key file. The server may also simply not accept this session's key.",
+  "ErrorSshTooManyAuthFailuresOneAgentKey": "Too many authentication failures. An SSH agent held one key to offer, and a password or key file saved on this session may have been tried first and used up part of the limit. Each refused key counts against the server limit: remove the keys this server does not know from the agent, give this session its own key file, or raise MaxAuthTries on the server.",
+  "ErrorSshTooManyAuthFailuresAgentKeys": "Too many authentication failures. An SSH agent held {0} keys to offer, and a password or key file saved on this session may have been tried first and used up part of the limit. Each refused key counts against the server limit: remove the keys this server does not know from the agent, give this session its own key file, or raise MaxAuthTries on the server.",
   "DialogSftpPasswordPromptTitle": "SFTP password required",
   "DialogSftpPasswordPromptNoCredential": "The file browser could not authenticate to {0}. Enter the SSH password.",
   "DialogSftpPasswordPromptRefused": "Authentication to {0} was refused. Enter the SSH password to try again.",

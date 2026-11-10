@@ -79,6 +79,7 @@ Index de tous les problèmes rencontrés pendant le développement et de leurs s
 62. [Tunnel - "Plink s'est arrêté avant d'ouvrir le tunnel"](#tunnel-plink-exited-early)
 63. [VNC - le serveur demande un nom d'utilisateur ou un mot de passe](#vnc-credentials-required)
 64. [WebView2 - le pointeur disparait à la fermeture d'un terminal](#webview2-pointer-hidden-after-close)
+65. [SSH - "Trop d'échecs d'authentification"](#ssh-too-many-authentication-failures)
 
 ---
 
@@ -1231,3 +1232,21 @@ N'utilisez **pas** `IServiceProvider.QueryService` dans ce cas. Sur `MsTscAx.MsT
 3. Un pointeur déjà perdu revient dès qu'il passe sur une autre vue embarquée. L'application n'a pas besoin d'être relancée et aucune session n'est perdue.
 
 **Fichiers** : `Services/WebView2Helper.cs`
+
+---
+
+<a id="ssh-too-many-authentication-failures"></a>
+## 65. SSH - "Trop d'échecs d'authentification"
+
+**Symptôme** : la connexion à un serveur échoue avec "Trop d'échecs d'authentification", alors que la bonne clé est chargée dans Pageant ou dans l'agent OpenSSH de Windows. Le message indique combien de clés l'agent a présentées quand ce nombre est connu.
+
+**Cause racine** : le serveur limite le nombre de tentatives d'authentification d'une même connexion (`MaxAuthTries` dans `sshd_config`, 6 par défaut, souvent abaissé à 3) et ferme la connexion quand la limite est atteinte. Chaque clé présentée par un agent que le serveur n'accepte pas consomme au moins une tentative, et une clé RSA en consomme jusqu'à trois : Heimdall la présente en `rsa-sha2-512`, puis `rsa-sha2-256`, puis `ssh-rsa`, parce que les serveurs diffèrent sur ceux qu'ils acceptent. Heimdall essaie le premier choix de toutes les clés avant le deuxième choix d'aucune, donc une mauvaise clé RSA placée en tête de l'agent n'épuise plus le budget avant que les clés suivantes soient essayées, mais un agent qui porte beaucoup de clés peut encore atteindre la limite. Un mot de passe ou un fichier de clé enregistré sur la session est essayé avant l'agent et compte aussi dans la limite.
+
+**Solution** :
+
+1. Chargez moins de clés dans l'agent : retirez celles que le serveur ne connaît pas.
+2. Donnez à la session son propre fichier de clé dans la fenêtre de la session, pour que l'agent ne soit pas nécessaire sur ce serveur.
+3. Si le serveur est le vôtre, augmentez `MaxAuthTries` dans `sshd_config` puis rechargez `sshd`.
+4. Si la session enregistre aussi un mot de passe, vérifiez qu'il est correct : un mot de passe refusé consomme au moins une tentative avant que les clés de l'agent soient essayées.
+
+**Fichiers** : `Heimdall.Ssh/Agents/SshAgentAlgorithmSource.cs`, `Heimdall.Ssh/SshConnectionFactory.cs` (`TryCreateAgentAuth`), `Heimdall.Ssh/FailureClassifier.cs`

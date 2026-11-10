@@ -60,6 +60,26 @@ public sealed class FrenchLocaleWordingGuardTests
         Assert.Contains("men\u00e9e \u00e0 son terme", values["UpdateBannerOutcomeCancelled"], StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// An accent escape that lost its backslash and its u ("conna00eet" for the i-circumflex
+    /// of "connait") parses as valid JSON, so only the raw text can reveal it.
+    /// </summary>
+    [Fact]
+    public void NoFrenchValueHoldsAnAccentEscapeThatLostItsBackslash()
+    {
+        string path = Path.Combine(ViewSource.RepoRoot(), "locales", "fr.json");
+        string raw = File.ReadAllText(path);
+
+        List<string> offenders = BareAccentHexPair.Matches(raw)
+            .Select(match => raw.Substring(Math.Max(0, match.Index - 20), 30))
+            .ToList();
+
+        Assert.True(offenders.Count == 0, "Damaged accent escapes in fr.json: " + string.Join(" | ", offenders));
+    }
+
+    private static readonly Regex BareAccentHexPair =
+        new(@"(?<!\\u)(?<![0-9A-Fa-f])00[ecEC][0-9a-fA-F]", RegexOptions.Compiled);
+
     private static Dictionary<string, string> FrenchValues()
     {
         string path = Path.Combine(ViewSource.RepoRoot(), "locales", "fr.json");
