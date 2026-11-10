@@ -119,7 +119,7 @@ public partial class MainWindow
             TreeViewItem? container = TreeInteractionState.FindTreeViewItemContainer(treeView, e.NewValue);
             if (container is not null)
             {
-                container.IsSelected = false;
+                ClearNativeSelection(container, e.NewValue);
             }
         }
 
@@ -206,6 +206,42 @@ public partial class MainWindow
         return preserveMultiSelection
             && newValue is ServerItemViewModel server
             && !isSelected(server);
+    }
+
+    /// <summary>
+    /// Takes WPF's native selected flag off a row it has just selected.
+    /// </summary>
+    /// <remarks>
+    /// A folder is selected natively by WPF itself while it collapses over a selected descendant
+    /// (<c>TreeView.HandleSelectionAndCollapsed</c>) when keyboard focus sits inside the natively
+    /// selected session row below it, and WPF reads its own selected container again right after
+    /// raising the change. Clearing the flag inside that notification leaves it null:
+    /// WPF throws a <see cref="NullReferenceException"/>, the binding update that carried the
+    /// chevron press swallows it, and the folder row never applies its collapsed state, so the
+    /// arrow turns while the sessions stay on screen. A folder's flag therefore comes off once the
+    /// notification has returned.
+    /// </remarks>
+    /// <param name="container">The row WPF has just selected.</param>
+    /// <param name="selectedItem">The item the row stands for.</param>
+    internal static void ClearNativeSelection(TreeViewItem container, object? selectedItem)
+    {
+        ArgumentNullException.ThrowIfNull(container);
+
+        if (selectedItem is not FolderViewModel)
+        {
+            container.IsSelected = false;
+            return;
+        }
+
+        _ = container.Dispatcher.BeginInvoke(
+            DispatcherPriority.Normal,
+            new Action(() =>
+            {
+                if (ReferenceEquals(container.DataContext, selectedItem))
+                {
+                    container.IsSelected = false;
+                }
+            }));
     }
 
     /// <summary>
