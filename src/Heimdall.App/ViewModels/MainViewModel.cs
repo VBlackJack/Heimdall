@@ -569,6 +569,10 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
             {
                 PersistTabGroupingPreference(Connection.GroupTabsByFolder);
             }
+            else if (string.Equals(e.PropertyName, nameof(ConnectionViewModel.TabGroupsOnOwnRow), StringComparison.Ordinal))
+            {
+                PersistTabGroupsOnOwnRowPreference(Connection.TabGroupsOnOwnRow);
+            }
         };
         Connection.PropertyChanged += _connectionPropertyChangedHandler;
 
@@ -741,6 +745,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         try
         {
             Connection.GroupTabsByFolder = settings.GroupSessionTabsByFolder;
+            Connection.TabGroupsOnOwnRow = settings.SessionTabGroupsOnOwnRow;
         }
         finally
         {
@@ -769,6 +774,30 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         catch (Exception ex)
         {
             Core.Logging.FileLogger.Warn($"Failed to save the tab grouping preference: {ex.Message}");
+        }
+    }
+
+    /// <summary>Saves the choice, made from the tab strip, to show the folders on their own row.</summary>
+    private void PersistTabGroupsOnOwnRowPreference(bool value)
+    {
+        if (_applyingTabGroupingPreference)
+        {
+            return;
+        }
+
+        PersistTabGroupsOnOwnRowPreferenceAsync(value).SafeFireAndForget();
+    }
+
+    private async Task PersistTabGroupsOnOwnRowPreferenceAsync(bool value)
+    {
+        try
+        {
+            await _configManager.MergeSettingAsync(
+                settings => settings.SessionTabGroupsOnOwnRow = value).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"Failed to save the tab group row preference: {ex.Message}");
         }
     }
 

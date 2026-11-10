@@ -533,6 +533,63 @@ public sealed partial class SessionCoordinatorPreMountTests
     }
 
     [Fact]
+    public void SessionTabContextMenu_OwnRow_FollowsCheckedState_EnabledOnlyWhileArranged()
+    {
+        RunOnStaThread(() =>
+        {
+            using TestHarness harness = TestHarness.Create();
+            SessionTabViewModel session = CreateSession("session-id", "SSH");
+            harness.Main.Connection.ActiveSessions.Add(session);
+            string header = harness.Main.Localize("SessionTabGroupsOnOwnRow");
+
+            MenuItem item = AssertMenuItem(CreateSessionTabMenu(harness.Main, session), header);
+            Assert.True(item.IsCheckable);
+            Assert.False(item.IsChecked);
+            Assert.False(item.IsEnabled);
+
+            harness.Main.Connection.GroupTabsByFolder = true;
+            item = AssertMenuItem(CreateSessionTabMenu(harness.Main, session), header);
+            Assert.True(item.IsEnabled);
+
+            // What the UIA Toggle pattern does: flip the state, raise no Click.
+            item.IsChecked = true;
+            Assert.True(harness.Main.Connection.TabGroupsOnOwnRow);
+
+            item.IsChecked = false;
+            Assert.False(harness.Main.Connection.TabGroupsOnOwnRow);
+        });
+    }
+
+    [Fact]
+    public void SessionTabContextMenu_OwnRow_HidesCollapseItems()
+    {
+        RunOnStaThread(() =>
+        {
+            using TestHarness harness = TestHarness.Create();
+            harness.Main.Connection.GroupTabsByFolder = true;
+            harness.Main.Connection.TabGroupsOnOwnRow = true;
+            SessionTabViewModel ops = CreateSession("ops", "SSH");
+            SessionTabViewModel lab = CreateSession("lab", "SSH");
+            harness.Main.Connection.ActiveSessions.Add(ops);
+            harness.Main.Connection.ActiveSessions.Add(lab);
+            ops.TabGroupKey = "Ops";
+            lab.TabGroupKey = "Lab";
+            string collapse = harness.Main.Localize("SessionCollapseTabGroup");
+            string collapseOthers = harness.Main.Localize("SessionCollapseOtherTabGroups");
+
+            Assert.True(harness.Main.Connection.IsTabGroupRowActive);
+            Assert.Null(FindMenuItem(CreateSessionTabMenu(harness.Main, ops), collapse));
+            Assert.Null(FindMenuItem(CreateSessionTabMenu(harness.Main, ops), collapseOthers));
+
+            harness.Main.Connection.TabGroupsOnOwnRow = false;
+            ops.TabGroupKey = "Ops";
+            lab.TabGroupKey = "Lab";
+            Assert.NotNull(FindMenuItem(CreateSessionTabMenu(harness.Main, ops), collapse));
+            Assert.NotNull(FindMenuItem(CreateSessionTabMenu(harness.Main, ops), collapseOthers));
+        });
+    }
+
+    [Fact]
     public void SessionTabContextMenu_TabInAFolder_OffersToCollapseItsFolder()
     {
         RunOnStaThread(() =>

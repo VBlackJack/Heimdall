@@ -37,6 +37,18 @@ public sealed class TabDropDecisionTests
     }
 
     [Fact]
+    public void ReleaseOverHeaderRow_DoesNotDetach()
+    {
+        // The row of folder headers is inside the window and outside the content area: a tab
+        // let go over it is neither dropped nor popped out into a window of its own.
+        Assert.False(TabDropDecision.ShouldDetach(
+            accepted: false,
+            cancelled: false,
+            releasedInsideWindow: true,
+            releasedOverSessionContent: false));
+    }
+
+    [Fact]
     public void ContentArea_SplitsTheDisplayedSession()
     {
         Assert.Equal(

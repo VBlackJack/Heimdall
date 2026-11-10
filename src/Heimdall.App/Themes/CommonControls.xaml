@@ -248,6 +248,23 @@
     <!-- Widths a tab title and a folder chip label are cut at, with an ellipsis. -->
     <sys:Double x:Key="SessionTabTitleMaxWidth">160</sys:Double>
     <sys:Double x:Key="SessionTabGroupLabelMaxWidth">120</sys:Double>
+    <!-- The row of folder headers above the session tab strip (folders on their own row): the row's
+         padding, a header's margin and padding, the gap after its colour dot, and the gap before
+         its tab count. -->
+    <sys:Double x:Key="SessionTabGroupDotSize">8</sys:Double>
+    <!-- Outline of the shown folder header's dot, drawn inside the dot's own box so its size holds. -->
+    <sys:Double x:Key="SessionTabGroupDotOutlineThickness">1</sys:Double>
+    <!-- Space above the tabs, and above the list button that mirrors it: the strip's own 8, or 2
+         while the row of folder headers sits right above it so the two rows read as one block. -->
+    <Thickness x:Key="SessionTabStripPadding">8,8,8,0</Thickness>
+    <Thickness x:Key="SessionTabStripPaddingUnderGroupRow">8,2,8,0</Thickness>
+    <Thickness x:Key="SessionTabListButtonRowMargin">0,8,1,1</Thickness>
+    <Thickness x:Key="SessionTabListButtonRowMarginUnderGroupRow">0,2,1,1</Thickness>
+    <Thickness x:Key="SessionTabGroupRowPadding">8,4,8,0</Thickness>
+    <Thickness x:Key="SessionTabGroupHeaderMargin">0,0,6,4</Thickness>
+    <Thickness x:Key="SessionTabGroupHeaderPadding">8,2</Thickness>
+    <Thickness x:Key="SessionTabGroupHeaderDotMargin">0,0,5,0</Thickness>
+    <Thickness x:Key="SessionTabGroupHeaderCountMargin">6,0,0,0</Thickness>
     <!-- The small marks of a tab header: protocol icon box, broadcast box, and their glyphs. -->
     <sys:Double x:Key="SessionTabIconBoxSize">14</sys:Double>
     <sys:Double x:Key="SessionTabChevronFontSize">8</sys:Double>
@@ -1223,6 +1240,7 @@
     <Style x:Key="HeaderOnlyTabControlStyle"
            TargetType="{x:Type TabControl}"
            BasedOn="{StaticResource ThemedTabControlStyle}">
+        <Setter Property="Padding" Value="{StaticResource SessionTabStripPadding}"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type TabControl}">
@@ -1238,7 +1256,7 @@
                                 BorderBrush="{DynamicResource BorderBrush}"
                                 BorderThickness="0,0,0,1"
                                 CornerRadius="12,12,0,0"
-                                Padding="8,8,8,0">
+                                Padding="{TemplateBinding Padding}">
                             <!-- No scroll bar: the strip scrolls to the selected tab, follows the
                                  mouse wheel, and the window adds a list of every open tab when the
                                  tabs overflow. The name lets the window find this viewer. -->
