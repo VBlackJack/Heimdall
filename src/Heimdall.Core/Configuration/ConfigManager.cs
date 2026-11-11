@@ -1359,6 +1359,37 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
         }
     }
 
+    /// <inheritdoc/>
+    /// <remarks>
+    /// A document that is not readable JSON is not copied: it would replace the one good copy
+    /// there is. Unlike the copy taken before a save, a failure to write is not swallowed, since
+    /// the caller relies on the copies being current.
+    /// </remarks>
+    public async Task RefreshLastGoodCopiesAsync()
+    {
+        await _writeLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            foreach (string path in new[] { _settingsPath, _serversPath })
+            {
+                if (!File.Exists(path))
+                {
+                    continue;
+                }
+
+                string current = await File.ReadAllTextAsync(path, Utf8NoBom).ConfigureAwait(false);
+                if (IsReadableJson(current))
+                {
+                    await WriteFileAsync(BackupPathFor(path), current).ConfigureAwait(false);
+                }
+            }
+        }
+        finally
+        {
+            _writeLock.Release();
+        }
+    }
+
     /// <summary>
     /// Persists the server inventory without acquiring the write lock.
     /// </summary>

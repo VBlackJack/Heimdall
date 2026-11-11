@@ -60,8 +60,9 @@ internal interface IPasswordPresetStorage
 
 internal sealed class PasswordPresetStorage : IPasswordPresetStorage
 {
-    private const string PresetsFileName = "password-presets.json";
-    private const char ByteOrderMark = (char)0xFEFF;
+    internal const string PresetsFileName = "password-presets.json";
+    private const string TemporarySuffix = ".tmp";
+    internal const char ByteOrderMark = (char)0xFEFF;
     private readonly string _filePath;
 
     /// <summary>Creates a storage rooted in the supplied directory.</summary>
@@ -162,7 +163,30 @@ internal sealed class PasswordPresetStorage : IPasswordPresetStorage
             // Windows account's own otherwise. A preset holds no password, but it does describe
             // the shape of the ones this person makes, and the leet mode's base word is whatever
             // they typed.
-            File.WriteAllText(_filePath, CredentialProtector.Protect(json), Encoding.UTF8);
+            // Sealed before the lock is taken: a locked vault refuses here and nothing is written.
+            var content = CredentialProtector.Protect(json);
+
+            // Written beside the file, then moved over it: a reader or a crash never sees half a file.
+            var gate = PasswordPresetFileGate.For(_filePath);
+            gate.Wait();
+            try
+            {
+                var temporary = _filePath + TemporarySuffix;
+                try
+                {
+                    File.WriteAllText(temporary, content, Encoding.UTF8);
+                    File.Move(temporary, _filePath, overwrite: true);
+                }
+                catch
+                {
+                    File.Delete(temporary);
+                    throw;
+                }
+            }
+            finally
+            {
+                gate.Release();
+            }
         }
         catch (Exception ex)
         {

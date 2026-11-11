@@ -120,6 +120,12 @@ public partial class VaultEnableDialogViewModel : ObservableObject, IPasswordRef
                 await Task.Run(() => _enableAsync(password)).ConfigureAwait(true);
                 IsCompleted = true;
             }
+            catch (VaultStoreException ex)
+            {
+                // Recoverable, and the store is named so a damaged file can be found.
+                FileLogger.Error("Vault enable failed", ex);
+                ErrorMessage = _localizer.Format("VaultStoreFailureError", _localizer.GetString(ex.StoreNameKey));
+            }
             catch (Exception ex)
             {
                 // Recoverable: the lifecycle persisted a resumable marker before migrating.

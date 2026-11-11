@@ -5395,6 +5395,40 @@ public sealed partial class SettingsViewModelTests : IDisposable
         return localizer;
     }
 
+    [Fact]
+    public async Task DisableVaultCommand_WithUnsavedGatewayEdits_IsRefusedWithAWarning()
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync();
+        FakeConfigManager config = new();
+        FakeDialogService dialog = new()
+        {
+            GatewayDialogResultToReturn = new GatewayDialogResult(CreateGateway("gw-draft", "Draft"), true)
+        };
+        SettingsViewModel viewModel = CreateViewModel(config, dialog, localizer: localizer);
+        viewModel.LoadFromSettings(config.Settings);
+        await viewModel.AddGatewayCommand.ExecuteAsync(null);
+
+        await viewModel.DisableVaultCommand.ExecuteAsync(null);
+
+        (string title, string message) = Assert.Single(dialog.WarningCalls);
+        Assert.Equal(localizer["VaultDisableTitle"], title);
+        Assert.Equal(localizer["VaultDisableUnsavedGatewaysMessage"], message);
+    }
+
+    [Fact]
+    public async Task DisableVaultCommand_WithoutGatewayEdits_DoesNotWarn()
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync();
+        FakeConfigManager config = new();
+        FakeDialogService dialog = new();
+        SettingsViewModel viewModel = CreateViewModel(config, dialog, localizer: localizer);
+        viewModel.LoadFromSettings(config.Settings);
+
+        await viewModel.DisableVaultCommand.ExecuteAsync(null);
+
+        Assert.Empty(dialog.WarningCalls);
+    }
+
     private static SshGatewayDto CreateGateway(string id, string name) =>
         new()
         {

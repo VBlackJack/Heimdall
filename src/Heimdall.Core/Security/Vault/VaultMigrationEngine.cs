@@ -37,7 +37,8 @@ namespace Heimdall.Core.Security.Vault;
 /// CitrixLaunchCommandLine (PLAINTEXT at rest -> brought under v2).</item>
 /// <item>settings.json: CredentialProviderUnlockSecretEncrypted and
 /// CmdLibGitSyncToken (both read + written through CredentialProtector, so their
-/// non-vault form is the CredentialProtector legacy format).</item>
+/// non-vault form is the CredentialProtector legacy format). The SSH gateways'
+/// password and key passphrase follow the same rule in both directions.</item>
 /// </list>
 /// Plaintext is materialized transiently as managed strings through the
 /// CredentialProtector string API (the same non-zeroable boundary as the rest of
@@ -46,6 +47,8 @@ namespace Heimdall.Core.Security.Vault;
 [SupportedOSPlatform("windows")]
 internal static class VaultMigrationEngine
 {
+    private static int s_undecryptableReported;
+
     /// <summary>Forward-migrate the whole confidential set (legacy -> v2). Idempotent.</summary>
     public static async Task MigrateForwardAsync(IConfigManager configManager)
     {
@@ -65,6 +68,16 @@ internal static class VaultMigrationEngine
                 v => settings.CredentialProviderUnlockSecretEncrypted = v, ForwardEncrypted);
             Apply(settings.CmdLibGitSyncToken,
                 v => settings.CmdLibGitSyncToken = v, ForwardEncrypted);
+
+            // Assigning only on change keeps the passphrase setter from declaring a field the
+            // gateway never had.
+            foreach (SshGatewayDto gateway in settings.SshGateways)
+            {
+                Apply(gateway.SshPasswordEncrypted,
+                    v => gateway.SshPasswordEncrypted = v, ForwardEncrypted);
+                Apply(gateway.SshKeyPassphraseEncrypted,
+                    v => gateway.SshKeyPassphraseEncrypted = v, ForwardEncrypted);
+            }
         }).ConfigureAwait(false);
     }
 
@@ -116,6 +129,17 @@ internal static class VaultMigrationEngine
             // form, consistent with CredentialProviderUnlockSecretEncrypted.
             Apply(settings.CmdLibGitSyncToken,
                 v => settings.CmdLibGitSyncToken = v, ReverseToCredentialProtectorLegacy);
+
+            // Gateway secrets are written through CredentialProtector too, so a gateway saved
+            // while the vault was unlocked holds a vault blob. Assigning only on change keeps the
+            // passphrase setter from declaring a field the gateway never had.
+            foreach (SshGatewayDto gateway in settings.SshGateways)
+            {
+                Apply(gateway.SshPasswordEncrypted,
+                    v => gateway.SshPasswordEncrypted = v, ReverseToCredentialProtectorLegacy);
+                Apply(gateway.SshKeyPassphraseEncrypted,
+                    v => gateway.SshKeyPassphraseEncrypted = v, ReverseToCredentialProtectorLegacy);
+            }
         }).ConfigureAwait(false);
     }
 
@@ -170,7 +194,13 @@ internal static class VaultMigrationEngine
         {
             // Undecryptable legacy blob (e.g. DPAPI from another user). Preserve
             // the original bytes - never lose data or write null. No value logged.
-            FileLogger.Warn("Vault migration: skipped an undecryptable legacy secret field.");
+            // Once per process: the pass also runs at every unlock, and the same secret would be
+            // reported each time.
+            if (Interlocked.Exchange(ref s_undecryptableReported, 1) == 0)
+            {
+                FileLogger.Warn("Vault migration: skipped an undecryptable legacy secret field.");
+            }
+
             return current;
         }
 

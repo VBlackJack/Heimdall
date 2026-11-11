@@ -601,6 +601,25 @@ public partial class App : System.Windows.Application
             ShutdownMode = ShutdownMode.OnMainWindowClose;
             mainWindow.Show();
 
+            // A store the master password could not be applied to is reported in the status line,
+            // once a session; the unlock itself never waits for it.
+            var vaultStores = _serviceProvider.GetRequiredService<VaultLifecycleService>();
+            void ShowUnsealedStores(IReadOnlyList<string> storeNameKeys) =>
+                Dispatcher.BeginInvoke(() =>
+                {
+                    if (_mainViewModel is not null)
+                    {
+                        _mainViewModel.StatusText = localization.Format(
+                            "VaultStoresUnsealedNotice",
+                            string.Join(", ", storeNameKeys.Select(key => localization.GetString(key))));
+                    }
+                });
+            vaultStores.UnsealedStoresDetected += ShowUnsealedStores;
+            if (vaultStores.UnsealedStoreNameKeys.Count > 0)
+            {
+                ShowUnsealedStores(vaultStores.UnsealedStoreNameKeys);
+            }
+
             // After the unlock gate, so a Git token held by the vault can be read.
             _ = RunStartupGitSyncAsync(
                 settings,
@@ -778,7 +797,7 @@ public partial class App : System.Windows.Application
         // Vault lifecycle owns the session DEK holder, so a single instance.
         services.AddSingleton<ITpmPresenceService, WindowsTpmPresenceService>();
         services.AddSingleton<IVaultHelloService, WindowsVaultHelloService>();
-        services.AddSingleton<VaultLifecycleService>();
+        VaultServiceRegistration.Register(services, ApplicationDataPathResolver.Resolve());
         services.AddSingleton<WorkspaceLockService>();
 
         // SSH/Tunnel services

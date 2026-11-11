@@ -31,6 +31,9 @@ namespace Heimdall.App.ViewModels.Dialogs;
 /// </summary>
 public partial class VaultDisableDialogViewModel : ObservableObject, IPasswordRefocusHost
 {
+    private const string StoreNameSeparator = ", ";
+    private const string MessageSeparator = " ";
+
     private readonly Func<char[], Task> _disableAsync;
     private readonly LocalizationManager _localizer;
 
@@ -65,6 +68,22 @@ public partial class VaultDisableDialogViewModel : ObservableObject, IPasswordRe
     /// <summary>Whether the disable action is currently available.</summary>
     public bool CanSubmit => !IsBusy;
 
+    /// <summary>
+    /// The stores that still hold vault secrets, or the generic failure when a step failed, followed
+    /// by the warning when the vault could not be fully put back.
+    /// </summary>
+    private string DescribeResidue(VaultResidueException ex)
+    {
+        string message = ex.StoreNameKeys.Count > 0
+            ? _localizer.Format(
+                "VaultDisableResidueError",
+                string.Join(StoreNameSeparator, ex.StoreNameKeys.Select(key => _localizer.GetString(key))))
+            : _localizer.GetString("VaultDisableError");
+        return ex.ProtectionRestored
+            ? message
+            : message + MessageSeparator + _localizer.GetString("VaultDisableRestoreIncomplete");
+    }
+
     [RelayCommand]
     private async Task Disable(char[]? password)
     {
@@ -93,6 +112,15 @@ public partial class VaultDisableDialogViewModel : ObservableObject, IPasswordRe
             {
                 // Wrong password (or corruption) - single generic message.
                 ErrorMessage = _localizer.GetString("VaultUnlockError");
+            }
+            catch (VaultResidueException ex)
+            {
+                ErrorMessage = DescribeResidue(ex);
+            }
+            catch (VaultStoreException ex)
+            {
+                // Names the store only: the message carries no secret and no path.
+                ErrorMessage = _localizer.Format("VaultStoreFailureError", _localizer.GetString(ex.StoreNameKey));
             }
             catch (Exception ex)
             {

@@ -4031,6 +4031,17 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     [RelayCommand]
     private async Task DisableVaultAsync()
     {
+        // The panel keeps edited gateways in memory and writes them over what is on disk when it
+        // saves. One edited before the disable and saved after it would write back the secret as
+        // the vault sealed it, which nothing could open once the key is gone.
+        if (_editedGatewayIds.Count > 0)
+        {
+            _dialogService.ShowWarning(
+                _localizer["VaultDisableTitle"],
+                _localizer["VaultDisableUnsavedGatewaysMessage"]);
+            return;
+        }
+
         VaultDisableDialogViewModel dialogViewModel = new VaultDisableDialogViewModel(
             password => _vaultLifecycle.DisableAsync(password),
             _localizer);

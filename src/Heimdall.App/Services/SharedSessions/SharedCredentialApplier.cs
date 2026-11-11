@@ -343,15 +343,31 @@ public sealed class SharedCredentialApplier
     /// counts as readable: the connection asks for the vault to be unlocked, as it does for every
     /// other saved password.
     /// </summary>
-    private static bool IsReadableByTheProtector(string sealedSecret)
+    private static bool IsReadableByTheProtector(string sealedSecret) =>
+        IsReadable(ConnectionHelpers.DecryptPassword, sealedSecret, CredentialProtector.IsVaultEnabled);
+
+    /// <summary>
+    /// The decision behind <see cref="IsReadableByTheProtector"/>, with the reader and the vault
+    /// state passed in.
+    /// </summary>
+    /// <remarks>
+    /// A secret the reader refuses because the vault is locked is readable only while a vault
+    /// exists to unlock. Once the vault has been disabled its key is gone, so a secret still
+    /// sealed with it can never be opened again: it counts as unreadable, is forgotten, and the
+    /// password is asked for again like any other one this machine cannot open.
+    /// </remarks>
+    /// <param name="decrypt">The reader, which throws for a vault secret while the vault is locked.</param>
+    /// <param name="sealedSecret">The remembered secret.</param>
+    /// <param name="vaultEnabled">Whether a master-password vault is configured.</param>
+    internal static bool IsReadable(Func<string, string?> decrypt, string sealedSecret, bool vaultEnabled)
     {
         try
         {
-            return ConnectionHelpers.DecryptPassword(sealedSecret) is not null;
+            return decrypt(sealedSecret) is not null;
         }
         catch (Heimdall.Core.Security.Vault.VaultLockedException)
         {
-            return true;
+            return vaultEnabled;
         }
     }
 
