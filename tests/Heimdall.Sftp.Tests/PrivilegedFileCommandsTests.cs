@@ -328,11 +328,16 @@ public sealed class PrivilegedFileCommandsTests
             "sh -c 'body'");
         Assert.Contains("sudo -n -v", streaming, StringComparison.Ordinal);
         Assert.Contains("IFS= read -r _heimdall_password", streaming, StringComparison.Ordinal);
-        Assert.Contains("exec sudo -n sh -c 'body'", streaming, StringComparison.Ordinal);
-        Assert.EndsWith(
-            "else sudo -k; exec sudo -S -p '' sh -c 'body'; fi",
-            streaming,
-            StringComparison.Ordinal);
+        Assert.EndsWith("; sudo -n sh -c 'body'", streaming, StringComparison.Ordinal);
+        Assert.Equal(1, streaming.Split("sudo -S").Length - 1);
+        Assert.Contains("printf '%s\\n' \"$_heimdall_password\" | sudo -S -p '' -v", streaming, StringComparison.Ordinal);
+        Assert.DoesNotContain("sudo -S -p '' sh -c", streaming, StringComparison.Ordinal);
+        Assert.True(
+            streaming.IndexOf(
+                $"exit {PrivilegedFileCommands.SudoAuthenticationFailedExitStatus};",
+                StringComparison.Ordinal)
+            < streaming.IndexOf("sh -c 'body'", StringComparison.Ordinal),
+            "the authentication failure must exit before the body.");
     }
 
     [Fact]

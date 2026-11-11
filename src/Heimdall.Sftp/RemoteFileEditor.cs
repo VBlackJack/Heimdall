@@ -652,6 +652,7 @@ public sealed class RemoteFileEditor : IDisposable
     /// </remarks>
     internal static bool IsDeterministicRefusal(Exception ex)
         => ex is SftpMetadataPreservationException
+            or SudoPasswordRejectedException
             or RemoteUploadTargetUnsupportedException
             or Renci.SshNet.Common.SftpPermissionDeniedException;
 
@@ -765,16 +766,32 @@ public sealed class RemoteFileEditor : IDisposable
                 .ConfigureAwait(false);
 
             ct.ThrowIfCancellationRequested();
-            if (result.ExitStatus != 0)
-            {
-                throw new InvalidOperationException(
-                    $"sudo atomic write failed (exit {result.ExitStatus}): {result.Error}");
-            }
+            EnsureSudoWriteSucceeded(result);
         }
         finally
         {
             sshClient.Disconnect();
         }
+    }
+
+    /// <summary>
+    /// Turns a failed privileged write into its exception. A refused password is its own type so
+    /// the caller can say so, instead of reporting a generic failed write.
+    /// </summary>
+    internal static void EnsureSudoWriteSucceeded(PrivilegedCommandResult result)
+    {
+        if (result.ExitStatus == 0)
+        {
+            return;
+        }
+
+        if (result.ExitStatus == PrivilegedFileCommands.SudoAuthenticationFailedExitStatus)
+        {
+            throw new SudoPasswordRejectedException(result.Error);
+        }
+
+        throw new InvalidOperationException(
+            $"sudo atomic write failed (exit {result.ExitStatus}): {result.Error}");
     }
 
     private static void DrainSession(EditSession session)
@@ -899,6 +916,20 @@ public sealed record RemoteEditorSudoSaveCompleted(
     string RemotePath,
     string LocalPath,
     bool Success);
+
+/// <summary>
+/// Indicates that the sudo password was refused before the privileged write started, so the
+/// target is untouched and sending the same password again cannot succeed.
+/// </summary>
+public sealed class SudoPasswordRejectedException : InvalidOperationException
+{
+    public SudoPasswordRejectedException(string? remoteError)
+        : base(string.IsNullOrWhiteSpace(remoteError)
+            ? "The sudo password was rejected."
+            : remoteError)
+    {
+    }
+}
 
 /// <summary>
 /// Indicates that a privileged edit was refused because the remote file is too large to buffer safely.

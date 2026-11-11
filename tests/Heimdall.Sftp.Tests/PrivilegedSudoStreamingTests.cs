@@ -178,6 +178,107 @@ public sealed class PrivilegedSudoStreamingTests
         Assert.Equal(payload, remoteStdin.ToArray());
     }
 
+    private sealed class ThrowingStream(Exception failure) : MemoryStream
+    {
+        public override void Write(byte[] buffer, int offset, int count) => throw failure;
+
+        public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
+            => throw failure;
+
+        public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+            => throw failure;
+    }
+
+    [Fact]
+    public async Task TryWriteInput_ReturnsTheWriteFailureInsteadOfThrowingIt()
+    {
+        var failure = new IOException("channel closed");
+        using var remoteStdin = new ThrowingStream(failure);
+        using var content = new MemoryStream("payload"u8.ToArray());
+
+        Exception? result = await PrivilegedFileTransfer.TryWriteInputAsync(
+            remoteStdin,
+            content,
+            PrivilegedFileTransfer.EncodePasswordLine(Password),
+            CancellationToken.None);
+
+        Assert.Same(failure, result);
+    }
+
+    [Fact]
+    public async Task TryWriteInput_StillThrowsOnCancellation()
+    {
+        using var remoteStdin = new MemoryStream();
+        using var content = new MemoryStream("payload"u8.ToArray());
+        using var cancelled = new CancellationTokenSource();
+        await cancelled.CancelAsync();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => PrivilegedFileTransfer.TryWriteInputAsync(
+                remoteStdin,
+                content,
+                ReadOnlyMemory<byte>.Empty,
+                cancelled.Token));
+    }
+
+    [Fact]
+    public void RethrowUnlessPasswordRefused_WriteFailureAfterAuthenticationExit_IsNotFatal()
+    {
+        var failure = new IOException("channel closed");
+
+        PrivilegedFileTransfer.RethrowUnlessPasswordRefused(
+            failure,
+            PrivilegedFileCommands.SudoAuthenticationFailedExitStatus);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(78)]
+    public void RethrowUnlessPasswordRefused_WriteFailureWithAnyOtherStatus_StillReportsTheIoFailure(int? status)
+    {
+        var failure = new IOException("channel closed");
+
+        IOException thrown = Assert.Throws<IOException>(
+            () => PrivilegedFileTransfer.RethrowUnlessPasswordRefused(failure, status));
+
+        Assert.Same(failure, thrown);
+    }
+
+    [Fact]
+    public void RethrowUnlessPasswordRefused_NoWriteFailure_NeverThrows()
+    {
+        PrivilegedFileTransfer.RethrowUnlessPasswordRefused(null, 1);
+        PrivilegedFileTransfer.RethrowUnlessPasswordRefused(null, null);
+    }
+
+    [Fact]
+    public void EditorWrite_AuthenticationExit_IsThePasswordRejectedError()
+    {
+        var result = new PrivilegedCommandResult(
+            PrivilegedFileCommands.SudoAuthenticationFailedExitStatus,
+            string.Empty,
+            "sudo: 1 incorrect password attempt");
+
+        var error = Assert.Throws<SudoPasswordRejectedException>(
+            () => RemoteFileEditor.EnsureSudoWriteSucceeded(result));
+
+        Assert.True(RemoteFileEditor.IsDeterministicRefusal(error));
+    }
+
+    [Fact]
+    public void EditorWrite_OtherFailureStaysGenericAndSuccessPasses()
+    {
+        RemoteFileEditor.EnsureSudoWriteSucceeded(new PrivilegedCommandResult(0, string.Empty, string.Empty));
+
+        var error = Assert.Throws<InvalidOperationException>(
+            () => RemoteFileEditor.EnsureSudoWriteSucceeded(new PrivilegedCommandResult(1, string.Empty, "boom")));
+
+        Assert.IsNotType<SudoPasswordRejectedException>(error);
+        Assert.False(RemoteFileEditor.IsDeterministicRefusal(error));
+    }
+
     private static int Count(string haystack, string needle)
     {
         int count = 0;

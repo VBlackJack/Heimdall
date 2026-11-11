@@ -1157,6 +1157,11 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             return GetSudoAuthenticationErrorMessage(sudoException.Kind);
         }
 
+        if (ex is SudoPasswordRejectedException)
+        {
+            return GetSudoAuthenticationErrorMessage(SudoFailureKind.PasswordRejected);
+        }
+
         if (ex is SudoToolingUnavailableException)
         {
             return L10n("SftpErrorSudoToolingUnavailable");

@@ -426,6 +426,41 @@ public static class PrivilegedFileTransfer
         await commandInput.FlushAsync(ct).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Writes the input and returns the failure instead of throwing it. Cancellation still throws.
+    /// </summary>
+    internal static async Task<Exception?> TryWriteInputAsync(
+        Stream commandInput,
+        Stream payload,
+        ReadOnlyMemory<byte> prefix,
+        CancellationToken ct)
+    {
+        try
+        {
+            await WriteInputAsync(commandInput, payload, prefix, ct).ConfigureAwait(false);
+            return null;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return ex;
+        }
+    }
+
+    /// <summary>
+    /// Raises a deferred write failure unless the remote side exited because it refused the
+    /// password, in which case the exit status is the real answer and the caller reads it.
+    /// </summary>
+    internal static void RethrowUnlessPasswordRefused(Exception? writeFailure, int? exitStatus)
+    {
+        if (writeFailure is null
+            || exitStatus == PrivilegedFileCommands.SudoAuthenticationFailedExitStatus)
+        {
+            return;
+        }
+
+        System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(writeFailure).Throw();
+    }
+
     private static async Task<PrivilegedCommandResult> ExecuteWithInputAsync(
         SshClient client,
         string commandText,
@@ -440,12 +475,21 @@ public static class PrivilegedFileTransfer
         try
         {
             executeTask = command.ExecuteAsync(ct);
-            using (Stream commandInput = command.CreateInputStream())
+            // A refused password makes the remote side exit before it reads the payload, so a large
+            // write can fail on a closed channel first. The failure waits for the exit status.
+            Exception? writeFailure = null;
+            try
             {
-                await WriteInputAsync(commandInput, input, prefix, ct).ConfigureAwait(false);
+                using Stream commandInput = command.CreateInputStream();
+                writeFailure = await TryWriteInputAsync(commandInput, input, prefix, ct).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                writeFailure ??= ex;
             }
 
             await executeTask.ConfigureAwait(false);
+            RethrowUnlessPasswordRefused(writeFailure, command.ExitStatus);
             return new PrivilegedCommandResult(
                 command.ExitStatus ?? -1,
                 command.Result ?? string.Empty,
