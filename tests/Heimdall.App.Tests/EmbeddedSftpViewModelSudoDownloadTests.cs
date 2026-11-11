@@ -44,6 +44,25 @@ public sealed class EmbeddedSftpViewModelSudoDownloadTests
     }
 
     [Fact]
+    public void EnsureSudoSucceeded_StreamingLineAuthenticationExit_IsAWrongPasswordError()
+    {
+        SudoAuthenticationException error = Assert.Throws<SudoAuthenticationException>(
+            () => EmbeddedSftpViewModel.EnsureSudoSucceeded(
+                Heimdall.Sftp.PrivilegedFileCommands.SudoAuthenticationFailedExitStatus,
+                string.Empty,
+                "atomic write"));
+
+        Assert.Equal(SudoFailureKind.PasswordRejected, error.Kind);
+    }
+
+    [Fact]
+    public void EnsureSudoSucceeded_OtherExitWithoutSudoMessage_StaysAGenericFailure()
+    {
+        Assert.Throws<InvalidOperationException>(
+            () => EmbeddedSftpViewModel.EnsureSudoSucceeded(1, "boom", "atomic write"));
+    }
+
+    [Fact]
     public void BuildSudoBase64DownloadBody_EscapesRemotePath()
     {
         string command = EmbeddedSftpViewModel.BuildSudoBase64DownloadBody("/etc/ssh/it's config");

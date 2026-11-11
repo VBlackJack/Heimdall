@@ -54,6 +54,14 @@ public static class PrivilegedFileCommands
     public const int ToolingUnavailableExitStatus = 77;
 
     /// <summary>
+    /// Exit status of the streaming sudo line when the supplied password was refused before the
+    /// writer started. Nothing was read from the payload and the target is untouched. Distinct from
+    /// 73 to 78, which the writer and the probe use. Kept in step with the literal built into the
+    /// line; a test pins the two.
+    /// </summary>
+    public const int SudoAuthenticationFailedExitStatus = 79;
+
+    /// <summary>
     /// The scripts below are written for GNU coreutils (<c>stat -c</c>, <c>cp --attributes-only</c>,
     /// <c>sync -f</c>, <c>mv -T</c>). On a BSD or busybox server they used to fail on the first
     /// such flag with a message about that flag; the probe names the missing tool instead, and
@@ -184,10 +192,21 @@ public static class PrivilegedFileCommands
     internal static string BuildPasswordStreamingSudoInvocation(string privilegedBody)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(privilegedBody);
-        return "if sudo -n -v 2>/dev/null; then "
-            + $"IFS= read -r _heimdall_password; exec sudo -n {privilegedBody}; "
-            + $"else sudo -k; exec sudo -S -p '' {privilegedBody}; fi";
+        // The first statement takes the password line off standard input, so what follows it is the
+        // payload alone and no sudo can mistake a payload line for a password. The password is
+        // checked through a pipe that carries only itself; the command that writes is
+        // non-interactive and can never prompt. Not exec'd, so every sudo here has the same parent
+        // process: with no terminal, the sudo timestamp that the check leaves is keyed to it.
+        return $"IFS= read -r {PasswordVariable}; "
+            + "if sudo -n -v 2>/dev/null; "
+            + $"then unset {PasswordVariable}; "
+            + $"else printf '%s\\n' \"${PasswordVariable}\" | sudo -S -p '' -v "
+            + $"|| {{ unset {PasswordVariable}; exit {SudoAuthenticationFailedExitStatus}; }}; "
+            + $"unset {PasswordVariable}; fi; "
+            + $"sudo -n {privilegedBody}";
     }
+
+    private const string PasswordVariable = "_heimdall_password";
 
     private static string BuildShellBody(string script, string remotePath)
     {
@@ -334,7 +353,7 @@ public static class PrivilegedFileTransfer
         }
 
         commandText = PrivilegedFileCommands.BuildPasswordStreamingSudoInvocation(privilegedBody);
-        byte[] passwordBytes = Encoding.UTF8.GetBytes(sudoPassword + "\n");
+        byte[] passwordBytes = EncodePasswordLine(sudoPassword);
         try
         {
             return await ExecuteWithInputAsync(client, commandText, content, passwordBytes, commandTimeout, ct)
@@ -371,6 +390,42 @@ public static class PrivilegedFileTransfer
         }
     }
 
+    /// <summary>
+    /// Encodes the single line the streaming sudo line reads before anything else: the password
+    /// and a line feed. A password holding a line feed would end the line early and leave the rest
+    /// at the head of the payload, so it is refused here rather than sent.
+    /// </summary>
+    internal static byte[] EncodePasswordLine(string sudoPassword)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(sudoPassword);
+        if (sudoPassword.Contains('\n', StringComparison.Ordinal))
+        {
+            throw new ArgumentException(
+                "The sudo password must be a single line.",
+                nameof(sudoPassword));
+        }
+
+        return Encoding.UTF8.GetBytes(sudoPassword + "\n");
+    }
+
+    /// <summary>
+    /// Writes the prefix, then exactly the payload, to the remote command's standard input.
+    /// </summary>
+    internal static async Task WriteInputAsync(
+        Stream commandInput,
+        Stream payload,
+        ReadOnlyMemory<byte> prefix,
+        CancellationToken ct)
+    {
+        if (!prefix.IsEmpty)
+        {
+            await commandInput.WriteAsync(prefix, ct).ConfigureAwait(false);
+        }
+
+        await payload.CopyToAsync(commandInput, ct).ConfigureAwait(false);
+        await commandInput.FlushAsync(ct).ConfigureAwait(false);
+    }
+
     private static async Task<PrivilegedCommandResult> ExecuteWithInputAsync(
         SshClient client,
         string commandText,
@@ -387,13 +442,7 @@ public static class PrivilegedFileTransfer
             executeTask = command.ExecuteAsync(ct);
             using (Stream commandInput = command.CreateInputStream())
             {
-                if (!prefix.IsEmpty)
-                {
-                    await commandInput.WriteAsync(prefix, ct).ConfigureAwait(false);
-                }
-
-                await input.CopyToAsync(commandInput, ct).ConfigureAwait(false);
-                await commandInput.FlushAsync(ct).ConfigureAwait(false);
+                await WriteInputAsync(commandInput, input, prefix, ct).ConfigureAwait(false);
             }
 
             await executeTask.ConfigureAwait(false);

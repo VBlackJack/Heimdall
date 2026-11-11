@@ -2511,6 +2511,14 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         }
 
         string error = stderr ?? string.Empty;
+
+        // The streaming line refused the password before it read any of the payload. Its own
+        // status, so the wrong-password message does not hang on sudo's wording or locale.
+        if (exitStatus == PrivilegedFileCommands.SudoAuthenticationFailedExitStatus)
+        {
+            throw new SudoAuthenticationException(SudoFailureKind.PasswordRejected, error);
+        }
+
         SudoFailureKind failureKind = ClassifySudoStderr(error);
         if (failureKind is SudoFailureKind.PasswordUnavailable or SudoFailureKind.PasswordRejected)
         {
