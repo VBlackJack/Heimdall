@@ -214,6 +214,46 @@ public sealed class VaultRealStoresTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task PresetSave_WaitsForTheExclusiveSideOfTheSealGate()
+    {
+        var storage = new PasswordPresetStorage(_root);
+        using IDisposable exclusive = await VaultSealGate.Shared.EnterExclusiveAsync();
+
+        Task save = Task.Run(() => storage.Save(new PasswordGeneratorStore()));
+        await Task.Delay(200);
+        bool finishedWhileHeld = save.IsCompleted;
+        exclusive.Dispose();
+        await save;
+
+        Assert.False(finishedWhileHeld);
+        Assert.True(File.Exists(Path.Combine(_root, PasswordPresetStorage.PresetsFileName)));
+    }
+
+    [Fact]
+    public async Task SettledPlan_SealsWithTheProtectionInForce_AndTheHeldPasswordIsNeverAVaultBlob()
+    {
+        using VaultDekHolder dek = VaultKeyManager.GenerateDek();
+        CredentialProtector.SetVaultEnabled(true);
+        CredentialProtector.SetVaultKey(dek);
+        var secrets = new SharedSessionSecretStore(SharedPath);
+        var plan = new SharedCredentialApplier.SharedCredentialPlan(
+            secrets,
+            new System.Collections.Concurrent.ConcurrentDictionary<SharedCredentialApplier.SecretTarget, byte>(),
+            CredentialProtector.Protect);
+        var target = new SharedCredentialApplier.SecretTarget(SharedSecretKind.Gateway, SourceId, "key-1");
+        string held = CredentialProtector.ProtectTransient("pending-password");
+        plan.Pending.Add((target, held));
+
+        Assert.False(VaultSecretBlob.IsSecretBlob(held));
+
+        await plan.SettleAsync(succeeded: true, sessionAuthenticated: true, failureCode: null, failedAtGateway: false);
+
+        string? stored = secrets.Find(SharedSecretKind.Gateway, SourceId, "key-1");
+        Assert.True(VaultSecretBlob.IsSecretBlob(stored));
+        Assert.Equal("pending-password", CredentialProtector.Unprotect(stored));
+    }
+
+    [Fact]
     public void ServiceRegistration_GivesTheLifecycleServiceTheThreeStores()
     {
         var services = new ServiceCollection();

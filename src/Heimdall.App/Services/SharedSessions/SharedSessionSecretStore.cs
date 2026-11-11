@@ -136,6 +136,48 @@ public sealed class SharedSessionSecretStore
         }
     }
 
+    /// <summary>Removes every remembered secret for which <paramref name="isUnreadable"/> is true.</summary>
+    /// <remarks>Reads the document strictly, like <see cref="TransformSecretsAsync"/>.</remarks>
+    internal async Task DropSecretsAsync(Func<string?, bool> isUnreadable, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(isUnreadable);
+        await _writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (!File.Exists(_path))
+            {
+                return;
+            }
+
+            string json = await File.ReadAllTextAsync(_path, cancellationToken).ConfigureAwait(false);
+            SecretDocument document = JsonSerializer.Deserialize<SecretDocument>(json)
+                ?? throw new InvalidDataException("The remembered passwords document is empty.");
+            if (document.FormatVersion != FormatVersion || document.Entries is null)
+            {
+                throw new InvalidDataException("The remembered passwords document has an unknown format.");
+            }
+
+            if (document.Entries.RemoveAll(entry => isUnreadable(entry.Secret)) == 0)
+            {
+                return;
+            }
+
+            await SecureFileWriter.WriteAllTextAtomicAsync(
+                _path,
+                JsonSerializer.Serialize(document, JsonOptions),
+                cancellationToken).ConfigureAwait(false);
+
+            lock (_gate)
+            {
+                _entries = [.. document.Entries.Where(entry => entry.IsComplete)];
+            }
+        }
+        finally
+        {
+            _writeGate.Release();
+        }
+    }
+
     /// <summary>Whether a remembered secret is still in the legacy form. An unreadable document throws.</summary>
     internal async Task<bool> HasUnsealedSecretsAsync(CancellationToken cancellationToken)
     {

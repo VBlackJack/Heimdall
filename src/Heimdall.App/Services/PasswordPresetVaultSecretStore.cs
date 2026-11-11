@@ -62,6 +62,26 @@ internal sealed class PasswordPresetVaultSecretStore : IVaultSecretStore
         await InspectAsync(VaultConfigurationScan.IsVaultSecret, cancellationToken).ConfigureAwait(false);
 
     /// <inheritdoc/>
+    public async Task DropUnreadableAsync(Func<string?, bool> isUnreadable, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(isUnreadable);
+        SemaphoreSlim gate = PasswordPresetFileGate.For(_filePath);
+        await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            string? sealedValue = await ReadSealedAsync(cancellationToken).ConfigureAwait(false);
+            if (sealedValue is not null && isUnreadable(sealedValue))
+            {
+                File.Delete(_filePath);
+            }
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
+
+    /// <inheritdoc/>
     public async Task<bool> HasUnsealedSecretsAsync(CancellationToken cancellationToken) =>
         await InspectAsync(value => !VaultConfigurationScan.IsVaultSecret(value), cancellationToken).ConfigureAwait(false);
 

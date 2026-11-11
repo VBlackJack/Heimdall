@@ -1368,7 +1368,7 @@ public partial class PasswordGeneratorView : UserControl, IToolView
     {
         if (_viewInitialized)
         {
-            _vm.PersistSettingsIfRemembering();
+            _vm.PersistSettingsInBackground();
         }
     }
 

@@ -271,7 +271,13 @@ public partial class App : System.Windows.Application
             await StartupStageTimer.RunAsync(ConfigInitStage, configManager.InitializeAsync);
 
             var localization = _serviceProvider.GetRequiredService<LocalizationManager>();
+
+            // A disable that did not finish leaves a journal: undo it before the vault state is read, so
+            // the application never starts as disabled while one exists. When the undo cannot be
+            // written yet, the start goes ahead as an enabled vault in memory.
+            VaultDisableJournal? unrestoredJournal = await VaultDisableJournal.RecoverAsync(configManager);
             var settings = await LoadStartupSettingsAsync(configManager);
+            unrestoredJournal?.ApplyTo(settings);
             _notesStoragePath = ResolveNotesStoragePath(settings, _dataRoot);
 
             await StartupStageTimer.RunAsync(
@@ -591,9 +597,18 @@ public partial class App : System.Windows.Application
             var workspaceLock = _serviceProvider.GetRequiredService<WorkspaceLockService>();
             workspaceLock.Configure(
                 settings.VaultEnabled, settings.AutoLockIdleMinutes, settings.DisconnectOnLock);
-            configManager.SettingsChanged += changed => Dispatcher.Invoke(() =>
+            // Posted, never waited for: this is raised from inside the vault operations, and a wait on
+            // the UI thread there is one more way for two threads to wait on each other.
+            configManager.SettingsChanged += changed => _ = Dispatcher.BeginInvoke(() =>
                 workspaceLock.Configure(
                     changed.VaultEnabled, changed.AutoLockIdleMinutes, changed.DisconnectOnLock));
+            workspaceLock.LockRefused += () => _ = Dispatcher.BeginInvoke(() =>
+            {
+                if (_mainViewModel is not null)
+                {
+                    _mainViewModel.StatusText = localization["VaultLockRefusedPending"];
+                }
+            });
 
             var mainWindow = _serviceProvider.GetRequiredService<MainWindow>();
             _mainViewModel = mainWindow.DataContext as MainViewModel;

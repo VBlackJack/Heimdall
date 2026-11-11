@@ -203,8 +203,9 @@ public sealed class VaultDisableResidueTests : IAsyncLifetime
 
         await service.DisableAsync(Pw(StrongPassword));
 
-        Assert.Equal(1, first.ReverseCalls);
-        Assert.Equal(1, second.ReverseCalls);
+        // The bulk pass, then the short one inside the exclusive side of the seal gate.
+        Assert.Equal(2, first.ReverseCalls);
+        Assert.Equal(2, second.ReverseCalls);
         Assert.False(CredentialProtector.IsVaultUnlocked);
         AppSettings settings = await _configManager.LoadSettingsAsync();
         Assert.False(settings.VaultEnabled);
@@ -411,39 +412,565 @@ public sealed class VaultDisableResidueTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task DisableAsync_ExceptionAfterTheErase_WhenTheWrappedKeyCannotBeWrittenBack_SealsNothing()
+    public async Task DisableAsync_WrappedKeyCannotBeWrittenBack_KeepsTheKeyAndAllowsARetry()
     {
         var decorated = new DecoratedConfigManager(_configManager);
-        var late = new FakeStore("StoreKeyLate") { Value = null };
+        var late = new FakeStore("StoreKeyLate");
         var service = new VaultLifecycleService(decorated, null, [late]);
         _services.Add(service);
         await service.EnableAsync(Pw(StrongPassword), FastParams);
         await SaveServerSecretAsync();
-        late.Value = CredentialProtector.Protect("late-secret");
 
-        // The second look fails, and from then on no settings write succeeds: the wrapped key
-        // cannot come back, so sealing anything would lose it.
+        // A value sealed with the key before it was withdrawn and written after the first check.
+        string lateBlob = CredentialProtector.Protect("late-secret");
         late.OnHolds = call =>
         {
             if (call == 2)
             {
+                late.Value = lateBlob;
                 decorated.FailMerges = true;
-                throw new IOException("locked");
             }
         };
 
-        await Assert.ThrowsAsync<VaultStoreException>(() => service.DisableAsync(Pw(StrongPassword)));
+        await Assert.ThrowsAsync<VaultDisableIncompleteException>(() => service.DisableAsync(Pw(StrongPassword)));
+
+        // Nothing was disabled, the key is still held, and the protector is still on.
+        Assert.True(service.IsDisableIncomplete);
+        Assert.True(service.IsUnlocked);
+        Assert.True(CredentialProtector.IsVaultEnabled);
+        AppSettings erased = await _configManager.LoadSettingsAsync();
+        Assert.True(string.IsNullOrEmpty(erased.VaultWrappedDek), "the erase is on disk until the retry");
+
+        // A lock request does not take the only copy of the key.
+        service.Lock();
+        Assert.True(service.IsUnlocked);
+
+        // Another disable is refused until the restore is finished.
+        await Assert.ThrowsAsync<VaultDisableIncompleteException>(() => service.DisableAsync(Pw(StrongPassword)));
 
         decorated.FailMerges = false;
-        AppSettings after = await _configManager.LoadSettingsAsync();
-        Assert.False(after.VaultEnabled);
-        Assert.True(string.IsNullOrEmpty(after.VaultWrappedDek));
-        Assert.False(CredentialProtector.IsVaultEnabled);
+        await service.RetryRestoreAsync();
 
-        // Every secret is readable with no key anywhere.
-        Assert.False(VaultSecretBlob.IsSecretBlob(await ServerSecretAsync()));
-        Assert.Equal(ServerSecret, CredentialProtector.Unprotect(await ServerSecretAsync()));
+        Assert.False(service.IsDisableIncomplete);
+        AppSettings restored = await _configManager.LoadSettingsAsync();
+        Assert.True(restored.VaultEnabled);
+        Assert.False(string.IsNullOrEmpty(restored.VaultWrappedDek));
+        Assert.True(CredentialProtector.IsVaultUnlocked);
         Assert.Equal("late-secret", CredentialProtector.Unprotect(late.Value));
+        Assert.True(VaultSecretBlob.IsSecretBlob(await ServerSecretAsync()));
+    }
+
+    private string JournalPath => VaultDisableJournal.PathFor(_configManager);
+
+    /// <summary>
+    /// Leaves a disable undone but unable to write the wrapped key back: the erase and the journal are
+    /// on disk, a vault blob landed after the first check, and the first service still holds the key.
+    /// </summary>
+    private async Task<(VaultLifecycleService Service, DecoratedConfigManager Decorated, string LateBlob)> PendingDisableAsync()
+    {
+        var decorated = new DecoratedConfigManager(_configManager);
+        var late = new FakeStore("StoreKeyLate");
+        var service = new VaultLifecycleService(decorated, null, [late]);
+        _services.Add(service);
+        await service.EnableAsync(Pw(StrongPassword), FastParams);
+        await SaveServerSecretAsync();
+        string lateBlob = CredentialProtector.Protect("late-secret");
+        late.OnHolds = call =>
+        {
+            if (call == 2)
+            {
+                late.Value = lateBlob;
+                decorated.FailMerges = true;
+            }
+        };
+
+        await Assert.ThrowsAsync<VaultDisableIncompleteException>(() => service.DisableAsync(Pw(StrongPassword)));
+        decorated.FailMerges = false;
+        return (service, decorated, lateBlob);
+    }
+
+    /// <summary>What a fresh process knows: no key, and the vault flag as the settings said at startup.</summary>
+    private static void SimulateProcessRestart()
+    {
+        CredentialProtector.ClearVaultKey();
+        CredentialProtector.SetVaultEnabled(false);
+    }
+
+    [Fact]
+    public async Task DisableAsync_JournalIsOnDiskBeforeTheErase_AndGoneOnceFinal_AndHoldsNothingNew()
+    {
+        var hello = new RecordingHelloService();
+        var probe = new FakeStore("StoreKeyProbe");
+        VaultLifecycleService service = await EnabledServiceAsync(hello, probe);
+        await service.EnrollHelloAsync();
+        AppSettings enrolled = await _configManager.LoadSettingsAsync();
+        var known = new HashSet<string?>(StringComparer.Ordinal)
+        {
+            enrolled.VaultWrappedDek,
+            enrolled.VaultId,
+            enrolled.VaultCreatedAt,
+            enrolled.VaultHelloWrappedDek,
+            enrolled.VaultHelloChallenge,
+            enrolled.VaultHelloSalt,
+            enrolled.VaultHelloCredentialName,
+            enrolled.VaultHelloPublicKeyHash,
+        };
+        string? journalText = null;
+        var erasedWhileJournalExisted = false;
+        probe.OnHolds = call =>
+        {
+            // The second look comes after the erase: the journal must be there, and the wrapped key gone.
+            if (call == 2)
+            {
+                journalText = File.Exists(JournalPath) ? File.ReadAllText(JournalPath) : null;
+                erasedWhileJournalExisted = journalText is not null
+                    && string.IsNullOrEmpty(_configManager.LoadSettingsAsync().GetAwaiter().GetResult().VaultWrappedDek);
+            }
+        };
+
+        await service.DisableAsync(Pw(StrongPassword));
+
+        Assert.True(erasedWhileJournalExisted);
+        Assert.False(File.Exists(JournalPath), "the journal goes once the disable is final");
+        using JsonDocument journal = JsonDocument.Parse(journalText!);
+        foreach (JsonProperty property in journal.RootElement.EnumerateObject())
+        {
+            if (property.Value.ValueKind == JsonValueKind.String)
+            {
+                Assert.Contains(property.Value.GetString(), known);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task Journal_IsRemovedWhenTheDisableIsRefusedAndTheVaultRestored()
+    {
+        var stuck = new FakeStore("StoreKeyStuck") { StuckSealed = true };
+        VaultLifecycleService service = await EnabledServiceAsync(null, stuck);
+        stuck.Value = CredentialProtector.Protect("stuck");
+
+        await Assert.ThrowsAsync<VaultResidueException>(() => service.DisableAsync(Pw(StrongPassword)));
+
+        Assert.False(File.Exists(JournalPath));
+    }
+
+    [Fact]
+    public async Task CrashAfterTheErase_NewProcessStartsEnabled_UnlocksWithTheSamePassword_AndEverySecretIsReadable()
+    {
+        (VaultLifecycleService first, _, string lateBlob) = await PendingDisableAsync();
+        Assert.True(File.Exists(JournalPath));
+        Assert.True(string.IsNullOrEmpty((await _configManager.LoadSettingsAsync()).VaultWrappedDek));
+        first.Dispose();
+        SimulateProcessRestart();
+
+        // The new process: startup recovery runs before the vault state is read.
+        Assert.Null(await VaultDisableJournal.RecoverAsync(_configManager));
+        AppSettings recovered = await _configManager.LoadSettingsAsync();
+        Assert.True(recovered.VaultEnabled);
+        Assert.Equal(VaultMigrationState.InProgress, recovered.VaultMigrationState);
+        Assert.False(File.Exists(JournalPath));
+
+        CredentialProtector.SetVaultEnabled(true);
+        var second = new VaultLifecycleService(_configManager);
+        _services.Add(second);
+        await second.UnlockAsync(Pw(StrongPassword));
+
+        Assert.True(second.IsUnlocked);
+        Assert.Equal("late-secret", CredentialProtector.Unprotect(lateBlob));
+        Assert.Equal(ServerSecret, CredentialProtector.Unprotect(await ServerSecretAsync()));
+        Assert.Equal(VaultMigrationState.Complete, (await _configManager.LoadSettingsAsync()).VaultMigrationState);
+    }
+
+    [Fact]
+    public async Task CrashAfterTheErase_UnlockRecoversEvenWhenNobodyRanTheStartupRecovery()
+    {
+        (VaultLifecycleService first, _, string lateBlob) = await PendingDisableAsync();
+        first.Dispose();
+        SimulateProcessRestart();
+
+        var second = new VaultLifecycleService(_configManager);
+        _services.Add(second);
+        await second.UnlockAsync(Pw(StrongPassword));
+
+        Assert.True((await _configManager.LoadSettingsAsync()).VaultEnabled);
+        Assert.Equal("late-secret", CredentialProtector.Unprotect(lateBlob));
+        Assert.False(File.Exists(JournalPath));
+    }
+
+    [Fact]
+    public async Task CrashAfterTheErase_WithUnwritableSettings_StillStartsEnabledFromTheJournal()
+    {
+        (VaultLifecycleService first, DecoratedConfigManager decorated, string lateBlob) = await PendingDisableAsync();
+        first.Dispose();
+        SimulateProcessRestart();
+        decorated.FailMerges = true;
+
+        VaultDisableJournal? unrestored = await VaultDisableJournal.RecoverAsync(decorated);
+        Assert.NotNull(unrestored);
+        Assert.True(File.Exists(JournalPath), "a journal that could not be applied is kept");
+
+        // The startup path applies it to the settings it loaded, in memory.
+        AppSettings loaded = await _configManager.LoadSettingsAsync();
+        Assert.False(loaded.VaultEnabled);
+        unrestored.ApplyTo(loaded);
+        Assert.True(loaded.VaultEnabled);
+        Assert.True(VaultUnlockGate.ShouldShowUnlockGate(loaded));
+
+        // And the unlock itself works without being able to write.
+        CredentialProtector.SetVaultEnabled(true);
+        var second = new VaultLifecycleService(decorated);
+        _services.Add(second);
+        await second.UnlockAsync(Pw(StrongPassword));
+
+        Assert.True(second.IsUnlocked);
+        Assert.Equal("late-secret", CredentialProtector.Unprotect(lateBlob));
+        Assert.True(File.Exists(JournalPath));
+    }
+
+    [Fact]
+    public async Task WhileARestoreIsPending_EnableUnlockEnrollAndChangeRefuse_AndTheHeldKeyIsKept()
+    {
+        (VaultLifecycleService service, _, string lateBlob) = await PendingDisableAsync();
+
+        await Assert.ThrowsAsync<VaultDisableIncompleteException>(
+            () => service.EnableAsync(Pw(StrongPassword), FastParams));
+        await Assert.ThrowsAsync<VaultDisableIncompleteException>(() => service.UnlockAsync(Pw(StrongPassword)));
+        await Assert.ThrowsAsync<VaultDisableIncompleteException>(() => service.EnrollHelloAsync());
+        await Assert.ThrowsAsync<VaultDisableIncompleteException>(
+            () => service.ChangeMasterPasswordAsync(Pw(StrongPassword), Pw("OtherMaster2!Pass"), FastParams));
+
+        Assert.True(service.IsDisableIncomplete);
+        Assert.True(service.IsUnlocked);
+        await service.RetryRestoreAsync();
+        Assert.Equal("late-secret", CredentialProtector.Unprotect(lateBlob));
+    }
+
+    [Fact]
+    public async Task DisableAsync_WritersDoNotFinishInTime_IsRefusedAsBusy_AndNothingIsTurnedOff()
+    {
+        VaultLifecycleService service = await EnabledServiceAsync();
+        await SaveServerSecretAsync();
+        service.SealGateTimeout = TimeSpan.FromMilliseconds(150);
+
+        IDisposable writer = await VaultSealGate.Shared.EnterAsync();
+        try
+        {
+            await Assert.ThrowsAsync<VaultBusyException>(() => service.DisableAsync(Pw(StrongPassword)));
+        }
+        finally
+        {
+            writer.Dispose();
+        }
+
+        AppSettings after = await _configManager.LoadSettingsAsync();
+        Assert.True(after.VaultEnabled);
+        Assert.False(string.IsNullOrEmpty(after.VaultWrappedDek));
+        Assert.True(CredentialProtector.IsVaultUnlocked);
+        Assert.True(VaultSecretBlob.IsSecretBlob(await ServerSecretAsync()));
+        Assert.False(File.Exists(JournalPath));
+
+        // The gate is free again: the same disable now goes through.
+        await service.DisableAsync(Pw(StrongPassword));
+        Assert.False((await _configManager.LoadSettingsAsync()).VaultEnabled);
+    }
+
+    [Fact]
+    public async Task IsOperationInProgress_IsFalseDuringThePassThatFollowsAnUnlock()
+    {
+        var slow = new FakeStore("StoreKeySlow");
+        VaultLifecycleService service = await EnabledServiceAsync(null, slow);
+        service.Lock();
+        var release = new TaskCompletionSource();
+        slow.ForwardGate = release.Task;
+
+        await service.UnlockAsync(Pw(StrongPassword));
+        await Task.Delay(150);
+
+        Assert.False(service.PostUnlockSealingTask.IsCompleted);
+        Assert.False(service.IsOperationInProgress, "a lock requested now is deferred safely; it is not blocked");
+        release.SetResult();
+        await service.PostUnlockSealingTask;
+    }
+
+    [Fact]
+    public async Task ConfigManager_RefusesAVaultBlobOnceTheVaultIsOff_AndTheKeyIsGone()
+    {
+        string blob = RandomVaultBlob();
+        var servers = new List<ServerProfileDto>
+        {
+            new() { Id = "srv1", DisplayName = "Server 1", ConnectionType = "RDP", RdpPasswordEncrypted = blob },
+        };
+
+        // Vault off on disk, no key: a stale blob would be orphaned, so the write is refused.
+        await Assert.ThrowsAsync<VaultLockedException>(() => _configManager.SaveServersAsync(servers));
+
+        // With the key present (a migration, a test) the same write is allowed.
+        using VaultDekHolder dek = VaultKeyManager.GenerateDek();
+        CredentialProtector.SetVaultEnabled(true);
+        CredentialProtector.SetVaultKey(dek);
+        await _configManager.SaveServersAsync(servers);
+        CredentialProtector.ClearVaultKey();
+        CredentialProtector.SetVaultEnabled(false);
+
+        // Vault on on disk but locked: rewriting what is already sealed is ordinary and allowed.
+        await _configManager.MergeSettingAsync(settings =>
+        {
+            settings.VaultEnabled = true;
+            settings.VaultWrappedDek = "placeholder-wrapped-key";
+            settings.VaultMigrationState = VaultMigrationState.Complete;
+        });
+        await _configManager.SaveServersAsync(servers);
+        Assert.True(VaultSecretBlob.IsSecretBlob(await ServerSecretAsync()));
+    }
+
+    [Fact]
+    public async Task VaultSealGate_AWaitingExclusiveRequestHoldsNewWritersBack_AndATimeoutGivesUp()
+    {
+        var gate = new VaultSealGate();
+
+        // Entered on another flow, so this one does not count as nested inside it.
+        IDisposable writer = await Task.Run(() => gate.EnterAsync().AsTask());
+
+        Task<IDisposable> exclusive = gate.EnterExclusiveAsync();
+        await Task.Delay(100);
+        Task<IDisposable> later = gate.EnterAsync().AsTask();
+        await Task.Delay(100);
+        Assert.False(later.IsCompleted, "a waiting exclusive request is not starved by new writers");
+
+        writer.Dispose();
+        (await exclusive).Dispose();
+        (await later).Dispose();
+
+        IDisposable busy = await Task.Run(() => gate.EnterAsync().AsTask());
+        await Assert.ThrowsAsync<TimeoutException>(() => gate.EnterExclusiveAsync(TimeSpan.FromMilliseconds(100)));
+        busy.Dispose();
+
+        // A timed-out request leaves the gate usable.
+        (await gate.EnterExclusiveAsync(TimeSpan.FromSeconds(5))).Dispose();
+    }
+
+    [Fact]
+    public async Task VaultSealGate_ANestedEntryByTheSameFlow_PassesThroughAWaitingExclusive()
+    {
+        var gate = new VaultSealGate();
+        IDisposable outer = await gate.EnterAsync();
+        Task<IDisposable> exclusive = gate.EnterExclusiveAsync();
+        await Task.Delay(100);
+
+        IDisposable inner = await gate.EnterAsync();
+
+        inner.Dispose();
+        outer.Dispose();
+        (await exclusive).Dispose();
+    }
+
+    [Fact]
+    public async Task RetryRestoreAsync_WithNothingPending_DoesNothing()
+    {
+        VaultLifecycleService service = await EnabledServiceAsync();
+
+        await service.RetryRestoreAsync();
+
+        Assert.False(service.IsDisableIncomplete);
+        Assert.True(service.IsUnlocked);
+    }
+
+    [Fact]
+    public async Task DisableAsync_AWriterBetweenSealAndWrite_IsWaitedForAndReversed()
+    {
+        var store = new FakeStore("StoreKeyOne");
+        VaultLifecycleService service = await EnabledServiceAsync(null, store);
+        var sealedNow = new TaskCompletionSource();
+        var mayWrite = new TaskCompletionSource();
+        string? blob = null;
+
+        // A writer that has sealed a secret and has not stored it yet.
+        Task writer = Task.Run(async () =>
+        {
+            using IDisposable scope = await VaultSealGate.Shared.EnterAsync();
+            blob = CredentialProtector.Protect("in-flight");
+            sealedNow.SetResult();
+            await mayWrite.Task;
+            store.Value = blob;
+        });
+        await sealedNow.Task;
+
+        Task disable = service.DisableAsync(Pw(StrongPassword));
+        await Task.Delay(300);
+        Assert.False(disable.IsCompleted, "the disable waits for the writer in flight");
+        mayWrite.SetResult();
+        await writer;
+        await disable;
+
+        // What the writer landed was reversed before the key went: no vault blob is left anywhere.
+        Assert.False(VaultSecretBlob.IsSecretBlob(store.Value));
+        Assert.Equal("in-flight", CredentialProtector.Unprotect(store.Value));
+        Assert.False((await _configManager.LoadSettingsAsync()).VaultEnabled);
+    }
+
+    [Fact]
+    public async Task VaultSealGate_ExclusiveWaitsForWritersAndHoldsNewOnesBack()
+    {
+        var gate = new VaultSealGate();
+        IDisposable writer = await gate.EnterAsync();
+
+        Task<IDisposable> exclusive = gate.EnterExclusiveAsync();
+        await Task.Delay(100);
+        Assert.False(exclusive.IsCompleted);
+        writer.Dispose();
+        IDisposable held = await exclusive;
+
+        Task<IDisposable> later = gate.EnterAsync().AsTask();
+        await Task.Delay(100);
+        Assert.False(later.IsCompleted);
+        held.Dispose();
+        (await later).Dispose();
+    }
+
+    [Fact]
+    public async Task ProtectTransient_IsNeverAVaultBlob_EvenWhileUnlocked()
+    {
+        await EnabledServiceAsync();
+
+        string transient = CredentialProtector.ProtectTransient("pending-password");
+
+        Assert.False(VaultSecretBlob.IsSecretBlob(transient));
+        Assert.Equal("pending-password", CredentialProtector.UnprotectTransient(transient));
+    }
+
+    [Fact]
+    public async Task DisableAsync_UnreadableValue_RefusesBeforeTheErase_AndNamesTheStoreAndCount()
+    {
+        var store = new FakeStore("StoreKeyOne");
+        VaultLifecycleService service = await EnabledServiceAsync(null, store);
+        await SaveServerSecretAsync();
+        string foreign = RandomVaultBlob();
+        store.Value = foreign;
+
+        VaultUnreadableSecretsException ex = await Assert.ThrowsAsync<VaultUnreadableSecretsException>(
+            () => service.DisableAsync(Pw(StrongPassword)));
+
+        Assert.Equal(new[] { new KeyValuePair<string, int>("StoreKeyOne", 1) }, ex.Counts);
+        Assert.Equal(1, ex.TotalCount);
+        Assert.True(ex.ProtectionRestored);
+        Assert.Equal(foreign, store.Value);
+        AppSettings after = await _configManager.LoadSettingsAsync();
+        Assert.True(after.VaultEnabled);
+        Assert.False(string.IsNullOrEmpty(after.VaultWrappedDek));
+        Assert.True(VaultSecretBlob.IsSecretBlob(await ServerSecretAsync()));
+        Assert.True(CredentialProtector.IsVaultUnlocked);
+    }
+
+    [Fact]
+    public async Task DisableAsync_DropUnreadable_ClearsOnlyWhatCannotBeRead()
+    {
+        var store = new FakeStore("StoreKeyOne");
+        VaultLifecycleService service = await EnabledServiceAsync(null, store);
+        await _configManager.SaveServersAsync(
+        [
+            new ServerProfileDto
+            {
+                Id = "srv1",
+                DisplayName = "Server 1",
+                ConnectionType = "RDP",
+                RdpPasswordEncrypted = CredentialProtector.Protect(ServerSecret),
+                SshPasswordEncrypted = RandomVaultBlob(),
+            },
+        ]);
+        store.Value = RandomVaultBlob();
+
+        await service.DisableAsync(Pw(StrongPassword), dropUnreadable: true);
+
+        ServerProfileDto profile = (await _configManager.LoadServersAsync())[0];
+        Assert.Null(profile.SshPasswordEncrypted);
+        Assert.Equal(ServerSecret, CredentialProtector.Unprotect(profile.RdpPasswordEncrypted));
+        Assert.Null(store.Value);
+        Assert.False((await _configManager.LoadSettingsAsync()).VaultEnabled);
+    }
+
+    [Fact]
+    public async Task DisableAsync_UnreadableInTheConfiguration_IsCountedUnderTheConfiguration()
+    {
+        VaultLifecycleService service = await EnabledServiceAsync();
+        await _configManager.SaveServersAsync(
+        [
+            new ServerProfileDto
+            {
+                Id = "srv1",
+                DisplayName = "Server 1",
+                ConnectionType = "RDP",
+                RdpPasswordEncrypted = RandomVaultBlob(),
+            },
+        ]);
+
+        VaultUnreadableSecretsException ex = await Assert.ThrowsAsync<VaultUnreadableSecretsException>(
+            () => service.DisableAsync(Pw(StrongPassword)));
+
+        Assert.Equal(new[] { new KeyValuePair<string, int>(ConfigurationStoreKey, 1) }, ex.Counts);
+    }
+
+    [Fact]
+    public async Task EnableAsync_StoreThrows_StillEnabled_NamesTheStore_AndTheNextUnlockFinishesIt()
+    {
+        var failing = new FakeStore("StoreKeyFailing") { ThrowOnForward = new IOException("locked") };
+        var fine = new FakeStore("StoreKeyFine") { Value = CredentialProtector.Protect("fine") };
+        VaultLifecycleService service = NewService(null, failing, fine);
+
+        VaultEnableResult result = await service.EnableAsync(Pw(StrongPassword), FastParams);
+
+        Assert.False(result.IsComplete);
+        Assert.Equal(new[] { "StoreKeyFailing" }, result.UnsealedStoreNameKeys);
+        AppSettings settings = await _configManager.LoadSettingsAsync();
+        Assert.True(settings.VaultEnabled);
+        Assert.Equal(VaultMigrationState.InProgress, settings.VaultMigrationState);
+        Assert.True(VaultSecretBlob.IsSecretBlob(fine.Value));
+
+        // A second click can no longer meet "already enabled" for a vault that did not come up.
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.EnableAsync(Pw(StrongPassword), FastParams));
+
+        failing.ThrowOnForward = null;
+        service.Lock();
+        await service.UnlockAsync(Pw(StrongPassword));
+        await service.PostUnlockSealingTask;
+
+        Assert.Equal(VaultMigrationState.Complete, (await _configManager.LoadSettingsAsync()).VaultMigrationState);
+    }
+
+    [Fact]
+    public async Task IsOperationInProgress_IsTrueWhileAStoreIsBeingSealed()
+    {
+        var slow = new FakeStore("StoreKeySlow");
+        VaultLifecycleService service = NewService(null, slow);
+        var release = new TaskCompletionSource();
+        slow.ForwardGate = release.Task;
+
+        Task enable = service.EnableAsync(Pw(StrongPassword), FastParams);
+        await Task.Delay(300);
+
+        Assert.True(service.IsOperationInProgress);
+        release.SetResult();
+        await enable;
+        Assert.False(service.IsOperationInProgress);
+    }
+
+    [Fact]
+    public async Task Lock_DuringThePassAfterAnUnlock_CancelsItAndLocks()
+    {
+        var slow = new FakeStore("StoreKeySlow");
+        VaultLifecycleService service = await EnabledServiceAsync(null, slow);
+        service.Lock();
+        slow.WaitForCancellation = true;
+        slow.ForwardCalls = 0;
+        await service.UnlockAsync(Pw(StrongPassword));
+        await Task.Delay(200);
+        Assert.Equal(1, slow.ForwardCalls);
+
+        service.Lock();
+        await service.PostUnlockSealingTask;
+
+        Assert.True(slow.WasCancelled);
+        Assert.False(service.IsUnlocked);
     }
 
     [Fact]
@@ -855,6 +1382,23 @@ public sealed class VaultDisableResidueTests : IAsyncLifetime
 
         public Task? ForwardGate { get; set; }
 
+        public bool WaitForCancellation { get; set; }
+
+        public bool WasCancelled { get; private set; }
+
+        public int DropCalls { get; private set; }
+
+        public Task DropUnreadableAsync(Func<string?, bool> isUnreadable, CancellationToken cancellationToken)
+        {
+            DropCalls++;
+            if (isUnreadable(Value))
+            {
+                Value = null;
+            }
+
+            return Task.CompletedTask;
+        }
+
         public async Task ForwardAsync(Func<string?, string?> toVault, CancellationToken cancellationToken)
         {
             ForwardCalls++;
@@ -866,6 +1410,19 @@ public sealed class VaultDisableResidueTests : IAsyncLifetime
             if (ForwardGate is not null)
             {
                 await ForwardGate.ConfigureAwait(false);
+            }
+
+            if (WaitForCancellation)
+            {
+                try
+                {
+                    await Task.Delay(Timeout.Infinite, cancellationToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    WasCancelled = true;
+                    throw;
+                }
             }
 
             Value = toVault(Value);

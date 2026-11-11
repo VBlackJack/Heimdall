@@ -48,6 +48,10 @@ internal sealed class SharedSessionVaultSecretStore : IVaultSecretStore
         _store.TransformSecretsAsync(toLegacy, cancellationToken);
 
     /// <inheritdoc/>
+    public Task DropUnreadableAsync(Func<string?, bool> isUnreadable, CancellationToken cancellationToken) =>
+        _store.DropSecretsAsync(isUnreadable, cancellationToken);
+
+    /// <inheritdoc/>
     public Task<bool> HasUnsealedSecretsAsync(CancellationToken cancellationToken) =>
         _store.HasUnsealedSecretsAsync(cancellationToken);
 

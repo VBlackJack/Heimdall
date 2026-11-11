@@ -18,6 +18,7 @@ using Heimdall.Core.Security.Vault;
 using Microsoft.EntityFrameworkCore;
 using TwinShell.Core.Security;
 using TwinShell.Persistence.Entities;
+using TwinShell.Persistence.Mappers;
 
 namespace TwinShell.Persistence.Security;
 
@@ -35,6 +36,8 @@ public sealed class HistoryVaultSecretStore : IVaultSecretStore
 {
     /// <summary>The locale key naming this store.</summary>
     public const string NameKey = "VaultStoreCommandHistory";
+
+    private const string EmptyParametersJson = "{}";
 
     /// <summary>How many rows are loaded and saved at a time.</summary>
     public const int DefaultBatchSize = 200;
@@ -128,12 +131,69 @@ public sealed class HistoryVaultSecretStore : IVaultSecretStore
                 || row.ParametersJson.Substring(0, vaultLength) == vaultPrefix);
     }
 
-    private async Task TransformAsync(
+    /// <inheritdoc/>
+    public async Task DropUnreadableAsync(Func<string?, bool> isUnreadable, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(isUnreadable);
+        await ForEachBatchAsync(
+            HoldsVaultForm,
+            (context, rows) =>
+            {
+                foreach (CommandHistoryEntity row in rows)
+                {
+                    bool commandLost = IsUnreadableWrapped(row.GeneratedCommand, isUnreadable);
+                    bool parametersLost = IsUnreadableWrapped(row.ParametersJson, isUnreadable);
+
+                    // The row goes only when nothing readable remains in it; a readable field is kept.
+                    if (commandLost && parametersLost)
+                    {
+                        context.CommandHistories.Remove(row);
+                        continue;
+                    }
+
+                    if (commandLost)
+                    {
+                        row.GeneratedCommand = CommandHistoryMapper.UnreadableCommand;
+                    }
+
+                    if (parametersLost)
+                    {
+                        row.ParametersJson = EmptyParametersJson;
+                    }
+                }
+            },
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private Task TransformAsync(
         Func<string?, string?> transform,
         Func<TwinShellDbContext, IQueryable<CommandHistoryEntity>> rowsToConvert,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(transform);
+        return ForEachBatchAsync(
+            rowsToConvert,
+            (_, rows) =>
+            {
+                foreach (CommandHistoryEntity row in rows)
+                {
+                    row.GeneratedCommand = Convert(row.GeneratedCommand, transform);
+                    row.ParametersJson = Convert(row.ParametersJson, transform);
+                }
+            },
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Runs <paramref name="change"/> over the rows <paramref name="rowsToConvert"/> selects, one
+    /// batch and one transaction at a time. A pass that stops part way leaves whole batches done and
+    /// the rest untouched; the conversions are idempotent, so the next pass finishes it.
+    /// </summary>
+    private async Task ForEachBatchAsync(
+        Func<TwinShellDbContext, IQueryable<CommandHistoryEntity>> rowsToConvert,
+        Action<TwinShellDbContext, List<CommandHistoryEntity>> change,
+        CancellationToken cancellationToken)
+    {
         await using TwinShellDbContext context = _contextFactory();
 
         // The usual case, at every unlock, is that there is nothing to do: that is one cheap read and
@@ -143,33 +203,31 @@ public sealed class HistoryVaultSecretStore : IVaultSecretStore
             return;
         }
 
-        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken)
-            .ConfigureAwait(false);
-
-        // Read inside the transaction: a row added between a read outside it and the first write
-        // would otherwise be missed or converted twice.
         List<string> ids = await rowsToConvert(context)
             .Select(row => row.Id)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
         foreach (string[] batch in ids.Chunk(_batchSize))
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            // Loaded inside the batch's transaction: a row changed since the ids were read is seen as it is.
             List<CommandHistoryEntity> rows = await context.CommandHistories
                 .Where(row => batch.Contains(row.Id))
                 .ToListAsync(cancellationToken)
                 .ConfigureAwait(false);
-            foreach (CommandHistoryEntity row in rows)
-            {
-                row.GeneratedCommand = Convert(row.GeneratedCommand, transform);
-                row.ParametersJson = Convert(row.ParametersJson, transform);
-            }
-
+            change(context, rows);
             await context.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
             context.ChangeTracker.Clear();
         }
-
-        await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
     }
+
+    private static bool IsUnreadableWrapped(string stored, Func<string?, bool> isUnreadable) =>
+        HistorySecretEnvelope.IsSealed(stored)
+        && isUnreadable(stored[HistorySecretEnvelope.Marker.Length..]);
 
     private static string Convert(string stored, Func<string?, string?> transform)
     {

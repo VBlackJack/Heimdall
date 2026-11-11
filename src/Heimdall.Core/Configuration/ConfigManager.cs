@@ -19,6 +19,8 @@ using System.Security.Principal;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Heimdall.Core.Security;
+using Heimdall.Core.Security.Vault;
 using Heimdall.Core.Ssh;
 
 namespace Heimdall.Core.Configuration;
@@ -57,6 +59,8 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
     private readonly string _installPath;
     private readonly string _dataPath;
     private readonly string _configPath;
+    private const string SettingsFileName = "settings.json";
+
     private readonly string _settingsPath;
     private readonly string _serversPath;
     private readonly string _settingsDefaultPath;
@@ -113,7 +117,7 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
         _installPath = installPath;
         _dataPath = dataPath;
         _configPath = dataPath;
-        _settingsPath = Path.Combine(_configPath, "settings.json");
+        _settingsPath = Path.Combine(_configPath, SettingsFileName);
         _serversPath = Path.Combine(_configPath, "servers.json");
 
         string bundledConfigPath =
@@ -1490,6 +1494,8 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
     /// </summary>
     private static async Task WriteTextAsync(string path, string content)
     {
+        RefuseOrphanedVaultBlobs(path, content);
+
         var directory = Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(directory))
         {
@@ -1498,6 +1504,64 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
 
         await BackUpLastGoodCopyAsync(path).ConfigureAwait(false);
         await WriteFileAsync(path, content).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Refuses to write a vault-sealed secret into a configuration document once the vault is off.
+    /// </summary>
+    /// <remarks>
+    /// A writer that sealed a secret before the vault was disabled and writes it afterwards would
+    /// leave a blob that no key can open. Every configuration writer ends here, under the write lock
+    /// that also serialises the erase of the vault, so the check needs no cooperation from the
+    /// writers: a write that comes after the erase meets a disabled vault and no key and is refused,
+    /// and one that comes before it is found by the check that follows the erase. The test is cheap
+    /// for everyone else: a substring search that finds nothing ends it.
+    /// </remarks>
+    private static void RefuseOrphanedVaultBlobs(string path, string content)
+    {
+        if (!OperatingSystem.IsWindows()
+            || CredentialProtector.IsVaultUnlocked
+            || !content.Contains(VaultSecretBlob.EncodedPrefix, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        if (VaultEnabledOnDisk(path, content) is not false)
+        {
+            return;
+        }
+
+        using JsonDocument document = JsonDocument.Parse(content);
+        if (VaultConfigurationScan.ContainsSecretBlob(document.RootElement))
+        {
+            throw new VaultLockedException();
+        }
+    }
+
+    /// <summary>Whether the settings say the vault is on: null when that cannot be told.</summary>
+    private static bool? VaultEnabledOnDisk(string path, string content)
+    {
+        try
+        {
+            string settingsText = string.Equals(Path.GetFileName(path), SettingsFileName, StringComparison.OrdinalIgnoreCase)
+                ? content
+                : File.ReadAllText(Path.Combine(Path.GetDirectoryName(path) ?? string.Empty, SettingsFileName));
+            using JsonDocument settings = JsonDocument.Parse(settingsText);
+            foreach (JsonProperty property in settings.RootElement.EnumerateObject())
+            {
+                if (string.Equals(property.Name, nameof(AppSettings.VaultEnabled), StringComparison.OrdinalIgnoreCase)
+                    && property.Value.ValueKind is JsonValueKind.True or JsonValueKind.False)
+                {
+                    return property.Value.GetBoolean();
+                }
+            }
+
+            return false;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        {
+            return null;
+        }
     }
 
     /// <summary>The last good copy kept beside a configuration document.</summary>

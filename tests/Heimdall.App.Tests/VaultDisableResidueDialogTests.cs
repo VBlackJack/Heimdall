@@ -88,6 +88,123 @@ public sealed class VaultDisableResidueDialogTests
         Assert.Contains(localizer.GetString("VaultStoreSharedSessionPasswords"), viewModel.ErrorMessage);
     }
 
+    [Fact]
+    public async Task Disable_Incomplete_KeepsTheDialogOpenWithRetry_AndNeverCompletes()
+    {
+        LocalizationManager localizer = await EnglishAsync();
+        var retries = 0;
+        var failRetry = true;
+        var viewModel = new VaultDisableDialogViewModel(
+            (_, _) => throw new VaultDisableIncompleteException(),
+            () =>
+            {
+                retries++;
+                return failRetry ? throw new VaultDisableIncompleteException() : Task.CompletedTask;
+            },
+            localizer);
+
+        await viewModel.DisableCommand.ExecuteAsync("Master1!Vault".ToCharArray());
+
+        Assert.True(viewModel.IsRetryPending);
+        Assert.False(viewModel.IsCompleted);
+        Assert.False(viewModel.CanSubmit);
+        Assert.Equal(localizer.GetString("VaultDisableIncompleteError"), viewModel.ErrorMessage);
+
+        await viewModel.RetryRestoreCommand.ExecuteAsync(null);
+        Assert.True(viewModel.IsRetryPending);
+        Assert.False(viewModel.IsCompleted);
+
+        failRetry = false;
+        await viewModel.RetryRestoreCommand.ExecuteAsync(null);
+
+        Assert.Equal(2, retries);
+        Assert.False(viewModel.IsRetryPending);
+        Assert.False(viewModel.IsCompleted, "a restored vault is not a completed disable");
+        Assert.Equal(localizer.GetString("VaultDisableRetryDone"), viewModel.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task Disable_Unreadable_ShowsStoresAndCounts_AndOffersTheExplicitAction()
+    {
+        LocalizationManager localizer = await EnglishAsync();
+        bool? dropRequested = null;
+        var viewModel = new VaultDisableDialogViewModel(
+            (_, drop) =>
+            {
+                dropRequested = drop;
+                return drop
+                    ? Task.CompletedTask
+                    : throw new VaultUnreadableSecretsException(
+                        [new("VaultStoreCommandHistory", 3), new("VaultStorePasswordPresets", 1)]);
+            },
+            () => Task.CompletedTask,
+            localizer);
+
+        await viewModel.DisableCommand.ExecuteAsync("Master1!Vault".ToCharArray());
+
+        Assert.False(viewModel.IsCompleted);
+        Assert.True(viewModel.HasUnreadable);
+        Assert.Contains("3", viewModel.ErrorMessage);
+        Assert.Contains(localizer.GetString("VaultStoreCommandHistory"), viewModel.ErrorMessage);
+        Assert.Contains("4", viewModel.DropButtonText);
+        Assert.False(dropRequested);
+
+        await viewModel.DropUnreadableCommand.ExecuteAsync("Master1!Vault".ToCharArray());
+
+        Assert.True(dropRequested);
+        Assert.True(viewModel.IsCompleted);
+    }
+
+    [Fact]
+    public async Task Enable_StoresStillUnsealed_CompletesAndNamesThem()
+    {
+        LocalizationManager localizer = await EnglishAsync();
+        var viewModel = new Heimdall.App.ViewModels.Dialogs.VaultEnableDialogViewModel(
+            _ => Task.FromResult(new VaultEnableResult(["VaultStoreCommandHistory"])),
+            localizer);
+        viewModel.Evaluate("StrongMaster1!Pass", "StrongMaster1!Pass");
+
+        await viewModel.EnableCommand.ExecuteAsync("StrongMaster1!Pass".ToCharArray());
+
+        Assert.True(viewModel.IsCompleted);
+        Assert.Contains(localizer.GetString("VaultStoreCommandHistory"), viewModel.CompletionNotice);
+    }
+
+    [Fact]
+    public async Task Disable_Busy_SaysNothingWasChanged()
+    {
+        LocalizationManager localizer = await EnglishAsync();
+        var viewModel = new VaultDisableDialogViewModel(_ => throw new VaultBusyException(), localizer);
+
+        await viewModel.DisableCommand.ExecuteAsync("Master1!Vault".ToCharArray());
+
+        Assert.False(viewModel.IsCompleted);
+        Assert.Equal(localizer.GetString("VaultDisableBusyError"), viewModel.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task Disable_UnreadablePresets_AreNamedAsAllOfThem()
+    {
+        LocalizationManager localizer = await EnglishAsync();
+        var viewModel = new VaultDisableDialogViewModel(
+            (_, _) => throw new VaultUnreadableSecretsException([new("VaultStorePasswordPresets", 1)]),
+            () => Task.CompletedTask,
+            localizer);
+
+        await viewModel.DisableCommand.ExecuteAsync("Master1!Vault".ToCharArray());
+
+        Assert.Contains(localizer.GetString("VaultStorePasswordPresetsAll"), viewModel.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task RetryDone_DoesNotClaimNothingWasTurnedOff()
+    {
+        LocalizationManager localizer = await EnglishAsync();
+
+        Assert.DoesNotContain("Nothing was turned off", localizer.GetString("VaultDisableRetryDone"));
+        Assert.DoesNotContain("not close", localizer.GetString("VaultDisableIncompleteError"), StringComparison.OrdinalIgnoreCase);
+    }
+
     [Theory]
     [InlineData("en")]
     [InlineData("fr")]
@@ -108,6 +225,19 @@ public sealed class VaultDisableResidueDialogTests
             "VaultDisableRestoreIncomplete",
             "VaultStoreFailureError",
             "VaultStoresUnsealedNotice",
+            "VaultDisableIncompleteError",
+            "VaultDisableRetryBtn",
+            "VaultDisableRetryBusy",
+            "VaultDisableRetryDone",
+            "VaultDisableUnreadableError",
+            "VaultUnreadableStoreCount",
+            "VaultDisableDropUnreadableBtn",
+            "VaultEnablePartialNotice",
+            "VaultDisableCloseRestoreLaterBtn",
+            "VaultDisableBusyError",
+            "VaultLockRefusedPending",
+            "SettingsVaultStatusPending",
+            "VaultStorePasswordPresetsAll",
         })
         {
             Assert.True(localizer.HasKey(key), key);

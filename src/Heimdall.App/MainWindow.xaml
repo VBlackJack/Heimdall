@@ -5064,6 +5064,12 @@
                                         <TextBlock x:Name="Mw_SettingsVaultExplanation" Text="{loc:Translate SettingsVaultExplanation}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,0,0,12"/>
                                         <DockPanel>
                                             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                                <Button x:Name="Mw_SettingsVaultRetryBtn"
+                                                        Content="{loc:Translate VaultDisableRetryBtn}"
+                                                        Command="{Binding Settings.RetryVaultRestoreCommand}"
+                                                        Visibility="{Binding Settings.IsVaultDisableIncomplete, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                        Style="{DynamicResource PrimaryButtonStyle}"
+                                                        AutomationProperties.Name="{loc:Translate VaultDisableRetryBtn}"/>
                                                 <Button x:Name="Mw_SettingsVaultEnableBtn"
                                                         Content="{loc:Translate SettingsVaultBtnEnable}"
                                                         Command="{Binding Settings.EnableVaultCommand}"

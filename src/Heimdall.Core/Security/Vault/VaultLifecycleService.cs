@@ -58,6 +58,15 @@ public sealed class VaultLifecycleService : IDisposable
     /// <summary>The locale key naming the configuration files in a residue report.</summary>
     public const string ConfigurationStoreNameKey = "VaultStoreConfiguration";
 
+    /// <summary>How long the exclusive side of the seal gate waits for writers in flight.</summary>
+    internal static readonly TimeSpan SealGateWaitTimeout = TimeSpan.FromSeconds(30);
+
+    /// <summary>How many times the wrapped key is written back before giving up.</summary>
+    internal const int WrappedKeyWriteBackAttempts = 3;
+
+    /// <summary>How long to wait between two attempts to write the wrapped key back.</summary>
+    internal static readonly TimeSpan WrappedKeyWriteBackDelay = TimeSpan.FromMilliseconds(250);
+
     private readonly IConfigManager _configManager;
     private readonly IVaultHelloService? _vaultHelloService;
     private readonly IReadOnlyList<IVaultSecretStore> _secretStores;
@@ -66,6 +75,9 @@ public sealed class VaultLifecycleService : IDisposable
     private int _lockDeferred;
     private int _unsealedNotified;
     private Task _postUnlockSealing = Task.CompletedTask;
+    private CancellationTokenSource? _postUnlockCancellation;
+    private PendingRestore? _pendingRestore;
+    private int _exclusiveOperations;
 
     /// <summary>Create the service over a configuration manager.</summary>
     /// <param name="configManager">The settings + servers persistence manager.</param>
@@ -104,6 +116,22 @@ public sealed class VaultLifecycleService : IDisposable
     /// <summary>The pass that follows the latest unlock; completed when none is pending.</summary>
     internal Task PostUnlockSealingTask => _postUnlockSealing;
 
+    /// <summary>
+    /// Whether a disable was undone but could not write the wrapped key back: the key is held in
+    /// memory only, and closing the application now would lose every secret sealed with it.
+    /// <see cref="RetryRestoreAsync"/> clears the state.
+    /// </summary>
+    public bool IsDisableIncomplete => _pendingRestore is not null;
+
+    /// <summary>
+    /// Whether an enable or a disable is running. The pass that seals the stores after an unlock is
+    /// not one: a lock requested during it is deferred safely by <see cref="Lock"/>.
+    /// </summary>
+    public bool IsOperationInProgress => Volatile.Read(ref _exclusiveOperations) > 0;
+
+    /// <summary>How long the exclusive side of the seal gate waits for writers in flight.</summary>
+    internal TimeSpan SealGateTimeout { get; set; } = SealGateWaitTimeout;
+
     /// <summary>Whether the vault is currently unlocked (a usable DEK is held).</summary>
     public bool IsUnlocked => _unlockedDek is { IsDisposed: false };
 
@@ -116,21 +144,29 @@ public sealed class VaultLifecycleService : IDisposable
     /// <param name="parameters">Argon2id cost parameters for the KEK.</param>
     /// <exception cref="MasterPasswordPolicyException">When the password is too weak.</exception>
     /// <exception cref="InvalidOperationException">When the vault is already enabled.</exception>
-    public async Task EnableAsync(char[] masterPassword, Argon2idParameters parameters)
+    /// <returns>
+    /// What is left to seal. Once the wrapped key and the enabled flag are on disk the master
+    /// password is on whatever else happens; a store that could not be sealed is named and is
+    /// finished by the pass that follows the next unlock.
+    /// </returns>
+    public async Task<VaultEnableResult> EnableAsync(char[] masterPassword, Argon2idParameters parameters)
     {
         await _gate.WaitAsync().ConfigureAwait(false);
+        Interlocked.Increment(ref _exclusiveOperations);
         try
         {
-            await EnableCoreAsync(masterPassword, parameters).ConfigureAwait(false);
+            return await EnableCoreAsync(masterPassword, parameters).ConfigureAwait(false);
         }
         finally
         {
+            Interlocked.Decrement(ref _exclusiveOperations);
             ReleaseGate();
         }
     }
 
-    private async Task EnableCoreAsync(char[] masterPassword, Argon2idParameters parameters)
+    private async Task<VaultEnableResult> EnableCoreAsync(char[] masterPassword, Argon2idParameters parameters)
     {
+        ThrowIfRestorePending();
         ArgumentNullException.ThrowIfNull(masterPassword);
         RequirePolicy(masterPassword);
 
@@ -167,15 +203,49 @@ public sealed class VaultLifecycleService : IDisposable
 
         // Activate the DEK (Protect now writes v2), then run the forward pass.
         SetUnlockedDek(dek);
-        await VaultMigrationEngine.MigrateForwardAsync(_configManager).ConfigureAwait(false);
-        await ForwardStoresStrictAsync().ConfigureAwait(false);
+
+        // From here the vault is on: nothing below may make the call fail, or a second attempt
+        // would meet "already enabled". Whatever cannot be sealed now is named, the marker stays,
+        // and the pass at the next unlock finishes it.
+        var unsealed = new List<string>();
+        try
+        {
+            await VaultMigrationEngine.MigrateForwardAsync(_configManager).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            unsealed.Add(ConfigurationStoreNameKey);
+            FileLogger.Warn($"Vault: the configuration could not be sealed yet ({ex.GetType().Name}).");
+        }
+
+        unsealed.AddRange(await TryForwardStoresAsync(CancellationToken.None).ConfigureAwait(false));
 
         // The last good copies still hold the pre-vault documents: a fall-back to one must not
-        // bring them back.
-        await _configManager.RefreshLastGoodCopiesAsync().ConfigureAwait(false);
+        // bring them back. Always attempted, since a failure above does not excuse leaving them.
+        try
+        {
+            await _configManager.RefreshLastGoodCopiesAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Warn($"Vault: the last good copies could not be refreshed ({ex.GetType().Name}).");
+        }
 
-        await _configManager.MergeSettingAsync(s => s.VaultMigrationState = VaultMigrationState.Complete)
-            .ConfigureAwait(false);
+        if (unsealed.Count == 0)
+        {
+            try
+            {
+                await _configManager.MergeSettingAsync(s => s.VaultMigrationState = VaultMigrationState.Complete)
+                    .ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                // The marker stays: the next unlock runs the pass again and clears it.
+                FileLogger.Warn($"Vault: the migration marker could not be cleared ({ex.GetType().Name}).");
+            }
+        }
+
+        return new VaultEnableResult(unsealed);
     }
 
     /// <summary>
@@ -203,9 +273,10 @@ public sealed class VaultLifecycleService : IDisposable
 
     private async Task UnlockCoreAsync(char[] masterPassword)
     {
+        ThrowIfRestorePending();
         ArgumentNullException.ThrowIfNull(masterPassword);
 
-        var settings = await _configManager.LoadSettingsAsync().ConfigureAwait(false);
+        (AppSettings settings, bool fromJournal) = await LoadEffectiveSettingsAsync().ConfigureAwait(false);
         if (!settings.VaultEnabled)
         {
             throw new InvalidOperationException("The vault is not enabled.");
@@ -219,9 +290,56 @@ public sealed class VaultLifecycleService : IDisposable
         var dek = UnwrapWithChars(masterPassword, settings.VaultWrappedDek);
         SetUnlockedDek(dek);
 
+        if (fromJournal)
+        {
+            // Started as enabled from the journal because settings could not be written: the unlock
+            // goes ahead, and what needs a write is left to the next start.
+            try
+            {
+                await ResumeOrReconcileForwardMigrationAsync(settings).ConfigureAwait(false);
+                await StampLastMasterUnlockAsync().ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                FileLogger.Warn($"Vault: the unlock from the journal could not persist its state ({ex.GetType().Name}).");
+            }
+
+            return;
+        }
+
         await ResumeOrReconcileForwardMigrationAsync(settings).ConfigureAwait(false);
 
         await StampLastMasterUnlockAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Undoes a disable that was interrupted, if a journal says so, then loads the settings; when the
+    /// undo could not be written the journal is applied to the loaded copy in memory, so the vault is
+    /// never treated as disabled while a journal exists.
+    /// </summary>
+    private async Task<(AppSettings Settings, bool FromJournal)> LoadEffectiveSettingsAsync()
+    {
+        VaultDisableJournal? unrestored = await VaultDisableJournal.RecoverAsync(_configManager).ConfigureAwait(false);
+        AppSettings settings = await _configManager.LoadSettingsAsync().ConfigureAwait(false);
+        if (unrestored is not null)
+        {
+            unrestored.ApplyTo(settings);
+            return (settings, true);
+        }
+
+        return (settings, false);
+    }
+
+    /// <summary>
+    /// Refuses while a disable that was undone is waiting for its wrapped key to be written back:
+    /// the key held in memory must not be replaced.
+    /// </summary>
+    private void ThrowIfRestorePending()
+    {
+        if (_pendingRestore is not null)
+        {
+            throw new VaultDisableIncompleteException();
+        }
     }
 
     /// <summary>
@@ -243,6 +361,7 @@ public sealed class VaultLifecycleService : IDisposable
 
     private async Task EnrollHelloCoreAsync(CancellationToken ct)
     {
+        ThrowIfRestorePending();
         ct.ThrowIfCancellationRequested();
         if (_vaultHelloService is null)
         {
@@ -329,6 +448,7 @@ public sealed class VaultLifecycleService : IDisposable
 
     private async Task<VaultHelloUnlockResult> UnlockWithHelloCoreAsync(CancellationToken ct)
     {
+        ThrowIfRestorePending();
         ct.ThrowIfCancellationRequested();
         if (_vaultHelloService is null)
         {
@@ -413,6 +533,7 @@ public sealed class VaultLifecycleService : IDisposable
 
     private async Task ChangeMasterPasswordCoreAsync(char[] oldPassword, char[] newPassword, Argon2idParameters parameters)
     {
+        ThrowIfRestorePending();
         ArgumentNullException.ThrowIfNull(oldPassword);
         ArgumentNullException.ThrowIfNull(newPassword);
         RequirePolicy(newPassword);
@@ -448,29 +569,51 @@ public sealed class VaultLifecycleService : IDisposable
     /// began. Windows Hello is removed last, once the vault is gone for good.</para>
     /// </remarks>
     /// <param name="masterPassword">The master password (caller zeroes after).</param>
+    /// <param name="dropUnreadable">
+    /// Clears the stored values that are sealed with a key that cannot open them (another vault
+    /// generation, a restored backup) instead of refusing. A value that can be read is never cleared.
+    /// </param>
     /// <exception cref="InvalidOperationException">When the vault is not enabled.</exception>
     /// <exception cref="VaultUnlockException">When the password is wrong or the vault is corrupted.</exception>
+    /// <exception cref="VaultUnreadableSecretsException">
+    /// When some stored values cannot be opened and <paramref name="dropUnreadable"/> is false.
+    /// Nothing was turned off.
+    /// </exception>
+    /// <exception cref="VaultDisableIncompleteException">
+    /// When the disable was undone but the wrapped key could not be written back to disk. The key
+    /// is held in memory; <see cref="RetryRestoreAsync"/> finishes the job.
+    /// </exception>
     /// <exception cref="VaultResidueException">
     /// When a store still holds secrets sealed with the vault key, or a step failed and the vault
     /// was put back. The vault stays on.
     /// </exception>
     /// <exception cref="VaultStoreException">When a store could not be read or updated.</exception>
-    public async Task DisableAsync(char[] masterPassword)
+    public async Task DisableAsync(char[] masterPassword, bool dropUnreadable = false)
     {
+        // A pass of the post-unlock sealing in flight would only delay this.
+        Volatile.Read(ref _postUnlockCancellation)?.Cancel();
         await _gate.WaitAsync().ConfigureAwait(false);
+        Interlocked.Increment(ref _exclusiveOperations);
         try
         {
-            await DisableCoreAsync(masterPassword).ConfigureAwait(false);
+            await DisableCoreAsync(masterPassword, dropUnreadable).ConfigureAwait(false);
         }
         finally
         {
+            Interlocked.Decrement(ref _exclusiveOperations);
             ReleaseGate();
         }
     }
 
-    private async Task DisableCoreAsync(char[] masterPassword)
+    private async Task DisableCoreAsync(char[] masterPassword, bool dropUnreadable)
     {
         ArgumentNullException.ThrowIfNull(masterPassword);
+
+        if (_pendingRestore is not null)
+        {
+            // The last disable could not put the wrapped key back: that has to be finished first.
+            throw new VaultDisableIncompleteException();
+        }
 
         // The snapshot keeps the wrapped key and the Hello enrolment in memory for the whole
         // operation, so they can be written back if the erase has to be undone.
@@ -489,12 +632,49 @@ public sealed class VaultLifecycleService : IDisposable
         var residue = new List<string>();
         try
         {
-            // Reverse while still enabled so v2 fields stay readable.
-            await VaultMigrationEngine.MigrateReverseAsync(_configManager).ConfigureAwait(false);
-            await ReverseStoresAsync().ConfigureAwait(false);
+            // First pass, unlocked and without holding anything up: it does the bulk of the work and
+            // leaves a value the key cannot open as it is. Reversing while still enabled keeps v2
+            // fields readable.
+            await VaultMigrationEngine.MigrateReverseAsync(_configManager, onUnreadable: () => { })
+                .ConfigureAwait(false);
+            await ReverseStoresAsync([]).ConfigureAwait(false);
 
-            // Withdraw the key but keep the vault flagged enabled: Protect now fails closed.
-            CredentialProtector.ClearVaultKey();
+            // The exclusive side waits for every writer that sealed a value and has not yet stored
+            // it, and holds new ones back. What those writers landed is reversed by a second pass,
+            // which is short because it only meets what the first one missed, and counts the values
+            // nothing can open. Only then is the key withdrawn, with the vault still flagged on, so
+            // that a writer released afterwards fails closed instead of sealing anything new.
+            var unreadable = new Dictionary<string, int>(StringComparer.Ordinal);
+            IDisposable exclusive;
+            try
+            {
+                exclusive = await VaultSealGate.Shared.EnterExclusiveAsync(SealGateTimeout).ConfigureAwait(false);
+            }
+            catch (TimeoutException)
+            {
+                throw new VaultBusyException();
+            }
+
+            using (exclusive)
+            {
+                await VaultMigrationEngine.MigrateReverseAsync(
+                    _configManager,
+                    () => Count(unreadable, ConfigurationStoreNameKey)).ConfigureAwait(false);
+                await ReverseStoresAsync(unreadable).ConfigureAwait(false);
+
+                if (unreadable.Count > 0)
+                {
+                    if (!dropUnreadable)
+                    {
+                        throw new VaultUnreadableSecretsException([.. unreadable]);
+                    }
+
+                    await DropUnreadableAsync(unreadable).ConfigureAwait(false);
+                }
+
+                CredentialProtector.ClearVaultKey();
+            }
+
             await CollectResidueAsync(residue).ConfigureAwait(false);
 
             if (residue.Count == 0)
@@ -506,14 +686,19 @@ public sealed class VaultLifecycleService : IDisposable
                 }
             }
         }
+        catch (VaultUnreadableSecretsException found)
+        {
+            bool restored = await RestoreAfterFailureAsync(dek, snapshot, found).ConfigureAwait(false);
+            throw new VaultUnreadableSecretsException(found.Counts, restored);
+        }
         catch (VaultResidueException found)
         {
-            bool restored = await RestoreAfterFailureAsync(dek, snapshot).ConfigureAwait(false);
+            bool restored = await RestoreAfterFailureAsync(dek, snapshot, found).ConfigureAwait(false);
             throw new VaultResidueException(found.StoreNameKeys, restored);
         }
         catch (Exception failure)
         {
-            bool restored = await RestoreAfterFailureAsync(dek, snapshot).ConfigureAwait(false);
+            bool restored = await RestoreAfterFailureAsync(dek, snapshot, failure).ConfigureAwait(false);
             if (!restored)
             {
                 throw new VaultResidueException([], protectionRestored: false, failure);
@@ -522,8 +707,33 @@ public sealed class VaultLifecycleService : IDisposable
             throw;
         }
 
-        bool sealedAgain = await RestoreAfterFailureAsync(dek, snapshot).ConfigureAwait(false);
+        bool sealedAgain = await RestoreAfterFailureAsync(dek, snapshot, cause: null).ConfigureAwait(false);
         throw new VaultResidueException(residue, sealedAgain);
+    }
+
+    private static void Count(Dictionary<string, int> counts, string storeNameKey) =>
+        counts[storeNameKey] = counts.GetValueOrDefault(storeNameKey) + 1;
+
+    /// <summary>Clears the values the key cannot open, in the configuration and in the stores that hold some.</summary>
+    private async Task DropUnreadableAsync(Dictionary<string, int> unreadable)
+    {
+        if (unreadable.ContainsKey(ConfigurationStoreNameKey))
+        {
+            await VaultMigrationEngine.MigrateDropUnreadableAsync(_configManager).ConfigureAwait(false);
+        }
+
+        foreach (IVaultSecretStore store in _secretStores.Where(store => unreadable.ContainsKey(store.StoreNameKey)))
+        {
+            try
+            {
+                await store.DropUnreadableAsync(VaultMigrationEngine.IsUnreadableVaultSecret, CancellationToken.None)
+                    .ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                throw new VaultStoreException(store.StoreNameKey, ex);
+            }
+        }
     }
 
     /// <summary>
@@ -535,6 +745,10 @@ public sealed class VaultLifecycleService : IDisposable
     {
         // A later fall-back to a last good copy must not bring the vault blobs back.
         await _configManager.RefreshLastGoodCopiesAsync().ConfigureAwait(false);
+
+        // Two-phase commit: what is needed to bring the vault back is on disk, atomically, before the
+        // wrapped key is erased, and stays there until the erase has been checked and is final.
+        await VaultDisableJournal.WriteAsync(_configManager, snapshot).ConfigureAwait(false);
 
         await _configManager.MergeSettingAsync(s =>
         {
@@ -562,6 +776,10 @@ public sealed class VaultLifecycleService : IDisposable
             return;
         }
 
+        // The disable is final: the journal goes. Were it left behind, the next start would bring the
+        // vault back, so a journal that cannot be deleted undoes the disable instead.
+        VaultDisableJournal.Delete(_configManager);
+
         // The credential goes last: removing it earlier left the vault on, with the enrolment
         // flag set and no credential, whenever a later step failed.
         try
@@ -579,32 +797,101 @@ public sealed class VaultLifecycleService : IDisposable
 
     /// <summary>
     /// Undoes a disable that did not complete, in the only safe order: the wrapped key is on disk
-    /// again first, then the key is put back and everything is sealed again. When the wrapped key
-    /// is gone and cannot be written back, nothing is sealed: a secret sealed with a key that is
-    /// not on disk is lost, whereas one left in the legacy form is merely less protected.
+    /// again first, then the key is put back and everything is sealed again.
     /// </summary>
-    /// <returns>Whether everything converted is sealed again (or the vault is, for good, off).</returns>
-    private async Task<bool> RestoreAfterFailureAsync(VaultDekHolder dek, AppSettings snapshot)
+    /// <remarks>
+    /// When the wrapped key cannot be written back the key is neither locked nor dropped: it stays
+    /// in memory, the protector stays flagged on, and the failure is reported as
+    /// <see cref="VaultDisableIncompleteException"/> so that it can be retried. Locking here would
+    /// zero the only copy of the key while values sealed with it may exist.
+    /// </remarks>
+    /// <returns>True only when protection is restored: the key is back and everything is sealed again.</returns>
+    private async Task<bool> RestoreAfterFailureAsync(VaultDekHolder dek, AppSettings snapshot, Exception? cause)
     {
-        bool keyOnDisk;
-        try
+        if (!await WriteBackWrappedKeyAsync(snapshot).ConfigureAwait(false))
         {
-            keyOnDisk = await EnsureWrappedKeyOnDiskAsync(snapshot).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            keyOnDisk = false;
-            FileLogger.Warn($"Vault: the wrapped key could not be confirmed on disk ({ex.GetType().Name}).");
-        }
-
-        if (!keyOnDisk)
-        {
-            CredentialProtector.SetVaultEnabled(false);
-            LockCore();
-            return true;
+            _pendingRestore = new PendingRestore(dek, snapshot);
+            throw new VaultDisableIncompleteException(cause);
         }
 
         return await RestoreProtectionAsync(dek).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Finishes a disable that was undone but could not write the wrapped key back: writes it,
+    /// then puts the key back and seals everything again. Does nothing when nothing is pending.
+    /// </summary>
+    /// <exception cref="VaultDisableIncompleteException">When the wrapped key still cannot be written.</exception>
+    /// <exception cref="VaultResidueException">When the key is back on disk but something stayed unsealed.</exception>
+    public async Task RetryRestoreAsync()
+    {
+        await _gate.WaitAsync().ConfigureAwait(false);
+        Interlocked.Increment(ref _exclusiveOperations);
+        try
+        {
+            PendingRestore? pending = _pendingRestore;
+            if (pending is null)
+            {
+                return;
+            }
+
+            if (!await WriteBackWrappedKeyAsync(pending.Snapshot).ConfigureAwait(false))
+            {
+                throw new VaultDisableIncompleteException();
+            }
+
+            _pendingRestore = null;
+            if (!await RestoreProtectionAsync(pending.Dek).ConfigureAwait(false))
+            {
+                throw new VaultResidueException([], protectionRestored: false);
+            }
+        }
+        finally
+        {
+            Interlocked.Decrement(ref _exclusiveOperations);
+            ReleaseGate();
+        }
+    }
+
+    private void TryDeleteJournal()
+    {
+        try
+        {
+            VaultDisableJournal.Delete(_configManager);
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Warn($"Vault: the disable journal could not be deleted ({ex.GetType().Name}).");
+        }
+    }
+
+    /// <summary>Writes the wrapped key back, a bounded number of times.</summary>
+    private async Task<bool> WriteBackWrappedKeyAsync(AppSettings snapshot)
+    {
+        for (var attempt = 1; attempt <= WrappedKeyWriteBackAttempts; attempt++)
+        {
+            try
+            {
+                if (await EnsureWrappedKeyOnDiskAsync(snapshot).ConfigureAwait(false))
+                {
+                    // The vault is back on disk: the journal has done its job. Left behind it would
+                    // only restore the same state at the next start.
+                    TryDeleteJournal();
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                FileLogger.Warn($"Vault: the wrapped key could not be written back ({ex.GetType().Name}).");
+            }
+
+            if (attempt < WrappedKeyWriteBackAttempts)
+            {
+                await Task.Delay(WrappedKeyWriteBackDelay).ConfigureAwait(false);
+            }
+        }
+
+        return false;
     }
 
     private async Task<bool> EnsureWrappedKeyOnDiskAsync(AppSettings snapshot)
@@ -653,7 +940,7 @@ public sealed class VaultLifecycleService : IDisposable
             FileLogger.Warn($"Vault: the configuration could not be sealed again ({ex.GetType().Name}).");
         }
 
-        if (!await TryForwardStoresAsync().ConfigureAwait(false))
+        if ((await TryForwardStoresAsync(CancellationToken.None).ConfigureAwait(false)).Count > 0)
         {
             restored = false;
         }
@@ -721,6 +1008,9 @@ public sealed class VaultLifecycleService : IDisposable
     /// </remarks>
     public void Lock()
     {
+        // A pass that seals the stores after an unlock gives way to the lock.
+        Volatile.Read(ref _postUnlockCancellation)?.Cancel();
+
         if (!_gate.Wait(0))
         {
             Volatile.Write(ref _lockDeferred, 1);
@@ -753,6 +1043,12 @@ public sealed class VaultLifecycleService : IDisposable
 
     private void LockCore()
     {
+        // The key is the only copy while a disable that could not be undone is pending.
+        if (_pendingRestore is not null)
+        {
+            return;
+        }
+
         CredentialProtector.ClearVaultKey();
         _unlockedDek?.Dispose();
         _unlockedDek = null;
@@ -815,29 +1111,42 @@ public sealed class VaultLifecycleService : IDisposable
 
     private void StartPostUnlockSealing()
     {
-        if (_secretStores.Count > 0)
+        if (_secretStores.Count == 0)
         {
-            _postUnlockSealing = Task.Run(PostUnlockSealingAsync);
+            return;
         }
+
+        var cancellation = new CancellationTokenSource();
+        Interlocked.Exchange(ref _postUnlockCancellation, cancellation)?.Cancel();
+        CancellationToken token = cancellation.Token;
+        _postUnlockSealing = Task.Run(() => PostUnlockSealingAsync(token));
     }
 
     /// <summary>
     /// Seals what older versions or an interrupted disable left in the legacy form, clears the
     /// marker once every store is sealed, and reports a store that stays unsealed (once a session).
-    /// Runs after the unlock has returned and never throws.
+    /// Runs after the unlock has returned and never throws. A lock request cancels it.
     /// </summary>
-    private async Task PostUnlockSealingAsync()
+    private async Task PostUnlockSealingAsync(CancellationToken cancellationToken)
     {
-        await _gate.WaitAsync().ConfigureAwait(false);
         try
         {
-            if (!IsUnlocked)
+            await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        try
+        {
+            if (!IsUnlocked || cancellationToken.IsCancellationRequested)
             {
                 return;
             }
 
             var settings = await _configManager.LoadSettingsAsync().ConfigureAwait(false);
-            bool allSealed = await TryForwardStoresAsync().ConfigureAwait(false);
+            bool allSealed = (await TryForwardStoresAsync(cancellationToken).ConfigureAwait(false)).Count == 0;
             if (allSealed && settings.VaultMigrationState == VaultMigrationState.InProgress)
             {
                 await _configManager.MergeSettingAsync(
@@ -851,6 +1160,10 @@ public sealed class VaultLifecycleService : IDisposable
                 UnsealedStoreNameKeys = unsealed;
                 UnsealedStoresDetected?.Invoke(unsealed);
             }
+        }
+        catch (OperationCanceledException)
+        {
+            // A lock was requested: the pass is picked up again at the next unlock.
         }
         catch (Exception ex)
         {
@@ -883,59 +1196,58 @@ public sealed class VaultLifecycleService : IDisposable
         return unsealed;
     }
 
-    private async Task ForwardStoresStrictAsync()
+    private async Task ReverseStoresAsync(Dictionary<string, int> unreadable)
     {
         foreach (IVaultSecretStore store in _secretStores)
         {
+            var count = 0;
             try
             {
-                await store.ForwardAsync(VaultMigrationEngine.ForwardEncrypted, CancellationToken.None)
-                    .ConfigureAwait(false);
+                await store.ReverseAsync(
+                    value => VaultMigrationEngine.ReverseTolerant(value, () => count++),
+                    CancellationToken.None).ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 throw new VaultStoreException(store.StoreNameKey, ex);
             }
-        }
-    }
 
-    private async Task ReverseStoresAsync()
-    {
-        foreach (IVaultSecretStore store in _secretStores)
-        {
-            try
+            if (count > 0)
             {
-                await store.ReverseAsync(VaultMigrationEngine.ReverseToCredentialProtectorLegacy, CancellationToken.None)
-                    .ConfigureAwait(false);
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                throw new VaultStoreException(store.StoreNameKey, ex);
+                unreadable[store.StoreNameKey] = count;
             }
         }
     }
 
     /// <summary>Seals every store, logging the ones that fail. No value is logged.</summary>
-    /// <returns>Whether every store was sealed.</returns>
-    private async Task<bool> TryForwardStoresAsync()
+    /// <returns>The locale keys of the stores that could not be sealed.</returns>
+    private async Task<List<string>> TryForwardStoresAsync(CancellationToken cancellationToken)
     {
-        var allSealed = true;
+        var failed = new List<string>();
         foreach (IVaultSecretStore store in _secretStores)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             try
             {
-                await store.ForwardAsync(VaultMigrationEngine.ForwardEncrypted, CancellationToken.None)
+                await store.ForwardAsync(VaultMigrationEngine.ForwardEncrypted, cancellationToken)
                     .ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
-                allSealed = false;
+                failed.Add(store.StoreNameKey);
                 FileLogger.Warn($"Vault: the store '{store.StoreNameKey}' could not be sealed ({ex.GetType().Name}).");
             }
         }
 
-        return allSealed;
+        return failed;
     }
+
+    /// <summary>What a disable that was undone needs to finish: the key and the settings to write back.</summary>
+    private sealed record PendingRestore(VaultDekHolder Dek, AppSettings Snapshot);
 
     private Task StampLastMasterUnlockAsync()
     {

@@ -198,15 +198,15 @@ public sealed class HistoryVaultSecretStoreTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task FailingPass_LeavesEveryRowAsItWas()
+    public async Task FailingPass_LeavesWholeBatchesDone_AndTheNextPassFinishesIt()
     {
         await AddRowAsync("a", Wrapped(LegacyPrefix + "one"), "{}");
         await AddRowAsync("b", Wrapped(LegacyPrefix + "two"), "{}");
         await AddRowAsync("c", Wrapped(LegacyPrefix + "three"), "{}");
         var calls = 0;
 
-        // One row per batch, so earlier batches are already saved inside the transaction when the
-        // third conversion fails.
+        // One row per batch, one transaction per batch: the third conversion fails, so the first two
+        // batches are committed and the third is untouched. No row is ever half converted.
         var store = new HistoryVaultSecretStore(NewContext, batchSize: 1);
         Func<Task> pass = () => store.ForwardAsync(
             stored => ++calls == 3 ? throw new InvalidOperationException("fails") : ToVault(stored),
@@ -214,9 +214,64 @@ public sealed class HistoryVaultSecretStoreTests : IAsyncLifetime
 
         await pass.Should().ThrowAsync<InvalidOperationException>();
 
-        foreach ((string id, string plain) in new[] { ("a", "one"), ("b", "two"), ("c", "three") })
+        var converted = 0;
+        foreach (string id in new[] { "a", "b", "c" })
         {
-            (await ReadRowAsync(id)).Should().Be((Wrapped(LegacyPrefix + plain), "{}"));
+            (string command, _) = await ReadRowAsync(id);
+            if (VaultSecretBlob.IsSecretBlob(command[HistorySecretEnvelope.Marker.Length..]))
+            {
+                converted++;
+            }
+            else
+            {
+                command.Should().StartWith(HistorySecretEnvelope.Marker + LegacyPrefix);
+            }
         }
+
+        converted.Should().Be(2);
+
+        await store.ForwardAsync(ToVault, CancellationToken.None);
+
+        (await store.HasUnsealedSecretsAsync(CancellationToken.None)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task CancelledBetweenBatches_StopsWithWholeBatchesDone()
+    {
+        await AddRowAsync("a", Wrapped(LegacyPrefix + "one"), "{}");
+        await AddRowAsync("b", Wrapped(LegacyPrefix + "two"), "{}");
+        using var cancellation = new CancellationTokenSource();
+        var store = new HistoryVaultSecretStore(NewContext, batchSize: 1);
+
+        Func<Task> pass = () => store.ForwardAsync(
+            stored =>
+            {
+                cancellation.Cancel();
+                return ToVault(stored);
+            },
+            cancellation.Token);
+
+        await pass.Should().ThrowAsync<OperationCanceledException>();
+
+        (await store.HasUnsealedSecretsAsync(CancellationToken.None)).Should().BeTrue("the second batch was not run");
+    }
+
+    [Fact]
+    public async Task Drop_ClearsOnlyTheUnreadableField_AndRemovesARowOnlyWhenNothingReadableRemains()
+    {
+        string readable = ToVault(LegacyPrefix + "good")!;
+        string foreign = VaultSecretBlob.Seal(RandomNumberGenerator.GetBytes(VaultCipher.KeySizeBytes), "x"u8);
+        await AddRowAsync("good", Wrapped(readable), "{}");
+        await AddRowAsync("both-bad", Wrapped(foreign), Wrapped(foreign));
+        await AddRowAsync("half", Wrapped(foreign), Wrapped(readable));
+        await AddRowAsync("clear", "uptime", "{}");
+        var store = new HistoryVaultSecretStore(NewContext);
+
+        await store.DropUnreadableAsync(value => value == foreign, CancellationToken.None);
+
+        await using TwinShellDbContext context = NewContext();
+        List<string> ids = await context.CommandHistories.Select(row => row.Id).OrderBy(id => id).ToListAsync();
+        ids.Should().Equal("clear", "good", "half");
+        (await ReadRowAsync("half")).Should().Be((string.Empty, Wrapped(readable)));
     }
 }

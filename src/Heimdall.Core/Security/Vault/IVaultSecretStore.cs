@@ -51,6 +51,14 @@ public interface IVaultSecretStore
     /// <param name="cancellationToken">Cancels the check.</param>
     Task<bool> HasUnsealedSecretsAsync(CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Removes the values for which <paramref name="isUnreadable"/> is true: sealed with a vault key
+    /// that cannot open them. A value that can be read is never removed.
+    /// </summary>
+    /// <param name="isUnreadable">Whether a stored protected value can never be opened again.</param>
+    /// <param name="cancellationToken">Cancels the pass.</param>
+    Task DropUnreadableAsync(Func<string?, bool> isUnreadable, CancellationToken cancellationToken);
+
     /// <summary>Whether the store still holds at least one secret sealed with the vault key.</summary>
     /// <param name="cancellationToken">Cancels the check.</param>
     Task<bool> HoldsVaultSecretsAsync(CancellationToken cancellationToken);

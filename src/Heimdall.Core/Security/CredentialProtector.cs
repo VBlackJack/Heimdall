@@ -186,6 +186,21 @@ public static class CredentialProtector
     }
 
     /// <summary>
+    /// Protects a value that only has to survive in this process's memory, in the legacy
+    /// current-user form whatever the vault state. Meant for a secret held across a long wait, such
+    /// as a network connect, where a value sealed with the vault key would be lost if the vault were
+    /// disabled meanwhile. It is never written to disk.
+    /// </summary>
+    /// <param name="plainText">The value to protect.</param>
+    /// <returns>The transient protected form, to be opened with <see cref="UnprotectTransient"/>.</returns>
+    public static string ProtectTransient(string plainText) => ProtectLegacy(plainText);
+
+    /// <summary>Opens a value protected with <see cref="ProtectTransient"/>.</summary>
+    /// <param name="transientValue">The transient protected form.</param>
+    /// <returns>The plaintext, or null when it cannot be opened.</returns>
+    public static string? UnprotectTransient(string? transientValue) => Unprotect(transientValue);
+
+    /// <summary>
     /// Decrypt a protected credential. Supports both HMAC-protected and legacy
     /// DPAPI-only formats for backward compatibility.
     /// </summary>

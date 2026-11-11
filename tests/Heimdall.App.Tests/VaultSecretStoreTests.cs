@@ -212,6 +212,34 @@ public sealed class VaultSecretStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task SharedSessionStore_Drop_RemovesOnlyTheUnreadableEntries()
+    {
+        var secrets = new SharedSessionSecretStore(SharedPath);
+        var store = new SharedSessionVaultSecretStore(secrets);
+        await secrets.RememberAsync(SharedSecretKind.Session, SourceId, "good", "readable-value");
+        await secrets.RememberAsync(SharedSecretKind.Session, SourceId, "bad", "unreadable-value");
+
+        await store.DropUnreadableAsync(value => value == "unreadable-value", CancellationToken.None);
+
+        Assert.Equal("readable-value", secrets.Find(SharedSecretKind.Session, SourceId, "good"));
+        Assert.Null(secrets.Find(SharedSecretKind.Session, SourceId, "bad"));
+        Assert.Null(new SharedSessionSecretStore(SharedPath).Find(SharedSecretKind.Session, SourceId, "bad"));
+    }
+
+    [Fact]
+    public async Task PresetStore_Drop_RemovesTheFileOnlyWhenItCannotBeRead()
+    {
+        var store = new PasswordPresetVaultSecretStore(_directory);
+        await File.WriteAllTextAsync(PresetPath, VaultTestTransforms.Legacy("presets"), Encoding.UTF8);
+
+        await store.DropUnreadableAsync(_ => false, CancellationToken.None);
+        Assert.True(File.Exists(PresetPath));
+
+        await store.DropUnreadableAsync(_ => true, CancellationToken.None);
+        Assert.False(File.Exists(PresetPath));
+    }
+
+    [Fact]
     public async Task PresetStore_AbsentFile_IsANoOp()
     {
         var store = new PasswordPresetVaultSecretStore(_directory);

@@ -31,7 +31,7 @@ namespace Heimdall.App.ViewModels.Dialogs;
 /// </summary>
 public partial class VaultEnableDialogViewModel : ObservableObject, IPasswordRefocusHost
 {
-    private readonly Func<char[], Task> _enableAsync;
+    private readonly Func<char[], Task<VaultEnableResult>> _enableAsync;
     private readonly LocalizationManager _localizer;
 
     [ObservableProperty]
@@ -65,11 +65,31 @@ public partial class VaultEnableDialogViewModel : ObservableObject, IPasswordRef
     /// <param name="enableAsync">The enable operation (new master password -> wrap DEK + migrate).</param>
     /// <param name="localizer">The localization source.</param>
     public VaultEnableDialogViewModel(Func<char[], Task> enableAsync, LocalizationManager localizer)
+        : this(
+            async password =>
+            {
+                await enableAsync(password).ConfigureAwait(false);
+                return new VaultEnableResult([]);
+            },
+            localizer)
+    {
+    }
+
+    /// <summary>Create the enable dialog ViewModel with an operation that reports what is still unsealed.</summary>
+    /// <param name="enableAsync">The enable operation (new master password -> wrap DEK + migrate).</param>
+    /// <param name="localizer">The localization source.</param>
+    public VaultEnableDialogViewModel(Func<char[], Task<VaultEnableResult>> enableAsync, LocalizationManager localizer)
     {
         _enableAsync = enableAsync;
         _localizer = localizer;
         PolicyMessage = localizer.GetString("VaultPolicyHint");
     }
+
+    /// <summary>
+    /// Said once the master password is on when some stores could not be sealed yet: it is on, and
+    /// the next unlock seals them. Empty otherwise.
+    /// </summary>
+    public string CompletionNotice { get; private set; } = "";
 
     /// <summary>
     /// Fires when the password box should take the keyboard focus back: the attempt failed and the
@@ -117,7 +137,16 @@ public partial class VaultEnableDialogViewModel : ObservableObject, IPasswordRef
             try
             {
                 // Migration re-encrypts every stored secret; offload so the UI stays responsive.
-                await Task.Run(() => _enableAsync(password)).ConfigureAwait(true);
+                VaultEnableResult result = await Task.Run(() => _enableAsync(password)).ConfigureAwait(true);
+                if (!result.IsComplete)
+                {
+                    CompletionNotice = _localizer.Format(
+                        "VaultEnablePartialNotice",
+                        string.Join(
+                            ", ",
+                            result.UnsealedStoreNameKeys.Select(key => _localizer.GetString(key))));
+                }
+
                 IsCompleted = true;
             }
             catch (VaultStoreException ex)

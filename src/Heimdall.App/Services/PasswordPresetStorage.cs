@@ -22,6 +22,7 @@ using System.Text.Json.Serialization;
 using Heimdall.App.ViewModels.Tools;
 using Heimdall.Core.Logging;
 using Heimdall.Core.Security;
+using Heimdall.Core.Security.Vault;
 
 namespace Heimdall.App.Services;
 
@@ -56,12 +57,18 @@ internal interface IPasswordPresetStorage
 {
     PasswordGeneratorStore Load();
     void Save(PasswordGeneratorStore store);
+
+    /// <summary>Saves without holding the caller; a storage with no background path saves at once.</summary>
+    Task SaveAsync(PasswordGeneratorStore store)
+    {
+        Save(store);
+        return Task.CompletedTask;
+    }
 }
 
 internal sealed class PasswordPresetStorage : IPasswordPresetStorage
 {
     internal const string PresetsFileName = "password-presets.json";
-    private const string TemporarySuffix = ".tmp";
     internal const char ByteOrderMark = (char)0xFEFF;
     private readonly string _filePath;
 
@@ -139,14 +146,65 @@ internal sealed class PasswordPresetStorage : IPasswordPresetStorage
         }
     }
 
+    /// <summary>
+    /// Saves and waits for the write. Kept for callers that need the file to be there on return.
+    /// </summary>
+    /// <remarks>
+    /// The seal gate is entered on a pool thread, never by the caller itself, and nothing the
+    /// exclusive side does waits on the UI thread, so the wait cannot become a cycle. The secret is
+    /// sealed on the caller's thread, inside the scope, and the write lands before the scope ends.
+    /// </remarks>
     public void Save(PasswordGeneratorStore store)
     {
         ArgumentNullException.ThrowIfNull(store);
 
+        if (!TrySerialize(store, out string json))
+        {
+            return;
+        }
+
+        IDisposable? sealScope = null;
+        try
+        {
+            sealScope = Task.Run(() => VaultSealGate.Shared.EnterAsync().AsTask()).GetAwaiter().GetResult();
+            var content = CredentialProtector.Protect(json);
+            Task.Run(() => WriteContentAsync(content)).GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Warn($"[PasswordGenerator] Failed to save custom presets: {ex.Message}");
+        }
+        finally
+        {
+            sealScope?.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Saves without holding the caller: the seal gate and the file are entered on a pool thread,
+    /// so a save started on the UI thread never blocks it on a disable that is draining writers.
+    /// Failures are logged, as they always were; the unreadable-store protection is unchanged.
+    /// </summary>
+    public Task SaveAsync(PasswordGeneratorStore store)
+    {
+        ArgumentNullException.ThrowIfNull(store);
+
+        return TrySerialize(store, out string json)
+            ? Task.Run(() => WriteSealedAsync(json))
+            : Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Serializes the store now, on the caller's thread (it may change once this returns). False
+    /// when nothing is to be written: an unreadable store is never written over the file.
+    /// </summary>
+    private bool TrySerialize(PasswordGeneratorStore store, out string json)
+    {
+        json = string.Empty;
         if (store.IsUnreadable)
         {
             FileLogger.Warn("[PasswordGenerator] The saved presets could not be read, so nothing is written over them.");
-            return;
+            return false;
         }
 
         try
@@ -157,40 +215,50 @@ internal sealed class PasswordPresetStorage : IPasswordPresetStorage
                 Directory.CreateDirectory(directory);
             }
 
-            var json = JsonSerializer.Serialize(store, new JsonSerializerOptions { WriteIndented = true });
-
-            // Sealed the way a session's password is: the vault's key when it is unlocked, the
-            // Windows account's own otherwise. A preset holds no password, but it does describe
-            // the shape of the ones this person makes, and the leet mode's base word is whatever
-            // they typed.
-            // Sealed before the lock is taken: a locked vault refuses here and nothing is written.
-            var content = CredentialProtector.Protect(json);
-
-            // Written beside the file, then moved over it: a reader or a crash never sees half a file.
-            var gate = PasswordPresetFileGate.For(_filePath);
-            gate.Wait();
-            try
-            {
-                var temporary = _filePath + TemporarySuffix;
-                try
-                {
-                    File.WriteAllText(temporary, content, Encoding.UTF8);
-                    File.Move(temporary, _filePath, overwrite: true);
-                }
-                catch
-                {
-                    File.Delete(temporary);
-                    throw;
-                }
-            }
-            finally
-            {
-                gate.Release();
-            }
+            json = JsonSerializer.Serialize(store, new JsonSerializerOptions { WriteIndented = true });
+            return true;
         }
         catch (Exception ex)
         {
             FileLogger.Warn($"[PasswordGenerator] Failed to save custom presets: {ex.Message}");
+            return false;
+        }
+    }
+
+    private async Task WriteSealedAsync(string json)
+    {
+        try
+        {
+            // Sealed the way a session's password is: the vault's key when it is unlocked, the
+            // Windows account's own otherwise. A preset holds no password, but it does describe
+            // the shape of the ones this person makes, and the leet mode's base word is whatever
+            // they typed. The seal and the write are one scope for the vault: disabling it waits for
+            // this save to land before it withdraws the key, so no blob sealed with that key is left.
+            using IDisposable sealScope = await VaultSealGate.Shared.EnterAsync().ConfigureAwait(false);
+            var content = CredentialProtector.Protect(json);
+            await WriteContentAsync(content).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Warn($"[PasswordGenerator] Failed to save custom presets: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// The same atomic, restricted-ACL writer the migration uses: a reader or a crash never sees
+    /// half a file.
+    /// </summary>
+    private async Task WriteContentAsync(string content)
+    {
+        var gate = PasswordPresetFileGate.For(_filePath);
+        await gate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            await SecureFileWriter.WriteAllTextAtomicAsync(_filePath, content).ConfigureAwait(false);
+        }
+        finally
+        {
+            gate.Release();
         }
     }
 

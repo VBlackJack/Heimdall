@@ -59,6 +59,12 @@ public sealed class WorkspaceLockService : IDisposable
     /// <summary>Raised whenever the locked state changes (lock or successful unlock).</summary>
     public event Action? LockStateChanged;
 
+    /// <summary>
+    /// Raised when a lock was asked for and refused because a disable of the master password could
+    /// not finish: the key is held in memory and a lock overlay over a live key would mislead.
+    /// </summary>
+    public event Action? LockRefused;
+
     /// <summary>Whether a master-password vault is configured (lock is a no-op otherwise).</summary>
     public bool IsVaultEnabled => _vaultEnabled;
 
@@ -84,7 +90,21 @@ public sealed class WorkspaceLockService : IDisposable
         _vaultEnabled = vaultEnabled;
         _autoLockIdleMinutes = autoLockIdleMinutes;
         _disconnectOnLock = disconnectOnLock;
+
+        // The vault is gone (disabled) while the workspace was locked: nothing can unlock it any
+        // more, so the window would stay behind an overlay for ever. Clear the lock.
+        bool clearedLock = !vaultEnabled && IsWorkspaceLocked;
+        if (clearedLock)
+        {
+            IsWorkspaceLocked = false;
+        }
+
         RefreshIdleTimer();
+        if (clearedLock)
+        {
+            FileLogger.Info("Workspace lock cleared: the vault is no longer enabled.");
+            LockStateChanged?.Invoke();
+        }
     }
 
     /// <summary>
@@ -104,6 +124,12 @@ public sealed class WorkspaceLockService : IDisposable
     {
         if (!_vaultEnabled || IsWorkspaceLocked)
         {
+            return;
+        }
+
+        if (_lifecycle.IsDisableIncomplete)
+        {
+            LockRefused?.Invoke();
             return;
         }
 
@@ -183,6 +209,14 @@ public sealed class WorkspaceLockService : IDisposable
         if (!_vaultEnabled || IsWorkspaceLocked)
         {
             _idleTimer.Stop();
+            return;
+        }
+
+        // An enable or a disable is running, or one that could not finish is waiting for its retry:
+        // locking now would take the key from under it. The pass that follows an unlock is not
+        // one of these; the lifecycle defers a lock requested during it.
+        if (_lifecycle.IsOperationInProgress || _lifecycle.IsDisableIncomplete)
+        {
             return;
         }
 
