@@ -1716,7 +1716,12 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
                     return false;
                 }
 
-                string noResult = _localizer.Format("WarnCredentialProviderNoResult", serverDto.DisplayName);
+                string noResult = serverDto.CredentialLookupConfirmed || SharedSessionIds.IsSharedProfile(serverDto)
+                    ? _localizer.Format("WarnCredentialProviderNoResult", serverDto.DisplayName)
+                    : _localizer.Format(
+                        "WarnCredentialProviderNoResultUnconfirmed",
+                        serverDto.DisplayName,
+                        serverDto.RemoteServer);
                 if (skipOnFailure)
                 {
                     reportQuietly?.Invoke(noResult);
@@ -1808,14 +1813,12 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     {
         ArgumentNullException.ThrowIfNull(serverDto);
 
-        if (SharedSessionIds.IsSharedProfile(serverDto))
+        if (SharedSessionIds.IsSharedProfile(serverDto) || !serverDto.CredentialLookupConfirmed)
         {
             return serverDto.RemoteServer;
         }
 
-        return string.IsNullOrWhiteSpace(serverDto.VaultEntryName)
-            ? serverDto.DisplayName
-            : serverDto.VaultEntryName;
+        return CredentialLookupPolicy.NameBasedTitle(serverDto);
     }
 
     private bool ShowConnectionError(string title, string message)

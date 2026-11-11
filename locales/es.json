@@ -1469,6 +1469,8 @@
   "ImportCountOrphanReferences": "{0} referencias huérfanas",
   "ImportCountOrphanReferencesOne": "{0} referencia huérfana",
   "StatusImportProfileGatewaySecretsExcluded": "Las contraseñas de pasarela y las contraseñas de clave no se incluyen en las exportaciones. Vuelve a introducirlas en Ajustes si la pasarela las requiere.",
+  "StatusImportCredentialLookupByHost": "{0} sesiones importadas buscarán su contraseña con el nombre de host hasta que abras y guardes cada una.",
+  "StatusImportCredentialLookupByHostOne": "{0} sesión importada buscará su contraseña con el nombre de host hasta que la abras y la guardes.",
   "ImportWarningNetworkPathCleared": "{0}: {1} apuntaba a un recurso compartido de red o a un dispositivo y se borró ({2}). Vuelve a introducirlo en el perfil si confías en esa ubicación.",
   "ImportWarningTrustFlagsReset": "{0}: se desactivó {1}. Vuelve a activarlos en el perfil si confías en su origen.",
   "StatusImportProfileGatewayOrphansAction": "Algunas sesiones importadas siguen haciendo referencia a pasarelas SSH que faltan. Vuelve a exportar desde una versión que incluya pasarelas, o vuelve a crear o reasignar la pasarela en Ajustes antes de conectar.",
@@ -2808,6 +2810,7 @@
   "ErrorCredentialProviderFailed": "Falló el proveedor de credenciales externo: {0}",
   "ErrorCredentialProviderTimeout": "El proveedor de credenciales externo no respondi\u00f3 en {1} ms para \"{0}\". Aumenta el tiempo de espera en Ajustes > Seguridad si tu almac\u00e9n pide confirmar cada solicitud.",
   "WarnCredentialProviderNoResult": "El proveedor de credenciales externo no devolvi\u00f3 ninguna contrase\u00f1a para \"{0}\": el comando fall\u00f3 o no mostr\u00f3 nada. Comprueba el nombre de la entrada del almac\u00e9n, el secreto de desbloqueo y el comando en Ajustes > Seguridad.",
+  "WarnCredentialProviderNoResultUnconfirmed": "{0} se importó: su contraseña se buscó con el nombre de host {1}. Abre la sesión y guárdala para que vuelva a buscarse con su nombre.",
 
   "ConnectionTypeVnc": "VNC",
   "ConnectionTypeWeb": "Web",

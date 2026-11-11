@@ -1469,6 +1469,8 @@
   "ImportCountOrphanReferences": "{0} orphan references",
   "ImportCountOrphanReferencesOne": "{0} orphan reference",
   "StatusImportProfileGatewaySecretsExcluded": "Gateway passwords and key passphrases are not included in exports. Re-enter them in Settings if the gateway requires them.",
+  "StatusImportCredentialLookupByHost": "{0} imported sessions will look up their password under their host name until you open and save each one.",
+  "StatusImportCredentialLookupByHostOne": "{0} imported session will look up its password under its host name until you open and save it.",
   "ImportWarningNetworkPathCleared": "{0}: {1} pointed at a network share or a device and was cleared ({2}). Re-enter it in the profile if you trust that location.",
   "ImportWarningTrustFlagsReset": "{0}: turned off {1}. Turn them back on in the profile if you trust its source.",
   "StatusImportProfileGatewayOrphansAction": "Some imported sessions still reference missing SSH gateways. Re-export from a build that includes gateways, or recreate/reassign the gateway in Settings before connecting.",
@@ -2808,6 +2810,7 @@
   "ErrorCredentialProviderFailed": "External credential provider failed: {0}",
   "ErrorCredentialProviderTimeout": "The external credential provider did not answer within {1} ms for \"{0}\". Raise the timeout in Settings > Security if your vault asks you to confirm each request.",
   "WarnCredentialProviderNoResult": "The external credential provider returned no password for \"{0}\": the command failed or printed nothing. Check the vault entry name, the unlock secret and the command in Settings > Security.",
+  "WarnCredentialProviderNoResultUnconfirmed": "{0} was imported: its password was looked up under the host name {1}. Open the session and save it to look it up under its name again.",
 
   "ConnectionTypeVnc": "VNC",
   "ConnectionTypeWeb": "Web",

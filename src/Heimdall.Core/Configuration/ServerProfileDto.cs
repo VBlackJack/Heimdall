@@ -434,6 +434,14 @@ public sealed class ServerProfileDto : IJsonOnDeserialized
     public bool ExecutionConfirmed { get; set; }
 
     /// <summary>
+    /// True when the user has vetted the names this profile looks a stored secret up by. An
+    /// imported profile controls both its names and its host, so until the user opens and saves
+    /// it, the external credential provider is asked under the host name only. Profiles stored
+    /// before this field, and files that omit it, read as true; the import boundary sets it false.
+    /// </summary>
+    public bool CredentialLookupConfirmed { get; set; } = true;
+
+    /// <summary>
     /// Returns the effective elevation mode: if <see cref="ElevationMode"/> is
     /// <see cref="Models.ElevationMode.None"/> but legacy <see cref="LocalShellElevated"/>
     /// is true, returns <see cref="Models.ElevationMode.Auto"/> for backward compatibility.

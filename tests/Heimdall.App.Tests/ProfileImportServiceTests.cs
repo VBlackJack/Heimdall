@@ -763,6 +763,104 @@ public sealed class ProfileImportServiceTests
         Assert.Equal("Conflict (Import\u00e9 2)", renamed.DisplayName);
     }
 
+    [Fact]
+    public async Task ImportFromPathAsync_Json_FileClaimingAConfirmedLookup_StillImportsUnconfirmed()
+    {
+        using var fixture = new ProfileImportFixture();
+        string path = await fixture.WriteTextAsync(
+            "crafted.json",
+            """
+            [
+              {
+                "id": "crafted-1",
+                "displayName": "prod-db",
+                "connectionType": "SSH",
+                "remoteServer": "elsewhere.example.com",
+                "sshPort": 22,
+                "CredentialLookupConfirmed": true
+              }
+            ]
+            """);
+
+        _ = await fixture.Service.ImportFromPathAsync(path, CancellationToken.None);
+
+        ServerProfileDto server = Assert.Single(await fixture.ConfigManager.LoadServersAsync());
+        Assert.False(server.CredentialLookupConfirmed);
+    }
+
+    [Fact]
+    public async Task ImportFromPathAsync_Rdp_ImportsUnconfirmed()
+    {
+        using var fixture = new ProfileImportFixture();
+        string path = await fixture.WriteTextAsync("Workstation.rdp", "full address:s:rdp.example.com");
+
+        _ = await fixture.Service.ImportFromPathAsync(path, CancellationToken.None);
+
+        Assert.False(Assert.Single(await fixture.ConfigManager.LoadServersAsync()).CredentialLookupConfirmed);
+    }
+
+    [Fact]
+    public async Task ImportFromPathAsync_Json_ProviderOn_SummaryTellsWhichSessionsLookUpByHost()
+    {
+        using var fixture = new ProfileImportFixture();
+        await fixture.ConfigManager.SaveSettingsAsync(new AppSettings { UseExternalCredentialProvider = true });
+        string path = await fixture.WriteTextAsync("lookup.json", TwoSessionsJson);
+
+        ProfileImportResult result = await fixture.Service.ImportFromPathAsync(path, CancellationToken.None);
+
+        Assert.Equal(1, result.HostLookupCount);
+        Assert.Contains(
+            "1 imported session will look up its password under its host name until you open and save it.",
+            result.UserMessage,
+            StringComparison.Ordinal);
+        Assert.DoesNotContain("1 imported sessions", result.UserMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ImportFromPathAsync_Json_ProviderOn_SummaryUsesThePluralForSeveralSessions()
+    {
+        using var fixture = new ProfileImportFixture();
+        await fixture.ConfigManager.SaveSettingsAsync(new AppSettings { UseExternalCredentialProvider = true });
+        string path = await fixture.WriteTextAsync(
+            "lookup-two.json",
+            """
+            [
+              { "id": "a", "displayName": "prod-db", "connectionType": "SSH", "remoteServer": "one.example.com", "sshPort": 22 },
+              { "id": "b", "displayName": "prod-web", "connectionType": "SSH", "remoteServer": "two.example.com", "sshPort": 22 }
+            ]
+            """);
+
+        ProfileImportResult result = await fixture.Service.ImportFromPathAsync(path, CancellationToken.None);
+
+        Assert.Equal(2, result.HostLookupCount);
+        Assert.Contains(
+            "2 imported sessions will look up their password under their host name until you open and save each one.",
+            result.UserMessage,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ImportFromPathAsync_Json_ProviderOff_SummaryHasNoHostLookupLine()
+    {
+        using var fixture = new ProfileImportFixture();
+        await fixture.ConfigManager.SaveSettingsAsync(new AppSettings { UseExternalCredentialProvider = false });
+        string path = await fixture.WriteTextAsync("lookup.json", TwoSessionsJson);
+
+        ProfileImportResult result = await fixture.Service.ImportFromPathAsync(path, CancellationToken.None);
+
+        Assert.Equal(0, result.HostLookupCount);
+        Assert.DoesNotContain("look up their password", result.UserMessage, StringComparison.Ordinal);
+    }
+
+    // One session named after another machine than its host, one named after its own host.
+    private const string TwoSessionsJson =
+        """
+        [
+          { "id": "a", "displayName": "prod-db", "connectionType": "SSH", "remoteServer": "elsewhere.example.com", "sshPort": 22 },
+          { "id": "b", "displayName": "same.example.com", "connectionType": "SSH", "remoteServer": "same.example.com", "sshPort": 22 }
+        ]
+        """;
+
     private sealed class ProfileImportFixture : IDisposable
     {
         public string RootPath { get; } = Path.Combine(Path.GetTempPath(), "heimdall-profile-import-tests", Guid.NewGuid().ToString("N"));

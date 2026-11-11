@@ -227,6 +227,39 @@ public sealed class ServerListExternalCredentialWiringTests : IDisposable
     }
 
     [Fact]
+    public async Task ResolveCredentials_UnconfirmedProfile_LooksTheVaultUpByHost()
+    {
+        var provider = new StubCredentialProvider { Result = new CredentialResult("", "s3cr3t") };
+        await using var fixture = await Fixture.CreateAsync(new FakeCredentialProviderFactory(provider));
+        var dto = CreateSshServer(passwordEncrypted: null);
+        dto.VaultEntryName = "prod-db";
+        dto.CredentialLookupConfirmed = false;
+
+        await fixture.ViewModel.TryResolveExternalCredentialsAsync(
+            dto, EnabledSettings(), CancellationToken.None, skipOnFailure: false);
+
+        Assert.Equal("ssh.example.com", provider.LastTitle);
+    }
+
+    [Fact]
+    public async Task ResolveCredentials_UnconfirmedProfile_NoResult_SaysTheLookupWasByHost()
+    {
+        var provider = new StubCredentialProvider { Result = null };
+        await using var fixture = await Fixture.CreateAsync(new FakeCredentialProviderFactory(provider));
+        var dto = CreateSshServer(passwordEncrypted: null);
+        dto.CredentialLookupConfirmed = false;
+        var statuses = new List<string>();
+
+        await fixture.ViewModel.TryResolveExternalCredentialsAsync(
+            dto, EnabledSettings(), CancellationToken.None, skipOnFailure: true, reportQuietly: statuses.Add);
+
+        string expected = fixture.Localizer.Format(
+            "WarnCredentialProviderNoResultUnconfirmed", "SSH Box", "ssh.example.com");
+        Assert.NotEqual("WarnCredentialProviderNoResultUnconfirmed", expected);
+        Assert.Equal(expected, Assert.Single(statuses));
+    }
+
+    [Fact]
     public async Task ResolveCredentials_ProviderTimesOut_NoSkip_ShowsTheTimeoutNotACancellation()
     {
         // A vault timeout used to arrive as an OperationCanceledException: the connect ended

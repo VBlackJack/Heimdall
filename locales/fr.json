@@ -1469,6 +1469,8 @@
   "ImportCountOrphanReferences": "{0} r\u00e9f\u00e9rences orphelines",
   "ImportCountOrphanReferencesOne": "{0} r\u00e9f\u00e9rence orpheline",
   "StatusImportProfileGatewaySecretsExcluded": "Les mots de passe et passphrases de passerelles ne sont pas inclus dans les exports. Ressaisis-les dans les Param\u00e8tres si la passerelle en a besoin.",
+  "StatusImportCredentialLookupByHost": "{0} sessions import\u00e9es chercheront leur mot de passe sous leur nom d'h\u00f4te tant que vous ne les aurez pas ouvertes et enregistr\u00e9es une par une.",
+  "StatusImportCredentialLookupByHostOne": "{0} session import\u00e9e cherchera son mot de passe sous son nom d'h\u00f4te tant que vous ne l'aurez pas ouverte et enregistr\u00e9e.",
   "ImportWarningNetworkPathCleared": "{0} : {1} d\u00e9signait un partage r\u00e9seau ou un p\u00e9riph\u00e9rique et a \u00e9t\u00e9 effac\u00e9 ({2}). Ressaisissez-le dans le profil si vous faites confiance \u00e0 cet emplacement.",
   "ImportWarningTrustFlagsReset": "{0} : d\u00e9sactiv\u00e9 {1}. R\u00e9activez-les dans le profil si vous faites confiance \u00e0 sa source.",
   "StatusImportProfileGatewayOrphansAction": "Certaines sessions import\u00e9es r\u00e9f\u00e9rencent encore des passerelles SSH manquantes. R\u00e9exportez depuis un build qui embarque les passerelles, ou recr\u00e9ez/r\u00e9assignez la passerelle dans les Param\u00e8tres avant de vous connecter.",
@@ -2805,6 +2807,7 @@
   "ErrorCredentialProviderFailed": "\u00c9chec du fournisseur d'identifiants externe : {0}",
   "ErrorCredentialProviderTimeout": "Le fournisseur d'identifiants externe n'a pas r\u00e9pondu en {1} ms pour \"{0}\". Augmentez le d\u00e9lai dans Param\u00e8tres > S\u00e9curit\u00e9 si votre coffre demande de confirmer chaque requ\u00eate.",
   "WarnCredentialProviderNoResult": "Le fournisseur d'identifiants externe n'a retourn\u00e9 aucun mot de passe pour \"{0}\" : la commande a \u00e9chou\u00e9 ou n'a rien affich\u00e9. V\u00e9rifiez le nom de l'entr\u00e9e du coffre, le secret de d\u00e9verrouillage et la commande dans Param\u00e8tres > S\u00e9curit\u00e9.",
+  "WarnCredentialProviderNoResultUnconfirmed": "{0} a \u00e9t\u00e9 import\u00e9e : son mot de passe a \u00e9t\u00e9 cherch\u00e9 sous le nom d'h\u00f4te {1}. Ouvrez la session et enregistrez-la pour qu'il soit \u00e0 nouveau cherch\u00e9 sous son nom.",
 
   "ConnectionTypeVnc": "VNC",
   "ConnectionTypeWeb": "Web",
