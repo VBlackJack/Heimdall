@@ -54,12 +54,26 @@ public static class PrivilegedFileCommands
     public const int ToolingUnavailableExitStatus = 77;
 
     /// <summary>
-    /// Exit status of the streaming sudo line when the supplied password was refused before the
-    /// writer started. Nothing was read from the payload and the target is untouched. Distinct from
-    /// 73 to 78, which the writer and the probe use. Kept in step with the literal built into the
-    /// line; a test pins the two.
+    /// Exit status of the user-side stage of a privileged write when the content could not be
+    /// staged in the server's temporary directory (no space, no directory, no <c>mktemp</c>).
+    /// Nothing privileged ran and the target is untouched. Kept in step with the literal the
+    /// outer script exits with; a test pins the two.
     /// </summary>
-    public const int SudoAuthenticationFailedExitStatus = 79;
+    public const int StagingFailedExitStatus = 74;
+
+    /// <summary>
+    /// The first line the root-side installer writes to standard error. Its presence means sudo
+    /// accepted the call and the installer started, so every status then belongs to the installer;
+    /// its absence means the failure came from the user-side stage or from sudo itself.
+    /// </summary>
+    public const string InstallStartedMarker = "HEIMDALL-INSTALL-STARTED";
+
+    /// <summary>The exit status a shell gives a command it could not find.</summary>
+    public const int CommandNotFoundExitStatus = 127;
+
+    private const string PasswordMode = "password";
+    private const string NoPasswordMode = "none";
+    private const string BangPlaceholder = "^";
 
     /// <summary>
     /// The scripts below are written for GNU coreutils (<c>stat -c</c>, <c>cp --attributes-only</c>,
@@ -189,24 +203,105 @@ public static class PrivilegedFileCommands
         return $"sudo -n {privilegedBody}";
     }
 
-    internal static string BuildPasswordStreamingSudoInvocation(string privilegedBody)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(privilegedBody);
-        // The first statement takes the password line off standard input, so what follows it is the
-        // payload alone and no sudo can mistake a payload line for a password. The password is
-        // checked through a pipe that carries only itself; the command that writes is
-        // non-interactive and can never prompt. Not exec'd, so every sudo here has the same parent
-        // process: with no terminal, the sudo timestamp that the check leaves is keyed to it.
-        return $"IFS= read -r {PasswordVariable}; "
-            + "if sudo -n -v 2>/dev/null; "
-            + $"then unset {PasswordVariable}; "
-            + $"else printf '%s\\n' \"${PasswordVariable}\" | sudo -S -p '' -v "
-            + $"|| {{ unset {PasswordVariable}; exit {SudoAuthenticationFailedExitStatus}; }}; "
-            + $"unset {PasswordVariable}; fi; "
-            + $"sudo -n {privilegedBody}";
-    }
+    /// <summary>
+    /// The script the connecting user runs, as a constant. Its positional parameters are the
+    /// installer script (<c>$1</c>), the mode (<c>$2</c>), the replace flag (<c>$3</c>), the
+    /// target (<c>$4</c>) and the number of bytes the content must have (<c>$5</c>).
+    /// </summary>
+    /// <remarks>
+    /// The content is first staged in a private directory of the connecting user, so no sudo ever
+    /// shares standard input with the payload: sudo's input is the single password line and then
+    /// its end, a wrong password meets the end after one attempt, and the password can neither be
+    /// written to the file nor taken from it. The install is first tried without any password and
+    /// with no input: when sudo needs none, the password never reaches sudo's input. Only when the
+    /// installer did not start is the password offered, once. A staged file that is not exactly the
+    /// expected size is refused before any sudo, so a truncated read is never installed. The script
+    /// holds no <c>!</c> (history expansion in some login shells) and no newline. The staged
+    /// directory is removed by this script's own trap, never by the root-side installer.
+    /// </remarks>
+    internal const string StagedWriteOuterScript =
+        "umask 077; LC_ALL=C; export LC_ALL; "
+        + "inner=$(printf '%s' \"$1\" | tr '^' '\\041') || exit 74; "
+        + "mode=$2; replace=$3; target=$4; size=$5; p=; "
+        + "if [ \"$mode\" = password ]; then IFS= read -r p; fi; "
+        + "d=$(mktemp -d \"${TMPDIR:-/tmp}/.heimdall-stage.XXXXXXXXXX\") || exit 74; "
+        + "trap 'rm -rf -- \"$d\"' EXIT; trap 'exit 129' HUP INT TERM; "
+        + "cat > \"$d/f\" || exit 74; "
+        + "[ $(wc -c < \"$d/f\") -eq \"$size\" ] || exit 74; "
+        + "uid=$(id -u) || exit 74; "
+        + "sudo -n sh -c \"$inner\" sh \"$replace\" \"$target\" \"$d/f\" \"$uid\" "
+        + "</dev/null 2> \"$d/e\"; rc=$?; "
+        + "case \"$(cat \"$d/e\")\" in *" + InstallStartedMarker + "*) "
+        + "cat \"$d/e\" >&2; p=; unset p; exit $rc ;; esac; "
+        + "if [ \"$mode\" = password ]; then "
+        + "printf '%s\\n' \"$p\" | sudo -S -p '' sh -c \"$inner\" sh \"$replace\" \"$target\" \"$d/f\" \"$uid\"; rc=$?; "
+        + "else cat \"$d/e\" >&2; fi; "
+        + "p=; unset p; exit $rc";
 
-    private const string PasswordVariable = "_heimdall_password";
+    /// <summary>
+    /// The script root runs: it announces itself, checks the staged file on the descriptor it
+    /// opened, then runs the atomic writer unchanged with that descriptor as standard input.
+    /// Positional parameters: replace flag, target, staged file, the caller's uid.
+    /// </summary>
+    /// <remarks>
+    /// The checks use GNU <c>stat</c> and <c>/proc/self/fd</c>, the same platform the writer and the
+    /// no-follow read already assume. A check that cannot be performed refuses with 73 rather than
+    /// proceed.
+    /// </remarks>
+    internal const string StagedInstallScript =
+        "printf '%s\\n' '" + InstallStartedMarker + "' >&2; "
+        + "replace=$1; target=$2; staged=$3; uid=$4; "
+        + ToolingProbe
+        + "case \"$staged\" in */*) ;; *) "
+        + "printf '%s\\n' 'Refusing: the staged file has no directory.' >&2; exit 73;; esac; "
+        + "sd=${staged%/*}; "
+        + "if [ -L \"$staged\" ] || [ -L \"$sd\" ]; then "
+        + "printf '%s\\n' 'Refusing symbolic-link staged file.' >&2; exit 73; fi; "
+        + "dinfo=$(stat -c '%u %a' -- \"$sd\" 2>/dev/null) || dinfo=; "
+        + "set -- $dinfo; du=$1; dm=$2; "
+        + "if [ -n \"$dm\" ] && [ \"$du\" = \"$uid\" ] && [ $((0$dm & 022)) -eq 0 ]; then :; else "
+        + "printf '%s\\n' 'Refusing: the staging directory is not private to the caller.' >&2; exit 73; fi; "
+        + "exec 3< \"$staged\"; "
+        + "info=$(stat -Lc %u:%h /proc/self/fd/3 2>/dev/null) || info=; "
+        + "if [ -f /proc/self/fd/3 ] && [ \"$info\" = \"$uid:1\" ]; then :; else "
+        + "printf '%s\\n' 'Refusing: the staged file is not a regular single-link file of the caller, or could not be checked.' >&2; "
+        + "exit 73; fi; "
+        + "exec 0<&3 3<&-; set -- \"$target\"; "
+        + AtomicWriteScript;
+
+    /// <summary>
+    /// Builds the one simple command that stages the content as the connecting user and installs it
+    /// with sudo. Every variable value is a quoted positional parameter.
+    /// </summary>
+    internal static string BuildStagedWriteCommand(
+        string targetRemotePath,
+        bool overwrite,
+        bool passwordMode,
+        long expectedBytes)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(targetRemotePath);
+        ArgumentOutOfRangeException.ThrowIfNegative(expectedBytes);
+
+        // The installer holds "!" (tests and comparisons), which a history-expanding login shell
+        // would act on even inside quotes. It travels as a placeholder the outer script restores.
+        string installer = StagedInstallScript.Replace("!", BangPlaceholder, StringComparison.Ordinal);
+
+        // A "!" in a file name is escaped the way every such shell reads it: outside the quotes.
+        string target = PathEscaper.EscapeForShell(targetRemotePath)
+            .Replace("!", "'\\!'", StringComparison.Ordinal);
+
+        return string.Join(
+            ' ',
+            "sh",
+            "-c",
+            PathEscaper.EscapeForShell(StagedWriteOuterScript),
+            "sh",
+            PathEscaper.EscapeForShell(installer),
+            PathEscaper.EscapeForShell(passwordMode ? PasswordMode : NoPasswordMode),
+            PathEscaper.EscapeForShell(overwrite ? "1" : "0"),
+            target,
+            PathEscaper.EscapeForShell(expectedBytes.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+    }
 
     private static string BuildShellBody(string script, string remotePath)
     {
@@ -315,48 +410,70 @@ public static class PrivilegedFileTransfer
     }
 
     /// <summary>
-    /// Streams file content to a privileged atomic writer. A password prefix is consumed by an
-    /// authentication prelude before the writer starts, so only payload bytes reach the writer.
+    /// Writes <paramref name="content"/> to <paramref name="targetRemotePath"/> as root. The content
+    /// is first staged in a private directory of the connecting user, then installed by one sudo
+    /// call that shares no input with the payload, so a password can never reach the file and a
+    /// payload line can never be read as a password.
     /// </summary>
     public static async Task<PrivilegedCommandResult> ExecuteAtomicWriteAsync(
         SshClient client,
-        string privilegedBody,
+        string targetRemotePath,
+        bool overwrite,
         Stream content,
         string? sudoPassword,
         CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(client);
-        ArgumentException.ThrowIfNullOrWhiteSpace(privilegedBody);
+        ArgumentException.ThrowIfNullOrWhiteSpace(targetRemotePath);
         ArgumentNullException.ThrowIfNull(content);
         if (!content.CanRead)
         {
             throw new ArgumentException("The content stream must be readable.", nameof(content));
         }
 
-        // The payload sets how long a legitimate write takes, so it sets the bound too. A stream
-        // whose length cannot be read gets the control bound: no caller passes one today.
-        TimeSpan commandTimeout = TransferCommandTimeout(
-            content.CanSeek ? Math.Max(0, content.Length - content.Position) : null);
-
-        string commandText;
-        if (string.IsNullOrEmpty(sudoPassword))
+        // The remote side refuses a staged file of any other size, so a read that stops early can
+        // never be installed. That needs the length up front: a stream that cannot report it is
+        // refused rather than buffered. Both callers pass a file stream.
+        if (!content.CanSeek)
         {
-            commandText = PrivilegedFileCommands.BuildNonInteractiveSudoInvocation(privilegedBody);
+            throw new ArgumentException("The content stream must report its length.", nameof(content));
+        }
+
+        long expectedBytes = Math.Max(0, content.Length - content.Position);
+
+        // The payload sets how long a legitimate write takes, so it sets the bound too.
+        TimeSpan commandTimeout = TransferCommandTimeout(expectedBytes);
+
+        bool passwordMode = !string.IsNullOrEmpty(sudoPassword);
+        string commandText = PrivilegedFileCommands.BuildStagedWriteCommand(
+            targetRemotePath,
+            overwrite,
+            passwordMode,
+            expectedBytes);
+        if (!passwordMode)
+        {
             return await ExecuteWithInputAsync(
                     client,
                     commandText,
                     content,
                     ReadOnlyMemory<byte>.Empty,
                     commandTimeout,
-                    ct)
+                    ct,
+                    remoteMayExplainWriteFailure: true)
                 .ConfigureAwait(false);
         }
 
-        commandText = PrivilegedFileCommands.BuildPasswordStreamingSudoInvocation(privilegedBody);
-        byte[] passwordBytes = EncodePasswordLine(sudoPassword);
+        byte[] passwordBytes = EncodePasswordLine(sudoPassword!);
         try
         {
-            return await ExecuteWithInputAsync(client, commandText, content, passwordBytes, commandTimeout, ct)
+            return await ExecuteWithInputAsync(
+                    client,
+                    commandText,
+                    content,
+                    passwordBytes,
+                    commandTimeout,
+                    ct,
+                    remoteMayExplainWriteFailure: true)
                 .ConfigureAwait(false);
         }
         finally
@@ -365,13 +482,139 @@ public static class PrivilegedFileTransfer
         }
     }
 
+    /// <summary>
+    /// Names what a failed privileged write failed at, from its exit status and standard error.
+    /// </summary>
+    public static PrivilegedWriteFailureKind ClassifyWrite(PrivilegedCommandResult result)
+    {
+        return ClassifyWrite(result.ExitStatus, result.Error);
+    }
+
+    internal static PrivilegedWriteFailureKind ClassifyWrite(int exitStatus, string? stderr)
+    {
+        if (exitStatus == 0)
+        {
+            return PrivilegedWriteFailureKind.None;
+        }
+
+        // The installer's own start line decides first: whatever it exits with is its own status.
+        string error = stderr ?? string.Empty;
+        if (error.Contains(PrivilegedFileCommands.InstallStartedMarker, StringComparison.Ordinal))
+        {
+            return PrivilegedWriteFailureKind.InstallFailed;
+        }
+
+        if (exitStatus == PrivilegedFileCommands.StagingFailedExitStatus)
+        {
+            return PrivilegedWriteFailureKind.StagingFailed;
+        }
+
+        if (exitStatus == PrivilegedFileCommands.CommandNotFoundExitStatus)
+        {
+            return PrivilegedWriteFailureKind.SudoMissing;
+        }
+
+        if (ContainsAny(error, NotPermittedMessages))
+        {
+            return PrivilegedWriteFailureKind.NotPermitted;
+        }
+
+        if (ContainsAny(error, PasswordRejectedMessages))
+        {
+            return PrivilegedWriteFailureKind.PasswordRejected;
+        }
+
+        if (ContainsAny(error, PasswordUnavailableMessages))
+        {
+            return PrivilegedWriteFailureKind.PasswordUnavailable;
+        }
+
+        return PrivilegedWriteFailureKind.SudoFailed;
+    }
+
+    /// <summary>
+    /// Standard error without the installer's start line, fit to show or log.
+    /// </summary>
+    public static string CleanWriteError(string? stderr)
+    {
+        if (string.IsNullOrEmpty(stderr))
+        {
+            return string.Empty;
+        }
+
+        return stderr
+            .Replace(PrivilegedFileCommands.InstallStartedMarker, string.Empty, StringComparison.Ordinal)
+            .Trim();
+    }
+
+    /// <summary>
+    /// Throws for a failure of the stages before the installer ran: staging, sudo's own refusal,
+    /// a missing sudo. A failure of the installer itself, or success, returns so the caller applies
+    /// the installer's own statuses.
+    /// </summary>
+    /// <exception cref="PrivilegedWriteFailedException">A named stage failure.</exception>
+    /// <exception cref="InvalidOperationException">An unnamed sudo stage failure.</exception>
+    public static void EnsureStageSucceeded(PrivilegedCommandResult result)
+    {
+        PrivilegedWriteFailureKind kind = ClassifyWrite(result);
+        string error = CleanWriteError(result.Error);
+        switch (kind)
+        {
+            case PrivilegedWriteFailureKind.None:
+            case PrivilegedWriteFailureKind.InstallFailed:
+                return;
+            case PrivilegedWriteFailureKind.SudoFailed:
+                throw new InvalidOperationException(
+                    $"sudo atomic write failed (exit {result.ExitStatus}): {error}");
+            default:
+                throw new PrivilegedWriteFailedException(kind, error);
+        }
+    }
+
+    private static readonly string[] PasswordRejectedMessages =
+    [
+        "incorrect password attempt",
+        "sorry, try again",
+        "no password was provided",
+    ];
+
+    private static readonly string[] PasswordUnavailableMessages =
+    [
+        "a terminal is required",
+        "no tty present",
+        "no askpass",
+        "a password is required",
+        "you must have a tty",
+    ];
+
+    private static readonly string[] NotPermittedMessages =
+    [
+        "not in the sudoers",
+        "may not run sudo",
+        "is not allowed to execute",
+        "is not allowed to run sudo",
+    ];
+
+    private static bool ContainsAny(string text, string[] needles)
+    {
+        foreach (string needle in needles)
+        {
+            if (text.Contains(needle, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private static async Task<PrivilegedCommandResult> ExecuteWithPasswordAsync(
         SshClient client,
         string commandText,
         string password,
         CancellationToken ct)
     {
-        byte[] passwordBytes = Encoding.UTF8.GetBytes(password + "\n");
+        byte[] passwordBytes = EncodePasswordLine(password);
         try
         {
             using var emptyInput = new MemoryStream();
@@ -422,8 +665,40 @@ public static class PrivilegedFileTransfer
             await commandInput.WriteAsync(prefix, ct).ConfigureAwait(false);
         }
 
-        await payload.CopyToAsync(commandInput, ct).ConfigureAwait(false);
+        byte[] buffer = new byte[CopyBufferBytes];
+        while (true)
+        {
+            int read;
+            try
+            {
+                read = await payload.ReadAsync(buffer, ct).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // Told apart from a failed write: the remote side then refuses the short file, and
+                // its status must not be allowed to hide that the local read is what failed.
+                throw new LocalPayloadReadException(ex);
+            }
+
+            if (read == 0)
+            {
+                break;
+            }
+
+            await commandInput.WriteAsync(buffer.AsMemory(0, read), ct).ConfigureAwait(false);
+        }
+
         await commandInput.FlushAsync(ct).ConfigureAwait(false);
+    }
+
+    private const int CopyBufferBytes = 81920;
+
+    private sealed class LocalPayloadReadException(Exception inner) : IOException(inner.Message, inner);
+
+    private static void Rethrow(Exception failure)
+    {
+        Exception original = failure is LocalPayloadReadException { InnerException: { } inner } ? inner : failure;
+        System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(original).Throw();
     }
 
     /// <summary>
@@ -447,18 +722,31 @@ public static class PrivilegedFileTransfer
     }
 
     /// <summary>
-    /// Raises a deferred write failure unless the remote side exited because it refused the
-    /// password, in which case the exit status is the real answer and the caller reads it.
+    /// Raises a deferred local write failure unless the remote command ended in one of the stages
+    /// before the installer (staging, sudo), whose status and message explain it better than a
+    /// closed channel does. After the installer started, or on success, the write failure stands.
     /// </summary>
-    internal static void RethrowUnlessPasswordRefused(Exception? writeFailure, int? exitStatus)
+    internal static void RethrowUnlessStageFailed(Exception? writeFailure, int exitStatus, string? stderr)
     {
-        if (writeFailure is null
-            || exitStatus == PrivilegedFileCommands.SudoAuthenticationFailedExitStatus)
+        if (writeFailure is null)
         {
             return;
         }
 
-        System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(writeFailure).Throw();
+        // A failed local read is the cause whatever the remote side then says about the short
+        // file, and no exit status read means nothing explains the write failure.
+        if (writeFailure is LocalPayloadReadException || exitStatus < 0)
+        {
+            Rethrow(writeFailure);
+        }
+
+        PrivilegedWriteFailureKind kind = ClassifyWrite(exitStatus, stderr);
+        if (kind is not (PrivilegedWriteFailureKind.None or PrivilegedWriteFailureKind.InstallFailed))
+        {
+            return;
+        }
+
+        Rethrow(writeFailure);
     }
 
     private static async Task<PrivilegedCommandResult> ExecuteWithInputAsync(
@@ -467,7 +755,8 @@ public static class PrivilegedFileTransfer
         Stream input,
         ReadOnlyMemory<byte> prefix,
         TimeSpan commandTimeout,
-        CancellationToken ct)
+        CancellationToken ct,
+        bool remoteMayExplainWriteFailure = false)
     {
         using SshCommand command = client.CreateCommand(commandText);
         command.CommandTimeout = commandTimeout;
@@ -489,7 +778,15 @@ public static class PrivilegedFileTransfer
             }
 
             await executeTask.ConfigureAwait(false);
-            RethrowUnlessPasswordRefused(writeFailure, command.ExitStatus);
+            if (remoteMayExplainWriteFailure)
+            {
+                RethrowUnlessStageFailed(writeFailure, command.ExitStatus ?? -1, command.Error);
+            }
+            else if (writeFailure is not null)
+            {
+                Rethrow(writeFailure);
+            }
+
             return new PrivilegedCommandResult(
                 command.ExitStatus ?? -1,
                 command.Result ?? string.Empty,
@@ -512,4 +809,55 @@ public static class PrivilegedFileTransfer
             throw;
         }
     }
+}
+
+/// <summary>
+/// What a failed privileged write failed at.
+/// </summary>
+public enum PrivilegedWriteFailureKind
+{
+    /// <summary>The write succeeded.</summary>
+    None,
+
+    /// <summary>The content could not be staged in the server's temporary directory.</summary>
+    StagingFailed,
+
+    /// <summary>sudo refused the password.</summary>
+    PasswordRejected,
+
+    /// <summary>sudo needs a password or a terminal it was not given.</summary>
+    PasswordUnavailable,
+
+    /// <summary>The account is not allowed to use sudo.</summary>
+    NotPermitted,
+
+    /// <summary>The server has no sudo to run.</summary>
+    SudoMissing,
+
+    /// <summary>The stage failed in a way none of the named kinds recognise.</summary>
+    SudoFailed,
+
+    /// <summary>The installer started; its own exit statuses apply.</summary>
+    InstallFailed,
+}
+
+/// <summary>
+/// A privileged write failed before the installer ran, at a stage the caller can name.
+/// </summary>
+public sealed class PrivilegedWriteFailedException : InvalidOperationException
+{
+    public PrivilegedWriteFailedException(PrivilegedWriteFailureKind kind, string remoteError)
+        : base(string.IsNullOrWhiteSpace(remoteError)
+            ? $"The privileged write failed: {kind}."
+            : remoteError)
+    {
+        Kind = kind;
+        RemoteError = remoteError ?? string.Empty;
+    }
+
+    /// <summary>The stage that failed.</summary>
+    public PrivilegedWriteFailureKind Kind { get; }
+
+    /// <summary>What the remote side wrote on standard error, without the installer's start line.</summary>
+    public string RemoteError { get; }
 }

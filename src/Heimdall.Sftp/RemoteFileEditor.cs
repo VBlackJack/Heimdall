@@ -652,7 +652,7 @@ public sealed class RemoteFileEditor : IDisposable
     /// </remarks>
     internal static bool IsDeterministicRefusal(Exception ex)
         => ex is SftpMetadataPreservationException
-            or SudoPasswordRejectedException
+            or PrivilegedWriteFailedException { Kind: not PrivilegedWriteFailureKind.StagingFailed }
             or RemoteUploadTargetUnsupportedException
             or Renci.SshNet.Common.SftpPermissionDeniedException;
 
@@ -756,10 +756,10 @@ public sealed class RemoteFileEditor : IDisposable
                 FileShare.Read,
                 bufferSize: 81920,
                 FileOptions.Asynchronous | FileOptions.SequentialScan);
-            string writeBody = PrivilegedFileCommands.BuildAtomicWriteBody(session.RemotePath);
             PrivilegedCommandResult result = await PrivilegedFileTransfer.ExecuteAtomicWriteAsync(
                     sshClient,
-                    writeBody,
+                    session.RemotePath,
+                    overwrite: true,
                     fileStream,
                     session.SshParams.Password,
                     ct)
@@ -775,8 +775,9 @@ public sealed class RemoteFileEditor : IDisposable
     }
 
     /// <summary>
-    /// Turns a failed privileged write into its exception. A refused password is its own type so
-    /// the caller can say so, instead of reporting a generic failed write.
+    /// Turns a failed privileged write into its exception. A failure of the stages before the
+    /// installer (staging, a refused or missing sudo) is named by its kind so the caller can say
+    /// what happened; a failure of the installer itself stays a generic failed write.
     /// </summary>
     internal static void EnsureSudoWriteSucceeded(PrivilegedCommandResult result)
     {
@@ -785,13 +786,11 @@ public sealed class RemoteFileEditor : IDisposable
             return;
         }
 
-        if (result.ExitStatus == PrivilegedFileCommands.SudoAuthenticationFailedExitStatus)
-        {
-            throw new SudoPasswordRejectedException(result.Error);
-        }
+        PrivilegedFileTransfer.EnsureStageSucceeded(result);
 
         throw new InvalidOperationException(
-            $"sudo atomic write failed (exit {result.ExitStatus}): {result.Error}");
+            $"sudo atomic write failed (exit {result.ExitStatus}): "
+            + PrivilegedFileTransfer.CleanWriteError(result.Error));
     }
 
     private static void DrainSession(EditSession session)
@@ -916,20 +915,6 @@ public sealed record RemoteEditorSudoSaveCompleted(
     string RemotePath,
     string LocalPath,
     bool Success);
-
-/// <summary>
-/// Indicates that the sudo password was refused before the privileged write started, so the
-/// target is untouched and sending the same password again cannot succeed.
-/// </summary>
-public sealed class SudoPasswordRejectedException : InvalidOperationException
-{
-    public SudoPasswordRejectedException(string? remoteError)
-        : base(string.IsNullOrWhiteSpace(remoteError)
-            ? "The sudo password was rejected."
-            : remoteError)
-    {
-    }
-}
 
 /// <summary>
 /// Indicates that a privileged edit was refused because the remote file is too large to buffer safely.

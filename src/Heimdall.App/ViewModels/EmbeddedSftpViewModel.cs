@@ -1157,9 +1157,17 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             return GetSudoAuthenticationErrorMessage(sudoException.Kind);
         }
 
-        if (ex is SudoPasswordRejectedException)
+        if (ex is PrivilegedWriteFailedException writeFailure)
         {
-            return GetSudoAuthenticationErrorMessage(SudoFailureKind.PasswordRejected);
+            return writeFailure.Kind switch
+            {
+                PrivilegedWriteFailureKind.PasswordRejected => GetSudoAuthenticationErrorMessage(SudoFailureKind.PasswordRejected),
+                PrivilegedWriteFailureKind.PasswordUnavailable => GetSudoAuthenticationErrorMessage(SudoFailureKind.PasswordUnavailable),
+                PrivilegedWriteFailureKind.NotPermitted => L10n("ErrorSudoNotPermitted"),
+                PrivilegedWriteFailureKind.SudoMissing => L10n("ErrorSudoMissing"),
+                PrivilegedWriteFailureKind.StagingFailed => L10n("SftpErrorSudoStagingFailed"),
+                _ => L10n("ErrorSudoAuthenticationFailed"),
+            };
         }
 
         if (ex is SudoToolingUnavailableException)
@@ -2470,22 +2478,23 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                         FileShare.Read,
                         bufferSize: 81920,
                         FileOptions.Asynchronous | FileOptions.SequentialScan);
-                    string writeBody = SudoUploadCommands.Build(remotePath, overwrite);
                     PrivilegedCommandResult result = await PrivilegedFileTransfer.ExecuteAtomicWriteAsync(
                             ssh,
-                            writeBody,
+                            remotePath,
+                            overwrite,
                             content,
                             _sshParams?.Password,
                             ct)
                         .ConfigureAwait(false);
 
+                    ThrowIfWriteStageFailed(result);
                     if (!overwrite && result.ExitStatus == PrivilegedFileCommands.DestinationExistsExitStatus)
                     {
                         throw new RemoteDestinationExistsException(remotePath);
                     }
                     EnsureSudoSucceeded(
                         result.ExitStatus,
-                        result.Error,
+                        PrivilegedFileTransfer.CleanWriteError(result.Error),
                         "atomic write");
                 },
                 () => new FileInfo(localPath).Length,
@@ -2494,6 +2503,26 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         finally
         {
             SafeDisconnect(ssh);
+        }
+    }
+
+    /// <summary>
+    /// Raises the error for a privileged write that failed before the installer ran: a refused or
+    /// unavailable password keeps the authentication error, the other stages keep their own kind.
+    /// </summary>
+    internal static void ThrowIfWriteStageFailed(PrivilegedCommandResult result)
+    {
+        try
+        {
+            PrivilegedFileTransfer.EnsureStageSucceeded(result);
+        }
+        catch (PrivilegedWriteFailedException ex) when (ex.Kind == PrivilegedWriteFailureKind.PasswordRejected)
+        {
+            throw new SudoAuthenticationException(SudoFailureKind.PasswordRejected, ex.RemoteError, ex);
+        }
+        catch (PrivilegedWriteFailedException ex) when (ex.Kind == PrivilegedWriteFailureKind.PasswordUnavailable)
+        {
+            throw new SudoAuthenticationException(SudoFailureKind.PasswordUnavailable, ex.RemoteError, ex);
         }
     }
 
@@ -2516,14 +2545,6 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         }
 
         string error = stderr ?? string.Empty;
-
-        // The streaming line refused the password before it read any of the payload. Its own
-        // status, so the wrong-password message does not hang on sudo's wording or locale.
-        if (exitStatus == PrivilegedFileCommands.SudoAuthenticationFailedExitStatus)
-        {
-            throw new SudoAuthenticationException(SudoFailureKind.PasswordRejected, error);
-        }
-
         SudoFailureKind failureKind = ClassifySudoStderr(error);
         if (failureKind is SudoFailureKind.PasswordUnavailable or SudoFailureKind.PasswordRejected)
         {

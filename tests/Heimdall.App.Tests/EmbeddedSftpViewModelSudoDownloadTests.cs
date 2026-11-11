@@ -44,18 +44,6 @@ public sealed class EmbeddedSftpViewModelSudoDownloadTests
     }
 
     [Fact]
-    public void EnsureSudoSucceeded_StreamingLineAuthenticationExit_IsAWrongPasswordError()
-    {
-        SudoAuthenticationException error = Assert.Throws<SudoAuthenticationException>(
-            () => EmbeddedSftpViewModel.EnsureSudoSucceeded(
-                Heimdall.Sftp.PrivilegedFileCommands.SudoAuthenticationFailedExitStatus,
-                string.Empty,
-                "atomic write"));
-
-        Assert.Equal(SudoFailureKind.PasswordRejected, error.Kind);
-    }
-
-    [Fact]
     public void EnsureSudoSucceeded_OtherExitWithoutSudoMessage_StaysAGenericFailure()
     {
         Assert.Throws<InvalidOperationException>(
