@@ -749,6 +749,47 @@ public sealed class CitrixHandlerTests
         Assert.DoesNotContain("store-01@@SecretApp", warning, StringComparison.Ordinal);
     }
 
+    // A network or device path is opened with the user's Windows sign-in and can name any
+    // program on a share: the file name check alone is not enough.
+    [Theory]
+    [InlineData(@"\\attacker\share\SelfService.exe")]
+    [InlineData(@"//attacker/share/SelfService.exe")]
+    [InlineData(@"\\?\C:\Custom\Citrix\SelfService.exe")]
+    public async Task ConnectAsync_SelfServiceCache_WithNetworkOrDeviceOverride_LogsWarningAndFallsBackToDefaultProbe(
+        string networkPath)
+    {
+        string? launchedExecutable = null;
+        int fallbackResolverCalls = 0;
+        List<string> warnings = [];
+        CitrixHandler handler = new(
+            new ConnectionStateMachine(),
+            new LocalizationManager(),
+            startInfo =>
+            {
+                launchedExecutable = startInfo.FileName;
+                return null;
+            },
+            static stored => stored,
+            () =>
+            {
+                fallbackResolverCalls++;
+                return @"C:\Fallback\SelfService.exe";
+            },
+            static _ => { },
+            warnings.Add,
+            fileExists: static _ => true);
+
+        ConnectionResult result = await handler.ConnectAsync(
+            CreateCacheServer("-launch -s store-01 -CitrixID store-01@@App -ica https://store.example.test/launch -cmdline"),
+            new AppSettings { CitrixSelfServicePath = networkPath },
+            CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Equal(@"C:\Fallback\SelfService.exe", launchedExecutable);
+        Assert.Equal(1, fallbackResolverCalls);
+        Assert.Single(warnings);
+    }
+
     [Fact]
     public async Task ConnectAsync_SelfServiceCache_WithMissingSelfServiceOverride_LogsWarningAndFallsBackToDefaultProbe()
     {

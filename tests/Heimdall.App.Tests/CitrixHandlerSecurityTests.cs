@@ -117,6 +117,7 @@ public sealed class CitrixHandlerCredentialProtectorTests : IDisposable
 public sealed class CitrixHandlerFileLoggerTests : IDisposable
 {
     private readonly string _tempDirectory;
+    private readonly bool _previousLoggingEnabled = FileLogger.IsEnabled;
 
     public CitrixHandlerFileLoggerTests()
     {
@@ -130,7 +131,7 @@ public sealed class CitrixHandlerFileLoggerTests : IDisposable
 
     public void Dispose()
     {
-        FileLogger.SetEnabled(false);
+        FileLogger.SetEnabled(_previousLoggingEnabled);
         try
         {
             if (Directory.Exists(_tempDirectory))

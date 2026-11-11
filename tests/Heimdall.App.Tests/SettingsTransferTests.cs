@@ -133,6 +133,16 @@ public sealed class SettingsTransferTests
             SettingsLabelCatalog.Unplaced([nameof(AppSettings.DefaultTheme), "NotAPanelSetting"]));
     }
 
+    // These decide what is launched or how scripts run; a truncated tail must never hide them.
+    [Theory]
+    [InlineData(nameof(AppSettings.CitrixSelfServicePath))]
+    [InlineData(nameof(AppSettings.X11AutoStart))]
+    [InlineData(nameof(AppSettings.PowerShellExecutionPolicy))]
+    public void TheSensitiveKeys_CoverTheSettingsThatDecideWhatRuns(string key)
+    {
+        Assert.Contains(key, SettingsImportPreview.SensitiveKeys);
+    }
+
     [Fact]
     public async Task APreviewLine_FallsBackOnThePropertyName_OnlyForASettingWithoutAPlace()
     {

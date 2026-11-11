@@ -23,8 +23,18 @@ using Heimdall.Core.Ssh;
 namespace Heimdall.App.Tests;
 
 [Collection(DialogVerifierFileLoggerCollection.Name)]
-public sealed class DialogHostKeyVerifierTests
+public sealed class DialogHostKeyVerifierTests : IDisposable
 {
+    private readonly bool _previousLoggingEnabled = FileLogger.IsEnabled;
+
+    public DialogHostKeyVerifierTests()
+    {
+        // These tests assert on log content, so logging is on whatever an earlier class left.
+        FileLogger.SetEnabled(true);
+    }
+
+    public void Dispose() => FileLogger.SetEnabled(_previousLoggingEnabled);
+
     [Fact]
     public async Task VerifyAsync_WithoutApplicationCurrent_ReturnsReject_AndLogsWarning()
     {

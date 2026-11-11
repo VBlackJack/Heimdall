@@ -1154,6 +1154,16 @@ public sealed class JsonSyncService : SyncServiceBase
 
                 var existing = await _actionRepository.GetByPublicIdAsync(model.Id);
 
+                if (existing != null && !existing.IsUserCreated)
+                {
+                    // A built-in action belongs to the shipped library: a sync file never rewrites
+                    // it. Taking it over would flag it as user created, and the seed refresher
+                    // never restores an action carrying that flag.
+                    result.ActionsSkipped++;
+                    result.Warnings.Add($"Action '{model.Title}' is a built-in action and was not changed by the import.");
+                    continue;
+                }
+
                 if (existing != null)
                 {
                     // Conflict detection: check if local is newer than remote
@@ -1334,6 +1344,14 @@ public sealed class JsonSyncService : SyncServiceBase
                     StringComparer.Ordinal);
 
                 var existing = await _batchRepository.GetByPublicIdAsync(model.Id);
+
+                if (existing != null && !existing.IsUserCreated)
+                {
+                    // A built-in batch is never rewritten by a sync file, nor flagged as user created.
+                    result.BatchesSkipped++;
+                    result.Warnings.Add($"Batch '{model.Name}' is a built-in batch and was not changed by the import.");
+                    continue;
+                }
 
                 if (existing != null)
                 {
