@@ -1721,6 +1721,21 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             return false;
         }
 
+        // An imported profile names its own host, gateway and entry: until the user has confirmed
+        // it, nothing is looked up for it, under any name. It goes on to the ordinary password
+        // handling. Only an interactive connect says so; the quiet paths (restore, reconnect,
+        // bulk connect) stay silent.
+        if (!serverDto.CredentialLookupConfirmed && !SharedSessionIds.IsSharedProfile(serverDto))
+        {
+            if (!skipOnFailure)
+            {
+                StatusMessageRequested?.Invoke(
+                    _localizer.Format("StatusCredentialLookupUnconfirmed", serverDto.DisplayName));
+            }
+
+            return false;
+        }
+
         var provider = _credentialProviderFactory.Create(settings);
 
         if (!provider.IsAvailable)
@@ -1762,12 +1777,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
                     return false;
                 }
 
-                string noResult = serverDto.CredentialLookupConfirmed || SharedSessionIds.IsSharedProfile(serverDto)
-                    ? _localizer.Format("WarnCredentialProviderNoResult", serverDto.DisplayName)
-                    : _localizer.Format(
-                        "WarnCredentialProviderNoResultUnconfirmed",
-                        serverDto.DisplayName,
-                        serverDto.RemoteServer);
+                string noResult = _localizer.Format("WarnCredentialProviderNoResult", serverDto.DisplayName);
                 if (skipOnFailure)
                 {
                     reportQuietly?.Invoke(noResult);
@@ -1859,7 +1869,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     {
         ArgumentNullException.ThrowIfNull(serverDto);
 
-        if (SharedSessionIds.IsSharedProfile(serverDto) || !serverDto.CredentialLookupConfirmed)
+        if (SharedSessionIds.IsSharedProfile(serverDto))
         {
             return serverDto.RemoteServer;
         }
@@ -1986,6 +1996,9 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             return;
         }
 
+        // Saving through the Add dialog, where the user sees the name and the host, is what
+        // confirms the new profile: an ad hoc session is typed by the user, so its template is
+        // confirmed and the dialog writes that value back.
         var dialogVm = ServerDialogViewModel.FromDto(template);
         dialogVm.DialogTitle = _localizer["DialogTitleAddServer"];
         dialogVm.IsEditMode = false;

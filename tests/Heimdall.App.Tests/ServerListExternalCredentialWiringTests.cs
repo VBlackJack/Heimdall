@@ -227,36 +227,108 @@ public sealed class ServerListExternalCredentialWiringTests : IDisposable
     }
 
     [Fact]
-    public async Task ResolveCredentials_UnconfirmedProfile_LooksTheVaultUpByHost()
+    public async Task ResolveCredentials_UnconfirmedProfile_NeverCallsTheProvider_AndSaysSoOnAnInteractiveConnect()
+    {
+        var provider = new StubCredentialProvider { Result = new CredentialResult("", "s3cr3t") };
+        var factory = new FakeCredentialProviderFactory(provider);
+        await using var fixture = await Fixture.CreateAsync(factory);
+        var dto = CreateSshServer(passwordEncrypted: null);
+        dto.VaultEntryName = "prod-db";
+        dto.CredentialLookupConfirmed = false;
+        var statuses = new List<string>();
+        fixture.ViewModel.StatusMessageRequested += statuses.Add;
+
+        bool skipped = await fixture.ViewModel.TryResolveExternalCredentialsAsync(
+            dto, EnabledSettings(), CancellationToken.None, skipOnFailure: false);
+
+        Assert.False(skipped);
+        Assert.Equal(0, provider.CallCount);
+        Assert.Equal(0, factory.CreateCallCount);
+        Assert.True(string.IsNullOrEmpty(dto.SshPasswordEncrypted));
+        Assert.Equal(
+            fixture.Localizer.Format("StatusCredentialLookupUnconfirmed", "SSH Box"),
+            Assert.Single(statuses));
+        Assert.Equal(0, fixture.Dialog.WarningCount);
+    }
+
+    [Fact]
+    public async Task ResolveCredentials_UnconfirmedProfile_QuietPath_CallsNothingAndSaysNothing()
     {
         var provider = new StubCredentialProvider { Result = new CredentialResult("", "s3cr3t") };
         await using var fixture = await Fixture.CreateAsync(new FakeCredentialProviderFactory(provider));
         var dto = CreateSshServer(passwordEncrypted: null);
-        dto.VaultEntryName = "prod-db";
         dto.CredentialLookupConfirmed = false;
+        var statuses = new List<string>();
+        fixture.ViewModel.StatusMessageRequested += statuses.Add;
 
-        await fixture.ViewModel.TryResolveExternalCredentialsAsync(
-            dto, EnabledSettings(), CancellationToken.None, skipOnFailure: false);
+        bool skipped = await fixture.ViewModel.TryResolveExternalCredentialsAsync(
+            dto, EnabledSettings(), CancellationToken.None, skipOnFailure: true, reportQuietly: statuses.Add);
 
-        Assert.Equal("ssh.example.com", provider.LastTitle);
+        Assert.False(skipped);
+        Assert.Equal(0, provider.CallCount);
+        Assert.Empty(statuses);
     }
 
     [Fact]
-    public async Task ResolveCredentials_UnconfirmedProfile_NoResult_SaysTheLookupWasByHost()
+    public async Task ResolveCredentials_UnconfirmedSftpCompanion_NeverCallsTheProvider()
     {
-        var provider = new StubCredentialProvider { Result = null };
+        var provider = new StubCredentialProvider { Result = new CredentialResult("", "s3cr3t") };
+        await using var fixture = await Fixture.CreateAsync(new FakeCredentialProviderFactory(provider));
+        var ssh = CreateSshServer(passwordEncrypted: null);
+        ssh.CredentialLookupConfirmed = false;
+        var companion = Heimdall.App.ViewModels.Session.SessionCoordinator.CreateCompanionSftpProfile(ssh, "sftp-1");
+
+        await fixture.ViewModel.TryResolveExternalCredentialsAsync(
+            companion, EnabledSettings(), CancellationToken.None, skipOnFailure: true);
+
+        Assert.False(companion.CredentialLookupConfirmed);
+        Assert.Equal(0, provider.CallCount);
+    }
+
+    [Fact]
+    public async Task Restore_And_Reconnect_UnconfirmedProfile_NeverCallTheProvider()
+    {
+        var provider = new StubCredentialProvider { Result = new CredentialResult("", "s3cr3t") };
         await using var fixture = await Fixture.CreateAsync(new FakeCredentialProviderFactory(provider));
         var dto = CreateSshServer(passwordEncrypted: null);
         dto.CredentialLookupConfirmed = false;
-        var statuses = new List<string>();
+        await fixture.SeedAsync(dto);
 
-        await fixture.ViewModel.TryResolveExternalCredentialsAsync(
-            dto, EnabledSettings(), CancellationToken.None, skipOnFailure: true, reportQuietly: statuses.Add);
+        await fixture.ViewModel.RestoreServerAsync(
+            "srv-ssh", CancellationToken.None, failureReport: ConnectFailureReport.FailedTabOnly);
+        await fixture.ViewModel.RestoreServerAsync("srv-ssh", CancellationToken.None);
 
-        string expected = fixture.Localizer.Format(
-            "WarnCredentialProviderNoResultUnconfirmed", "SSH Box", "ssh.example.com");
-        Assert.NotEqual("WarnCredentialProviderNoResultUnconfirmed", expected);
-        Assert.Equal(expected, Assert.Single(statuses));
+        Assert.Equal(0, provider.CallCount);
+    }
+
+    [Fact]
+    public async Task BulkPlan_UnconfirmedProfile_NeverCallsTheProvider_AndStaysConnectable()
+    {
+        var provider = new StubCredentialProvider { Result = new CredentialResult("", "s3cr3t") };
+        await using var fixture = await Fixture.CreateAsync(new FakeCredentialProviderFactory(provider));
+        var dto = CreateSshServer(passwordEncrypted: null);
+        dto.CredentialLookupConfirmed = false;
+        await fixture.SeedAsync(dto);
+
+        var plan = await fixture.ViewModel.PrepareBulkConnectPlanAsync(
+            fixture.ViewModel.Servers.ToList(), CancellationToken.None);
+
+        Assert.Equal(0, provider.CallCount);
+        Assert.Equal(1, plan.ConnectableCount);
+    }
+
+    [Fact]
+    public async Task Connect_UnconfirmedProfile_NeverCallsTheProvider()
+    {
+        var provider = new StubCredentialProvider { Result = new CredentialResult("", "s3cr3t") };
+        await using var fixture = await Fixture.CreateAsync(new FakeCredentialProviderFactory(provider));
+        var dto = CreateSshServer(passwordEncrypted: null);
+        dto.CredentialLookupConfirmed = false;
+        await fixture.SeedAsync(dto);
+
+        await fixture.ViewModel.ConnectCommand.ExecuteAsync(fixture.ViewModel.Servers[0]);
+
+        Assert.Equal(0, provider.CallCount);
     }
 
     [Fact]

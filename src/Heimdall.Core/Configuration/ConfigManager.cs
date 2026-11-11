@@ -1385,7 +1385,10 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
             {
                 snapshots.TryAdd(
                     server.Id,
-                    new CredentialReferenceSnapshot(server.DisplayName, server.VaultEntryName));
+                    new CredentialReferenceSnapshot(
+                        server.DisplayName,
+                        server.VaultEntryName,
+                        server.CredentialLookupConfirmed));
             }
         }
 
@@ -1434,6 +1437,9 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
         foreach (ServerProfileDto updatedProfile in updatedProfiles)
         {
             if (!previousProfiles.TryGetValue(updatedProfile.Id, out CredentialReferenceSnapshot previousProfile)
+                // An unconfirmed profile's name came from a file: it must not become the key a
+                // stored secret is looked up by once the profile is confirmed.
+                || !previousProfile.LookupConfirmed
                 || string.Equals(previousProfile.DisplayName, updatedProfile.DisplayName, StringComparison.Ordinal)
                 || !string.IsNullOrWhiteSpace(previousProfile.VaultEntryName)
                 || !string.IsNullOrWhiteSpace(updatedProfile.VaultEntryName))
@@ -1447,7 +1453,8 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
 
     private readonly record struct CredentialReferenceSnapshot(
         string DisplayName,
-        string? VaultEntryName);
+        string? VaultEntryName,
+        bool LookupConfirmed);
 
     private sealed record PublishedSettingsSnapshot(
         long Revision,

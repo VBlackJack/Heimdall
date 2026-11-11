@@ -102,14 +102,4 @@ public sealed class CredentialLookupConfirmedTests
 
         Assert.Equal(expected, CredentialLookupPolicy.NameBasedTitle(profile));
     }
-
-    [Fact]
-    public void NameBasedTitleDiffersFromHost_IsFalseWhenTheNameIsTheHost()
-    {
-        ServerProfileDto profile = new() { DisplayName = "box.example.com", RemoteServer = "box.example.com" };
-
-        Assert.False(CredentialLookupPolicy.NameBasedTitleDiffersFromHost(profile));
-        profile.DisplayName = "Box";
-        Assert.True(CredentialLookupPolicy.NameBasedTitleDiffersFromHost(profile));
-    }
 }

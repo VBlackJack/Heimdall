@@ -800,17 +800,23 @@ public sealed class ProfileImportServiceTests
     }
 
     [Fact]
-    public async Task ImportFromPathAsync_Json_ProviderOn_SummaryTellsWhichSessionsLookUpByHost()
+    public async Task ImportFromPathAsync_Json_ProviderOn_SummaryUsesTheSingularForOneSession()
     {
         using var fixture = new ProfileImportFixture();
         await fixture.ConfigManager.SaveSettingsAsync(new AppSettings { UseExternalCredentialProvider = true });
-        string path = await fixture.WriteTextAsync("lookup.json", TwoSessionsJson);
+        string path = await fixture.WriteTextAsync(
+            "lookup.json",
+            """
+            [
+              { "id": "a", "displayName": "prod-db", "connectionType": "SSH", "remoteServer": "elsewhere.example.com", "sshPort": 22 }
+            ]
+            """);
 
         ProfileImportResult result = await fixture.Service.ImportFromPathAsync(path, CancellationToken.None);
 
-        Assert.Equal(1, result.HostLookupCount);
+        Assert.Equal(1, result.UnconfirmedLookupCount);
         Assert.Contains(
-            "1 imported session will look up its password under its host name until you open and save it.",
+            "1 imported session will not use the credential provider until you confirm it.",
             result.UserMessage,
             StringComparison.Ordinal);
         Assert.DoesNotContain("1 imported sessions", result.UserMessage, StringComparison.Ordinal);
@@ -832,9 +838,9 @@ public sealed class ProfileImportServiceTests
 
         ProfileImportResult result = await fixture.Service.ImportFromPathAsync(path, CancellationToken.None);
 
-        Assert.Equal(2, result.HostLookupCount);
+        Assert.Equal(2, result.UnconfirmedLookupCount);
         Assert.Contains(
-            "2 imported sessions will look up their password under their host name until you open and save each one.",
+            "2 imported sessions will not use the credential provider until you confirm them.",
             result.UserMessage,
             StringComparison.Ordinal);
     }
@@ -848,8 +854,8 @@ public sealed class ProfileImportServiceTests
 
         ProfileImportResult result = await fixture.Service.ImportFromPathAsync(path, CancellationToken.None);
 
-        Assert.Equal(0, result.HostLookupCount);
-        Assert.DoesNotContain("look up their password", result.UserMessage, StringComparison.Ordinal);
+        Assert.Equal(0, result.UnconfirmedLookupCount);
+        Assert.DoesNotContain("credential provider", result.UserMessage, StringComparison.Ordinal);
     }
 
     // One session named after another machine than its host, one named after its own host.

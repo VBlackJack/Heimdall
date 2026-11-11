@@ -201,16 +201,16 @@ public sealed class ProfileImportService(
             result.SkippedCount);
         IReadOnlyList<string> sanitizationWarnings = ImportSummaryText.SanitizationWarnings(_localizer, sanitization);
         var fullSummary = BuildJsonImportSummary(summary, result, sanitizationWarnings);
-        if (result.HostLookupCount > 0)
+        if (result.UnconfirmedLookupCount > 0)
         {
             fullSummary = string.Join(
                 Environment.NewLine,
                 fullSummary,
                 _localizer.FormatCount(
-                    result.HostLookupCount,
-                    "StatusImportCredentialLookupByHostOne",
-                    "StatusImportCredentialLookupByHost",
-                    result.HostLookupCount));
+                    result.UnconfirmedLookupCount,
+                    "StatusImportCredentialLookupOffOne",
+                    "StatusImportCredentialLookupOff",
+                    result.UnconfirmedLookupCount));
         }
 
         if ((result.ImportedCount > 0 || result.ReplacedCount > 0)
@@ -235,7 +235,7 @@ public sealed class ProfileImportService(
             GatewayCreatedCount = result.GatewayCreatedCount,
             GatewayMergedCount = result.GatewayMergedCount,
             GatewayOrphanCount = result.GatewayOrphanCount,
-            HostLookupCount = result.HostLookupCount
+            UnconfirmedLookupCount = result.UnconfirmedLookupCount
         };
     }
 
@@ -442,9 +442,8 @@ public sealed class ProfileImportService(
                     GatewayCreatedCount = gatewayReconciliation.CreatedCount,
                     GatewayMergedCount = gatewayReconciliation.MergedCount,
                     GatewayOrphanCount = gatewayReconciliation.OrphanReferences.Count,
-                    HostLookupCount = settings.UseExternalCredentialProvider
-                        ? appliedServers.Count(server => !server.CredentialLookupConfirmed
-                            && CredentialLookupPolicy.NameBasedTitleDiffersFromHost(server))
+                    UnconfirmedLookupCount = settings.UseExternalCredentialProvider
+                        ? appliedServers.Count(server => !server.CredentialLookupConfirmed)
                         : 0
                 },
                 GatewaysToAdd: gatewayReconciliation.GatewaysToAdd);

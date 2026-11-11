@@ -48,10 +48,10 @@ public sealed class ProfileImportResult
     public int GatewayOrphanCount { get; init; }
 
     /// <summary>
-    /// How many imported profiles will be looked up in the external credential provider under
-    /// their host instead of their name until the user saves them. Zero when the provider is off.
+    /// How many imported profiles will not use the external credential provider until the user
+    /// confirms them. Zero when the provider is off.
     /// </summary>
-    public int HostLookupCount { get; init; }
+    public int UnconfirmedLookupCount { get; init; }
 
     public static ProfileImportResult NoChanges() => new();
 

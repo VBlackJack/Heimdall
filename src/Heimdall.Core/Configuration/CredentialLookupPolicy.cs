@@ -33,15 +33,4 @@ public static class CredentialLookupPolicy
             ? profile.DisplayName
             : profile.VaultEntryName;
     }
-
-    /// <summary>
-    /// Whether an unconfirmed profile is looked up under a different name than its confirmed
-    /// lookup would use, which is the case the import tells the user about.
-    /// </summary>
-    public static bool NameBasedTitleDiffersFromHost(ServerProfileDto profile)
-    {
-        ArgumentNullException.ThrowIfNull(profile);
-
-        return !string.Equals(NameBasedTitle(profile), profile.RemoteServer, StringComparison.OrdinalIgnoreCase);
-    }
 }

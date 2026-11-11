@@ -126,6 +126,7 @@ public partial class ServerDialogViewModel : ObservableValidator
             AppSettings settings = value;
             RunWithoutDirtyTracking(() =>
             {
+                _noticeSettings = settings;
                 _defaultRdpTunnelPort = settings.DefaultRdpTunnelPort;
                 _defaultSshTunnelPort = settings.DefaultSshTunnelPort;
                 _defaultRdpResizeEnableDelayMs = settings.RdpResizeEnableDelayMs;
@@ -212,6 +213,7 @@ public partial class ServerDialogViewModel : ObservableValidator
         OnPropertyChanged(nameof(ShowProtocolSelector));
         OnPropertyChanged(nameof(ShowFormFields));
         OnPropertyChanged(nameof(CanSwitchToAuto));
+        OnPropertyChanged(nameof(ShowCredentialLookupNotice));
         TryApplyRdpDialogAdvancedDefault();
     }
 
@@ -234,6 +236,51 @@ public partial class ServerDialogViewModel : ObservableValidator
         ClearValidationState();
         IsProtocolSelected = false;
     }
+
+    // --- Credential lookup confirmation ---
+
+    /// <summary>
+    /// Whether the external credential provider may be asked for this session. A session created
+    /// here is confirmed; an imported one keeps its value until the user allows the lookup.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowCredentialLookupNotice))]
+    private bool _credentialLookupConfirmed = true;
+
+    /// <summary>Whether the bar offering to allow the lookup is shown.</summary>
+    public bool ShowCredentialLookupNotice => IsEditMode && !CredentialLookupConfirmed;
+
+    /// <summary>
+    /// The bar's text: the entry the provider would be asked for and where the session connects.
+    /// </summary>
+    public string CredentialLookupNoticeText
+    {
+        get
+        {
+            if (_localizer is null)
+            {
+                return string.Empty;
+            }
+
+            // Built from what the dialog holds now, so the key and the destination shown are the
+            // ones that would be saved with the "Allow lookup" choice.
+            IReadOnlyList<CredentialLookupRow> rows = CredentialLookupConfirmation.BuildRows(
+                [ToDto()],
+                _noticeSettings ?? new AppSettings());
+            return _localizer.Format(
+                "ServerDialogCredentialLookupNotice",
+                CredentialLookupConfirmation.FormatRows(rows, _localizer));
+        }
+    }
+
+    private AppSettings? _noticeSettings;
+
+    private static readonly System.ComponentModel.PropertyChangedEventArgs NoticeTextChanged =
+        new(nameof(CredentialLookupNoticeText));
+
+    /// <summary>Allows the lookup; the choice is saved with the dialog.</summary>
+    [RelayCommand]
+    private void AllowCredentialLookup() => CredentialLookupConfirmed = true;
 
     // --- Identity ---
 
@@ -1514,11 +1561,22 @@ public partial class ServerDialogViewModel : ObservableValidator
         nameof(TestChipText),
         nameof(IsTestingReachability),
         nameof(IsTestingRdpConnection),
+
+        // Derived from the fields above and refreshed with them; never an edit of its own.
+        nameof(CredentialLookupNoticeText),
+        nameof(ShowCredentialLookupNotice),
     };
 
     protected override void OnPropertyChanged(System.ComponentModel.PropertyChangedEventArgs e)
     {
         base.OnPropertyChanged(e);
+
+        if (!CredentialLookupConfirmed
+            && IsEditMode
+            && e.PropertyName is not (nameof(CredentialLookupNoticeText) or nameof(ShowCredentialLookupNotice) or nameof(IsDirty)))
+        {
+            base.OnPropertyChanged(NoticeTextChanged);
+        }
 
         if (_isInitializing) return;
         if (e.PropertyName is null) return;
@@ -2401,7 +2459,7 @@ public partial class ServerDialogViewModel : ObservableValidator
             DisplayName = DisplayName,
             Origin = Origin,
             ExecutionConfirmed = true,
-            CredentialLookupConfirmed = true,
+            CredentialLookupConfirmed = CredentialLookupConfirmed,
             RemoteServer = RemoteServer,
             RemotePort = RemotePort,
             LocalPort = LocalPort,
@@ -2623,6 +2681,7 @@ public partial class ServerDialogViewModel : ObservableValidator
             ? new ServerDialogViewModel()
             : new ServerDialogViewModel(monitorEnumerator);
         vm._seed = dto;
+        vm.CredentialLookupConfirmed = dto.CredentialLookupConfirmed;
         vm._isInitializing = true;
         vm.IsEditMode = true;
         vm.IsProtocolSelected = true;
