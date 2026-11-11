@@ -553,6 +553,34 @@ public partial class ConnectionViewModel : ObservableObject
         return result;
     }
 
+    /// <summary>
+    /// Asks every guarded pane of every open session, detached windows included, whether the
+    /// application may exit. False means the user kept the window open.
+    /// </summary>
+    internal Task<bool> ConfirmCloseForExitAsync(bool workspaceLocked = false)
+    {
+        // Locked: no tool prompt, file dialog or pane title may appear behind the lock, so the
+        // close proceeds as it did before the sweep existed.
+        if (workspaceLocked)
+        {
+            return Task.FromResult(true);
+        }
+
+        List<ExitCloseHost> hosts =
+        [
+            .. AllOpenSessions.SelectMany(session =>
+                Core.Models.SplitTreeHelper.EnumerateLeaves(session.RootContent)
+                    .Select(pane => new ExitCloseHost(pane.HostControl, pane.Title)))
+        ];
+
+        return ExitCloseGuardSweep.ConfirmAsync(
+            hosts,
+            _closeArbiter,
+            (reasonKey, title) => _dialogService.ShowInfo(
+                _localizer[CloseGuardLocaleKeys.BlockedTitle],
+                _localizer.Format(reasonKey, title)));
+    }
+
     private static IReadOnlyList<object?> LeafHosts(SessionTabViewModel session)
         => [.. Core.Models.SplitTreeHelper.EnumerateLeaves(session.RootContent)
                  .Select(pane => pane.HostControl)];
