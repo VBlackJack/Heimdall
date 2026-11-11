@@ -43,7 +43,7 @@ namespace Heimdall.App.Views.Tools;
 /// <see cref="DiagramDocumentState"/> so that saving, Save As and the
 /// unsaved-changes prompt all read the same record.
 /// </remarks>
-public partial class DiagramEditorView : UserControl, IToolView
+public partial class DiagramEditorView : UserControl, IToolView, IRecoverableUnsavedWork
 {
     private const string VirtualHost = "heimdall-drawio.local";
     private const string HostPagePath = "heimdall-host.html";

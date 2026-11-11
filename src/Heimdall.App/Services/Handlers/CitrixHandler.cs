@@ -403,7 +403,12 @@ internal sealed class CitrixHandler : IProtocolHandler
         {
             string candidate = Environment.ExpandEnvironmentVariables(configuredOverridePath.Trim());
             string fileName = Path.GetFileName(candidate);
-            if (!string.Equals(fileName, SelfServiceExecutableName, StringComparison.OrdinalIgnoreCase))
+            if (ImportedPathPolicy.IsNetworkOrDevicePath(candidate))
+            {
+                _logWarning(
+                    $"Citrix SelfService path override rejected (network or device paths are not accepted): path={candidate}");
+            }
+            else if (!string.Equals(fileName, SelfServiceExecutableName, StringComparison.OrdinalIgnoreCase))
             {
                 _logWarning(
                     $"Citrix SelfService path override rejected (file name must be {SelfServiceExecutableName}): path={candidate}");

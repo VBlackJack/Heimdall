@@ -189,6 +189,72 @@ public sealed class ServerListExecutionTrustTests
         Assert.DoesNotContain("powershell.exe", fixture.DialogService.LastConfirmMessage, StringComparison.Ordinal);
     }
 
+    // The gate also counts arguments, working directory and elevation, so the prompt names them.
+    [Fact]
+    public async Task ConfirmAndTrustExecutionAsync_LocalProfile_NamesArgumentsWorkingDirectoryAndElevation()
+    {
+        await using ServerListExecutionTrustFixture fixture = await ServerListExecutionTrustFixture.CreateAsync(false);
+        ServerProfileDto promptProfile = CreateLocalShellProfile("local-1");
+        promptProfile.LocalShellArguments = "-NoProfile -Command evil";
+        promptProfile.LocalShellWorkingDirectory = @"C:\Temp\work";
+        promptProfile.ElevationMode = ElevationMode.Gsudo;
+
+        await fixture.ViewModel.ConfirmAndTrustExecutionAsync(promptProfile);
+
+        string message = fixture.DialogService.LastConfirmMessage;
+        Assert.Contains("evil.exe", message, StringComparison.Ordinal);
+        Assert.Contains("-NoProfile -Command evil", message, StringComparison.Ordinal);
+        Assert.Contains(@"C:\Temp\work", message, StringComparison.Ordinal);
+        Assert.Contains("elevated", message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ConfirmAndTrustExecutionAsync_LocalProfileWithOnlyExecutable_OmitsUnsetDetails()
+    {
+        await using ServerListExecutionTrustFixture fixture = await ServerListExecutionTrustFixture.CreateAsync(false);
+
+        await fixture.ViewModel.ConfirmAndTrustExecutionAsync(CreateLocalShellProfile("local-1"));
+
+        string message = fixture.DialogService.LastConfirmMessage;
+        Assert.DoesNotContain("elevated", message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("working directory", message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("arguments", message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ConfirmAndTrustExecutionAsync_MultiLineArgument_StaysOnOneLineAndKeepsElevationFirst()
+    {
+        await using ServerListExecutionTrustFixture fixture = await ServerListExecutionTrustFixture.CreateAsync(false);
+        ServerProfileDto promptProfile = CreateLocalShellProfile("local-1");
+        promptProfile.LocalShellArguments = "-a\nworking directory: C:\\evil\rtab\t";
+        promptProfile.ElevationMode = ElevationMode.Gsudo;
+
+        await fixture.ViewModel.ConfirmAndTrustExecutionAsync(promptProfile);
+
+        string message = fixture.DialogService.LastConfirmMessage;
+        Assert.DoesNotContain("\n", message, StringComparison.Ordinal);
+        Assert.DoesNotContain("\r", message, StringComparison.Ordinal);
+        Assert.DoesNotContain("\t", message, StringComparison.Ordinal);
+        Assert.Contains("-a\\nworking directory: C:\\evil\\rtab\\t", message, StringComparison.Ordinal);
+        Assert.True(
+            message.IndexOf("elevated", StringComparison.OrdinalIgnoreCase)
+            < message.IndexOf("evil.exe", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ConfirmAndTrustExecutionAsync_ArgumentImitatingTheWorkingDirectoryLabel_CannotCloseItsQuotes()
+    {
+        await using ServerListExecutionTrustFixture fixture = await ServerListExecutionTrustFixture.CreateAsync(false);
+        ServerProfileDto promptProfile = CreateLocalShellProfile("local-1");
+        promptProfile.LocalShellArguments = "x\"; working directory: \"C:\\good";
+
+        await fixture.ViewModel.ConfirmAndTrustExecutionAsync(promptProfile);
+
+        string message = fixture.DialogService.LastConfirmMessage;
+        Assert.Contains("arguments: \"x\\\"; working directory: \\\"C:\\good\"", message, StringComparison.Ordinal);
+        Assert.DoesNotContain("working directory: \"C:", message, StringComparison.Ordinal);
+    }
+
     private static ServerProfileDto CreateLocalShellProfile(string id)
     {
         return new ServerProfileDto

@@ -12,6 +12,71 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-11-11: data-loss and safeguard fixes, SSH agent key attempts (v2026.111101)
+
+Fixes only, merged as #760, #761, #762, #765 and #767. The user-facing summary and the upgrade notes
+are in the release notes.
+
+### Session tree (#760)
+
+- `MainWindow.OnTreeViewSelectedItemChanged` cleared the native selection flag of a folder inside
+  the `IsExpanded` change that had just selected it; WPF then dereferenced a null selected container
+  and the binding update swallowed the exception, so the template never hid the children.
+  `ClearNativeSelection` now clears a folder's flag once the notification has returned, and skips a
+  row re-bound to another item. A session row is still cleared at once.
+
+### SSH (#761)
+
+- Agent keys are offered algorithm-major (`SshAgentAlgorithmSource`): every key with rsa-sha2-512,
+  then rsa-sha2-256, then ssh-rsa; a non-RSA key once, in the first pass. Same set of attempts as
+  before. SSH.NET 2026.0.0 sends one unsigned query per entry and has no `server-sig-algs` support.
+- `FailureClassifier.FormatMessage` and `SshFailureLocalizer.Localize` take the number of keys the
+  agent held at dial; `TooManyAuthFailures` uses a counted message for SSH sessions. SFTP and
+  tunnels keep the plain message. TROUBLESHOOTING entry 65, English and French.
+
+### Data loss (#762, #765)
+
+- `EmbeddedEditorViewModel.CanSave` is false after a load that failed for any reason other than a
+  missing file; `SaveAsync` refuses and the editor is read-only. A missing file opens an empty
+  buffer.
+- `PasswordPresetStorage`: a store that failed to load is flagged unreadable and is never saved over
+  the file.
+- `NotesToolViewModel`: a failed save aborts open, new, rename, duplicate, back and forward; the
+  user may discard the changes.
+- `ServerListViewModel.RestoreServerAsync` resolves the profile from the whole inventory, not the
+  filtered projection.
+- `SessionSnapshotService.IsValidEntry` accepts shared profile ids.
+- `ExitCloseGuardSweep` runs the close guards (`ICloseGuard`, then `IToolView.CanClose`) over every
+  open session at window close, through a new optional delegate of
+  `WindowClosingFlow.TryPrepareCloseAsync`, after the existing prompts and before state persistence.
+  Busy tools, tools implementing `IRecoverableUnsavedWork` and a locked workspace are not asked.
+
+### Safeguards (#762, #767)
+
+- Workspace lock: `ISessionWindowService.HideDetachedWindows` / `ShowDetachedWindows`
+  (`LockHiddenWindows<T>`); a window opened while locked stays hidden; disconnect-on-lock walks
+  every open session.
+- Web sessions: `WebExternalLaunch.RequiresConfirmation` gates `WebExternalProgram` on the profile's
+  `ExecutionConfirmed`; asked once per tab.
+- `ServerListViewModel.DescribeLocalShellExecution`: elevation, arguments and working directory in
+  the execution trust prompt, control characters shown as escapes.
+- `JsonSyncService`: an incoming action or batch matching a system one is skipped, counted and
+  reported; `IsUserCreated` is never flipped.
+- `SettingsImportPreview.SensitiveKeys` gains `X11AutoStart`, `CitrixSelfServicePath` and
+  `PowerShellExecutionPolicy`; `CitrixHandler.ResolveEffectiveSelfServicePath` refuses network and
+  device paths.
+- Private keys: `TimedSecretClipboard` over `SecretClipboardGuard` (30 s, tool close, application
+  exit); `GeneratedFileWriter` with `SecureFileWriter.WriteBytesAtomic` / `WriteTextAtomic`.
+- `TunnelProbeCommands`: port scan, firewall tester and banner grab pass host and port as positional
+  parameters of a constant remote script; each service validates them.
+
+### Tests (#760, #761, #767)
+
+- `SessionTabContextMenuFactoryTests`: the folder row test waits for the stored preference and the
+  view model to agree. `FrenchLocaleWordingGuardTests`: an accent escape that lost its backslash is
+  refused. File logger state restored by the two classes that switched it off.
+  `PrivilegeLauncherTests`: argument handling and command line quoting, refusal reason asserted.
+
 ## 2026-11-10: close fix, session tree and tab strip ergonomics (v2026.111001)
 
 Two fixes and six ergonomics changes from discussion #500, merged as #752 to #758. The user-facing

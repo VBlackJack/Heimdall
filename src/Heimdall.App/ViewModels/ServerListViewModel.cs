@@ -65,6 +65,9 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     /// sources. Shared with the session coordinator and the scheduler, which reach it through here.
     /// </summary>
     internal IProfileLookup ProfileLookup => _profileLookup;
+    private const string DefaultLocalShellExecutable = "powershell.exe";
+    private const string ConfirmExecutionDetailSeparator = "; ";
+
     private readonly LocalizationManager _localizer;
     private readonly IUiDispatcher _uiDispatcher;
     private readonly TimeProvider _timeProvider;
@@ -472,9 +475,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         {
             string executable = string.Equals(profile.ConnectionType, "WEB", StringComparison.OrdinalIgnoreCase)
                 ? $"{profile.WebExternalProgram} {profile.WebExternalArguments}".Trim()
-                : string.IsNullOrWhiteSpace(profile.LocalShellExecutable)
-                    ? "powershell.exe"
-                    : profile.LocalShellExecutable;
+                : DescribeLocalShellExecution(profile, _localizer);
             body = _localizer.Format(
                 "ConfirmExecutionImportedBody",
                 profile.DisplayName,
@@ -495,6 +496,51 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
 
         return true;
     }
+
+    /// <summary>
+    /// Describes everything a LOCAL profile would run, matching what the execution gate counts:
+    /// the program, then its arguments, working directory and elevation, each only when set.
+    /// </summary>
+    internal static string DescribeLocalShellExecution(ServerProfileDto profile, LocalizationManager localizer)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+        ArgumentNullException.ThrowIfNull(localizer);
+
+        // The elevation line comes first so a long value cannot push it out of view.
+        List<string> parts = [];
+        if (profile.EffectiveElevationMode != ElevationMode.None)
+        {
+            parts.Add(localizer["ConfirmExecutionDetailElevated"]);
+        }
+
+        parts.Add(
+            string.IsNullOrWhiteSpace(profile.LocalShellExecutable)
+                ? DefaultLocalShellExecutable
+                : MakeVisible(profile.LocalShellExecutable));
+
+        if (!string.IsNullOrWhiteSpace(profile.LocalShellArguments))
+        {
+            parts.Add(localizer.Format("ConfirmExecutionDetailArguments", MakeVisible(profile.LocalShellArguments)));
+        }
+
+        if (!string.IsNullOrWhiteSpace(profile.LocalShellWorkingDirectory))
+        {
+            parts.Add(localizer.Format("ConfirmExecutionDetailWorkingDirectory", MakeVisible(profile.LocalShellWorkingDirectory)));
+        }
+
+        return string.Join(ConfirmExecutionDetailSeparator, parts);
+    }
+
+    /// <summary>
+    /// Makes a value shown in the trust prompt unable to break the line or imitate another
+    /// field: line breaks and tabs become visible escapes and a double quote is escaped.
+    /// </summary>
+    private static string MakeVisible(string value)
+        => value
+            .Replace("\r", "\\r", StringComparison.Ordinal)
+            .Replace("\n", "\\n", StringComparison.Ordinal)
+            .Replace("\t", "\\t", StringComparison.Ordinal)
+            .Replace("\"", "\\\"", StringComparison.Ordinal);
 
     /// <summary>
     /// Confirms and best-effort persists trust for imported post-connect commands.

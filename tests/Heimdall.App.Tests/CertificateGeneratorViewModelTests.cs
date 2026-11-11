@@ -184,6 +184,55 @@ public sealed class CertificateGeneratorViewModelTests
         Assert.Equal("CA-KEY", payload);
     }
 
+    // The view cannot tell a key from a certificate by the copy event alone, so it asks the view
+    // model, which knows which text it holds.
+    [Fact]
+    public async Task IsPrivateKeyMaterial_RecognisesTheKeysAndNotTheCertificateOrFingerprint()
+    {
+        var vm = new CertificateGeneratorViewModel(new FakeCertificateGeneratorService())
+        {
+            Mode = CertificateMode.CaLeaf,
+            Cn = "server.local",
+        };
+        await vm.GenerateCommand.ExecuteAsync(null);
+
+        Assert.True(vm.IsPrivateKeyMaterial("CA-KEY"));
+        Assert.True(vm.IsPrivateKeyMaterial(vm.LeafKeyPem));
+        Assert.True(vm.IsPrivateKeyMaterial("-----BEGIN PRIVATE KEY-----\nAAAA\n-----END PRIVATE KEY-----"));
+        Assert.False(vm.IsPrivateKeyMaterial("LEAF-CERT"));
+        Assert.False(vm.IsPrivateKeyMaterial("SHA256:AA:BB"));
+        Assert.False(vm.IsPrivateKeyMaterial(string.Empty));
+    }
+
+    [Fact]
+    public async Task SavePfx_MarksTheRequestAsCarryingAPrivateKey_AndSavePemDoesNot()
+    {
+        var vm = new CertificateGeneratorViewModel(new FakeCertificateGeneratorService()) { Cn = "server.local" };
+        await vm.GenerateCommand.ExecuteAsync(null);
+
+        List<SaveFileRequest> requests = [];
+        vm.PfxPasswordRequested += (_, passwordRequest) => passwordRequest.ResultCallback("secret");
+        vm.SaveFileRequested += (_, payload) => requests.Add(payload);
+
+        vm.SavePemCommand.Execute(null);
+        vm.SavePfxCommand.Execute(null);
+
+        Assert.Equal(2, requests.Count);
+        Assert.False(requests[0].ContainsPrivateKey);
+        Assert.True(requests[1].ContainsPrivateKey);
+    }
+
+    [Fact]
+    public async Task ReportSaveFailure_ShowsTheExportErrorStatus()
+    {
+        var vm = new CertificateGeneratorViewModel(new FakeCertificateGeneratorService());
+        vm.Initialize(await CreateLocalizerAsync("en"));
+
+        vm.ReportSaveFailure("disk full");
+
+        Assert.Contains("disk full", vm.ValidationMessage, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task SavePem_InSelfMode_SendsSelfCert()
     {

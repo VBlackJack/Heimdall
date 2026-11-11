@@ -198,15 +198,18 @@ public sealed class PortScanService : IPortScanService
         int port,
         CancellationToken ct)
     {
+        if (!TunnelProbeCommands.IsProbeTargetValid(host, port))
+        {
+            return new PortProbeResult(port, false, NetworkToolPresets.GetPortServiceLabel(port), "-", null);
+        }
+
         var stopwatch = Stopwatch.StartNew();
 
         try
         {
             var result = await Task.Run(() =>
             {
-                var safeHost = InputValidator.EscapeShellArg(host);
-                using var command = sshClient.CreateCommand(
-                    $"timeout 2 bash -c \"echo >/dev/tcp/{safeHost}/{port}\" 2>/dev/null && echo OPEN || echo CLOSED");
+                using var command = sshClient.CreateCommand(TunnelProbeCommands.BuildConnectCommand(host, port));
                 command.CommandTimeout = TimeSpan.FromSeconds(5);
                 command.Execute();
                 return command.Result?.Trim();
