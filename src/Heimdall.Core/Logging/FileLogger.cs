@@ -159,6 +159,12 @@ public sealed class FileLogger : IDisposable
     }
 
     /// <summary>
+    /// True while log messages are being kept. A caller that switches logging off or on for a
+    /// while reads this first, so it can put the previous state back.
+    /// </summary>
+    public static bool IsEnabled => _enabled;
+
+    /// <summary>
     /// Log a message at the given level.
     /// </summary>
     public static void Log(string level, string message)

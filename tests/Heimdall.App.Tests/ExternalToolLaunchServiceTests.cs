@@ -36,6 +36,7 @@ public sealed class ExternalToolLaunchFileLoggerCollectionDefinition;
 public sealed class ExternalToolLaunchServiceTests : IDisposable
 {
     private readonly string _tempDirectory;
+    private readonly bool _previousLoggingEnabled = FileLogger.IsEnabled;
 
     public ExternalToolLaunchServiceTests()
     {
@@ -49,7 +50,7 @@ public sealed class ExternalToolLaunchServiceTests : IDisposable
 
     public void Dispose()
     {
-        FileLogger.SetEnabled(false);
+        FileLogger.SetEnabled(_previousLoggingEnabled);
         try
         {
             if (Directory.Exists(_tempDirectory))

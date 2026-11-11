@@ -29,8 +29,18 @@ public sealed class DialogVerifierFileLoggerCollection
 }
 
 [Collection(DialogVerifierFileLoggerCollection.Name)]
-public sealed class DialogFtpsCertificateVerifierTests
+public sealed class DialogFtpsCertificateVerifierTests : IDisposable
 {
+    private readonly bool _previousLoggingEnabled = FileLogger.IsEnabled;
+
+    public DialogFtpsCertificateVerifierTests()
+    {
+        // These tests assert on log content, so logging is on whatever an earlier class left.
+        FileLogger.SetEnabled(true);
+    }
+
+    public void Dispose() => FileLogger.SetEnabled(_previousLoggingEnabled);
+
     [Fact]
     public async Task VerifyAsync_WithoutApplicationCurrent_ReturnsRejectAndLogsWarning()
     {

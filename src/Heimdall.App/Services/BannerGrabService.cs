@@ -207,19 +207,22 @@ public sealed class BannerGrabService : IBannerGrabService
         int port,
         CancellationToken ct)
     {
+        if (!TunnelProbeCommands.IsProbeTargetValid(host, port))
+        {
+            var invalidService = BannerGrabEngine.IdentifyService(port, null, NetworkToolPresets.GetPortServiceLabel);
+            return new BannerProbeResult(port, invalidService, "-", null);
+        }
+
         var stopwatch = Stopwatch.StartNew();
 
         try
         {
-            var safeHost = InputValidator.EscapeShellArg(host);
-
             await commandLock.WaitAsync(ct).ConfigureAwait(false);
             try
             {
                 var connectResult = await Task.Run(() =>
                 {
-                    using var command = sshClient.CreateCommand(
-                        $"timeout 2 bash -c \"echo >/dev/tcp/{safeHost}/{port}\" 2>/dev/null && echo OPEN || echo CLOSED");
+                    using var command = sshClient.CreateCommand(TunnelProbeCommands.BuildConnectCommand(host, port));
                     command.CommandTimeout = TimeSpan.FromSeconds(5);
                     command.Execute();
                     return command.Result?.Trim();
@@ -235,7 +238,7 @@ public sealed class BannerGrabService : IBannerGrabService
                 var bannerRaw = await Task.Run(() =>
                 {
                     using var command = sshClient.CreateCommand(
-                        $"timeout 2 bash -c \"cat < /dev/tcp/{safeHost}/{port}\" 2>/dev/null | head -c {BannerGrabEngine.BannerMaxBytes}");
+                        TunnelProbeCommands.BuildBannerCommand(host, port, BannerGrabEngine.BannerMaxBytes));
                     command.CommandTimeout = TimeSpan.FromSeconds(5);
                     command.Execute();
                     return command.Result?.Trim();
