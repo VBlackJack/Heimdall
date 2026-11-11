@@ -45,6 +45,30 @@ public static class SecureFileWriter
     {
         ArgumentException.ThrowIfNullOrEmpty(filePath);
 
+        byte[] bytes = Utf8NoBom.GetBytes(text ?? string.Empty);
+        try
+        {
+            WriteBytesAndProtect(filePath, bytes);
+        }
+        finally
+        {
+            Array.Clear(bytes);
+        }
+    }
+
+    /// <summary>
+    /// Writes bytes (for example a PKCS#12 file) to a file created with the same restrictive ACL
+    /// as <see cref="WriteAndProtect(string, string)"/>. The caller keeps ownership of
+    /// <paramref name="data"/> and clears it when it is sensitive.
+    /// </summary>
+    /// <param name="filePath">The target file path.</param>
+    /// <param name="data">The bytes to write.</param>
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    public static void WriteBytesAndProtect(string filePath, byte[] data)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(filePath);
+        ArgumentNullException.ThrowIfNull(data);
+
         FileSecurity security = BuildRestrictedSecurity();
         FileInfo fileInfo = new(filePath);
 
@@ -57,10 +81,41 @@ public static class SecureFileWriter
         using FileStream stream = fileInfo.Create(FileMode.CreateNew, FileSystemRights.WriteData,
             FileShare.None, 4096, FileOptions.None, security);
 
-        byte[] bytes = Utf8NoBom.GetBytes(text ?? string.Empty);
+        stream.Write(data, 0, data.Length);
+    }
+
+    /// <summary>
+    /// Replaces <paramref name="filePath"/> with <paramref name="data"/> without ever deleting the
+    /// existing file first: the bytes go to a temporary file in the same folder created with the
+    /// restrictive ACL, which then replaces the target in one step. A failure leaves the existing
+    /// file as it was and surfaces the error. The caller keeps ownership of <paramref name="data"/>.
+    /// </summary>
+    /// <param name="filePath">The target file path.</param>
+    /// <param name="data">The bytes to write.</param>
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    public static void WriteBytesAtomic(string filePath, byte[] data)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(filePath);
+        ArgumentNullException.ThrowIfNull(data);
+
+        // The staged write never resumes on a captured context, so blocking here cannot deadlock a UI thread.
+        WriteAllBytesAtomicAsync(filePath, data).GetAwaiter().GetResult();
+    }
+
+    /// <summary>
+    /// Text form of <see cref="WriteBytesAtomic"/>: UTF-8 without a byte order mark.
+    /// </summary>
+    /// <param name="filePath">The target file path.</param>
+    /// <param name="text">The text to write.</param>
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    public static void WriteTextAtomic(string filePath, string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+
+        byte[] bytes = Utf8NoBom.GetBytes(text);
         try
         {
-            stream.Write(bytes, 0, bytes.Length);
+            WriteBytesAtomic(filePath, bytes);
         }
         finally
         {

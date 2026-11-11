@@ -4679,7 +4679,8 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
                 () => SaveWindowBoundsAsync(vm),
                 () => vm.DialogService.ShowWarning(warningTitle, warningMessage),
                 () => vm.Settings.DiscardChangesAsync(),
-                () => vm.DialogService.ShowWarning(notConfirmedTitle, notConfirmedMessage));
+                () => vm.DialogService.ShowWarning(notConfirmedTitle, notConfirmedMessage),
+                () => vm.Connection.ConfirmCloseForExitAsync(vm.IsWorkspaceLocked));
 
             if (!prepared)
             {

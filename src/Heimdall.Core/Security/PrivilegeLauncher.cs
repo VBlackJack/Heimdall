@@ -93,6 +93,19 @@ public static class PrivilegeLauncher
 
     internal sealed record PrivilegeLaunchPayload(string Exe, string[] Args);
 
+    /// <summary>Which check of <c>HandlePrivilegeLaunchArgs</c> refused a request.</summary>
+    internal enum PrivilegeLaunchRefusal
+    {
+        None,
+        MalformedCommandLine,
+        InvalidLevel,
+        UnsupportedLevel,
+        PayloadUndecodable,
+        PayloadInvalid,
+        NotElevated,
+        LaunchFailed,
+    }
+
     // ── Win32 structures ──────────────────────────────────────────────
 
     [StructLayout(LayoutKind.Sequential)]
@@ -308,13 +321,27 @@ public static class PrivilegeLauncher
     /// Returns null if args don't match; otherwise returns an exit code (0=success).
     /// </summary>
     public static int? HandlePrivilegeLaunchArgs(string[] args)
+        => HandlePrivilegeLaunchArgs(args, IsCurrentProcessElevated, out _);
+
+    /// <summary>
+    /// Same as the public entry point, with the elevation check supplied by the caller and the
+    /// reason for a refusal reported, so tests can name the check that refused.
+    /// </summary>
+    internal static int? HandlePrivilegeLaunchArgs(
+        string[] args,
+        Func<bool> isElevated,
+        out PrivilegeLaunchRefusal refusal)
     {
+        ArgumentNullException.ThrowIfNull(isElevated);
+
+        refusal = PrivilegeLaunchRefusal.None;
         if (args.Length == 0 || !string.Equals(args[0], PrivLaunchArg, StringComparison.OrdinalIgnoreCase))
             return null;
 
         if (args.Length != 4 || !string.Equals(args[2], PayloadArg, StringComparison.Ordinal))
         {
             FileLogger.Warn("[PrivilegeLauncher] Rejected malformed self-elevation command line.");
+            refusal = PrivilegeLaunchRefusal.MalformedCommandLine;
             return 1;
         }
 
@@ -322,12 +349,14 @@ public static class PrivilegeLauncher
         if (!Enum.TryParse<PrivilegeLevel>(levelStr, ignoreCase: true, out PrivilegeLevel level))
         {
             FileLogger.Warn($"[PrivilegeLauncher] Rejected self-elevation request with invalid level '{levelStr}'.");
+            refusal = PrivilegeLaunchRefusal.InvalidLevel;
             return 1;
         }
 
         if (level == PrivilegeLevel.CurrentUserElevated)
         {
             FileLogger.Warn("[PrivilegeLauncher] Rejected self-elevation request for unsupported CurrentUserElevated level.");
+            refusal = PrivilegeLaunchRefusal.UnsupportedLevel;
             return 1;
         }
 
@@ -339,19 +368,22 @@ public static class PrivilegeLauncher
         catch (Exception ex)
         {
             FileLogger.Warn($"[PrivilegeLauncher] Rejected self-elevation payload decode: {ex.Message}");
+            refusal = PrivilegeLaunchRefusal.PayloadUndecodable;
             return 1;
         }
 
         if (!TryValidateLaunchPayload(payload, out string validationError, level))
         {
             FileLogger.Warn($"[PrivilegeLauncher] Rejected self-elevation payload validation: {validationError}");
+            refusal = PrivilegeLaunchRefusal.PayloadInvalid;
             return 1;
         }
 
-        if (!IsCurrentProcessElevated())
+        if (!isElevated())
         {
             FileLogger.Warn(
                 "[PrivilegeLauncher] Rejected self-elevation token work: process is not elevated.");
+            refusal = PrivilegeLaunchRefusal.NotElevated;
             return 1;
         }
 
@@ -370,6 +402,9 @@ public static class PrivilegeLauncher
         {
             result = PrivilegeLaunchResult.Failed(ex.Message);
         }
+
+        if (!result.Success)
+            refusal = PrivilegeLaunchRefusal.LaunchFailed;
 
         return result.Success ? 0 : 2;
     }

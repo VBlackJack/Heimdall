@@ -71,7 +71,8 @@ internal static class WindowClosingFlow
         Func<Task> persistWindowStateAsync,
         Action warnSaveFailed,
         Func<Task>? discardSettingsAsync = null,
-        Action? warnCloseNotConfirmed = null)
+        Action? warnCloseNotConfirmed = null,
+        Func<Task<bool>>? confirmGuardedContentAsync = null)
     {
         ArgumentNullException.ThrowIfNull(promptSaveDiscardCancelAsync);
         ArgumentNullException.ThrowIfNull(trySaveSettingsAsync);
@@ -124,6 +125,27 @@ internal static class WindowClosingFlow
             catch (Exception ex)
             {
                 FileLogger.Error("Main window session close confirmation failed", ex);
+                NotifyCloseNotConfirmed(warnCloseNotConfirmed);
+                return false;
+            }
+        }
+
+        // Unsaved editor buffers, remote edits and transfers in flight are asked about after the
+        // sessions prompt and before the window state is persisted. A refusal keeps the window open
+        // but does not undo what was already answered: a Save or Discard chosen on the settings
+        // prompt above has been applied by then.
+        if (confirmGuardedContentAsync is not null)
+        {
+            try
+            {
+                if (!await confirmGuardedContentAsync())
+                {
+                    return false;
+                }
+            }
+            catch (Exception ex)
+            {
+                FileLogger.Error("Main window guarded content confirmation failed", ex);
                 NotifyCloseNotConfirmed(warnCloseNotConfirmed);
                 return false;
             }

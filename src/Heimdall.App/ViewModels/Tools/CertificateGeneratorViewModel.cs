@@ -24,12 +24,25 @@ using Heimdall.Core.Localization;
 
 namespace Heimdall.App.ViewModels.Tools;
 
-public sealed record SaveFileRequest(object Content, bool IsBinary, string Filter, string DefaultName);
+/// <param name="Content">The text or bytes to save.</param>
+/// <param name="IsBinary">True when <paramref name="Content"/> is a byte array.</param>
+/// <param name="Filter">The file dialog filter.</param>
+/// <param name="DefaultName">The suggested file name.</param>
+/// <param name="ContainsPrivateKey">True when the file holds a private key, which is then written with a restricted ACL.</param>
+public sealed record SaveFileRequest(
+    object Content,
+    bool IsBinary,
+    string Filter,
+    string DefaultName,
+    bool ContainsPrivateKey = false);
 
 public sealed record PfxPasswordRequest(string Title, string Prompt, Action<string?> ResultCallback);
 
 public sealed partial class CertificateGeneratorViewModel : ObservableObject, IDisposable
 {
+    /// <summary>The tail of every PEM private key header (plain, RSA, EC, encrypted).</summary>
+    private const string PrivateKeyPemMarker = "PRIVATE KEY-----";
+
     public const int DefaultValidityDays = 365;
     public const int CaValidityDays = 3650;
     public const string MaskedPlaceholder = "********";
@@ -288,6 +301,34 @@ public sealed partial class CertificateGeneratorViewModel : ObservableObject, ID
         }
     }
 
+    /// <summary>
+    /// True when <paramref name="text"/> is private key material, so a view can route its copy
+    /// through the secret clipboard path. The copy event carries only text.
+    /// </summary>
+    public bool IsPrivateKeyMaterial(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+        {
+            return false;
+        }
+
+        return string.Equals(text, CurrentKeyPem, StringComparison.Ordinal)
+            || string.Equals(text, LeafKeyPem, StringComparison.Ordinal)
+            || ContainsPrivateKeyMarker(text);
+    }
+
+    /// <summary>True when <paramref name="text"/> carries a PEM private key header.</summary>
+    internal static bool ContainsPrivateKeyMarker(string text)
+        => text.Contains(PrivateKeyPemMarker, StringComparison.Ordinal);
+
+    /// <summary>Shows the export error status for a file that could not be written.</summary>
+    public void ReportSaveFailure(string detail)
+    {
+        _lastMessageKind = CertificateMessageKind.ExportError;
+        _lastMessageDetail = detail;
+        ValidationMessage = string.Format(CultureInfo.InvariantCulture, L("ToolCertGenErrorExport"), detail);
+    }
+
     [RelayCommand]
     private void ToggleKey() => IsKeyVisible = !IsKeyVisible;
 
@@ -344,13 +385,12 @@ public sealed partial class CertificateGeneratorViewModel : ObservableObject, ID
                                 bytes,
                                 true,
                                 L("ToolCertGenPfxFilter"),
-                                "certificate.pfx"));
+                                "certificate.pfx",
+                                ContainsPrivateKey: true));
                     }
                     catch (CryptographicException ex)
                     {
-                        _lastMessageKind = CertificateMessageKind.ExportError;
-                        _lastMessageDetail = ex.Message;
-                        ValidationMessage = string.Format(CultureInfo.InvariantCulture, L("ToolCertGenErrorExport"), ex.Message);
+                        ReportSaveFailure(ex.Message);
                     }
                 }));
     }
