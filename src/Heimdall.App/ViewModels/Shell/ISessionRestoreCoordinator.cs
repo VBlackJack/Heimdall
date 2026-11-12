@@ -39,6 +39,24 @@ public interface ISessionRestoreHost
 }
 
 /// <summary>
+/// Optional companion of <see cref="ISessionRestoreHost"/>: names the sessions of a snapshot from
+/// the whole inventory, not from what the tree currently shows.
+/// </summary>
+/// <remarks>
+/// <see cref="ISessionRestoreHost.RestorableServers"/> is the filtered list, so a session hidden by
+/// a filter or a shared session outside the tree would be labelled unknown in the restore dialog.
+/// A host that can resolve them implements this interface as well.
+/// </remarks>
+public interface ISessionRestoreServerResolver
+{
+    /// <summary>
+    /// The servers the identifiers stand for, wherever they are held: the whole inventory first,
+    /// then the shared sources. An identifier nothing holds is left out.
+    /// </summary>
+    Task<IReadOnlyList<ServerItemViewModel>> ResolveAsync(IReadOnlyCollection<string> ids);
+}
+
+/// <summary>
 /// Replays the previous run's session snapshot at launch: asks the user what to reopen, reopens it,
 /// then tries once to delete the snapshot.
 /// </summary>

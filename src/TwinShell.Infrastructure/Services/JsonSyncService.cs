@@ -814,9 +814,30 @@ public sealed class JsonSyncService : SyncServiceBase
         SyncImportResult result,
         CancellationToken cancellationToken)
     {
+        if (session.PendingTemplateUpdates.Count == 0)
+        {
+            return;
+        }
+
+        // A built-in action's templates belong to the shipped library, whatever the sync folder
+        // says about the action: a file must not rewrite their command.
+        HashSet<Guid> builtInTemplateIds = (await _actionRepository.GetAllWithTemplatesAsync())
+            .Where(action => !action.IsUserCreated)
+            .SelectMany(action => new[] { action.WindowsCommandTemplate, action.LinuxCommandTemplate })
+            .OfType<CommandTemplate>()
+            .Select(template => template.PublicId)
+            .ToHashSet();
+
         foreach ((Guid publicId, CommandTemplate template) in session.PendingTemplateUpdates)
         {
             cancellationToken.ThrowIfCancellationRequested();
+
+            if (builtInTemplateIds.Contains(publicId))
+            {
+                result.TemplatesSkipped++;
+                result.Warnings.Add($"Template '{template.Name}' belongs to a built-in action and was not changed by the import.");
+                continue;
+            }
 
             if (session.KeepLocalTemplateIds.Contains(publicId))
             {

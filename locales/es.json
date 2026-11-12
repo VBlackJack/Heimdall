@@ -2847,6 +2847,8 @@
   "ErrorVncConnectionFailed": "Falló la conexión VNC: {0}",
   "ErrorWebInvalidAddress": "El host, el puerto y la ruta de este perfil no forman una direcci\u00f3n web. Edite el perfil: el campo host solo admite un nombre o una direcci\u00f3n, sin http:// ni ruta.",
   "ErrorWebExternalShellRefused": "Un int\u00e9rprete de comandos no puede abrir una consola web. Elija un navegador en las opciones del perfil.",
+  "ErrorWebExternalNetworkPathRefused": "Un programa de un recurso compartido de red o una ruta de dispositivo no puede abrir una consola web. Elija un programa instalado en este equipo.",
+  "ErrorWebExternalCommandTooLong": "El programa o sus argumentos son demasiado largos para mostrarse completos, por lo que no se abri\u00f3 la consola. Ac\u00f3rtelos en las opciones del perfil.",
   "ErrorWebExternalArgumentRejected": "Un valor de este perfil empieza por '-', o contiene un espacio, una comilla doble o un carácter de control donde los argumentos del programa no lo entrecomillan, y el navegador podría leerlo como una opción. Revisa los campos del perfil o entrecomilla la variable en sus argumentos.",
   "ErrorWebExternalLaunchFailed": "No se pudo iniciar el programa externo: {0}",
   "ErrorWebExternalWithGateway": "Este perfil pasa por una pasarela SSH, que un programa externo no puede usar. \u00c1bralo en una pesta\u00f1a o qu\u00edtele la pasarela.",
@@ -6133,6 +6135,7 @@
 
   "_comment_ux_buttons": "",
   "ToolSshKeyGenGenerating": "Generando...",
+  "ToolSshKeyGenSaveFailed": "No se pudo guardar la clave. El archivo existente no se modific\u00f3. Compruebe que no est\u00e9 abierto en otro lugar ni sea de solo lectura.",
   "ToolCertGenGenerating": "Generando...",
   "ToolTextDiffComparing": "Comparando...",
 

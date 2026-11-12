@@ -2847,6 +2847,8 @@
   "ErrorVncConnectionFailed": "VNC connection failed: {0}",
   "ErrorWebInvalidAddress": "The host, port and path of this profile do not form a web address. Edit the profile: the host field takes a name or an address only, without http:// or a path.",
   "ErrorWebExternalShellRefused": "A command interpreter cannot open a web console. Choose a browser program in the profile's options.",
+  "ErrorWebExternalNetworkPathRefused": "A program on a network share or a device path cannot open a web console. Choose a program installed on this computer.",
+  "ErrorWebExternalCommandTooLong": "The program or its arguments are too long to be shown in full, so the console was not opened. Shorten them in the profile's options.",
   "ErrorWebExternalArgumentRejected": "A value of this profile starts with '-', or holds a space, a double quote or a control character where the program's arguments do not quote it, so the browser could read it as an option. Check the profile's fields, or quote the placeholder in its arguments.",
   "ErrorWebExternalLaunchFailed": "The external program could not be started: {0}",
   "ErrorWebExternalWithGateway": "This profile goes through an SSH gateway, which an external program cannot use. Open it in a tab, or turn off the gateway for it.",
@@ -6133,6 +6135,7 @@
 
   "_comment_ux_buttons": "--- Async tool buttons ---",
   "ToolSshKeyGenGenerating": "Generating...",
+  "ToolSshKeyGenSaveFailed": "The key could not be saved. The existing file was not changed. Check that the file is not open elsewhere or read-only.",
   "ToolCertGenGenerating": "Generating...",
   "ToolTextDiffComparing": "Comparing...",
 

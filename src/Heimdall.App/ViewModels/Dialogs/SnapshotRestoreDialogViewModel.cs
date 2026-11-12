@@ -53,7 +53,13 @@ public partial class SnapshotRestoreDialogViewModel : ObservableObject
         DontRestoreText = _localizer["DialogSnapshotRestoreBtnDontRestore"];
         RestoreSelectedText = _localizer["DialogSnapshotRestoreBtnRestoreSelected"];
 
-        var serverMap = servers.ToDictionary(server => server.Id, StringComparer.OrdinalIgnoreCase);
+        // TryAdd: a list holding one identifier twice must not stop the dialog from opening.
+        var serverMap = new Dictionary<string, ServerItemViewModel>(StringComparer.OrdinalIgnoreCase);
+        foreach (ServerItemViewModel server in servers)
+        {
+            serverMap.TryAdd(server.Id, server);
+        }
+
         Sessions = new ObservableCollection<SnapshotRestoreItemViewModel>(
             snapshot.Sessions
                 .OrderBy(session => session.Order)
