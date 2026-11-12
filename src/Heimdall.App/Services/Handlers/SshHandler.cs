@@ -1022,13 +1022,37 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
             // conditions are the same as without one.
             if (ShouldPromptForPlinkPassword(password, server.SshKeyPath))
             {
+                // The prompt is not skipped when the agent already holds a key: what plink does
+                // without a password file once that key is refused has not been measured.
+                string promptMessage = _localizer.Format("DialogSshPasswordPromptMessage", target);
+
+                // Not tied to ct: the lookup is bounded by its own timeout, and the prompt
+                // follows whatever the token says, as it did before the hint existed.
+                // Pageant is asked directly: plink talks to it whatever the agent preference is.
+                bool agentOnlyAllowed = await SshAgentKeyPreflight
+                    .AgentHoldsAnyIdentityAsync(
+                        _agentRegistryFactory(settings.SshAgentPreference),
+                        PageantAgent.AgentName)
+                    .ConfigureAwait(false);
+                if (agentOnlyAllowed)
+                {
+                    promptMessage = string.Concat(
+                        promptMessage,
+                        Environment.NewLine,
+                        _localizer[SshLocalizationKeys.PlinkPasswordPromptAgentHint]);
+                }
+
                 password = await _dialogService.ShowPasswordInputAsync(
                         _localizer["DialogSshPasswordPromptTitle"],
-                        _localizer.Format("DialogSshPasswordPromptMessage", target),
+                        promptMessage,
                         ct)
                     .ConfigureAwait(false);
 
-                if (string.IsNullOrEmpty(password))
+                // Cancel answers null. An empty answer is "agent only" (plink is launched without a
+                // password file and tries the agent's keys) and is accepted only when the hint
+                // offered it; otherwise it keeps failing as cancelled, since a launch with no
+                // password and no key has an unmeasured outcome.
+                if (password is null || (password.Length == 0 && !agentOnlyAllowed))
                 {
                     string message = SshFailureMessageBuilder.Cancelled(_localizer);
                     _connectionSm.SetError(server.Id, message);
@@ -1315,6 +1339,12 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                     passwordFilePath,
                     _deletePlinkPasswordFile,
                     firstByteProvesConsumption);
+
+                // Disposing kills the process and detaches the exit notification, so a tab closed
+                // on a normal path would otherwise leave the plaintext password file behind until
+                // the janitor. The handle deletes once whichever signal arrives first.
+                PlinkPasswordFileReleaseHandle passwordHandle = passwordFileRelease;
+                terminalSession.Disposed += passwordHandle.Release;
             }
 
             // Same single release path and the same proof as the password file: -load is read

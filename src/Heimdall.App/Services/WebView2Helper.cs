@@ -84,15 +84,25 @@ public static class WebView2Helper
     /// Uses the bundled Fixed Version Runtime if present, otherwise falls back to system Evergreen.
     /// </summary>
     /// <param name="userDataSubfolder">
-    /// Subfolder name under <c>%TEMP%/Heimdall/WebView2/</c> for profile isolation.
+    /// Subfolder name under the per-instance folder of <c>%TEMP%/Heimdall/WebView2/</c> for profile isolation.
     /// </param>
+    /// <remarks>
+    /// Kept under <c>%TEMP%</c> because these profiles hold no state worth keeping. The folder is
+    /// scoped by data root, install folder and runtime, because one profile folder serves one browser process
+    /// and WebView2 refuses a second host with a different runtime or different options on a
+    /// folder whose browser is already running: a test build, another data root or an installed
+    /// release would otherwise interfere.
+    /// </remarks>
     public static async Task<CoreWebView2Environment> CreateEnvironmentAsync(
         string userDataSubfolder = "Default")
     {
-        var userDataFolder = Path.Combine(
-            Path.GetTempPath(), "Heimdall", "WebView2", userDataSubfolder);
-
         string? browserExecutableFolder = BundledRuntimeFolder.Value;
+        string userDataFolder = EmbeddedUserDataFolderFor(
+            Path.GetTempPath(),
+            Core.Configuration.ApplicationDataPathResolver.Resolve(),
+            AppContext.BaseDirectory,
+            browserExecutableFolder,
+            userDataSubfolder);
         var options = new CoreWebView2EnvironmentOptions(
             additionalBrowserArguments: EmbeddedBrowserArguments(null));
 
@@ -102,6 +112,44 @@ public static class WebView2Helper
             options: options)
             .ConfigureAwait(false);
     }
+
+    /// <summary>Length, in hex characters, of the instance key naming a per-instance profile folder.</summary>
+    internal const int InstanceKeyLength = 12;
+
+    /// <summary>Runtime identity of the system Evergreen runtime in the instance key.</summary>
+    internal const string EvergreenRuntimeMarker = "evergreen";
+
+    private const string TempRootFolder = "Heimdall";
+    private const string TempWebView2Folder = "WebView2";
+    private const char InstanceKeySeparator = '|';
+
+    /// <summary>
+    /// The profile folder of one embedded view: scoped by data root, install folder and runtime
+    /// identity. The install folder separates a release from a debug build that share the default
+    /// data root and the Evergreen runtime; two windows of one install still share a folder.
+    /// The hash only keeps folder names short and stable, it protects nothing.
+    /// </summary>
+    internal static string EmbeddedUserDataFolderFor(
+        string tempRoot,
+        string dataRoot,
+        string installFolder,
+        string? bundledRuntimeFolder,
+        string subfolder)
+    {
+        string normalizedRoot = NormalizeForKey(dataRoot);
+        string install = NormalizeForKey(installFolder);
+        string runtime = string.IsNullOrWhiteSpace(bundledRuntimeFolder)
+            ? EvergreenRuntimeMarker
+            : NormalizeForKey(bundledRuntimeFolder);
+        byte[] hash = System.Security.Cryptography.SHA256.HashData(
+            System.Text.Encoding.UTF8.GetBytes(
+                string.Join(InstanceKeySeparator, normalizedRoot, install, runtime)));
+        string key = Convert.ToHexStringLower(hash)[..InstanceKeyLength];
+        return Path.Combine(tempRoot, TempRootFolder, TempWebView2Folder, key, subfolder);
+    }
+
+    private static string NormalizeForKey(string folder)
+        => Path.TrimEndingDirectorySeparator(folder.Trim()).ToLowerInvariant();
 
     /// <summary>
     /// The switch every embedded view runs with: the pointer stays visible while the user types.
