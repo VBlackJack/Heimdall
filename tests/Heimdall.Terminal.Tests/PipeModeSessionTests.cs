@@ -22,6 +22,32 @@ namespace Heimdall.Terminal.Tests;
 public sealed class PipeModeSessionTests
 {
     [Fact]
+    public void Disposed_IsRaisedOnce_WhenDisposeRunsTwice()
+    {
+        PipeModeSession session = new();
+        int raised = 0;
+        session.Disposed += () => Interlocked.Increment(ref raised);
+
+        Parallel.Invoke(session.Dispose, session.Dispose);
+        session.Dispose();
+
+        Assert.Equal(1, raised);
+    }
+
+    [Fact]
+    public void Disposed_ThrowingSubscriber_DoesNotSkipTheNext()
+    {
+        PipeModeSession session = new();
+        bool nextRan = false;
+        session.Disposed += () => throw new InvalidOperationException("subscriber failed");
+        session.Disposed += () => nextRan = true;
+
+        session.Dispose();
+
+        Assert.True(nextRan);
+    }
+
+    [Fact]
     public async Task DataReceived_SubscriberAddedAfterBootstrapOutput_ReplaysBufferedOutput()
     {
         // The child is the command processor rather than PowerShell. It carries the same

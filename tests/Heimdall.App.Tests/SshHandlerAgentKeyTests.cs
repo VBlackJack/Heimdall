@@ -66,6 +66,8 @@ public sealed class SshHandlerAgentKeyTests
         return blob;
     }
 
+    private const int TunnelLocalPort = 54321;
+
     private static string FingerprintOf(byte[] blob) => SshAgentKeyFingerprints.Compute(blob);
 
     [Fact]
@@ -459,10 +461,56 @@ public sealed class SshHandlerAgentKeyTests
     [InlineData("ssh-rsa")]
     [InlineData("ssh-dss")]
     [InlineData("ssh-ed25519-cert-v01@openssh.com")]
-    [InlineData("ssh-rsa-cert-v01@openssh.com")]
     public void PlinkKeyType_Allowed_IsAccepted(string type)
     {
         Assert.True(SshAgentKeyPreflight.IsPlinkParseable(new FakeKey("k", Blob(type, 1), type)));
+    }
+
+    [Theory]
+    [InlineData("ssh-rsa-cert-v01@openssh.com")]
+    [InlineData("ssh-ed448-cert-v01@openssh.com")]
+    public async Task PlinkKeyType_UnmeasuredCertificate_Refuses(string type)
+    {
+        byte[] blob = Blob(type, 4);
+        using Harness harness = await Harness.CreateAsync(
+            [new FakeAgent(PageantAgent.AgentName, [new FakeKey("cert", blob, type)])],
+            attested: true);
+
+        ConnectionResult result = await harness.ConnectViaPlinkAsync(harness.Server(FingerprintOf(blob)));
+
+        Assert.False(result.Success);
+        Assert.Equal(
+            harness.Localizer.Format(SshLocalizationKeys.ErrorSshAgentKeyPlinkKeyType, FingerprintOf(blob)),
+            result.ErrorMessage);
+        Assert.Equal(0, harness.Launches);
+    }
+
+    [Fact]
+    public async Task CancelDuringTheRetryDecision_ReleasesTheTunnel()
+    {
+        using ManualResetEventSlim release = new();
+        using CancellationTokenSource cts = new();
+        using Harness harness = await Harness.CreateAsync(
+            [new SwitchingAgent(release, [new FakeKey("a", BlobA)])],
+            attested: true,
+            connectShell: (_, _, _, _, _, _, _) =>
+            {
+                // The retry decision then waits on an agent that never answers; the cancel lands there.
+                cts.CancelAfter(TimeSpan.FromMilliseconds(150));
+                throw new SshAuthenticationException("Permission denied (publickey).");
+            });
+        harness.UsesTunnel = true;
+        try
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                () => harness.ConnectAsync(harness.Server(FingerprintOf(BlobA)), cts.Token));
+
+            Assert.Equal(1, harness.TunnelReleases);
+        }
+        finally
+        {
+            release.Set();
+        }
     }
 
     [Fact]
@@ -701,12 +749,12 @@ public sealed class SshHandlerAgentKeyTests
         private readonly string _plinkPath = Path.GetTempFileName();
         private readonly SshHandler _handler;
         private readonly Func<int, bool> _attestedAt;
-        private readonly List<FakeAgent> _agents;
+        private readonly List<ISshAgent> _agents;
         private readonly List<string> _createdPaths = [];
         private int _attestationCalls;
 
         private Harness(
-            List<FakeAgent> agents,
+            List<ISshAgent> agents,
             LocalizationManager localizer,
             Func<int, bool> attestedAt,
             SshHandler.ConnectShellSession? connectShell,
@@ -790,7 +838,7 @@ public sealed class SshHandlerAgentKeyTests
         public int Launches { get; private set; }
 
         public static async Task<Harness> CreateAsync(
-            List<FakeAgent> agents,
+            List<ISshAgent> agents,
             bool attested = false,
             SshHandler.ConnectShellSession? connectShell = null,
             Action<string, string>? start = null,
@@ -845,6 +893,13 @@ public sealed class SshHandlerAgentKeyTests
         public Task<ConnectionResult> ConnectAsync(ServerProfileDto server) =>
             _handler.ConnectAsync(server, Settings(), CancellationToken.None);
 
+        public Task<ConnectionResult> ConnectAsync(ServerProfileDto server, CancellationToken ct) =>
+            _handler.ConnectAsync(server, Settings(), ct);
+
+        public bool UsesTunnel { get; set; }
+
+        public int TunnelReleases { get; set; }
+
         public Task<ConnectionResult> ConnectViaPlinkAsync(ServerProfileDto server) =>
             _handler.ConnectSshViaPlinkAsync(
                 server,
@@ -883,8 +938,9 @@ public sealed class SshHandlerAgentKeyTests
             bool preferDistinctLoopback = false)
         {
             harness.TunnelSetups++;
-            return Task.FromResult(
-                new TunnelSetupOutcome(true, false, server.RemoteServer, remotePort, null, null));
+            return Task.FromResult(harness.UsesTunnel
+                ? new TunnelSetupOutcome(true, true, "127.0.0.1", TunnelLocalPort, null, null)
+                : new TunnelSetupOutcome(true, false, server.RemoteServer, remotePort, null, null));
         }
 
         public void UpdateSettings(AppSettings settings)
@@ -895,6 +951,7 @@ public sealed class SshHandlerAgentKeyTests
 
         public void ReleaseTunnelReference(int localPort)
         {
+            harness.TunnelReleases++;
         }
     }
 
@@ -910,6 +967,26 @@ public sealed class SshHandlerAgentKeyTests
         {
             harness.HostKeyProbes++;
             return Task.FromResult<PlinkHostKeyPresentation?>(null);
+        }
+    }
+
+    /// <summary>Lists its keys once, then blocks: the first look succeeds, the next never answers.</summary>
+    internal sealed class SwitchingAgent(ManualResetEventSlim release, IReadOnlyList<ISshAgentKey> identities) : ISshAgent
+    {
+        private int _calls;
+
+        public string Name => PageantAgent.AgentName;
+
+        public bool IsAvailable() => true;
+
+        public IReadOnlyList<ISshAgentKey> GetIdentities()
+        {
+            if (Interlocked.Increment(ref _calls) > 1)
+            {
+                release.Wait();
+            }
+
+            return identities;
         }
     }
 

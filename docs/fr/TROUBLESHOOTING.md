@@ -1286,18 +1286,20 @@ N'utilisez **pas** `IServiceProvider.QueryService` dans ce cas. Sur `MsTscAx.MsT
 **Symptôme** : une session qui désigne une clé d'agent ne s'ouvre pas et le message est l'un de ceux-ci :
 
 - "La clé d'agent choisie pour cette session (SHA256:...) n'est pas chargée dans Pageant, dont cette connexion a besoin. Chargez-la dans Pageant, ou choisissez une autre clé dans les paramètres de la session."
-- "La clé d'agent choisie pour cette session (SHA256:...) est d'un type auquel Plink ne peut pas être limité, et le transfert d'agent fait passer cette session par Plink. Désactivez le transfert d'agent, ou choisissez une autre clé."
-- "Cette session désigne une clé d'agent et aussi un fichier de clé, et le transfert d'agent la fait passer par Plink, qui n'accepte que l'un des deux. Retirez le fichier de clé, retirez le choix de clé d'agent, ou désactivez le transfert d'agent."
+- "La clé d'agent choisie pour cette session (SHA256:...) est d'un type auquel Plink ne peut pas être limité, et cette connexion passe par Plink. Désactivez le transfert d'agent, ou choisissez une autre clé."
+- "Cette session désigne une clé d'agent et aussi un fichier de clé, et cette connexion passe par Plink, qui n'accepte que l'un des deux. Retirez le fichier de clé, retirez le choix de clé d'agent, ou désactivez le transfert d'agent."
 - "Cette session désigne une clé d'agent, et le programme Plink utilisé n'est pas celui fourni avec Heimdall : rien ne garantit qu'il ne propose que cette clé. Utilisez le Plink fourni, ou retirez le choix de clé d'agent."
 - "Cette session désigne une seule clé d'agent, et le programme utilisé pour cette connexion ne peut pas être limité à cette clé. Passez la session au terminal intégré, ou retirez le choix de clé d'agent."
 
 **Cause racine** : Plink est utilisé quand le transfert d'agent est activé (il transfère Pageant) et comme nouvel essai après un échec du client intégré. Plink ne peut joindre que Pageant, et Heimdall le limite à la clé choisie en lui remettant la moitié publique de cette clé par `-i`. Il refuse de démarrer quand il ne peut pas garantir que seule cette clé est présentée, plutôt que de présenter toutes les clés de Pageant :
 
 - La clé est dans l'agent OpenSSH de Windows mais pas dans Pageant.
-- La clé est d'un type que Plink ne sait pas lire dans un fichier de clé publique, comme une clé matérielle "sk".
+- La clé est d'un type que Plink ne sait pas lire dans un fichier de clé publique, comme une clé matérielle "sk". Parmi les certificats, seul un certificat Ed25519 est accepté sur le chemin Plink.
 - La session a aussi un fichier de clé : Plink n'accepte qu'un seul `-i`.
 - Le Plink utilisé n'est pas la version fournie avec Heimdall (un autre chemin de `plink.exe` dans `Settings > SSH & SFTP`).
 - La session est réglée sur PuTTY externe, à qui l'on ne peut pas dire quelle clé d'agent utiliser.
+
+Après un échec du client intégré, le nouvel essai par Plink est simplement ignoré quand Plink ne peut pas être limité à la clé choisie, et l'erreur propre du client intégré est affichée.
 
 **Solution** :
 

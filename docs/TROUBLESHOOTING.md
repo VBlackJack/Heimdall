@@ -1286,18 +1286,20 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 **Symptom**: A session that names one agent key fails to open and the message is one of these:
 
 - "The agent key chosen for this session (SHA256:...) is not loaded in Pageant, which this connection needs. Load it in Pageant, or choose another key in the session's settings."
-- "The agent key chosen for this session (SHA256:...) is of a type Plink cannot be limited to, and agent forwarding sends this session through Plink. Turn off agent forwarding, or choose another key."
-- "This session names one agent key and also a key file, and agent forwarding sends it through Plink, which takes only one of the two. Remove the key file, clear the chosen agent key, or turn off agent forwarding."
+- "The agent key chosen for this session (SHA256:...) is of a type Plink cannot be limited to, and this connection goes through Plink. Turn off agent forwarding, or choose another key."
+- "This session names one agent key and also a key file, and this connection goes through Plink, which takes only one of the two. Remove the key file, clear the chosen agent key, or turn off agent forwarding."
 - "This session names one agent key, and the Plink program in use is not the one shipped with Heimdall, so it cannot be trusted to offer only that key. Use the bundled Plink, or clear the chosen agent key."
 - "This session names one agent key, and the program used for this connection cannot be limited to it. Switch the session to the embedded terminal, or clear the chosen key."
 
 **Root cause**: Plink is used when agent forwarding is on (it forwards Pageant) and as the retry after a failure of the embedded client. Plink can only reach Pageant, and Heimdall limits it to the chosen key by handing it that key's public half through `-i`. It refuses to start when it cannot guarantee that only that key is offered, rather than offering every key of Pageant:
 
 - The key is in the Windows OpenSSH Agent but not in Pageant.
-- The key is a type Plink cannot read from a public key file, such as a hardware "sk" key.
+- The key is a type Plink cannot read from a public key file, such as a hardware "sk" key. Among certificates, only an Ed25519 certificate is accepted on the Plink path.
 - The session also has a key file: Plink takes one `-i` only.
 - The Plink in use is not the build shipped with Heimdall (a different `plink.exe` path in `Settings > SSH & SFTP`).
 - The session is set to external PuTTY, which cannot be told which agent key to use.
+
+After a failure of the embedded client, the retry through Plink is simply skipped when Plink cannot be limited to the chosen key, and the embedded client's own error is shown.
 
 **Solution**:
 

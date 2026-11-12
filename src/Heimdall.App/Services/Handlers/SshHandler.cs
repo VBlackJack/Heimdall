@@ -418,10 +418,24 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
             // With a chosen agent key the retry goes through Plink only when Plink can honour that
             // key; otherwise the embedded client's own failure is the answer, unchanged. A code in
             // no retry set (the key is not loaded) never gets here.
-            if (!sshParams.KeyboardInteractive.HasInteractiveAnswer
-                && SshPlinkRetryPolicy.AllowsPlinkRetry(failure.Code)
-                && (chosenAgentKey is null
-                    || await CanPlinkHonourChosenKeyAsync(server, settings, ct).ConfigureAwait(false)))
+            bool plinkMayRetry = !sshParams.KeyboardInteractive.HasInteractiveAnswer
+                && SshPlinkRetryPolicy.AllowsPlinkRetry(failure.Code);
+            if (plinkMayRetry && chosenAgentKey is not null)
+            {
+                try
+                {
+                    plinkMayRetry = await CanPlinkHonourChosenKeyAsync(server, settings, ct).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    // Same ending as a cancelled dial above: the tunnel reference is given back
+                    // and the cancellation travels on.
+                    ReleaseTunnelIfNeeded(usesTunnel, targetPort, tunnelLeaseId);
+                    throw;
+                }
+            }
+
+            if (plinkMayRetry)
             {
                 var fallbackAgentRegistry = _agentRegistryFactory(settings.SshAgentPreference);
                 if (!fallbackAgentRegistry.HasPlinkCompatibleAgent() && fallbackAgentRegistry.HasAnyNonPlinkAgent())

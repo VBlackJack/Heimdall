@@ -32,6 +32,7 @@ public sealed class PipeModeSession : ITerminalSession
     private Task? _stderrLoop;
     private CancellationTokenSource? _cts;
     private bool _disposed;
+    private int _disposedFlag;
     private readonly object _processExitedLock = new();
     private Action<int>? _processExited;
     private bool _processExitedRaised;
@@ -273,19 +274,27 @@ public sealed class PipeModeSession : ITerminalSession
 
     public void Dispose()
     {
-        if (_disposed) return;
+        if (Interlocked.Exchange(ref _disposedFlag, 1) != 0) return;
         _disposed = true;
 
         _cts?.Cancel();
         KillProcess();
 
-        try
+        // Each subscriber in its own try: one that throws must not skip the next.
+        Action? subscribers = Disposed;
+        if (subscribers is not null)
         {
-            Disposed?.Invoke();
-        }
-        catch (Exception ex)
-        {
-            Heimdall.Core.Logging.FileLogger.Warn($"[PipeModeSession] Disposed subscriber: {ex.Message}");
+            foreach (Action subscriber in subscribers.GetInvocationList().Cast<Action>())
+            {
+                try
+                {
+                    subscriber();
+                }
+                catch (Exception ex)
+                {
+                    Heimdall.Core.Logging.FileLogger.Warn($"[PipeModeSession] Disposed subscriber: {ex.Message}");
+                }
+            }
         }
 
         lock (_dataLock)

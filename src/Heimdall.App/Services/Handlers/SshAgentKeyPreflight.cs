@@ -56,15 +56,15 @@ internal enum SshAgentKeyRefusal
 /// </summary>
 internal static class SshAgentKeyPreflight
 {
-    private const string CertificateSuffix = "-cert-v01@openssh.com";
     private const int BlobLengthPrefixBytes = sizeof(uint);
     private const char FirstPrintableAscii = '!';
     private const char LastPrintableAscii = '~';
 
     /// <summary>
-    /// The key types whose public key file Plink 0.83 parses. A type outside this set makes Plink
-    /// report that it cannot load the file and then try every key of Pageant, which would offer
-    /// more than the one chosen: so such a key is refused on the Plink path.
+    /// Exactly the key type names measured against the bundled Plink 0.83: Plink reports that it
+    /// cannot load the public key file of any other type and then tries every key of Pageant,
+    /// which would offer more than the one chosen, so such a key is refused on the Plink path.
+    /// Only the Ed25519 certificate line was measured among the certificate types.
     /// </summary>
     private static readonly HashSet<string> PlinkParseableKeyTypes = new(StringComparer.Ordinal)
     {
@@ -75,6 +75,7 @@ internal static class SshAgentKeyPreflight
         "ecdsa-sha2-nistp521",
         "ssh-rsa",
         "ssh-dss",
+        "ssh-ed25519-cert-v01@openssh.com",
     };
 
     /// <summary>
@@ -167,11 +168,6 @@ internal static class SshAgentKeyPreflight
         if (type is null)
         {
             return false;
-        }
-
-        if (type.EndsWith(CertificateSuffix, StringComparison.Ordinal))
-        {
-            type = type[..^CertificateSuffix.Length];
         }
 
         return PlinkParseableKeyTypes.Contains(type);
