@@ -97,6 +97,7 @@
   "ErrorSudoMissing": "sudo est introuvable sur le serveur : il n'est pas install\u00e9, ou absent du chemin de ce compte.",
   "DialogSshPasswordPromptTitle": "Mot de passe SSH requis",
   "DialogSshPasswordPromptMessage": "Saisissez le mot de passe SSH pour {0}.",
+  "SshPlinkPasswordPromptAgentHint": "Laissez-le vide pour vous connecter uniquement avec les cl\u00e9s de votre agent SSH.",
   "ErrorSshProtocolError": "Erreur de protocole SSH. Le serveur utilise peut-\u00eatre une version de protocole incompatible.",
   "ErrorSshTooManyAuthFailures": "Trop d'\u00e9checs d'authentification. Un agent SSH qui propose beaucoup de cl\u00e9s peut en \u00eatre la cause : chargez moins de cl\u00e9s dans l'agent, ou indiquez \u00e0 cette session son propre fichier de cl\u00e9. Le serveur peut aussi simplement ne pas accepter la cl\u00e9 de cette session.",
   "ErrorSshTooManyAuthFailuresOneAgentKey": "Trop d'\u00e9checs d'authentification. Un agent SSH d\u00e9tenait une cl\u00e9 \u00e0 pr\u00e9senter, et un mot de passe ou un fichier de cl\u00e9 enregistr\u00e9 sur cette session a peut-\u00eatre \u00e9t\u00e9 essay\u00e9 avant et a entam\u00e9 la limite. Chaque cl\u00e9 refus\u00e9e compte dans la limite du serveur : retirez de l'agent les cl\u00e9s que ce serveur ne conna\u00eet pas, donnez \u00e0 cette session son propre fichier de cl\u00e9, ou augmentez MaxAuthTries sur le serveur.",

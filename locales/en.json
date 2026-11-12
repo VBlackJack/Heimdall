@@ -97,6 +97,7 @@
   "ErrorSudoMissing": "sudo was not found on the server: it is not installed, or not on this account's path.",
   "DialogSshPasswordPromptTitle": "SSH password required",
   "DialogSshPasswordPromptMessage": "Enter the SSH password for {0}.",
+  "SshPlinkPasswordPromptAgentHint": "Leave it empty to sign in with the keys of your SSH agent only.",
   "ErrorSshProtocolError": "SSH protocol error. The server may use an incompatible protocol version.",
   "ErrorSshTooManyAuthFailures": "Too many authentication failures. An SSH agent offering many keys can cause this: load fewer keys in the agent, or point this session at its own key file. The server may also simply not accept this session's key.",
   "ErrorSshTooManyAuthFailuresOneAgentKey": "Too many authentication failures. An SSH agent held one key to offer, and a password or key file saved on this session may have been tried first and used up part of the limit. Each refused key counts against the server limit: remove the keys this server does not know from the agent, give this session its own key file, or raise MaxAuthTries on the server.",

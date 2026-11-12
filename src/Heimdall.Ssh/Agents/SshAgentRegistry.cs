@@ -162,6 +162,41 @@ public sealed class SshAgentRegistry
     }
 
     /// <summary>
+    /// Whether the agent called <paramref name="agentName"/> is reachable and holds at least one
+    /// identity. An agent whose identity request fails holds nothing that can be offered.
+    /// </summary>
+    /// <remarks>
+    /// Not filtered by the agent preference: a caller asking about one named agent (plink only
+    /// talks to Pageant) wants its answer whichever agents the embedded client is set to use.
+    /// </remarks>
+    public bool HoldsAnyIdentity(string agentName)
+    {
+        ArgumentNullException.ThrowIfNull(agentName);
+
+        foreach (var agent in _agents)
+        {
+            if (!string.Equals(agent.Name, agentName, StringComparison.Ordinal) || !IsAvailableSafe(agent))
+            {
+                continue;
+            }
+
+            try
+            {
+                if (agent.GetIdentities().Count > 0)
+                {
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                Core.Logging.FileLogger.Warn($"SSH agent {agent.Name}: identity lookup failed: {ex.Message}");
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// How many identities Heimdall would actually offer a gateway.
     /// <para>
     /// Authentication takes the first reachable agent that holds any identity

@@ -97,6 +97,7 @@
   "ErrorSudoMissing": "No se encuentra sudo en el servidor: no está instalado o no está en la ruta de esta cuenta.",
   "DialogSshPasswordPromptTitle": "Se requiere contraseña SSH",
   "DialogSshPasswordPromptMessage": "Introduce la contraseña SSH para {0}.",
+  "SshPlinkPasswordPromptAgentHint": "Déjalo vacío para iniciar sesión solo con las claves de tu agente SSH.",
   "ErrorSshProtocolError": "Error de protocolo SSH. Es posible que el servidor use una versión de protocolo incompatible.",
   "ErrorSshTooManyAuthFailures": "Demasiados fallos de autenticación. Un agente SSH que ofrece muchas claves puede causarlo: carga menos claves en el agente o indica a esta sesión su propio archivo de clave. Además, el servidor puede simplemente no aceptar la clave de esta sesión.",
   "ErrorSshTooManyAuthFailuresOneAgentKey": "Demasiados fallos de autenticación. Un agente SSH tenía una clave para ofrecer, y es posible que antes se probara una contraseña o un archivo de clave guardado en esta sesión y que ya haya consumido parte del límite. Cada clave rechazada cuenta para el límite del servidor: quita del agente las claves que este servidor no conoce, indica a esta sesión su propio archivo de clave o aumenta MaxAuthTries en el servidor.",
