@@ -3395,6 +3395,7 @@
   "SshSessionStatusError": "Erreur",
   "SshSessionStatusConnecting": "Connexion en cours",
   "SshPipeSessionSizeMismatchNotice": "Cette session ne peut pas suivre la nouvelle largeur du terminal ({0} colonnes) ; elle reste en {1} colonnes. Reconnectez-la pour appliquer la taille actuelle.",
+  "SshPipeSessionSizeMismatchBadge": "Largeur fixe : {0} col.",
   "FileBrowserFilterPlaceholder": "Filtrer...",
 
   "ToolPwdGenTitle": "G\u00e9n\u00e9rateur de mot de passe",

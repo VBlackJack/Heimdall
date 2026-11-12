@@ -3396,6 +3396,7 @@
   "SshSessionStatusError": "Error",
   "SshSessionStatusConnecting": "Conectando",
   "SshPipeSessionSizeMismatchNotice": "Esta sesión no puede seguir el nuevo ancho del terminal ({0} columnas); se queda en {1} columnas. Reconecta para aplicar el tamaño actual.",
+  "SshPipeSessionSizeMismatchBadge": "Ancho fijo: {0} col.",
   "FileBrowserFilterPlaceholder": "Filtrar...",
 
   "ToolPwdGenTitle": "Generador de contraseñas",

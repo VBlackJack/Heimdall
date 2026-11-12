@@ -342,11 +342,11 @@ public sealed class SshHandlerInitialTerminalSizeTests
     /// <summary>
     /// The original race, reproduced. The connect path reaches the size lookup while the page is
     /// still loading, and the page's first size lands only after that. The real producer is the
-    /// terminal page: it posts <c>ready:cols,rows</c> at the end of <c>initializeTerminal()</c> when the
-    /// fit addon could measure its surface, and otherwise posts <c>ready:</c> without a size and
-    /// sends the size with the first fit that can measure. The view hands a size to the report in
-    /// the <c>MsgReady</c> and <c>MsgResize</c> branches of <c>EmbeddedSshView.OnWebMessageReceived</c>,
-    /// through <c>RememberTerminalSize</c>.
+    /// terminal page: its <c>ready:</c> never carries a size. The host answers with
+    /// <c>viewport:W,H</c> while the surface is hidden (or <c>viewport:</c> once it is shown), and the
+    /// page then reports <c>resize:cols,rows</c>. The view hands that size to the report in the
+    /// <c>MsgResize</c> branch of <c>EmbeddedSshView.OnWebMessageReceived</c>, through
+    /// <c>RememberTerminalSize</c>.
     /// Here the report is released only once the connect path has asked, which is the order a
     /// fresh tab measured in the product: no "at the reported" line before the launch.
     /// </summary>

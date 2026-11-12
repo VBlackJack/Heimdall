@@ -3396,6 +3396,7 @@
   "SshSessionStatusError": "Error",
   "SshSessionStatusConnecting": "Connecting",
   "SshPipeSessionSizeMismatchNotice": "This session cannot follow the new terminal width ({0} columns); it stays at {1} columns. Reconnect to apply the current size.",
+  "SshPipeSessionSizeMismatchBadge": "Width fixed: {0} cols",
   "FileBrowserFilterPlaceholder": "Filter...",
 
   "ToolPwdGenTitle": "Password Generator",

@@ -182,10 +182,29 @@
             var term = null;
             var fitAddon = null;
             var ready = false;
-            // True once the host has been sent a size that the fit addon really measured. Until
-            // then the host must not take term.cols/term.rows for a measurement: before the first
-            // successful fit they are xterm's built-in 80x24.
-            var measuredSizePosted = false;
+            // The viewport the host says to lay out in while the surface is hidden (the native
+            // window is not positioned then, so the page cannot measure its own box), or null.
+            var hostViewport = null;
+            // True once the host has said the surface is shown. Until the host has spoken, one way
+            // or the other, the page reports no size at all: before then term.cols/term.rows are
+            // xterm's built-in 80x24 or a fit to a box that is not the pane.
+            var surfaceShown = false;
+            // The host-given box stays on the container until the real bounds have arrived.
+            var viewportConstraintActive = false;
+            // True from the host's "shown" message until the page's box is its real one.
+            var awaitingRealBounds = false;
+            var viewportConstraintHandle = 0;
+            var viewportConstraintFallbackMilliseconds = 1000;
+            // The fallback timer re-arms this many times while the box is still the creation box,
+            // then gives up and says so.
+            var viewportFallbackMaxRearms = 5;
+            var viewportFallbackRearms = 0;
+            // The box the page had when it was created: not the pane. Recorded at ready.
+            var creationBox = null;
+            var viewportMatchTolerancePixels = 1;
+            // While the host-given box is applied, onResize stays quiet: the handler reports once.
+            var suppressResizePost = false;
+            var lastPostedSize = null;
             var pendingHostMessages = [];
             var pendingResizeHandle = 0;
             var baseFontSize = /*{{TERMINAL_FONT_SIZE}}*/;
@@ -331,33 +350,6 @@
                 }
             }
 
-            // The size the fit addon can measure right now, or null when the container has no
-            // size yet (hidden tab, page not laid out) and it would have nothing to measure.
-            function measureTerminal() {
-                if (!fitAddon || !term) {
-                    return null;
-                }
-                if (terminalElement.clientWidth <= 0 || terminalElement.clientHeight <= 0) {
-                    return null;
-                }
-                var dimensions = fitAddon.proposeDimensions();
-                if (!dimensions || !isFinite(dimensions.cols) || !isFinite(dimensions.rows)
-                    || dimensions.cols <= 0 || dimensions.rows <= 0) {
-                    return null;
-                }
-                return dimensions;
-            }
-
-            // The first measured fit may land on the size xterm already has (80x24), in which case
-            // onResize never fires and the host would never hear a size at all. Called by the
-            // callers of fitTerminal, never by it: fitTerminal leaves every report to onResize.
-            function reportFirstMeasuredSize() {
-                if (ready && !measuredSizePosted && measureTerminal()) {
-                    measuredSizePosted = true;
-                    postMessage('resize:' + term.cols + ',' + term.rows);
-                }
-            }
-
             function fitTerminal() {
                 if (!fitAddon || !term) {
                     return;
@@ -367,18 +359,135 @@
                 fitAddon.fit();
             }
 
-            // A fit that can be the first measured one: the size is reported once, if onResize did
-            // not already do it.
-            function fitAndReportTerminal() {
-                fitTerminal();
-                reportFirstMeasuredSize();
+            // Sends the grid to the host, once per distinct size unless forced.
+            function postTerminalSize(force) {
+                var size = term.cols + ',' + term.rows;
+                if (!force && size === lastPostedSize) {
+                    return;
+                }
+                lastPostedSize = size;
+                // The forced report is the first one measured with the surface shown, and the
+                // host compares exactly that one with the size it derived while hidden.
+                postMessage('resize:' + size + (force ? ',shown' : ''));
             }
+
+            // Fits without letting onResize report, then reports from here. The report is made by
+            // this function rather than by fitTerminal, which leaves every report to onResize.
+            function fitAndReportOnce(force) {
+                suppressResizePost = true;
+                try {
+                    fitTerminal();
+                } finally {
+                    suppressResizePost = false;
+                }
+                postTerminalSize(force);
+            }
+
+            function boxMatches(width, height) {
+                return Math.abs(window.innerWidth - width) <= viewportMatchTolerancePixels
+                    && Math.abs(window.innerHeight - height) <= viewportMatchTolerancePixels;
+            }
+
+            // Whether the window has taken its real bounds: the box is the one the host derived, or
+            // it is no longer the creation box. A pane that is by coincidence exactly the creation
+            // box is told apart only by a host-derived box, which the host sends whenever it is laid out.
+            function realBoundsArrived() {
+                if (hostViewport && boxMatches(hostViewport.w, hostViewport.h)) {
+                    return true;
+                }
+                return !(creationBox && boxMatches(creationBox.w, creationBox.h));
+            }
+
+            function armViewportFallback() {
+                if (viewportConstraintHandle) {
+                    window.clearTimeout(viewportConstraintHandle);
+                }
+                viewportConstraintHandle = window.setTimeout(
+                    onViewportFallback, viewportConstraintFallbackMilliseconds);
+            }
+
+            // The way out when no resize event comes. It never releases onto the creation box.
+            function onViewportFallback() {
+                viewportConstraintHandle = 0;
+                if (!awaitingRealBounds) {
+                    return;
+                }
+                if (realBoundsArrived()) {
+                    releaseViewportConstraint();
+                    return;
+                }
+                if (viewportFallbackRearms < viewportFallbackMaxRearms) {
+                    viewportFallbackRearms++;
+                    armViewportFallback();
+                    return;
+                }
+                postMessage('diag:surface-never-took-bounds ' + window.innerWidth + 'x' + window.innerHeight);
+            }
+
+            // The real bounds are known: the host-given box comes off and the grid is reported.
+            function releaseViewportConstraint() {
+                if (viewportConstraintHandle) {
+                    window.clearTimeout(viewportConstraintHandle);
+                    viewportConstraintHandle = 0;
+                }
+                awaitingRealBounds = false;
+                viewportFallbackRearms = 0;
+                viewportConstraintActive = false;
+                hostViewport = null;
+                terminalElement.style.width = '';
+                terminalElement.style.height = '';
+                // Forced: the host compares this first measured size with the one it derived.
+                fitAndReportOnce(true);
+            }
+
+            // The host's "viewport:" message. "viewport:W,H" while the surface is hidden: lay out
+            // as if the viewport were W x H. "viewport:" once it is shown: measure yourself.
+            function handleViewportMessage(payload) {
+                if (payload.length === 0) {
+                    surfaceShown = true;
+                    if (realBoundsArrived()) {
+                        releaseViewportConstraint();
+                        return;
+                    }
+                    // The window has not been positioned yet: nothing is measured until it is.
+                    awaitingRealBounds = true;
+                    viewportFallbackRearms = 0;
+                    armViewportFallback();
+                    return;
+                }
+
+                var parts = payload.split(',');
+                var width = parseFloat(parts[0]);
+                var height = parseFloat(parts[1]);
+                if (parts.length !== 2 || !isFinite(width) || !isFinite(height) || width <= 0 || height <= 0) {
+                    return;
+                }
+                var pixelRatio = window.devicePixelRatio || 1;
+                var snappedWidth = Math.round(width * pixelRatio) / pixelRatio;
+                var snappedHeight = Math.round(height * pixelRatio) / pixelRatio;
+                hostViewport = { w: width, h: height };
+                viewportConstraintActive = true;
+                surfaceShown = false;
+                if (viewportConstraintHandle) {
+                    window.clearTimeout(viewportConstraintHandle);
+                    viewportConstraintHandle = 0;
+                }
+                terminalElement.style.width = snappedWidth + 'px';
+                terminalElement.style.height = snappedHeight + 'px';
+                fitAndReportOnce(false);
+            }
+
+            window.addEventListener('resize', function () {
+                if (awaitingRealBounds && surfaceShown && realBoundsArrived()) {
+                    releaseViewportConstraint();
+                }
+            });
 
             function setFontSize(size) {
                 size = Math.max(fontSizeMin, Math.min(fontSizeMax, size));
                 currentFontSize = size;
                 term.options.fontSize = size;
-                fitAndReportTerminal();
+                fitTerminal();
             }
 
             // ── Search ──────────────────────────────────────────────
@@ -562,6 +671,11 @@
                     return;
                 }
 
+                if (message.indexOf('viewport:') === 0) {
+                    handleViewportMessage(message.substring('viewport:'.length));
+                    return;
+                }
+
                 if (message.indexOf('set-convert-eol:') === 0) {
                     term.options.convertEol = message.substring('set-convert-eol:'.length) === 'true';
                     return;
@@ -668,10 +782,12 @@
                 });
 
                 term.onResize(function (size) {
-                    if (ready && measureTerminal()) {
-                        measuredSizePosted = true;
+                    // Nothing is reported before the host has spoken about the surface.
+                    if (suppressResizePost || (!hostViewport && !surfaceShown)) {
+                        return;
                     }
-                    postMessage('resize:' + size.cols + ',' + size.rows);
+                    lastPostedSize = size.cols + ',' + size.rows;
+                    postMessage('resize:' + lastPostedSize);
                 });
 
                 if (typeof term.registerOscHandler === 'function') {
@@ -810,15 +926,11 @@
                 };
 
                 ready = true;
-                // A size is sent only when it was measured. Otherwise "ready:" goes without one and
-                // the first fit that can measure sends it (see fitAndReportTerminal), so the host never
-                // takes xterm's default grid for the real size of the surface.
-                if (measureTerminal()) {
-                    measuredSizePosted = true;
-                    postMessage('ready:' + term.cols + ',' + term.rows);
-                } else {
-                    postMessage('ready:');
-                }
+                // What the page sees of its own box, for the host's log: this is where a wrong
+                // box shows up. "ready:" never carries a size; the host answers with "viewport:".
+                creationBox = { w: window.innerWidth, h: window.innerHeight };
+                postMessage('diag:' + window.innerWidth + 'x' + window.innerHeight + '@' + window.devicePixelRatio);
+                postMessage('ready:');
                 flushPendingHostMessages();
                 term.focus();
 
@@ -827,19 +939,18 @@
                         window.clearTimeout(pendingResizeHandle);
                     }
                     pendingResizeHandle = window.setTimeout(function () {
-                        fitAndReportTerminal();
+                        fitTerminal();
                     }, resizeDebounceMilliseconds);
                 }).observe(terminalElement);
 
-                // A page whose cell metrics were not measurable at ready: reports once they are,
-                // without waiting for a real change of size: when the web fonts have loaded, and
-                // when a tab that was hidden at load becomes visible.
+                // Cell metrics that were not measurable at ready: refit once they are, when the web
+                // fonts have loaded and when a page that was hidden at load becomes visible.
                 if (document.fonts && document.fonts.ready) {
-                    document.fonts.ready.then(fitAndReportTerminal);
+                    document.fonts.ready.then(fitTerminal);
                 }
                 document.addEventListener('visibilitychange', function () {
                     if (document.visibilityState === 'visible') {
-                        fitAndReportTerminal();
+                        fitTerminal();
                     }
                 });
             }

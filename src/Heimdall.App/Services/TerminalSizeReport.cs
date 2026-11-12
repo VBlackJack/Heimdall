@@ -67,10 +67,25 @@ internal sealed class TerminalSizeReport
     /// size that xterm.js made up (its built-in 80x24) would otherwise release a launch that is
     /// still waiting for a real one.
     /// </remarks>
-    internal static bool TryParseSize(ReadOnlySpan<char> payload, out int columns, out int rows)
+    internal static bool TryParseSize(ReadOnlySpan<char> payload, out int columns, out int rows) =>
+        TryParseSizeReport(payload, out columns, out rows, out _);
+
+    /// <summary>The marker the page appends to the one report it measured with its surface shown.</summary>
+    internal const string ShownMarker = "shown";
+
+    /// <summary>
+    /// Reads <c>cols,rows</c> or <c>cols,rows,shown</c>. The size is read exactly as
+    /// <see cref="TryParseSize"/> always did; the third field, when present, must be the marker.
+    /// </summary>
+    internal static bool TryParseSizeReport(
+        ReadOnlySpan<char> payload,
+        out int columns,
+        out int rows,
+        out bool shownMarker)
     {
         columns = 0;
         rows = 0;
+        shownMarker = false;
 
         int separatorIndex = payload.IndexOf(',');
         if (separatorIndex <= 0 || separatorIndex >= payload.Length - 1)
@@ -78,8 +93,21 @@ internal sealed class TerminalSizeReport
             return false;
         }
 
+        ReadOnlySpan<char> rowsAndMarker = payload[(separatorIndex + 1)..];
+        int markerIndex = rowsAndMarker.IndexOf(',');
+        ReadOnlySpan<char> rowsText = markerIndex < 0 ? rowsAndMarker : rowsAndMarker[..markerIndex];
+        if (markerIndex >= 0)
+        {
+            if (!rowsAndMarker[(markerIndex + 1)..].SequenceEqual(ShownMarker))
+            {
+                return false;
+            }
+
+            shownMarker = true;
+        }
+
         return int.TryParse(payload[..separatorIndex], out columns)
-            && int.TryParse(payload[(separatorIndex + 1)..], out rows)
+            && int.TryParse(rowsText, out rows)
             && columns > 0
             && rows > 0;
     }
