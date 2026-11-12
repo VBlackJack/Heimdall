@@ -903,7 +903,11 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
                 if (string.IsNullOrWhiteSpace(dto.SshKeyPath)
                     && string.IsNullOrWhiteSpace(dto.SshPasswordEncrypted))
                 {
-                    parts.Add(T("SessionAuthSshAgent"));
+                    // A chosen key is the more useful thing to say than "an agent": it is the
+                    // one key this row will offer.
+                    parts.Add(string.IsNullOrWhiteSpace(dto.SshAgentKeyFingerprint)
+                        ? T("SessionAuthSshAgent")
+                        : Format("SessionAuthSshAgentKey", dto.SshAgentKeyFingerprint));
                 }
 
                 break;

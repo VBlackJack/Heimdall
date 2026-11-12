@@ -46,6 +46,24 @@ internal static class SshLocalizationKeys
     public const string ErrorSshUsernameRequiredForPassword = "ErrorSshUsernameRequiredForPassword";
     public const string ErrorSshUsernameRequired = "ErrorSshUsernameRequired";
     public const string ErrorPreflightFailed = "ErrorPreflightFailed";
+
+    /// <summary>The session's chosen agent key is in no reachable agent; {0} is its fingerprint.</summary>
+    public const string ErrorSshAgentKeyNotLoaded = "ErrorSshAgentKeyNotLoaded";
+
+    /// <summary>The chosen agent key is not in Pageant, which the connection needs; {0} is its fingerprint.</summary>
+    public const string ErrorSshAgentKeyNotInPageant = "ErrorSshAgentKeyNotInPageant";
+
+    /// <summary>An external PuTTY window cannot be limited to the chosen agent key.</summary>
+    public const string ErrorSshAgentKeyLauncherUnsupported = "ErrorSshAgentKeyLauncherUnsupported";
+
+    /// <summary>Plink would take two identity files: the chosen agent key and the session's key file.</summary>
+    public const string ErrorSshAgentKeyPlinkKeyFile = "ErrorSshAgentKeyPlinkKeyFile";
+
+    /// <summary>The chosen key is of a type Plink cannot be limited to; {0} is its fingerprint.</summary>
+    public const string ErrorSshAgentKeyPlinkKeyType = "ErrorSshAgentKeyPlinkKeyType";
+
+    /// <summary>The Plink in use is not the bundled build, so it cannot be trusted to offer one key.</summary>
+    public const string ErrorSshAgentKeyPlinkNotBundled = "ErrorSshAgentKeyPlinkNotBundled";
     public const string ErrorPuttyNotConfigured = "ErrorPuttyNotConfigured";
     public const string ErrorSshCancelled = "ErrorSshCancelled";
     public const string ErrorSshHostKeyRejected = "ErrorSshHostKeyRejected";

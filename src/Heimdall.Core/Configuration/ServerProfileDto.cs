@@ -30,6 +30,7 @@ public sealed class ServerProfileDto : IJsonOnDeserialized
     private int _winRmPort = DefaultPorts.WinRmHttp;
     private int _sshPort = DefaultPorts.Ssh;
     private string? _sshKeyPassphraseEncrypted;
+    private string? _sshAgentKeyFingerprint;
     private RdpResolutionMode _rdpResolutionMode = RdpResolutionMode.FitWindow;
     private int? _rdpFixedWidth;
     private int? _rdpFixedHeight;
@@ -269,6 +270,19 @@ public sealed class ServerProfileDto : IJsonOnDeserialized
 
     public string SshMode { get; set; } = "Embedded";
     public bool SshAgentForwarding { get; set; }
+
+    /// <summary>
+    /// The one SSH agent key this session offers, as a fingerprint in the form <c>ssh-add -l</c>
+    /// prints: <c>SHA256:</c> followed by 43 unpadded base64 characters. Null means any key of the
+    /// agent. Local to this machine: an import never sets it and a shared file never carries it.
+    /// </summary>
+    public string? SshAgentKeyFingerprint
+    {
+        get => _sshAgentKeyFingerprint;
+
+        // A hand-edited blank value means "any key", like an absent one, wherever it came from.
+        set => _sshAgentKeyFingerprint = string.IsNullOrWhiteSpace(value) ? null : value;
+    }
     public string? SshKeyPath { get; set; }
     public string? SshPasswordEncrypted { get; set; }
     public string? SshKeyPassphraseEncrypted

@@ -144,5 +144,11 @@ public enum SshFailureCode
     /// example after the configuration was copied from another one. Appended last so that the
     /// values of the existing codes do not move.
     /// </summary>
-    CredentialUnreadable
+    CredentialUnreadable,
+
+    /// <summary>
+    /// The session names one agent key and no reachable agent holds it. Appended last so that
+    /// the values of the existing codes do not move.
+    /// </summary>
+    AgentKeyNotLoaded
 }

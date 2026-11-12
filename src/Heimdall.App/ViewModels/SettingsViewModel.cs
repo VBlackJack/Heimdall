@@ -70,7 +70,11 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                                 JsonNamingPolicy.CamelCase.ConvertName(nameof(ServerProfileDto.WebPasswordEncrypted)),
                                 JsonNamingPolicy.CamelCase.ConvertName(nameof(ServerProfileDto.SshKeyPassphraseEncrypted)),
                                 JsonNamingPolicy.CamelCase.ConvertName(nameof(ServerProfileDto.VncPassword)),
-                                JsonNamingPolicy.CamelCase.ConvertName(nameof(ServerProfileDto.CitrixLaunchCommandLine))
+                                JsonNamingPolicy.CamelCase.ConvertName(nameof(ServerProfileDto.CitrixLaunchCommandLine)),
+
+                                // Not a secret: a choice made from this machine's agent, which means
+                                // nothing on another one and must not travel in an export.
+                                JsonNamingPolicy.CamelCase.ConvertName(nameof(ServerProfileDto.SshAgentKeyFingerprint))
                             ]);
                         return;
                     }
