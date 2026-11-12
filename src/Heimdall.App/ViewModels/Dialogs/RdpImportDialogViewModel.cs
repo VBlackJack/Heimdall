@@ -327,8 +327,9 @@ public partial class RdpImportRowViewModel : ObservableObject
         SourceFileName = Path.GetFileName(previewEntry.SourceFilePath);
         SourceFilePath = previewEntry.SourceFilePath;
         ProposedName = previewEntry.ProposedName;
-        TargetHost = previewEntry.Candidate.RemotePort > 0
-            ? $"{previewEntry.Candidate.RemoteServer}:{previewEntry.Candidate.RemotePort}"
+        int targetPort = ServerItemViewModel.EffectivePortOf(previewEntry.Candidate);
+        TargetHost = targetPort > 0
+            ? $"{previewEntry.Candidate.RemoteServer}:{targetPort}"
             : previewEntry.Candidate.RemoteServer;
         HasPasswordBlob = previewEntry.HasPasswordBlob;
         HasParseError = previewEntry.HasParseError;

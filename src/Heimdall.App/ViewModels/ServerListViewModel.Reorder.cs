@@ -310,6 +310,7 @@ public partial class ServerListViewModel
         {
             Dictionary<string, ServerProfileDto> dtoById = dtos.ToDictionary(dto => dto.Id, StringComparer.Ordinal);
             List<(ServerItemViewModel OldVm, ServerProfileDto NewDto)> updates = [];
+            bool everyRowKeptItsFolder = true;
             for (int index = 0; index < orderedSiblings.Count; index++)
             {
                 ServerItemViewModel sibling = orderedSiblings[index];
@@ -328,6 +329,9 @@ public partial class ServerListViewModel
                     continue;
                 }
 
+                everyRowKeptItsFolder &=
+                    string.Equals(NormalizeGroupForPersistence(dto.Group), targetGroup, StringComparison.Ordinal)
+                    && string.Equals(NormalizeGroupForPersistence(sibling.Group), targetGroup, StringComparison.Ordinal);
                 dto.SortOrder = order;
                 dto.Group = targetGroup;
                 updates.Add((sibling, dto));
@@ -342,7 +346,8 @@ public partial class ServerListViewModel
                 primaryId,
                 primaryId,
                 written ? statusKey : null,
-                statusArgs);
+                statusArgs,
+                everyRowKeptItsFolder);
         }
     }
 }
