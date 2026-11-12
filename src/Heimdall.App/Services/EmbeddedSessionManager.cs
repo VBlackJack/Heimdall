@@ -163,6 +163,12 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
     /// </summary>
     public Func<SessionLaunchRequest, string?, Task>? AddServerCallback { get; set; }
 
+    /// <summary>
+    /// Where every terminal view notes the size its page reports, so a connect with no measurable
+    /// view can fall back on it. Set by the session coordinator, which also reads it.
+    /// </summary>
+    internal TerminalSizeHints? SizeHints { get; set; }
+
     public EmbeddedSessionManager(
         LocalizationManager localizer,
         IDialogService dialogService,
@@ -871,6 +877,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
             SessionLoggingOverride = server.SessionLoggingOverride,
             SessionLogService = _sessionLogService
         };
+        view.TerminalSizeReport.Hints = SizeHints;
         view.InitializeConnecting(sessionTab, displayName, BuildSshEndpointLabel(server));
         ApplyQueuedReconnectAttempt(view, sessionTab);
 
@@ -946,6 +953,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
             SessionLoggingOverride = sessionLoggingOverride,
             SessionLogService = _sessionLogService
         };
+        view.TerminalSizeReport.Hints = SizeHints;
         view.InitializeSession(session, tab, displayName, string.Empty, keepAliveIntervalSeconds);
         WireBroadcast(view);
         WireSaveToLibrary(view, tab);
@@ -974,6 +982,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
             SessionLoggingOverride = sessionLoggingOverride,
             SessionLogService = _sessionLogService
         };
+        view.TerminalSizeReport.Hints = SizeHints;
         bool autoReconnectOnProcessExit = TerminalReconnectPolicy.ReconnectsOnProcessExit(
             tab.ConnectionType);
         view.InitializeTerminalSession(

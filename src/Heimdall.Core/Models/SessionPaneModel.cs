@@ -80,6 +80,16 @@ public partial class SessionPaneModel : ObservableObject, ISplitContent
     private string? _sftpReconnectPathHint;
 
     /// <summary>
+    /// Transient: this pane stands in for the SFTP companion of an SSH session that has not
+    /// connected it yet. Set when the tab is laid out before the connect and cleared when the
+    /// companion fills the pane. Never persisted. While one is pending the tab's layout commands
+    /// (swap, split, merge, unsplit, detach) are refused, because the SSH session still looks its
+    /// tab up by the first pane.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isPendingCompanion;
+
+    /// <summary>
     /// Transient, per-pane toggle controlling whether this SFTP pane follows OSC 7
     /// current-directory notifications emitted by a sibling SSH terminal.
     /// </summary>

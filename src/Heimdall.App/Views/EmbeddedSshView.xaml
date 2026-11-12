@@ -45,6 +45,34 @@
                 <StackPanel x:Name="HeaderControls"
                             DockPanel.Dock="Right"
                             Orientation="Horizontal">
+                    <!-- A pipe-mode session cannot follow a new terminal width: the short label is the
+                         badge, the full sentence its tooltip and automation name. -->
+                    <Border x:Name="PipeSizeBadge"
+                            Visibility="Collapsed"
+                            Focusable="True"
+                            BorderBrush="{DynamicResource WarningIndicatorBrush}"
+                            BorderThickness="1"
+                            CornerRadius="{StaticResource CornerRadiusSm}"
+                            Padding="6,1"
+                            Margin="8,0,0,0"
+                            VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="&#xE7BA;"
+                                       FontFamily="{StaticResource FontFamilyIcons}"
+                                       FontSize="{StaticResource FontSizeSmallCaption}"
+                                       Foreground="{DynamicResource WarningTextBrush}"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,4,0"/>
+                            <TextBlock x:Name="PipeSizeBadgeText"
+                                       AutomationProperties.LiveSetting="Polite"
+                                       behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"
+                                       FontSize="{StaticResource FontSizeSmallCaption}"
+                                       Foreground="{DynamicResource WarningTextBrush}"
+                                       VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis"/>
+                        </StackPanel>
+                    </Border>
+
                     <!-- Broadcast mode indicator -->
                     <Border x:Name="BroadcastBadge"
                             Visibility="Collapsed"
@@ -178,6 +206,7 @@
                                VerticalAlignment="Center"
                                TextTrimming="CharacterEllipsis"
                                MaxWidth="{StaticResource SessionHeaderStatusMaxWidth}"
+                               ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
                                AutomationProperties.LiveSetting="Polite"
                                behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"/>
                 </Grid>

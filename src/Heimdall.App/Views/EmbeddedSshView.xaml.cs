@@ -86,7 +86,7 @@ internal sealed class AutoReconnectTickScheduler
 /// WPF host for an interactive SSH shell session rendered through WebView2 + xterm.js.
 /// The browser surface handles VT parsing, ANSI colors, cursor movement, and scrollback.
 /// </summary>
-public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalCommandSink, ITerminalTextSource, ISessionPaneOwner
+public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalCommandSink, ITerminalTextSource, ISessionPaneOwner, ITerminalSizeSource
 {
     private static readonly (string Tag, Func<string> ContentFactory, string WrapperStart, string WrapperEnd)[] InlineAssets =
     [
@@ -141,6 +141,16 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
     /// <summary>Outbound message: sets the xterm.js convertEol option at runtime.</summary>
     private const string MsgSetConvertEol = "set-convert-eol:";
+
+    /// <summary>
+    /// Outbound message: the box the page lays itself out in while its surface is hidden
+    /// (<c>viewport:W,H</c>), or an empty payload once the surface is shown. See
+    /// <see cref="TerminalViewportMessage"/>.
+    /// </summary>
+    private const string MsgViewport = TerminalViewportMessage.Prefix;
+
+    /// <summary>Inbound message: the page's own view of its box, <c>WxH@ratio</c>, for the log.</summary>
+    private const string MsgDiag = "diag:";
 
     /// <summary>Outbound message: the page's localized texts, as a JSON object.</summary>
     private const string MsgSetLabels = "set-labels:";
@@ -331,6 +341,27 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     private int _keepAliveIntervalSeconds;
 
     /// <summary>
+    /// Set for a pipe-mode session only, which keeps the size it was launched with: tells when the
+    /// terminal has moved away from it. <see langword="null"/> for a session that resizes.
+    /// </summary>
+    private PipeSessionSizeNotice? _pipeSizeNotice;
+
+    /// <summary>The terminal width the size badge states; meaningful while the badge is shown.</summary>
+    private int _pipeNoticeColumns;
+
+    /// <summary>Whether the size badge is up.</summary>
+    private bool _pipeSizeBadgeShown;
+
+    /// <summary>The surface visibility last synchronised, to tell a change from a repeat.</summary>
+    private Visibility _lastSurfaceVisibility = Visibility.Visible;
+
+    /// <summary>
+    /// Compares the size the page reported while hidden with the first one once shown, for the
+    /// support log.
+    /// </summary>
+    private readonly FirstShownSizeCheck _firstShownSizeCheck = new();
+
+    /// <summary>
     /// The sizes the page reported (<c>ready:</c> or <c>resize:</c>). Written on the UI thread;
     /// read by the SSH handler from the connect thread just before it creates the PTY, and
     /// awaited there on the Plink path when the page has not spoken yet.
@@ -342,6 +373,9 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     /// The SSH handler creates the PTY at this size when it is known before the connect.
     /// </summary>
     internal TerminalSize? LastKnownTerminalSize => TerminalSizeReport.Latest;
+
+    /// <inheritdoc />
+    TerminalSize? ITerminalSizeSource.LastKnownTerminalSize => TerminalSizeReport.Latest;
 
     /// <summary>Localizer for translating user-facing strings. Set by EmbeddedSessionManager.</summary>
     public Core.Localization.LocalizationManager? Localizer
@@ -436,6 +470,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
         // The view starts under its connecting veil, so the surface starts out of its way.
         SyncTerminalSurfaceVisibility();
+        TerminalWebView.SizeChanged += (_, _) => SendViewportIfHidden();
 
         Loaded += OnLoaded;
         IsVisibleChanged += OnVisibilityChanged;
@@ -544,6 +579,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         }
 
         _session = session;
+        _pipeSizeNotice = null;
         // Stamped before the subscriptions: a disconnect already latched on the session is
         // delivered inside the Disconnected subscription below.
         _shellSessionAttachedAtUtc = DateTimeOffset.UtcNow;
@@ -608,6 +644,10 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         }
 
         _terminalSession = terminalSession;
+
+        // Cleared before the replay below: a tracker left by an earlier session of this view
+        // describes another launch size.
+        _pipeSizeNotice = null;
         _autoReconnectOnProcessExit = autoReconnectOnProcessExit;
         ShowHealthButton(false);
         _terminalSessionHasInput = false;
@@ -633,6 +673,15 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             + (terminalSession is Heimdall.Terminal.PipeModeSession ? "true" : "false"));
 
         UpdateStatus(connectedStatus);
+
+        // After the status, which would overwrite the notice: a page that already measured a size
+        // other than the launch size is the case the notice exists for.
+        _pipeSizeNotice = PipeSessionSizeNotice.ForSession(terminalSession);
+        if (TerminalSizeReport.Latest is { } measuredAtAttach)
+        {
+            ObservePipeSessionSize(measuredAtAttach);
+        }
+
         // Only an SSH shell has a remote TMOUT to reset. The local shell and WinRM sessions share
         // this view, and for them the reset is nothing but a stray Enter.
         StartKeepAliveTimer(TerminalKeepAlivePolicy.ResolveIntervalSeconds(_sessionTab?.ConnectionType, keepAliveIntervalSeconds));
@@ -1109,6 +1158,98 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             || AutoReconnectOverlay.Visibility == Visibility.Visible
             || ConnectingOverlay.Visibility == Visibility.Visible;
         TerminalWebView.Visibility = ResolveTerminalSurfaceVisibility(_webViewUnavailable, overlayShown);
+        AnnounceSurfaceVisibilityToPage();
+    }
+
+    /// <summary>
+    /// Tells the page what the host knows and the page cannot see: that its surface was hidden (the
+    /// box it is to lay itself out in) or shown (measure yourself). Only once the page is ready, so
+    /// that <c>ready:</c> answers with the state of the moment rather than a queue of old ones.
+    /// </summary>
+    private void AnnounceSurfaceVisibilityToPage()
+    {
+        Visibility now = TerminalWebView.Visibility;
+        Visibility previous = _lastSurfaceVisibility;
+        _lastSurfaceVisibility = now;
+        if (!_terminalReady || previous == now)
+        {
+            return;
+        }
+
+        if (now == Visibility.Visible)
+        {
+            PostSurfaceShown();
+        }
+        else if (now == Visibility.Hidden)
+        {
+            SendViewportIfHidden();
+        }
+    }
+
+    /// <summary>
+    /// While the surface is hidden, tells the page the box the pane has: the native window behind
+    /// the control is not positioned while it is hidden, so the page cannot measure it. Nothing is
+    /// sent before layout has happened; the next size change sends it.
+    /// </summary>
+    private void SendViewportIfHidden()
+    {
+        if (!_terminalReady || TerminalWebView.Visibility != Visibility.Hidden)
+        {
+            return;
+        }
+
+        SendViewportBox();
+    }
+
+    /// <summary>
+    /// Tells the page its surface is shown. When layout is valid the box goes first, always, so the
+    /// page waits for its real bounds the same way whether or not it was ever laid out hidden: the
+    /// shown message arrives before WPF's next layout pass has positioned the native window.
+    /// </summary>
+    private void PostSurfaceShown()
+    {
+        SendViewportBox();
+        PostTerminalMessage(TerminalViewportMessage.Shown);
+    }
+
+    /// <summary>
+    /// Posts <c>viewport:W,H</c> for the box the native window will get: the element's bounds
+    /// relative to the window root, in device pixels with each edge rounded, as the host window is
+    /// sized. Nothing is sent before layout.
+    /// </summary>
+    private void SendViewportBox()
+    {
+        double width = TerminalWebView.ActualWidth;
+        double height = TerminalWebView.ActualHeight;
+        Rect bounds = new(0, 0, width, height);
+        try
+        {
+            if (PresentationSource.FromVisual(TerminalWebView)?.RootVisual is Visual root)
+            {
+                bounds = TerminalWebView.TransformToAncestor(root).TransformBounds(bounds);
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            // Not connected to the visual tree: the size alone is what there is.
+            bounds = new Rect(0, 0, width, height);
+        }
+
+        DpiScale dpi = VisualTreeHelper.GetDpi(TerminalWebView);
+        double zoom = TerminalWebView.ZoomFactor > 0 ? TerminalWebView.ZoomFactor : 1;
+        if (TerminalViewportMessage.TryBuild(
+                bounds.Left,
+                bounds.Top,
+                bounds.Width,
+                bounds.Height,
+                dpi.DpiScaleX,
+                dpi.DpiScaleY,
+                surfaceHidden: true,
+                out string message,
+                zoom))
+        {
+            PostTerminalMessage(message);
+        }
     }
 
     private void ShowReconnectOverlay()
@@ -1338,8 +1479,11 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
             Core.Logging.FileLogger.Info("EmbeddedSSH initializing WebView2 terminal surface");
 
+            Core.Logging.FileLogger.Info("EmbeddedSSH WebView2 environment creation started");
             CoreWebView2Environment env = await Services.WebView2Helper.CreateEnvironmentAsync("SSH");
+            Core.Logging.FileLogger.Info("EmbeddedSSH WebView2 environment creation ended");
             await TerminalWebView.EnsureCoreWebView2Async(env);
+            Core.Logging.FileLogger.Info("EmbeddedSSH WebView2 EnsureCoreWebView2Async returned");
             if (_disposed || !TryGetCoreWebView2(out CoreWebView2? core))
             {
                 return;
@@ -1402,6 +1546,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     private void OnWebViewNavigationCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs navArgs)
     {
         _terminalPageNavigationPending = false;
+        Core.Logging.FileLogger.Info($"EmbeddedSSH WebView2 NavigationCompleted success={navArgs.IsSuccess}");
 
         if (!navArgs.IsSuccess)
         {
@@ -1476,9 +1621,39 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
                 ResizeSession(readyCols, readyRows);
             }
 
+            // The page reports no size until the host has told it what its surface is: the box to
+            // lay out in while hidden, or "measure yourself" while shown.
+            _lastSurfaceVisibility = TerminalWebView.Visibility;
+            if (TerminalWebView.Visibility == Visibility.Visible)
+            {
+                PostSurfaceShown();
+            }
+            else
+            {
+                SendViewportIfHidden();
+            }
+
             FlushPendingTerminalMessages();
             ApplyInitialTerminalFocus();
             HideConnectingOverlayWhenEstablished();
+            return;
+        }
+
+        if (message.StartsWith(MsgDiag + TerminalViewportMessage.DiagSurfaceNeverTookBounds, StringComparison.Ordinal))
+        {
+            Core.Logging.FileLogger.Warn(
+                $"EmbeddedSSH the terminal surface never took its bounds: {message[MsgDiag.Length..]}; host WebView "
+                + $"{TerminalWebView.ActualWidth:0.##}x{TerminalWebView.ActualHeight:0.##} "
+                + $"visible={TerminalWebView.IsVisible}");
+            return;
+        }
+
+        if (message.StartsWith(MsgDiag, StringComparison.Ordinal))
+        {
+            Core.Logging.FileLogger.Info(
+                $"EmbeddedSSH page box {message[MsgDiag.Length..]}; host WebView "
+                + $"{TerminalWebView.ActualWidth:0.##}x{TerminalWebView.ActualHeight:0.##} "
+                + $"visible={TerminalWebView.IsVisible} dpiScale={VisualTreeHelper.GetDpi(TerminalWebView).DpiScaleX:0.##}");
             return;
         }
 
@@ -1488,6 +1663,10 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             {
                 RememberTerminalSize(cols, rows);
                 ResizeSession(cols, rows);
+                NoteSizeForShownCheck(
+                    new TerminalSize(cols, rows),
+                    TerminalSizeReport.TryParseSizeReport(message.AsSpan(MsgResize.Length), out _, out _, out bool shownMarker)
+                        && shownMarker);
             }
             return;
         }
@@ -2098,6 +2277,66 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         }
     }
 
+    /// <summary>
+    /// Tells the user, with a warning badge in the header controls, that a pipe-mode session cannot
+    /// follow the terminal's new width, and takes the badge down when the widths agree again.
+    /// </summary>
+    /// <remarks>
+    /// The badge is short and keyboard reachable; the full sentence is its tooltip and its
+    /// automation name. It is announced once on raise and once per distinct width on refresh. It
+    /// never touches the status line, which keeps showing the session status. A finished session
+    /// takes the badge down with its own status (see <see cref="UpdateStatus"/>).
+    /// </remarks>
+    private void ObservePipeSessionSize(TerminalSize current)
+    {
+        if (_pipeSizeNotice is not { } notice || _disposed)
+        {
+            return;
+        }
+
+        int? shownColumns = _pipeSizeBadgeShown ? _pipeNoticeColumns : null;
+        bool running = _terminalSession is Heimdall.Terminal.PipeModeSession { IsRunning: true };
+
+        switch (notice.Observe(current, shownColumns, plainStatusShown: true, sessionRunning: running))
+        {
+            case SizeNoticeChange.Raise:
+            case SizeNoticeChange.Refresh:
+                _pipeNoticeColumns = current.Columns;
+                _pipeSizeBadgeShown = true;
+                RenderPipeSizeBadge(notice);
+                PipeSizeBadge.Visibility = Visibility.Visible;
+                Behaviors.LiveRegionBehavior.Announce(PipeSizeBadgeText);
+                break;
+            case SizeNoticeChange.Clear:
+                HidePipeSizeBadge();
+                break;
+        }
+    }
+
+    private void HidePipeSizeBadge()
+    {
+        _pipeSizeBadgeShown = false;
+        PipeSizeBadge.Visibility = Visibility.Collapsed;
+    }
+
+    private void RenderPipeSizeBadge(PipeSessionSizeNotice notice)
+    {
+        string sentence = _localizer is null
+            ? "SshPipeSessionSizeMismatchNotice"
+            : _localizer.Format(
+                "SshPipeSessionSizeMismatchNotice",
+                _pipeNoticeColumns,
+                notice.LaunchedAt.Columns);
+        PipeSizeBadgeText.Text = _localizer is null
+            ? "SshPipeSessionSizeMismatchBadge"
+            : _localizer.Format("SshPipeSessionSizeMismatchBadge", notice.LaunchedAt.Columns);
+        PipeSizeBadge.ToolTip = sentence;
+
+        // A border has no automation peer: the text element that carries the live region is the one
+        // that is announced, so it carries the full sentence while showing the short label.
+        System.Windows.Automation.AutomationProperties.SetName(PipeSizeBadgeText, sentence);
+    }
+
     private void ResizeSession(int columns, int rows)
     {
         if (_disposed || columns <= 0 || rows <= 0)
@@ -2107,6 +2346,8 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
         int clampedColumns = Math.Clamp(columns, 1, MaxResizeColumns);
         int clampedRows = Math.Clamp(rows, 1, MaxResizeRows);
+
+        ObservePipeSessionSize(new TerminalSize(clampedColumns, clampedRows));
 
         try
         {
@@ -2756,6 +2997,13 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         }
 
         LocalizeButtons();
+
+        // The badge states its numbers in words: shown, it follows the language.
+        if (_pipeSizeBadgeShown && _pipeSizeNotice is { } shownNotice)
+        {
+            RenderPipeSizeBadge(shownNotice);
+        }
+
         PostTerminalMessage(MsgSetLabels + TerminalHtmlLocalizer.BuildLabelsJson(key => _localizer?[key]));
 
         if (_healthPanelVisible)
@@ -2856,6 +3104,18 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         if (!_webViewUnavailable && !IsDispatcherShuttingDown())
         {
             _pendingTerminalMessages.Enqueue(message);
+        }
+    }
+
+    /// <summary>
+    /// Logs how the report the page marked as its first shown size compares with the size it derived
+    /// while hidden. The marker is the page's own statement, not read from the surface visibility.
+    /// </summary>
+    private void NoteSizeForShownCheck(TerminalSize size, bool shownMarker)
+    {
+        if (_firstShownSizeCheck.Observe(size, shownMarker) is { } result)
+        {
+            Core.Logging.FileLogger.Info(result.ToLogLine());
         }
     }
 
@@ -3112,6 +3372,12 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         var isDisconnected = string.Equals(status, SessionStatusTokens.Disconnected, StringComparison.OrdinalIgnoreCase)
             || string.Equals(status, SessionStatusTokens.Error, StringComparison.OrdinalIgnoreCase);
 
+        // A finished session has nothing left to warn about.
+        if (isDisconnected)
+        {
+            HidePipeSizeBadge();
+        }
+
         DisconnectButton.IsEnabled = !_disposed && !isDisconnected;
         DisconnectButton.Visibility = isDisconnected ? Visibility.Collapsed : Visibility.Visible;
         ReconnectButton.Visibility = isDisconnected ? Visibility.Visible : Visibility.Collapsed;
@@ -3128,22 +3394,8 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         return TryFindResource(resourceKey) as Brush ?? fallback;
     }
 
-    private static bool TryParseSize(ReadOnlySpan<char> payload, out int columns, out int rows)
-    {
-        columns = 0;
-        rows = 0;
-
-        var separatorIndex = payload.IndexOf(',');
-        if (separatorIndex <= 0 || separatorIndex >= payload.Length - 1)
-        {
-            return false;
-        }
-
-        return int.TryParse(payload[..separatorIndex], out columns)
-            && int.TryParse(payload[(separatorIndex + 1)..], out rows)
-            && columns > 0
-            && rows > 0;
-    }
+    private static bool TryParseSize(ReadOnlySpan<char> payload, out int columns, out int rows) =>
+        TerminalSizeReport.TryParseSize(payload, out columns, out rows);
 
     private string GetTerminalHtml()
     {

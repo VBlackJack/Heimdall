@@ -3249,6 +3249,7 @@
   "SplitDropToMerge": "Deposer pour diviser",
   "SplitMaxPanesReached": "Nombre maximum de panneaux atteint (8).",
   "SplitMergeBlockedByConnecting": "Fusion bloquee : une session source est encore en cours de connexion.",
+  "SplitBlockedByPendingCompanion": "Cette action de disposition est indisponible tant que le panneau SFTP se connecte.",
   "SplitMergeBlockedByTool": "Fusion bloquee : un outil dans l'onglet source est occupe.",
   "SplitForcedEmbeddedTitle": "Le mode split necessite une session integree",
   "SplitForcedEmbeddedMessage": "{0} est configure en mode externe (mstsc.exe), mais les panneaux de split ne peuvent heberger que des sessions integrees. Ce split utilisera le mode integre. Ouvrez le serveur dans un onglet normal pour conserver le mode externe.",
@@ -3393,6 +3394,8 @@
   "SshSessionStatusDisconnected": "D\u00e9connect\u00e9",
   "SshSessionStatusError": "Erreur",
   "SshSessionStatusConnecting": "Connexion en cours",
+  "SshPipeSessionSizeMismatchNotice": "Cette session ne peut pas suivre la nouvelle largeur du terminal ({0} colonnes) ; elle reste en {1} colonnes. Reconnectez-la pour appliquer la taille actuelle.",
+  "SshPipeSessionSizeMismatchBadge": "Largeur fixe : {0} col.",
   "FileBrowserFilterPlaceholder": "Filtrer...",
 
   "ToolPwdGenTitle": "G\u00e9n\u00e9rateur de mot de passe",

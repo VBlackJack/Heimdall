@@ -3250,6 +3250,7 @@
   "SplitDropToMerge": "Soltar para dividir",
   "SplitMaxPanesReached": "Se alcanzó el número máximo de paneles (8).",
   "SplitMergeBlockedByConnecting": "Fusión bloqueada: un panel de origen sigue conectando.",
+  "SplitBlockedByPendingCompanion": "Esta acción de disposición no está disponible mientras el panel SFTP se está conectando.",
   "SplitMergeBlockedByTool": "Fusión bloqueada: una herramienta en la pestaña de origen está ocupada.",
   "SplitForcedEmbeddedTitle": "El modo dividido requiere sesiones incrustadas",
   "SplitForcedEmbeddedMessage": "{0} está configurado para el modo externo (mstsc.exe), pero los paneles divididos solo pueden alojar sesiones incrustadas. Esta división usará el modo incrustado. Abre el servidor en una pestaña normal para mantener el modo externo.",
@@ -3394,6 +3395,8 @@
   "SshSessionStatusDisconnected": "Desconectado",
   "SshSessionStatusError": "Error",
   "SshSessionStatusConnecting": "Conectando",
+  "SshPipeSessionSizeMismatchNotice": "Esta sesión no puede seguir el nuevo ancho del terminal ({0} columnas); se queda en {1} columnas. Reconecta para aplicar el tamaño actual.",
+  "SshPipeSessionSizeMismatchBadge": "Ancho fijo: {0} col.",
   "FileBrowserFilterPlaceholder": "Filtrar...",
 
   "ToolPwdGenTitle": "Generador de contraseñas",
