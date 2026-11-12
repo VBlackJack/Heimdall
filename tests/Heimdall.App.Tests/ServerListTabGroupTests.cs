@@ -67,4 +67,25 @@ public sealed partial class ServerListSelectionTests
 
         Assert.Equal("#00FF00", seen);
     }
+
+    [Fact]
+    public async Task RealResolver_NeverYieldsTheToolsKey()
+    {
+        await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync();
+        string[] groups = ["/tools", "\\tools", " /tools ", "tools", "Tools", "//Tools//"];
+        fixture.LoadServers(
+            fixture.ExpandGroups(),
+            groups.Select((group, index) => CreateServer("tool-folder-" + index, "T" + index, group)).ToArray());
+
+        for (int index = 0; index < groups.Length; index++)
+        {
+            SessionTabGroupInfo? info = fixture.ViewModel.ResolveTabGroup("tool-folder-" + index);
+
+            Assert.NotNull(info);
+            Assert.False(
+                string.Equals(info.Key, ConnectionViewModel.ToolsTabGroupKey, StringComparison.OrdinalIgnoreCase),
+                $"group '{groups[index]}' resolved to the tools key");
+            Assert.False(ConnectionViewModel.IsToolsTabGroup(info.Key));
+        }
+    }
 }

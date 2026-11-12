@@ -807,6 +807,35 @@ public sealed partial class SessionCoordinatorPreMountTests
     }
 
     [Fact]
+    public void ToolsTab_CloseGroupMenu_SaysToolTabs()
+    {
+        RunOnStaThread(() =>
+        {
+            using TestHarness harness = TestHarness.Create();
+            SessionTabViewModel session = CreateSession("tool-id", "TOOL:PING");
+            harness.Main.Connection.ActiveSessions.Add(session);
+            string closeFolder = harness.Main.Localize("SessionCloseFolderTabs");
+            string closeTools = harness.Main.Localize("SessionTabGroupToolsCloseTabs");
+            string collapseFolder = harness.Main.Localize("SessionCollapseTabGroup");
+            string collapseTools = harness.Main.Localize("SessionTabGroupToolsCollapseTabs");
+
+            session.TabGroupKey = ConnectionViewModel.ToolsTabGroupKey;
+            ContextMenu menu = CreateSessionTabMenu(harness.Main, session);
+
+            Assert.NotNull(FindMenuItem(menu, closeTools));
+            Assert.Null(FindMenuItem(menu, closeFolder));
+            Assert.NotNull(FindMenuItem(menu, collapseTools));
+            Assert.Null(FindMenuItem(menu, collapseFolder));
+
+            session.TabGroupKey = "Tools";
+            ContextMenu folderMenu = CreateSessionTabMenu(harness.Main, session);
+
+            Assert.NotNull(FindMenuItem(folderMenu, closeFolder));
+            Assert.Null(FindMenuItem(folderMenu, closeTools));
+        });
+    }
+
+    [Fact]
     public void SessionTabContextMenu_CollapseOtherFolders_OnlyWithAnotherFolderInTheStrip()
     {
         RunOnStaThread(() =>

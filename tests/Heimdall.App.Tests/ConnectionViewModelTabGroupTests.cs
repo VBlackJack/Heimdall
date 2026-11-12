@@ -941,6 +941,215 @@ public sealed class ConnectionViewModelTabGroupTests
         Assert.Same(opsHeader, Assert.Single(sut.TabGroupHeaders));
     }
 
+    [Fact]
+    public void ToolTabs_FormOneToolsGroup_WhenGroupingOn()
+    {
+        ConnectionViewModel sut = CreateViewModel(groupByFolder: true);
+
+        SessionTabViewModel ops1 = Open(sut, "ops-1");
+        SessionTabViewModel ping = OpenTool(sut, PingTool);
+        SessionTabViewModel lab1 = Open(sut, "lab-1");
+        SessionTabViewModel scan = OpenTool(sut, ScanTool);
+
+        Assert.Equal(new[] { ops1, ping, scan, lab1 }, sut.ActiveSessions);
+        Assert.Equal(ConnectionViewModel.ToolsTabGroupKey, ping.TabGroupKey);
+        Assert.Equal(ConnectionViewModel.ToolsTabGroupKey, scan.TabGroupKey);
+        Assert.Equal(ToolsLabelKey, ping.TabGroupLabel);
+        Assert.Equal(string.Empty, ping.TabGroupColor);
+        Assert.True(ping.IsTabGroupHead);
+        Assert.False(scan.IsTabGroupHead);
+        Assert.Equal(Ops, ops1.TabGroupKey);
+    }
+
+    [Fact]
+    public void ToolTabs_Ungrouped_WhenGroupingOff()
+    {
+        ConnectionViewModel sut = CreateViewModel(groupByFolder: false);
+
+        SessionTabViewModel ping = OpenTool(sut, PingTool);
+        SessionTabViewModel ops1 = Open(sut, "ops-1");
+        SessionTabViewModel scan = OpenTool(sut, ScanTool);
+
+        Assert.Equal(new[] { ping, ops1, scan }, sut.ActiveSessions);
+        Assert.All(sut.ActiveSessions, tab => Assert.False(tab.HasTabGroup));
+
+        sut.GroupTabsByFolder = true;
+
+        Assert.Equal(ConnectionViewModel.ToolsTabGroupKey, ping.TabGroupKey);
+
+        sut.GroupTabsByFolder = false;
+
+        Assert.All(sut.ActiveSessions, tab => Assert.False(tab.HasTabGroup));
+    }
+
+    [Fact]
+    public void PinnedTool_StaysOutOfTools()
+    {
+        ConnectionViewModel sut = CreateViewModel(groupByFolder: true);
+        SessionTabViewModel ping = OpenTool(sut, PingTool);
+        SessionTabViewModel scan = OpenTool(sut, ScanTool);
+
+        sut.SetPinned(scan, true);
+
+        Assert.False(scan.HasTabGroup);
+        Assert.Equal(ConnectionViewModel.ToolsTabGroupKey, ping.TabGroupKey);
+        Assert.Same(scan, sut.ActiveSessions[0]);
+
+        sut.SetPinned(scan, false);
+
+        Assert.Equal(ConnectionViewModel.ToolsTabGroupKey, scan.TabGroupKey);
+    }
+
+    [Fact]
+    public void ToolsKey_NeverCollidesWithAFolderNamedTools()
+    {
+        const string sharedToolsFolder = ServerListViewModel.SharedFolderKeyPrefix + "source/Tools";
+        string[] folderKeys = ["Tools", "tools", sharedToolsFolder];
+        Dictionary<string, string> folderByProfile = folderKeys
+            .Select((key, index) => (key, index))
+            .ToDictionary(entry => "folder-" + entry.index, entry => entry.key, StringComparer.Ordinal);
+        ConnectionViewModel sut = CreateViewModel(groupByFolder: true, ownRow: true);
+        sut.TabGroupResolver = profileId => folderByProfile.TryGetValue(profileId, out string? key)
+            ? new SessionTabGroupInfo(key, key, string.Empty)
+            : null;
+
+        SessionTabViewModel tool = OpenTool(sut, PingTool);
+        SessionTabViewModel[] folderTabs = folderByProfile.Keys.Select(id => Open(sut, id)).ToArray();
+
+        Assert.Equal(ConnectionViewModel.ToolsTabGroupKey, tool.TabGroupKey);
+        Assert.False(ServerListViewModel.IsSharedFolderKey(ConnectionViewModel.ToolsTabGroupKey));
+        Assert.False(ConnectionViewModel.ToolsTabGroupKey.StartsWith(ServerListViewModel.SharedFolderKeyPrefix, StringComparison.Ordinal));
+        Assert.DoesNotContain(folderTabs, tab => tab.TabGroupKey == ConnectionViewModel.ToolsTabGroupKey);
+        Assert.Equal(3, sut.TabGroupHeaders.Count);
+        Assert.Equal(1, sut.TabGroupHeaders.Single(header => header.Key == ConnectionViewModel.ToolsTabGroupKey).TabCount);
+        Assert.Equal(
+            2,
+            sut.TabGroupHeaders.Single(header => string.Equals(header.Key, "Tools", StringComparison.OrdinalIgnoreCase)).TabCount);
+        Assert.Equal(1, sut.TabGroupHeaders.Single(header => header.Key == sharedToolsFolder).TabCount);
+    }
+
+    [Fact]
+    public async Task OwnRow_ToolsHasAHeader_NamedByLabel()
+    {
+        ConnectionViewModel sut = await CreateLocalizedViewModelAsync("en", ownRow: true);
+
+        OpenTool(sut, PingTool);
+        OpenTool(sut, ScanTool);
+        Open(sut, "ops-1");
+
+        SessionTabGroupHeaderViewModel tools = Assert.Single(
+            sut.TabGroupHeaders, header => header.Key == ConnectionViewModel.ToolsTabGroupKey);
+        Assert.Equal("Tools", tools.Label);
+        Assert.Equal(2, tools.TabCount);
+        Assert.Equal("Tool tabs, 2 tabs, hidden; select to show them", tools.AccessibleName);
+
+        sut.ActiveSession = sut.ActiveSessions.First(tab => tab.TabGroupKey == ConnectionViewModel.ToolsTabGroupKey);
+
+        Assert.Equal("Tool tabs, 2 tabs, shown", tools.AccessibleName);
+    }
+
+    [Fact]
+    public async Task FolderNamedTools_AndToolsGroup_AreAnnouncedDifferently()
+    {
+        const string folderProfile = "folder-tools";
+        ConnectionViewModel ownRow = await CreateLocalizedViewModelAsync("en", ownRow: true);
+        ownRow.TabGroupResolver = profileId => profileId == folderProfile
+            ? new SessionTabGroupInfo("Tools", "Tools", string.Empty)
+            : null;
+        Open(ownRow, folderProfile);
+        OpenTool(ownRow, PingTool);
+
+        SessionTabGroupHeaderViewModel folderHeader = ownRow.TabGroupHeaders.Single(header => header.Key == "Tools");
+        SessionTabGroupHeaderViewModel toolsHeader = ownRow.TabGroupHeaders.Single(
+            header => header.Key == ConnectionViewModel.ToolsTabGroupKey);
+
+        Assert.Equal(folderHeader.Label, toolsHeader.Label);
+        Assert.Equal("Folder Tools, 1 tab, hidden; select to show it", folderHeader.AccessibleName);
+        Assert.Equal("Tool tabs, 1 tab, shown", toolsHeader.AccessibleName);
+
+        ConnectionViewModel chips = await CreateLocalizedViewModelAsync("en", ownRow: false);
+        chips.TabGroupResolver = ownRow.TabGroupResolver;
+        SessionTabViewModel folderTab = Open(chips, folderProfile);
+        SessionTabViewModel toolTab = OpenTool(chips, PingTool);
+        Open(chips, "no-folder");
+
+        Assert.Equal("Tabs of folder Tools, expanded", folderTab.TabGroupAccessibleName);
+        Assert.Equal("Tool tabs, expanded", toolTab.TabGroupAccessibleName);
+    }
+
+    [Fact]
+    public async Task LanguageSwitch_RelabelsTheToolsGroup()
+    {
+        LocalizationManager localizer = new();
+        ConnectionViewModel sut = await CreateLocalizedViewModelAsync("en", ownRow: true, localizer);
+        SessionTabViewModel tool = OpenTool(sut, PingTool);
+        OpenTool(sut, ScanTool);
+        Open(sut, "ops-1");
+        SessionTabGroupHeaderViewModel tools = sut.TabGroupHeaders.Single(
+            header => header.Key == ConnectionViewModel.ToolsTabGroupKey);
+        string englishChip = tool.TabGroupAccessibleName;
+        string englishHeader = tools.AccessibleName;
+        Assert.Equal("Tools", tool.TabGroupLabel);
+        Assert.Equal("Tools", tools.Label);
+
+        await localizer.LoadAsync(Path.Combine(ViewSource.RepoRoot(), "locales"), "fr");
+        sut.RefreshTabGroups();
+
+        Assert.Equal("Outils", tool.TabGroupLabel);
+        Assert.Equal("Outils", tools.Label);
+        Assert.NotEqual(englishChip, tool.TabGroupAccessibleName);
+        Assert.StartsWith("Onglets d'outils, ", tool.TabGroupAccessibleName, StringComparison.Ordinal);
+        Assert.NotEqual(englishHeader, tools.AccessibleName);
+        Assert.StartsWith("Onglets d'outils, 2 onglets, masqu", tools.AccessibleName, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Chip_AnnouncesTheToolsGroupAsToolTabs()
+    {
+        ConnectionViewModel english = await CreateLocalizedViewModelAsync("en", ownRow: false);
+        SessionTabViewModel englishTool = OpenTool(english, PingTool);
+        OpenTool(english, ScanTool);
+        Open(english, "ops-1");
+
+        Assert.Equal("Tool tabs, expanded", englishTool.TabGroupAccessibleName);
+
+        ConnectionViewModel french = await CreateLocalizedViewModelAsync("fr", ownRow: false);
+        SessionTabViewModel frenchTool = OpenTool(french, PingTool);
+        OpenTool(french, ScanTool);
+        Open(french, "ops-1");
+
+        Assert.StartsWith("Onglets d'outils, d", frenchTool.TabGroupAccessibleName, StringComparison.Ordinal);
+    }
+
+    private const string PingTool = "TOOL:PING";
+    private const string ScanTool = "TOOL:SCAN";
+    private const string ToolsLabelKey = "SessionTabGroupTools";
+
+    private static SessionTabViewModel OpenTool(ConnectionViewModel viewModel, string toolType)
+        => viewModel.AddSession(toolType, toolType, toolType);
+
+    private async Task<ConnectionViewModel> CreateLocalizedViewModelAsync(
+        string locale,
+        bool ownRow,
+        LocalizationManager? existing = null)
+    {
+        LocalizationManager localizer = existing ?? new();
+        await localizer.LoadAsync(Path.Combine(ViewSource.RepoRoot(), "locales"), locale);
+        return new ConnectionViewModel(
+            localizer,
+            new ConnectionViewModelCloseTests.TrackingDialogService(true),
+            new ConnectionViewModelCloseTests.TrackingSplitService(),
+            new PaneCloseArbiter(),
+            new SessionWindowService(static (_, _) => { }))
+        {
+            GroupTabsByFolder = true,
+            TabGroupsOnOwnRow = ownRow,
+            TabGroupResolver = profileId => _folderByProfile.TryGetValue(profileId, out string? folder)
+                ? new SessionTabGroupInfo(folder, folder + " label", string.Empty)
+                : null,
+        };
+    }
+
     private ConnectionViewModel CreateViewModel(bool groupByFolder, bool ownRow = false)
     {
         ConnectionViewModel viewModel = new(

@@ -57,6 +57,7 @@ public sealed class SshShellSession : IDisposable
     /// </summary>
     private static readonly TimeSpan StopReadLoopFinal = TimeSpan.FromSeconds(2);
 
+    private readonly ShellOutputGate _output = new();
     private readonly TimeProvider _timeProvider;
     private readonly Transport _transport;
     private SshClient? _client;
@@ -66,6 +67,9 @@ public sealed class SshShellSession : IDisposable
     private readonly object _teardownGate = new();
     private readonly object _streamGate = new();
     private int _disconnectNotified;
+    private readonly object _disconnectLock = new();
+    private Action<SshSessionDisconnectInfo>? _disconnected;
+    private SshSessionDisconnectInfo? _announcedDisconnect;
     private bool _teardownStarted;
     private bool _disposed;
 
@@ -133,13 +137,60 @@ public sealed class SshShellSession : IDisposable
     }
 
     /// <summary>Raised when data is received from the remote shell.</summary>
-    public event Action<byte[]>? DataReceived;
+    public event Action<byte[]>? DataReceived
+    {
+        add => _output.Add(value);
+        remove => _output.Remove(value);
+    }
 
     /// <summary>
     /// Raised when the session is disconnected. The argument contains the
     /// classified SSH failure when one is available.
     /// </summary>
-    public event Action<SshSessionDisconnectInfo>? Disconnected;
+    /// <remarks>
+    /// A handler added after the disconnect was announced is invoked at once with the same
+    /// argument, so a view that attaches after a device printed a message and closed still learns
+    /// the session is gone. A handler removed and added again after the disconnect is invoked again.
+    /// </remarks>
+    public event Action<SshSessionDisconnectInfo>? Disconnected
+    {
+        add
+        {
+            if (value is null)
+            {
+                return;
+            }
+
+            SshSessionDisconnectInfo? latched;
+            lock (_disconnectLock)
+            {
+                latched = _announcedDisconnect;
+                if (latched is null)
+                {
+                    _disconnected += value;
+                }
+            }
+
+            if (latched is not null)
+            {
+                try
+                {
+                    value(latched);
+                }
+                catch (Exception ex)
+                {
+                    FileLogger.Error("[SshShellSession] A late Disconnected subscriber threw", ex);
+                }
+            }
+        }
+        remove
+        {
+            lock (_disconnectLock)
+            {
+                _disconnected -= value;
+            }
+        }
+    }
 
     /// <summary>
     /// Raised when a security-relevant failure occurs. Fired in addition to <see cref="Disconnected"/>.
@@ -194,6 +245,10 @@ public sealed class SshShellSession : IDisposable
             }
 
             _disconnectNotified = 0;
+            lock (_disconnectLock)
+            {
+                _announcedDisconnect = null;
+            }
         }
 
         PinnedFingerprintVerifier pinnedVerifier = await _transport.ResolveHostKeyAsync(
@@ -325,6 +380,7 @@ public sealed class SshShellSession : IDisposable
 
     public void Dispose()
     {
+        _output.Release();
         BeginTeardown(notifyDisconnected: false, markDisposed: true, operationName: nameof(Dispose));
     }
 
@@ -420,7 +476,7 @@ public sealed class SshShellSession : IDisposable
 
                 var chunk = new byte[bytesRead];
                 Array.Copy(buffer, chunk, bytesRead);
-                DataReceived?.Invoke(chunk);
+                _output.Deliver(chunk);
             }
         }
         catch (OperationCanceledException)
@@ -479,7 +535,14 @@ public sealed class SshShellSession : IDisposable
     {
         if (Interlocked.Exchange(ref _disconnectNotified, 1) == 0)
         {
-            Disconnected?.Invoke(disconnectInfo);
+            Action<SshSessionDisconnectInfo>? handlers;
+            lock (_disconnectLock)
+            {
+                _announcedDisconnect = disconnectInfo;
+                handlers = _disconnected;
+            }
+
+            handlers?.Invoke(disconnectInfo);
         }
     }
 
