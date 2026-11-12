@@ -516,6 +516,7 @@ public sealed class PrivilegedSudoStreamingTests
         + "while [ $i -lt $n ]; do\n"
         + "  a=$1; shift; i=$((i+1))\n"
         + "  if [ \"$FAKE_SUDO_TAMPER\" = uid ] && [ $i -eq $n ]; then a=$((a+1)); fi\n"
+        + "  if [ \"$FAKE_SUDO_TAMPER\" = dirmode ] && [ $i -eq 3 ]; then a=\"$FAKE_STAT_FUNCTION$a\"; fi\n"
         + "  if [ \"$FAKE_SUDO_TAMPER\" = hardlink ] && [ $i -eq $((n-1)) ]; then ln \"$a\" \"$a.hl\"; fi\n"
         + "  if [ \"$FAKE_SUDO_TAMPER\" = symlink ] && [ $i -eq $((n-1)) ]; then\n"
         + "    mv \"$a\" \"$a.real\"; ln -s \"${a##*/}.real\" \"$a\"\n"
@@ -525,13 +526,12 @@ public sealed class PrivilegedSudoStreamingTests
         + "done\n"
         + "exec \"$@\"\n";
 
-    private const string FakeStatScript =
-        "#!/bin/sh\n"
-        + "PATH=${PATH#*:}\n"
-        + "if [ \"$FAKE_STAT_DIRMODE\" = 1 ] && [ \"$1\" = -c ] && [ \"$2\" = '%u %a' ]; then\n"
-        + "  echo \"$(stat -c %u -- \"$4\") 770\"; exit 0\n"
-        + "fi\n"
-        + "exec stat \"$@\"\n";
+    // Defined at the head of the installer, so it takes precedence over whichever stat the PATH of
+    // the machine running the test would find. It reports the staging directory (and only it) as
+    // writable by group, which a file system without permission bits cannot be made to do.
+    private const string StatReportingGroupWritableDirectory =
+        "stat() { if [ \"$1\" = -c ] && [ \"$2\" = '%u %a' ]; then "
+        + "echo \"$(command stat -c %u -- \"$4\") 770\"; else command stat \"$@\"; fi; }; ";
 
     private const string RunnerScript =
         "mkdir stage-tmp\n"
@@ -807,7 +807,6 @@ public sealed class PrivilegedSudoStreamingTests
         {
             File.WriteAllText(Path.Combine(directory, "sudo"), FakeSudoScript, new UTF8Encoding(false));
             File.WriteAllText(Path.Combine(directory, "run.sh"), RunnerScript, new UTF8Encoding(false));
-            File.WriteAllText(Path.Combine(directory, "stat"), FakeStatScript, new UTF8Encoding(false));
 
             string command = PrivilegedFileCommands.BuildStagedWriteCommand(
                 "out.bin",
@@ -837,7 +836,7 @@ public sealed class PrivilegedSudoStreamingTests
             start.Environment["FAKE_SUDO_MODE"] = mode;
             start.Environment["FAKE_SUDO_PASSWORD"] = expectedPassword ?? string.Empty;
             start.Environment["FAKE_SUDO_TAMPER"] = tamper;
-            start.Environment["FAKE_STAT_DIRMODE"] = tamper == "dirmode" ? "1" : "0";
+            start.Environment["FAKE_STAT_FUNCTION"] = StatReportingGroupWritableDirectory;
             start.Environment["HEIMDALL_TEST_COMMAND"] = command;
 
             using Process process = Process.Start(start)!;
