@@ -16,6 +16,7 @@
 
 using System.Diagnostics;
 using System.Text;
+using Heimdall.Core.Terminal;
 
 namespace Heimdall.Terminal;
 
@@ -37,68 +38,12 @@ public sealed class PipeModeSession : ITerminalSession
     private Action<int>? _processExited;
     private bool _processExitedRaised;
     private int _processExitCode;
-    private readonly object _dataLock = new();
-    private readonly object _deliveryLock = new();
-    private Action<ReadOnlyMemory<byte>>? _dataReceived;
-    private List<byte[]>? _bootstrapBuffer = new();
-    private int _bootstrapBufferedBytes;
-    private bool _dataSubscriberAttached;
-    private bool _bootstrapCapLogged;
+    private readonly OutputReplayGate _output = new(nameof(PipeModeSession));
 
     public event Action<ReadOnlyMemory<byte>>? DataReceived
     {
-        add
-        {
-            if (value is null)
-            {
-                return;
-            }
-
-            lock (_deliveryLock)
-            {
-                bool firstSubscriber;
-                byte[][] replay;
-                Action<ReadOnlyMemory<byte>>? target;
-                lock (_dataLock)
-                {
-                    _dataReceived += value;
-                    target = _dataReceived;
-                    firstSubscriber = !_dataSubscriberAttached;
-                    if (firstSubscriber)
-                    {
-                        _dataSubscriberAttached = true;
-                        replay = _bootstrapBuffer is { Count: > 0 }
-                            ? _bootstrapBuffer.ToArray()
-                            : [];
-                        _bootstrapBuffer = null;
-                    }
-                    else
-                    {
-                        replay = [];
-                    }
-                }
-
-                if (firstSubscriber)
-                {
-                    foreach (byte[] chunk in replay)
-                    {
-                        SafeInvokeDataReceived(target, chunk.AsMemory());
-                    }
-                }
-            }
-        }
-        remove
-        {
-            if (value is null)
-            {
-                return;
-            }
-
-            lock (_dataLock)
-            {
-                _dataReceived -= value;
-            }
-        }
+        add => _output.AddMemory(value);
+        remove => _output.RemoveMemory(value);
     }
 
     public event Action<int>? ProcessExited
@@ -309,10 +254,7 @@ public sealed class PipeModeSession : ITerminalSession
             }
         }
 
-        lock (_dataLock)
-        {
-            _bootstrapBuffer = null;
-        }
+        _output.Release();
 
         if (_process is not null)
         {
@@ -371,7 +313,7 @@ public sealed class PipeModeSession : ITerminalSession
 
                 byte[] copy = new byte[bytesRead];
                 Buffer.BlockCopy(buffer, 0, copy, 0, bytesRead);
-                DeliverOrBuffer(copy);
+                _output.Deliver(copy);
             }
         }
         catch (OperationCanceledException) { /* Expected when session is disposed or cancelled */ }
@@ -383,70 +325,6 @@ public sealed class PipeModeSession : ITerminalSession
         int exitCode = 0;
         try { exitCode = _process?.ExitCode ?? -1; } catch (Exception ex) { Heimdall.Core.Logging.FileLogger.Warn($"[PipeModeSession] OnProcessExited: {ex.Message}"); }
         SafeInvokeProcessExitedOnce(exitCode);
-    }
-
-    private void DeliverOrBuffer(byte[] chunk)
-    {
-        lock (_deliveryLock)
-        {
-            Action<ReadOnlyMemory<byte>>? target;
-            lock (_dataLock)
-            {
-                if (!_dataSubscriberAttached)
-                {
-                    BufferBootstrapChunk(chunk);
-                    return;
-                }
-
-                target = _dataReceived;
-            }
-
-            SafeInvokeDataReceived(target, chunk.AsMemory());
-        }
-    }
-
-    private void BufferBootstrapChunk(byte[] chunk)
-    {
-        if (_bootstrapBuffer is null)
-        {
-            return;
-        }
-
-        if (_bootstrapBufferedBytes + chunk.Length > Heimdall.Core.Configuration.AppConstants.MaxConPtyBootstrapBufferBytes)
-        {
-            if (!_bootstrapCapLogged)
-            {
-                _bootstrapCapLogged = true;
-                Heimdall.Core.Logging.FileLogger.Warn(
-                    "[PipeModeSession] Bootstrap output exceeded " +
-                    $"{Heimdall.Core.Configuration.AppConstants.MaxConPtyBootstrapBufferBytes} bytes " +
-                    "before a subscriber attached; dropping further bootstrap bytes.");
-            }
-
-            return;
-        }
-
-        _bootstrapBuffer.Add(chunk);
-        _bootstrapBufferedBytes += chunk.Length;
-    }
-
-    private static void SafeInvokeDataReceived(
-        Action<ReadOnlyMemory<byte>>? handler,
-        ReadOnlyMemory<byte> data)
-    {
-        if (handler is null)
-        {
-            return;
-        }
-
-        try
-        {
-            handler(data);
-        }
-        catch (Exception ex)
-        {
-            Heimdall.Core.Logging.FileLogger.Warn($"[PipeModeSession] DataReceived subscriber: {ex.Message}");
-        }
     }
 
     private void SafeInvokeProcessExitedOnce(int exitCode)

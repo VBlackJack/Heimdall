@@ -17,6 +17,7 @@
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Text;
+using Heimdall.Core.Terminal;
 using Microsoft.Win32.SafeHandles;
 
 namespace Heimdall.Terminal.ConPty;
@@ -79,81 +80,16 @@ public sealed class ConPtySession : ITerminalSession
     private bool _processExitedRaised;
     private int _processExitCode;
 
-    // Bootstrap-output buffering: a ConPTY child writes its prompt/banner within
-    // milliseconds of launch, before the terminal view subscribes to DataReceived.
-    // Those bytes are buffered here and replayed to the first subscriber so the
-    // initial prompt is never lost. _deliveryLock serializes the bootstrap replay
-    // with the read loop's direct deliveries to preserve byte ordering; _dataLock
-    // guards the buffer + subscriber state. Lock order is always _deliveryLock then
-    // _dataLock. Subscriber callbacks are invoked outside _dataLock.
-    private readonly object _dataLock = new();
-    private readonly object _deliveryLock = new();
-    private Action<ReadOnlyMemory<byte>>? _dataReceived;
-    private List<byte[]>? _bootstrapBuffer = new();
-    private int _bootstrapBufferedBytes;
-    private bool _dataSubscriberAttached;
-    private bool _bootstrapCapLogged;
+    // A ConPTY child writes its prompt/banner within milliseconds of launch, before the terminal
+    // view subscribes to DataReceived: the gate keeps those bytes for the first subscriber, as an
+    // unbroken prefix of the stream, and serializes the replay with the read loop's deliveries.
+    private readonly OutputReplayGate _output = new(nameof(ConPtySession));
 
     /// <inheritdoc />
     public event Action<ReadOnlyMemory<byte>>? DataReceived
     {
-        add
-        {
-            if (value is null)
-            {
-                return;
-            }
-
-            lock (_deliveryLock)
-            {
-                bool firstSubscriber;
-                byte[][] replay;
-                Action<ReadOnlyMemory<byte>>? target;
-                lock (_dataLock)
-                {
-                    _dataReceived += value;
-                    target = _dataReceived;
-                    firstSubscriber = !_dataSubscriberAttached;
-                    if (firstSubscriber)
-                    {
-                        _dataSubscriberAttached = true;
-                        replay = _bootstrapBuffer is { Count: > 0 }
-                            ? _bootstrapBuffer.ToArray()
-                            : [];
-                        _bootstrapBuffer = null;
-                    }
-                    else
-                    {
-                        replay = [];
-                    }
-                }
-
-                // Replay buffered bootstrap output to the first subscriber in order,
-                // outside _dataLock. Holding _deliveryLock here guarantees the read
-                // loop cannot interleave a direct delivery ahead of this replay: the
-                // read loop only delivers directly once _dataSubscriberAttached is
-                // set (above, under _deliveryLock), so it must wait on _deliveryLock.
-                if (firstSubscriber)
-                {
-                    foreach (byte[] chunk in replay)
-                    {
-                        SafeInvokeDataReceived(target, chunk.AsMemory());
-                    }
-                }
-            }
-        }
-        remove
-        {
-            if (value is null)
-            {
-                return;
-            }
-
-            lock (_dataLock)
-            {
-                _dataReceived -= value;
-            }
-        }
+        add => _output.AddMemory(value);
+        remove => _output.RemoveMemory(value);
     }
 
     /// <inheritdoc />
@@ -381,10 +317,7 @@ public sealed class ConPtySession : ITerminalSession
         _cts?.Cancel();
 
         // Release any unreplayed bootstrap output; no subscriber will consume it now.
-        lock (_dataLock)
-        {
-            _bootstrapBuffer = null;
-        }
+        _output.Release();
 
         // Close pseudo console first - this signals the child process to exit
         // and unblocks any pending read on the output pipe.
@@ -644,7 +577,7 @@ public sealed class ConPtySession : ITerminalSession
                     // Deliver a copy to subscribers so the buffer can be reused.
                     byte[] copy = new byte[bytesRead];
                     Buffer.BlockCopy(buffer, 0, copy, 0, bytesRead);
-                    DeliverOrBuffer(copy);
+                    _output.Deliver(copy);
                 }
             }
             catch (OperationCanceledException) { /* Expected when session is disposed */ }
@@ -766,77 +699,6 @@ public sealed class ConPtySession : ITerminalSession
         catch (ObjectDisposedException)
         {
             return UnknownExitCode;
-        }
-    }
-
-    /// <summary>
-    /// Delivers a read-loop chunk to the current subscriber, or buffers it as
-    /// bootstrap output when no subscriber has attached yet. Serialized with the
-    /// first-subscriber replay via _deliveryLock to preserve byte ordering.
-    /// </summary>
-    private void DeliverOrBuffer(byte[] chunk)
-    {
-        lock (_deliveryLock)
-        {
-            Action<ReadOnlyMemory<byte>>? target;
-            lock (_dataLock)
-            {
-                if (!_dataSubscriberAttached)
-                {
-                    BufferBootstrapChunk(chunk);
-                    return;
-                }
-
-                target = _dataReceived;
-            }
-
-            SafeInvokeDataReceived(target, chunk.AsMemory());
-        }
-    }
-
-    /// <summary>
-    /// Appends a chunk to the bootstrap buffer. The caller must hold <see cref="_dataLock"/>.
-    /// Buffering stops (and is logged once) when the configured cap is exceeded.
-    /// </summary>
-    private void BufferBootstrapChunk(byte[] chunk)
-    {
-        if (_bootstrapBuffer is null)
-        {
-            return;
-        }
-
-        if (_bootstrapBufferedBytes + chunk.Length > Heimdall.Core.Configuration.AppConstants.MaxConPtyBootstrapBufferBytes)
-        {
-            if (!_bootstrapCapLogged)
-            {
-                _bootstrapCapLogged = true;
-                Heimdall.Core.Logging.FileLogger.Warn(
-                    "[ConPtySession] Bootstrap output exceeded " +
-                    $"{Heimdall.Core.Configuration.AppConstants.MaxConPtyBootstrapBufferBytes} bytes " +
-                    "before a subscriber attached; dropping further bootstrap bytes.");
-            }
-
-            return;
-        }
-
-        _bootstrapBuffer.Add(chunk);
-        _bootstrapBufferedBytes += chunk.Length;
-    }
-
-    private static void SafeInvokeDataReceived(Action<ReadOnlyMemory<byte>>? handler, ReadOnlyMemory<byte> data)
-    {
-        if (handler is null)
-        {
-            return;
-        }
-
-        try
-        {
-            handler(data);
-        }
-        catch (Exception ex)
-        {
-            Heimdall.Core.Logging.FileLogger.Warn($"[ConPtySession] DataReceived subscriber: {ex.Message}");
         }
     }
 

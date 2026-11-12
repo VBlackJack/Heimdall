@@ -17,6 +17,7 @@
 using System.Text;
 using Heimdall.Core.Logging;
 using Heimdall.Core.Ssh;
+using Heimdall.Core.Terminal;
 using Renci.SshNet;
 
 namespace Heimdall.Ssh;
@@ -57,7 +58,7 @@ public sealed class SshShellSession : IDisposable
     /// </summary>
     private static readonly TimeSpan StopReadLoopFinal = TimeSpan.FromSeconds(2);
 
-    private readonly ShellOutputGate _output = new();
+    private readonly OutputReplayGate _output = new(nameof(SshShellSession));
     private readonly TimeProvider _timeProvider;
     private readonly Transport _transport;
     private SshClient? _client;
