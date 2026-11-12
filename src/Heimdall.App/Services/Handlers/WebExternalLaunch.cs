@@ -15,8 +15,11 @@
  */
 
 using System.Diagnostics;
+using System.IO;
+using System.Text.RegularExpressions;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Security;
+using Heimdall.Core.Utilities;
 
 namespace Heimdall.App.Services.Handlers;
 
@@ -28,6 +31,25 @@ internal static class WebExternalLaunch
 {
     /// <summary>The arguments a profile gets when it names a program and no arguments.</summary>
     public const string DefaultArguments = "{Url}";
+
+    /// <summary>The longest program path the confirmation shows before it is cut.</summary>
+    public const int MaxDescribedProgramLength = 260;
+
+    /// <summary>The longest argument list the confirmation shows before it is cut.</summary>
+    public const int MaxDescribedArgumentsLength = 1024;
+
+    /// <summary>The localization key of the refusal of a program or argument list too long to show whole.</summary>
+    public const string CommandTooLongErrorKey = "ErrorWebExternalCommandTooLong";
+
+    /// <summary>The localization key of the refusal of a program the shell would resolve to a share or a device.</summary>
+    public const string NetworkPathErrorKey = "ErrorWebExternalNetworkPathRefused";
+
+    /// <summary>A URI scheme: two or more characters before the colon, since a single letter is a drive designator.</summary>
+    private const string SchemePattern = "^[A-Za-z][A-Za-z0-9+.-]+:";
+
+    private static readonly char[] PathSeparators = ['/', '\\'];
+
+    private static readonly Regex UriScheme = new(SchemePattern, RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     /// <summary>The placeholder replaced with the whole address.</summary>
     public const string UrlPlaceholder = "{Url}";
@@ -53,7 +75,61 @@ internal static class WebExternalLaunch
     public static string DescribeCommand(WebSessionResult session)
     {
         ArgumentNullException.ThrowIfNull(session);
-        return $"{session.ExternalProgram} {session.ExternalArguments}".Trim();
+        return DescribeCommand(session.ExternalProgram, session.ExternalArguments);
+    }
+
+    /// <summary>
+    /// The program and arguments as a confirmation shows them. Both come from a profile that may
+    /// have been imported, so control, format and line-separator characters are written out
+    /// visibly instead of starting a new line or hiding part of the command.
+    /// </summary>
+    public static string DescribeCommand(string? program, string? arguments)
+    {
+        string shownProgram = UntrustedText.MakeVisible(program, MaxDescribedProgramLength);
+        string shownArguments = UntrustedText.MakeVisible(arguments, MaxDescribedArgumentsLength);
+        return $"{shownProgram} {shownArguments}".Trim();
+    }
+
+    /// <summary>
+    /// Whether the program and arguments fit the confirmation whole. A longer value would be cut
+    /// with a marker, and the end of an argument list could then hold a flag nobody saw, so such a
+    /// launch is refused instead of shown cut.
+    /// </summary>
+    public static bool FitsDescription(string? program, string? arguments) =>
+        UntrustedText.MakeVisible(program, int.MaxValue).Length <= MaxDescribedProgramLength
+        && UntrustedText.MakeVisible(arguments, int.MaxValue).Length <= MaxDescribedArgumentsLength;
+
+    /// <summary>
+    /// Whether <paramref name="program"/> would be resolved by the shell to something other than a
+    /// local file: a value wrapped in quotes, a URI with a scheme (<c>file://host/share/x.exe</c>),
+    /// or a path that is, or resolves to, a share or a device path. A bare program name and a
+    /// drive path are not.
+    /// </summary>
+    public static bool IsNetworkOrIndirectProgram(string program)
+    {
+        if (program.Contains('"', StringComparison.Ordinal) || UriScheme.IsMatch(program))
+        {
+            return true;
+        }
+
+        if (ImportedPathPolicy.IsNetworkOrDevicePath(program))
+        {
+            return true;
+        }
+
+        if (program.IndexOfAny(PathSeparators) < 0)
+        {
+            return false;
+        }
+
+        try
+        {
+            return ImportedPathPolicy.IsNetworkOrDevicePath(Path.GetFullPath(program));
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return true;
+        }
     }
 
     /// <summary>
@@ -68,6 +144,11 @@ internal static class WebExternalLaunch
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(confirmAsync);
+
+        if (!FitsDescription(session.ExternalProgram, session.ExternalArguments))
+        {
+            return new SessionLaunch(null, CommandTooLongErrorKey, Declined: false);
+        }
 
         if (RequiresConfirmation(session))
         {
@@ -140,9 +221,21 @@ internal static class WebExternalLaunch
             };
         }
 
+        if (IsNetworkOrIndirectProgram(program))
+        {
+            errorKey = NetworkPathErrorKey;
+            return null;
+        }
+
         if (InputValidator.IsShellTarget(program))
         {
             errorKey = "ErrorWebExternalShellRefused";
+            return null;
+        }
+
+        if (!FitsDescription(program, profile.WebExternalArguments))
+        {
+            errorKey = CommandTooLongErrorKey;
             return null;
         }
 

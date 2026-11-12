@@ -47,7 +47,7 @@ namespace Heimdall.App.ViewModels;
 /// <summary>
 /// ViewModel for the server list with filtering, sorting, and connection actions.
 /// </summary>
-public partial class ServerListViewModel : ObservableObject, IDisposable, ISessionRestoreHost
+public partial class ServerListViewModel : ObservableObject, IDisposable, ISessionRestoreHost, ISessionRestoreServerResolver
 {
     internal static readonly TimeSpan SearchFilterDebounceDelay = TimeSpan.FromMilliseconds(300);
 
@@ -473,8 +473,19 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         }
         else
         {
+            if (string.Equals(profile.ConnectionType, "WEB", StringComparison.OrdinalIgnoreCase)
+                && !WebExternalLaunch.FitsDescription(profile.WebExternalProgram, profile.WebExternalArguments))
+            {
+                // A description cut short could hide the end of the arguments from the one who
+                // confirms, so nothing is asked.
+                _dialogService.ShowError(
+                    _localizer["ConfirmExecutionImportedTitle"],
+                    _localizer[WebExternalLaunch.CommandTooLongErrorKey]);
+                return false;
+            }
+
             string executable = string.Equals(profile.ConnectionType, "WEB", StringComparison.OrdinalIgnoreCase)
-                ? $"{profile.WebExternalProgram} {profile.WebExternalArguments}".Trim()
+                ? WebExternalLaunch.DescribeCommand(profile.WebExternalProgram, profile.WebExternalArguments)
                 : DescribeLocalShellExecution(profile, _localizer);
             body = _localizer.Format(
                 "ConfirmExecutionImportedBody",
@@ -1119,6 +1130,29 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
 
     /// <inheritdoc />
     IEnumerable<ServerItemViewModel> ISessionRestoreHost.RestorableServers => Servers;
+
+    /// <inheritdoc />
+    async Task<IReadOnlyList<ServerItemViewModel>> ISessionRestoreServerResolver.ResolveAsync(
+        IReadOnlyCollection<string> ids)
+    {
+        ArgumentNullException.ThrowIfNull(ids);
+
+        // The same lookup RestoreServerAsync uses: the full inventory, not the filtered projection,
+        // then the shared sources.
+        List<ServerItemViewModel> resolved = [];
+        foreach (string id in ids.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            ServerItemViewModel? server = _allServers.FirstOrDefault(
+                candidate => string.Equals(candidate.Id, id, StringComparison.OrdinalIgnoreCase))
+                ?? await FindSharedServerItemAsync(id);
+            if (server is not null)
+            {
+                resolved.Add(server);
+            }
+        }
+
+        return resolved;
+    }
 
     /// <inheritdoc />
     Task<bool> ISessionRestoreHost.RestoreServerAsync(

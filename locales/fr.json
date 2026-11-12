@@ -2844,6 +2844,8 @@
   "ErrorVncConnectionFailed": "\u00c9chec de la connexion VNC : {0}",
   "ErrorWebInvalidAddress": "L'h\u00f4te, le port et le chemin de ce profil ne forment pas une adresse web. Modifiez le profil : le champ h\u00f4te prend seulement un nom ou une adresse, sans http:// ni chemin.",
   "ErrorWebExternalShellRefused": "Un interpr\u00e9teur de commandes ne peut pas ouvrir une console web. Choisissez un navigateur dans les options du profil.",
+  "ErrorWebExternalNetworkPathRefused": "Un programme situ\u00e9 sur un partage r\u00e9seau ou un chemin de p\u00e9riph\u00e9rique ne peut pas ouvrir une console web. Choisissez un programme install\u00e9 sur cet ordinateur.",
+  "ErrorWebExternalCommandTooLong": "Le programme ou ses arguments sont trop longs pour \u00eatre affich\u00e9s en entier, la console n'a donc pas \u00e9t\u00e9 ouverte. Raccourcissez-les dans les options du profil.",
   "ErrorWebExternalArgumentRejected": "Une valeur de ce profil commence par '-', ou contient une espace, un guillemet double ou un caract\u00e8re de contr\u00f4le l\u00e0 o\u00f9 les arguments du programme ne la mettent pas entre guillemets, et le navigateur pourrait la lire comme une option. V\u00e9rifiez les champs du profil, ou mettez la variable entre guillemets dans ses arguments.",
   "ErrorWebExternalLaunchFailed": "Le programme externe n'a pas pu \u00eatre lanc\u00e9 : {0}",
   "ErrorWebExternalWithGateway": "Ce profil passe par une passerelle SSH, qu'un programme externe ne peut pas utiliser. Ouvrez-le dans un onglet, ou retirez-lui la passerelle.",
@@ -6132,6 +6134,7 @@
 
   "_comment_ux_buttons": "--- Boutons d'outils async ---",
   "ToolSshKeyGenGenerating": "G\u00e9n\u00e9ration...",
+  "ToolSshKeyGenSaveFailed": "La cl\u00e9 n'a pas pu \u00eatre enregistr\u00e9e. Le fichier existant n'a pas \u00e9t\u00e9 modifi\u00e9. V\u00e9rifiez qu'il n'est pas ouvert ailleurs ni en lecture seule.",
   "ToolCertGenGenerating": "G\u00e9n\u00e9ration...",
   "ToolTextDiffComparing": "Comparaison...",
 

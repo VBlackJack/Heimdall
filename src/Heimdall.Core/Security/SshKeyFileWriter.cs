@@ -29,22 +29,37 @@ namespace Heimdall.Core.Security;
 public static class SshKeyFileWriter
 {
     private const string LineFeed = "\n";
+    private const string TempSuffix = ".tmp";
 
     private static readonly UTF8Encoding Utf8NoBom = new(encoderShouldEmitUTF8Identifier: false);
 
     /// <summary>
-    /// Writes an OpenSSH public key line (<c>type base64 comment</c>) followed by a single LF.
+    /// Writes an OpenSSH public key line (<c>type base64 comment</c>) followed by a single LF,
+    /// replacing any existing file in one step: a failure leaves the existing file as it was.
     /// </summary>
     public static void WritePublicKey(string filePath, string publicKeyLine)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
         ArgumentNullException.ThrowIfNull(publicKeyLine);
 
-        File.WriteAllText(filePath, NormalizeLineEndings(publicKeyLine.TrimEnd()) + LineFeed, Utf8NoBom);
+        string text = NormalizeLineEndings(publicKeyLine.TrimEnd()) + LineFeed;
+        string directory = Path.GetDirectoryName(Path.GetFullPath(filePath))!;
+        string tempPath = Path.Combine(directory, Path.GetFileName(filePath) + TempSuffix + Guid.NewGuid().ToString("N"));
+        try
+        {
+            File.WriteAllText(tempPath, text, Utf8NoBom);
+            File.Move(tempPath, filePath, overwrite: true);
+        }
+        catch
+        {
+            TryDeleteTemp(tempPath);
+            throw;
+        }
     }
 
     /// <summary>
-    /// Writes a PEM-encoded private key with a restrictive ACL, replacing any existing file.
+    /// Writes a PEM-encoded private key with a restrictive ACL, replacing any existing file in one
+    /// step: a failure leaves the existing key as it was and surfaces the error.
     /// </summary>
     [System.Runtime.Versioning.SupportedOSPlatform("windows")]
     public static void WritePrivateKey(string filePath, string privateKeyPem)
@@ -52,7 +67,29 @@ public static class SshKeyFileWriter
         ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
         ArgumentNullException.ThrowIfNull(privateKeyPem);
 
-        SecureFileWriter.WriteAndProtect(filePath, NormalizeLineEndings(privateKeyPem));
+        try
+        {
+            SecureFileWriter.WriteTextAtomic(filePath, NormalizeLineEndings(privateKeyPem));
+        }
+        catch (SecureFileWriter.AclCreationNotSupportedException ex)
+        {
+            // Reported as an ordinary write failure so a caller handles one family of errors.
+            throw new IOException(ex.Message, ex);
+        }
+    }
+
+    private static void TryDeleteTemp(string tempPath)
+    {
+        try
+        {
+            File.Delete(tempPath);
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
     }
 
     private static string NormalizeLineEndings(string text)
