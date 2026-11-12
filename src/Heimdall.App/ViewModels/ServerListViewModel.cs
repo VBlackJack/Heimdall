@@ -1295,7 +1295,8 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
 
             // The connection that went ahead without the vault's password failed in turn, and its
             // own message ("connection refused", "authentication failed") replaced the vault's on
-            // the status line. The vault failure is the cause, so it has the last word.
+            // the status line. The vault failure is the cause, so it has the last word. The same
+            // holds for the note that an unconfirmed session was not looked up at all.
             if (!connected && quietVaultFailure is not null)
             {
                 StatusMessageRequested?.Invoke(quietVaultFailure);
@@ -1729,8 +1730,17 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         {
             if (!skipOnFailure)
             {
-                StatusMessageRequested?.Invoke(
-                    _localizer.Format("StatusCredentialLookupUnconfirmed", serverDto.DisplayName));
+                // Through the quiet-report channel when there is one, so a connection that then
+                // fails or asks for a password does not leave the reason behind its own message.
+                string reason = _localizer.Format("StatusCredentialLookupUnconfirmed", serverDto.DisplayName);
+                if (reportQuietly is not null)
+                {
+                    reportQuietly(reason);
+                }
+                else
+                {
+                    StatusMessageRequested?.Invoke(reason);
+                }
             }
 
             return false;

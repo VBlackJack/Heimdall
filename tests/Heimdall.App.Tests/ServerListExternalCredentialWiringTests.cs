@@ -531,6 +531,66 @@ public sealed class ServerListExternalCredentialWiringTests : IDisposable
     }
 
     [Fact]
+    public async Task Connect_UnconfirmedProfile_FailingConnection_LeavesTheReasonAsTheLastStatus()
+    {
+        var provider = new StubCredentialProvider { Result = new CredentialResult("", "s3cr3t") };
+        await using var fixture = await Fixture.CreateAsync(
+            new FakeCredentialProviderFactory(provider), new FailingSshHandler());
+        var dto = CreateSshServer(passwordEncrypted: null);
+        dto.CredentialLookupConfirmed = false;
+        await fixture.SeedAsync(dto);
+        var events = new List<string>();
+        fixture.ViewModel.SessionFailed += (_, _, _, _, statusText, _) => events.Add("failed:" + statusText);
+        fixture.ViewModel.StatusMessageRequested += message => events.Add("status:" + message);
+
+        await fixture.ViewModel.ConnectCommand.ExecuteAsync(fixture.ViewModel.Servers[0]);
+
+        string reason = "status:" + fixture.Localizer.Format("StatusCredentialLookupUnconfirmed", "SSH Box");
+        Assert.Equal(0, provider.CallCount);
+        Assert.Equal(reason, events.Last());
+        int lastFailure = events.FindLastIndex(entry => entry.StartsWith("failed:", StringComparison.Ordinal));
+        Assert.True(lastFailure >= 0, "the connection was expected to publish a failed session");
+        Assert.True(events.LastIndexOf(reason) > lastFailure);
+    }
+
+    [Fact]
+    public async Task Connect_ConfirmedProfile_FailingConnection_SaysNothingAboutAnUnconfirmedLookup()
+    {
+        var provider = new StubCredentialProvider { Result = new CredentialResult("", "s3cr3t") };
+        await using var fixture = await Fixture.CreateAsync(
+            new FakeCredentialProviderFactory(provider), new FailingSshHandler());
+        await fixture.SeedAsync(CreateSshServer(passwordEncrypted: null));
+        var statuses = new List<string>();
+        fixture.ViewModel.StatusMessageRequested += statuses.Add;
+
+        await fixture.ViewModel.ConnectCommand.ExecuteAsync(fixture.ViewModel.Servers[0]);
+
+        Assert.DoesNotContain(
+            fixture.Localizer.Format("StatusCredentialLookupUnconfirmed", "SSH Box"),
+            statuses);
+    }
+
+    [Fact]
+    public async Task Restore_UnconfirmedProfile_FailingConnection_ShowsNoUnconfirmedReason()
+    {
+        var provider = new StubCredentialProvider { Result = new CredentialResult("", "s3cr3t") };
+        await using var fixture = await Fixture.CreateAsync(
+            new FakeCredentialProviderFactory(provider), new FailingSshHandler());
+        var dto = CreateSshServer(passwordEncrypted: null);
+        dto.CredentialLookupConfirmed = false;
+        await fixture.SeedAsync(dto);
+        var statuses = new List<string>();
+        fixture.ViewModel.StatusMessageRequested += statuses.Add;
+
+        await fixture.ViewModel.RestoreServerAsync(
+            "srv-ssh", CancellationToken.None, failureReport: ConnectFailureReport.FailedTabOnly);
+
+        Assert.DoesNotContain(
+            fixture.Localizer.Format("StatusCredentialLookupUnconfirmed", "SSH Box"),
+            statuses);
+    }
+
+    [Fact]
     public async Task Connect_AnnouncesTheVaultLookup()
     {
         var provider = new StubCredentialProvider { Result = new CredentialResult("", "s3cr3t") };
