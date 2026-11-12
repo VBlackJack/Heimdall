@@ -404,6 +404,9 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         vm.ToolsTab.RefreshHeaderText();
         vm.ToolsTab.InvalidateSections();
 
+        // The tools group label is localized text, not user data: it follows the language.
+        vm.Connection.RefreshTabGroups();
+
         // The banner status is set imperatively, like its settings twin, which the locale
         // handler clears; the banner remembers its key and re-formats instead.
         vm.Update.RefreshLocalization();

@@ -315,6 +315,8 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     private bool _terminalSessionHasInput;
     private string? _pendingSecurityDisconnectMessage;
     private DateTimeOffset? _terminalSessionAttachedAtUtc;
+    private DateTimeOffset? _shellSessionAttachedAtUtc;
+    private bool _shellSessionHasInput;
     private int _autoReconnectAttempt;
     private int _autoReconnectMaxAttempts;
     private int _autoReconnectSecondsRemaining;
@@ -542,6 +544,10 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         }
 
         _session = session;
+        // Stamped before the subscriptions: a disconnect already latched on the session is
+        // delivered inside the Disconnected subscription below.
+        _shellSessionAttachedAtUtc = DateTimeOffset.UtcNow;
+        _shellSessionHasInput = false;
         _winRmEarlyOutputDiagnostic = null;
         ShowHealthButton(true);
 
@@ -1986,6 +1992,23 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
                 return;
             }
 
+            // The reconnect chain is completed by the attach, so a session that ends right after
+            // it would count as attempt 1 forever. Like the plink path, a session that ends
+            // before the user typed anything, within the connect window, is not retried.
+            if (_session is not null
+                && _shellSessionAttachedAtUtc is { } shellAttachedAt
+                && TerminalReconnectPolicy.SuppressesConnectTimeShellDisconnect(
+                    _shellSessionHasInput,
+                    DateTimeOffset.UtcNow - shellAttachedAt,
+                    TerminalReconnectPolicy.ResolveConnectTimeExitWindow(
+                        TerminalSettings?.SshConnectTimeExitWindowSeconds)))
+            {
+                Core.Logging.FileLogger.Info(
+                    "EmbeddedSSH auto-reconnect skipped: the session ended within the connect window");
+                ShowReconnectOverlay();
+                return;
+            }
+
             int maxAttempts = ResolveMaxAutoReconnectAttempts();
             if (TerminalSettings?.SshAutoReconnect == true
                 && _autoReconnectAttempt < maxAttempts)
@@ -2198,6 +2221,11 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         if (_session is not null)
         {
             SshShellSession session = _session;
+            if (marksTerminalInput)
+            {
+                _shellSessionHasInput = true;
+            }
+
             TryTransportWrite(() => session.Write(data), "ssh");
         }
         else
@@ -2432,6 +2460,11 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         if (_session is not null)
         {
             SshShellSession session = _session;
+            if (marksTerminalInput)
+            {
+                _shellSessionHasInput = true;
+            }
+
             TryTransportWrite(() => session.Write(text), "ssh");
         }
         else

@@ -48,6 +48,22 @@ public sealed class SessionTabContextMenuFactory
     /// <summary>Locale key of the "Active mode" caption that opens the resolution header.</summary>
     private const string ActiveModeLabelKey = "RdpResolutionActiveModeLabel";
 
+    private const string CloseFolderTabsKey = "SessionCloseFolderTabs";
+    private const string CloseToolTabsKey = "SessionTabGroupToolsCloseTabs";
+    private const string CollapseFolderTabsKey = "SessionCollapseTabGroup";
+    private const string ExpandFolderTabsKey = "SessionExpandTabGroup";
+    private const string CollapseToolTabsKey = "SessionTabGroupToolsCollapseTabs";
+    private const string ExpandToolTabsKey = "SessionTabGroupToolsExpandTabs";
+
+    // The tools group is not a folder: its items say "tool tabs".
+    private static string CollapseItemKey(SessionTabViewModel session)
+    {
+        bool tools = ConnectionViewModel.IsToolsTabGroup(session.TabGroupKey);
+        return session.IsTabGroupCollapsed
+            ? tools ? ExpandToolTabsKey : ExpandFolderTabsKey
+            : tools ? CollapseToolTabsKey : CollapseFolderTabsKey;
+    }
+
     /// <summary>
     /// Initialises a new <see cref="SessionTabContextMenuFactory"/>.
     /// </summary>
@@ -340,7 +356,7 @@ public sealed class SessionTabContextMenuFactory
 
         var collapseItem = new MenuItem
         {
-            Header = vm.Localize(session.IsTabGroupCollapsed ? "SessionExpandTabGroup" : "SessionCollapseTabGroup"),
+            Header = vm.Localize(CollapseItemKey(session)),
             Command = vm.Connection.ToggleTabGroupCollapsedCommand,
             CommandParameter = session
         };
@@ -885,7 +901,10 @@ public sealed class SessionTabContextMenuFactory
         if (session.TabGroupKey is { } folder)
         {
             IReadOnlyList<SessionTabViewModel> folderTargets = SessionsInFolder(ordered.ToList(), folder);
-            var closeFolderItem = new MenuItem { Header = vm.Localize("SessionCloseFolderTabs") };
+            var closeFolderItem = new MenuItem
+            {
+                Header = vm.Localize(ConnectionViewModel.IsToolsTabGroup(folder) ? CloseToolTabsKey : CloseFolderTabsKey)
+            };
             closeFolderItem.Click += async (_, _) =>
             {
                 await vm.Connection.CloseSessionsAsync(

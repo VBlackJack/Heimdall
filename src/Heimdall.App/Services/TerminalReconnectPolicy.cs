@@ -98,6 +98,24 @@ internal static class TerminalReconnectPolicy
             && processRuntime <= effectiveExitWindow;
     }
 
+    /// <summary>
+    /// Whether a shell session that ended <paramref name="sinceAttach"/> after it was attached
+    /// should skip auto-reconnect. A device that closes right after opening the shell (a session
+    /// limit, an access list) would otherwise be retried at the shortest delay forever, because
+    /// every attach restarts the attempt count. A session the user typed into is a real session.
+    /// </summary>
+    public static bool SuppressesConnectTimeShellDisconnect(
+        bool hasTerminalInput,
+        TimeSpan sinceAttach,
+        TimeSpan? connectTimeExitWindow = null)
+    {
+        TimeSpan effectiveExitWindow = connectTimeExitWindow ?? ConnectTimeExitWindow;
+
+        return !hasTerminalInput
+            && sinceAttach >= TimeSpan.Zero
+            && sinceAttach <= effectiveExitWindow;
+    }
+
     public static TimeSpan ResolveConnectTimeExitWindow(int? configuredSeconds)
     {
         return configuredSeconds.HasValue
