@@ -12,6 +12,169 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-11-12: Tools tab group, agent key per session, terminal width, credential lookup confirmation (v2026.111201)
+
+Fixes and additions, merged as #764, #766, #769, #770, #771, #772, #773 and #774. The user-facing
+summary and the upgrade notes are in the release notes.
+
+### Tab strip (#772)
+
+- `ConnectionViewModel.TabGroups`: with tab grouping on, tool tabs that the folder resolver leaves
+  ungrouped and that are not pinned get the `/tools` group. A local folder key never starts with `/`
+  and a shared one starts with `::shared:`, so no folder can collide, whatever its name. Dedicated
+  accessible names and menu wording (`SessionTabGroupTools*`, en/fr/es). In the own-row layout the
+  group has its header and folds with the others; tool tabs used to stay visible whatever folder was
+  shown.
+
+### SSH (#771, #772, #773, #774)
+
+- **Early shell output (#772).** `SshShellSession` raised `DataReceived` before the terminal view
+  could subscribe, so a device that prints its prompt once showed a blank terminal until Enter.
+  `ShellOutputGate` (`Heimdall.Ssh`) buffers output until the first subscriber, capped at 256 KiB as
+  a contiguous prefix, and replays it in order under one delivery lock.
+  `SshShellSession.Disconnected` is latched and delivered once to a late subscriber. A throwing
+  `DataReceived` subscriber no longer ends the read loop; it is logged once. Verified on a scripted
+  stream, not on real equipment.
+- **Auto-reconnect (#772).** `TerminalReconnectPolicy.SuppressesConnectTimeShellDisconnect`, called
+  from `EmbeddedSshView`: an SSH.NET shell that disconnects within `SshConnectTimeExitWindowSeconds`
+  (15 by default) with nothing typed is not redialled, the rule plink sessions already had.
+- **Agent key per session (#773).** `ServerProfileDto.SshAgentKeyFingerprint` (`SHA256:` plus 43
+  base64 characters), null meaning every key. The SSH.NET shell, SFTP and the SFTP companion offer
+  only that key. A key no agent holds is refused before any tunnel, host key prompt or password
+  prompt (`SshFailureCode.AgentKeyNotLoaded`, never retried, never auto-reconnected). Plink gets the
+  key as a one-line public key file through `-i`, only when the key is in Pageant, is one of the
+  seven base types or the Ed25519 certificate (the set measured against the bundled plink 0.83; any
+  other type is refused because plink tries every Pageant key when it cannot read the file), no key
+  file is configured and plink is the attested bundled build. External PuTTY with a chosen key is
+  refused. Agent lookups before the dial are bounded and run off the calling thread. The shared
+  sanitizer drops the field, every import clears it, the settings export strips it. A cancellation
+  while deciding whether plink can honour the key now releases the tunnel reference.
+  `PipeModeSession` raises `Disposed` exactly once under concurrent disposal, and one failing
+  subscriber no longer skips the next. Troubleshooting entries 66 and 67 (and 65 pointing to the
+  Agent key list), English and French. `SharedProfileSanitizerTests` lists the property among those
+  dropped from shared files.
+- **Plink launch width (#774).** A plink pipe session keeps its launch size for good. It was
+  launched at 80x24 whenever the terminal page had not reported a size, and otherwise at a size
+  measured while the terminal surface was hidden behind the connecting veil (see the next item),
+  which was not the pane's. The full tab width, when the SFTP side panel then split the tab, was an
+  additional mismatch. An SSH tab that will open the panel is now split
+  before the connect, the panel shown as loading, filled in place when SFTP connects and removed
+  when it does not. Layout commands (split, swap, toggle, merge, detach) are refused while the panel
+  loads, and a merge from a tab still connecting is refused. When the page did not report in time,
+  the fallback is the size of the replaced terminal, then the last size reported by any terminal
+  (application wide), then the default; sizes under 20x5 are never kept, and the log names the
+  source. The page no longer reports xterm's built-in 80x24 when it had nothing to measure.
+- **Hidden surface (#774).** While a session connects the terminal surface is hidden behind the
+  connecting veil; WPF arranges a hidden element but does not position its native window, so the
+  WebView2 kept its creation bounds and the page fitted to that box (243x81 reported for a pane of
+  76 columns). The host now sends the pane's box (`viewport:W,H`, computed from the layout with each
+  edge rounded to a device pixel) while the surface is hidden and `viewport:` once shown; `ready:`
+  never carries a size. The log compares the first size from real bounds with the size derived while
+  hidden (`match` or `MISMATCH`). A pipe session whose width differs from its launch width shows a
+  badge in the session header, full sentence in the tooltip. Hand tested on a debug build against
+  OpenSSH 9.2 at 100% display scaling; 125% and 150% and a startup restore of many tabs were not
+  tried. Bulk connect keeps its previous sequence.
+- **Plink host key probe (#771).** The probe passed no manual host key, so on a host cached in
+  PuTTY's registry plink accepted the key, authenticated through Pageant and held a shell until its
+  timeout. It now runs `-v -batch -noagent -noshare -N -ssh -P <port> -hostkey SHA256:<43 x A>`:
+  plink prints the presented key, refuses it and exits before user authentication, with standard
+  input closed at once. The output is read strictly (one fingerprint line, the key on the next line,
+  the refusal after it, the fatal error last, nothing past the key exchange, a process that ended by
+  itself); otherwise no result, and a first connection is refused as before. Measured on the bundled
+  plink 0.83 against OpenSSH 9.2 in a container; that transcript is the fixture of the tests. With
+  GSSAPI key exchange no host key is sent and plink can still authenticate with Kerberos during the
+  probe; the result is discarded then. A host cached in PuTTY's registry was not measured. The
+  previous parser is kept with its tests and no longer called.
+
+### Session tree and import (#769)
+
+- Moving a session up or down rebuilt the whole tree. A change of order alone now moves the row in
+  place; a move to another folder still rebuilds. After a move the row is scrolled into view only
+  when its own line is not visible, measured on the line and not on a folder with all its content.
+  The scrolling itself is not covered by a test.
+- The KeePass 2 (KPScript) and KeePassXC credential provider presets start with the quoted path
+  under Program Files when the program is there, and with the bare name otherwise. A saved command
+  is still recognised as its preset whatever folder its path names.
+- The import preview showed the RDP port field (3389 by default) for a session that is not RDP; it
+  shows the port the session uses.
+
+### Credential lookup (#764)
+
+- With an external credential provider, a profile's password is looked up under its vault entry
+  name or its display name. An imported file chooses both and the host, and can supply the gateway;
+  the network scanner names a session after a reverse DNS answer.
+  `ServerProfileDto.CredentialLookupConfirmed` (true by default, so existing profiles and files
+  without the field are unchanged) is cleared by every import (JSON, mRemoteNG, MobaXterm, RDCMan,
+  .rdp including Replace, PuTTY, OpenSSH config), the network scanner and the Citrix cache scanner.
+  While false, the profile makes no lookup in the provider on connect, restore, reconnect, bulk
+  connect or the SFTP companion; shared sessions are unchanged. An earlier revision looked the
+  profile up by host; that was still open to a crafted file.
+- "Confirm credential lookup..." on a session, a selection or a folder lists the entry and the
+  destination (protocol, host, port, user, gateway chain, RD Gateway) for at most ten profiles at a
+  time; a row is confirmed only if the stored profile still matches what was shown. Declining is the
+  default. Values are shown with control and format characters made visible and long values cut.
+- The session dialog keeps the state it loaded and shows a notice with an "Allow lookup" button.
+  Renaming an unconfirmed profile no longer freezes the file's name as its vault entry. The line
+  saying the lookup is off is the last status once an interactive connect has ended; restore,
+  reconnect, bulk connect and the SFTP companion stay silent.
+- Not covered: profiles imported before this change keep the lookup by name; shared sessions are
+  still looked up by host with a gateway the shared file can supply; a command preset built on
+  `{Host}` instead of `{Title}`. Hand tested through the UI on an empty data directory with a logging
+  command provider: 7 of 8 checks passed, 1 partial (the status line, fixed afterwards).
+
+### SFTP (#766)
+
+- A privileged write sent the sudo password and then the content on the remote standard input, and
+  the sudo running the write could read its password from that stream; with a wrong password sudo
+  read lines of the content as further attempts. The write is now one remote command, a constant
+  outer script and a constant inner script, every value a positional parameter. As the connecting
+  user, the content is staged in a private 0700 directory under `$TMPDIR`, its size is checked, then
+  ONE sudo runs: first `sudo -n`, and only if that did not start the installer is the password piped
+  to `sudo -S`, so sudo's input never carries the content. As root, the installer opens the staged
+  file and checks on the open descriptor that it is a regular file owned by the caller with a single
+  link in a directory only the caller can write, then the existing atomic replace runs. A truncated
+  content is refused before install. Failures are told apart (rejected password, password or
+  terminal required, not in sudoers, sudo missing, no temporary space, installer refusals). The
+  remote editor reports a rejected password once, without retry on the debounce timer, and a local
+  write failure no longer hides it when the remote side exited before reading. A first revision
+  (`sudo -v` then `sudo -n`) failed under `timestamp_timeout=0` and `verifypw=any`.
+- Limits: the descriptor check needs GNU `stat` and `/proc`, otherwise the write is refused; the
+  staged content sits in a 0600 file of the connecting user until the install ends and a killed
+  connection or a power loss can leave it there; a POSIX `sh` is needed on the server.
+- `SudoInvocations_ConsumePasswordBeforeStreamingPayload` was updated with the owner's approval and
+  keeps its name; it pins the new script. 21 tests run the real scripts in `sh` against a fake
+  `sudo`. `PrivilegedSudoRealHostTests` (opt-in, `HEIMDALL_SUDO_TEST_CONTAINER`) ran 15 of 15
+  against sudo 1.9.13p3 in a Debian 12 container; a real SSH session from the application, fish or
+  tcsh as login shell, other sudo versions and SELinux were not exercised.
+
+### Work that is no longer lost, and safeguards (#770)
+
+- `JsonSyncService`: a pending update of a template that belongs to a built-in action is skipped,
+  counted and reported; the title and danger level stayed while the command was rewritten.
+- The SSH key generator deleted the existing file before writing; keys are now written beside the
+  target and put in place once complete, and an IO error is shown in the tool instead of escaping.
+- `NotesToolViewModel`: moving the open note with unsaved edits wrote them to the old place and
+  showed stale text. It is saved first, then moved; the back and forward history follows a move and
+  a rename.
+- Web session external program: the description shown before the start makes control characters
+  visible; a program on a network or device path, given as a file URI or wrapped in quotes, is
+  refused, and so is a command too long to be shown in full. A portable browser started from a
+  network share is therefore refused, as for the Citrix SelfService path.
+- Session restore dialog: with a filter active, hidden and shared sessions were listed as an unknown
+  server; names are resolved from the whole inventory and the shared sessions.
+- Not changed: IPv6 targets in the gateway tools. The report was checked and is wrong: those tools
+  have never accepted an IPv6 literal, so supporting it would be a feature.
+
+### Tests (#766, #771, #774)
+
+- The staging-directory test of #766 defines a `stat` shell function around the installer instead
+  of putting a fake `stat` first on PATH, which the CI runner's real `stat` bypassed, and fails if
+  the simulation has no effect.
+- `SessionCoordinatorPreMountTests.SftpCompanionReconnect_BringsTheRowBackToConnected` timed out
+  once (5 s) in a full run made on a loaded machine; it passed five times alone and in the next full
+  run. `PlinkTunnelRunnerTests.TunnelPasswordFile_ForeignListenerFailsClosed` failed once in a full
+  run of #771 and passed on the rerun.
+
 ## 2026-11-11: data-loss and safeguard fixes, SSH agent key attempts (v2026.111101)
 
 Fixes only, merged as #760, #761, #762, #765 and #767. The user-facing summary and the upgrade notes
