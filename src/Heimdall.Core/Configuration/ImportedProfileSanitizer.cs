@@ -102,6 +102,10 @@ public static class ImportedProfileSanitizer
             profile.CitrixLaunchCommandLine = null;
             profile.ExecutionConfirmed = false;
 
+            // The file chose the names and the host: no stored secret is looked up by a name until
+            // the user has opened and saved the profile.
+            profile.CredentialLookupConfirmed = false;
+
             // A trust decision about the remote certificate, made on the exporting machine.
             profile.WinRmSkipCertificateCheck = false;
 

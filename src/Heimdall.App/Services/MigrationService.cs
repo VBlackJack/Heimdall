@@ -421,6 +421,8 @@ public sealed class MigrationService
 
     private static ServerProfileDto MapLegacyServer(JsonElement legacy)
     {
+        // CredentialLookupConfirmed stays true here: the source folder is the user's own previous
+        // installation, chosen by the user, so its names are theirs and not a file's.
         var dto = new ServerProfileDto();
 
         // Identity

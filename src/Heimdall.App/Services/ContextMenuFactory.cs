@@ -115,6 +115,11 @@ public sealed class ContextMenuFactory
                 vm.Localize("TreeCtxDuplicate"),
                 vm.ServerList.DuplicateServerCommand,
                 server));
+            if (server.NeedsCredentialLookupConfirmation)
+            {
+                menu.Items.Add(CreateConfirmCredentialLookupItem(vm, [server]));
+            }
+
             menu.Items.Add(CreateFavoriteMenuItem(vm, [server]));
             menu.Items.Add(new Separator());
             menu.Items.Add(CreateMoveToGroupMenu(vm, server));
@@ -208,6 +213,19 @@ public sealed class ContextMenuFactory
     }
 
     /// <summary>
+    /// The "Confirm credential lookup..." entry: shown only where at least one targeted session
+    /// is an imported one still waiting for the user's confirmation.
+    /// </summary>
+    private static MenuItem CreateConfirmCredentialLookupItem(
+        MainViewModel vm,
+        IReadOnlyList<ServerItemViewModel> servers)
+    {
+        MenuItem item = new() { Header = vm.Localize("TreeCtxConfirmCredentialLookup") };
+        item.Click += async (_, _) => _ = await vm.ServerList.ConfirmCredentialLookupAsync(servers);
+        return item;
+    }
+
+    /// <summary>
     /// A disabled line saying a shared session or folder is read-only, standing where the entries
     /// that would change it are left out.
     /// </summary>
@@ -268,6 +286,13 @@ public sealed class ContextMenuFactory
         menu.Items.Add(writeEntries[0]);
         menu.Items.Add(writeEntries[1]);
         menu.Items.Add(writeEntries[2]);
+        if (bulkContext.Items.Any(item => item.NeedsCredentialLookupConfirmation))
+        {
+            MenuItem confirmLookup = CreateConfirmCredentialLookupItem(vm, bulkContext.Items);
+            writeEntries.Add(confirmLookup);
+            menu.Items.Add(confirmLookup);
+        }
+
         menu.Items.Add(new Separator());
         MenuItem moveMenu = CreateBulkMoveToGroupMenu(vm, bulkContext);
         writeEntries.Add(moveMenu);
@@ -656,6 +681,10 @@ public sealed class ContextMenuFactory
         addSubItem.Click += async (_, _) => await CreateFolderFromMenuAsync(vm, folder.FullPath);
         menu.Items.Add(addSubItem);
         menu.Items.Add(CreateAddToolMenuItem(vm, callbacks, folder.FullPath));
+        if (allServers.Any(server => server.NeedsCredentialLookupConfirmation))
+        {
+            menu.Items.Add(CreateConfirmCredentialLookupItem(vm, allServers));
+        }
 
         menu.Items.Add(new Separator());
 

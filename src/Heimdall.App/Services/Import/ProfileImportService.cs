@@ -201,6 +201,17 @@ public sealed class ProfileImportService(
             result.SkippedCount);
         IReadOnlyList<string> sanitizationWarnings = ImportSummaryText.SanitizationWarnings(_localizer, sanitization);
         var fullSummary = BuildJsonImportSummary(summary, result, sanitizationWarnings);
+        if (result.UnconfirmedLookupCount > 0)
+        {
+            fullSummary = string.Join(
+                Environment.NewLine,
+                fullSummary,
+                _localizer.FormatCount(
+                    result.UnconfirmedLookupCount,
+                    "StatusImportCredentialLookupOffOne",
+                    "StatusImportCredentialLookupOff",
+                    result.UnconfirmedLookupCount));
+        }
 
         if ((result.ImportedCount > 0 || result.ReplacedCount > 0)
             && result.GatewayOrphanCount == 0
@@ -223,7 +234,8 @@ public sealed class ProfileImportService(
             SkippedCount = result.SkippedCount,
             GatewayCreatedCount = result.GatewayCreatedCount,
             GatewayMergedCount = result.GatewayMergedCount,
-            GatewayOrphanCount = result.GatewayOrphanCount
+            GatewayOrphanCount = result.GatewayOrphanCount,
+            UnconfirmedLookupCount = result.UnconfirmedLookupCount
         };
     }
 
@@ -429,7 +441,10 @@ public sealed class ProfileImportService(
                     SkippedCount = skippedCount,
                     GatewayCreatedCount = gatewayReconciliation.CreatedCount,
                     GatewayMergedCount = gatewayReconciliation.MergedCount,
-                    GatewayOrphanCount = gatewayReconciliation.OrphanReferences.Count
+                    GatewayOrphanCount = gatewayReconciliation.OrphanReferences.Count,
+                    UnconfirmedLookupCount = settings.UseExternalCredentialProvider
+                        ? appliedServers.Count(server => !server.CredentialLookupConfirmed)
+                        : 0
                 },
                 GatewaysToAdd: gatewayReconciliation.GatewaysToAdd);
         });

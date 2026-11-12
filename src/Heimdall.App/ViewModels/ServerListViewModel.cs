@@ -1295,7 +1295,8 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
 
             // The connection that went ahead without the vault's password failed in turn, and its
             // own message ("connection refused", "authentication failed") replaced the vault's on
-            // the status line. The vault failure is the cause, so it has the last word.
+            // the status line. The vault failure is the cause, so it has the last word. The same
+            // holds for the note that an unconfirmed session was not looked up at all.
             if (!connected && quietVaultFailure is not null)
             {
                 StatusMessageRequested?.Invoke(quietVaultFailure);
@@ -1721,6 +1722,30 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             return false;
         }
 
+        // An imported profile names its own host, gateway and entry: until the user has confirmed
+        // it, nothing is looked up for it, under any name. It goes on to the ordinary password
+        // handling. Only an interactive connect says so; the quiet paths (restore, reconnect,
+        // bulk connect) stay silent.
+        if (!serverDto.CredentialLookupConfirmed && !SharedSessionIds.IsSharedProfile(serverDto))
+        {
+            if (!skipOnFailure)
+            {
+                // Through the quiet-report channel when there is one, so a connection that then
+                // fails or asks for a password does not leave the reason behind its own message.
+                string reason = _localizer.Format("StatusCredentialLookupUnconfirmed", serverDto.DisplayName);
+                if (reportQuietly is not null)
+                {
+                    reportQuietly(reason);
+                }
+                else
+                {
+                    StatusMessageRequested?.Invoke(reason);
+                }
+            }
+
+            return false;
+        }
+
         var provider = _credentialProviderFactory.Create(settings);
 
         if (!provider.IsAvailable)
@@ -1859,9 +1884,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             return serverDto.RemoteServer;
         }
 
-        return string.IsNullOrWhiteSpace(serverDto.VaultEntryName)
-            ? serverDto.DisplayName
-            : serverDto.VaultEntryName;
+        return CredentialLookupPolicy.NameBasedTitle(serverDto);
     }
 
     private bool ShowConnectionError(string title, string message)
@@ -1983,6 +2006,9 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             return;
         }
 
+        // Saving through the Add dialog, where the user sees the name and the host, is what
+        // confirms the new profile: an ad hoc session is typed by the user, so its template is
+        // confirmed and the dialog writes that value back.
         var dialogVm = ServerDialogViewModel.FromDto(template);
         dialogVm.DialogTitle = _localizer["DialogTitleAddServer"];
         dialogVm.IsEditMode = false;
