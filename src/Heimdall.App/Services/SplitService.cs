@@ -72,6 +72,18 @@ public sealed class SplitService : ISplitService
     internal Action<bool>? SetHasActiveSessions { get; set; }
     internal Action<string>? SetStatusText { get; set; }
 
+    /// <summary>
+    /// Where a pane reconnect leaves the size of the terminal it replaces, so the Plink launch that
+    /// follows (which cannot resize afterwards) starts at the size the pane had.
+    /// </summary>
+    internal TerminalSizeHints? SizeHints { get; set; }
+
+    /// <summary>
+    /// Whether a tab is still waiting for its SSH session to attach. Wired by the session
+    /// coordinator, which owns the connecting views.
+    /// </summary>
+    internal Func<SessionTabViewModel, bool>? IsSessionConnecting { get; set; }
+
     public SplitService(
         IConfigManager configManager,
         LocalizationManager localizer,
@@ -164,6 +176,11 @@ public sealed class SplitService : ISplitService
         SplitOrientation orientation,
         string? paneId = null)
     {
+        if (RefuseWhilePendingCompanion(session))
+        {
+            return;
+        }
+
         CancellationToken ct = GetSessionToken(session);
         string? pendingPaneSessionId = null;
         bool connectionDispatchCompleted = false;
@@ -332,6 +349,11 @@ public sealed class SplitService : ISplitService
         SplitOrientation orientation,
         string? paneId = null)
     {
+        if (RefuseWhilePendingCompanion(session))
+        {
+            return;
+        }
+
         var pipeIndex = paletteToolPayload.IndexOf('|');
         var toolId = pipeIndex >= 0 ? paletteToolPayload[..pipeIndex] : paletteToolPayload;
         var argument = pipeIndex >= 0 ? paletteToolPayload[(pipeIndex + 1)..] : null;
@@ -394,6 +416,11 @@ public sealed class SplitService : ISplitService
         var activeSessions = ActiveSessionsProvider?.Invoke();
         if (activeSessions is null) return;
 
+        if (RefuseWhilePendingCompanion(target))
+        {
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(sourceSessionId))
         {
             SetStatusText?.Invoke(_localizer["ErrorSplitSessionFailed"]);
@@ -435,13 +462,24 @@ public sealed class SplitService : ISplitService
         // not in-flight, and merges fine.
         foreach (SessionPaneModel leaf in SplitTreeHelper.EnumerateLeaves(source.RootContent))
         {
-            if (leaf.HostControl is null && !leaf.HasFailureDetails)
+            // Still connecting: no host yet, or a companion still pending.
+            if ((leaf.HostControl is null && !leaf.HasFailureDetails) || leaf.IsPendingCompanion)
             {
                 SetStatusText?.Invoke(_localizer["SplitMergeBlockedByConnecting"]);
                 Core.Logging.FileLogger.Info(
                     $"Merge blocked: source pane '{leaf.Title}' is still connecting.");
                 return;
             }
+        }
+
+        // An SSH tab whose session has not attached yet: moving it would leave the session, when it
+        // arrives, no tab to attach to.
+        if (IsSessionConnecting?.Invoke(source) == true)
+        {
+            SetStatusText?.Invoke(_localizer["SplitMergeBlockedByConnecting"]);
+            Core.Logging.FileLogger.Info(
+                $"Merge blocked: source session '{source.Title}' has not attached yet.");
+            return;
         }
 
         // Check CanClose for tool panes in the source tree (busy tool blocks the merge)
@@ -593,7 +631,7 @@ public sealed class SplitService : ISplitService
                 return ToolCloseRefusalReport.Refused(toolView.CloseRefusal);
             }
         }
-        else if (!string.IsNullOrEmpty(pane.ServerId))
+        else if (!string.IsNullOrEmpty(pane.ServerId) && !pane.IsPendingCompanion)
         {
             string historyId = pane.ProfileLookupServerId;
             Core.Logging.ConnectionHistory.RecordDisconnect(
@@ -684,6 +722,7 @@ public sealed class SplitService : ISplitService
         try
         {
             CaptureSftpReconnectPathHint(pane);
+            CaptureTerminalSizeHint(pane, oldServerId);
 
             // Dispose current host control through the shared teardown order before
             // replacing it with the reconnect placeholder state.
@@ -812,6 +851,43 @@ public sealed class SplitService : ISplitService
             Core.Logging.FileLogger.Error($"ReconnectPane error: {ex.Message}", ex);
             SetStatusText?.Invoke(_localizer["ErrorSplitSessionFailed"] + $" - {ex.Message}");
         }
+        finally
+        {
+            // The connect has resolved its size by now, or never will: a hint left behind would be
+            // picked up by an unrelated later connect of this pane.
+            SizeHints?.Forget(oldServerId);
+        }
+    }
+
+    /// <summary>
+    /// Refuses a layout command while the tab still waits for its SFTP companion: the SSH session
+    /// is looked up by the tab's first pane, so a swap would lose it, and a split, merge or detach
+    /// would move a pane the companion is about to fill.
+    /// </summary>
+    private bool RefuseWhilePendingCompanion(SessionTabViewModel session)
+    {
+        if (!session.HasPendingCompanion)
+        {
+            return false;
+        }
+
+        SetStatusText?.Invoke(_localizer["SplitBlockedByPendingCompanion"]);
+        return true;
+    }
+
+    /// <summary>
+    /// Remembers the size the pane's terminal last showed under the key the reconnect will connect
+    /// with, before the teardown disposes the view. A pane that never reported leaves nothing.
+    /// </summary>
+    private void CaptureTerminalSizeHint(SessionPaneModel pane, string paneSessionKey)
+    {
+        if (SizeHints is not null
+            && !string.IsNullOrEmpty(paneSessionKey)
+            && pane.HostControl is ITerminalSizeSource sizeSource
+            && sizeSource.LastKnownTerminalSize is { } size)
+        {
+            SizeHints.RememberPrevious(paneSessionKey, size);
+        }
     }
 
     private static void CaptureSftpReconnectPathHint(SessionPaneModel pane)
@@ -840,6 +916,7 @@ public sealed class SplitService : ISplitService
         try
         {
             if (!session.IsSplit) return;
+            if (RefuseWhilePendingCompanion(session)) return;
 
             var container = !string.IsNullOrEmpty(paneId)
                 ? SplitTreeHelper.FindParent(session.RootContent, paneId)
@@ -915,6 +992,7 @@ public sealed class SplitService : ISplitService
     public void ToggleSplitOrientation(SessionTabViewModel session, string? paneId = null)
     {
         if (!session.IsSplit) return;
+        if (RefuseWhilePendingCompanion(session)) return;
 
         var container = !string.IsNullOrEmpty(paneId)
             ? SplitTreeHelper.FindParent(session.RootContent, paneId)
@@ -1043,8 +1121,10 @@ public sealed class SplitService : ISplitService
 
         foreach (var pane in leaves)
         {
+            // A companion that never connected has no session to record or tear down.
             if (!ConnectionTypeCatalog.IsToolConnectionType(pane.ConnectionType)
-                && !string.IsNullOrEmpty(pane.ServerId))
+                && !string.IsNullOrEmpty(pane.ServerId)
+                && !pane.IsPendingCompanion)
             {
                 string historyId = pane.ProfileLookupServerId;
                 Core.Logging.ConnectionHistory.RecordDisconnect(
@@ -1081,6 +1161,8 @@ public sealed class SplitService : ISplitService
     /// </remarks>
     private void TearDownPaneState(SessionPaneModel pane)
     {
+        SizeHints?.Forget(pane.ServerId);
+
         try
         {
             _connectionSm.Teardown(pane.ServerId);

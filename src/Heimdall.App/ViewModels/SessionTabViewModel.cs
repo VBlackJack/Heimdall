@@ -475,6 +475,13 @@ public partial class SessionTabViewModel : ObservableObject
     internal SessionPaneModel? SecondaryPaneOrNull => SecondaryPaneOf(RootContent);
 
     /// <summary>
+    /// Whether a pane of this tab stands in for an SFTP companion that has not connected yet. The
+    /// one predicate the layout commands, their menu items and the close loops share.
+    /// </summary>
+    internal bool HasPendingCompanion =>
+        SplitTreeHelper.EnumerateLeaves(RootContent).Any(pane => pane.IsPendingCompanion);
+
+    /// <summary>
     /// The same resolution for any split, not only a tab's root: the one definition, which
     /// <see cref="SecondaryPaneOrNull"/> and the split-ratio memory both ask.
     /// </summary>

@@ -24,12 +24,12 @@ namespace Heimdall.App.Tests;
 /// The handoff of the page's terminal size to the connect path, and the bounded wait for it.
 /// </summary>
 /// <remarks>
-/// The real producer is <c>src/Heimdall.App/Assets/terminal.html:472</c>,
-/// <c>postMessage('ready:' + term.cols + ',' + term.rows)</c>, posted at the end of
-/// <c>initializeTerminal()</c> once xterm.js has opened and fitted its surface. The view receives
-/// it in <c>EmbeddedSshView.OnWebMessageReceived</c> (the <c>MsgReady</c> branch,
-/// <c>EmbeddedSshView.xaml.cs:1234</c>) and hands it to <see cref="TerminalSizeReport.Remember"/>
-/// through <c>RememberTerminalSize</c> (line 1698). <see cref="TerminalSizeReport.Remember"/> is
+/// The real producer is the terminal page. At the end of <c>initializeTerminal()</c> it posts
+/// <c>ready:cols,rows</c> when the fit addon could measure its surface, and otherwise
+/// <c>ready:</c> without a size, sending the size with the first fit that can measure. The view
+/// receives both in <c>EmbeddedSshView.OnWebMessageReceived</c> (the <c>MsgReady</c> and
+/// <c>MsgResize</c> branches) and hands a size to <see cref="TerminalSizeReport.Remember"/>
+/// through <c>RememberTerminalSize</c>. <see cref="TerminalSizeReport.Remember"/> is
 /// called directly below in its place, from a pool thread where the real one runs on the UI thread.
 /// </remarks>
 public sealed class TerminalSizeReportTests

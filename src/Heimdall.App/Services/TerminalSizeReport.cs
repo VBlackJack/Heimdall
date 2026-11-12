@@ -37,6 +37,12 @@ internal sealed class TerminalSizeReport
 
     private TerminalSize? _latest;
 
+    /// <summary>
+    /// Where the size of every report is also noted, so a later connect that has no view of its own
+    /// can fall back on what the window last showed. Set once, before the page can speak.
+    /// </summary>
+    internal TerminalSizeHints? Hints { get; set; }
+
     /// <summary>The last size reported, or <see langword="null"/> before the page has spoken.</summary>
     public TerminalSize? Latest => Volatile.Read(ref _latest);
 
@@ -48,7 +54,34 @@ internal sealed class TerminalSizeReport
     {
         TerminalSize size = new(columns, rows);
         Volatile.Write(ref _latest, size);
+        Hints?.RememberWindow(size);
         _firstReport.TrySetResult(size);
+    }
+
+    /// <summary>
+    /// Reads the <c>cols,rows</c> payload of a <c>ready:</c> or <c>resize:</c> page message.
+    /// </summary>
+    /// <remarks>
+    /// A <c>ready:</c> posted before the page could measure its surface carries no size, and an
+    /// empty or partial payload is refused here so that it never counts as the first report: a
+    /// size that xterm.js made up (its built-in 80x24) would otherwise release a launch that is
+    /// still waiting for a real one.
+    /// </remarks>
+    internal static bool TryParseSize(ReadOnlySpan<char> payload, out int columns, out int rows)
+    {
+        columns = 0;
+        rows = 0;
+
+        int separatorIndex = payload.IndexOf(',');
+        if (separatorIndex <= 0 || separatorIndex >= payload.Length - 1)
+        {
+            return false;
+        }
+
+        return int.TryParse(payload[..separatorIndex], out columns)
+            && int.TryParse(payload[(separatorIndex + 1)..], out rows)
+            && columns > 0
+            && rows > 0;
     }
 
     /// <summary>
@@ -61,14 +94,20 @@ internal sealed class TerminalSizeReport
     /// which is what a transport that can resize after start asks for.</param>
     /// <param name="cancellationToken">The connection token; cancelling it ends the wait with
     /// <see cref="OperationCanceledException"/>.</param>
+    /// <param name="hints">Sizes seen elsewhere, used when the view is absent or silent. Never
+    /// consulted for a zero wait: that is the transport that resizes after it attaches, and it
+    /// keeps the lookup it always had.</param>
+    /// <param name="sessionKey">The key the previous view of this pane or tab was remembered under.</param>
     public static async Task<TerminalSizeLookup> ResolveAsync(
         TerminalSizeReport? report,
         TimeSpan wait,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        TerminalSizeHints? hints = null,
+        string? sessionKey = null)
     {
         if (report is null)
         {
-            return TerminalSizeLookup.NoView;
+            return FromHints(TerminalSizeLookup.NoView, wait, hints, sessionKey);
         }
 
         if (report.Latest is { } known)
@@ -87,11 +126,41 @@ internal sealed class TerminalSizeReport
         }
         catch (TimeoutException)
         {
-            return TerminalSizeLookup.TimedOut(wait);
+            return FromHints(TerminalSizeLookup.TimedOut(wait), wait, hints, sessionKey);
         }
 
         // The latest rather than the first: a resize can land between the report and this line.
         return TerminalSizeLookup.Reported(report.Latest ?? report.FirstReported.Result);
+    }
+
+    /// <summary>
+    /// The best size known without a report: the one the terminal that previously held this pane or
+    /// tab showed, then the one the window last showed, else the lookup unchanged.
+    /// </summary>
+    /// <remarks>
+    /// The previous view comes first because a reconnect lands in the same place, at the same size.
+    /// The window comes second: a tab opened in the background shares the layout of the visible
+    /// one, which is a far better guess than the 80 columns of a default.
+    /// </remarks>
+    private static TerminalSizeLookup FromHints(
+        TerminalSizeLookup missing,
+        TimeSpan wait,
+        TerminalSizeHints? hints,
+        string? sessionKey)
+    {
+        if (hints is null || wait <= TimeSpan.Zero)
+        {
+            return missing;
+        }
+
+        if (sessionKey is not null && hints.TakePrevious(sessionKey) is { } previous)
+        {
+            return new TerminalSizeLookup(previous, TerminalSizeSource.PreviousView, missing.Waited);
+        }
+
+        return hints.Window is { } window
+            ? new TerminalSizeLookup(window, TerminalSizeSource.Window, missing.Waited)
+            : missing;
     }
 }
 
@@ -100,6 +169,12 @@ internal enum TerminalSizeSource
 {
     /// <summary>The page reported a size.</summary>
     Reported,
+
+    /// <summary>The terminal that previously held this pane or tab last showed this size.</summary>
+    PreviousView,
+
+    /// <summary>The terminal most recently measured in the window showed this size.</summary>
+    Window,
 
     /// <summary>No terminal view is connecting for the session.</summary>
     NoView,

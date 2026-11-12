@@ -587,13 +587,22 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         if (lookup.Size is { } size)
         {
             TerminalSizeLog(
-                $"SSH opening the PTY for {server.DisplayName} at the reported {size.Columns}x{size.Rows}");
+                $"SSH opening the PTY for {server.DisplayName} at the {DescribeSizeSource(lookup.Source)} "
+                + $"{size.Columns}x{size.Rows}");
             return size;
         }
 
         LogDefaultTerminalSize(server, DescribeMissingSize(lookup));
         return TerminalSize.Default;
     }
+
+    /// <summary>The name a support log gives the origin of a size that was used.</summary>
+    internal static string DescribeSizeSource(TerminalSizeSource source) => source switch
+    {
+        TerminalSizeSource.PreviousView => "previous view",
+        TerminalSizeSource.Window => "window",
+        _ => "reported",
+    };
 
     internal static string DescribeMissingSize(TerminalSizeLookup lookup) => lookup.Source switch
     {

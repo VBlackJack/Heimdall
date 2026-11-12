@@ -664,7 +664,7 @@ public sealed class SessionTabContextMenuFactory
             var detachSecondaryItem = new MenuItem
             {
                 Header = vm.Localize("SplitDetachSecondary"),
-                IsEnabled = session.SecondaryHostControl is not null
+                IsEnabled = session.SecondaryHostControl is not null && !session.HasPendingCompanion
             };
             detachSecondaryItem.Click += (_, _) => callbacks.DetachSecondaryToFloatingWindow(session);
             menu.Items.Add(detachSecondaryItem);
@@ -982,18 +982,22 @@ public sealed class SessionTabContextMenuFactory
         }
         else
         {
-            var unsplit = new MenuItem { Header = vm.Localize("SplitUnsplit") };
+            // Layout commands wait for the SFTP companion: the SSH session is found by the first pane.
+            bool layoutAvailable = !session.HasPendingCompanion;
+
+            var unsplit = new MenuItem { Header = vm.Localize("SplitUnsplit"), IsEnabled = layoutAvailable };
             unsplit.Click += (_, _) => callbacks.UnsplitSession(session);
             menu.Items.Add(unsplit);
 
-            var swapItem = new MenuItem { Header = vm.Localize("SplitSwapPanes") };
+            var swapItem = new MenuItem { Header = vm.Localize("SplitSwapPanes"), IsEnabled = layoutAvailable };
             swapItem.Click += async (_, _) => await vm.SwapSplitPanesAsync(session);
             menu.Items.Add(swapItem);
 
             var toggleItem = new MenuItem
             {
                 Header = vm.Localize("SplitToggleOrientation"),
-                InputGestureText = "Ctrl+Shift+O"
+                InputGestureText = "Ctrl+Shift+O",
+                IsEnabled = layoutAvailable
             };
             toggleItem.Click += (_, _) => vm.ToggleSplitOrientation(session);
             menu.Items.Add(toggleItem);

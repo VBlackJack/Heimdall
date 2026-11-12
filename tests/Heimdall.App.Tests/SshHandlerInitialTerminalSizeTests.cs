@@ -341,12 +341,12 @@ public sealed class SshHandlerInitialTerminalSizeTests
 
     /// <summary>
     /// The original race, reproduced. The connect path reaches the size lookup while the page is
-    /// still loading, and the page's first <c>ready:</c> lands only after that. The real producer is
-    /// <c>src/Heimdall.App/Assets/terminal.html:472</c>,
-    /// <c>postMessage('ready:' + term.cols + ',' + term.rows)</c>, posted at the end of
-    /// <c>initializeTerminal()</c> once xterm.js has opened and fitted; the view hands it to the
-    /// report in the <c>MsgReady</c> branch of <c>EmbeddedSshView.OnWebMessageReceived</c>
-    /// (<c>EmbeddedSshView.xaml.cs:1234</c>, through <c>RememberTerminalSize</c> at line 1698).
+    /// still loading, and the page's first size lands only after that. The real producer is the
+    /// terminal page: it posts <c>ready:cols,rows</c> at the end of <c>initializeTerminal()</c> when the
+    /// fit addon could measure its surface, and otherwise posts <c>ready:</c> without a size and
+    /// sends the size with the first fit that can measure. The view hands a size to the report in
+    /// the <c>MsgReady</c> and <c>MsgResize</c> branches of <c>EmbeddedSshView.OnWebMessageReceived</c>,
+    /// through <c>RememberTerminalSize</c>.
     /// Here the report is released only once the connect path has asked, which is the order a
     /// fresh tab measured in the product: no "at the reported" line before the launch.
     /// </summary>
@@ -471,6 +471,40 @@ public sealed class SshHandlerInitialTerminalSizeTests
         registry.Written.Should().BeEmpty();
         registry.GetSessionNames().Should().BeEmpty();
         sizeLog.Should().ContainSingle().Which.Should().Contain("cancelled");
+    }
+
+    /// <summary>
+    /// A tab opened in the background is deselected before its page loads, so the page never reports.
+    /// The launch then takes the size the window last showed rather than 80x24, and says so.
+    /// </summary>
+    [Fact]
+    public async Task PlinkConnect_TabNeverLoaded_UsesWindowSizeNotDefault()
+    {
+        InMemoryPuttySessionRegistry registry = new();
+        TerminalSizeHints hints = new();
+        hints.RememberWindow(new TerminalSize(ReportedColumns, ReportedRows));
+        List<string> sizeLog = [];
+        (int Columns, int Rows)? started = null;
+        IReadOnlyList<PuttyRegistryValue>? atLaunch = null;
+
+        ConnectionResult result = await ConnectViaPlinkAsync(
+            registry,
+            (_, _, _, columns, rows, _) =>
+            {
+                started = (columns, rows);
+                atLaunch = registry.ReadSession(registry.Written.Single());
+                return Task.CompletedTask;
+            },
+            resolve: (_, wait, ct) => TerminalSizeReport.ResolveAsync(new TerminalSizeReport(), wait, ct, hints, "tab-session"),
+            waitMs: 200,
+            sizeLog: sizeLog);
+
+        result.Success.Should().BeTrue(result.ErrorMessage);
+        started.Should().Be((ReportedColumns, ReportedRows));
+        atLaunch.Should().ContainEquivalentOf(
+            new PuttyRegistryValue(PlinkSizeSession.TermWidthValueName, ReportedColumns, Microsoft.Win32.RegistryValueKind.DWord));
+        sizeLog.Should().ContainSingle().Which.Should()
+            .Contain($"at the window {ReportedColumns}x{ReportedRows}").And.NotContain("default");
     }
 
     private async Task<ConnectionResult> ConnectViaPlinkAsync(

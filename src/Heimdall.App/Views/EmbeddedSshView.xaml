@@ -178,6 +178,7 @@
                                VerticalAlignment="Center"
                                TextTrimming="CharacterEllipsis"
                                MaxWidth="{StaticResource SessionHeaderStatusMaxWidth}"
+                               ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
                                AutomationProperties.LiveSetting="Polite"
                                behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"/>
                 </Grid>

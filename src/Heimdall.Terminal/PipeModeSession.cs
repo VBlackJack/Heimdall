@@ -145,6 +145,16 @@ public sealed class PipeModeSession : ITerminalSession
     public int? ProcessId => _process?.Id;
     public Dictionary<string, string>? EnvironmentVariables { get; set; }
 
+    /// <summary>
+    /// The width the session was launched with, or <see langword="null"/> before it started. The
+    /// remote PTY keeps this size for the whole session (see <see cref="Resize"/>), so an owner that
+    /// sees the terminal grow or shrink can tell that the session did not follow.
+    /// </summary>
+    public int? LaunchColumns { get; private set; }
+
+    /// <summary>The height the session was launched with, or <see langword="null"/> before it started.</summary>
+    public int? LaunchRows { get; private set; }
+
     /// <inheritdoc />
     /// <remarks>
     /// <paramref name="columns"/> and <paramref name="rows"/> are the size the caller knows
@@ -169,6 +179,8 @@ public sealed class PipeModeSession : ITerminalSession
 
         cancellationToken.ThrowIfCancellationRequested();
 
+        LaunchColumns = columns;
+        LaunchRows = rows;
         _cts = new CancellationTokenSource();
         bool processStarted = false;
 

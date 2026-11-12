@@ -86,7 +86,7 @@ internal sealed class AutoReconnectTickScheduler
 /// WPF host for an interactive SSH shell session rendered through WebView2 + xterm.js.
 /// The browser surface handles VT parsing, ANSI colors, cursor movement, and scrollback.
 /// </summary>
-public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalCommandSink, ITerminalTextSource, ISessionPaneOwner
+public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalCommandSink, ITerminalTextSource, ISessionPaneOwner, ITerminalSizeSource
 {
     private static readonly (string Tag, Func<string> ContentFactory, string WrapperStart, string WrapperEnd)[] InlineAssets =
     [
@@ -331,6 +331,30 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     private int _keepAliveIntervalSeconds;
 
     /// <summary>
+    /// Set for a pipe-mode session only, which keeps the size it was launched with: tells when the
+    /// terminal has moved away from it. <see langword="null"/> for a session that resizes.
+    /// </summary>
+    private PipeSessionSizeNotice? _pipeSizeNotice;
+
+    /// <summary>What the header status line shows, kept explicitly rather than read back from its text.</summary>
+    private enum HeaderStatusKind
+    {
+        /// <summary>The plain connected status.</summary>
+        Plain,
+
+        /// <summary>The pipe-mode size notice.</summary>
+        Notice,
+
+        /// <summary>Any other status: disconnected, an error, a macro timeout, connecting.</summary>
+        Other,
+    }
+
+    private HeaderStatusKind _headerKind = HeaderStatusKind.Other;
+
+    /// <summary>The terminal width the size notice in the header states.</summary>
+    private int _pipeNoticeColumns;
+
+    /// <summary>
     /// The sizes the page reported (<c>ready:</c> or <c>resize:</c>). Written on the UI thread;
     /// read by the SSH handler from the connect thread just before it creates the PTY, and
     /// awaited there on the Plink path when the page has not spoken yet.
@@ -342,6 +366,9 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     /// The SSH handler creates the PTY at this size when it is known before the connect.
     /// </summary>
     internal TerminalSize? LastKnownTerminalSize => TerminalSizeReport.Latest;
+
+    /// <inheritdoc />
+    TerminalSize? ITerminalSizeSource.LastKnownTerminalSize => TerminalSizeReport.Latest;
 
     /// <summary>Localizer for translating user-facing strings. Set by EmbeddedSessionManager.</summary>
     public Core.Localization.LocalizationManager? Localizer
@@ -544,6 +571,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         }
 
         _session = session;
+        _pipeSizeNotice = null;
         // Stamped before the subscriptions: a disconnect already latched on the session is
         // delivered inside the Disconnected subscription below.
         _shellSessionAttachedAtUtc = DateTimeOffset.UtcNow;
@@ -608,6 +636,10 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         }
 
         _terminalSession = terminalSession;
+
+        // Cleared before the replay below: a tracker left by an earlier session of this view
+        // describes another launch size.
+        _pipeSizeNotice = null;
         _autoReconnectOnProcessExit = autoReconnectOnProcessExit;
         ShowHealthButton(false);
         _terminalSessionHasInput = false;
@@ -633,6 +665,15 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             + (terminalSession is Heimdall.Terminal.PipeModeSession ? "true" : "false"));
 
         UpdateStatus(connectedStatus);
+
+        // After the status, which would overwrite the notice: a page that already measured a size
+        // other than the launch size is the case the notice exists for.
+        _pipeSizeNotice = PipeSessionSizeNotice.ForSession(terminalSession);
+        if (TerminalSizeReport.Latest is { } measuredAtAttach)
+        {
+            ObservePipeSessionSize(measuredAtAttach);
+        }
+
         // Only an SSH shell has a remote TMOUT to reset. The local shell and WinRM sessions share
         // this view, and for them the reset is nothing but a stray Enter.
         StartKeepAliveTimer(TerminalKeepAlivePolicy.ResolveIntervalSeconds(_sessionTab?.ConnectionType, keepAliveIntervalSeconds));
@@ -2098,6 +2139,53 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         }
     }
 
+    /// <summary>
+    /// Tells the user, in the header status line (a polite live region), that a pipe-mode session
+    /// cannot follow the terminal's new width, and puts the line back when the widths agree again.
+    /// </summary>
+    /// <remarks>
+    /// Driven by what the header holds. The notice goes over the plain connected text only: another
+    /// status on screen (a macro timeout, in the error brush) keeps the line until it goes away, and
+    /// the next observation after that raises the notice. Clearing restores the text that was
+    /// covered, without touching the session status, and a finished session is left alone: its
+    /// disconnect path has set its own status.
+    /// </remarks>
+    private void ObservePipeSessionSize(TerminalSize current)
+    {
+        if (_pipeSizeNotice is not { } notice || _disposed)
+        {
+            return;
+        }
+
+        int? shownColumns = _headerKind == HeaderStatusKind.Notice ? _pipeNoticeColumns : null;
+        bool plainShown = _headerKind == HeaderStatusKind.Plain;
+        bool running = _terminalSession is Heimdall.Terminal.PipeModeSession { IsRunning: true };
+
+        switch (notice.Observe(current, shownColumns, plainShown, running))
+        {
+            case SizeNoticeChange.Raise:
+            case SizeNoticeChange.Refresh:
+                _pipeNoticeColumns = current.Columns;
+                StatusTextBlock.Text = FormatPipeSizeNotice(notice);
+                _headerKind = HeaderStatusKind.Notice;
+                Behaviors.LiveRegionBehavior.Announce(StatusTextBlock);
+                break;
+            case SizeNoticeChange.Clear:
+                StatusTextBlock.Text = L("SshSessionStatusConnected");
+                _headerKind = HeaderStatusKind.Plain;
+                Behaviors.LiveRegionBehavior.Announce(StatusTextBlock);
+                break;
+        }
+    }
+
+    private string FormatPipeSizeNotice(PipeSessionSizeNotice notice) =>
+        _localizer is null
+            ? "SshPipeSessionSizeMismatchNotice"
+            : _localizer.Format(
+                "SshPipeSessionSizeMismatchNotice",
+                _pipeNoticeColumns,
+                notice.LaunchedAt.Columns);
+
     private void ResizeSession(int columns, int rows)
     {
         if (_disposed || columns <= 0 || rows <= 0)
@@ -2107,6 +2195,8 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
         int clampedColumns = Math.Clamp(columns, 1, MaxResizeColumns);
         int clampedRows = Math.Clamp(rows, 1, MaxResizeRows);
+
+        ObservePipeSessionSize(new TerminalSize(clampedColumns, clampedRows));
 
         try
         {
@@ -2756,6 +2846,13 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         }
 
         LocalizeButtons();
+
+        // The notice states its numbers in words: shown, it follows the language.
+        if (_headerKind == HeaderStatusKind.Notice && _pipeSizeNotice is { } shownNotice)
+        {
+            StatusTextBlock.Text = FormatPipeSizeNotice(shownNotice);
+        }
+
         PostTerminalMessage(MsgSetLabels + TerminalHtmlLocalizer.BuildLabelsJson(key => _localizer?[key]));
 
         if (_healthPanelVisible)
@@ -3107,6 +3204,9 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             _ => status
         };
         StatusTextBlock.Text = displayText;
+        _headerKind = displayTextOverride is null && string.Equals(status, SessionStatusTokens.Connected, StringComparison.Ordinal)
+            ? HeaderStatusKind.Plain
+            : HeaderStatusKind.Other;
         Behaviors.LiveRegionBehavior.Announce(StatusTextBlock);
 
         var isDisconnected = string.Equals(status, SessionStatusTokens.Disconnected, StringComparison.OrdinalIgnoreCase)
@@ -3128,22 +3228,8 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         return TryFindResource(resourceKey) as Brush ?? fallback;
     }
 
-    private static bool TryParseSize(ReadOnlySpan<char> payload, out int columns, out int rows)
-    {
-        columns = 0;
-        rows = 0;
-
-        var separatorIndex = payload.IndexOf(',');
-        if (separatorIndex <= 0 || separatorIndex >= payload.Length - 1)
-        {
-            return false;
-        }
-
-        return int.TryParse(payload[..separatorIndex], out columns)
-            && int.TryParse(payload[(separatorIndex + 1)..], out rows)
-            && columns > 0
-            && rows > 0;
-    }
+    private static bool TryParseSize(ReadOnlySpan<char> payload, out int columns, out int rows) =>
+        TerminalSizeReport.TryParseSize(payload, out columns, out rows);
 
     private string GetTerminalHtml()
     {

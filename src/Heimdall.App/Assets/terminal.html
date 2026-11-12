@@ -182,6 +182,10 @@
             var term = null;
             var fitAddon = null;
             var ready = false;
+            // True once the host has been sent a size that the fit addon really measured. Until
+            // then the host must not take term.cols/term.rows for a measurement: before the first
+            // successful fit they are xterm's built-in 80x24.
+            var measuredSizePosted = false;
             var pendingHostMessages = [];
             var pendingResizeHandle = 0;
             var baseFontSize = /*{{TERMINAL_FONT_SIZE}}*/;
@@ -327,6 +331,33 @@
                 }
             }
 
+            // The size the fit addon can measure right now, or null when the container has no
+            // size yet (hidden tab, page not laid out) and it would have nothing to measure.
+            function measureTerminal() {
+                if (!fitAddon || !term) {
+                    return null;
+                }
+                if (terminalElement.clientWidth <= 0 || terminalElement.clientHeight <= 0) {
+                    return null;
+                }
+                var dimensions = fitAddon.proposeDimensions();
+                if (!dimensions || !isFinite(dimensions.cols) || !isFinite(dimensions.rows)
+                    || dimensions.cols <= 0 || dimensions.rows <= 0) {
+                    return null;
+                }
+                return dimensions;
+            }
+
+            // The first measured fit may land on the size xterm already has (80x24), in which case
+            // onResize never fires and the host would never hear a size at all. Called by the
+            // callers of fitTerminal, never by it: fitTerminal leaves every report to onResize.
+            function reportFirstMeasuredSize() {
+                if (ready && !measuredSizePosted && measureTerminal()) {
+                    measuredSizePosted = true;
+                    postMessage('resize:' + term.cols + ',' + term.rows);
+                }
+            }
+
             function fitTerminal() {
                 if (!fitAddon || !term) {
                     return;
@@ -336,11 +367,18 @@
                 fitAddon.fit();
             }
 
+            // A fit that can be the first measured one: the size is reported once, if onResize did
+            // not already do it.
+            function fitAndReportTerminal() {
+                fitTerminal();
+                reportFirstMeasuredSize();
+            }
+
             function setFontSize(size) {
                 size = Math.max(fontSizeMin, Math.min(fontSizeMax, size));
                 currentFontSize = size;
                 term.options.fontSize = size;
-                fitTerminal();
+                fitAndReportTerminal();
             }
 
             // ── Search ──────────────────────────────────────────────
@@ -630,6 +668,9 @@
                 });
 
                 term.onResize(function (size) {
+                    if (ready && measureTerminal()) {
+                        measuredSizePosted = true;
+                    }
                     postMessage('resize:' + size.cols + ',' + size.rows);
                 });
 
@@ -769,7 +810,15 @@
                 };
 
                 ready = true;
-                postMessage('ready:' + term.cols + ',' + term.rows);
+                // A size is sent only when it was measured. Otherwise "ready:" goes without one and
+                // the first fit that can measure sends it (see fitAndReportTerminal), so the host never
+                // takes xterm's default grid for the real size of the surface.
+                if (measureTerminal()) {
+                    measuredSizePosted = true;
+                    postMessage('ready:' + term.cols + ',' + term.rows);
+                } else {
+                    postMessage('ready:');
+                }
                 flushPendingHostMessages();
                 term.focus();
 
@@ -778,9 +827,21 @@
                         window.clearTimeout(pendingResizeHandle);
                     }
                     pendingResizeHandle = window.setTimeout(function () {
-                        fitTerminal();
+                        fitAndReportTerminal();
                     }, resizeDebounceMilliseconds);
                 }).observe(terminalElement);
+
+                // A page whose cell metrics were not measurable at ready: reports once they are,
+                // without waiting for a real change of size: when the web fonts have loaded, and
+                // when a tab that was hidden at load becomes visible.
+                if (document.fonts && document.fonts.ready) {
+                    document.fonts.ready.then(fitAndReportTerminal);
+                }
+                document.addEventListener('visibilitychange', function () {
+                    if (document.visibilityState === 'visible') {
+                        fitAndReportTerminal();
+                    }
+                });
             }
 
             // ── Search bar events ───────────────────────────────────

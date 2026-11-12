@@ -1192,6 +1192,10 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
                 return false;
             }
 
+            // The inventory profile as read, before any credential resolution writes onto the
+            // connection copy: the SFTP companion is decided and built from it.
+            RememberInventoryProfile(serverDto, serverDto.CloneFaithfully());
+
             // Only a connection someone asked for may ask something back. A restore
             // reconnecting on its own must fail quietly rather than raise a modal - or
             // several, one per restored session. The copy is detached and never saved.
@@ -1590,6 +1594,31 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             }
         }
     }
+
+    /// <summary>
+    /// The inventory profile behind each SSH connection copy, taken at the read that produced the
+    /// copy. Keyed by the copy and held weakly, so it lives exactly as long as the connection.
+    /// </summary>
+    /// <remarks>
+    /// The <see cref="SessionStarting"/> event keeps its shape: it carries the connection copy, and
+    /// this table carries what the copy no longer shows once the vault has written onto it.
+    /// </remarks>
+    private readonly System.Runtime.CompilerServices.ConditionalWeakTable<ServerProfileDto, ServerProfileDto> _inventoryProfiles = new();
+
+    /// <summary>Notes the inventory profile a connection copy was read as, for SSH profiles.</summary>
+    internal void RememberInventoryProfile(ServerProfileDto connectionCopy, ServerProfileDto inventoryProfile)
+    {
+        ArgumentNullException.ThrowIfNull(connectionCopy);
+        ArgumentNullException.ThrowIfNull(inventoryProfile);
+        if (string.Equals(connectionCopy.ConnectionType, "SSH", StringComparison.OrdinalIgnoreCase))
+        {
+            _inventoryProfiles.AddOrUpdate(connectionCopy, inventoryProfile);
+        }
+    }
+
+    /// <summary>The inventory profile a connection copy was read as, or null when none was noted.</summary>
+    internal ServerProfileDto? InventoryProfileOf(ServerProfileDto connectionCopy) =>
+        _inventoryProfiles.TryGetValue(connectionCopy, out ServerProfileDto? inventory) ? inventory : null;
 
     internal static CredentialTarget? GetCredentialTarget(ServerProfileDto dto)
     {
