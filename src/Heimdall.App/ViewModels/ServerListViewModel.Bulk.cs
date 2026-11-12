@@ -1813,7 +1813,17 @@ public partial class ServerListViewModel
         RefreshLookupCollections(settings);
 
         var anchorId = plan.FocusId ?? _selectionAnchor?.Id;
-        RebuildStableTreeProjection();
+        if (plan.OrderOnly && plan.ToRemove.Count == 0 && plan.ToAppend.Count == 0)
+        {
+            // Rows only changed rank inside their own folder: keep the folder instances so the
+            // tree rows are not regenerated and the scroll offset survives.
+            ResortStableTreeProjection();
+        }
+        else
+        {
+            RebuildStableTreeProjection();
+        }
+
         ApplyFilter(plan.FocusId);
 
         if (plan.FinalSelectionIds is not null)
@@ -2046,7 +2056,8 @@ public partial class ServerListViewModel
         string? PrimarySelectionId,
         string? FocusId,
         string? StatusKey,
-        object[]? StatusArgs)
+        object[]? StatusArgs,
+        bool OrderOnly = false)
     {
         public bool IsNoOp => ToRemove.Count == 0
                            && ToUpdate.Count == 0

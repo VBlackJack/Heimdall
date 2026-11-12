@@ -281,17 +281,26 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
     /// Returns the protocol-appropriate port for this server (SSH→SshPort, FTP→FtpPort, etc.)
     /// instead of the generic <see cref="RemotePort"/> which defaults to the RDP port.
     /// </summary>
-    public int EffectivePort => _sourceDto is null ? RemotePort
-        : ConnectionType?.ToUpperInvariant() switch
+    public int EffectivePort => _sourceDto is null ? RemotePort : EffectivePortOf(_sourceDto);
+
+    /// <summary>
+    /// The port of the protocol <paramref name="dto"/> connects with: the generic remote port
+    /// (the RDP one) only for the protocols that have no port field of their own.
+    /// </summary>
+    internal static int EffectivePortOf(ServerProfileDto dto)
+    {
+        ArgumentNullException.ThrowIfNull(dto);
+        return dto.ConnectionType?.ToUpperInvariant() switch
         {
-            "SSH" or "SFTP" => _sourceDto.SshPort,
-            "WINRM" => _sourceDto.WinRmPort,
-            "FTP" => _sourceDto.FtpPort,
-            "VNC" => _sourceDto.VncPort,
-            "WEB" => _sourceDto.WebPort,
-            "TELNET" => _sourceDto.TelnetPort,
-            _ => RemotePort
+            "SSH" or "SFTP" => dto.SshPort,
+            "WINRM" => dto.WinRmPort,
+            "FTP" => dto.FtpPort,
+            "VNC" => dto.VncPort,
+            "WEB" => dto.WebPort,
+            "TELNET" => dto.TelnetPort,
+            _ => dto.RemotePort
         };
+    }
 
     /// <summary>
     /// Path to the SSH private key file, if configured.
@@ -748,16 +757,7 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
         var host = dto.RemoteServer;
         if (string.IsNullOrEmpty(host)) return "";
 
-        var port = type switch
-        {
-            "SSH" or "SFTP" => dto.SshPort,
-            "WINRM" => dto.WinRmPort,
-            "FTP" => dto.FtpPort,
-            "VNC" => dto.VncPort,
-            "WEB" => dto.WebPort,
-            "TELNET" => dto.TelnetPort,
-            _ => dto.RemotePort
-        };
+        var port = EffectivePortOf(dto);
 
         return port > 0 ? $"{host}:{port}" : host;
     }

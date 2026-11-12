@@ -42,6 +42,9 @@ namespace Heimdall.App;
 /// </summary>
 public partial class MainWindow
 {
+    /// <summary>The tree row template's part that holds a row's header, children excluded.</summary>
+    private const string TreeRowHeaderPartName = "SelectionBorder";
+
     private readonly DnsWarmupGate _dnsWarmupGate = new();
     private readonly DnsWarmupCancellation _dnsWarmupCancellation = new();
     private IInlineRenameNode? _inlineRenameNode;
@@ -1664,9 +1667,35 @@ public partial class MainWindow
                     return;
                 }
 
-                container.BringIntoView();
+                BringIntoViewWhenHidden(container);
                 container.Focus();
             }));
+    }
+
+    /// <summary>
+    /// Scrolls <paramref name="container"/> into view only when its header row is not already
+    /// vertically inside the visible area of the session tree, so a reorder that kept the rows
+    /// does not move the scroll. The header is measured alone: an expanded folder's container
+    /// also spans all its children.
+    /// </summary>
+    private void BringIntoViewWhenHidden(TreeViewItem container)
+    {
+        ScrollContentPresenter? viewport = FindVisualDescendant<ScrollContentPresenter>(SessionTreeView, _ => true);
+        if (viewport is null
+            || container.Template?.FindName(TreeRowHeaderPartName, container) is not FrameworkElement header
+            || !header.IsDescendantOf(viewport))
+        {
+            container.BringIntoView();
+            return;
+        }
+
+        Rect row = header
+            .TransformToAncestor(viewport)
+            .TransformBounds(new Rect(header.RenderSize));
+        if (TreeInteractionState.NeedsBringIntoView(row, new Rect(viewport.RenderSize)))
+        {
+            container.BringIntoView();
+        }
     }
 
     /// <summary>
@@ -1687,7 +1716,7 @@ public partial class MainWindow
                 }
 
                 container.IsSelected = true;
-                container.BringIntoView();
+                BringIntoViewWhenHidden(container);
                 container.Focus();
             }));
     }
