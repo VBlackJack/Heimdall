@@ -1942,6 +1942,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             SshPort = server.SshPort,
             SshMode = server.SshMode,
             SshAgentForwarding = server.SshAgentForwarding,
+            SshAgentKeyFingerprint = server.SshAgentKeyFingerprint,
             SshKeyPath = server.SshKeyPath,
             SshPasswordEncrypted = server.SshPasswordEncrypted,
             SshCompression = server.SshCompression,

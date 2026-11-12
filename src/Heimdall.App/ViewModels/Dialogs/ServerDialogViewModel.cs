@@ -41,6 +41,12 @@ public enum SshAgentChipState
     Ok
 }
 
+/// <summary>
+/// One entry of the "Agent key" list: the fingerprint it stands for (null for "any key") and the
+/// text shown for it.
+/// </summary>
+public sealed record SshAgentKeyChoice(string? Fingerprint, string DisplayText);
+
 public enum SshTestChipState
 {
     Hidden,
@@ -101,6 +107,8 @@ public partial class ServerDialogViewModel : ObservableValidator
             _localizer = value;
             OnPropertyChanged(nameof(ConnectionTypeDisplayName));
             OnPropertyChanged(nameof(SshAuthHint));
+            OnPropertyChanged(nameof(SshAgentKeyHelpText));
+            OnPropertyChanged(nameof(AgentKeyForwardingWarningText));
             OnPropertyChanged(nameof(SshKeyPassphraseHint));
             OnPropertyChanged(nameof(SessionKindLabel));
             OnPropertyChanged(nameof(GatewayToServerLabel));
@@ -109,6 +117,7 @@ public partial class ServerDialogViewModel : ObservableValidator
             RaiseWinRmHintsChanged();
             OnPropertyChanged(nameof(RdpResizeEnableDelayPlaceholder));
             RefreshAvailableMonitors();
+            RebuildSshAgentKeyChoices();
             RefreshAgentChipIfNeeded();
         });
     }
@@ -508,7 +517,137 @@ public partial class ServerDialogViewModel : ObservableValidator
     private bool _sshX11Forwarding;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowAgentKeyForwardingWarning))]
+    [NotifyPropertyChangedFor(nameof(AgentKeyForwardingWarningText))]
     private bool _sshAgentForwarding;
+
+    /// <summary>
+    /// The one agent key this session offers, as a fingerprint; null means any key. The single
+    /// source of truth: the list below only displays it, and a refresh of that list never writes it.
+    /// Kept as it is when the dialog edits a profile type that shows no agent field.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowAgentKeyForwardingWarning))]
+    [NotifyPropertyChangedFor(nameof(AgentKeyForwardingWarningText))]
+    [NotifyPropertyChangedFor(nameof(HasChosenSshAgentKey))]
+    [NotifyPropertyChangedFor(nameof(SshAgentKeyHelpText))]
+    private string? _sshAgentKeyFingerprint;
+
+    /// <summary>Agent forwarding hands the remote host the whole agent, so a chosen key does not limit it.</summary>
+    public bool ShowAgentKeyForwardingWarning => SshAgentForwarding && HasChosenSshAgentKey;
+
+    /// <summary>
+    /// The warning text, empty while it does not apply. The notice announces itself when this text
+    /// is written into it, which a text that never changes (only its visibility) would not do.
+    /// </summary>
+    public string AgentKeyForwardingWarningText =>
+        ShowAgentKeyForwardingWarning ? L("ServerDialogSshAgentKeyForwardingWarning") : "";
+
+    /// <summary>Whether a specific key is chosen, so the hint describing its effect applies.</summary>
+    public bool HasChosenSshAgentKey => !string.IsNullOrWhiteSpace(SshAgentKeyFingerprint);
+
+    /// <summary>The hint for assistive technology, only while a key is chosen (blank otherwise).</summary>
+    public string SshAgentKeyHelpText => HasChosenSshAgentKey ? L("ServerDialogSshAgentKeyHint") : "";
+
+    private IReadOnlyList<SshAgentKeyChoice> _sshAgentKeyChoices = [];
+
+    private SshAgentKeyChoice? _selectedSshAgentKeyChoice;
+
+    private bool _isRebuildingSshAgentKeyChoices;
+
+    private IReadOnlyList<ProbedAgentKey> _loadedAgentKeys = [];
+
+    /// <summary>The entries of the "Agent key" list: any key, the loaded keys, and the saved key when it is not loaded.</summary>
+    public IReadOnlyList<SshAgentKeyChoice> SshAgentKeyChoices => _sshAgentKeyChoices;
+
+    /// <summary>
+    /// The entry the list shows as selected. Only a real user pick reaches
+    /// <see cref="SshAgentKeyFingerprint"/>.
+    /// </summary>
+    /// <remarks>
+    /// When the list is rebuilt the control pushes null into the selection. Taking that at its
+    /// word would erase the saved fingerprint and the next save would silently widen the session to
+    /// every key of the agent. "Any key" is a real entry, so a user can never legitimately select
+    /// nothing: a null, and any write during a rebuild, is ignored and the control is re-synchronised.
+    /// </remarks>
+    public SshAgentKeyChoice? SelectedSshAgentKeyChoice
+    {
+        get => _selectedSshAgentKeyChoice;
+        set
+        {
+            if (_isRebuildingSshAgentKeyChoices || ReferenceEquals(value, _selectedSshAgentKeyChoice))
+            {
+                return;
+            }
+
+            if (value is null)
+            {
+                RunWithoutDirtyTracking(() => OnPropertyChanged(nameof(SelectedSshAgentKeyChoice)));
+                return;
+            }
+
+            _selectedSshAgentKeyChoice = value;
+            OnPropertyChanged();
+            SshAgentKeyFingerprint = value.Fingerprint;
+        }
+    }
+
+    partial void OnSshAgentKeyFingerprintChanged(string? value)
+    {
+        // A pick from the list already is the selection; anything else (hydration) must be shown.
+        if (_selectedSshAgentKeyChoice is not null && _selectedSshAgentKeyChoice.Fingerprint == value)
+        {
+            return;
+        }
+
+        RebuildSshAgentKeyChoices();
+    }
+
+    /// <summary>
+    /// Rebuilds the list from the last probe and the saved fingerprint. The selected entry exists
+    /// before the control sees the new list, and the saved value is kept even when no loaded key
+    /// matches it (agent down, probe failed, key not loaded).
+    /// </summary>
+    private void RebuildSshAgentKeyChoices()
+    {
+        RunWithoutDirtyTracking(() =>
+        {
+            _isRebuildingSshAgentKeyChoices = true;
+            try
+            {
+                List<SshAgentKeyChoice> choices = [new(null, L("ServerDialogSshAgentKeyAny"))];
+                choices.AddRange(_loadedAgentKeys.Select(key => new SshAgentKeyChoice(
+                    key.Fingerprint,
+                    string.Format(
+                        CultureInfo.CurrentCulture,
+                        L("ServerDialogSshAgentKeyItem"),
+                        string.IsNullOrWhiteSpace(key.Comment) ? L("ServerDialogSshAgentKeyNoComment") : key.Comment,
+                        key.KeyType,
+                        key.Fingerprint))));
+
+                // A blank value means "any key", like null.
+                string? saved = HasChosenSshAgentKey ? SshAgentKeyFingerprint : null;
+                SshAgentKeyChoice? selected = choices.FirstOrDefault(
+                    choice => string.Equals(choice.Fingerprint, saved, StringComparison.Ordinal));
+                if (selected is null)
+                {
+                    selected = new SshAgentKeyChoice(
+                        saved,
+                        string.Format(CultureInfo.CurrentCulture, L("ServerDialogSshAgentKeyNotLoaded"), saved));
+                    choices.Add(selected);
+                }
+
+                _selectedSshAgentKeyChoice = selected;
+                _sshAgentKeyChoices = choices;
+                OnPropertyChanged(nameof(SshAgentKeyChoices));
+                OnPropertyChanged(nameof(SelectedSshAgentKeyChoice));
+            }
+            finally
+            {
+                _isRebuildingSshAgentKeyChoices = false;
+            }
+        });
+    }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(RequiresSshUsername))]
@@ -953,7 +1092,7 @@ public partial class ServerDialogViewModel : ObservableValidator
         SshAgentPreference preference = _sshAgentPreference;
         Func<SshAgentPreference, SshAgentRegistry> registryFactory = AgentRegistryFactory;
 
-        IReadOnlyList<(string Name, int KeyCount)>? agents;
+        IReadOnlyList<ProbedAgent>? agents;
         try
         {
             agents = await Task.Run(() => ProbeAgents(registryFactory(preference)));
@@ -973,7 +1112,11 @@ public partial class ServerDialogViewModel : ObservableValidator
 
         (SshAgentChipState state, string text) = agents is null
             ? (SshAgentChipState.Off, L("ServerDialogAgentChipOff"))
-            : DescribeAgents(agents);
+            : DescribeAgents([.. agents.Select(agent => (agent.Name, agent.Keys.Count))]);
+
+        // The chip text is the last thing a probe writes: whoever waits on it finds the list ready.
+        _loadedAgentKeys = MergeKeysByFingerprint(agents);
+        RebuildSshAgentKeyChoices();
         AgentChipState = state;
         AgentChipText = text;
     }
@@ -1001,13 +1144,28 @@ public partial class ServerDialogViewModel : ObservableValidator
         _agentProbeGeneration++;
         AgentChipState = SshAgentChipState.Off;
         AgentChipText = "";
+        _loadedAgentKeys = [];
+        RebuildSshAgentKeyChoices();
     }
 
-    /// <summary>The available agents and how many identities each holds. Blocking; run off the UI thread.</summary>
-    private static IReadOnlyList<(string Name, int KeyCount)> ProbeAgents(SshAgentRegistry registry) =>
+    /// <summary>One identity an agent reported, with the fingerprint the session stores for it.</summary>
+    private sealed record ProbedAgentKey(string AgentName, string Comment, string KeyType, string Fingerprint);
+
+    private sealed record ProbedAgent(string Name, IReadOnlyList<ProbedAgentKey> Keys);
+
+    /// <summary>The available agents and the identities each holds. Blocking; run off the UI thread.</summary>
+    private static IReadOnlyList<ProbedAgent> ProbeAgents(SshAgentRegistry registry) =>
         registry.GetAvailableAgents()
-            .Select(agent => (agent.Name, KeyCount: SafeGetIdentityCount(agent)))
+            .Select(agent => new ProbedAgent(agent.Name, SafeGetIdentities(agent)))
             .ToList();
+
+    /// <summary>A key held by two agents is one choice: the session names the key, not where it lives.</summary>
+    private static IReadOnlyList<ProbedAgentKey> MergeKeysByFingerprint(IReadOnlyList<ProbedAgent>? agents) =>
+        agents is null
+            ? []
+            : [.. agents
+                .SelectMany(agent => agent.Keys)
+                .DistinctBy(key => key.Fingerprint, StringComparer.Ordinal)];
 
     private (SshAgentChipState State, string Text) DescribeAgents(IReadOnlyList<(string Name, int KeyCount)> counts)
     {
@@ -1028,15 +1186,20 @@ public partial class ServerDialogViewModel : ObservableValidator
             string.Format(CultureInfo.CurrentCulture, L("ServerDialogAgentChipOk"), displayAgent, totalKeys));
     }
 
-    private static int SafeGetIdentityCount(ISshAgent agent)
+    private static IReadOnlyList<ProbedAgentKey> SafeGetIdentities(ISshAgent agent)
     {
         try
         {
-            Task<int> task = Task.Run(() => agent.GetIdentities().Count);
+            Task<IReadOnlyList<ProbedAgentKey>> task = Task.Run<IReadOnlyList<ProbedAgentKey>>(() =>
+                [.. agent.GetIdentities().Select(key => new ProbedAgentKey(
+                    agent.Name,
+                    key.Comment,
+                    key.KeyType,
+                    SshAgentKeyFingerprints.Compute(key.PublicKeyBlob)))]);
             if (!task.Wait(TimeSpan.FromMilliseconds(AgentIdentityProbeTimeoutMs)))
             {
                 FileLogger.Warn($"SSH agent {agent.Name}: identity lookup timed out.");
-                return 0;
+                return [];
             }
 
             return task.GetAwaiter().GetResult();
@@ -1044,7 +1207,7 @@ public partial class ServerDialogViewModel : ObservableValidator
         catch (Exception ex)
         {
             FileLogger.Warn($"SSH agent {agent.Name}: identity lookup failed: {ex.GetBaseException().Message}");
-            return 0;
+            return [];
         }
     }
 
@@ -1557,6 +1720,7 @@ public partial class ServerDialogViewModel : ObservableValidator
         // test or letting the agent chip probe must not claim the profile was edited.
         nameof(AgentChipState),
         nameof(AgentChipText),
+        nameof(SshAgentKeyChoices),
         nameof(TestChipState),
         nameof(TestChipText),
         nameof(IsTestingReachability),
@@ -1565,6 +1729,10 @@ public partial class ServerDialogViewModel : ObservableValidator
         // Derived from the fields above and refreshed with them; never an edit of its own.
         nameof(CredentialLookupNoticeText),
         nameof(ShowCredentialLookupNotice),
+        nameof(ShowAgentKeyForwardingWarning),
+        nameof(HasChosenSshAgentKey),
+        nameof(SshAgentKeyHelpText),
+        nameof(AgentKeyForwardingWarningText),
     };
 
     protected override void OnPropertyChanged(System.ComponentModel.PropertyChangedEventArgs e)
@@ -2488,6 +2656,7 @@ public partial class ServerDialogViewModel : ObservableValidator
             SshCompression = SshCompression,
             SshX11Forwarding = SshX11Forwarding,
             SshAgentForwarding = SshAgentForwarding,
+            SshAgentKeyFingerprint = SshAgentKeyFingerprint,
             SocksProxyPort = SocksProxyPort,
             RemoteBindPort = RemoteBindPort,
             RemoteLocalPort = RemoteLocalPort,
@@ -2713,6 +2882,7 @@ public partial class ServerDialogViewModel : ObservableValidator
         vm.SshCompression = dto.SshCompression;
         vm.SshX11Forwarding = dto.SshX11Forwarding;
         vm.SshAgentForwarding = dto.SshAgentForwarding;
+        vm.SshAgentKeyFingerprint = dto.SshAgentKeyFingerprint;
         vm.SocksProxyPort = dto.SocksProxyPort;
         vm.RemoteBindPort = dto.RemoteBindPort;
         vm.RemoteLocalPort = dto.RemoteLocalPort;

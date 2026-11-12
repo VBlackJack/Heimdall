@@ -1153,6 +1153,39 @@
                                                 </StackPanel>
                                             </Button>
                                         </Border>
+                                        <!-- The one agent key this session offers. Declared before the passphrase box
+                                             so that, sharing its tab index, it comes first. -->
+                                        <TextBlock x:Name="DlgSrv_BasicSshAgentKeyLabel"
+                                                   Text="{loc:Translate ServerDialogLabelSshAgentKey}"
+                                                   Style="{StaticResource LabelStyle}"
+                                                   Margin="0,12,0,4"/>
+                                        <ComboBox x:Name="DlgSrv_SshAgentKeyCombo"
+                                                  TabIndex="13"
+                                                  AutomationProperties.Name="{Binding Text, ElementName=DlgSrv_BasicSshAgentKeyLabel}"
+                                                  AutomationProperties.HelpText="{Binding SshAgentKeyHelpText}"
+                                                  ItemsSource="{Binding SshAgentKeyChoices}"
+                                                  SelectedItem="{Binding SelectedSshAgentKeyChoice, Mode=TwoWay}"
+                                                  DisplayMemberPath="DisplayText"
+                                                  Style="{StaticResource DialogFormComboBoxStyle}"/>
+                                        <TextBlock x:Name="DlgSrv_SshAgentKeyHint"
+                                                   Text="{loc:Translate ServerDialogSshAgentKeyHint}"
+                                                   Style="{StaticResource DialogHintTextStyle}"
+                                                   Margin="0,8,0,0"
+                                                   TextWrapping="Wrap"
+                                                   Visibility="{Binding HasChosenSshAgentKey, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                        <Border x:Name="DlgSrv_SshAgentKeyForwardingNotice"
+                                                Margin="0,8,0,0"
+                                                CornerRadius="{StaticResource CornerRadiusSm}"
+                                                Padding="8,4"
+                                                BorderBrush="{DynamicResource WarningIndicatorBrush}"
+                                                BorderThickness="1"
+                                                Visibility="{Binding ShowAgentKeyForwardingWarning, Converter={StaticResource BoolToVisibilityConverter}}">
+                                            <TextBlock Text="{Binding AgentKeyForwardingWarningText, NotifyOnTargetUpdated=True}"
+                                                       AutomationProperties.LiveSetting="Polite"
+                                                       behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"
+                                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                                       TextWrapping="Wrap"/>
+                                        </Border>
                                         <StackPanel Visibility="{Binding HasSshKeyPath, Converter={StaticResource BoolToVisibilityConverter}}">
                                             <TextBlock x:Name="DlgSrv_BasicSshKeyPassphraseLabel"
                                                        Text="{loc:Translate ServerDialogLabelKeyPassphrase}"

@@ -32,6 +32,7 @@ public sealed class PipeModeSession : ITerminalSession
     private Task? _stderrLoop;
     private CancellationTokenSource? _cts;
     private bool _disposed;
+    private int _disposedFlag;
     private readonly object _processExitedLock = new();
     private Action<int>? _processExited;
     private bool _processExitedRaised;
@@ -264,13 +265,37 @@ public sealed class PipeModeSession : ITerminalSession
         KillProcess();
     }
 
+    /// <summary>
+    /// Raised once when the session is disposed, after the process was killed. Disposal detaches
+    /// the exit notification, so an owner holding a temporary file for the process cannot rely on
+    /// <see cref="ProcessExited"/> to learn that the session ended when its tab is closed.
+    /// </summary>
+    public event Action? Disposed;
+
     public void Dispose()
     {
-        if (_disposed) return;
+        if (Interlocked.Exchange(ref _disposedFlag, 1) != 0) return;
         _disposed = true;
 
         _cts?.Cancel();
         KillProcess();
+
+        // Each subscriber in its own try: one that throws must not skip the next.
+        Action? subscribers = Disposed;
+        if (subscribers is not null)
+        {
+            foreach (Action subscriber in subscribers.GetInvocationList().Cast<Action>())
+            {
+                try
+                {
+                    subscriber();
+                }
+                catch (Exception ex)
+                {
+                    Heimdall.Core.Logging.FileLogger.Warn($"[PipeModeSession] Disposed subscriber: {ex.Message}");
+                }
+            }
+        }
 
         lock (_dataLock)
         {

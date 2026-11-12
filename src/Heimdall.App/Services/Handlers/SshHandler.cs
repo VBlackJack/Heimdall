@@ -25,6 +25,7 @@ using Heimdall.Core.Ssh;
 using Heimdall.Core.StateMachine;
 using Heimdall.Ssh;
 using Heimdall.Ssh.Agents;
+using Heimdall.Ssh.Pageant;
 using Heimdall.Ssh.Plink;
 
 namespace Heimdall.App.Services.Handlers;
@@ -84,6 +85,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
     private readonly ConnectShellSession _connectShellSession;
     private readonly StartPipeModeSession _startPipeModeSession;
     private readonly IPuttySessionRegistry _puttySessionRegistry;
+    private readonly Action<string, ISshAgentKey> _writeAgentKeyFile;
 
     internal Action<string>? SetStatusText { get; set; }
 
@@ -117,8 +119,10 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         Func<SshAgentPreference, SshAgentRegistry>? agentRegistryFactory = null,
         ConnectShellSession? connectShellSession = null,
         StartPipeModeSession? startPipeModeSession = null,
-        IPuttySessionRegistry? puttySessionRegistry = null)
+        IPuttySessionRegistry? puttySessionRegistry = null,
+        Action<string, ISshAgentKey>? writeAgentKeyFile = null)
     {
+        _writeAgentKeyFile = writeAgentKeyFile ?? PlinkAgentKeyFile.Write;
         _tunnelService = tunnelService;
         _connectionSm = connectionSm;
         _localizer = localizer;
@@ -168,6 +172,15 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         Core.Logging.FileLogger.Info(
             $"ConnectSshAsync: {server.DisplayName} ({server.RemoteServer}:{server.SshPort}) Gateway={server.SshGatewayId ?? "none"}");
         _connectionSm.TryTransition(server.Id, ConnectionState.ValidatingConfig);
+
+        // Before the tunnel, the host key resolution and the dial: a session that names an agent
+        // key nobody holds must be refused without asking the user to trust a host first.
+        (ConnectionResult? agentKeyRefusal, SshAgentIdentityMatch? chosenAgentKey) =
+            await PreflightChosenAgentKeyAsync(server, settings, ct).ConfigureAwait(false);
+        if (agentKeyRefusal is not null)
+        {
+            return agentKeyRefusal;
+        }
 
         int sshPort = server.SshPort > 0 ? server.SshPort : DefaultPorts.Ssh;
         TunnelSetupOutcome tunnelOutcome = await _tunnelService
@@ -225,6 +238,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
             KeyPassphrase = ConnectionHelpers.DecryptPassword(server.SshKeyPassphraseEncrypted),
             KeyPath = string.IsNullOrWhiteSpace(server.SshKeyPath) ? null : server.SshKeyPath,
             SshAgentPreference = settings.SshAgentPreference,
+            AgentKeyFingerprint = server.SshAgentKeyFingerprint,
             UseLegacyPasswordAsKeyPassphrase = server.UsesLegacySshCredentialMapping,
             LegacyCredentialName = server.DisplayName,
             AgentForwarding = server.SshAgentForwarding,
@@ -321,7 +335,11 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         int? agentKeysAtDial = null;
         try
         {
-            agentKeysAtDial = agentRegistry.Observe().OfferableIdentityCount;
+            // A chosen key found by the preflight is the only one offered, whatever else the
+            // agents hold: the count the failure message states is that one key.
+            agentKeysAtDial = chosenAgentKey is not null
+                ? 1
+                : agentRegistry.Observe().OfferableIdentityCount;
         }
         catch (Exception ex)
         {
@@ -397,8 +415,27 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
             var failure = FailureClassifier.Classify(ex, sshParams);
             SshFailureInfo localizedFailure = LocalizeFailure(failure, targetHost, agentKeysAtDial);
 
-            if (!sshParams.KeyboardInteractive.HasInteractiveAnswer
-                && SshPlinkRetryPolicy.AllowsPlinkRetry(failure.Code))
+            // With a chosen agent key the retry goes through Plink only when Plink can honour that
+            // key; otherwise the embedded client's own failure is the answer, unchanged. A code in
+            // no retry set (the key is not loaded) never gets here.
+            bool plinkMayRetry = !sshParams.KeyboardInteractive.HasInteractiveAnswer
+                && SshPlinkRetryPolicy.AllowsPlinkRetry(failure.Code);
+            if (plinkMayRetry && chosenAgentKey is not null)
+            {
+                try
+                {
+                    plinkMayRetry = await CanPlinkHonourChosenKeyAsync(server, settings, ct).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    // Same ending as a cancelled dial above: the tunnel reference is given back
+                    // and the cancellation travels on.
+                    ReleaseTunnelIfNeeded(usesTunnel, targetPort, tunnelLeaseId);
+                    throw;
+                }
+            }
+
+            if (plinkMayRetry)
             {
                 var fallbackAgentRegistry = _agentRegistryFactory(settings.SshAgentPreference);
                 if (!fallbackAgentRegistry.HasPlinkCompatibleAgent() && fallbackAgentRegistry.HasAnyNonPlinkAgent())
@@ -841,6 +878,43 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                         originalFailure));
             }
 
+            // The chosen agent key is checked again here although the preflight and the retry
+            // decision already looked: this method is also entered directly, and the Pageant,
+            // key-file and launcher guards below are independent of the lookup that found the key.
+            // Ahead of every host-key probe, prompt and file, for the same reason as the preflight.
+            // chosenAgentKey is the key as PAGEANT holds it: a key present in both agents is
+            // reported by the first one in preference order by an unrestricted search, which would
+            // wrongly read as "not in Pageant" here.
+            SshAgentIdentityMatch? chosenAgentKey = null;
+            if (server.SshAgentKeyFingerprint is { } chosenFingerprint)
+            {
+                SshAgentRegistry chosenRegistry = _agentRegistryFactory(settings.SshAgentPreference);
+                SshAgentKeyRefusal refusal;
+                if (await SshAgentKeyPreflight.LocateAsync(chosenFingerprint, chosenRegistry, ct: ct)
+                        .ConfigureAwait(false) is null)
+                {
+                    refusal = SshAgentKeyRefusal.NotLoaded;
+                }
+                else
+                {
+                    chosenAgentKey = await SshAgentKeyPreflight.LocateAsync(
+                            chosenFingerprint,
+                            chosenRegistry,
+                            PageantAgent.AgentName,
+                            ct: ct)
+                        .ConfigureAwait(false);
+                    refusal = SshAgentKeyPreflight.RefusalForPlink(
+                        chosenAgentKey,
+                        keyFileConfigured: !string.IsNullOrWhiteSpace(server.SshKeyPath),
+                        plinkAttested: IsPlinkAttested(plinkPath));
+                }
+
+                if (refusal != SshAgentKeyRefusal.None)
+                {
+                    return RefuseAgentKey(server, refusal, chosenFingerprint, originalFailureMessage);
+                }
+            }
+
             // Refused here, before the password dialog, before any host-key probe or trust
             // mutation, before the launcher is identified and before the password file exists.
             // Without a username the launcher waits for a login name and writes nothing, so the
@@ -935,6 +1009,8 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
             // an attestation taken before the dialog would describe an image that a legitimate
             // update could have replaced before the launch.
             string? password = ConnectionHelpers.DecryptPassword(server.SshPasswordEncrypted);
+            // The chosen key restricts which agent keys are offered and nothing else: the prompt
+            // conditions are the same as without one.
             if (ShouldPromptForPlinkPassword(password, server.SshKeyPath))
             {
                 password = await _dialogService.ShowPasswordInputAsync(
@@ -982,51 +1058,44 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
 
             using (PlinkAttestationLease attestation = _plinkAttestation(plinkPath))
             {
-                string? passwordFilePath = CreatePlinkPasswordFile(password);
+                // The image is identified again at the lease that will be launched: the check
+                // above looked at a file that could have been replaced during the prompts. Nothing
+                // has been written yet, so refusing here leaves nothing to clean up.
+                if (chosenAgentKey is not null && !attestation.FirstByteProvesConsumption)
+                {
+                    return RefuseAgentKey(
+                        server,
+                        SshAgentKeyRefusal.PlinkNotBundled,
+                        server.SshAgentKeyFingerprint!,
+                        originalFailureMessage);
+                }
 
-                // A temporary saved session is the only way the size reaches Plink. A null name
-                // means the registry refused and the launch goes ahead at Plink's default size.
-                string? sizeSessionName = PlinkSizeSession.TryCreate(
-                    _puttySessionRegistry,
-                    initialSize.Columns,
-                    initialSize.Rows);
-
-                string args = BuildPipeModeArguments(
-                    server.SshKeyPath,
-                    server.SshCompression,
-                    server.SshAgentForwarding,
+                PlinkLaunchPreparation preparation = PrepareLaunch(
+                    server,
+                    password,
+                    initialSize,
                     x11Forwarding,
                     targetPort,
                     target,
                     hostKeyArg,
-                    passwordFilePath,
-                    sizeSessionName);
-
-                PlinkPasswordFileReleaseHandle? passwordFileRelease = null;
-                if (!string.IsNullOrEmpty(passwordFilePath))
+                    chosenAgentKey,
+                    terminalSession,
+                    attestation.FirstByteProvesConsumption);
+                if (preparation.Error is { } prepareError)
                 {
-                    // Armed before the process starts so no output can arrive unobserved. Every path
-                    // that frees this file goes through the returned handle, including the catches
-                    // below: disposing the session can itself raise ProcessExited, so a direct delete
-                    // there would be a second invocation.
-                    passwordFileRelease = PlinkPasswordFileRelease.Arm(
-                        terminalSession,
-                        passwordFilePath,
-                        _deletePlinkPasswordFile,
-                        attestation.FirstByteProvesConsumption);
+                    Core.Logging.FileLogger.Error("Plink launch preparation failed", prepareError);
+                    _connectionSm.SetError(server.Id, prepareError.Message);
+                    return new ConnectionResult(
+                        false,
+                        prepareError.Message,
+                        null,
+                        SshSessionDiagnosticFactory.CreatePipeModeFailure(prepareError.Message));
                 }
 
-                // Same single release path and the same proof as the password file: -load is read
-                // in the command-line pass, so the first byte shows the session was loaded.
-                PlinkSizeSessionReleaseHandle? sizeSessionRelease = null;
-                if (sizeSessionName is not null)
-                {
-                    sizeSessionRelease = PlinkSizeSession.ArmRelease(
-                        terminalSession,
-                        sizeSessionName,
-                        name => PlinkSizeSession.Delete(_puttySessionRegistry, name),
-                        attestation.FirstByteProvesConsumption);
-                }
+                string args = preparation.Args;
+                PlinkPasswordFileReleaseHandle? passwordFileRelease = preparation.PasswordFileRelease;
+                PlinkSizeSessionReleaseHandle? sizeSessionRelease = preparation.SizeSessionRelease;
+                PlinkPasswordFileReleaseHandle? agentKeyFileRelease = preparation.AgentKeyFileRelease;
 
                 // The attested path comes from the pinned handle, with every junction already
                 // followed. Launching the configured string instead would resolve it a second time,
@@ -1053,6 +1122,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                     terminalSession.Dispose();
                     passwordFileRelease?.Release();
                     sizeSessionRelease?.Release();
+                    agentKeyFileRelease?.Release();
                     throw;
                 }
                 catch (Exception ex)
@@ -1060,6 +1130,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                     terminalSession.Dispose();
                     passwordFileRelease?.Release();
                     sizeSessionRelease?.Release();
+                    agentKeyFileRelease?.Release();
                     Core.Logging.FileLogger.Error("Plink SSH launch failed", ex);
                     _connectionSm.SetError(server.Id, ex.Message);
                     return new ConnectionResult(
@@ -1081,6 +1152,263 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         {
             ReleaseTunnelIfNeeded(releaseTunnel, targetPort, tunnelLeaseId);
         }
+    }
+
+    /// <summary>
+    /// Refuses, before the tunnel and the dial, a session whose chosen agent key cannot be used.
+    /// </summary>
+    /// <returns>
+    /// The refusal (null when the connection may proceed) and the key found in any agent (null
+    /// when none is chosen).
+    /// </returns>
+    private async Task<(ConnectionResult? Refusal, SshAgentIdentityMatch? Chosen)> PreflightChosenAgentKeyAsync(
+        ServerProfileDto server,
+        AppSettings settings,
+        CancellationToken ct)
+    {
+        if (server.SshAgentKeyFingerprint is not { } fingerprint)
+        {
+            return (null, null);
+        }
+
+        // An external PuTTY has no way to be told which agent key to use.
+        if (string.Equals(server.SshMode, "External", StringComparison.OrdinalIgnoreCase))
+        {
+            return (RefuseAgentKey(server, SshAgentKeyRefusal.LauncherUnsupported, fingerprint), null);
+        }
+
+        SshAgentRegistry registry = _agentRegistryFactory(settings.SshAgentPreference);
+        SshAgentIdentityMatch? chosen = await SshAgentKeyPreflight
+            .LocateAsync(fingerprint, registry, ct: ct)
+            .ConfigureAwait(false);
+        if (chosen is null)
+        {
+            return (RefuseAgentKey(server, SshAgentKeyRefusal.NotLoaded, fingerprint), null);
+        }
+
+        // Forwarding sends the connection through Plink, which only reaches Pageant. Whether
+        // Pageant holds the key and can describe it in a file Plink reads is judged here; the key
+        // file and the launcher need the plink path, so they are judged where it is resolved.
+        if (server.SshAgentForwarding && registry.HasPlinkCompatibleAgent())
+        {
+            SshAgentIdentityMatch? pageantKey = await SshAgentKeyPreflight
+                .LocateAsync(fingerprint, registry, PageantAgent.AgentName, ct: ct)
+                .ConfigureAwait(false);
+            SshAgentKeyRefusal refusal = SshAgentKeyPreflight.RefusalForPlink(
+                pageantKey,
+                keyFileConfigured: false,
+                plinkAttested: true);
+            if (refusal != SshAgentKeyRefusal.None)
+            {
+                return (RefuseAgentKey(server, refusal, fingerprint), null);
+            }
+        }
+
+        return (null, chosen);
+    }
+
+    /// <summary>
+    /// Whether a retry through Plink would offer the chosen key and nothing else.
+    /// </summary>
+    private async Task<bool> CanPlinkHonourChosenKeyAsync(
+        ServerProfileDto server,
+        AppSettings settings,
+        CancellationToken ct)
+    {
+        string? plinkPath = ConnectionHelpers.ResolvePlinkPath(settings.PlinkPath);
+        if (string.IsNullOrWhiteSpace(plinkPath) || !File.Exists(plinkPath) || server.SshAgentKeyFingerprint is null)
+        {
+            return false;
+        }
+
+        SshAgentIdentityMatch? pageantKey = await SshAgentKeyPreflight
+            .LocateAsync(
+                server.SshAgentKeyFingerprint,
+                _agentRegistryFactory(settings.SshAgentPreference),
+                PageantAgent.AgentName,
+                ct: ct)
+            .ConfigureAwait(false);
+        return SshAgentKeyPreflight.RefusalForPlink(
+            pageantKey,
+            keyFileConfigured: !string.IsNullOrWhiteSpace(server.SshKeyPath),
+            plinkAttested: IsPlinkAttested(plinkPath)) == SshAgentKeyRefusal.None;
+    }
+
+    /// <summary>What the launch needs, built under a guard that frees everything on any failure.</summary>
+    private sealed record PlinkLaunchPreparation(
+        string Args,
+        PlinkPasswordFileReleaseHandle? PasswordFileRelease,
+        PlinkSizeSessionReleaseHandle? SizeSessionRelease,
+        PlinkPasswordFileReleaseHandle? AgentKeyFileRelease,
+        Exception? Error);
+
+    /// <summary>
+    /// Writes the password file, creates the size session, builds the command line and writes the
+    /// agent public key file, arming each release as it goes.
+    /// </summary>
+    /// <remarks>
+    /// Any exception frees every file created so far and disposes the session, then comes back as
+    /// <see cref="PlinkLaunchPreparation.Error"/>: the password file holds a secret and must not
+    /// outlive a failure between its creation and the launch. A method of its own so the launch
+    /// catches of the caller keep their shape.
+    /// </remarks>
+    private PlinkLaunchPreparation PrepareLaunch(
+        ServerProfileDto server,
+        string? password,
+        TerminalSize initialSize,
+        bool x11Forwarding,
+        int targetPort,
+        string target,
+        string? hostKeyArg,
+        SshAgentIdentityMatch? chosenAgentKey,
+        Heimdall.Terminal.PipeModeSession terminalSession,
+        bool firstByteProvesConsumption)
+    {
+        string? passwordFilePath = null;
+        string? sizeSessionName = null;
+        string? agentKeyFilePath = null;
+        PlinkPasswordFileReleaseHandle? passwordFileRelease = null;
+        PlinkSizeSessionReleaseHandle? sizeSessionRelease = null;
+        PlinkPasswordFileReleaseHandle? agentKeyFileRelease = null;
+        try
+        {
+            passwordFilePath = CreatePlinkPasswordFile(password);
+
+            // A temporary saved session is the only way the size reaches Plink. A null name
+            // means the registry refused and the launch goes ahead at Plink's default size.
+            sizeSessionName = PlinkSizeSession.TryCreate(
+                _puttySessionRegistry,
+                initialSize.Columns,
+                initialSize.Rows);
+
+            agentKeyFilePath = chosenAgentKey is null ? null : PlinkAgentKeyFile.NewPath();
+
+            string args = BuildPipeModeArguments(
+                server.SshKeyPath,
+                server.SshCompression,
+                server.SshAgentForwarding,
+                x11Forwarding,
+                targetPort,
+                target,
+                hostKeyArg,
+                passwordFilePath,
+                sizeSessionName,
+                agentKeyFilePath);
+
+            if (!string.IsNullOrEmpty(passwordFilePath))
+            {
+                // Armed before the process starts so no output can arrive unobserved. Every path
+                // that frees this file goes through the returned handle, including the catches
+                // of the caller: disposing the session can itself raise ProcessExited, so a direct
+                // delete there would be a second invocation.
+                passwordFileRelease = PlinkPasswordFileRelease.Arm(
+                    terminalSession,
+                    passwordFilePath,
+                    _deletePlinkPasswordFile,
+                    firstByteProvesConsumption);
+            }
+
+            // Same single release path and the same proof as the password file: -load is read
+            // in the command-line pass, so the first byte shows the session was loaded.
+            if (sizeSessionName is not null)
+            {
+                sizeSessionRelease = PlinkSizeSession.ArmRelease(
+                    terminalSession,
+                    sizeSessionName,
+                    name => PlinkSizeSession.Delete(_puttySessionRegistry, name),
+                    firstByteProvesConsumption);
+            }
+
+            // The public key file is written last, once the other releases are armed. It is
+            // freed on process exit and also when the session is disposed: disposing kills the
+            // process and detaches the exit notification, so a closed tab would otherwise leave
+            // it behind. The key is read when authentication starts, not when the command line is
+            // parsed, so the first byte of output proves nothing about it.
+            if (chosenAgentKey is not null && agentKeyFilePath is not null)
+            {
+                agentKeyFileRelease = PlinkPasswordFileRelease.Arm(
+                    terminalSession,
+                    agentKeyFilePath,
+                    _deletePlinkPasswordFile,
+                    firstByteProvesConsumption: false);
+                PlinkPasswordFileReleaseHandle keyFileHandle = agentKeyFileRelease;
+                terminalSession.Disposed += keyFileHandle.Release;
+                _writeAgentKeyFile(agentKeyFilePath, chosenAgentKey.Key);
+            }
+
+            return new PlinkLaunchPreparation(args, passwordFileRelease, sizeSessionRelease, agentKeyFileRelease, null);
+        }
+        catch (Exception ex)
+        {
+            terminalSession.Dispose();
+
+            // A file created but not yet armed has no handle: freed directly. An armed one is freed
+            // through its handle, which deletes at most once.
+            if (passwordFileRelease is not null)
+            {
+                passwordFileRelease.Release();
+            }
+            else if (passwordFilePath is not null)
+            {
+                _deletePlinkPasswordFile(passwordFilePath);
+            }
+
+            if (sizeSessionRelease is not null)
+            {
+                sizeSessionRelease.Release();
+            }
+            else if (sizeSessionName is not null)
+            {
+                PlinkSizeSession.Delete(_puttySessionRegistry, sizeSessionName);
+            }
+
+            if (agentKeyFileRelease is not null)
+            {
+                agentKeyFileRelease.Release();
+            }
+            else if (agentKeyFilePath is not null)
+            {
+                _deletePlinkPasswordFile(agentKeyFilePath);
+            }
+
+            return new PlinkLaunchPreparation(string.Empty, null, null, null, ex);
+        }
+    }
+
+    private bool IsPlinkAttested(string? plinkPath)
+    {
+        using PlinkAttestationLease lease = _plinkAttestation(plinkPath);
+        return lease.FirstByteProvesConsumption;
+    }
+
+    private ConnectionResult RefuseAgentKey(
+        ServerProfileDto server,
+        SshAgentKeyRefusal refusal,
+        string fingerprint,
+        string? originalFailureMessage = null)
+    {
+        string key = SshAgentKeyPreflight.MessageKey(refusal);
+        string refusalMessage = SshAgentKeyPreflight.NamesFingerprint(refusal)
+            ? _localizer.Format(key, fingerprint)
+            : _localizer[key];
+
+        // After a refusal the embedded client already met, its sentence stays first.
+        string message = string.IsNullOrWhiteSpace(originalFailureMessage)
+            ? refusalMessage
+            : SshAuthFailureMessageComposer.AppendSentence(originalFailureMessage, refusalMessage, key)
+                ?? refusalMessage;
+
+        Core.Logging.FileLogger.Warn(
+            $"SSH connection of {server.DisplayName} refused: agent key {fingerprint}: {refusal}");
+        _connectionSm.SetError(server.Id, message);
+        return new ConnectionResult(
+            false,
+            message,
+            null,
+            SshSessionDiagnosticFactory.CreatePreflightFailure(
+                key,
+                message,
+                refusal == SshAgentKeyRefusal.LauncherUnsupported ? null : SshFailureCode.AgentKeyNotLoaded));
     }
 
     private static string BuildDisplayEndpoint(ServerProfileDto server)
@@ -1246,8 +1574,18 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         string target,
         string? hostKeyFingerprint,
         string? passwordFilePath = null,
-        string? sizeSessionName = null)
+        string? sizeSessionName = null,
+        string? agentPublicKeyFilePath = null)
     {
+        // Plink takes one identity file. Both set means two things asked for the same slot, which
+        // the handler refuses before building: reaching here is a programming error.
+        if (!string.IsNullOrWhiteSpace(keyPath) && !string.IsNullOrWhiteSpace(agentPublicKeyFilePath))
+        {
+            throw new ArgumentException(
+                "A private key file and an agent public key file cannot both take the -i slot.",
+                nameof(agentPublicKeyFilePath));
+        }
+
         var argParts = new List<string>();
         if (!string.IsNullOrWhiteSpace(sizeSessionName))
         {
@@ -1263,6 +1601,13 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         {
             argParts.Add("-i");
             argParts.Add($"\"{InputValidator.EscapeForDoubleQuotedString(keyPath)}\"");
+        }
+        else if (!string.IsNullOrWhiteSpace(agentPublicKeyFilePath))
+        {
+            // A public key file given to -i makes Pageant offer that key (PuTTY documents it).
+            // Nothing private is read from this file.
+            argParts.Add("-i");
+            argParts.Add($"\"{InputValidator.EscapeForDoubleQuotedString(agentPublicKeyFilePath)}\"");
         }
 
         if (compression)

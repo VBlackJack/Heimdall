@@ -182,6 +182,7 @@ internal static class SshSessionDiagnosticFactory
                 or SshFailureCode.PassphraseRequired
                 or SshFailureCode.KeyFileInvalid
                 or SshFailureCode.KeyFileNotFound
+                or SshFailureCode.AgentKeyNotLoaded
                 => SessionFailureStage.SshPreflight,
 
             _ => SessionFailureStage.GenericFailure,

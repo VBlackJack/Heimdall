@@ -72,6 +72,13 @@ public sealed class SshConnectionParams
     /// <summary>Preferred local SSH agent order for authentication.</summary>
     public SshAgentPreference SshAgentPreference { get; init; } = SshAgentPreference.AutoOpenSshFirst;
 
+    /// <summary>
+    /// Fingerprint of the one agent key to offer, or null to offer every key of the agent.
+    /// When set and the key is not loaded in a reachable agent, building the connection throws
+    /// <see cref="SshAgentKeyNotLoadedException"/>: there is no fallback to other keys.
+    /// </summary>
+    public string? AgentKeyFingerprint { get; init; }
+
     /// <summary>Whether to enable SSH agent forwarding.</summary>
     public bool AgentForwarding { get; init; }
 

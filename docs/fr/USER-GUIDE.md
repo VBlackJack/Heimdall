@@ -93,6 +93,24 @@ fait passer pour elle. Sur cette demande, le bouton mis en avant est **Rejeter**
 Entrée refuse la connexion. Accepter la nouvelle clé, ou ne lui faire confiance que pour cette
 session, demande un clic délibéré.
 
+### Choisir la clé d'agent SSH qu'une session présente
+
+Par défaut, une session présente au serveur toutes les clés de votre agent SSH (Pageant ou l'agent OpenSSH de Windows). Un serveur qui ferme la connexion après quelques échecs peut épuiser ses tentatives avant que la bonne clé soit essayée. Désignez la clé pour l'éviter.
+
+1. Ouvrez la session dans la fenêtre de la session, sur la carte des identifiants SSH/SFTP.
+2. Choisissez la clé dans la liste **Clé d'agent**. Le choix par défaut est **N'importe quelle clé (par défaut)**.
+3. Enregistrez.
+
+À quoi s'attendre :
+
+- Seule cette clé est présentée au serveur. Un mot de passe enregistré, un fichier de clé et l'authentification interactive au clavier fonctionnent comme avant : le choix ne limite que les clés d'agent.
+- Si la clé n'est chargée dans aucun agent que Heimdall est réglé pour utiliser, la connexion est refusée avant toute demande, avec un message qui nomme l'empreinte SHA256 de la clé. Heimdall ne se rabat pas sur les autres clés. Voir le [dépannage](TROUBLESHOOTING.md#ssh-agent-key-not-loaded).
+- Le choix s'applique au terminal SSH, aux sessions SFTP et au panneau latéral SFTP d'une session. Il ne s'applique pas aux sauts de passerelle ni aux tunnels : ils présentent toujours toutes les clés de l'agent.
+- Le choix reste sur cette machine. Il n'est pas écrit dans les fichiers de sessions partagés, tout import l'efface, et l'export des réglages l'omet. Une version plus ancienne de Heimdall l'ignore et présente toutes les clés.
+- Avec le transfert d'agent activé, l'hôte distant peut quand même utiliser toutes les clés de l'agent. La fenêtre vous en avertit.
+- Une session qui passe par Plink (transfert d'agent avec Pageant, ou nouvel essai après un échec du client intégré) exige que la clé soit dans Pageant, d'un type auquel Plink peut être limité (pas une clé matérielle "sk"), et qu'aucun fichier de clé ne soit configuré sur la session. Voir le [dépannage](TROUBLESHOOTING.md#ssh-agent-key-plink-refused).
+- Le mode PuTTY externe ne peut pas être limité à une clé : une session qui en désigne une y est refusée.
+
 ### Consoles web
 
 Choisissez **Web** en ajoutant une session, pour un iLO, un iDRAC, un commutateur ou la page

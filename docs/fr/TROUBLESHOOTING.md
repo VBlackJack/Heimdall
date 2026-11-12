@@ -80,6 +80,8 @@ Index de tous les problèmes rencontrés pendant le développement et de leurs s
 63. [VNC - le serveur demande un nom d'utilisateur ou un mot de passe](#vnc-credentials-required)
 64. [WebView2 - le pointeur disparait à la fermeture d'un terminal](#webview2-pointer-hidden-after-close)
 65. [SSH - "Trop d'échecs d'authentification"](#ssh-too-many-authentication-failures)
+66. [SSH - "La clé d'agent choisie pour cette session ... n'est chargée"](#ssh-agent-key-not-loaded)
+67. [SSH - Une session avec une clé d'agent choisie est refusée sur le chemin Plink](#ssh-agent-key-plink-refused)
 
 ---
 
@@ -1245,8 +1247,66 @@ N'utilisez **pas** `IServiceProvider.QueryService` dans ce cas. Sur `MsTscAx.MsT
 **Solution** :
 
 1. Chargez moins de clés dans l'agent : retirez celles que le serveur ne connaît pas.
-2. Donnez à la session son propre fichier de clé dans la fenêtre de la session, pour que l'agent ne soit pas nécessaire sur ce serveur.
-3. Si le serveur est le vôtre, augmentez `MaxAuthTries` dans `sshd_config` puis rechargez `sshd`.
-4. Si la session enregistre aussi un mot de passe, vérifiez qu'il est correct : un mot de passe refusé consomme au moins une tentative avant que les clés de l'agent soient essayées.
+2. Désignez la seule clé que le serveur accepte dans la fenêtre de la session (la liste "Clé d'agent" de la carte des identifiants SSH/SFTP). Seule cette clé est présentée, donc les autres ne consomment aucune tentative. Voir l'[entrée 66](#ssh-agent-key-not-loaded) si la connexion est ensuite refusée parce que la clé n'est pas chargée.
+3. Donnez à la session son propre fichier de clé dans la fenêtre de la session, pour que l'agent ne soit pas nécessaire sur ce serveur.
+4. Si le serveur est le vôtre, augmentez `MaxAuthTries` dans `sshd_config` puis rechargez `sshd`.
+5. Si la session enregistre aussi un mot de passe, vérifiez qu'il est correct : un mot de passe refusé consomme au moins une tentative avant que les clés de l'agent soient essayées.
 
 **Fichiers** : `Heimdall.Ssh/Agents/SshAgentAlgorithmSource.cs`, `Heimdall.Ssh/SshConnectionFactory.cs` (`TryCreateAgentAuth`), `Heimdall.Ssh/FailureClassifier.cs`
+
+---
+
+<a id="ssh-agent-key-not-loaded"></a>
+## 66. SSH - "La clé d'agent choisie pour cette session ... n'est chargée"
+
+**Symptôme** : la connexion d'une session SSH ou SFTP échoue aussitôt, avant toute question sur la clé d'hôte ou demande de mot de passe, avec "La clé d'agent choisie pour cette session (SHA256:...) n'est chargée dans aucun agent SSH que Heimdall est réglé pour utiliser. Chargez-la, ou choisissez une autre clé dans les paramètres de la session." Le message nomme l'empreinte de la clé que la session demande. Le même message apparaît sur le panneau latéral SFTP de la session.
+
+**Cause racine** : la session désigne une clé d'agent (la liste "Clé d'agent" de la fenêtre de la session) et Heimdall n'a trouvé aucune clé avec cette empreinte. Il ne se rabat pas sur les autres clés de l'agent, car le but du choix est de ne présenter que cette clé. Les causes habituelles :
+
+- La clé n'est pas chargée : l'agent a été redémarré, la machine a redémarré, ou la clé n'a jamais été ajoutée.
+- L'agent qui détient la clé n'est pas un de ceux que Heimdall est réglé pour utiliser. Le choix se fait dans `Settings > SSH & SFTP > Connexion > SSH agent preference`.
+- L'agent n'a pas répondu dans la courte attente que Heimdall s'accorde avant de se connecter, donc la clé a été traitée comme non chargée. Réessayez.
+- La configuration a été copiée d'une autre machine en tant que fichier entier : la clé avait été choisie dans l'agent de cette machine. Un import ne pose jamais le choix, mais un fichier de réglages copié peut le porter.
+- L'empreinte enregistrée a été modifiée à la main et n'a pas la forme `SHA256:` suivi de 43 caractères.
+
+**Solution** :
+
+1. Chargez la clé dans l'agent (Pageant : Add Key ; agent OpenSSH de Windows : `ssh-add`), puis reconnectez-vous.
+2. Vérifiez `Settings > SSH & SFTP > Connexion > SSH agent preference` et assurez-vous que l'agent qui détient la clé est autorisé.
+3. Ouvrez la session dans la fenêtre de la session et regardez la liste "Clé d'agent". Une clé enregistrée mais non chargée reste listée sous la forme "Non chargée actuellement : ...". Choisissez la clé voulue, ou "N'importe quelle clé (par défaut)" pour présenter de nouveau toutes les clés de l'agent.
+4. Si le serveur ferme les connexions après quelques tentatives, voir l'[entrée 65](#ssh-too-many-authentication-failures) : désigner la clé est le remède, et il exige que la clé soit chargée.
+
+**Fichiers** : `Services/Handlers/SshAgentKeyPreflight.cs`, `Services/Handlers/SshHandler.cs`, `Services/Handlers/SftpHandler.cs`, `Heimdall.Ssh/SshConnectionFactory.cs` (`ResolveChosenAgentKey`), `Heimdall.Ssh/Agents/SshAgentRegistry.cs` (`FindIdentity`)
+
+---
+
+<a id="ssh-agent-key-plink-refused"></a>
+## 67. SSH - Une session avec une clé d'agent choisie est refusée sur le chemin Plink
+
+**Symptôme** : une session qui désigne une clé d'agent ne s'ouvre pas et le message est l'un de ceux-ci :
+
+- "La clé d'agent choisie pour cette session (SHA256:...) n'est pas chargée dans Pageant, dont cette connexion a besoin. Chargez-la dans Pageant, ou choisissez une autre clé dans les paramètres de la session."
+- "La clé d'agent choisie pour cette session (SHA256:...) est d'un type auquel Plink ne peut pas être limité, et cette connexion passe par Plink. Désactivez le transfert d'agent, ou choisissez une autre clé."
+- "Cette session désigne une clé d'agent et aussi un fichier de clé, et cette connexion passe par Plink, qui n'accepte que l'un des deux. Retirez le fichier de clé, retirez le choix de clé d'agent, ou désactivez le transfert d'agent."
+- "Cette session désigne une clé d'agent, et le programme Plink utilisé n'est pas celui fourni avec Heimdall : rien ne garantit qu'il ne propose que cette clé. Utilisez le Plink fourni, ou retirez le choix de clé d'agent."
+- "Cette session désigne une seule clé d'agent, et le programme utilisé pour cette connexion ne peut pas être limité à cette clé. Passez la session au terminal intégré, ou retirez le choix de clé d'agent."
+
+**Cause racine** : Plink est utilisé quand le transfert d'agent est activé (il transfère Pageant) et comme nouvel essai après un échec du client intégré. Plink ne peut joindre que Pageant, et Heimdall le limite à la clé choisie en lui remettant la moitié publique de cette clé par `-i`. Il refuse de démarrer quand il ne peut pas garantir que seule cette clé est présentée, plutôt que de présenter toutes les clés de Pageant :
+
+- La clé est dans l'agent OpenSSH de Windows mais pas dans Pageant.
+- La clé est d'un type que Plink ne sait pas lire dans un fichier de clé publique, comme une clé matérielle "sk". Parmi les certificats, seul un certificat Ed25519 est accepté sur le chemin Plink.
+- La session a aussi un fichier de clé : Plink n'accepte qu'un seul `-i`.
+- Le Plink utilisé n'est pas la version fournie avec Heimdall (un autre chemin de `plink.exe` dans `Settings > SSH & SFTP`).
+- La session est réglée sur PuTTY externe, à qui l'on ne peut pas dire quelle clé d'agent utiliser.
+
+Après un échec du client intégré, le nouvel essai par Plink est simplement ignoré quand Plink ne peut pas être limité à la clé choisie, et l'erreur propre du client intégré est affichée.
+
+**Solution** :
+
+1. Chargez la clé dans Pageant, ou désactivez le transfert d'agent pour que le client intégré soit utilisé.
+2. Pour un type de clé auquel Plink ne peut pas être limité, désactivez le transfert d'agent ou choisissez une autre clé.
+3. Retirez le fichier de clé de la session, ou retirez le choix de clé d'agent.
+4. Remettez `Chemin de plink.exe` sur le Plink fourni avec Heimdall, ou retirez le choix de clé d'agent.
+5. Pour PuTTY externe, passez la session au terminal intégré, ou retirez le choix de clé.
+
+**Fichiers** : `Services/Handlers/SshAgentKeyPreflight.cs` (`RefusalForPlink`), `Services/Handlers/SshHandler.cs`

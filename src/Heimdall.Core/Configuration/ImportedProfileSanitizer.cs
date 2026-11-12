@@ -106,6 +106,10 @@ public static class ImportedProfileSanitizer
             // the user has opened and saved the profile.
             profile.CredentialLookupConfirmed = false;
 
+            // The key was chosen from the agent of the exporting machine: a file must not decide
+            // which key this machine offers to a server.
+            profile.SshAgentKeyFingerprint = null;
+
             // A trust decision about the remote certificate, made on the exporting machine.
             profile.WinRmSkipCertificateCheck = false;
 
