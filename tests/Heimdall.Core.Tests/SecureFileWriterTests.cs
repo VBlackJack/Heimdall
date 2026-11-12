@@ -135,6 +135,57 @@ public class SecureFileWriterTests : IDisposable
     // ── WriteAndProtect applies restrictive ACL ────────────────────────
 
     [Fact]
+    public void WriteBytesAndProtect_WritesTheBytesWithARestrictiveAcl()
+    {
+        var path = TempFile("data.pfx");
+        byte[] data = [0, 1, 2, 250, 255];
+
+        SecureFileWriter.WriteBytesAndProtect(path, data);
+
+        Assert.Equal(data, File.ReadAllBytes(path));
+        AssertRestrictiveAcl(path);
+    }
+
+    [Fact]
+    public void WriteBytesAtomic_OverwritesAnExistingFileAndRestrictsIt()
+    {
+        var path = TempFile("atomic.bin");
+        File.WriteAllBytes(path, [9, 9, 9]);
+        byte[] data = [1, 2, 3, 4];
+
+        SecureFileWriter.WriteBytesAtomic(path, data);
+
+        Assert.Equal(data, File.ReadAllBytes(path));
+        AssertRestrictiveAcl(path);
+        Assert.Equal([path], Directory.GetFiles(_tempDir));
+    }
+
+    [Fact]
+    public void WriteTextAtomic_WritesUtf8WithoutAByteOrderMark()
+    {
+        var path = TempFile("atomic.txt");
+
+        SecureFileWriter.WriteTextAtomic(path, "key");
+
+        Assert.Equal([(byte)'k', (byte)'e', (byte)'y'], File.ReadAllBytes(path));
+    }
+
+    [Fact]
+    public void WriteBytesAtomic_WhenTheTargetCannotBeReplaced_LeavesItIntactAndRemovesTheTemporaryFile()
+    {
+        var path = TempFile("held.bin");
+        File.WriteAllBytes(path, [7, 7, 7]);
+
+        using (new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None))
+        {
+            Assert.ThrowsAny<Exception>(() => SecureFileWriter.WriteBytesAtomic(path, [1, 2, 3]));
+        }
+
+        Assert.Equal(new byte[] { 7, 7, 7 }, File.ReadAllBytes(path));
+        Assert.Equal([path], Directory.GetFiles(_tempDir));
+    }
+
+    [Fact]
     public void WriteAndProtect_AppliesRestrictiveAcl()
     {
         var path = TempFile();

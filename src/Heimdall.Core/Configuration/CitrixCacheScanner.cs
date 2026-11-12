@@ -144,6 +144,8 @@ public static class CitrixCacheScanner
             CitrixLaunchCommandLine = r.LaunchCommandLine,
             CitrixUseSso = true,
             UseDirectConnection = true,
+            // The names come from the local Citrix cache, not from the user.
+            CredentialLookupConfirmed = false,
         }).ToList();
     }
 

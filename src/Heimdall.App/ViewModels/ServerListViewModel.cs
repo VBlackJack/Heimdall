@@ -65,6 +65,9 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     /// sources. Shared with the session coordinator and the scheduler, which reach it through here.
     /// </summary>
     internal IProfileLookup ProfileLookup => _profileLookup;
+    private const string DefaultLocalShellExecutable = "powershell.exe";
+    private const string ConfirmExecutionDetailSeparator = "; ";
+
     private readonly LocalizationManager _localizer;
     private readonly IUiDispatcher _uiDispatcher;
     private readonly TimeProvider _timeProvider;
@@ -472,9 +475,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         {
             string executable = string.Equals(profile.ConnectionType, "WEB", StringComparison.OrdinalIgnoreCase)
                 ? $"{profile.WebExternalProgram} {profile.WebExternalArguments}".Trim()
-                : string.IsNullOrWhiteSpace(profile.LocalShellExecutable)
-                    ? "powershell.exe"
-                    : profile.LocalShellExecutable;
+                : DescribeLocalShellExecution(profile, _localizer);
             body = _localizer.Format(
                 "ConfirmExecutionImportedBody",
                 profile.DisplayName,
@@ -495,6 +496,51 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
 
         return true;
     }
+
+    /// <summary>
+    /// Describes everything a LOCAL profile would run, matching what the execution gate counts:
+    /// the program, then its arguments, working directory and elevation, each only when set.
+    /// </summary>
+    internal static string DescribeLocalShellExecution(ServerProfileDto profile, LocalizationManager localizer)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+        ArgumentNullException.ThrowIfNull(localizer);
+
+        // The elevation line comes first so a long value cannot push it out of view.
+        List<string> parts = [];
+        if (profile.EffectiveElevationMode != ElevationMode.None)
+        {
+            parts.Add(localizer["ConfirmExecutionDetailElevated"]);
+        }
+
+        parts.Add(
+            string.IsNullOrWhiteSpace(profile.LocalShellExecutable)
+                ? DefaultLocalShellExecutable
+                : MakeVisible(profile.LocalShellExecutable));
+
+        if (!string.IsNullOrWhiteSpace(profile.LocalShellArguments))
+        {
+            parts.Add(localizer.Format("ConfirmExecutionDetailArguments", MakeVisible(profile.LocalShellArguments)));
+        }
+
+        if (!string.IsNullOrWhiteSpace(profile.LocalShellWorkingDirectory))
+        {
+            parts.Add(localizer.Format("ConfirmExecutionDetailWorkingDirectory", MakeVisible(profile.LocalShellWorkingDirectory)));
+        }
+
+        return string.Join(ConfirmExecutionDetailSeparator, parts);
+    }
+
+    /// <summary>
+    /// Makes a value shown in the trust prompt unable to break the line or imitate another
+    /// field: line breaks and tabs become visible escapes and a double quote is escaped.
+    /// </summary>
+    private static string MakeVisible(string value)
+        => value
+            .Replace("\r", "\\r", StringComparison.Ordinal)
+            .Replace("\n", "\\n", StringComparison.Ordinal)
+            .Replace("\t", "\\t", StringComparison.Ordinal)
+            .Replace("\"", "\\\"", StringComparison.Ordinal);
 
     /// <summary>
     /// Confirms and best-effort persists trust for imported post-connect commands.
@@ -1249,7 +1295,8 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
 
             // The connection that went ahead without the vault's password failed in turn, and its
             // own message ("connection refused", "authentication failed") replaced the vault's on
-            // the status line. The vault failure is the cause, so it has the last word.
+            // the status line. The vault failure is the cause, so it has the last word. The same
+            // holds for the note that an unconfirmed session was not looked up at all.
             if (!connected && quietVaultFailure is not null)
             {
                 StatusMessageRequested?.Invoke(quietVaultFailure);
@@ -1675,6 +1722,30 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             return false;
         }
 
+        // An imported profile names its own host, gateway and entry: until the user has confirmed
+        // it, nothing is looked up for it, under any name. It goes on to the ordinary password
+        // handling. Only an interactive connect says so; the quiet paths (restore, reconnect,
+        // bulk connect) stay silent.
+        if (!serverDto.CredentialLookupConfirmed && !SharedSessionIds.IsSharedProfile(serverDto))
+        {
+            if (!skipOnFailure)
+            {
+                // Through the quiet-report channel when there is one, so a connection that then
+                // fails or asks for a password does not leave the reason behind its own message.
+                string reason = _localizer.Format("StatusCredentialLookupUnconfirmed", serverDto.DisplayName);
+                if (reportQuietly is not null)
+                {
+                    reportQuietly(reason);
+                }
+                else
+                {
+                    StatusMessageRequested?.Invoke(reason);
+                }
+            }
+
+            return false;
+        }
+
         var provider = _credentialProviderFactory.Create(settings);
 
         if (!provider.IsAvailable)
@@ -1813,9 +1884,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             return serverDto.RemoteServer;
         }
 
-        return string.IsNullOrWhiteSpace(serverDto.VaultEntryName)
-            ? serverDto.DisplayName
-            : serverDto.VaultEntryName;
+        return CredentialLookupPolicy.NameBasedTitle(serverDto);
     }
 
     private bool ShowConnectionError(string title, string message)
@@ -1937,6 +2006,9 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             return;
         }
 
+        // Saving through the Add dialog, where the user sees the name and the host, is what
+        // confirms the new profile: an ad hoc session is typed by the user, so its template is
+        // confirmed and the dialog writes that value back.
         var dialogVm = ServerDialogViewModel.FromDto(template);
         dialogVm.DialogTitle = _localizer["DialogTitleAddServer"];
         dialogVm.IsEditMode = false;

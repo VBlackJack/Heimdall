@@ -81,7 +81,9 @@ public sealed class ServerRenameService
                 return new ServerRenameResult(ServerRenameStatus.NoChange, server);
             }
 
-            if (string.IsNullOrWhiteSpace(server.VaultEntryName))
+            // An unconfirmed profile's name came from a file: copying it into the vault entry would
+            // make it the key a stored secret is looked up by once the profile is confirmed.
+            if (server.CredentialLookupConfirmed && string.IsNullOrWhiteSpace(server.VaultEntryName))
             {
                 server.VaultEntryName = server.DisplayName;
             }

@@ -589,6 +589,24 @@
                         </TabItem.Header>
                         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                             <StackPanel Margin="{StaticResource SpacingSm}">
+                                <!-- Imported session whose credential lookup still waits for the user -->
+                                <Border x:Name="DlgSrv_CredentialLookupNotice"
+                                        Style="{StaticResource DialogSectionCardStyle}"
+                                        BorderBrush="{DynamicResource WarningIndicatorBrush}"
+                                        BorderThickness="1"
+                                        Visibility="{Binding ShowCredentialLookupNotice, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding CredentialLookupNoticeText}"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                                   TextWrapping="Wrap"/>
+                                        <Button x:Name="DlgSrv_AllowCredentialLookupButton"
+                                                Command="{Binding AllowCredentialLookupCommand}"
+                                                Content="{loc:Translate ServerDialogCredentialLookupAllow}"
+                                                Style="{StaticResource GhostButtonStyle}"
+                                                HorizontalAlignment="Left"
+                                                Margin="0,8,0,0"/>
+                                    </StackPanel>
+                                </Border>
                                 <!-- Connection basics: Name, Type, Host, Port -->
                                 <Border Style="{StaticResource DialogSectionCardStyle}">
                                     <StackPanel>

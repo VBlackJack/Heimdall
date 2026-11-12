@@ -33,6 +33,7 @@ namespace Heimdall.App.Views.Tools;
 public partial class CertificateGeneratorView : UserControl, IToolView
 {
     private readonly CertificateGeneratorViewModel _vm;
+    private readonly TimedSecretClipboard _secretClipboard = TimedSecretClipboard.CreateDefault();
     private LocalizationManager? _localizer;
     private Action<bool>? _setBusy;
     private bool _disposed;
@@ -72,6 +73,7 @@ public partial class CertificateGeneratorView : UserControl, IToolView
         _setBusy?.Invoke(false);
         _vm.PropertyChanged -= OnVmPropertyChanged;
         _vm.CopyTextRequested -= OnCopyTextRequested;
+        _secretClipboard.Dispose();
         _vm.SaveFileRequested -= OnSaveFileRequested;
         _vm.PfxPasswordRequested -= OnPfxPasswordRequested;
         _vm.ValidationFocusRequested -= OnValidationFocusRequested;
@@ -99,6 +101,13 @@ public partial class CertificateGeneratorView : UserControl, IToolView
     private void OnCopyTextRequested(object? sender, string text)
     {
         if (string.IsNullOrEmpty(text)) return;
+        if (_vm.IsPrivateKeyMaterial(text))
+        {
+            // A private key stays out of the clipboard history and the cloud clipboard and is taken back.
+            _secretClipboard.TryCopy(text);
+            return;
+        }
+
         try
         {
             Clipboard.SetText(text);
@@ -118,15 +127,14 @@ public partial class CertificateGeneratorView : UserControl, IToolView
             DefaultExt = Path.GetExtension(request.DefaultName),
         };
         if (dialog.ShowDialog() != true) return;
-        if (request.IsBinary && request.Content is byte[] bytes)
+        try
         {
-            File.WriteAllBytes(dialog.FileName, bytes);
-            return;
+            GeneratedFileWriter.Write(dialog.FileName, request);
         }
-
-        if (!request.IsBinary && request.Content is string text)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            File.WriteAllText(dialog.FileName, text, System.Text.Encoding.UTF8);
+            // The previous file is left as it was; the tool's export error status tells the user.
+            _vm.ReportSaveFailure(ex.Message);
         }
     }
 

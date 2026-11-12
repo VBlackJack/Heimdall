@@ -1918,7 +1918,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         return $"sftp-{baseId}-{Guid.NewGuid():N}";
     }
 
-    private static ServerProfileDto CreateCompanionSftpProfile(
+    internal static ServerProfileDto CreateCompanionSftpProfile(
         ServerProfileDto server,
         string sftpSessionId)
     {
@@ -1937,6 +1937,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             ConnectionType = "SFTP",
             SessionLoggingOverride = server.SessionLoggingOverride,
             VaultEntryName = server.VaultEntryName,
+            CredentialLookupConfirmed = server.CredentialLookupConfirmed,
             SshUsername = server.SshUsername,
             SshPort = server.SshPort,
             SshMode = server.SshMode,

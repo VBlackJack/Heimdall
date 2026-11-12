@@ -612,6 +612,23 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
         IsFavorite = isFavorite;
     }
 
+    /// <summary>
+    /// Whether this row is a local session whose credential lookup still waits for the user.
+    /// </summary>
+    public bool NeedsCredentialLookupConfirmation
+        => !IsShared && _sourceDto is { CredentialLookupConfirmed: false };
+
+    /// <summary>Takes a confirmation the inventory has just persisted.</summary>
+    internal void ApplyCredentialLookupConfirmed()
+    {
+        if (_sourceDto is not null)
+        {
+            _sourceDto.CredentialLookupConfirmed = true;
+        }
+
+        OnPropertyChanged(nameof(NeedsCredentialLookupConfirmation));
+    }
+
     partial void OnDisplayNameChanged(string value)
     {
         OnPropertyChanged(nameof(SidebarDisplayName));

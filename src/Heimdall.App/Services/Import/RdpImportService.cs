@@ -721,6 +721,9 @@ public sealed class RdpImportService(IConfigManager configManager, LocalizationM
         replaced.RemoteServer = candidate.RemoteServer;
         replaced.RemotePort = candidate.RemotePort;
 
+        // The stored linkage is kept but the name and the host now come from the file.
+        replaced.CredentialLookupConfirmed = false;
+
         if (previewEntry.Schema is not null)
         {
             // The mapping already ran once on the candidate, so it cannot fail here; the skipped
@@ -738,6 +741,7 @@ public sealed class RdpImportService(IConfigManager configManager, LocalizationM
             Id = candidate.Id,
             DisplayName = candidate.DisplayName,
             Origin = ProfileOrigin.ImportRdp,
+            CredentialLookupConfirmed = candidate.CredentialLookupConfirmed,
             RemoteServer = candidate.RemoteServer,
             RemotePort = candidate.RemotePort,
             ConnectionType = candidate.ConnectionType,

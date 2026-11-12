@@ -21,6 +21,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using Heimdall.App.Services;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
 using SaveFileDialog = Microsoft.Win32.SaveFileDialog;
@@ -56,6 +57,7 @@ public partial class SshKeyGeneratorView : UserControl, IToolView
     private static readonly Type? EdDsaType = Type.GetType("System.Security.Cryptography.EdDSA, System.Security.Cryptography");
     private static readonly Type? EdDsaParametersType = Type.GetType("System.Security.Cryptography.EdDSAParameters, System.Security.Cryptography");
 
+    private readonly TimedSecretClipboard _secretClipboard = TimedSecretClipboard.CreateDefault();
     private LocalizationManager? _localizer;
     private string _privateKeyPem = string.Empty;
     private string _publicKeyOpenSsh = string.Empty;
@@ -187,8 +189,7 @@ public partial class SshKeyGeneratorView : UserControl, IToolView
     {
         if (!string.IsNullOrEmpty(_privateKeyPem))
         {
-            try { Clipboard.SetText(_privateKeyPem); }
-            catch (System.Runtime.InteropServices.ExternalException) { return; }
+            if (!_secretClipboard.TryCopy(_privateKeyPem)) { return; }
             CopyFeedbackHelper.ShowCopyFeedback(sender as Button);
         }
     }
@@ -565,7 +566,8 @@ public partial class SshKeyGeneratorView : UserControl, IToolView
 
     public void Dispose()
     {
-        // Clear sensitive data from memory
+        // A copied private key must not outlive the tool, and sensitive data leaves memory
+        _secretClipboard.Dispose();
         _privateKeyPem = string.Empty;
         GC.SuppressFinalize(this);
     }
