@@ -324,15 +324,31 @@ public sealed class PrivilegedFileCommandsTests
             "sudo -n sh -c 'body'",
             PrivilegedFileCommands.BuildNonInteractiveSudoInvocation("sh -c 'body'"));
 
-        string streaming = PrivilegedFileCommands.BuildPasswordStreamingSudoInvocation(
-            "sh -c 'body'");
-        Assert.Contains("sudo -n -v", streaming, StringComparison.Ordinal);
-        Assert.Contains("IFS= read -r _heimdall_password", streaming, StringComparison.Ordinal);
-        Assert.Contains("exec sudo -n sh -c 'body'", streaming, StringComparison.Ordinal);
-        Assert.EndsWith(
-            "else sudo -k; exec sudo -S -p '' sh -c 'body'; fi",
-            streaming,
+        // The password write is one simple sh -c command: the password is read first, the content
+        // is staged and its size checked next, and only then does a sudo run, so no sudo shares
+        // input with the payload.
+        string outer = PrivilegedFileCommands.StagedWriteOuterScript;
+        string command = PrivilegedFileCommands.BuildStagedWriteCommand("/srv/app.conf", true, true, 5);
+        Assert.StartsWith("sh -c ", command, StringComparison.Ordinal);
+        Assert.EndsWith(" '/srv/app.conf' '5'", command, StringComparison.Ordinal);
+
+        int read = outer.IndexOf("IFS= read -r p", StringComparison.Ordinal);
+        int stage = outer.IndexOf("cat > \"$d/f\"", StringComparison.Ordinal);
+        int firstSudo = outer.IndexOf("sudo", StringComparison.Ordinal);
+        Assert.True(read >= 0 && read < stage && stage < firstSudo, "the password is not read before staging.");
+
+        // The install is tried first with no input at all; the only sudo that reads a password is
+        // fed by a printf pipe holding that password alone, and runs after it.
+        int withoutPassword = outer.IndexOf("sudo -n sh -c \"$inner\"", StringComparison.Ordinal);
+        int withPassword = outer.IndexOf("sudo -S", StringComparison.Ordinal);
+        Assert.True(withoutPassword > 0 && withoutPassword < withPassword);
+        Assert.Contains("</dev/null", outer, StringComparison.Ordinal);
+        Assert.Equal(1, outer.Split("sudo -S").Length - 1);
+        Assert.Contains(
+            "printf '%s\\n' \"$p\" | sudo -S -p '' sh -c \"$inner\"",
+            outer,
             StringComparison.Ordinal);
+        Assert.DoesNotContain("sudo -k", outer, StringComparison.Ordinal);
     }
 
     [Fact]

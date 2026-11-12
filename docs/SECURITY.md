@@ -472,7 +472,18 @@ generic `SshException("Failure")` messages do not trigger privileged
 operations. This trades occasional manual retry prompts for avoiding sudo
 actions on non-permission failures.
 
-Privileged uploads stream into a private directory beside the destination.
+Privileged uploads are staged first: the content goes into a private 0700 directory of the
+connecting user under `$TMPDIR` (default `/tmp`), in a 0600 file, and stays there until the
+install finishes. A killed connection or a power loss can leave that directory, and the
+content, on the server. A staged file whose size differs from the expected one is refused
+before any sudo runs, so a read that stopped early is never installed. One sudo call then
+installs the file into a private directory beside the destination and renames it over the
+target. The install is tried first without a password and with no input; the password is
+offered, once, through a pipe that carries only that line, so it can neither reach the file
+nor sit unread on sudo's input. The installer refuses a staging directory that is a symbolic
+link, is not owned by the caller, or can be written by other accounts, and checks, on the
+descriptor it opens, that the staged file is a regular file of the caller with a single link;
+the connecting user's own cleanup removes the staging directory, root never does.
 Accepted replacements use atomic rename; creation-only transfers publish by an
 exclusive hard link (`ln -T`, which refuses a destination that has become a
 directory instead of linking inside it). Cleanup removes only the staging files.

@@ -525,7 +525,19 @@ privilégiée. Ce compromis accepte quelques invites de nouvelle tentative
 manuelle en échange de l'absence d'actions sudo sur des échecs qui ne relèvent
 pas des permissions.
 
-Les téléversements privilégiés écrivent dans un répertoire privé voisin de la cible.
+Les téléversements privilégiés passent d'abord par une zone de transit : le contenu est déposé
+dans un répertoire privé (0700) de l'utilisateur connecté, sous `$TMPDIR` (`/tmp` par défaut),
+dans un fichier 0600, et il y reste jusqu'à la fin de l'installation. Une connexion tuée ou une
+coupure de courant peut laisser ce répertoire, et le contenu, sur le serveur. Un fichier déposé
+dont la taille diffère de celle attendue est refusé avant tout sudo, de sorte qu'une lecture
+interrompue n'est jamais installée. Un appel sudo installe ensuite le fichier dans un répertoire
+privé voisin de la destination et le renomme par-dessus la cible. L'installation est d'abord
+tentée sans mot de passe et sans entrée ; le mot de passe n'est proposé qu'une fois, par un tube
+qui ne porte que cette ligne, si bien qu'il ne peut ni atterrir dans le fichier ni rester non lu
+sur l'entrée de sudo. L'installateur refuse un répertoire de dépôt qui est un lien symbolique,
+qui n'appartient pas à l'appelant ou qui peut être modifié par d'autres comptes, et vérifie,
+sur le descripteur qu'il ouvre, que le fichier déposé est un fichier ordinaire de l'appelant,
+avec un seul lien ; le nettoyage est fait par l'utilisateur connecté lui-même, jamais par root.
 Un remplacement accepté utilise un renommage atomique ; une création seule publie
 par lien physique exclusif (`ln -T`, qui refuse une destination devenue un
 répertoire au lieu de créer le lien à l'intérieur). Le nettoyage ne retire que les

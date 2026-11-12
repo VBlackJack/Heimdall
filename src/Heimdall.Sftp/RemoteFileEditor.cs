@@ -652,6 +652,7 @@ public sealed class RemoteFileEditor : IDisposable
     /// </remarks>
     internal static bool IsDeterministicRefusal(Exception ex)
         => ex is SftpMetadataPreservationException
+            or PrivilegedWriteFailedException { Kind: not PrivilegedWriteFailureKind.StagingFailed }
             or RemoteUploadTargetUnsupportedException
             or Renci.SshNet.Common.SftpPermissionDeniedException;
 
@@ -755,26 +756,41 @@ public sealed class RemoteFileEditor : IDisposable
                 FileShare.Read,
                 bufferSize: 81920,
                 FileOptions.Asynchronous | FileOptions.SequentialScan);
-            string writeBody = PrivilegedFileCommands.BuildAtomicWriteBody(session.RemotePath);
             PrivilegedCommandResult result = await PrivilegedFileTransfer.ExecuteAtomicWriteAsync(
                     sshClient,
-                    writeBody,
+                    session.RemotePath,
+                    overwrite: true,
                     fileStream,
                     session.SshParams.Password,
                     ct)
                 .ConfigureAwait(false);
 
             ct.ThrowIfCancellationRequested();
-            if (result.ExitStatus != 0)
-            {
-                throw new InvalidOperationException(
-                    $"sudo atomic write failed (exit {result.ExitStatus}): {result.Error}");
-            }
+            EnsureSudoWriteSucceeded(result);
         }
         finally
         {
             sshClient.Disconnect();
         }
+    }
+
+    /// <summary>
+    /// Turns a failed privileged write into its exception. A failure of the stages before the
+    /// installer (staging, a refused or missing sudo) is named by its kind so the caller can say
+    /// what happened; a failure of the installer itself stays a generic failed write.
+    /// </summary>
+    internal static void EnsureSudoWriteSucceeded(PrivilegedCommandResult result)
+    {
+        if (result.ExitStatus == 0)
+        {
+            return;
+        }
+
+        PrivilegedFileTransfer.EnsureStageSucceeded(result);
+
+        throw new InvalidOperationException(
+            $"sudo atomic write failed (exit {result.ExitStatus}): "
+            + PrivilegedFileTransfer.CleanWriteError(result.Error));
     }
 
     private static void DrainSession(EditSession session)

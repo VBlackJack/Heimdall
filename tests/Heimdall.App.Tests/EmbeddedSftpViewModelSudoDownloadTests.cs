@@ -44,6 +44,13 @@ public sealed class EmbeddedSftpViewModelSudoDownloadTests
     }
 
     [Fact]
+    public void EnsureSudoSucceeded_OtherExitWithoutSudoMessage_StaysAGenericFailure()
+    {
+        Assert.Throws<InvalidOperationException>(
+            () => EmbeddedSftpViewModel.EnsureSudoSucceeded(1, "boom", "atomic write"));
+    }
+
+    [Fact]
     public void BuildSudoBase64DownloadBody_EscapesRemotePath()
     {
         string command = EmbeddedSftpViewModel.BuildSudoBase64DownloadBody("/etc/ssh/it's config");
