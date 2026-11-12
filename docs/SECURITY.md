@@ -702,6 +702,21 @@ real requests have a 5 s timeout. Pipe-not-found and timeout both return
 setting (`AppSettings.SshAgentPreference`); changes take effect on the next
 connection attempt without app restart.
 
+A session can name the one agent key it offers (`ServerProfileDto.SshAgentKeyFingerprint`,
+a `SHA256:` fingerprint). The key is looked up in the agents Heimdall is set to use before
+any tunnel or prompt, with a bounded wait off the calling thread; an agent that does not
+answer in time holds nothing that can be offered. A key found in no agent is refused with
+no fallback to the other keys. The choice limits agent keys only: it does not affect a
+stored password, a key file or keyboard-interactive sign-in. Gateway hops and tunnels do not
+receive it and still offer every agent key. The value is local to the machine: the shared
+profile sanitizer drops it, every import clears it and the settings export strips it. With
+agent forwarding on, the remote host can still use every key of the agent, whatever key the
+session names. On the Plink path (agent forwarding with Pageant, retry after an embedded
+client failure) the key is handed to Plink as a one-line public key file, only when the key
+is in Pageant, of a type Plink can parse, no key file is configured and Plink is the
+bundled build; otherwise the session is refused. External PuTTY mode with a chosen key is
+refused.
+
 `OpenSshPipeAgent.SendRequest` is built on async pipe I/O
 (`NamedPipeClientStream` opened with `PipeOptions.Asynchronous`) and a
 linked timeout/cancellation token, replacing the best-effort `ReadTimeout`

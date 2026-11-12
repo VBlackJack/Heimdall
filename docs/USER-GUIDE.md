@@ -88,6 +88,24 @@ someone.** It can mean the machine was rebuilt, or that something is impersonati
 prompt the highlighted button is **Reject**: pressing Enter refuses the connection. Accepting the
 new key, or trusting it for this session only, takes a deliberate click.
 
+### Choosing the SSH agent key a session offers
+
+By default a session offers every key of your SSH agent (Pageant or the Windows OpenSSH Agent) to the server. A server that closes a connection after a few failed attempts can run out of attempts before the right key comes up. Name the key to avoid that.
+
+1. Open the session in the session dialog, on the SSH/SFTP credentials card.
+2. Pick the key in the **Agent key** list. The default is **Any key (default)**.
+3. Save.
+
+What to expect:
+
+- Only that key is offered to the server. A stored password, a key file and keyboard-interactive sign-in work as before: the choice limits agent keys only.
+- If the key is not loaded in an agent Heimdall is set to use, the connection is refused before any prompt, with a message that names the key's SHA256 fingerprint. Heimdall does not fall back to the other keys. See [Troubleshooting](TROUBLESHOOTING.md#ssh-agent-key-not-loaded).
+- It applies to the SSH terminal, to SFTP sessions and to the SFTP side panel of a session. It does not apply to gateway hops and tunnels: they still offer every agent key.
+- The choice stays on this machine. It is not written to shared session files, any import clears it, and the settings export leaves it out. An older Heimdall ignores it and offers every key.
+- With agent forwarding on, the remote host can still use every key of the agent. The dialog warns you.
+- A session that goes through Plink (agent forwarding with Pageant, or the retry after a failure of the embedded client) needs the key in Pageant, of a type Plink can be limited to (not a hardware "sk" key), and no key file configured on the session. See [Troubleshooting](TROUBLESHOOTING.md#ssh-agent-key-plink-refused).
+- External PuTTY mode cannot be limited to one key: a session that names one is refused there.
+
 ### Web consoles
 
 Choose **Web** when you add a session, for an iLO, an iDRAC, a switch or a NAS admin page. Type

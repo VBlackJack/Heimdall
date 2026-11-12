@@ -783,6 +783,25 @@ préférence de l'utilisateur entre les agents est un réglage d'exécution
 (`AppSettings.SshAgentPreference`) ; les changements prennent effet à la
 prochaine tentative de connexion, sans redémarrage de l'application.
 
+Une session peut désigner la seule clé d'agent qu'elle présente
+(`ServerProfileDto.SshAgentKeyFingerprint`, une empreinte `SHA256:`). La clé est
+cherchée dans les agents que Heimdall est réglé pour utiliser avant tout tunnel ou
+toute demande, avec une attente bornée hors du thread appelant ; un agent qui ne
+répond pas à temps ne détient rien qui puisse être présenté. Une clé trouvée dans
+aucun agent est refusée, sans repli sur les autres clés. Le choix limite les clés
+d'agent seulement : il n'agit ni sur un mot de passe enregistré, ni sur un fichier de
+clé, ni sur l'authentification interactive au clavier. Les sauts de passerelle et les
+tunnels ne le reçoivent pas et présentent toujours toutes les clés de l'agent. La
+valeur est locale à la machine : l'assainisseur des profils partagés la retire, tout
+import l'efface et l'export des réglages la supprime. Avec le transfert d'agent activé,
+l'hôte distant peut quand même utiliser toutes les clés de l'agent, quelle que soit la
+clé désignée par la session. Sur le chemin Plink (transfert d'agent avec Pageant, nouvel
+essai après un échec du client intégré), la clé est remise à Plink sous la forme d'un
+fichier de clé publique d'une ligne, seulement si la clé est dans Pageant, d'un type que
+Plink sait lire, si aucun fichier de clé n'est configuré et si Plink est la version
+fournie ; sinon la session est refusée. Le mode PuTTY externe avec une clé choisie est
+refusé.
+
 `OpenSshPipeAgent.SendRequest` repose sur des entrées/sorties de tube
 asynchrones (`NamedPipeClientStream` ouvert avec `PipeOptions.Asynchronous`) et
 sur un jeton lié de délai/annulation, en remplacement du `ReadTimeout` au
