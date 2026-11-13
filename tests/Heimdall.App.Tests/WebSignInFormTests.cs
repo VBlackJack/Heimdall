@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.Text.Json;
 using Heimdall.App.Services;
 
 namespace Heimdall.App.Tests;
@@ -81,12 +82,20 @@ public sealed class WebSignInFormTests
     }
 
     [Fact]
-    public void TheAccountIsSerialized_SoAQuoteStaysPartOfThePassword()
+    public void TheAccountIsWrittenAsAStringLiteral_NotConcatenatedIntoOne()
     {
-        string script = WebSignInFormPolicy.BuildScript(Form(username: "ad\"min", password: "p\"a\\ss"))!;
+        const string username = "ad\"min";
+        const string password = "p\"a\\ss";
 
-        Assert.Contains("user: \"ad\\\"min\"", script);
-        Assert.Contains("password: \"p\\\"a\\\\ss\"", script);
+        string script = WebSignInFormPolicy.BuildScript(Form(username: username, password: password))!;
+
+        // The literal is the serializer's, so a quote inside an account cannot close the
+        // JavaScript string and cut it. The expected text is asked of the serializer rather than
+        // written here: how it escapes a quote is its business, and System.Text.Json spells it
+        // as an escape the page reads back as the same character.
+        Assert.Contains("user: " + JsonSerializer.Serialize(username), script);
+        Assert.Contains("password: " + JsonSerializer.Serialize(password), script);
+        Assert.DoesNotContain("password: \"" + password + "\"", script);
     }
 
     [Fact]
@@ -124,8 +133,14 @@ public sealed class WebSignInFormTests
     [Fact]
     public void TheButtonIsPressedOnlyWhenTheProfileNamesOne()
     {
-        Assert.DoesNotContain(".click()", WebSignInFormPolicy.BuildScript(Form())!);
-        Assert.Contains(".click()", WebSignInFormPolicy.BuildScript(Form(submitSelector: "#submit"))!);
+        string withoutButton = WebSignInFormPolicy.BuildScript(Form())!;
+        string withButton = WebSignInFormPolicy.BuildScript(Form(submitSelector: "#submit"))!;
+
+        // The click is always in the script, behind the selector's own value: with no button the
+        // value is the empty string and the branch never runs, so the press stays the user's.
+        Assert.Contains("var submitSelector = \"\";", withoutButton);
+        Assert.Contains("var submitSelector = \"#submit\";", withButton);
+        Assert.Contains("if (submitSelector) {", withoutButton);
     }
 
     [Fact]

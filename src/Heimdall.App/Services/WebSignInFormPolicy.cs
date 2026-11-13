@@ -35,7 +35,8 @@ namespace Heimdall.App.Services;
 /// iDRAC 9), so a fill attempted when the document loads would find an empty page.</para>
 /// <para>The password reaches the page as a JavaScript string literal, which is the only way a
 /// page can be signed in from outside: it is serialized rather than concatenated, so a quote or a
-/// backslash in it stays part of the password, and neither it nor the script is ever logged.</para>
+/// backslash in it stays part of the password (the serializer spells a quote as an escape the page
+/// reads back as the same character), and neither it nor the script is ever logged.</para>
 /// </remarks>
 internal static class WebSignInFormPolicy
 {
