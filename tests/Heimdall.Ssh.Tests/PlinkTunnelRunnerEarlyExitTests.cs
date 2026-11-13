@@ -21,6 +21,7 @@ using System.Net.Sockets;
 using System.Text;
 using Heimdall.Core.Network;
 using Heimdall.Ssh.Plink;
+using Microsoft.Extensions.Time.Testing;
 
 namespace Heimdall.Ssh.Tests;
 
@@ -67,23 +68,47 @@ public sealed class PlinkTunnelRunnerEarlyExitTests
     /// A plink that exited is read to the end of its stderr before the start reports why. The
     /// runner joined the stderr drain for 500 ms and then cancelled it: on a loaded machine the
     /// drain had not read "Access denied" yet, and the refused sign-in was reported as a port
-    /// nobody listened on (seen under full CPU load on 2026-10-26).
+    /// nobody listened on (seen under full CPU load on 2026-10-26). The bound runs on a controlled
+    /// clock and the stderr is released by the test, so no wall-clock duration decides the outcome.
     /// </summary>
     [Fact]
     public async Task StartAsync_StderrReadLateAfterTheExit_StillNamesTheRefusal()
     {
+        Assert.True(LateStderrDelay < PlinkTunnelRunner.ExitedDrainTimeout);
+
         string plinkStandIn = Path.GetTempFileName();
+        TimerSignallingTimeProvider time = new();
+        GatedStream stderr = new("Using username \"ops\".\r\nAccess denied\r\n");
         using PlinkTunnelRunner runner = new(
             new PlinkTunnelRunnerOptions(PortCheckIntervalMs: 1000, KillGracePeriodMs: 100),
             new NothingListeningProbe(),
-            _ => new ExitedPlinkProcess(new SlowStream("Using username \"ops\".\r\nAccess denied\r\n", LateStderrDelay)));
+            _ => new ExitedPlinkProcess(stderr),
+            Path.GetTempPath,
+            time);
 
         try
         {
-            PlinkTunnelResult result = await runner.StartAsync(
+            Task<PlinkTunnelResult> start = runner.StartAsync(
                 plinkStandIn,
                 "gw.test", 22, "ops", null, "s3cret",
                 "remote", 22, GetAvailableLoopbackPort(), "SHA256:test");
+
+            // The drain bound is the only timer made through the provider: once it exists the
+            // start is waiting on the drain, whose first read is still gated.
+            Task first = await Task.WhenAny(time.TimerCreated.Task, start).WaitAsync(FailureBackstop);
+            if (first == start)
+            {
+                await start;
+            }
+
+            Assert.Same(time.TimerCreated.Task, first);
+
+            // The late stderr arrives within the bound: time passes, the bound is not over.
+            time.Advance(LateStderrDelay);
+            Assert.False(start.IsCompleted);
+
+            stderr.Release();
+            PlinkTunnelResult result = await start.WaitAsync(FailureBackstop);
 
             Assert.False(result.Success);
             Assert.Equal(SshFailureCode.AuthRejected, result.FailureCode);
@@ -264,8 +289,15 @@ public sealed class PlinkTunnelRunnerEarlyExitTests
         public TcpListenerOwnership Probe(string bindHost, int port, int expectedProcessId) => ownership;
     }
 
-    /// <summary>Three times the 500 ms the runner used to wait for the drain of an exited plink.</summary>
+    /// <summary>
+    /// How much of the runner's drain bound passes before the gated stderr is released. Three
+    /// times the 500 ms the runner used to wait for the drain of an exited plink, and below the
+    /// bound it has now.
+    /// </summary>
     private static readonly TimeSpan LateStderrDelay = TimeSpan.FromMilliseconds(1500);
+
+    /// <summary>Only guards against a hang: no outcome depends on it elapsing.</summary>
+    private static readonly TimeSpan FailureBackstop = TimeSpan.FromSeconds(30);
 
     /// <summary>The runner's bounded wait for an exited plink's drain, plus room for a loaded machine.</summary>
     private static readonly TimeSpan NeverClosingStderrBound = TimeSpan.FromSeconds(15);
@@ -298,6 +330,72 @@ public sealed class PlinkTunnelRunnerEarlyExitTests
                 _delayed = true;
             }
 
+            return await _inner.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+        }
+
+        public override int Read(byte[] buffer, int offset, int count) =>
+            ReadAsync(buffer.AsMemory(offset, count)).AsTask().GetAwaiter().GetResult();
+
+        public override void Flush()
+        {
+        }
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                _inner.Dispose();
+            }
+
+            base.Dispose(disposing);
+        }
+    }
+
+    /// <summary>A controlled clock that tells the test when the runner has created a timer.</summary>
+    private sealed class TimerSignallingTimeProvider : FakeTimeProvider
+    {
+        public TaskCompletionSource TimerCreated { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+        {
+            ITimer timer = base.CreateTimer(callback, state, dueTime, period);
+            TimerCreated.TrySetResult();
+            return timer;
+        }
+    }
+
+    /// <summary>A stderr pipe whose first read waits for the test to open the gate.</summary>
+    private sealed class GatedStream(string content) : Stream
+    {
+        private readonly MemoryStream _inner = new(Encoding.UTF8.GetBytes(content));
+        private readonly TaskCompletionSource _gate = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public override bool CanRead => true;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => false;
+
+        public override long Length => throw new NotSupportedException();
+
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+
+        public void Release() => _gate.TrySetResult();
+
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            await _gate.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
             return await _inner.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
         }
 
