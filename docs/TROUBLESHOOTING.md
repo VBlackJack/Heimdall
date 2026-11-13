@@ -1306,7 +1306,7 @@ After a failure of the embedded client, the retry through Plink is simply skippe
 1. Load the key in Pageant, or turn off agent forwarding so the embedded client is used.
 2. For a key type Plink cannot be limited to, turn off agent forwarding or choose another key.
 3. Remove the key file from the session, or clear the chosen agent key.
-4. Point `Path to plink.exe` back to the Plink shipped with Heimdall, or clear the chosen agent key.
+4. Point `Path to plink.exe` back to the Plink shipped with Heimdall (or reset the field to its default), or clear the chosen agent key.
 5. For external PuTTY, switch the session to the embedded terminal, or clear the chosen key.
 
 **Files**: `Services/Handlers/SshAgentKeyPreflight.cs` (`RefusalForPlink`), `Services/Handlers/SshHandler.cs`

@@ -393,6 +393,10 @@ question is the name the connection was made through, and it stays so.
 
 **Path to plink.exe** is needed only for the PuTTY-based paths: Pageant keys,
 keyboard-interactive servers, and the Plink fallback. Key files alone need nothing here.
+Left at its default value (`C:\Program Files\PuTTY\plink.exe`), the field means "use the Plink
+shipped with Heimdall when present", even when PuTTY is installed on the machine; any other path is used as is.
+A PuTTY fork installed at the default path (a smart card build, for example) is therefore no
+longer used unless the field points to it at another location.
 **PuTTY path** is needed only when SSH mode is set to External; left blank it is looked for next
 to plink.exe. A path typed where there is no file says "No file at this path." under the field;
 an empty field says nothing.

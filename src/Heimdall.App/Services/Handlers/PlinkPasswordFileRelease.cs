@@ -32,6 +32,9 @@ namespace Heimdall.App.Services.Handlers;
 /// something before it reads the file - so the early deletion is withheld and the file is released
 /// at process exit, exactly as before. That is a deliberate fail-closed default: withholding the
 /// early deletion costs exposure time, while deleting too early would break the authentication.</para>
+/// <para>The first byte is observed through <see cref="IFirstOutputSignal"/> and not through the
+/// data event, because subscribing to the data event consumes the session's bootstrap replay and
+/// the terminal view that subscribes afterwards would lose the banner and the first prompt.</para>
 /// <para>The first byte is a proof and not a delay. A timer would only show that time passed, and
 /// process start would not even show that the child finished parsing its arguments. A
 /// delete-and-retry loop was rejected as well: it would succeed just as readily before the launcher
@@ -61,7 +64,9 @@ internal static class PlinkPasswordFileRelease
     /// <param name="firstByteProvesConsumption">
     /// Whether the launcher's first byte of output proves it already read the password file. When
     /// <see langword="false"/>, output is not listened to at all and only process exit or an
-    /// explicit <see cref="PlinkPasswordFileReleaseHandle.Release"/> frees the file.
+    /// explicit <see cref="PlinkPasswordFileReleaseHandle.Release"/> frees the file. When
+    /// <see langword="true"/>, <paramref name="session"/> must implement
+    /// <see cref="IFirstOutputSignal"/>, otherwise an <see cref="ArgumentException"/> is thrown.
     /// </param>
     internal static PlinkPasswordFileReleaseHandle Arm(
         ITerminalSession session,
@@ -93,7 +98,8 @@ internal sealed class PlinkPasswordFileReleaseHandle
     private readonly ITerminalSession _session;
     private readonly string _passwordFilePath;
     private readonly Action<string?> _delete;
-    private readonly Action<ReadOnlyMemory<byte>>? _onData;
+    private readonly IFirstOutputSignal? _firstOutput;
+    private readonly Action? _onFirstOutput;
     private readonly Action<int> _onExit;
 
     private int _released;
@@ -108,18 +114,31 @@ internal sealed class PlinkPasswordFileReleaseHandle
         _passwordFilePath = passwordFilePath;
         _delete = delete;
 
+        if (firstByteProvesConsumption)
+        {
+            // Checked before anything is subscribed, so a refusal leaves no handler behind. The
+            // message carries no path: the caller logs it and shows it.
+            _firstOutput = session as IFirstOutputSignal
+                ?? throw new ArgumentException(
+                    "An attested launcher requires a session that signals its first output.",
+                    nameof(session));
+        }
+
         _onExit = _ => Release();
         _session.ProcessExited += _onExit;
 
-        if (!firstByteProvesConsumption)
+        if (_firstOutput is null)
         {
             // Not subscribing at all, rather than subscribing and ignoring: an unattested launcher
             // must have no path from its output to the deletion, not merely a disabled one.
             return;
         }
 
-        _onData = _ => Release();
-        _session.DataReceived += _onData;
+        // The first-output signal and not DataReceived: the first subscriber of the data event
+        // disarms the session's bootstrap replay, and the terminal view that subscribes later
+        // must still receive the banner and the first prompt.
+        _onFirstOutput = Release;
+        _firstOutput.FirstOutputReceived += _onFirstOutput;
     }
 
     /// <summary>
@@ -139,9 +158,9 @@ internal sealed class PlinkPasswordFileReleaseHandle
             return;
         }
 
-        if (_onData is not null)
+        if (_firstOutput is not null && _onFirstOutput is not null)
         {
-            _session.DataReceived -= _onData;
+            _firstOutput.FirstOutputReceived -= _onFirstOutput;
         }
 
         _session.ProcessExited -= _onExit;

@@ -159,7 +159,8 @@ public sealed class PlinkSizeSessionTests
         PlinkSizeSession.ArmRelease(session, "HeimdallPtySize-a", deleted.Add, Attested);
 
         deleted.Should().BeEmpty();
-        session.DataSubscribers.Should().Be(1);
+        session.FirstOutputSubscribers.Should().Be(1);
+        session.DataSubscribers.Should().Be(0);
         session.ExitSubscribers.Should().Be(1);
     }
 
@@ -176,6 +177,7 @@ public sealed class PlinkSizeSessionTests
 
         deleted.Should().Equal("HeimdallPtySize-a");
         session.DataSubscribers.Should().Be(0);
+        session.FirstOutputSubscribers.Should().Be(0);
         session.ExitSubscribers.Should().Be(0);
     }
 
@@ -187,6 +189,7 @@ public sealed class PlinkSizeSessionTests
         PlinkSizeSession.ArmRelease(session, "HeimdallPtySize-a", deleted.Add, NotAttested);
 
         session.DataSubscribers.Should().Be(0);
+        session.FirstOutputSubscribers.Should().Be(0);
         session.RaiseData([0x24]);
         deleted.Should().BeEmpty();
 
@@ -194,6 +197,18 @@ public sealed class PlinkSizeSessionTests
         session.RaiseExit(1);
 
         deleted.Should().Equal("HeimdallPtySize-a");
+    }
+
+    [Fact]
+    public void Release_Attested_SessionWithoutTheFirstOutputSignal_IsRefusedWithoutTheName()
+    {
+        PlainTerminalSession session = new();
+
+        Action arm = () => PlinkSizeSession.ArmRelease(session, "HeimdallPtySize-secret-name", _ => { }, Attested);
+
+        ArgumentException thrown = arm.Should().Throw<ArgumentException>().Which;
+        thrown.Message.Should().NotContain("HeimdallPtySize");
+        session.ExitSubscribers.Should().Be(0);
     }
 
     [Fact]
@@ -366,11 +381,42 @@ public sealed class PlinkSizeSessionTests
     /// <summary>
     /// Counts live subscribers so the oracles can see the unsubscription.
     /// </summary>
-    private sealed class FakeTerminalSession : ITerminalSession
+    private sealed class FakeTerminalSession : ITerminalSession, IFirstOutputSignal
     {
         private readonly object _sync = new();
         private Action<ReadOnlyMemory<byte>>? _data;
         private Action<int>? _exit;
+        private Action? _firstOutput;
+        private bool _firstOutputRaised;
+
+        // Faithful to the real session: a handler added after the signal was raised is invoked at
+        // once, inside the add, and the handler list is cleared once the signal has been raised.
+        public event Action? FirstOutputReceived
+        {
+            add
+            {
+                bool invokeNow;
+                lock (_sync)
+                {
+                    invokeNow = _firstOutputRaised;
+                    if (!invokeNow)
+                    {
+                        _firstOutput += value;
+                    }
+                }
+
+                if (invokeNow)
+                {
+                    value?.Invoke();
+                }
+            }
+            remove { lock (_sync) { _firstOutput -= value; } }
+        }
+
+        public int FirstOutputSubscribers
+        {
+            get { lock (_sync) { return _firstOutput?.GetInvocationList().Length ?? 0; } }
+        }
 
         public event Action<ReadOnlyMemory<byte>>? DataReceived
         {
@@ -403,11 +449,19 @@ public sealed class PlinkSizeSessionTests
         public void RaiseData(byte[] chunk)
         {
             Action<ReadOnlyMemory<byte>>? handler;
+            Action? firstOutputHandler = null;
             lock (_sync)
             {
                 handler = _data;
+                if (!_firstOutputRaised)
+                {
+                    _firstOutputRaised = true;
+                    firstOutputHandler = _firstOutput;
+                    _firstOutput = null;
+                }
             }
 
+            firstOutputHandler?.Invoke();
             handler?.Invoke(chunk.AsMemory());
         }
 
@@ -421,6 +475,63 @@ public sealed class PlinkSizeSessionTests
 
             handler?.Invoke(exitCode);
         }
+
+        public Task StartAsync(
+            string executable,
+            string arguments,
+            int columns = 80,
+            int rows = 24,
+            string? workingDirectory = null,
+            CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
+
+        public void Write(ReadOnlySpan<byte> data)
+        {
+        }
+
+        public void Write(string text)
+        {
+        }
+
+        public void Resize(int columns, int rows)
+        {
+        }
+
+        public void Kill()
+        {
+        }
+
+        public void Dispose()
+        {
+        }
+    }
+
+    /// <summary>
+    /// A session that does not implement the first-output signal.
+    /// </summary>
+    private sealed class PlainTerminalSession : ITerminalSession
+    {
+        private Action<int>? _exit;
+
+        public event Action<ReadOnlyMemory<byte>>? DataReceived
+        {
+            add { }
+            remove { }
+        }
+
+        public event Action<int>? ProcessExited
+        {
+            add { _exit += value; }
+            remove { _exit -= value; }
+        }
+
+        public int ExitSubscribers => _exit?.GetInvocationList().Length ?? 0;
+
+        public bool IsRunning => true;
+
+        public int? ProcessId => 4242;
+
+        public Dictionary<string, string>? EnvironmentVariables { get; set; }
 
         public Task StartAsync(
             string executable,

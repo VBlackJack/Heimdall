@@ -448,7 +448,11 @@ connexion a été établie, et le reste.
 
 **Chemin de plink.exe** n'est nécessaire que pour les chemins passant par PuTTY : clés Pageant,
 serveurs en keyboard-interactive, et le repli sur Plink. Des fichiers de clés seuls n'en ont pas
-besoin. **Chemin de PuTTY** n'est nécessaire que si le mode SSH est réglé sur External ; laissé
+besoin. Laissé à sa valeur par défaut (`C:\Program Files\PuTTY\plink.exe`), le champ signifie
+"utiliser le Plink fourni avec Heimdall quand il est présent", même si PuTTY est installé sur la machine ; tout autre
+chemin est utilisé tel quel. Un fork de PuTTY installé au chemin par défaut (une version carte à
+puce, par exemple) n'est donc plus utilisé tant que le champ ne pointe pas vers lui à un autre
+emplacement. **Chemin de PuTTY** n'est nécessaire que si le mode SSH est réglé sur External ; laissé
 vide, il est cherché à côté de plink.exe. Un chemin saisi là où il n'y a pas de fichier affiche
 "Aucun fichier à cet emplacement." sous le champ ; un champ vide ne dit rien.
 
