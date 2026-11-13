@@ -3299,6 +3299,7 @@
   "LocalFileBrowserColModified": "Modificado",
   "CtxMenuCopy": "Copiar",
   "StatusSftpAutoOpenFailed": "Falló la apertura automática de SFTP: {0}",
+  "StatusSftpCompanionNotOpenedAfterPlinkRetry": "Conectado a: {0}. El panel SFTP no se abrió: el cliente integrado no pudo iniciar sesión en este servidor.",
   "ErrorGatewayNotFound": "No se encontró la pasarela SSH: {0}. Edita la sesión \"{1}\" y elige una pasarela existente, o vuelve a crear esta pasarela en Ajustes antes de conectar.",
   "ErrorGatewayCredentialUnreadable": "La contraseña o la frase de contraseña guardadas para la pasarela \"{0}\" no se pueden leer en este equipo o cuenta de Windows. Vuelve a introducirlas en los ajustes de la pasarela.",
   "ErrorGatewayNotFoundForEdit": "La pasarela {0} ya no existe. Elige otra pasarela para esta sesión.",

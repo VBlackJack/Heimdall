@@ -35,7 +35,13 @@ internal sealed class TerminalSizeReport
     private readonly TaskCompletionSource<TerminalSize> _firstReport =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+    private readonly object _widerGate = new();
+
     private TerminalSize? _latest;
+
+    private TaskCompletionSource<TerminalSize>? _widerWaiter;
+
+    private int _widerThanColumns;
 
     /// <summary>
     /// Where the size of every report is also noted, so a later connect that has no view of its own
@@ -56,6 +62,51 @@ internal sealed class TerminalSizeReport
         Volatile.Write(ref _latest, size);
         Hints?.RememberWindow(size);
         _firstReport.TrySetResult(size);
+        CompleteWiderWaiter(size);
+    }
+
+    /// <summary>
+    /// Waits for a usable report strictly wider than the one held now. The caller applies its own
+    /// timeout, for example with <c>WaitAsync</c>; there is no timer here.
+    /// </summary>
+    /// <remarks>
+    /// "Wider" rather than "next": a layout change that widens the terminal can be preceded by a
+    /// report of the old, narrow size still in flight, and that report must not release the wait.
+    /// With no size held yet, any usable report completes it. Arming again replaces the previous
+    /// waiter, whose task is cancelled. The task never faults and never runs its continuations
+    /// inline on the reporting thread.
+    /// </remarks>
+    /// <returns>A task that completes with the first usable, strictly wider size reported.</returns>
+    public Task<TerminalSize> ArmWiderReport()
+    {
+        TaskCompletionSource<TerminalSize> waiter = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource<TerminalSize>? replaced;
+        lock (_widerGate)
+        {
+            replaced = _widerWaiter;
+            _widerWaiter = waiter;
+            _widerThanColumns = Latest?.Columns ?? 0;
+        }
+
+        replaced?.TrySetCanceled();
+        return waiter.Task;
+    }
+
+    private void CompleteWiderWaiter(TerminalSize size)
+    {
+        TaskCompletionSource<TerminalSize>? waiter = null;
+        lock (_widerGate)
+        {
+            if (_widerWaiter is not null
+                && TerminalSizeHints.IsUsableHint(size)
+                && size.Columns > _widerThanColumns)
+            {
+                waiter = _widerWaiter;
+                _widerWaiter = null;
+            }
+        }
+
+        waiter?.TrySetResult(size);
     }
 
     /// <summary>

@@ -3299,6 +3299,7 @@
   "LocalFileBrowserColModified": "Modified",
   "CtxMenuCopy": "Copy",
   "StatusSftpAutoOpenFailed": "SFTP auto-open failed: {0}",
+  "StatusSftpCompanionNotOpenedAfterPlinkRetry": "Connected to: {0}. The SFTP panel was not opened: the embedded client could not sign in to this server.",
   "ErrorGatewayNotFound": "SSH gateway not found: {0}. Edit session '{1}' and choose an existing gateway, or recreate this gateway in Settings before connecting.",
   "ErrorGatewayCredentialUnreadable": "The password or passphrase saved for gateway \"{0}\" cannot be read on this machine or Windows account. Enter it again in the gateway settings.",
   "ErrorGatewayNotFoundForEdit": "Gateway {0} no longer exists. Choose another gateway for this session.",

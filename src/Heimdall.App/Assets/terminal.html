@@ -51,6 +51,9 @@
             height: 100%;
             background: var(--terminal-bg);
             border: 0;
+            /* A host-given hidden box can be wider than the window (the creation box). Without
+               this the flex item shrinks to the window and the fit measures the window, not the pane. */
+            flex-shrink: 0;
         }
 
         #loading {

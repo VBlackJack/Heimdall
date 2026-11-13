@@ -3298,6 +3298,7 @@
   "LocalFileBrowserColModified": "Modifi\u00e9",
   "CtxMenuCopy": "Copier",
   "StatusSftpAutoOpenFailed": "Ouverture automatique SFTP \u00e9chou\u00e9e : {0}",
+  "StatusSftpCompanionNotOpenedAfterPlinkRetry": "Connect\u00e9 \u00e0 : {0}. Le panneau SFTP n'a pas \u00e9t\u00e9 ouvert : le client int\u00e9gr\u00e9 n'a pas pu s'authentifier sur ce serveur.",
   "ErrorGatewayNotFound": "Passerelle SSH introuvable : {0}. Modifiez la session \"{1}\" et choisissez une passerelle existante, ou recr\u00e9ez cette passerelle dans les Param\u00e8tres avant de vous connecter.",
   "ErrorGatewayCredentialUnreadable": "Le mot de passe ou la passphrase enregistrés pour la passerelle \"{0}\" ne peuvent pas être lus sur cette machine ou ce compte Windows. Saisissez-les à nouveau dans les paramètres de la passerelle.",
   "ErrorGatewayNotFoundForEdit": "La passerelle {0} n'existe plus. Choisissez une autre passerelle pour cette session.",

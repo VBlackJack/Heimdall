@@ -105,6 +105,22 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         new(StringComparer.Ordinal);
 
     /// <summary>
+    /// The sessions whose pending companion pane was withdrawn because the embedded client failed to
+    /// authenticate and the connect moved on to Plink: the companion would share that client's
+    /// credentials and could never prompt, so it is not opened once the session is ready.
+    /// </summary>
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> _withdrawnCompanions =
+        new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// For a session whose companion pane was withdrawn, the task that completes when the terminal
+    /// page reports a wider size, so the Plink launch that follows is made at the full width. Taken
+    /// by the first size lookup that is allowed to wait.
+    /// </summary>
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, Task<TerminalSize>> _pendingRelayouts =
+        new(StringComparer.Ordinal);
+
+    /// <summary>
     /// The profile whose manual reconnect is running in this async flow. Lets the session that the
     /// reconnect starts, and only that one, take the size of the terminal it replaces.
     /// </summary>
@@ -233,6 +249,10 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         // size the connecting view's page has reported, waiting for it on the Plink path.
         _main.ServerList.ConnectionService.ResolveInitialTerminalSize = ResolveConnectingTerminalSizeAsync;
 
+        // The embedded client could not authenticate and Plink takes over: the pending file panel
+        // can never connect, so the terminal gets its full width back before Plink launches.
+        _main.ServerList.ConnectionService.PlinkRetryStarting = OnPlinkRetryStarting;
+
         // Wire connect-time execution-trust confirmation relay
         _main.ServerList.ConnectionService.ConfirmExecution =
             profile => _main.ServerList.ConfirmAndTrustExecutionAsync(profile);
@@ -274,6 +294,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         {
             gone.PropertyChanged -= OnObservedTabPropertyChanged;
             _observedTabs.Remove(gone);
+            PurgePlinkRetryState(gone.ServerId);
         }
 
         foreach (SessionTabViewModel added in current.Where(_observedTabs.Add))
@@ -931,6 +952,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         _connectingSshViews.TryRemove(sessionId, out _);
         _companionPlaceholders.TryRemove(sessionId, out SessionPaneModel? failedPlaceholder);
         _companionProfiles.TryRemove(sessionId, out _);
+        PurgePlinkRetryState(sessionId);
         _sharedSshConnectionInputs.TryRemove(sessionId, out _);
         ReconnectChainState? reconnectChain = RemoveReconnectChainSession(sessionId);
         if (reconnectChain is not null)
@@ -1060,6 +1082,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                     // neither a live connection nor a tab stuck in Connecting is left behind.
                     _companionPlaceholders.TryRemove(sessionId, out _);
                     _companionProfiles.TryRemove(sessionId, out _);
+                    PurgePlinkRetryState(sessionId);
                     _main.Connection.CloseFailedMaterialization(existingTab);
                     SafeDisposeSessionResult(session);
                     throw;
@@ -1080,6 +1103,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                 FileLogger.Info($"SessionReady for SSH sessionId={sessionId} arrived after its tab was closed; discarding it.");
                 _companionPlaceholders.TryRemove(sessionId, out _);
                 _companionProfiles.TryRemove(sessionId, out _);
+                PurgePlinkRetryState(sessionId);
                 SafeDisposeSessionResult(session);
                 throw new OperationCanceledException();
             }
@@ -1155,7 +1179,15 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         // Auto-open SFTP alongside SSH - use original server ID for inventory lookup
         _companionPlaceholders.TryRemove(sessionId, out SessionPaneModel? companionPlaceholder);
         _companionProfiles.TryRemove(sessionId, out ServerProfileDto? plannedProfile);
-        if (WillOpenSftpCompanion(connectionType, _main.CurrentSettings))
+        bool companionWithdrawn = _withdrawnCompanions.TryRemove(sessionId, out _);
+        _pendingRelayouts.TryRemove(sessionId, out _);
+        if (companionWithdrawn)
+        {
+            // The embedded client could not sign in and Plink did: a companion built on that client
+            // would fail the same way, and opening it now would split the terminal again.
+            _main.StatusText = _localizer.Format("StatusSftpCompanionNotOpenedAfterPlinkRetry", displayName);
+        }
+        else if (WillOpenSftpCompanion(connectionType, _main.CurrentSettings))
         {
             AutoOpenSftpAsync(
                     tab,
@@ -2404,16 +2436,110 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
     /// <paramref name="wait"/> for its first report. Called from the connect thread; the
     /// dictionary and the view's report are safe for it, and nothing here blocks the UI thread.
     /// </summary>
-    private Task<TerminalSizeLookup> ResolveConnectingTerminalSizeAsync(
+    private async Task<TerminalSizeLookup> ResolveConnectingTerminalSizeAsync(
         string sessionId,
         TimeSpan wait,
         CancellationToken cancellationToken)
     {
-        TerminalSizeReport? report = _connectingSshViews.TryGetValue(sessionId, out EmbeddedSshView? view)
-            && view is not null
+        // Only a lookup that may wait takes the relayout: the zero-wait lookup of the embedded dial
+        // comes first and must leave it for the Plink launch.
+        if (wait > TimeSpan.Zero && _pendingRelayouts.TryRemove(sessionId, out Task<TerminalSize>? relayout))
+        {
+            try
+            {
+                await relayout.WaitAsync(wait, cancellationToken).ConfigureAwait(false);
+            }
+            catch (TimeoutException)
+            {
+                FileLogger.Info(
+                    $"Terminal page did not report a wider size within {wait.TotalMilliseconds:0} ms after the " +
+                    $"companion pane was withdrawn for sessionId={sessionId}; launching at the size it holds.");
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                // The wait was replaced by a newer one: the report holds whatever the page sent last.
+                FileLogger.Info($"The wider-size wait for sessionId={sessionId} was replaced; using the latest size.");
+            }
+        }
+
+        return await TerminalSizeReport
+            .ResolveAsync(ConnectingReportOf(sessionId), wait, cancellationToken, _sizeHints, sessionId)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>Where the connecting view's size report comes from; replaced by tests.</summary>
+    internal Func<string, TerminalSizeReport?>? ConnectingSizeReportSource { get; set; }
+
+    private TerminalSizeReport? ConnectingReportOf(string sessionId)
+    {
+        if (ConnectingSizeReportSource is { } source)
+        {
+            return source(sessionId);
+        }
+
+        return _connectingSshViews.TryGetValue(sessionId, out EmbeddedSshView? view) && view is not null
             ? view.TerminalSizeReport
             : null;
-        return TerminalSizeReport.ResolveAsync(report, wait, cancellationToken, _sizeHints, sessionId);
+    }
+
+    /// <summary>
+    /// The embedded client failed to authenticate and Plink is about to take over. The id is the
+    /// server id the SSH handler was given, which for a connect is the session id: the same key the
+    /// size relay looks up in <c>_connectingSshViews</c> and the tab and placeholder are filed under.
+    /// Runs on a pool thread; nothing is thrown out of it.
+    /// </summary>
+    private void OnPlinkRetryStarting(string sessionId)
+    {
+        try
+        {
+            InvokeOnUi(() =>
+            {
+                if (!_companionPlaceholders.TryGetValue(sessionId, out SessionPaneModel? placeholder))
+                {
+                    return;
+                }
+
+                SessionTabViewModel? tab = _main.Connection.ActiveSessions.FirstOrDefault(
+                    t => string.Equals(t.ServerId, sessionId, StringComparison.Ordinal));
+                if (tab is null
+                    || placeholder.HostControl is not null
+                    || SplitTreeHelper.FindPane(tab.RootContent, placeholder.PaneId) is null)
+                {
+                    return;
+                }
+
+                _companionPlaceholders.TryRemove(sessionId, out _);
+                _companionProfiles.TryRemove(sessionId, out _);
+                _withdrawnCompanions[sessionId] = true;
+
+                // Armed before the tree changes, so the report that the new layout provokes is not
+                // missed. Only for the selected tab: a tab that is not on screen is not laid out
+                // again, so no wider report would come and the launch would wait for nothing. A page
+                // that never reported (bulk connect, restore) has nothing to wait for either:
+                // Plink launches at the size it already gets.
+                if (ReferenceEquals(_main.Connection.ActiveSession, tab)
+                    && ConnectingReportOf(sessionId) is { Latest: not null } report)
+                {
+                    _pendingRelayouts[sessionId] = report.ArmWiderReport();
+                }
+
+                RemoveCompanionPlaceholder(tab, placeholder);
+            });
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            FileLogger.Warn($"Withdrawing the SFTP companion pane before the Plink retry failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>How many per-session companion and Plink retry entries are held; zero when nothing leaks.</summary>
+    internal int CompanionStateCount =>
+        _companionPlaceholders.Count + _companionProfiles.Count + _withdrawnCompanions.Count + _pendingRelayouts.Count;
+
+    private void PurgePlinkRetryState(string sessionId)
+    {
+        _withdrawnCompanions.TryRemove(sessionId, out _);
+        _pendingRelayouts.TryRemove(sessionId, out _);
     }
 
     private void TrackConnectingCancellation(
@@ -2528,6 +2654,8 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         }
         _connectingCancellations.Clear();
         _sharedSshConnectionInputs.Clear();
+        _withdrawnCompanions.Clear();
+        _pendingRelayouts.Clear();
 
         lock (_reconnectChainGate)
         {
