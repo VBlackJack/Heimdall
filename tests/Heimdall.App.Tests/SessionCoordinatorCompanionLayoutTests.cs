@@ -581,6 +581,347 @@ public sealed partial class SessionCoordinatorPreMountTests
         }
     }
 
+    private const int SplitColumns = 80;
+    private const int FullColumns = 160;
+    private const int TerminalRows = 24;
+    private static readonly TimeSpan LongWait = TimeSpan.FromSeconds(30);
+
+    private static TerminalSizeReport UseReport(TestHarness harness, int columns)
+    {
+        TerminalSizeReport report = new();
+        report.Remember(columns, TerminalRows);
+        harness.Main.Session.ConnectingSizeReportSource = _ => report;
+        return report;
+    }
+
+    private static Task<TerminalSizeLookup> LookupAsync(TestHarness harness, TimeSpan wait) =>
+        harness.Main.ServerList.ConnectionService.ResolveInitialTerminalSize!(
+            CompanionSessionId, wait, CancellationToken.None);
+
+    private static void RelayPlinkRetry(TestHarness harness) =>
+        harness.Main.ServerList.ConnectionService.PlinkRetryStarting!(CompanionSessionId);
+
+    [Fact]
+    public async Task PlinkRetry_WithdrawsThePendingCompanion()
+    {
+        using TestHarness harness = TestHarness.Create();
+        ServerProfileDto server = harness.CreateServer("SSH");
+        (Task<BulkConnectOutcome> pipeline, ControlledProtocolHandler ssh, SessionTabViewModel tab) =
+            await StartSshWithCompanionSettingsAsync(harness, server, CompanionSettings());
+        SessionPaneModel companion = CompanionOf(tab);
+        UseReport(harness, SplitColumns);
+
+        RelayPlinkRetry(harness);
+
+        Assert.Same(tab.PrimaryPane, tab.RootContent);
+        Assert.Null(SplitTreeHelper.FindPane(tab.RootContent, companion.PaneId));
+
+        ssh.Result.SetResult(new ConnectionResult(false, "stop here", null));
+        await pipeline.WaitAsync(TestTimeout);
+    }
+
+    [Fact]
+    public async Task PlinkRetry_ThenSshSucceeds_CompanionNeverConnects_AndTheStatusSaysWhy()
+    {
+        using TestHarness harness = TestHarness.Create();
+        ServerProfileDto server = harness.CreateServer("SSH");
+        (Task<BulkConnectOutcome> pipeline, ControlledProtocolHandler ssh, SessionTabViewModel tab) =
+            await StartSshWithCompanionSettingsAsync(harness, server, CompanionSettings());
+        ControlledProtocolHandler sftp = harness.GetHandler("SFTP");
+        UseReport(harness, SplitColumns);
+        RelayPlinkRetry(harness);
+
+        ssh.Result.SetResult(SuccessWithTerminalSession());
+        await pipeline.WaitAsync(TestTimeout);
+        await Task.Delay(NoConnectGrace);
+
+        Assert.False(sftp.Started.Task.IsCompleted);
+        Assert.Same(tab.PrimaryPane, tab.RootContent);
+        Assert.Equal(
+            harness.Main.GetLocalizer().Format("StatusSftpCompanionNotOpenedAfterPlinkRetry", tab.Title),
+            harness.Main.StatusText);
+        Assert.Equal(0, harness.Main.Session.CompanionStateCount);
+    }
+
+    [Fact]
+    public async Task PlinkRetry_SizeLookupWaitsForTheWiderReport()
+    {
+        using TestHarness harness = TestHarness.Create();
+        ServerProfileDto server = harness.CreateServer("SSH");
+        (Task<BulkConnectOutcome> pipeline, ControlledProtocolHandler ssh, SessionTabViewModel _) =
+            await StartSshWithCompanionSettingsAsync(harness, server, CompanionSettings());
+        TerminalSizeReport report = UseReport(harness, SplitColumns);
+
+        TerminalSizeLookup before = await LookupAsync(harness, TimeSpan.Zero);
+        Assert.Equal(new TerminalSize(SplitColumns, TerminalRows), before.Size);
+
+        RelayPlinkRetry(harness);
+        Task<TerminalSizeLookup> waiting = LookupAsync(harness, LongWait);
+        await Task.Delay(NoConnectGrace);
+        Assert.False(waiting.IsCompleted);
+
+        report.Remember(FullColumns, TerminalRows);
+        TerminalSizeLookup after = await waiting.WaitAsync(TestTimeout);
+
+        Assert.Equal(new TerminalSize(FullColumns, TerminalRows), after.Size);
+
+        ssh.Result.SetResult(new ConnectionResult(false, "stop here", null));
+        await pipeline.WaitAsync(TestTimeout);
+    }
+
+    [Fact]
+    public async Task PlinkRetry_SizeLookupTimesOut_KeepsThePreviousSize()
+    {
+        using TestHarness harness = TestHarness.Create();
+        ServerProfileDto server = harness.CreateServer("SSH");
+        (Task<BulkConnectOutcome> pipeline, ControlledProtocolHandler ssh, SessionTabViewModel _) =
+            await StartSshWithCompanionSettingsAsync(harness, server, CompanionSettings());
+        UseReport(harness, SplitColumns);
+        RelayPlinkRetry(harness);
+
+        TerminalSizeLookup lookup = await LookupAsync(harness, HintWait).WaitAsync(TestTimeout);
+
+        Assert.Equal(new TerminalSize(SplitColumns, TerminalRows), lookup.Size);
+
+        ssh.Result.SetResult(new ConnectionResult(false, "stop here", null));
+        await pipeline.WaitAsync(TestTimeout);
+    }
+
+    [Fact]
+    public async Task PlinkRetry_ZeroWaitLookup_DoesNotConsumeTheRelayout()
+    {
+        using TestHarness harness = TestHarness.Create();
+        ServerProfileDto server = harness.CreateServer("SSH");
+        (Task<BulkConnectOutcome> pipeline, ControlledProtocolHandler ssh, SessionTabViewModel _) =
+            await StartSshWithCompanionSettingsAsync(harness, server, CompanionSettings());
+        TerminalSizeReport report = UseReport(harness, SplitColumns);
+        RelayPlinkRetry(harness);
+
+        TerminalSizeLookup zeroWait = await LookupAsync(harness, TimeSpan.Zero).WaitAsync(TestTimeout);
+        Task<TerminalSizeLookup> waiting = LookupAsync(harness, LongWait);
+        await Task.Delay(NoConnectGrace);
+
+        Assert.Equal(new TerminalSize(SplitColumns, TerminalRows), zeroWait.Size);
+        Assert.False(waiting.IsCompleted);
+
+        report.Remember(FullColumns, TerminalRows);
+        TerminalSizeLookup after = await waiting.WaitAsync(TestTimeout);
+        Assert.Equal(new TerminalSize(FullColumns, TerminalRows), after.Size);
+
+        ssh.Result.SetResult(new ConnectionResult(false, "stop here", null));
+        await pipeline.WaitAsync(TestTimeout);
+    }
+
+    [Fact]
+    public async Task PlinkRetry_WithoutACompanion_NothingIsWaitedFor()
+    {
+        using TestHarness harness = TestHarness.Create();
+        ServerProfileDto server = harness.CreateServer("SSH");
+        (Task<BulkConnectOutcome> pipeline, ControlledProtocolHandler ssh, SessionTabViewModel tab) =
+            await StartSshWithCompanionSettingsAsync(harness, server, CompanionSettings(autoOpen: false));
+        UseReport(harness, SplitColumns);
+
+        RelayPlinkRetry(harness);
+        TerminalSizeLookup lookup = await LookupAsync(harness, LongWait).WaitAsync(TestTimeout);
+
+        Assert.Equal(new TerminalSize(SplitColumns, TerminalRows), lookup.Size);
+        Assert.Same(tab.PrimaryPane, tab.RootContent);
+        Assert.Equal(0, harness.Main.Session.CompanionStateCount);
+
+        ssh.Result.SetResult(new ConnectionResult(false, "stop here", null));
+        await pipeline.WaitAsync(TestTimeout);
+    }
+
+    [Fact]
+    public async Task PlinkRetry_WhenTheCompanionIsAlreadyAttached_NothingIsWithdrawnOrWaitedFor()
+    {
+        using TestHarness harness = TestHarness.Create();
+        ServerProfileDto server = harness.CreateServer("SSH");
+        (Task<BulkConnectOutcome> pipeline, ControlledProtocolHandler ssh, SessionTabViewModel tab) =
+            await StartSshWithCompanionSettingsAsync(harness, server, CompanionSettings());
+        SessionPaneModel companion = CompanionOf(tab);
+        companion.HostControl = new object();
+        UseReport(harness, SplitColumns);
+
+        RelayPlinkRetry(harness);
+        TerminalSizeLookup lookup = await LookupAsync(harness, LongWait).WaitAsync(TestTimeout);
+
+        Assert.Equal(new TerminalSize(SplitColumns, TerminalRows), lookup.Size);
+        Assert.Same(companion, CompanionOf(tab));
+
+        ssh.Result.SetResult(new ConnectionResult(false, "stop here", null));
+        await pipeline.WaitAsync(TestTimeout);
+    }
+
+    [Fact]
+    public async Task PlinkRetry_ThenSshFails_LeavesNothingBehind()
+    {
+        using TestHarness harness = TestHarness.Create();
+        ServerProfileDto server = harness.CreateServer("SSH");
+        (Task<BulkConnectOutcome> pipeline, ControlledProtocolHandler ssh, SessionTabViewModel tab) =
+            await StartSshWithCompanionSettingsAsync(harness, server, CompanionSettings());
+        UseReport(harness, SplitColumns);
+        RelayPlinkRetry(harness);
+        Assert.NotEqual(0, harness.Main.Session.CompanionStateCount);
+
+        ssh.Result.SetResult(new ConnectionResult(false, "ssh refused", null));
+        await pipeline.WaitAsync(TestTimeout);
+        await WaitUntilAsync(() => !harness.Main.Connection.ActiveSessions.Contains(tab));
+
+        Assert.Equal(0, harness.Main.Session.CompanionStateCount);
+    }
+
+    [Fact]
+    public async Task PlinkRetry_WiderReportRaisedDuringTheLayoutChange_IsTheSizeReturned()
+    {
+        using TestHarness harness = TestHarness.Create();
+        ServerProfileDto server = harness.CreateServer("SSH");
+        (Task<BulkConnectOutcome> pipeline, ControlledProtocolHandler ssh, SessionTabViewModel tab) =
+            await StartSshWithCompanionSettingsAsync(harness, server, CompanionSettings());
+        TerminalSizeReport report = UseReport(harness, SplitColumns);
+        tab.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(SessionTabViewModel.RootContent))
+            {
+                report.Remember(FullColumns, TerminalRows);
+            }
+        };
+
+        RelayPlinkRetry(harness);
+        TerminalSizeLookup lookup = await LookupAsync(harness, LongWait).WaitAsync(TestTimeout);
+
+        Assert.Equal(new TerminalSize(FullColumns, TerminalRows), lookup.Size);
+
+        ssh.Result.SetResult(new ConnectionResult(false, "stop here", null));
+        await pipeline.WaitAsync(TestTimeout);
+    }
+
+    [Fact]
+    public async Task PlinkRetry_WithoutAReportedSize_StillWithdrawsTheCompanion_AndSaysWhy()
+    {
+        using TestHarness harness = TestHarness.Create();
+        ServerProfileDto server = harness.CreateServer("SSH");
+        (Task<BulkConnectOutcome> pipeline, ControlledProtocolHandler ssh, SessionTabViewModel tab) =
+            await StartSshWithCompanionSettingsAsync(harness, server, CompanionSettings());
+        ControlledProtocolHandler sftp = harness.GetHandler("SFTP");
+        harness.Main.Session.ConnectingSizeReportSource = _ => new TerminalSizeReport();
+
+        RelayPlinkRetry(harness);
+
+        Assert.Same(tab.PrimaryPane, tab.RootContent);
+
+        ssh.Result.SetResult(SuccessWithTerminalSession());
+        await pipeline.WaitAsync(TestTimeout);
+        await Task.Delay(NoConnectGrace);
+
+        Assert.False(sftp.Started.Task.IsCompleted);
+        Assert.Equal(
+            harness.Main.GetLocalizer().Format("StatusSftpCompanionNotOpenedAfterPlinkRetry", tab.Title),
+            harness.Main.StatusText);
+        Assert.Equal(0, harness.Main.Session.CompanionStateCount);
+    }
+
+    [Fact]
+    public async Task PlinkRetry_AfterTheUserClosedThePlaceholder_WithdrawsNothingAndShowsTheConnectedStatus()
+    {
+        using TestHarness harness = TestHarness.Create();
+        ServerProfileDto server = harness.CreateServer("SSH");
+        (Task<BulkConnectOutcome> pipeline, ControlledProtocolHandler ssh, SessionTabViewModel tab) =
+            await StartSshWithCompanionSettingsAsync(harness, server, CompanionSettings());
+        ControlledProtocolHandler sftp = harness.GetHandler("SFTP");
+        UseReport(harness, SplitColumns);
+        tab.SetRootContent(tab.PrimaryPane);
+
+        RelayPlinkRetry(harness);
+        TerminalSizeLookup lookup = await LookupAsync(harness, LongWait).WaitAsync(TestTimeout);
+        Assert.Equal(new TerminalSize(SplitColumns, TerminalRows), lookup.Size);
+
+        ssh.Result.SetResult(SuccessWithTerminalSession());
+        await pipeline.WaitAsync(TestTimeout);
+        await Task.Delay(NoConnectGrace);
+
+        Assert.False(sftp.Started.Task.IsCompleted);
+        Assert.NotEqual(
+            harness.Main.GetLocalizer().Format("StatusSftpCompanionNotOpenedAfterPlinkRetry", tab.Title),
+            harness.Main.StatusText);
+        Assert.Equal(
+            harness.Main.GetLocalizer().Format("StatusConnected", tab.Title),
+            harness.Main.StatusText);
+        Assert.Equal(0, harness.Main.Session.CompanionStateCount);
+    }
+
+    [Fact]
+    public async Task PlinkRetry_ThenTheTabCloses_LeavesNothingBehind()
+    {
+        using TestHarness harness = TestHarness.Create();
+        ServerProfileDto server = harness.CreateServer("SSH");
+        (Task<BulkConnectOutcome> pipeline, ControlledProtocolHandler _, SessionTabViewModel tab) =
+            await StartSshWithCompanionSettingsAsync(harness, server, CompanionSettings());
+        UseReport(harness, SplitColumns);
+        RelayPlinkRetry(harness);
+        Assert.NotEqual(0, harness.Main.Session.CompanionStateCount);
+
+        await harness.Main.Connection.CloseSessionAsync(
+            tab,
+            DisconnectReason.UserAction,
+            confirm: false,
+            CloseIntent.Silent);
+
+        Assert.Equal(0, harness.Main.Session.CompanionStateCount);
+
+        try
+        {
+            await pipeline.WaitAsync(TestTimeout);
+        }
+        catch (OperationCanceledException)
+        {
+            // The connect was cancelled with its tab.
+        }
+    }
+
+    [Fact]
+    public async Task PlinkRetry_CancellationDuringTheRelayoutWait_Propagates()
+    {
+        using TestHarness harness = TestHarness.Create();
+        ServerProfileDto server = harness.CreateServer("SSH");
+        (Task<BulkConnectOutcome> pipeline, ControlledProtocolHandler ssh, SessionTabViewModel _) =
+            await StartSshWithCompanionSettingsAsync(harness, server, CompanionSettings());
+        UseReport(harness, SplitColumns);
+        RelayPlinkRetry(harness);
+        using CancellationTokenSource cancellation = new();
+
+        Task<TerminalSizeLookup> waiting = harness.Main.ServerList.ConnectionService.ResolveInitialTerminalSize!(
+            CompanionSessionId, LongWait, cancellation.Token);
+        await Task.Delay(HintWait);
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => waiting.WaitAsync(TestTimeout));
+
+        ssh.Result.SetResult(new ConnectionResult(false, "stop here", null));
+        await pipeline.WaitAsync(TestTimeout);
+    }
+
+    [Fact]
+    public async Task PlinkRetry_ForATabThatIsNotSelected_WithdrawsTheCompanionButDoesNotWait()
+    {
+        using TestHarness harness = TestHarness.Create();
+        ServerProfileDto server = harness.CreateServer("SSH");
+        (Task<BulkConnectOutcome> pipeline, ControlledProtocolHandler ssh, SessionTabViewModel tab) =
+            await StartSshWithCompanionSettingsAsync(harness, server, CompanionSettings());
+        UseReport(harness, SplitColumns);
+        SessionTabViewModel other = harness.Main.Connection.AddSession("other-tab", "Other", "SSH");
+        harness.Main.Connection.ActiveSession = other;
+
+        RelayPlinkRetry(harness);
+        TerminalSizeLookup lookup = await LookupAsync(harness, LongWait).WaitAsync(TestTimeout);
+
+        Assert.Same(tab.PrimaryPane, tab.RootContent);
+        Assert.Equal(new TerminalSize(SplitColumns, TerminalRows), lookup.Size);
+
+        ssh.Result.SetResult(new ConnectionResult(false, "stop here", null));
+        await pipeline.WaitAsync(TestTimeout);
+    }
+
     private sealed class CompanionTestSession : ISessionResult
     {
     }

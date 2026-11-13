@@ -98,6 +98,17 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
     internal Func<string, TimeSpan, CancellationToken, Task<TerminalSizeLookup>>? ResolveInitialTerminalSize { get; set; }
 
     /// <summary>
+    /// Called with the server id the moment the embedded client's authentication failure is about
+    /// to be retried through Plink, before the terminal size is asked for. Wired by the shell so
+    /// it can drop the pending file panel, which could never connect in that case. Invoked
+    /// synchronously: the subscriber applies its layout change on the UI thread through a
+    /// synchronous dispatcher call, so the connect is held until the UI has applied it. It may
+    /// block briefly on the UI thread and must not be given long work. An exception from it is
+    /// logged and ignored.
+    /// </summary>
+    internal Action<string>? PlinkRetryStarting { get; set; }
+
+    /// <summary>
     /// Receives the Info lines of the initial size resolution: the size used and, when it is the
     /// default, why. Replaced in tests so the fallback line can be observed.
     /// </summary>
@@ -467,6 +478,15 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                 Core.Logging.FileLogger.Info(
                     $"SSH.NET auth failed ({failure.Code}), falling back to Plink: {failure.Message}");
                 SetStatusText?.Invoke(_localizer[SshLocalizationKeys.StatusSshRetryingViaPlink]);
+
+                try
+                {
+                    PlinkRetryStarting?.Invoke(server.Id);
+                }
+                catch (Exception relayFailure)
+                {
+                    Core.Logging.FileLogger.Warn($"Plink retry notification failed: {relayFailure.GetType().Name}");
+                }
 
                 // Whatever the retry returns, the refusal it retried travels with it: a remembered
                 // password the server just refused must be dropped even when Plink then starts.

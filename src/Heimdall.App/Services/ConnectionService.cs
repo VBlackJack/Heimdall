@@ -38,6 +38,7 @@ public sealed class ConnectionService : IConnectionService
     private Action<string>? _setStatusText;
     private Func<ServerProfileDto, Task<bool>>? _confirmExecution;
     private Func<string, TimeSpan, CancellationToken, Task<TerminalSizeLookup>>? _resolveInitialTerminalSize;
+    private Action<string>? _plinkRetryStarting;
 
     /// <summary>Cached snapshot of the latest application settings.</summary>
     private AppSettings? _currentSettings;
@@ -84,6 +85,24 @@ public sealed class ConnectionService : IConnectionService
     }
 
     /// <summary>
+    /// Relay wired by the shell so the SSH handler can say, with the server id, that an
+    /// authentication failure is being retried through Plink and the pending file panel will
+    /// never connect.
+    /// </summary>
+    internal Action<string>? PlinkRetryStarting
+    {
+        get => _plinkRetryStarting;
+        set
+        {
+            _plinkRetryStarting = value;
+            if (_handlers.TryGetValue("SSH", out IProtocolHandler? handler) && handler is SshHandler sshHandler)
+            {
+                sshHandler.PlinkRetryStarting = value;
+            }
+        }
+    }
+
+    /// <summary>
     /// Relay wired by the shell to confirm and trust execution of an imported profile's
     /// local-execution payload before connecting. Returns true to proceed, false to block.
     /// </summary>
@@ -111,6 +130,7 @@ public sealed class ConnectionService : IConnectionService
         {
             sshHandler.SetStatusText = _setStatusText;
             sshHandler.ResolveInitialTerminalSize = _resolveInitialTerminalSize;
+            sshHandler.PlinkRetryStarting = _plinkRetryStarting;
         }
 
         _configManager.SettingsChanged += OnSettingsChanged;
