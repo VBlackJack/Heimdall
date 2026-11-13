@@ -30,6 +30,7 @@ public interface ITerminalSession : IDisposable
 
     /// <summary>
     /// Raised when the child process exits. The argument is the exit code.
+    /// A handler added after the session has ended may be invoked synchronously inside the subscription.
     /// </summary>
     event Action<int>? ProcessExited;
 

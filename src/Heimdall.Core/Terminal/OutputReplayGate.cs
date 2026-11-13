@@ -17,13 +17,13 @@
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Logging;
 
-namespace Heimdall.Ssh;
+namespace Heimdall.Core.Terminal;
 
 /// <summary>
-/// Routes shell output to subscribers and keeps what arrives before the first one.
-/// A device that prints its banner and prompt once (network equipment) produces that
-/// output while the connect is still returning, before the terminal view can subscribe;
-/// without a buffer the screen stays blank until the user presses Enter.
+/// Routes session output to subscribers and keeps what arrives before the first one.
+/// A device or child process that prints its banner and prompt once (network equipment, a
+/// shell) produces that output while the start is still returning, before the terminal view
+/// can subscribe; without a buffer the screen stays blank until the user presses Enter.
 /// </summary>
 /// <remarks>
 /// Lock order is always the delivery lock, then the state lock. The delivery lock
@@ -31,32 +31,40 @@ namespace Heimdall.Ssh;
 /// loop, so order is preserved. Subscriber callbacks run under the delivery lock only,
 /// never under the state lock, so a callback may add or remove handlers on its own thread.
 /// </remarks>
-internal sealed class ShellOutputGate
+internal sealed class OutputReplayGate
 {
     /// <summary>
-    /// Default cap on bytes held for the first subscriber; the same bound a ConPTY
-    /// session applies to its own bootstrap output.
+    /// Default cap on bytes held for the first subscriber; one bound for every session type.
     /// </summary>
     internal const int DefaultBootstrapCapBytes = AppConstants.MaxConPtyBootstrapBufferBytes;
 
     private readonly object _deliveryLock = new();
     private readonly object _stateLock = new();
     private readonly int _capBytes;
+    private readonly string _owner;
+    private readonly List<(Action<ReadOnlyMemory<byte>> Original, Action<byte[]> Adapter)> _memoryHandlers = new();
     private Action<byte[]>? _handlers;
     private List<byte[]>? _bootstrap = new();
     private int _bootstrapBytes;
     private bool _firstSubscriberAttached;
     private bool _bufferClosed;
-    private bool _subscriberFailureLogged;
+    private int _subscriberFailureLogged;
 
-    public ShellOutputGate(int capBytes = DefaultBootstrapCapBytes)
+    /// <param name="owner">Session type name, prefixed to the log lines.</param>
+    /// <param name="capBytes">Bytes held for the first subscriber.</param>
+    public OutputReplayGate(string owner, int capBytes = DefaultBootstrapCapBytes)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(owner);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(capBytes);
         _capBytes = capBytes;
+        _owner = owner;
     }
 
     /// <summary>Adds a handler. The first one ever added receives the buffered output, in order.</summary>
-    public void Add(Action<byte[]>? handler)
+    public void Add(Action<byte[]>? handler) => Add(handler, null);
+
+    // bookkeeping runs under the state lock in the same step as the subscription.
+    private void Add(Action<byte[]>? handler, Action? bookkeeping)
     {
         if (handler is null)
         {
@@ -71,6 +79,7 @@ internal sealed class ShellOutputGate
             lock (_stateLock)
             {
                 _handlers += handler;
+                bookkeeping?.Invoke();
                 target = _handlers;
                 first = !_firstSubscriberAttached;
                 if (first)
@@ -91,6 +100,42 @@ internal sealed class ShellOutputGate
                 foreach (byte[] chunk in replay)
                 {
                     Invoke(target, chunk);
+                }
+            }
+        }
+    }
+
+    /// <summary>Adds a handler of a memory-shaped event; same contract as <see cref="Add"/>.</summary>
+    public void AddMemory(Action<ReadOnlyMemory<byte>>? handler)
+    {
+        if (handler is null)
+        {
+            return;
+        }
+
+        Action<byte[]> adapter = chunk => handler(chunk);
+        Add(adapter, () => _memoryHandlers.Add((handler, adapter)));
+    }
+
+    /// <summary>Removes a handler added with <see cref="AddMemory"/>; the last matching add is undone, as for a delegate.</summary>
+    public void RemoveMemory(Action<ReadOnlyMemory<byte>>? handler)
+    {
+        if (handler is null)
+        {
+            return;
+        }
+
+        // The lookup and the removal are one step under the state lock, so a concurrent add of the
+        // same handler cannot leave an adapter that nothing can remove.
+        lock (_stateLock)
+        {
+            for (int i = _memoryHandlers.Count - 1; i >= 0; i--)
+            {
+                if (_memoryHandlers[i].Original.Equals(handler))
+                {
+                    _handlers -= _memoryHandlers[i].Adapter;
+                    _memoryHandlers.RemoveAt(i);
+                    break;
                 }
             }
         }
@@ -155,7 +200,7 @@ internal sealed class ShellOutputGate
         {
             _bufferClosed = true;
             FileLogger.Warn(
-                $"[SshShellSession] Output exceeded {_capBytes} bytes before a subscriber "
+                $"[{_owner}] Output exceeded {_capBytes} bytes before a subscriber "
                 + "attached; keeping the bytes received so far and dropping everything after.");
             return;
         }
@@ -181,10 +226,9 @@ internal sealed class ShellOutputGate
             }
             catch (Exception ex)
             {
-                if (!_subscriberFailureLogged)
+                if (Interlocked.Exchange(ref _subscriberFailureLogged, 1) == 0)
                 {
-                    _subscriberFailureLogged = true;
-                    FileLogger.Error("[SshShellSession] A DataReceived subscriber threw; the session continues", ex);
+                    FileLogger.Error($"[{_owner}] A DataReceived subscriber threw; the session continues", ex);
                 }
             }
         }

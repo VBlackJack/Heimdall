@@ -11,6 +11,12 @@
     <!-- The App-side runtime protector guard arms CredentialProtector.CryptoCallObserver.
          Heimdall.Sftp and Heimdall.Ssh already expose their internals to this assembly. -->
     <InternalsVisibleTo Include="Heimdall.App.Tests" />
+    <!-- OutputReplayGate and ExitLatch are shared by the terminal-like sessions, which sit in
+         sibling assemblies that reference only Core; their tests exercise the gate directly. -->
+    <InternalsVisibleTo Include="Heimdall.Ssh" />
+    <InternalsVisibleTo Include="Heimdall.Ssh.Tests" />
+    <InternalsVisibleTo Include="Heimdall.Terminal" />
+    <InternalsVisibleTo Include="Heimdall.Terminal.Tests" />
   </ItemGroup>
 
   <ItemGroup>

@@ -16,6 +16,7 @@
 
 using System.Text;
 using Heimdall.Core.Ssh;
+using Heimdall.Core.Terminal;
 using Renci.SshNet;
 
 namespace Heimdall.Ssh.Tests;
@@ -26,6 +27,7 @@ namespace Heimdall.Ssh.Tests;
 /// </summary>
 public sealed class SshShellSessionBootstrapOutputTests
 {
+    private const string Owner = "SshShellSession";
     private const int SmallCapBytes = 8;
     private static readonly TimeSpan Backstop = TimeSpan.FromSeconds(30);
 
@@ -35,7 +37,7 @@ public sealed class SshShellSessionBootstrapOutputTests
     [Fact]
     public void DataBeforeFirstSubscriber_IsReplayedInOrder()
     {
-        ShellOutputGate gate = new();
+        OutputReplayGate gate = new(Owner);
         gate.Deliver(Bytes("banner|"));
         gate.Deliver(Bytes("router#"));
         StringBuilder received = new();
@@ -64,7 +66,7 @@ public sealed class SshShellSessionBootstrapOutputTests
     [Fact]
     public void BootstrapBuffer_IsCapped()
     {
-        ShellOutputGate gate = new(SmallCapBytes);
+        OutputReplayGate gate = new(Owner, SmallCapBytes);
         gate.Deliver(Bytes("12345"));
         gate.Deliver(Bytes("6789"));
         gate.Deliver(Bytes("ab"));
@@ -80,7 +82,7 @@ public sealed class SshShellSessionBootstrapOutputTests
     [Fact]
     public void LaterSubscriber_GetsNoReplay()
     {
-        ShellOutputGate gate = new();
+        OutputReplayGate gate = new(Owner);
         gate.Deliver(Bytes("prompt"));
         StringBuilder first = new();
         StringBuilder second = new();
@@ -96,7 +98,7 @@ public sealed class SshShellSessionBootstrapOutputTests
     [Fact]
     public void ReleasedGate_DropsBufferedOutput()
     {
-        ShellOutputGate gate = new();
+        OutputReplayGate gate = new(Owner);
         gate.Deliver(Bytes("lost"));
         gate.Release();
         gate.Deliver(Bytes("lost too"));
@@ -110,7 +112,7 @@ public sealed class SshShellSessionBootstrapOutputTests
     [Fact]
     public void ThrowingSubscriber_DoesNotStopLaterSubscribersOrLaterChunks()
     {
-        ShellOutputGate gate = new();
+        OutputReplayGate gate = new(Owner);
         StringBuilder received = new();
         gate.Add(_ => throw new InvalidOperationException("subscriber failure"));
         gate.Add(chunk => received.Append(Encoding.UTF8.GetString(chunk)));
@@ -124,7 +126,7 @@ public sealed class SshShellSessionBootstrapOutputTests
     [Fact]
     public async Task LiveChunk_NeverOvertakesTheReplay()
     {
-        ShellOutputGate gate = new();
+        OutputReplayGate gate = new(Owner);
         gate.Deliver(Bytes("replay1|"));
         gate.Deliver(Bytes("replay2|"));
         List<string> order = [];
