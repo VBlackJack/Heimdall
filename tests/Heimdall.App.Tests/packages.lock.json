@@ -336,8 +336,8 @@
       },
       "System.Management": {
         "type": "Transitive",
-        "resolved": "10.0.14",
-        "contentHash": "ywAltakc72Oe7liNatclpyq8oiLYx0VMSjQvphlsbPbiQ9glrV3JKvn5M2xFbsOzzh8sV3QAiUdmu2AV/ffN7Q=="
+        "resolved": "10.0.15",
+        "contentHash": "U21LynVbH2ayLFLTqlLnd3hx52Fe/acpCXO4BAUIqfWs8CwFWT0zxlg8WR2+LZ7zcLgi/d08eq7rp4iLMMt+4w=="
       },
       "ThemeForge.Theme": {
         "type": "Transitive",
@@ -400,7 +400,7 @@
           "Heimdall.Ssh": "[1.0.0, )",
           "Heimdall.Terminal": "[1.0.0, )",
           "Microsoft.Extensions.DependencyInjection": "[10.0.15, )",
-          "System.Management": "[10.0.14, )",
+          "System.Management": "[10.0.15, )",
           "ThemeForge.Theme": "[2.1.0, )",
           "TwinShell.Core": "[1.0.0, )",
           "TwinShell.Infrastructure": "[1.0.0, )",
@@ -483,8 +483,8 @@
       },
       "System.Management": {
         "type": "Transitive",
-        "resolved": "10.0.14",
-        "contentHash": "ywAltakc72Oe7liNatclpyq8oiLYx0VMSjQvphlsbPbiQ9glrV3JKvn5M2xFbsOzzh8sV3QAiUdmu2AV/ffN7Q=="
+        "resolved": "10.0.15",
+        "contentHash": "U21LynVbH2ayLFLTqlLnd3hx52Fe/acpCXO4BAUIqfWs8CwFWT0zxlg8WR2+LZ7zcLgi/d08eq7rp4iLMMt+4w=="
       }
     }
   }
