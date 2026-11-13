@@ -1333,7 +1333,7 @@ After a failure of the embedded client, the retry through Plink is simply skippe
 
 **Limits**:
 
-- A server that asks a second factor (keyboard-interactive) after Kerberos is not supported on this path: type the password instead.
+- A server that asks a second factor (keyboard-interactive) after Kerberos is not supported with an empty answer: Plink runs in batch mode and cannot answer it. Typing the password instead was not tried.
 - The embedded client and the SFTP side panel do not do Kerberos. With a Kerberos-only server the SFTP panel does not connect.
 - A session with no user name is still refused before the prompt: set a user name in the session.
 

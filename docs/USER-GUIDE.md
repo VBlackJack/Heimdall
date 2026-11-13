@@ -108,7 +108,7 @@ What to expect:
 
 ### Signing in through Plink with Kerberos or a Pageant key
 
-When a session has a user name, no stored password and no key file, and the connection goes through Plink (after the embedded client failed to authenticate, or with agent forwarding and Pageant), Heimdall asks "SSH password required". Leave the answer empty to sign in with Kerberos (your Windows sign-in) or a key held by Pageant. Heimdall then starts Plink with no password file and in batch mode: nothing is written to disk and no password is sent. If the server accepts neither, the terminal says so; connect again and type your password, or store it in the session. Cancel still cancels. A server that asks a second factor after Kerberos is not supported on this path, and the SFTP side panel does not do Kerberos. See [Troubleshooting](TROUBLESHOOTING.md#ssh-plink-kerberos-pageant).
+When a session has a user name, no stored password and no key file, and the connection goes through Plink (after the embedded client failed to authenticate, or with agent forwarding and Pageant), Heimdall asks "SSH password required". Leave the answer empty to sign in with Kerberos (your Windows sign-in) or a key held by Pageant. Heimdall then starts Plink with no password file and in batch mode: no password file is written and no password is sent. If the server accepts neither, the terminal says so; connect again and type your password, or store it in the session. Cancel still cancels. A server that asks a second factor after Kerberos is not supported on this path, and the SFTP side panel does not do Kerberos. See [Troubleshooting](TROUBLESHOOTING.md#ssh-plink-kerberos-pageant).
 
 ### Web consoles
 

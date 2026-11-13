@@ -1333,7 +1333,7 @@ Après un échec du client intégré, le nouvel essai par Plink est simplement i
 
 **Limites** :
 
-- Un serveur qui demande un second facteur (authentification interactive au clavier) après Kerberos n'est pas pris en charge sur ce chemin : saisissez le mot de passe.
+- Un serveur qui demande un second facteur (authentification interactive au clavier) après Kerberos n'est pas pris en charge avec une réponse vide : Plink tourne en mode batch et ne peut pas y répondre. Saisir le mot de passe à la place n'a pas été essayé.
 - Le client intégré et le panneau latéral SFTP ne font pas Kerberos. Avec un serveur Kerberos seul, le panneau SFTP ne se connecte pas.
 - Une session sans nom d'utilisateur est toujours refusée avant la demande : renseignez un nom d'utilisateur dans la session.
 

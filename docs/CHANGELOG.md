@@ -12,6 +12,79 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-11-13: Kerberos through Plink, bundled Plink first, first output kept for every terminal (v2026.111301)
+
+Fixes merged as #776, #777, #778, #781, #782 and #783. The user-facing summary and the upgrade notes
+are in the release notes.
+
+### SSH through Plink (#776, #781, #782, #783)
+
+- **Bundled Plink first (#781).** `ConnectionHelpers.ResolvePlinkPath` returned the `PlinkPath`
+  setting whenever that file existed, and the setting defaults to
+  `C:\Program Files\PuTTY\plink.exe`, so a machine with PuTTY installed never ran the bundled,
+  attested build. `AppSettings.LegacyPlinkPath` now counts as not chosen: the bundled Plink comes
+  first, a user-chosen existing path still wins, and the legacy default is the last fallback when
+  the bundled copy is missing. `SettingsViewModel.IsPlinkPathMissing` is false for the legacy
+  default. `settings.default.json` is pinned to the constant by a test. In external PuTTY mode the
+  host key probe now runs the bundled Plink while `putty.exe` is still resolved from the raw
+  setting.
+- **First output kept on an attested launch (#781).** `PlinkPasswordFileRelease` and
+  `PlinkSizeSession` subscribed to `PipeModeSession.DataReceived` before the process started. As the
+  first subscriber they disarmed the bootstrap buffer of the output gate, so the view got no replay.
+  `IFirstOutputSignal.FirstOutputReceived` (`Heimdall.Terminal`) is latched, raised once after the
+  first chunk is delivered or buffered, and independent from the replay; both handles listen to it.
+  A late subscriber is invoked inside the add. Proven by a test on the real session, red on the
+  previous handles.
+- **Empty answer to the Plink prompt (#776, #782).** With a user name, no stored password and no
+  key file, the prompt carries `SshPlinkPasswordPromptPasswordlessHint` and an empty answer launches
+  Plink with no password file and with `-batch` (`TerminalSessionResult.CredentialFreeLaunch`).
+  Measured with the bundled Plink 0.83 launched with redirected streams and no window: without
+  `-batch`, a refused sign-in leaves Plink waiting on a console nobody sees, having written only its
+  user name line; with `-batch` it exits 1 with "Cannot answer interactive prompts in batch mode".
+  #776 first allowed the empty answer only when Pageant held an identity and without `-batch`; #782
+  replaced that rule and removed `SshAgentKeyPreflight.AgentHoldsAnyIdentityAsync` and
+  `SshAgentRegistry.HoldsAnyIdentity`. A session with no user name is still refused before the
+  prompt. A typed or stored password and a key file are unchanged, without `-batch`.
+- **Refusal explained (#782, #783).** A non-zero exit of a credential-free launch inside the
+  connect-time window, not asked by the user, prints `ErrorSshPasswordlessSignInFailed` in the
+  terminal (`TerminalReconnectPolicy.ResolveCredentialFreeExitMessageKey`) and puts it in the
+  detail of the disconnected panel, above the exit code (`ComposePanelDetail`). The detail is a
+  polite live region. Both view materialization paths carry the flag.
+- **Password file lifetime (#776).** The release of the temporary password file is also tied to
+  `PipeModeSession.Disposed`.
+- Kerberos was measured on a Windows Server 2022 domain controller with OpenSSH for Windows 8.1 and
+  GSSAPI, client and server on the same machine. Not measured: a Linux sshd, delegation, a gateway
+  tunnel.
+
+### Terminals (#776, #777)
+
+- **One output gate for every session type (#777).** `ShellOutputGate` (`Heimdall.Ssh`) became
+  `OutputReplayGate` in `Heimdall.Core/Terminal` and is used by `SshShellSession`, `TelnetSession`,
+  `ConPtySession` and `PipeModeSession`. Telnet now buffers output produced before the first
+  subscriber (it dropped it); ConPTY and pipe sessions already buffered it but kept appending after
+  an overflow, and the buffer now closes for good at the first overflow so the replay is a
+  contiguous prefix. A throwing subscriber is logged and no longer skips the others.
+  `TelnetSession` latches its end of session (`ExitLatch<T>`), so a late subscriber still learns
+  that the device closed. Verified on scripted streams.
+- **WebView2 user data folder per install (#776).** `WebView2Helper.EmbeddedUserDataFolderFor`
+  keys the folder by data root, install folder and runtime
+  (`%TEMP%\Heimdall\WebView2\<12 hex>\<subfolder>`). Folders of previous versions are left in place.
+
+### Tests (#778, #781, #782)
+
+- Three load-sensitive tests are deterministic (#778):
+  `SftpCompanionReconnect_BringsTheRowBackToConnected` waits for the attached companion pane, not
+  the placeholder; `StartAsync_StderrReadLateAfterTheExit_StillNamesTheRefusal` drives a
+  `TimeProvider` injected in `PlinkTunnelRunner` and a gated stream; `DialogInitialFocusTests`
+  asserts logical focus, takes the thread's Win32 focus, then keeps the keyboard focus assertion.
+- Two tests that pinned the release handles on `DataReceived` now assert the first-output
+  subscription and no data subscription (#781). The tests of #776 that pinned "an empty answer
+  cancels unless Pageant holds a key" follow the new rule (#782).
+- Seen failing once each under heavy load and passing alone, left as they are:
+  `PlinkTunnelRunnerTests.TunnelPasswordFile_ForeignListenerFailsClosed`,
+  `ConPtySessionTests.DataReceived_SubscriberAddedAfterBootstrapOutput_ReplaysBufferedOutput`,
+  `PlinkTunnelRunnerDrainReproTests.C04_Control_WhileTheConnectTokenIsLive_AStderrBurstIsDrainedAndTheChildKeepsRunningCommands`.
+
 ## 2026-11-12: Tools tab group, agent key per session, terminal width, credential lookup confirmation (v2026.111201)
 
 Fixes and additions, merged as #764, #766, #769, #770, #771, #772, #773 and #774. The user-facing
