@@ -1022,25 +1022,13 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
             // conditions are the same as without one.
             if (ShouldPromptForPlinkPassword(password, server.SshKeyPath))
             {
-                // The prompt is not skipped when the agent already holds a key: what plink does
-                // without a password file once that key is refused has not been measured.
-                string promptMessage = _localizer.Format("DialogSshPasswordPromptMessage", target);
-
-                // Not tied to ct: the lookup is bounded by its own timeout, and the prompt
-                // follows whatever the token says, as it did before the hint existed.
-                // Pageant is asked directly: plink talks to it whatever the agent preference is.
-                bool agentOnlyAllowed = await SshAgentKeyPreflight
-                    .AgentHoldsAnyIdentityAsync(
-                        _agentRegistryFactory(settings.SshAgentPreference),
-                        PageantAgent.AgentName)
-                    .ConfigureAwait(false);
-                if (agentOnlyAllowed)
-                {
-                    promptMessage = string.Concat(
-                        promptMessage,
-                        Environment.NewLine,
-                        _localizer[SshLocalizationKeys.PlinkPasswordPromptAgentHint]);
-                }
+                // The prompt always says that an empty answer is allowed: a host that signs in
+                // with Kerberos or a Pageant key needs no password, and forcing a dummy one
+                // was the workaround this replaces.
+                string promptMessage = string.Concat(
+                    _localizer.Format("DialogSshPasswordPromptMessage", target),
+                    Environment.NewLine,
+                    _localizer[SshLocalizationKeys.PlinkPasswordPromptPasswordlessHint]);
 
                 password = await _dialogService.ShowPasswordInputAsync(
                         _localizer["DialogSshPasswordPromptTitle"],
@@ -1048,11 +1036,11 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                         ct)
                     .ConfigureAwait(false);
 
-                // Cancel answers null. An empty answer is "agent only" (plink is launched without a
-                // password file and tries the agent's keys) and is accepted only when the hint
-                // offered it; otherwise it keeps failing as cancelled, since a launch with no
-                // password and no key has an unmeasured outcome.
-                if (password is null || (password.Length == 0 && !agentOnlyAllowed))
+                // Cancel answers null and cancels the connection. An empty answer is the
+                // credential-free launch: no password file and plink in batch mode, so Kerberos
+                // or an agent key decides and a refusal exits at once instead of waiting on a
+                // hidden console (measured).
+                if (password is null)
                 {
                     string message = SshFailureMessageBuilder.Cancelled(_localizer);
                     _connectionSm.SetError(server.Id, message);
@@ -1066,6 +1054,9 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                             SshFailureCode.Cancelled));
                 }
             }
+
+            // True when plink is launched with neither a password file nor a private key file.
+            bool credentialFree = string.IsNullOrEmpty(password) && string.IsNullOrWhiteSpace(server.SshKeyPath);
 
             // Plink takes the remote PTY size only from its saved-session configuration, and the
             // pipe transport cannot resize after start, so the launch is the only moment the size
@@ -1113,7 +1104,8 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                     hostKeyArg,
                     chosenAgentKey,
                     terminalSession,
-                    attestation.FirstByteProvesConsumption);
+                    attestation.FirstByteProvesConsumption,
+                    credentialFree);
                 if (preparation.Error is { } prepareError)
                 {
                     Core.Logging.FileLogger.Error("Plink launch preparation failed", prepareError);
@@ -1179,7 +1171,10 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
             return new ConnectionResult(true, null, new TerminalSessionResult(
                 terminalSession,
                 BuildDisplayEndpoint(server),
-                server.SessionLoggingOverride));
+                server.SessionLoggingOverride)
+            {
+                CredentialFreeLaunch = credentialFree,
+            });
         }
         finally
         {
@@ -1295,7 +1290,8 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         string? hostKeyArg,
         SshAgentIdentityMatch? chosenAgentKey,
         Heimdall.Terminal.PipeModeSession terminalSession,
-        bool firstByteProvesConsumption)
+        bool firstByteProvesConsumption,
+        bool credentialFree)
     {
         string? passwordFilePath = null;
         string? sizeSessionName = null;
@@ -1326,7 +1322,8 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                 hostKeyArg,
                 passwordFilePath,
                 sizeSessionName,
-                agentKeyFilePath);
+                agentKeyFilePath,
+                credentialFree);
 
             if (!string.IsNullOrEmpty(passwordFilePath))
             {
@@ -1614,7 +1611,8 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         string? hostKeyFingerprint,
         string? passwordFilePath = null,
         string? sizeSessionName = null,
-        string? agentPublicKeyFilePath = null)
+        string? agentPublicKeyFilePath = null,
+        bool batchMode = false)
     {
         // Plink takes one identity file. Both set means two things asked for the same slot, which
         // the handler refuses before building: reaching here is a programming error.
@@ -1636,6 +1634,13 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         }
 
         argParts.AddRange(["-ssh", "-t", "-no-antispoof"]);
+        if (batchMode)
+        {
+            // Plink cannot answer a prompt in batch mode, so a refused sign-in exits with code 1
+            // instead of waiting forever on a console nobody can see.
+            argParts.Add("-batch");
+        }
+
         if (!string.IsNullOrWhiteSpace(keyPath))
         {
             argParts.Add("-i");

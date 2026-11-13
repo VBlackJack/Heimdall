@@ -44,7 +44,7 @@ internal static class SshLocalizationKeys
     public const string ErrorPlinkPassphraseUnsupported = "ErrorPlinkPassphraseUnsupported";
     public const string ErrorSshTunnelPortOwnershipUnattested = "ErrorSshTunnelPortOwnershipUnattested";
     public const string ErrorSshUsernameRequiredForPassword = "ErrorSshUsernameRequiredForPassword";
-    public const string PlinkPasswordPromptAgentHint = "SshPlinkPasswordPromptAgentHint";
+    public const string PlinkPasswordPromptPasswordlessHint = "SshPlinkPasswordPromptPasswordlessHint";
     public const string ErrorSshUsernameRequired = "ErrorSshUsernameRequired";
     public const string ErrorPreflightFailed = "ErrorPreflightFailed";
 
@@ -67,6 +67,9 @@ internal static class SshLocalizationKeys
     public const string ErrorSshAgentKeyPlinkNotBundled = "ErrorSshAgentKeyPlinkNotBundled";
     public const string ErrorPuttyNotConfigured = "ErrorPuttyNotConfigured";
     public const string ErrorSshCancelled = "ErrorSshCancelled";
+
+    /// <summary>A connection started without a password (Kerberos or a Pageant key) did not sign in.</summary>
+    public const string ErrorSshPasswordlessSignInFailed = "ErrorSshPasswordlessSignInFailed";
     public const string ErrorSshHostKeyRejected = "ErrorSshHostKeyRejected";
 
     /// <summary>Title of the password prompt the SFTP handler raises after a refused connection.</summary>

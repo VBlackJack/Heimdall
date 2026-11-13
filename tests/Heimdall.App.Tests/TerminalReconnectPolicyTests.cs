@@ -41,6 +41,23 @@ public sealed class TerminalReconnectPolicyTests
             TerminalReconnectPolicy.ResolveWinRmNotEnteredMessageKey(connectionType, exitCode));
     }
 
+    [Theory]
+    [InlineData(true, 1, true, SshLocalizationKeys.ErrorSshPasswordlessSignInFailed)]
+    [InlineData(true, 0, true, null)]
+    [InlineData(false, 1, true, null)]
+    [InlineData(true, 1, false, null)]
+    [InlineData(true, 0, false, null)]
+    public void ResolveCredentialFreeExitMessageKey_OnlyForCredentialFreeFailureInsideWindow(
+        bool credentialFree,
+        int exitCode,
+        bool connectTimeExit,
+        string? expected)
+    {
+        Assert.Equal(
+            expected,
+            TerminalReconnectPolicy.ResolveCredentialFreeExitMessageKey(credentialFree, exitCode, connectTimeExit));
+    }
+
     [Fact]
     public void ClassifyProcessExit_ZeroExit_ReturnsCleanDisconnect()
     {

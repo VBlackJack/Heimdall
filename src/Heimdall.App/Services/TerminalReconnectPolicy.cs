@@ -56,6 +56,20 @@ internal static class TerminalReconnectPolicy
                 : null;
 
     /// <summary>
+    /// Locale key of the hint shown when a session launched without any credential (Kerberos or
+    /// a Pageant key) ended with a failure inside the connect-time window, or null otherwise.
+    /// <paramref name="connectTimeExit"/> is the result of
+    /// <see cref="SuppressesConnectTimeProcessExit"/>, so the window is defined in one place.
+    /// </summary>
+    public static string? ResolveCredentialFreeExitMessageKey(
+        bool credentialFree,
+        int exitCode,
+        bool connectTimeExit)
+        => credentialFree && exitCode != 0 && connectTimeExit
+            ? SshLocalizationKeys.ErrorSshPasswordlessSignInFailed
+            : null;
+
+    /// <summary>
     /// Classifies a terminal process exit into a disconnect info: exit code 0 is a clean
     /// end; a non-zero exit is auto-reconnect-eligible only when the session is
     /// connection-backed, otherwise it is surfaced but not reconnected.

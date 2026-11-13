@@ -127,38 +127,6 @@ internal static class SshAgentKeyPreflight
     }
 
     /// <summary>
-    /// Whether the named agent holds at least one identity, bounded in time and off the calling
-    /// thread. An agent that does not answer in time counts as holding nothing.
-    /// </summary>
-    internal static async Task<bool> AgentHoldsAnyIdentityAsync(
-        SshAgentRegistry registry,
-        string agentName,
-        TimeSpan? timeout = null,
-        CancellationToken ct = default)
-    {
-        ArgumentNullException.ThrowIfNull(registry);
-        ArgumentNullException.ThrowIfNull(agentName);
-
-        Task<bool> lookup = Task.Run(() => registry.HoldsAnyIdentity(agentName), CancellationToken.None);
-        try
-        {
-            return await lookup
-                .WaitAsync(timeout ?? TimeSpan.FromMilliseconds(SshAgentRegistry.IdentityLookupTimeoutMs), ct)
-                .ConfigureAwait(false);
-        }
-        catch (TimeoutException)
-        {
-            Core.Logging.FileLogger.Warn("SSH agent identity check timed out; no agent hint is shown.");
-            return false;
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            Core.Logging.FileLogger.Warn($"SSH agent identity check failed: {ex.Message}");
-            return false;
-        }
-    }
-
-    /// <summary>
     /// Whether Plink can honour the chosen key, given where the key lives and what is launched.
     /// </summary>
     /// <param name="pageantMatch">The key as Pageant holds it, or null when Pageant does not.</param>

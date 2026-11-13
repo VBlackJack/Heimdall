@@ -916,6 +916,8 @@ un. **Un profil qui s'authentifie par clé et sans mot de passe n'est pas concer
 jamais le fichier, il n'a donc rien à protéger ici, et rien n'est affirmé ici au sujet des
 connexions par clé seule.
 
+**Une réponse vide au mot de passe n'écrit aucun fichier.** Quand une session a un nom d'utilisateur mais ni mot de passe enregistré ni clé, la demande de mot de passe peut recevoir une réponse vide, pour se connecter avec Kerberos ou une clé Pageant. Heimdall n'écrit alors aucun fichier de mot de passe et lance Plink en mode batch (`-batch`) : aucune invite ne peut attendre sur une console cachée et aucun mot de passe n'est envoyé. Si le serveur n'accepte aucune des deux méthodes, Plink se termine aussitôt et le terminal en donne la raison.
+
 La fin du processus reste le filet de sécurité, tous les chemins qui libèrent le fichier passent par
 une barrière unique afin que la suppression s'exécute exactement une fois, et un lancement qui
 échoue ou qui est annulé libère sur-le-champ.

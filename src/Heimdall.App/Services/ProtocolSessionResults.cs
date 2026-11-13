@@ -83,7 +83,14 @@ public sealed record SshSessionResult(
 public sealed record TerminalSessionResult(
     Heimdall.Terminal.ITerminalSession Session,
     string? Endpoint = null,
-    bool? SessionLoggingOverride = null) : ISessionResult;
+    bool? SessionLoggingOverride = null) : ISessionResult
+{
+    /// <summary>
+    /// True when plink was launched with no password file and no private key file, in batch mode, so
+    /// Kerberos or an agent key decides the sign-in.
+    /// </summary>
+    public bool CredentialFreeLaunch { get; init; }
+}
 
 /// <summary>
 /// Bundles an SFTP browser session with the SSH connection parameters needed for sudo operations.
