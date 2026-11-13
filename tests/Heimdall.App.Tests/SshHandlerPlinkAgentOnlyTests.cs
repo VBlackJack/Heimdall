@@ -22,6 +22,7 @@ using Heimdall.App.Services.Handlers;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
+using Heimdall.Core.Security;
 using Heimdall.Core.Ssh;
 using Heimdall.Core.StateMachine;
 using Heimdall.Ssh;
@@ -33,13 +34,23 @@ using Xunit;
 namespace Heimdall.App.Tests;
 
 /// <summary>
-/// The plink password prompt: Cancel fails, an empty answer means "agent keys only", and the
-/// prompt says so only when Pageant actually holds a key.
+/// The plink password prompt: Cancel fails, and an empty answer launches plink without a password
+/// file and in batch mode (Kerberos or an agent key decides), whatever Pageant holds. The prompt
+/// always carries the hint that says so.
 /// </summary>
 [Collection(CredentialProtectorAppCollection.Name)]
-public sealed class SshHandlerPlinkAgentOnlyTests
+public sealed class SshHandlerPlinkAgentOnlyTests : IDisposable
 {
+    // The stored-password test protects a password through the process-global protector: pinned
+    // to the no-vault baseline so a writer scheduled before this class cannot leave it locked.
+    private readonly CredentialProtectorStateScope _scope = new();
+
     private static readonly byte[] BlobA = SshHandlerAgentKeyTests.Blob("ssh-ed25519", 1);
+
+    public void Dispose()
+    {
+        _scope.Dispose();
+    }
 
     [Fact]
     public async Task PlinkPrompt_EmptyAnswer_PageantHoldsAKey_LaunchesWithoutPasswordFile()
@@ -52,7 +63,73 @@ public sealed class SshHandlerPlinkAgentOnlyTests
             Assert.True(result.Success, result.ErrorMessage);
             Assert.Equal(1, harness.Launches);
             Assert.DoesNotContain("-pwfile", harness.LastArguments, StringComparison.Ordinal);
+            Assert.Contains(" -batch", harness.LastArguments, StringComparison.Ordinal);
             Assert.Empty(harness.PasswordFilePaths);
+            Assert.True(((TerminalSessionResult)result.Session!).CredentialFreeLaunch);
+        }
+        finally
+        {
+            (result.Session as TerminalSessionResult)?.Session.Dispose();
+        }
+    }
+
+    [Fact]
+    public async Task PlinkPrompt_StoredPassword_LaunchesWithoutPromptAndWithoutBatch()
+    {
+        using PlinkPromptHarness harness = await PlinkPromptHarness.CreateAsync(PageantWithAKey(), answer: null);
+
+        ConnectionResult result = await harness.ConnectViaPlinkAsync(
+            server => server.SshPasswordEncrypted = CredentialProtector.Protect("stored-secret"));
+        try
+        {
+            Assert.True(result.Success, result.ErrorMessage);
+            Assert.Empty(harness.Prompts);
+            Assert.Contains("-pwfile", harness.LastArguments, StringComparison.Ordinal);
+            Assert.DoesNotContain("-batch", harness.LastArguments, StringComparison.Ordinal);
+            Assert.False(((TerminalSessionResult)result.Session!).CredentialFreeLaunch);
+        }
+        finally
+        {
+            (result.Session as TerminalSessionResult)?.Session.Dispose();
+        }
+    }
+
+    [Fact]
+    public async Task PlinkPrompt_KeyFileWithoutPassword_LaunchesWithoutPromptAndWithoutBatch()
+    {
+        using PlinkPromptHarness harness = await PlinkPromptHarness.CreateAsync(PageantWithAKey(), answer: null);
+
+        string keyFile = Path.GetTempFileName();
+        ConnectionResult result = await harness.ConnectViaPlinkAsync(server => server.SshKeyPath = keyFile);
+        try
+        {
+            Assert.True(result.Success, result.ErrorMessage);
+            Assert.Empty(harness.Prompts);
+            Assert.Contains("-i ", harness.LastArguments, StringComparison.Ordinal);
+            Assert.DoesNotContain("-pwfile", harness.LastArguments, StringComparison.Ordinal);
+            Assert.DoesNotContain("-batch", harness.LastArguments, StringComparison.Ordinal);
+            Assert.False(((TerminalSessionResult)result.Session!).CredentialFreeLaunch);
+        }
+        finally
+        {
+            File.Delete(keyFile);
+            (result.Session as TerminalSessionResult)?.Session.Dispose();
+        }
+    }
+
+    [Fact]
+    public async Task PlinkPrompt_SpacesOnlyAnswer_IsATypedPassword()
+    {
+        using PlinkPromptHarness harness = await PlinkPromptHarness.CreateAsync(PageantWithAKey(), answer: "   ");
+
+        ConnectionResult result = await harness.ConnectViaPlinkAsync();
+        try
+        {
+            Assert.True(result.Success, result.ErrorMessage);
+            Assert.Contains("-pwfile", harness.LastArguments, StringComparison.Ordinal);
+            Assert.DoesNotContain("-batch", harness.LastArguments, StringComparison.Ordinal);
+            Assert.False(((TerminalSessionResult)result.Session!).CredentialFreeLaunch);
+            Assert.Equal("   ", Assert.Single(harness.PasswordFileContents));
         }
         finally
         {
@@ -82,6 +159,8 @@ public sealed class SshHandlerPlinkAgentOnlyTests
         {
             Assert.True(result.Success, result.ErrorMessage);
             Assert.Contains("-pwfile", harness.LastArguments, StringComparison.Ordinal);
+            Assert.DoesNotContain("-batch", harness.LastArguments, StringComparison.Ordinal);
+            Assert.False(((TerminalSessionResult)result.Session!).CredentialFreeLaunch);
             Assert.Equal("typed-secret", Assert.Single(harness.PasswordFileContents));
         }
         finally
@@ -91,7 +170,7 @@ public sealed class SshHandlerPlinkAgentOnlyTests
     }
 
     [Fact]
-    public async Task PlinkPrompt_PageantHoldsAKey_ShowsTheAgentHint()
+    public async Task PlinkPrompt_PageantHoldsAKey_ShowsThePasswordlessHint()
     {
         using PlinkPromptHarness harness = await PlinkPromptHarness.CreateAsync(PageantWithAKey(), answer: string.Empty);
 
@@ -100,13 +179,13 @@ public sealed class SshHandlerPlinkAgentOnlyTests
 
         string message = Assert.Single(harness.Prompts).Message;
         Assert.Contains(
-            harness.Localizer[SshLocalizationKeys.PlinkPasswordPromptAgentHint],
+            harness.Localizer[SshLocalizationKeys.PlinkPasswordPromptPasswordlessHint],
             message,
             StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task PlinkPrompt_NoAgentIdentity_ShowsNoHint()
+    public async Task PlinkPrompt_NoAgentIdentity_StillShowsThePasswordlessHint()
     {
         using PlinkPromptHarness harness = await PlinkPromptHarness.CreateAsync(
             [new SshHandlerAgentKeyTests.FakeAgent(PageantAgent.AgentName, [])],
@@ -116,28 +195,37 @@ public sealed class SshHandlerPlinkAgentOnlyTests
         (result.Session as TerminalSessionResult)?.Session.Dispose();
 
         string message = Assert.Single(harness.Prompts).Message;
-        Assert.DoesNotContain(
-            harness.Localizer[SshLocalizationKeys.PlinkPasswordPromptAgentHint],
+        Assert.Contains(
+            harness.Localizer[SshLocalizationKeys.PlinkPasswordPromptPasswordlessHint],
             message,
             StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task PlinkPrompt_EmptyAnswer_NoAgentIdentity_StillFailsCancelled()
+    public async Task PlinkPrompt_EmptyAnswer_NoAgentIdentity_LaunchesWithoutPasswordFileInBatchMode()
     {
         using PlinkPromptHarness harness = await PlinkPromptHarness.CreateAsync(
             [new SshHandlerAgentKeyTests.FakeAgent(PageantAgent.AgentName, [])],
             answer: string.Empty);
 
         ConnectionResult result = await harness.ConnectViaPlinkAsync();
-
-        Assert.False(result.Success);
-        Assert.Equal(SshFailureMessageBuilder.Cancelled(harness.Localizer), result.ErrorMessage);
-        Assert.Equal(0, harness.Launches);
+        try
+        {
+            Assert.True(result.Success, result.ErrorMessage);
+            Assert.Equal(1, harness.Launches);
+            Assert.DoesNotContain("-pwfile", harness.LastArguments, StringComparison.Ordinal);
+            Assert.Contains(" -batch ", harness.LastArguments, StringComparison.Ordinal);
+            Assert.Empty(harness.PasswordFilePaths);
+            Assert.True(((TerminalSessionResult)result.Session!).CredentialFreeLaunch);
+        }
+        finally
+        {
+            (result.Session as TerminalSessionResult)?.Session.Dispose();
+        }
     }
 
     [Fact]
-    public async Task PlinkPrompt_PreferenceExcludesPageant_PageantHoldsAKey_StillShowsTheHint()
+    public async Task PlinkPrompt_PreferenceExcludesPageant_PageantHoldsAKey_StillShowsThePasswordlessHint()
     {
         using PlinkPromptHarness harness = await PlinkPromptHarness.CreateAsync(
             PageantWithAKey(),
@@ -149,7 +237,7 @@ public sealed class SshHandlerPlinkAgentOnlyTests
 
         string message = Assert.Single(harness.Prompts).Message;
         Assert.Contains(
-            harness.Localizer[SshLocalizationKeys.PlinkPasswordPromptAgentHint],
+            harness.Localizer[SshLocalizationKeys.PlinkPasswordPromptPasswordlessHint],
             message,
             StringComparison.Ordinal);
         Assert.Equal(1, harness.Launches);
@@ -248,25 +336,30 @@ public sealed class SshHandlerPlinkAgentOnlyTests
             return new PlinkPromptHarness(agents, localizer, answer, onDelete, preference);
         }
 
-        public Task<ConnectionResult> ConnectViaPlinkAsync() =>
-            _handler.ConnectSshViaPlinkAsync(
-                new ServerProfileDto
-                {
-                    Id = "plink-prompt",
-                    DisplayName = "plink prompt",
-                    ConnectionType = "SSH",
-                    RemoteServer = TrustedHost,
-                    SshPort = DefaultPorts.Ssh,
-                    SshMode = "Embedded",
-                    SshUsername = "operator",
-                    UseDirectConnection = true,
-                },
+        public Task<ConnectionResult> ConnectViaPlinkAsync(Action<ServerProfileDto>? configure = null)
+        {
+            var profile = new ServerProfileDto
+            {
+                Id = "plink-prompt",
+                DisplayName = "plink prompt",
+                ConnectionType = "SSH",
+                RemoteServer = TrustedHost,
+                SshPort = DefaultPorts.Ssh,
+                SshMode = "Embedded",
+                SshUsername = "operator",
+                UseDirectConnection = true,
+            };
+            configure?.Invoke(profile);
+
+            return _handler.ConnectSshViaPlinkAsync(
+                profile,
                 new AppSettings { PlinkPath = _plinkPath },
                 TrustedHost,
                 DefaultPorts.Ssh,
                 usesTunnel: false,
                 originalFailure: null,
                 CancellationToken.None);
+        }
 
         public void Dispose()
         {

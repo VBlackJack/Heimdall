@@ -82,6 +82,7 @@ Index of all issues encountered during development and their solutions.
 65. [SSH - "Too many authentication failures"](#ssh-too-many-authentication-failures)
 66. [SSH - "The agent key chosen for this session ... is not loaded"](#ssh-agent-key-not-loaded)
 67. [SSH - A Session With a Chosen Agent Key Is Refused on the Plink Path](#ssh-agent-key-plink-refused)
+68. [SSH - Signing in with Kerberos or a Pageant Key Through Plink](#ssh-plink-kerberos-pageant)
 
 ---
 
@@ -1310,3 +1311,30 @@ After a failure of the embedded client, the retry through Plink is simply skippe
 5. For external PuTTY, switch the session to the embedded terminal, or clear the chosen key.
 
 **Files**: `Services/Handlers/SshAgentKeyPreflight.cs` (`RefusalForPlink`), `Services/Handlers/SshHandler.cs`
+
+---
+
+<a id="ssh-plink-kerberos-pageant"></a>
+## 68. SSH - Signing in with Kerberos or a Pageant Key Through Plink
+
+**Symptom**: One of these:
+
+- A session with a user name, no stored password and no key file shows "SSH password required" although your Windows sign-in (Kerberos) or a Pageant key would be enough.
+- On an older version, answering that prompt with nothing ends with "Connection was cancelled", unless Pageant holds a key.
+- The terminal shows "This connection was started without a password, for Kerberos or a Pageant key. If the server refused the sign-in, connect again and type your password, or store it in the session."
+
+**Root cause**: The prompt appears when the connection goes through Plink: after the embedded client failed to authenticate, or with agent forwarding and Pageant. The prompt always says "Leave it empty to sign in with Kerberos (your Windows sign-in) or a key held by Pageant." An empty answer launches Plink with no password file and in batch mode (`-batch`). Plink then tries Kerberos (GSSAPI through Windows SSPI) and the keys of Pageant (with an agent key chosen on the session, only that key is offered). No password is written to disk and none is sent to the server. Batch mode makes Plink exit at once ("FATAL ERROR: Cannot answer interactive prompts in batch mode") when the server accepts neither; without it Plink would wait forever on a prompt that is shown nowhere, and the terminal would stay blank. The failure line above is Heimdall's explanation of that exit. Before this behavior, an empty answer cancelled the connection unless Pageant held a key, so a Kerberos user had to type a dummy password.
+
+**Solution**:
+
+1. For Kerberos or a Pageant key, leave the prompt empty and confirm.
+2. If the server refused the sign-in (the failure line above), connect again and type your password, or store it in the session.
+3. Cancel still cancels, and a typed password behaves as before.
+
+**Limits**:
+
+- A server that asks a second factor (keyboard-interactive) after Kerberos is not supported on this path: type the password instead.
+- The embedded client and the SFTP side panel do not do Kerberos. With a Kerberos-only server the SFTP panel does not connect.
+- A session with no user name is still refused before the prompt: set a user name in the session.
+
+**Files**: `Services/Handlers/SshHandler.cs`, `Views/EmbeddedSshView.xaml.cs`, `Services/TerminalReconnectPolicy.cs`

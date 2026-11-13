@@ -106,6 +106,10 @@ What to expect:
 - A session that goes through Plink (agent forwarding with Pageant, or the retry after a failure of the embedded client) needs the key in Pageant, of a type Plink can be limited to (not a hardware "sk" key), and no key file configured on the session. See [Troubleshooting](TROUBLESHOOTING.md#ssh-agent-key-plink-refused).
 - External PuTTY mode cannot be limited to one key: a session that names one is refused there.
 
+### Signing in through Plink with Kerberos or a Pageant key
+
+When a session has a user name, no stored password and no key file, and the connection goes through Plink (after the embedded client failed to authenticate, or with agent forwarding and Pageant), Heimdall asks "SSH password required". Leave the answer empty to sign in with Kerberos (your Windows sign-in) or a key held by Pageant. Heimdall then starts Plink with no password file and in batch mode: nothing is written to disk and no password is sent. If the server accepts neither, the terminal says so; connect again and type your password, or store it in the session. Cancel still cancels. A server that asks a second factor after Kerberos is not supported on this path, and the SFTP side panel does not do Kerberos. See [Troubleshooting](TROUBLESHOOTING.md#ssh-plink-kerberos-pageant).
+
 ### Web consoles
 
 Choose **Web** when you add a session, for an iLO, an iDRAC, a switch or a NAS admin page. Type

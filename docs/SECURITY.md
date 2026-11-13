@@ -823,6 +823,8 @@ without a key, or neither password nor key, since that path goes on to ask for o
 authenticates with a key and no password is untouched** - it never writes the file, so it has nothing
 to protect here, and nothing about key-only connections is claimed by this.
 
+**An empty password answer writes no file.** When a session has a user name but no stored password and no key, the password prompt can be answered with nothing, to sign in with Kerberos or a Pageant key. Heimdall then writes no password file and starts Plink in batch mode (`-batch`), so no prompt can wait on a hidden console and no password is sent. If the server accepts neither method, Plink exits at once and the terminal says why.
+
 Process exit remains the backstop, every path that frees the file goes through one gate so the
 deletion runs exactly once, and a launch that fails or is cancelled releases on the spot.
 

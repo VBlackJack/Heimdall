@@ -322,6 +322,10 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     private bool _isRecording;
     private bool _localeChangeSubscribed;
     private bool _autoReconnectOnProcessExit = true;
+
+    // True when the attached terminal session was launched with no password and no key, relying
+    // on Kerberos or a Pageant key. Set on every attach and cleared when the session is torn down.
+    private bool _credentialFreeLaunch;
     private bool _terminalSessionHasInput;
     private string? _pendingSecurityDisconnectMessage;
     private DateTimeOffset? _terminalSessionAttachedAtUtc;
@@ -501,7 +505,8 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         int keepAliveIntervalSeconds = AppSettings.DefaultSshTmoutResetIntervalSeconds,
         string? endpoint = null,
         string connectedStatus = SessionStatusTokens.Connected,
-        bool autoReconnectOnProcessExit = true)
+        bool autoReconnectOnProcessExit = true,
+        bool credentialFreeLaunch = false)
     {
         var endpointLabel = string.IsNullOrWhiteSpace(endpoint)
             ? L("SshEndpointViaPlink")
@@ -512,7 +517,8 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             terminalSession,
             keepAliveIntervalSeconds,
             connectedStatus,
-            autoReconnectOnProcessExit);
+            autoReconnectOnProcessExit,
+            credentialFreeLaunch);
     }
 
     /// <summary>
@@ -624,7 +630,8 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         Heimdall.Terminal.ITerminalSession terminalSession,
         int keepAliveIntervalSeconds = AppSettings.DefaultSshTmoutResetIntervalSeconds,
         string connectedStatus = SessionStatusTokens.Connected,
-        bool autoReconnectOnProcessExit = true)
+        bool autoReconnectOnProcessExit = true,
+        bool credentialFreeLaunch = false)
     {
         ArgumentNullException.ThrowIfNull(terminalSession);
 
@@ -649,6 +656,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         // describes another launch size.
         _pipeSizeNotice = null;
         _autoReconnectOnProcessExit = autoReconnectOnProcessExit;
+        _credentialFreeLaunch = credentialFreeLaunch;
         ShowHealthButton(false);
         _terminalSessionHasInput = false;
         _terminalSessionAttachedAtUtc = DateTimeOffset.UtcNow;
@@ -784,6 +792,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             _terminalSession = null;
         }
 
+        _credentialFreeLaunch = false;
         _winRmEarlyOutputDiagnostic = null;
         _terminalDataHandler = null;
         _terminalExitHandler = null;
@@ -2247,6 +2256,19 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         {
             string notEnteredText = $"\r\n\x1b[91m{L(notEnteredKey)}\x1b[0m\r\n";
             QueueOutput(Encoding.UTF8.GetBytes(notEnteredText));
+        }
+
+        // The window is the one that decides auto-reconnect suppression, so the hint and the
+        // suppression agree. Consumed here so a late second exit event cannot write it twice.
+        string? credentialFreeKey = TerminalReconnectPolicy.ResolveCredentialFreeExitMessageKey(
+            _credentialFreeLaunch,
+            exitCode,
+            suppressAutoReconnect);
+        _credentialFreeLaunch = false;
+        if (credentialFreeKey is not null)
+        {
+            string credentialFreeText = $"\r\n\x1b[91m{L(credentialFreeKey)}\x1b[0m\r\n";
+            QueueOutput(Encoding.UTF8.GetBytes(credentialFreeText));
         }
 
         SshSessionDisconnectInfo disconnectInfo =

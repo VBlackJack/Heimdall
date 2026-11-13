@@ -388,6 +388,54 @@ public sealed class SshHandlerAgentKeyTests
     }
 
     [Fact]
+    public async Task ChosenKey_PlinkPath_EmptyAnswer_OffersTheKeyInBatchModeWithoutPasswordFile()
+    {
+        string? argsSeen = null;
+        string? keyFilePath = null;
+        List<string> deleted = [];
+        using Harness harness = await Harness.CreateAsync(
+            [new FakeAgent(PageantAgent.AgentName, [new FakeKey("a", BlobA)])],
+            attested: true,
+            start: (_, args) =>
+            {
+                argsSeen = args;
+
+                // The argument carries the path with its backslashes doubled.
+                keyFilePath = ExtractQuotedArgument(args, "-i").Replace("\\\\", "\\", StringComparison.Ordinal);
+            },
+            dialogAnswer: string.Empty,
+            delete: path =>
+            {
+                if (path is not null)
+                {
+                    deleted.Add(path);
+                    File.Delete(path);
+                }
+            });
+
+        ConnectionResult result = await harness.ConnectViaPlinkAsync(harness.Server(FingerprintOf(BlobA)));
+        try
+        {
+            Assert.True(result.Success, result.ErrorMessage);
+            Assert.Contains(" -batch ", argsSeen, StringComparison.Ordinal);
+            Assert.Contains(" -i ", argsSeen, StringComparison.Ordinal);
+            Assert.DoesNotContain("-pwfile", argsSeen, StringComparison.Ordinal);
+            Assert.True(((TerminalSessionResult)result.Session!).CredentialFreeLaunch);
+        }
+        finally
+        {
+            (result.Session as TerminalSessionResult)?.Session.Dispose();
+            if (keyFilePath is not null)
+            {
+                File.Delete(keyFilePath);
+            }
+        }
+
+        // Only the public key file is ever released: no password file exists on this path.
+        Assert.All(deleted, path => Assert.Equal(keyFilePath, path));
+    }
+
+    [Fact]
     public async Task AnyFailureWhilePreparingTheLaunch_LeavesNoPasswordFileAndNoKeyFile()
     {
         List<string> deleted = [];
@@ -692,6 +740,27 @@ public sealed class SshHandlerAgentKeyTests
             target: "operator@server01",
             hostKeyFingerprint: null,
             agentPublicKeyFilePath: "agent.pub"));
+    }
+
+    [Fact]
+    public void BuildPipeModeArguments_BatchMode_AddsBatchRightAfterNoAntispoof()
+    {
+        string args = SshHandler.BuildPipeModeArguments(
+            null, false, false, false, 22, "server01", null, batchMode: true);
+
+        Assert.Equal("-ssh -t -no-antispoof -batch -P 22 server01", args);
+    }
+
+    [Fact]
+    public void BuildPipeModeArguments_BatchMode_CoexistsWithLoadAndIdentityFile()
+    {
+        string withKeyFile = SshHandler.BuildPipeModeArguments(
+            "id.ppk", false, false, false, 22, "server01", null, sizeSessionName: "session", batchMode: true);
+        string withAgentKey = SshHandler.BuildPipeModeArguments(
+            null, false, false, false, 22, "server01", null, agentPublicKeyFilePath: "agent.pub", batchMode: true);
+
+        Assert.Equal("-load session -ssh -t -no-antispoof -batch -i \"id.ppk\" -P 22 server01", withKeyFile);
+        Assert.Equal("-ssh -t -no-antispoof -batch -i \"agent.pub\" -P 22 server01", withAgentKey);
     }
 
     [Fact]

@@ -334,7 +334,8 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
                 sshKeepAliveInterval,
                 settings,
                 endpoint: termResult.Endpoint,
-                sessionLoggingOverride: termResult.SessionLoggingOverride);
+                sessionLoggingOverride: termResult.SessionLoggingOverride,
+                credentialFreeLaunch: termResult.CredentialFreeLaunch);
         }
 
         if (string.Equals(connectionType, "LOCAL", StringComparison.OrdinalIgnoreCase) &&
@@ -922,7 +923,8 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
                 view.AttachTerminalSession(
                     terminalResult.Session,
                     keepAlive,
-                    autoReconnectOnProcessExit: autoReconnectOnProcessExit);
+                    autoReconnectOnProcessExit: autoReconnectOnProcessExit,
+                    credentialFreeLaunch: terminalResult.CredentialFreeLaunch);
                 break;
             default:
                 throw new InvalidOperationException(
@@ -973,7 +975,8 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
         string? endpoint = null,
         string connectedStatus = "Connected",
         bool? sessionLoggingOverride = null,
-        bool trackWinRmLifecycle = false)
+        bool trackWinRmLifecycle = false,
+        bool credentialFreeLaunch = false)
     {
         var view = new EmbeddedSshView
         {
@@ -992,7 +995,8 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
             keepAliveIntervalSeconds,
             endpoint,
             connectedStatus,
-            autoReconnectOnProcessExit);
+            autoReconnectOnProcessExit,
+            credentialFreeLaunch);
         if (isElevated)
         {
             view.SetElevatedIndicator(true);

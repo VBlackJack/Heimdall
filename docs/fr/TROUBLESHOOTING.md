@@ -82,6 +82,7 @@ Index de tous les problèmes rencontrés pendant le développement et de leurs s
 65. [SSH - "Trop d'échecs d'authentification"](#ssh-too-many-authentication-failures)
 66. [SSH - "La clé d'agent choisie pour cette session ... n'est chargée"](#ssh-agent-key-not-loaded)
 67. [SSH - Une session avec une clé d'agent choisie est refusée sur le chemin Plink](#ssh-agent-key-plink-refused)
+68. [SSH - Se connecter avec Kerberos ou une clé Pageant par Plink](#ssh-plink-kerberos-pageant)
 
 ---
 
@@ -1310,3 +1311,30 @@ Après un échec du client intégré, le nouvel essai par Plink est simplement i
 5. Pour PuTTY externe, passez la session au terminal intégré, ou retirez le choix de clé.
 
 **Fichiers** : `Services/Handlers/SshAgentKeyPreflight.cs` (`RefusalForPlink`), `Services/Handlers/SshHandler.cs`
+
+---
+
+<a id="ssh-plink-kerberos-pageant"></a>
+## 68. SSH - Se connecter avec Kerberos ou une clé Pageant par Plink
+
+**Symptôme** : l'un de ceux-ci :
+
+- Une session avec un nom d'utilisateur, sans mot de passe enregistré ni fichier de clé affiche "Mot de passe SSH requis" alors que votre session Windows (Kerberos) ou une clé Pageant suffirait.
+- Sur une version plus ancienne, répondre à cette demande par rien se termine par "La connexion a été annulée", sauf si Pageant détient une clé.
+- Le terminal affiche "Cette connexion a été lancée sans mot de passe, pour Kerberos ou une clé de Pageant. Si le serveur a refusé l'authentification, reconnectez-vous et saisissez votre mot de passe, ou enregistrez-le dans la session."
+
+**Cause racine** : la demande apparaît quand la connexion passe par Plink : après un échec d'authentification du client intégré, ou avec le transfert d'agent et Pageant. La demande indique toujours : "Laissez-le vide pour vous connecter avec Kerberos (votre session Windows) ou une clé chargée dans Pageant." Une réponse vide lance Plink sans fichier de mot de passe et en mode batch (`-batch`). Plink essaie alors Kerberos (GSSAPI via Windows SSPI) et les clés de Pageant (avec une clé d'agent choisie sur la session, seule cette clé est présentée). Aucun mot de passe n'est écrit sur le disque et aucun n'est envoyé au serveur. Le mode batch fait quitter Plink aussitôt ("FATAL ERROR: Cannot answer interactive prompts in batch mode") quand le serveur n'accepte ni l'un ni l'autre ; sans lui, Plink attendrait indéfiniment une question affichée nulle part et le terminal resterait vide. La ligne d'échec ci-dessus est l'explication de Heimdall pour cette sortie. Avant ce comportement, une réponse vide annulait la connexion sauf si Pageant détenait une clé : un utilisateur Kerberos devait saisir un faux mot de passe.
+
+**Solution** :
+
+1. Pour Kerberos ou une clé Pageant, laissez la demande vide et validez.
+2. Si le serveur a refusé l'authentification (la ligne d'échec ci-dessus), reconnectez-vous et saisissez votre mot de passe, ou enregistrez-le dans la session.
+3. Annuler annule toujours, et un mot de passe saisi se comporte comme avant.
+
+**Limites** :
+
+- Un serveur qui demande un second facteur (authentification interactive au clavier) après Kerberos n'est pas pris en charge sur ce chemin : saisissez le mot de passe.
+- Le client intégré et le panneau latéral SFTP ne font pas Kerberos. Avec un serveur Kerberos seul, le panneau SFTP ne se connecte pas.
+- Une session sans nom d'utilisateur est toujours refusée avant la demande : renseignez un nom d'utilisateur dans la session.
+
+**Fichiers** : `Services/Handlers/SshHandler.cs`, `Views/EmbeddedSshView.xaml.cs`, `Services/TerminalReconnectPolicy.cs`

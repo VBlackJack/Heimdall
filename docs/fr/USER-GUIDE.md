@@ -111,6 +111,10 @@ Par défaut, une session présente au serveur toutes les clés de votre agent SS
 - Une session qui passe par Plink (transfert d'agent avec Pageant, ou nouvel essai après un échec du client intégré) exige que la clé soit dans Pageant, d'un type auquel Plink peut être limité (pas une clé matérielle "sk"), et qu'aucun fichier de clé ne soit configuré sur la session. Voir le [dépannage](TROUBLESHOOTING.md#ssh-agent-key-plink-refused).
 - Le mode PuTTY externe ne peut pas être limité à une clé : une session qui en désigne une y est refusée.
 
+### Se connecter par Plink avec Kerberos ou une clé Pageant
+
+Quand une session a un nom d'utilisateur, aucun mot de passe enregistré et aucun fichier de clé, et que la connexion passe par Plink (après un échec d'authentification du client intégré, ou avec le transfert d'agent et Pageant), Heimdall demande "Mot de passe SSH requis". Laissez-le vide pour vous connecter avec Kerberos (votre session Windows) ou une clé chargée dans Pageant. Heimdall lance alors Plink sans fichier de mot de passe et en mode batch : rien n'est écrit sur le disque et aucun mot de passe n'est envoyé. Si le serveur n'accepte ni l'un ni l'autre, le terminal le dit ; reconnectez-vous et saisissez votre mot de passe, ou enregistrez-le dans la session. Annuler annule toujours. Un serveur qui demande un second facteur après Kerberos n'est pas pris en charge sur ce chemin, et le panneau latéral SFTP ne fait pas Kerberos. Voir le [dépannage](TROUBLESHOOTING.md#ssh-plink-kerberos-pageant).
+
 ### Consoles web
 
 Choisissez **Web** en ajoutant une session, pour un iLO, un iDRAC, un commutateur ou la page
