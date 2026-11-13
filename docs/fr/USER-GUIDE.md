@@ -125,9 +125,16 @@ dans **Chemin**. La ligne sous le chemin montre l'adresse qui sera ouverte.
   revenir sur un certificat approuvé durablement, ouvrez **Paramètres > Sécurité > Certificats web**, retrouvez-le
   sous **Certificats de consoles web approuvés** et oubliez-le.
 - Un nom d'utilisateur et un mot de passe dans le profil répondent à la fenêtre de connexion du
-  navigateur lui-même (Basic ou NTLM). Un formulaire de connexion dans la page n'est pas rempli.
-  Avec le fournisseur d'identifiants activé, indiquez seulement le nom d'utilisateur : le mot de
-  passe vient de votre coffre.
+  navigateur lui-même (Basic ou NTLM). Avec le fournisseur d'identifiants activé, indiquez
+  seulement le nom d'utilisateur : le mot de passe vient de votre coffre.
+- Une console qui demande le compte sur sa propre page, ce qui est le cas de la plupart, se
+  connecte depuis le profil : remplissez **Champ du nom d'utilisateur** et **Champ du mot de
+  passe** sous **Formulaire de connexion** avec un sélecteur CSS pour chacun, comme `#username` ou
+  `input[name="user"]`, et **Bouton de validation** aussi si vous voulez que Heimdall le presse.
+  Pour lire le sélecteur d'un champ, ouvrez la même page dans Edge et utilisez ses outils de
+  développement. Seule l'adresse de la console est remplie, le formulaire est rempli une fois par
+  onglet pour qu'un compte refusé ne soit pas réessayé jusqu'au blocage, et Recharger refait la
+  tentative.
 - Avec la vérification d'accessibilité activée, la pastille d'une console web demande sa page au
   lieu de seulement ouvrir son port : une console qui répond par une erreur serveur (5xx) apparaît
   injoignable, avec le code dans l'infobulle. Une console dont le système refuse la connexion sécurisée,

@@ -168,6 +168,18 @@ public sealed record WebSessionResult(
     public string? DisplayName { get; init; }
 
     /// <summary>
+    /// The selector of the console's user name field, when the profile names a sign-in form;
+    /// null leaves the form to the user.
+    /// </summary>
+    public string? SignInUsernameSelector { get; init; }
+
+    /// <summary>The selector of that form's password field, which decides whether there is one to fill.</summary>
+    public string? SignInPasswordSelector { get; init; }
+
+    /// <summary>The selector of the button that submits the form, when the profile names one.</summary>
+    public string? SignInSubmitSelector { get; init; }
+
+    /// <summary>
     /// Whether the user has confirmed that this profile may start a local program. Decided when
     /// the session is built and false until a builder says otherwise, so a session whose builder
     /// forgot to decide asks rather than runs. It is mutable state of the tab and takes part in

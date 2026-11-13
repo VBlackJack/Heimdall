@@ -97,6 +97,11 @@ public sealed class SharedProfileSanitizerTests
         nameof(ServerProfileDto.WebUsername), nameof(ServerProfileDto.WebPasswordEncrypted),
         nameof(ServerProfileDto.WebOpenExternally), nameof(ServerProfileDto.WebExternalProgram),
         nameof(ServerProfileDto.WebExternalArguments),
+        // A shared file would otherwise point a profile that keeps a local password at a host of
+        // its choosing, and the sign-in form would write that password there.
+        nameof(ServerProfileDto.WebSignInUsernameSelector),
+        nameof(ServerProfileDto.WebSignInPasswordSelector),
+        nameof(ServerProfileDto.WebSignInSubmitSelector),
     ];
 
     /// <summary>Every <see cref="SshGatewayDto"/> property a shared file may NOT set.</summary>

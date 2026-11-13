@@ -119,8 +119,15 @@ will open.
   asked again with a warning. To take back a certificate trusted for good, open
   **Settings > Security > Web certificates**, find it under **Trusted web console certificates** and forget it.
 - A username and password in the profile answer the browser's own sign-in window (Basic or
-  NTLM). A sign-in form inside the page is not filled in. With the credential provider turned
-  on, give the profile a username only: the password comes from your vault.
+  NTLM). With the credential provider turned on, give the profile a username only: the password
+  comes from your vault.
+- A console that asks for the account on a page of its own, which is most of them, is signed in
+  from the profile instead: fill **User name field** and **Password field** under **Sign-in form**
+  with a CSS selector for each, such as `#username` or `input[name="user"]`, and **Submit button**
+  as well if you want Heimdall to press it. To read a field's selector, open the same page in Edge
+  and use its developer tools. Only the console's own address is filled, the form is filled once
+  per tab so that a refused account is not retried into a lockout, and Reload tries the sign-in
+  again.
 - With the reachability check on, a web console's dot asks for its page rather than only opening
   its port: a console answering with a server error (5xx) shows as unreachable, with the code in
   the tooltip. A console whose secure connection the system refuses, often an old one, still shows

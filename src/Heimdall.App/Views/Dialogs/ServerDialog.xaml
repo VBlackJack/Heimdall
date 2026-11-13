@@ -1293,6 +1293,31 @@
                                                     MinHeight="0"
                                                     Margin="8,0,0,0"/>
                                         </StackPanel>
+                                        <TextBlock Text="{loc:Translate ServerDialogWebFormSignInTitle}" Style="{StaticResource DialogSectionTitleStyle}" Margin="0,18,0,0"/>
+                                        <TextBlock Text="{loc:Translate ServerDialogWebFormSignInDesc}"
+                                                   Style="{StaticResource DialogSectionDescriptionStyle}"/>
+                                        <TextBlock Text="{loc:Translate ServerDialogWebFormSignInUsernameLabel}" Style="{StaticResource LabelStyle}" Margin="0,14,0,4"/>
+                                        <TextBox x:Name="DlgSrv_WebSignInUsernameSelectorBox" TabIndex="10"
+                                                 AutomationProperties.Name="{loc:Translate ServerDialogWebFormSignInUsernameLabel}"
+                                                 AutomationProperties.HelpText="{loc:Translate ServerDialogWebFormSignInHint}"
+                                                 Text="{Binding WebSignInUsernameSelector, UpdateSourceTrigger=PropertyChanged}"
+                                                 Style="{StaticResource DialogFormTextBoxStyle}"/>
+                                        <TextBlock Text="{loc:Translate ServerDialogWebFormSignInPasswordLabel}" Style="{StaticResource LabelStyle}" Margin="0,14,0,4"/>
+                                        <TextBox x:Name="DlgSrv_WebSignInPasswordSelectorBox" TabIndex="10"
+                                                 AutomationProperties.Name="{loc:Translate ServerDialogWebFormSignInPasswordLabel}"
+                                                 AutomationProperties.HelpText="{loc:Translate ServerDialogWebFormSignInHint}"
+                                                 Text="{Binding WebSignInPasswordSelector, UpdateSourceTrigger=PropertyChanged}"
+                                                 Style="{StaticResource DialogFormTextBoxStyle}"/>
+                                        <TextBlock Text="{loc:Translate ServerDialogWebFormSignInSubmitLabel}" Style="{StaticResource LabelStyle}" Margin="0,14,0,4"/>
+                                        <TextBox x:Name="DlgSrv_WebSignInSubmitSelectorBox" TabIndex="10"
+                                                 AutomationProperties.Name="{loc:Translate ServerDialogWebFormSignInSubmitLabel}"
+                                                 AutomationProperties.HelpText="{loc:Translate ServerDialogWebFormSignInHint}"
+                                                 Text="{Binding WebSignInSubmitSelector, UpdateSourceTrigger=PropertyChanged}"
+                                                 Style="{StaticResource DialogFormTextBoxStyle}"/>
+                                        <TextBlock Text="{loc:Translate ServerDialogWebFormSignInHint}"
+                                                   Style="{StaticResource DialogHintTextStyle}"
+                                                   Margin="0,8,0,0"
+                                                   TextWrapping="Wrap"/>
                                     </StackPanel>
                                 </Border>
 

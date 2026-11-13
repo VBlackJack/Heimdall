@@ -508,7 +508,10 @@ public sealed class ServerProfileDto : IJsonOnDeserialized
     /// <summary>Path, query and fragment appended to the address, such as <c>/login.html</c>.</summary>
     public string? WebPath { get; set; }
 
-    /// <summary>Answers an HTTP authentication challenge (Basic, NTLM); never fills a form.</summary>
+    /// <summary>
+    /// The account that answers an HTTP authentication challenge (Basic, NTLM), and the one
+    /// written into the sign-in form when the profile names its fields.
+    /// </summary>
     public string? WebUsername { get; set; }
     public string? WebPasswordEncrypted { get; set; }
 
@@ -523,6 +526,26 @@ public sealed class ServerProfileDto : IJsonOnDeserialized
 
     /// <summary>Arguments for <see cref="WebExternalProgram"/>; {Url}, {Host} and {Port} are expanded.</summary>
     public string? WebExternalArguments { get; set; }
+
+    /// <summary>
+    /// The CSS selector of the console's own user name field, such as <c>#username</c> or
+    /// <c>input[name="user"]</c>. Left unset with <see cref="WebSignInPasswordSelector"/>, the
+    /// form is the user's, as it always was.
+    /// </summary>
+    public string? WebSignInUsernameSelector { get; set; }
+
+    /// <summary>
+    /// The CSS selector of the console's own password field. The form is filled only when this
+    /// and a stored password are both present, and <see cref="WebUsername"/> is the name written
+    /// into it.
+    /// </summary>
+    public string? WebSignInPasswordSelector { get; set; }
+
+    /// <summary>
+    /// The CSS selector of the button that submits that form. Unset, Heimdall fills the fields
+    /// and leaves the press to the user.
+    /// </summary>
+    public string? WebSignInSubmitSelector { get; set; }
 
     /// <summary>
     /// Returns an independent copy of this profile, identical in every observable respect.

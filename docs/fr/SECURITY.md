@@ -223,6 +223,18 @@ d'état et les en-têtes et ferme la connexion au lieu de lire un corps. Un serv
 sur la couleur de la pastille. La confiance dans le certificat d'une console se
 décide dans son onglet web, par l'épinglage que l'utilisateur y accepte.
 
+Le compte enregistré pour une console web n'est écrit dans le formulaire de
+connexion de la console que lorsque le profil en indique les champs, et seulement
+sur le schéma, l'hôte et le port que ce profil adresse : une console qui redirige
+vers un autre hôte est laissée à l'utilisateur plutôt que de recevoir le mot de
+passe. Le mot de passe arrive dans la page comme une chaîne JavaScript, n'est
+jamais journalisé, et le formulaire est rempli une fois par onglet, noté dans le
+stockage de session de la page, pour qu'un compte refusé ne soit pas réessayé
+jusqu'au blocage ; Recharger rend cette tentative. Les champs sont renseignés par
+le mutateur de valeur de l'élément et les événements input et change, ce que lit
+le framework de la page, et un sélecteur qui ne correspond à rien laisse le champ
+tel quel.
+
 L'import et l'export de `~/.ssh/known_hosts` sont des actions utilisateur
 explicites exposées dans `Settings > SSH & SFTP > Trusted host keys`. L'import
 préserve les entrées existantes en conflit, sauf si l'utilisateur choisit

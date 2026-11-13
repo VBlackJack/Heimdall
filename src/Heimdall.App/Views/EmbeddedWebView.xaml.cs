@@ -229,6 +229,14 @@ public partial class EmbeddedWebView : UserControl, IDisposable, ISessionPaneOwn
 
             ConsoleWebView.ZoomFactorChanged += OnZoomFactorChanged;
 
+            // The profile's own sign-in form, when it names one, filled on the page now being
+            // opened. The engine's autofill stays off above, so the account lives in the profile
+            // and reaches the console itself, never a store beside it.
+            if (WebSignInFormPolicy.BuildScript(_session) is { } signInScript)
+            {
+                await core.AddScriptToExecuteOnDocumentCreatedAsync(signInScript);
+            }
+
             core.Navigate(_session.Address.AbsoluteUri);
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
@@ -535,7 +543,7 @@ public partial class EmbeddedWebView : UserControl, IDisposable, ISessionPaneOwn
         }
     }
 
-    private void OnReloadClick(object sender, RoutedEventArgs e)
+    private async void OnReloadClick(object sender, RoutedEventArgs e)
     {
         if (_disposed || _session is null)
         {
@@ -564,6 +572,11 @@ public partial class EmbeddedWebView : UserControl, IDisposable, ISessionPaneOwn
         StatusTextBlock.Text = Text("StatusWebConnecting");
         Behaviors.LiveRegionBehavior.Announce(StatusTextBlock);
 
+        // A reload is the user asking for the same sign-in again, so the tab gets its attempt
+        // back before the form is drawn: the empty form the first attempt left behind would
+        // otherwise stay empty.
+        await ClearSignInFormAttemptAsync(core);
+
         // After a failure the browser still shows the error page of the address that failed;
         // reloading it would retry the error page, so the console's own address is opened again.
         if (string.Equals(core.Source, "about:blank", StringComparison.Ordinal) || !_connectedRaised)
@@ -573,6 +586,22 @@ public partial class EmbeddedWebView : UserControl, IDisposable, ISessionPaneOwn
         else
         {
             core.Reload();
+        }
+    }
+
+    /// <summary>
+    /// Gives the tab back its single attempt at the profile's sign-in form. Nothing else is
+    /// retried here: a form that comes back on its own means the account was refused.
+    /// </summary>
+    private static async Task ClearSignInFormAttemptAsync(CoreWebView2 core)
+    {
+        try
+        {
+            await core.ExecuteScriptAsync(WebSignInFormPolicy.BuildAttemptResetScript());
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            FileLogger.Warn($"Web console could not reset its sign-in form attempt: {ex.Message}");
         }
     }
 
