@@ -64,8 +64,8 @@
       },
       "FluentFTP": {
         "type": "Transitive",
-        "resolved": "54.2.0",
-        "contentHash": "n+OyaqU80gnOltXo2xBPZklAqbtxJAfl2GfblOIe5OCAk4jr/3zYW9Jf1fG6eR/USZq4AKWQcUMmKE9neSk8og=="
+        "resolved": "55.1.0",
+        "contentHash": "RXA6WEaziJiSt/lrOxbpxfkOyTY1YaeQiCKzsVoQQxEwcoI0dtoTzGiqS47mrqq3zBuETMwaVjI7FLTCcJC80w=="
       },
       "Humanizer.Core": {
         "type": "Transitive",
@@ -424,7 +424,7 @@
       "heimdall.sftp": {
         "type": "Project",
         "dependencies": {
-          "FluentFTP": "[54.2.0, )",
+          "FluentFTP": "[55.1.0, )",
           "Heimdall.Core": "[1.0.0, )",
           "Heimdall.Ssh": "[1.0.0, )",
           "SSH.NET": "[2026.0.0, )"
