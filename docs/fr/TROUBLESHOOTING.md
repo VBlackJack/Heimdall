@@ -1306,7 +1306,7 @@ Après un échec du client intégré, le nouvel essai par Plink est simplement i
 1. Chargez la clé dans Pageant, ou désactivez le transfert d'agent pour que le client intégré soit utilisé.
 2. Pour un type de clé auquel Plink ne peut pas être limité, désactivez le transfert d'agent ou choisissez une autre clé.
 3. Retirez le fichier de clé de la session, ou retirez le choix de clé d'agent.
-4. Remettez `Chemin de plink.exe` sur le Plink fourni avec Heimdall, ou retirez le choix de clé d'agent.
+4. Remettez `Chemin de plink.exe` sur le Plink fourni avec Heimdall (ou remettez le champ à sa valeur par défaut), ou retirez le choix de clé d'agent.
 5. Pour PuTTY externe, passez la session au terminal intégré, ou retirez le choix de clé.
 
 **Fichiers** : `Services/Handlers/SshAgentKeyPreflight.cs` (`RefusalForPlink`), `Services/Handlers/SshHandler.cs`

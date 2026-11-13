@@ -3181,7 +3181,7 @@
   "SettingsSshAgentPreferenceOpenSshOnly": "Solo OpenSSH de Windows",
   "SettingsSshAgentPreferencePageantOnly": "Solo Pageant",
   "SettingsSshAgentPreferenceHint": "Controla qué claves de agente SSH cargadas intenta primero Heimdall. Los cambios se aplican a la siguiente conexión.",
-  "SettingsPlinkPathHint": "Necesario para el respaldo de Plink, los flujos de PuTTY basados en Pageant y los servidores interactivos por teclado. No es necesario si usas solo archivos de clave.",
+  "SettingsPlinkPathHint": "Necesario para el respaldo de Plink, los flujos de PuTTY basados en Pageant y los servidores interactivos por teclado. No es necesario si usas solo archivos de clave. El valor por defecto usa el Plink incluido con Heimdall cuando está presente; cualquier otra ruta se usa tal cual.",
   "SettingsFileNotFound": "No hay ningún archivo en esta ruta.",
   "SettingsFolderNotFound": "No hay ninguna carpeta en esta ruta.",
   "SettingsPuttyPathHint": "Necesario cuando el modo SSH está en Externo. Se detecta automáticamente junto a plink.exe si se deja en blanco.",

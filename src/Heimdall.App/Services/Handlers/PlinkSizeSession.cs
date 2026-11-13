@@ -130,7 +130,9 @@ internal static class PlinkSizeSession
     /// <param name="firstByteProvesConsumption">
     /// Whether the launcher's first byte of output proves it already parsed its command line, and
     /// so already loaded the session. Same attestation as the password file: <c>-load</c> is
-    /// processed in the same command-line pass as <c>-pwfile</c>, before any network activity.
+    /// processed in the same command-line pass as <c>-pwfile</c>, before any network activity. When
+    /// <see langword="true"/>, <paramref name="session"/> must implement
+    /// <see cref="IFirstOutputSignal"/>, otherwise an <see cref="ArgumentException"/> is thrown.
     /// </param>
     internal static PlinkSizeSessionReleaseHandle ArmRelease(
         ITerminalSession session,
@@ -156,7 +158,8 @@ internal static class PlinkSizeSession
 /// </summary>
 /// <remarks>
 /// The same single-path shape as <see cref="PlinkPasswordFileReleaseHandle"/>: first output (when
-/// attested), process exit, launch failure and cancellation all arrive here, and the launch failure
+/// attested, observed through <see cref="IFirstOutputSignal"/> so the bootstrap replay stays
+/// intact for the view), process exit, launch failure and cancellation all arrive here, and the launch failure
 /// and cancellation paths dispose the session, which can itself raise
 /// <see cref="ITerminalSession.ProcessExited"/>, before releasing explicitly.
 /// </remarks>
@@ -165,7 +168,8 @@ internal sealed class PlinkSizeSessionReleaseHandle
     private readonly ITerminalSession _session;
     private readonly string _sessionName;
     private readonly Action<string> _delete;
-    private readonly Action<ReadOnlyMemory<byte>>? _onData;
+    private readonly IFirstOutputSignal? _firstOutput;
+    private readonly Action? _onFirstOutput;
     private readonly Action<int> _onExit;
 
     private int _released;
@@ -180,16 +184,27 @@ internal sealed class PlinkSizeSessionReleaseHandle
         _sessionName = sessionName;
         _delete = delete;
 
+        if (firstByteProvesConsumption)
+        {
+            // Checked before anything is subscribed, so a refusal leaves no handler behind.
+            _firstOutput = session as IFirstOutputSignal
+                ?? throw new ArgumentException(
+                    "An attested launcher requires a session that signals its first output.",
+                    nameof(session));
+        }
+
         _onExit = _ => Release();
         _session.ProcessExited += _onExit;
 
-        if (!firstByteProvesConsumption)
+        if (_firstOutput is null)
         {
             return;
         }
 
-        _onData = _ => Release();
-        _session.DataReceived += _onData;
+        // The first-output signal and not DataReceived, which would consume the bootstrap replay
+        // the terminal view needs.
+        _onFirstOutput = Release;
+        _firstOutput.FirstOutputReceived += _onFirstOutput;
     }
 
     /// <summary>
@@ -202,9 +217,9 @@ internal sealed class PlinkSizeSessionReleaseHandle
             return;
         }
 
-        if (_onData is not null)
+        if (_firstOutput is not null && _onFirstOutput is not null)
         {
-            _session.DataReceived -= _onData;
+            _firstOutput.FirstOutputReceived -= _onFirstOutput;
         }
 
         _session.ProcessExited -= _onExit;

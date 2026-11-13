@@ -26,7 +26,7 @@ namespace Heimdall.Terminal;
 /// required for plink SSH where ConPTY breaks arrow keys.
 /// The -t flag on plink forces remote PTY allocation.
 /// </summary>
-public sealed class PipeModeSession : ITerminalSession
+public sealed class PipeModeSession : ITerminalSession, IFirstOutputSignal
 {
     private Process? _process;
     private Task? _readLoop;
@@ -38,12 +38,54 @@ public sealed class PipeModeSession : ITerminalSession
     private Action<int>? _processExited;
     private bool _processExitedRaised;
     private int _processExitCode;
+    private readonly object _firstOutputLock = new();
+    private Action? _firstOutputReceived;
+    private bool _firstOutputRaised;
     private readonly OutputReplayGate _output = new(nameof(PipeModeSession));
 
     public event Action<ReadOnlyMemory<byte>>? DataReceived
     {
         add => _output.AddMemory(value);
         remove => _output.RemoveMemory(value);
+    }
+
+    /// <inheritdoc />
+    public event Action? FirstOutputReceived
+    {
+        add
+        {
+            if (value is null)
+            {
+                return;
+            }
+
+            bool invokeImmediately;
+            lock (_firstOutputLock)
+            {
+                invokeImmediately = _firstOutputRaised;
+                if (!invokeImmediately)
+                {
+                    _firstOutputReceived += value;
+                }
+            }
+
+            if (invokeImmediately)
+            {
+                SafeInvokeFirstOutputHandler(value);
+            }
+        }
+        remove
+        {
+            if (value is null)
+            {
+                return;
+            }
+
+            lock (_firstOutputLock)
+            {
+                _firstOutputReceived -= value;
+            }
+        }
     }
 
     public event Action<int>? ProcessExited
@@ -314,10 +356,52 @@ public sealed class PipeModeSession : ITerminalSession
                 byte[] copy = new byte[bytesRead];
                 Buffer.BlockCopy(buffer, 0, copy, 0, bytesRead);
                 _output.Deliver(copy);
+
+                // After the delivery: "raised" implies the chunk was delivered or buffered, so a
+                // reaction to the signal that subscribes to DataReceived still gets it in the replay.
+                RaiseFirstOutputOnce();
             }
         }
         catch (OperationCanceledException) { /* Expected when session is disposed or cancelled */ }
         catch (Exception ex) { Heimdall.Core.Logging.FileLogger.Warn($"[PipeModeSession] ReadStreamLoop: {ex.Message}"); }
+    }
+
+    private void RaiseFirstOutputOnce()
+    {
+        Action? handlers;
+        lock (_firstOutputLock)
+        {
+            if (_firstOutputRaised)
+            {
+                return;
+            }
+
+            _firstOutputRaised = true;
+            handlers = _firstOutputReceived;
+            _firstOutputReceived = null;
+        }
+
+        if (handlers is null)
+        {
+            return;
+        }
+
+        foreach (Action handler in handlers.GetInvocationList().Cast<Action>())
+        {
+            SafeInvokeFirstOutputHandler(handler);
+        }
+    }
+
+    private static void SafeInvokeFirstOutputHandler(Action handler)
+    {
+        try
+        {
+            handler();
+        }
+        catch (Exception ex)
+        {
+            Heimdall.Core.Logging.FileLogger.Warn($"[PipeModeSession] FirstOutputReceived subscriber: {ex.Message}");
+        }
     }
 
     private void OnProcessExited(object? sender, EventArgs e)

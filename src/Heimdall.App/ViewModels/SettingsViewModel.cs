@@ -479,7 +479,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     /// The six tool paths were accepted as typed and failed only at use: a mistyped Plink path
     /// surfaced as a connection that fell back or failed, far from the field that caused it.
     /// </remarks>
-    public bool IsPlinkPathMissing => IsFileMissing(PlinkPath);
+    public bool IsPlinkPathMissing =>
+        !IsLegacyPlinkDefault(PlinkPath) && IsFileMissing(PlinkPath);
 
     /// <summary>True when a PuTTY path is typed and no file is there.</summary>
     public bool IsPuttyPathMissing => IsFileMissing(PuttyPath);
@@ -501,6 +502,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     /// <summary>True when a Citrix cache folder is typed and does not exist.</summary>
     public bool IsCitrixCacheDirectoryMissing => IsFolderMissing(CitrixCacheDirectory);
+
+    // The legacy default means "use the bundled Plink", so it is never reported as a missing file.
+    private static bool IsLegacyPlinkDefault(string? path) =>
+        !string.IsNullOrWhiteSpace(path) && ConnectionHelpers.IsSamePath(path, AppSettings.LegacyPlinkPath);
 
     private bool IsFileMissing(string? path) =>
         !string.IsNullOrWhiteSpace(path) && !FileExists(Environment.ExpandEnvironmentVariables(path.Trim()));
