@@ -274,6 +274,8 @@
                                        Foreground="{DynamicResource TextPrimaryBrush}" />
                             <!-- Real cause of the disconnect, when there is one. -->
                             <TextBlock x:Name="ReconnectDetailText"
+                                       AutomationProperties.LiveSetting="Polite"
+                                       behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"
                                        Visibility="Collapsed"
                                        Margin="0,8,0,0"
                                        FontSize="{StaticResource FontSizeBody}"

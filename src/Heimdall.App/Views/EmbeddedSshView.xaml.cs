@@ -318,7 +318,9 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     private bool _webViewUnavailable;
     private bool _initialTerminalFocusApplied;
     private bool _sleepPreventionActive;
-    private bool _userInitiatedDisconnect;
+    // Written on the UI thread by the Disconnect click, read by the process-exit event, which
+    // may arrive on another thread.
+    private volatile bool _userInitiatedDisconnect;
     private bool _isRecording;
     private bool _localeChangeSubscribed;
     private bool _autoReconnectOnProcessExit = true;
@@ -2088,6 +2090,13 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     }
 
     private void OnDisconnected(SshSessionDisconnectInfo disconnectInfo)
+        => OnDisconnected(disconnectInfo, panelReason: null);
+
+    /// <summary>
+    /// Handles the end of the session. <paramref name="panelReason"/> is a resolved, localized
+    /// explanation shown first in the disconnected panel's detail, above the generic detail.
+    /// </summary>
+    private void OnDisconnected(SshSessionDisconnectInfo disconnectInfo, string? panelReason)
     {
         ArgumentNullException.ThrowIfNull(disconnectInfo);
 
@@ -2154,7 +2163,11 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             {
                 ReconnectMessageText.Text = L("SshDisconnectedMessage");
                 Behaviors.LiveRegionBehavior.Announce(ReconnectMessageText);
-                SetReconnectDetail(errorMessage);
+                SetReconnectDetail(TerminalReconnectPolicy.ComposePanelDetail(panelReason, errorMessage));
+                if (!string.IsNullOrWhiteSpace(ReconnectDetailText.Text))
+                {
+                    Behaviors.LiveRegionBehavior.Announce(ReconnectDetailText);
+                }
             }
 
             UpdateStatus(SessionStatusTokens.Disconnected);
@@ -2263,11 +2276,14 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         string? credentialFreeKey = TerminalReconnectPolicy.ResolveCredentialFreeExitMessageKey(
             _credentialFreeLaunch,
             exitCode,
-            suppressAutoReconnect);
+            suppressAutoReconnect,
+            _userInitiatedDisconnect);
         _credentialFreeLaunch = false;
+        string? panelReason = null;
         if (credentialFreeKey is not null)
         {
-            string credentialFreeText = $"\r\n\x1b[91m{L(credentialFreeKey)}\x1b[0m\r\n";
+            panelReason = L(credentialFreeKey);
+            string credentialFreeText = $"\r\n\x1b[91m{panelReason}\x1b[0m\r\n";
             QueueOutput(Encoding.UTF8.GetBytes(credentialFreeText));
         }
 
@@ -2276,7 +2292,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
                 exitCode,
                 _autoReconnectOnProcessExit,
                 suppressAutoReconnect);
-        OnDisconnected(disconnectInfo);
+        OnDisconnected(disconnectInfo, panelReason);
     }
 
     /// <summary>
