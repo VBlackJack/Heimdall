@@ -12,6 +12,56 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-11-13: Plink terminals start at the full width of their pane (v2026.111302)
+
+Fixes merged as #790, dependency updates as #791. The user-facing summary and the upgrade notes are
+in the release notes.
+
+### SSH through Plink (#790)
+
+- **Hidden-surface width.** While a session connects the terminal surface is hidden and the
+  WebView2 keeps its creation box. The host sends the page the pane box (`viewport:W,H`) and the
+  page sizes `#terminal` to it before fitting. `#terminal` is a flex item of a `body` as wide as
+  the window, with the default shrink, so a box wider than the window was shrunk back and the fit
+  addon, which reads the computed width of the terminal's parent, measured the window. Measured:
+  `page box 1066x1225@1; host WebView 1439x1024 visible=False`, Plink launched at 149 columns,
+  `first shown size 203x59 vs host-derived 149x59: MISMATCH`. `flex-shrink: 0` on `#terminal` in
+  `terminal.html`; after it, 203 columns and `match`. Present since the viewport protocol of
+  v2026.111201 for any pane wider than the creation box. Rows are the cross axis and were not
+  clamped.
+- **Pending SFTP companion on a Plink retry.** `SshHandler.PlinkRetryStarting`, relayed by
+  `ConnectionService`, fires when the embedded client failed to authenticate and the connect is
+  retried through Plink; not on the direct Plink path of agent forwarding with Pageant.
+  `SessionCoordinator.OnPlinkRetryStarting` withdraws the placeholder pane and the companion
+  profile, and `CompleteReadySession` skips `AutoOpenSftpAsync` for that session and sets
+  `StatusSftpCompanionNotOpenedAfterPlinkRetry`. The companion could not connect: same SSH.NET
+  client, same credentials, `AllowCredentialPrompt` false.
+- **Waiting for the wider size.** For the selected tab whose page had already reported,
+  `TerminalSizeReport.ArmWiderReport()` is armed before the tree changes, and
+  `ResolveConnectingTerminalSizeAsync` awaits it within the caller's wait
+  (`PlinkInitialSizeWaitMs`). It completes on a usable report with strictly more columns than the
+  size held when armed, because a report of the split width can still be in flight. The zero-wait
+  read of the embedded dial does not consume it. A tab that is not selected is not waited for.
+
+### Dependencies (#791)
+
+- Microsoft.EntityFrameworkCore.Sqlite, Microsoft.Extensions.Caching.Memory,
+  Microsoft.Extensions.DependencyInjection and its Abstractions,
+  Microsoft.Extensions.Logging.Abstractions, System.Management and
+  System.Security.Cryptography.ProtectedData 10.0.14 to 10.0.15; Microsoft.NET.Test.Sdk 17.14.1 to
+  17.14.2; FluentFTP 54.2.0 to 55.1.0; LibGit2Sharp 0.31.0 to 0.32.0. Each update is followed by a
+  commit refreshing the lock files of the dependent projects: restore runs in locked mode and
+  Dependabot refreshes only the lock file of the project it touches (NU1004).
+
+### Tests (#790)
+
+- `TerminalHtmlViewportLayoutTests` reads the page: the `#terminal` rule, the sizing it protects in
+  `handleViewportMessage`, and what the vendored fit addon measures.
+- `SshHandlerPlinkRetryStartingTests`, and additions to `TerminalSizeReportTests` and
+  `SessionCoordinatorCompanionLayoutTests`.
+- Seen failing once in CI and passing on rerun, left as it is:
+  `SshShellSessionTeardownTests.Disconnect_StuckReadLoop_DoesNotBlockCallerForFinalWait`.
+
 ## 2026-11-13: Kerberos through Plink, bundled Plink first, first output kept for every terminal (v2026.111301)
 
 Fixes merged as #776, #777, #778, #781, #782 and #783. The user-facing summary and the upgrade notes
