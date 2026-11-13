@@ -60,14 +60,33 @@ internal static class TerminalReconnectPolicy
     /// a Pageant key) ended with a failure inside the connect-time window, or null otherwise.
     /// <paramref name="connectTimeExit"/> is the result of
     /// <see cref="SuppressesConnectTimeProcessExit"/>, so the window is defined in one place.
+    /// A user-initiated disconnect kills the process with a non-zero code, which is not a
+    /// server refusal, so it never gets the hint.
     /// </summary>
     public static string? ResolveCredentialFreeExitMessageKey(
         bool credentialFree,
         int exitCode,
-        bool connectTimeExit)
-        => credentialFree && exitCode != 0 && connectTimeExit
+        bool connectTimeExit,
+        bool userInitiatedDisconnect)
+        => credentialFree && exitCode != 0 && connectTimeExit && !userInitiatedDisconnect
             ? SshLocalizationKeys.ErrorSshPasswordlessSignInFailed
             : null;
+
+    /// <summary>
+    /// Text of the disconnected panel's detail block: the resolved reason first, then the
+    /// generic disconnect detail (the exit code) on a second line. Either part may be absent.
+    /// </summary>
+    public static string? ComposePanelDetail(string? reason, string? disconnectDetail)
+    {
+        bool hasReason = !string.IsNullOrWhiteSpace(reason);
+        bool hasDetail = !string.IsNullOrWhiteSpace(disconnectDetail);
+        if (hasReason && hasDetail)
+        {
+            return reason + "\n" + disconnectDetail;
+        }
+
+        return hasReason ? reason : hasDetail ? disconnectDetail : null;
+    }
 
     /// <summary>
     /// Classifies a terminal process exit into a disconnect info: exit code 0 is a clean
