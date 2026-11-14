@@ -14,7 +14,10 @@
  * limitations under the License.
  */
 
+using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
+using System.Text;
 using Heimdall.Core.Network;
 using Heimdall.Ssh.Plink;
 
@@ -66,9 +69,13 @@ public sealed class PlinkTunnelRunnerDrainReproTests
         child.WriteStderrBurst(BurstLines);
         child.TypeExit();
 
+        bool exited = child.WaitForExit(ExitVerdictWindow);
         Assert.True(
-            child.WaitForExit(ExitVerdictWindow),
-            "control failed: the child did not reach its exit command although the drain was live");
+            exited,
+            exited
+                ? string.Empty
+                : "control failed: the child did not reach its exit command although the drain was live. "
+                    + child.DescribeDrainState());
     }
 
     [Fact]
@@ -100,7 +107,8 @@ public sealed class PlinkTunnelRunnerDrainReproTests
         Assert.True(
             exited,
             "after the connect token was cancelled the child never reached its exit command: "
-            + "it is blocked writing to a stderr pipe nobody drains any more");
+            + "it is blocked writing to a stderr pipe nobody drains any more. "
+            + (exited ? string.Empty : child.DescribeDrainState()));
     }
 
     private static string CommandProcessorPath => Path.Combine(
@@ -119,7 +127,17 @@ public sealed class PlinkTunnelRunnerDrainReproTests
     /// </summary>
     private sealed class CommandProcessorStandin : IPlinkProcess
     {
+        private const int StandardErrorReaderBufferBytes = 4096;
+        private const int MillisecondsPerSecond = 1000;
+        private static readonly TimeSpan PoolProbeBackstop = TimeSpan.FromSeconds(5);
         private static readonly string Line = new string('x', 100);
+
+        private ObservedReadStream? _observedStream;
+        private StreamReader? _standardError;
+        private long _burstTimestamp;
+        private bool _burstRecorded;
+        private PoolSnapshot _poolAtBurst;
+        private volatile bool _exitTyped;
 
         private readonly Process _process = new()
         {
@@ -146,11 +164,17 @@ public sealed class PlinkTunnelRunnerDrainReproTests
 
         public int ExitCode => _process.ExitCode;
 
-        public StreamReader StandardError => _process.StandardError;
+        public StreamReader StandardError => _standardError ?? _process.StandardError;
 
         public bool Start()
         {
             bool started = _process.Start();
+            _observedStream = new ObservedReadStream(_process.StandardError.BaseStream);
+            _standardError = new StreamReader(
+                _observedStream,
+                _process.StandardError.CurrentEncoding,
+                false,
+                StandardErrorReaderBufferBytes);
             // Stdout is never read by the runner; discard it so it can never be the pipe that blocks.
             _process.BeginOutputReadLine();
             return started;
@@ -174,15 +198,112 @@ public sealed class PlinkTunnelRunnerDrainReproTests
         /// <summary>Makes the child write <paramref name="lines"/> lines of 100 characters to stderr.</summary>
         public void WriteStderrBurst(int lines)
         {
+            _poolAtBurst = PoolSnapshot.Capture();
+            Interlocked.Exchange(ref _burstTimestamp, Stopwatch.GetTimestamp());
+            _burstRecorded = true;
             _process.StandardInput.WriteLine($"for /L %i in (1,1,{lines}) do @echo {Line} 1>&2");
             _process.StandardInput.Flush();
         }
 
         public void TypeExit()
         {
+            _exitTyped = true;
             _process.StandardInput.WriteLine("exit");
             _process.StandardInput.Flush();
         }
+
+        /// <summary>
+        /// One diagnostic line naming where the stderr drain stands, so a failed verdict says
+        /// whether the drain was starved, stuck on a read, or never started.
+        /// </summary>
+        public string DescribeDrainState()
+        {
+            long now = Stopwatch.GetTimestamp();
+            CultureInfo inv = CultureInfo.InvariantCulture;
+            StringBuilder text = new("drain state: ");
+
+            if (_burstRecorded)
+            {
+                text.Append(inv, $"elapsed since burst {Millis(Interlocked.Read(ref _burstTimestamp), now)} ms; ");
+            }
+            else
+            {
+                text.Append("burst not written; ");
+            }
+
+            ObservedReadStream? stream = _observedStream;
+            if (stream is null)
+            {
+                text.Append("no observed stream (process never started); ");
+            }
+            else
+            {
+                long started = stream.ReadsStarted;
+                long completed = stream.ReadsCompleted;
+                long lastStart = stream.LastStartTimestamp;
+                long lastCompletion = stream.LastCompletionTimestamp;
+                text.Append(inv, $"reads started {started}, completed {completed}, bytes {stream.BytesRead}; ");
+                long faulted = stream.ReadsFaulted;
+                long cancelled = stream.ReadsCancelled;
+                long lastAbort = stream.LastAbortTimestamp;
+                text.Append(inv, $"faulted {faulted}, cancelled {cancelled}, end-of-stream {stream.EndOfStreamReads}; ");
+                if (faulted + cancelled > 0)
+                {
+                    text.Append(inv, $"last faulted or cancelled read {Millis(lastAbort, now)} ms ago; ");
+                }
+
+                if (started > completed + faulted + cancelled)
+                {
+                    text.Append(inv, $"a read has been pending for {Millis(lastStart, now)} ms; ");
+                }
+
+                if (lastCompletion == 0)
+                {
+                    text.Append("no read ever completed; ");
+                }
+                else
+                {
+                    text.Append(inv, $"last completion {Millis(lastCompletion, now)} ms ago; ");
+                }
+            }
+
+            PoolSnapshot current = PoolSnapshot.Capture();
+            text.Append(inv, $"pool at burst [{_poolAtBurst}], pool now [{current}], completed items delta {current.Completed - _poolAtBurst.Completed}; ");
+
+            using ManualResetEventSlim probeRan = new(false);
+            long probeStart = Stopwatch.GetTimestamp();
+            ThreadPool.UnsafeQueueUserWorkItem(static gate => gate.Set(), probeRan, preferLocal: false);
+            bool dispatched = probeRan.Wait(PoolProbeBackstop);
+            long probeEnd = Stopwatch.GetTimestamp();
+            if (dispatched)
+            {
+                text.Append(inv, $"pool probe dispatched in {Millis(probeStart, probeEnd)} ms; ");
+            }
+            else
+            {
+                text.Append(inv, $"pool probe NOT dispatched within {PoolProbeBackstop.TotalMilliseconds:0} ms; ");
+            }
+
+            try
+            {
+                bool hasExited = _process.HasExited;
+                text.Append(inv, $"child HasExited {hasExited}");
+                if (!hasExited)
+                {
+                    text.Append(inv, $", TotalProcessorTime {_process.TotalProcessorTime.TotalMilliseconds:0} ms");
+                }
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or Win32Exception or NotSupportedException)
+            {
+                text.Append(inv, $"child state unavailable ({ex.GetType().Name})");
+            }
+
+            text.Append(inv, $"; exit typed {_exitTyped}");
+            return text.ToString();
+        }
+
+        private static long Millis(long fromTimestamp, long toTimestamp)
+            => (toTimestamp - fromTimestamp) * MillisecondsPerSecond / Stopwatch.Frequency;
 
         public void Dispose()
         {
@@ -195,6 +316,178 @@ public sealed class PlinkTunnelRunnerDrainReproTests
             }
 
             _process.Dispose();
+        }
+    }
+
+    private readonly record struct PoolSnapshot(int Threads, long Pending, long Completed)
+    {
+        public static PoolSnapshot Capture()
+            => new(ThreadPool.ThreadCount, ThreadPool.PendingWorkItemCount, ThreadPool.CompletedWorkItemCount);
+
+        public override string ToString()
+            => string.Create(CultureInfo.InvariantCulture, $"threads {Threads}, pending {Pending}, completed {Completed}");
+    }
+
+    /// <summary>Read-only pass-through that counts the reads made on the child's stderr pipe.</summary>
+    private sealed class ObservedReadStream(Stream inner) : Stream
+    {
+        private long _readsStarted;
+
+        public long ReadsStarted => Interlocked.Read(ref _readsStarted);
+
+        private long _readsCompleted;
+
+        public long ReadsCompleted => Interlocked.Read(ref _readsCompleted);
+
+        private long _bytesRead;
+
+        public long BytesRead => Interlocked.Read(ref _bytesRead);
+
+        private long _lastStartTimestamp;
+
+        public long LastStartTimestamp => Interlocked.Read(ref _lastStartTimestamp);
+
+        private long _readsFaulted;
+
+        public long ReadsFaulted => Interlocked.Read(ref _readsFaulted);
+
+        private long _readsCancelled;
+
+        public long ReadsCancelled => Interlocked.Read(ref _readsCancelled);
+
+        private long _endOfStreamReads;
+
+        public long EndOfStreamReads => Interlocked.Read(ref _endOfStreamReads);
+
+        private long _lastAbortTimestamp;
+
+        public long LastAbortTimestamp => Interlocked.Read(ref _lastAbortTimestamp);
+
+        private long _lastCompletionTimestamp;
+
+        public long LastCompletionTimestamp => Interlocked.Read(ref _lastCompletionTimestamp);
+
+
+        public override bool CanRead => inner.CanRead;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => false;
+
+        public override long Length => throw new NotSupportedException();
+
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            Begin();
+            try
+            {
+                int count = await inner.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+                End(count);
+                return count;
+            }
+            catch (Exception ex)
+            {
+                Abort(ex);
+                throw;
+            }
+        }
+
+        public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        {
+            Begin();
+            try
+            {
+                int read = await inner.ReadAsync(buffer, offset, count, cancellationToken).ConfigureAwait(false);
+                End(read);
+                return read;
+            }
+            catch (Exception ex)
+            {
+                Abort(ex);
+                throw;
+            }
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            Begin();
+            try
+            {
+                int read = inner.Read(buffer, offset, count);
+                End(read);
+                return read;
+            }
+            catch (Exception ex)
+            {
+                Abort(ex);
+                throw;
+            }
+        }
+
+        public override int Read(Span<byte> buffer)
+        {
+            Begin();
+            try
+            {
+                int read = inner.Read(buffer);
+                End(read);
+                return read;
+            }
+            catch (Exception ex)
+            {
+                Abort(ex);
+                throw;
+            }
+        }
+
+        public override void Flush()
+        {
+        }
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                inner.Dispose();
+            }
+
+            base.Dispose(disposing);
+        }
+
+        private void Begin()
+        {
+            Interlocked.Increment(ref _readsStarted);
+            Interlocked.Exchange(ref _lastStartTimestamp, Stopwatch.GetTimestamp());
+        }
+
+        private void Abort(Exception ex)
+        {
+            Interlocked.Increment(ref ex is OperationCanceledException ? ref _readsCancelled : ref _readsFaulted);
+            Interlocked.Exchange(ref _lastAbortTimestamp, Stopwatch.GetTimestamp());
+        }
+
+        private void End(int count)
+        {
+            if (count == 0)
+            {
+                Interlocked.Increment(ref _endOfStreamReads);
+            }
+
+            Interlocked.Add(ref _bytesRead, count);
+            Interlocked.Exchange(ref _lastCompletionTimestamp, Stopwatch.GetTimestamp());
+            Interlocked.Increment(ref _readsCompleted);
         }
     }
 }
