@@ -317,7 +317,8 @@ public class PlinkTunnelRunnerTests : IDisposable
         // The foreign listener is bound on a system-assigned port and kept open for the whole test.
         // Picking a free port number and binding it later left a window in which another test
         // process could take the port; here the port is never free between being chosen and listened
-        // on. The listener lives in the test process, whose pid differs from the fake plink pid.
+        // on. The listener lives in the test process; the pid of the fake plink process differs from
+        // it because FakePlinkProcess never hands out Environment.ProcessId.
         var listener = new TcpListener(IPAddress.Loopback, AnyAvailablePort);
         listener.Start();
         int localPort = ((IPEndPoint)listener.LocalEndpoint).Port;
@@ -1212,7 +1213,21 @@ public class PlinkTunnelRunnerTests : IDisposable
 
         public event EventHandler? Exited;
 
-        public int Id { get; } = Interlocked.Increment(ref _nextProcessId);
+        /// <summary>
+        /// Hands out the next fake process id, never the id of the test host itself.
+        /// </summary>
+        /// <remarks>
+        /// Tests bind their listeners inside the test host, so the real ownership probe attributes
+        /// them to <see cref="Environment.ProcessId"/>. A fake id equal to it would make a foreign
+        /// listener look owned by the fake plink process.
+        /// </remarks>
+        private static int NextProcessId()
+        {
+            int id = Interlocked.Increment(ref _nextProcessId);
+            return id == Environment.ProcessId ? Interlocked.Increment(ref _nextProcessId) : id;
+        }
+
+        public int Id { get; } = NextProcessId();
 
         public bool HasExited { get; private set; }
 
