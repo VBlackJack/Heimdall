@@ -15,6 +15,7 @@
  */
 
 using Heimdall.App.Localization;
+using Heimdall.App.ViewModels;
 using Heimdall.Ssh;
 
 namespace Heimdall.App.Services;
@@ -87,6 +88,18 @@ internal static class TerminalReconnectPolicy
 
         return hasReason ? reason : hasDetail ? disconnectDetail : null;
     }
+
+    /// <summary>
+    /// Whether a late early-output diagnostic may still write the handed-off status. The session
+    /// output and its exit are delivered by separate threads, so the last chunk can reach the
+    /// dispatcher after the end of the session was already applied: writing the handed-off status
+    /// then would leave a dead session looking alive (no Reconnect, Disconnect shown, counted at
+    /// quit). The pane status is the fact that the session is over: it is written on the
+    /// dispatcher only, and a re-attach writes the connected status again, which lifts the guard.
+    /// </summary>
+    public static bool MayWriteHandedOffDiagnostic(string? currentPaneStatus)
+        => !string.Equals(currentPaneStatus, SessionStatusTokens.Disconnected, StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(currentPaneStatus, SessionStatusTokens.Error, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Classifies a terminal process exit into a disconnect info: exit code 0 is a clean

@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.Collections.Frozen;
 using Heimdall.App.ViewModels;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
@@ -33,8 +34,22 @@ namespace Heimdall.App.Services;
 /// </remarks>
 internal static class ShutdownDecisions
 {
-    /// <summary>The status a session pane reports while it is connected.</summary>
-    private const string ConnectedStatus = "Connected";
+    /// <summary>
+    /// The pane statuses of a session that quitting the application really ends: a connected
+    /// session and an embedded remote session (WinRM), which is a live remote PowerShell hosted
+    /// inside Heimdall for its whole life. Deliberately not the set the close-tab prompts use
+    /// (<c>ConnectionStateSets.Connected</c>): that one also holds the external-client status,
+    /// and an external client (mstsc, PuTTY, a browser) is a separate process that survives the
+    /// exit, so counting it would ask a false question at every quit.
+    /// </summary>
+    /// <remarks>
+    /// Compared ordinally against the exact tokens: the status can also be free failure text,
+    /// which an enum parse would accept in forms such as a number or a comma list. A wrong
+    /// count only adds or removes a confirmation question, so the strict match is the safe one.
+    /// </remarks>
+    private static readonly FrozenSet<string> EndedByQuitStatuses =
+        new[] { SessionStatusTokens.Connected, SessionStatusTokens.RemoteSessionHandedOff }
+            .ToFrozenSet(StringComparer.Ordinal);
 
     /// <summary>Locale key of the title of the exit confirmation.</summary>
     private const string ExitConfirmationTitleKey = "ConfirmCloseSessionGroupTitle";
@@ -112,10 +127,17 @@ internal static class ShutdownDecisions
     }
 
     /// <summary>
-    /// How many sessions are connected, counting the ones detached into floating
-    /// windows. The close confirmation counted the main collection only, and detaching
+    /// How many sessions quitting the application will end, counting the ones detached into
+    /// floating windows. The close confirmation counted the main collection only, and detaching
     /// removes a session from it: three detached sessions produced a count of zero.
     /// </summary>
+    /// <remarks>
+    /// A session counts when one of its panes is <c>Connected</c> or <c>RemoteSessionHandedOff</c>
+    /// (an embedded WinRM session). <c>LaunchedExternalClient</c> does not count: that client is
+    /// a separate process which outlives Heimdall, and for some of them there is no signal that
+    /// it ended. Every other status (connecting, reconnecting, disconnecting, error,
+    /// disconnected, free failure text, empty) does not count either.
+    /// </remarks>
     public static int CountConnectedSessions(
         IEnumerable<SessionTabViewModel> attached,
         IEnumerable<SessionTabViewModel> detached)
@@ -127,7 +149,7 @@ internal static class ShutdownDecisions
 
     private static bool IsConnected(SessionTabViewModel session)
         => SplitTreeHelper.EnumerateLeaves(session.RootContent)
-            .Any(pane => string.Equals(pane.Status, ConnectedStatus, StringComparison.Ordinal));
+            .Any(pane => pane.Status is not null && EndedByQuitStatuses.Contains(pane.Status));
 }
 
 /// <summary>Where an unhandled exception goes once it is logged and flushed.</summary>

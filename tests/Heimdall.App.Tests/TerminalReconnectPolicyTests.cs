@@ -41,6 +41,24 @@ public sealed class TerminalReconnectPolicyTests
             TerminalReconnectPolicy.ResolveWinRmNotEnteredMessageKey(connectionType, exitCode));
     }
 
+    /// <remarks>
+    /// Output and exit arrive on separate threads: a late diagnostic chunk was queued after the
+    /// disconnect and wrote the handed-off status over a dead session.
+    /// </remarks>
+    [Theory]
+    [InlineData(Heimdall.App.ViewModels.SessionStatusTokens.Disconnected, false)]
+    [InlineData(Heimdall.App.ViewModels.SessionStatusTokens.Error, false)]
+    [InlineData("disconnected", false)]
+    [InlineData(Heimdall.App.ViewModels.SessionStatusTokens.Connected, true)]
+    [InlineData(Heimdall.App.ViewModels.SessionStatusTokens.RemoteSessionHandedOff, true)]
+    [InlineData(Heimdall.App.ViewModels.SessionStatusTokens.Connecting, true)]
+    [InlineData("", true)]
+    [InlineData(null, true)]
+    public void MayWriteHandedOffDiagnostic_NeverOverAnEndedSession(string? currentPaneStatus, bool expected)
+    {
+        Assert.Equal(expected, TerminalReconnectPolicy.MayWriteHandedOffDiagnostic(currentPaneStatus));
+    }
+
     [Theory]
     [InlineData(true, 1, true, false, SshLocalizationKeys.ErrorSshPasswordlessSignInFailed)]
     [InlineData(true, 1, true, true, null)]

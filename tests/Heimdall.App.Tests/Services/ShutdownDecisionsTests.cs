@@ -16,6 +16,7 @@
 
 using Heimdall.App.Services;
 using Heimdall.App.ViewModels;
+using Heimdall.Core.Models;
 
 namespace Heimdall.App.Tests.Services;
 
@@ -113,7 +114,110 @@ public sealed class ShutdownDecisionsTests
         Assert.Equal(0, ShutdownDecisions.CountConnectedSessions([], []));
     }
 
-    private static SessionTabViewModel Connected() => new() { Status = "Connected" };
+    /// <remarks>
+    /// An embedded WinRM session carries this status for its whole life and is ended by quitting,
+    /// so quitting with only WinRM tabs open must ask, attached or detached.
+    /// </remarks>
+    [Fact]
+    public void CountConnectedSessions_CountsEmbeddedRemoteSessionsAttachedAndDetached()
+    {
+        SessionTabViewModel[] attached = [WithStatus(SessionStatusTokens.RemoteSessionHandedOff)];
+        SessionTabViewModel[] detached = [WithStatus(SessionStatusTokens.RemoteSessionHandedOff)];
 
-    private static SessionTabViewModel Disconnected() => new() { Status = "Disconnected" };
+        Assert.Equal(1, ShutdownDecisions.CountConnectedSessions(attached, []));
+        Assert.Equal(1, ShutdownDecisions.CountConnectedSessions([], detached));
+        Assert.Equal(2, ShutdownDecisions.CountConnectedSessions(attached, detached));
+    }
+
+    /// <remarks>
+    /// An external client (mstsc, PuTTY, a browser) is a separate process that survives the exit,
+    /// and for some of them Heimdall has no signal that they ended: counting them would ask a
+    /// false question at every quit. This differs on purpose from ConnectionStateSets.Connected.
+    /// </remarks>
+    [Fact]
+    public void CountConnectedSessions_DoesNotCountExternalClientsAttachedOrDetached()
+    {
+        SessionTabViewModel[] attached = [WithStatus(SessionStatusTokens.LaunchedExternalClient)];
+        SessionTabViewModel[] detached = [WithStatus(SessionStatusTokens.LaunchedExternalClient)];
+
+        Assert.Equal(0, ShutdownDecisions.CountConnectedSessions(attached, detached));
+    }
+
+    [Theory]
+    [InlineData(SessionStatusTokens.Connecting)]
+    [InlineData(SessionStatusTokens.Reconnecting)]
+    [InlineData(SessionStatusTokens.Disconnecting)]
+    [InlineData(SessionStatusTokens.Error)]
+    [InlineData(SessionStatusTokens.Disconnected)]
+    [InlineData("The remote host refused the connection")]
+    [InlineData("")]
+    public void CountConnectedSessions_DoesNotCountOtherStatuses(string status)
+    {
+        SessionTabViewModel[] attached = [WithStatus(status)];
+        SessionTabViewModel[] detached = [WithStatus(status)];
+
+        Assert.Equal(0, ShutdownDecisions.CountConnectedSessions(attached, detached));
+    }
+
+    [Fact]
+    public void CountConnectedSessions_MixedSet_CountsOnlySessionsQuittingEnds()
+    {
+        SessionTabViewModel[] attached =
+        [
+            WithStatus(SessionStatusTokens.Connected),
+            WithStatus(SessionStatusTokens.RemoteSessionHandedOff),
+            WithStatus(SessionStatusTokens.LaunchedExternalClient),
+            WithStatus(SessionStatusTokens.Error),
+        ];
+        SessionTabViewModel[] detached =
+        [
+            WithStatus(SessionStatusTokens.RemoteSessionHandedOff),
+            WithStatus(SessionStatusTokens.LaunchedExternalClient),
+            WithStatus(SessionStatusTokens.Disconnected),
+        ];
+
+        Assert.Equal(3, ShutdownDecisions.CountConnectedSessions(attached, detached));
+    }
+
+    /// <remarks>Pins the ordinal match: the tokens are exact, not parsed like an enum name.</remarks>
+    [Fact]
+    public void CountConnectedSessions_DoesNotCountAWrongCaseStatus()
+    {
+        SessionTabViewModel[] attached =
+        [
+            WithStatus(SessionStatusTokens.RemoteSessionHandedOff.ToLowerInvariant()),
+            WithStatus(SessionStatusTokens.Connected.ToUpperInvariant()),
+        ];
+
+        Assert.Equal(0, ShutdownDecisions.CountConnectedSessions(attached, []));
+    }
+
+    [Fact]
+    public void CountConnectedSessions_CountsATabWhoseOnlyWinRmPaneIsSecondary()
+    {
+        SessionTabViewModel split = new()
+        {
+            RootContent = new SplitContainerModel
+            {
+                First = new SessionPaneModel { Status = SessionStatusTokens.Disconnected },
+                Second = new SessionPaneModel { Status = SessionStatusTokens.RemoteSessionHandedOff },
+            },
+        };
+
+        Assert.Equal(1, ShutdownDecisions.CountConnectedSessions([split], []));
+    }
+
+    [Fact]
+    public void CountConnectedSessions_NullStatus_IsNotCounted()
+    {
+        SessionTabViewModel[] attached = [WithStatus(null!)];
+
+        Assert.Equal(0, ShutdownDecisions.CountConnectedSessions(attached, []));
+    }
+
+    private static SessionTabViewModel Connected() => WithStatus(SessionStatusTokens.Connected);
+
+    private static SessionTabViewModel Disconnected() => WithStatus(SessionStatusTokens.Disconnected);
+
+    private static SessionTabViewModel WithStatus(string status) => new() { Status = status };
 }
