@@ -12,6 +12,59 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-11-14: The Open Ports tool reads a table again when it grows while it is read (v2026.111401)
+
+Fixes merged as #796 and #806, test work as #796, #804 and #805, Dependabot rules as #797. The
+user-facing summary is in the release notes.
+
+### System table reads (#796, #806)
+
+- **Listener ownership probe (#796).** `WindowsTcpListenerOwnershipProbe.LoadTable` called
+  `GetExtendedTcpTable` for the size, then once with that size. Connections added in between give
+  ERROR_INSUFFICIENT_BUFFER, the probe answered Indeterminate, and `WaitForPortBindAsync` keeps the
+  last answer, so a port owned by another process could be reported as
+  `TunnelPortOwnershipIndeterminate` instead of `TunnelPortOwnedByDifferentProcess`. Both codes map
+  to the same message key (`ErrorSshTunnelPortOwnershipUnattested`, also used for
+  `TunnelPortNotListening`); the one visible difference is that with Indeterminate an exited Plink
+  whose stderr names a known cause is reported by that cause instead. A healthy tunnel was only
+  delayed: the loop probes again after `_portCheckInterval`. The sized read is retried at the size
+  the API reports, up to `MaxTableReadAttempts` (4), behind the internal seam
+  `WindowsTcpListenerOwnershipProbe.ITcpTableNative`.
+- **Open Ports tool (#806).** `OpenPortsService` had the same pattern in four copies (TCP and UDP,
+  IPv4 and IPv6), and a failed read gave an empty list for that table with no log. One generic
+  `LoadRows<TRow>` over `TryReadTable` now retries the same way, frees every buffer on every path,
+  and refuses a header row count that would run past the buffer. Internal seam
+  `OpenPortsService.IOpenPortsTableNative`. The ownership probe has no such row-count check yet.
+
+### Dependabot (#797)
+
+- FluentAssertions 8 and later and every major update of JsonSchema.Net are ignored: both moved to
+  a license that asks for payment in commercial use (Xceed community license, Open Source
+  Maintenance Fee agreement). FluentAssertions 7.x stays open. Same rule as WiX 7.
+
+### Tests (#796, #804, #805)
+
+- `PlinkTunnelRunnerTests.StartAsync_ProcessStartFails_ResetsStateAndAllowsRetry` started a text
+  file named `.exe`; on 64-bit Windows that raises a "16-bit application" dialog owned by the test
+  host, which held an unattended run for twenty minutes. The file is now held with an exclusive
+  lock, so the start fails on open with a sharing violation and no dialog appears (#796).
+- `ConPtySessionTests.DataReceived_SubscriberAddedAfterBootstrapOutput_ReplaysBufferedOutput`
+  awaits the new internal `ConPtySession.BootstrapOutputBuffered`, backed by
+  `OutputReplayGate.FirstChunkBuffered`, instead of sleeping 1.5 s. It keeps its
+  `CIUnstable` tag for now (#804).
+- `SshShellSessionTeardownTests.Disconnect_StuckReadLoop_DoesNotBlockCallerForFinalWait` asserts an
+  order on the fake clock instead of a 1.5 s wall-clock bound. With a substituted clock
+  `SshShellSession` runs its graceful wait on that clock; with the real clock the wait is the same
+  timed task wait as before. Two tests added: the two bounds keep their values, and a stuck read
+  loop on the real clock (#804).
+- `PlinkTunnelRunnerDrainReproTests`, control C-04: cause of its occasional failure under load not
+  established. The failure message now carries the read counters, the thread-pool state and the
+  child's state (#804).
+- `PlinkTunnelRunnerTests.TunnelPasswordFile_ForeignListenerFailsClosed` binds its foreign listener
+  first, on a system-assigned port, instead of on a port it had released (#805).
+- `TcpListenerOwnershipProbeTableTests` and `OpenPortsServiceTableTests` drive the two readers
+  through their native seams with real table layouts.
+
 ## 2026-11-13: Plink terminals start at the full width of their pane (v2026.111302)
 
 Fixes merged as #790, dependency updates as #791. The user-facing summary and the upgrade notes are
