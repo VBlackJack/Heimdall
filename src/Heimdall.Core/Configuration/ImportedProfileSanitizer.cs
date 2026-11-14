@@ -100,10 +100,15 @@ public static class ImportedProfileSanitizer
             }
 
             profile.CitrixLaunchCommandLine = null;
+
+            // What the file makes the profile run is not trusted until the user allows it: on the
+            // notice of the session dialog (and then saves), or at the connect-time prompt. Opening
+            // and saving the profile does not change it.
             profile.ExecutionConfirmed = false;
 
             // The file chose the names and the host: no stored secret is looked up by a name until
-            // the user has opened and saved the profile.
+            // the user allows it, on the notice of the session dialog (and then saves) or from the
+            // session list. Opening and saving the profile does not change it.
             profile.CredentialLookupConfirmed = false;
 
             // The key was chosen from the agent of the exporting machine: a file must not decide

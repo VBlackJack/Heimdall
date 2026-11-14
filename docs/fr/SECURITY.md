@@ -922,6 +922,10 @@ La fin du processus reste le filet de sécurité, tous les chemins qui libèrent
 une barrière unique afin que la suppression s'exécute exactement une fois, et un lancement qui
 échoue ou qui est annulé libère sur-le-champ.
 
+### Profils importés qui exécutent quelque chose
+
+Un profil issu d'un fichier peut démarrer un programme sur cet ordinateur (exécutable du shell local, arguments, répertoire de travail, élévation ; programme externe d'une console web ; fichier ICA Citrix) ou saisir des commandes post-connexion dans une session. L'import met `ExecutionConfirmed` à faux, et tant qu'il l'est, Heimdall désigne le programme qu'il démarrerait, ou compte les commandes post-connexion, et demande confirmation avant de les lancer. Modifier le profil n'y change rien : la boîte de dialogue de la session affiche au-dessus de ses onglets un avis qui énumère chacune de ces valeurs, étapes post-connexion comprises, même pour un protocole dont la boîte de dialogue ne les montre pas, et le profil n'est marqué comme approuvé que par le bouton "Autoriser l'exécution" de l'avis suivi de l'enregistrement, ou par l'acceptation de cette confirmation. Un profil créé dans la boîte de dialogue est approuvé.
+
 ### Durcissement des arguments de sous-processus
 
 `PlinkTunnelRunner` construit la liste d'arguments de plink via
@@ -1196,7 +1200,7 @@ remplacer la destination.
   bloquante (la suite moins les cas marqués `CIUnstable` ou `RequiresDesktop`,
   qui tournent dans deux autres lanes signalant leurs échecs sans faire rougir
   l'exécution), la parité des locales JSON (chaque catalogue porte exactement
-  le jeu de clés anglais, actuellement 6 200+ clés) et une analyse informative
+  le jeu de clés anglais, actuellement 6 300+ clés) et une analyse informative
   `dotnet list package --vulnerable`.
 - Analyse des dépendances pour revue manuelle : `dotnet list Heimdall.slnx
   package --vulnerable --include-transitive`. La CI émet des avertissements mais

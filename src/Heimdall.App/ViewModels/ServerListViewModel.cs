@@ -39,6 +39,7 @@ using Heimdall.Core.SessionDiagnostics;
 using Heimdall.Core.SessionHealth;
 using Heimdall.Core.Ssh;
 using Heimdall.Core.StateMachine;
+using Heimdall.Core.Utilities;
 using Microsoft.Win32;
 using KnownHostsImporter = Heimdall.App.Services.Import.KnownHostsImporter;
 
@@ -471,7 +472,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             body = _localizer.Format(
                 "ConfirmExecutionImportedIcaBody",
                 profile.DisplayName,
-                profile.CitrixIcaFilePath ?? string.Empty);
+                UntrustedText.MakeVisible(profile.CitrixIcaFilePath, UntrustedText.NoLengthLimit));
         }
         else
         {
@@ -546,14 +547,18 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
 
     /// <summary>
     /// Makes a value shown in the trust prompt unable to break the line or imitate another
-    /// field: line breaks and tabs become visible escapes and a double quote is escaped.
+    /// field: line breaks and tabs become visible escapes and a double quote is escaped. Any
+    /// other control, bidi, zero-width or line-separator character is then written out by
+    /// <see cref="UntrustedText"/>, without truncation.
     /// </summary>
     private static string MakeVisible(string value)
-        => value
-            .Replace("\r", "\\r", StringComparison.Ordinal)
-            .Replace("\n", "\\n", StringComparison.Ordinal)
-            .Replace("\t", "\\t", StringComparison.Ordinal)
-            .Replace("\"", "\\\"", StringComparison.Ordinal);
+        => UntrustedText.MakeVisible(
+            value
+                .Replace("\r", "\\r", StringComparison.Ordinal)
+                .Replace("\n", "\\n", StringComparison.Ordinal)
+                .Replace("\t", "\\t", StringComparison.Ordinal)
+                .Replace("\"", "\\\"", StringComparison.Ordinal),
+            UntrustedText.NoLengthLimit);
 
     /// <summary>
     /// Confirms and best-effort persists trust for imported post-connect commands.
@@ -2073,9 +2078,14 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         }
 
         // Saving through the Add dialog, where the user sees the name and the host, is what
-        // confirms the new profile: an ad hoc session is typed by the user, so its template is
-        // confirmed and the dialog writes that value back.
+        // confirms the new profile. A typed ad hoc template carries nothing the execution gate
+        // counts, so it is confirmed and the dialog writes that value back. A template that does
+        // carry a program, an ICA file or post-connect commands keeps its flag, and the dialog
+        // shows the notice for it.
         var dialogVm = ServerDialogViewModel.FromDto(template);
+        dialogVm.ExecutionConfirmed = template.ExecutionConfirmed
+            || !(ProfileExecutionTrust.CarriesLocalExecutionPayload(template)
+                || ProfileExecutionTrust.CarriesPostConnectPayload(template));
         dialogVm.DialogTitle = _localizer["DialogTitleAddServer"];
         dialogVm.IsEditMode = false;
         dialogVm.Origin = ProfileOrigin.Manual;

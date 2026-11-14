@@ -20,6 +20,7 @@ using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Heimdall.App.Services;
+using Heimdall.App.Services.Handlers;
 using Heimdall.App.Services.WinRm;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
@@ -290,6 +291,144 @@ public partial class ServerDialogViewModel : ObservableValidator
     /// <summary>Allows the lookup; the choice is saved with the dialog.</summary>
     [RelayCommand]
     private void AllowCredentialLookup() => CredentialLookupConfirmed = true;
+
+    // --- Execution trust ---
+
+    private const string ExecutionTrustNoticeKey = "ServerDialogExecutionTrustNotice";
+
+    /// <summary>
+    /// Whether what this session runs (a local program, a Citrix ICA file, post-connect commands)
+    /// was written or vetted by the user. A session created here is confirmed; an imported one
+    /// keeps its value until the user allows it on the notice, so renaming and saving an imported
+    /// session cannot turn its payload into a trusted one.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowExecutionTrustNotice))]
+    private bool _executionConfirmed = true;
+
+    /// <summary>
+    /// Whether the bar offering to allow what the session runs is shown: only while the session is
+    /// unconfirmed and the dialog holds something that is gated at connect time. Nothing is
+    /// computed once the session is confirmed.
+    /// </summary>
+    public bool ShowExecutionTrustNotice
+    {
+        get
+        {
+            if (ExecutionConfirmed)
+            {
+                return false;
+            }
+
+            ServerProfileDto probe = BuildExecutionTrustProbe();
+            return ProfileExecutionTrust.CarriesLocalExecutionPayload(probe)
+                || ProfileExecutionTrust.CarriesPostConnectPayload(probe);
+        }
+    }
+
+    /// <summary>
+    /// The bar's text: every value the session would run, as the dialog holds it now, so the
+    /// values listed are the ones the Allow choice would save.
+    /// </summary>
+    public string ExecutionTrustNoticeText
+    {
+        get
+        {
+            if (_localizer is null || ExecutionConfirmed)
+            {
+                return string.Empty;
+            }
+
+            ServerProfileDto probe = BuildExecutionTrustProbe();
+            return _localizer.Format(
+                ExecutionTrustNoticeKey,
+                ExecutionTrustDescriber.Describe(probe, LinkedTitleByLibraryId(), _localizer));
+        }
+    }
+
+    private static readonly System.ComponentModel.PropertyChangedEventArgs ExecutionTrustNoticeTextChanged =
+        new(nameof(ExecutionTrustNoticeText));
+
+    private static readonly System.ComponentModel.PropertyChangedEventArgs ShowExecutionTrustNoticeChanged =
+        new(nameof(ShowExecutionTrustNotice));
+
+    /// <summary>
+    /// The profile as the next load would see it: what the dialog would save, with a legacy
+    /// post-connect command turned into steps the way loading does, so the notice lists the same
+    /// commands the connect-time gate will count.
+    /// </summary>
+    private ServerProfileDto BuildExecutionTrustProbe()
+    {
+        // ToDto builds a new object with its own step list, so migrating it touches nothing else.
+        ServerProfileDto probe = ToDto();
+        PostConnectMigration.Migrate(probe);
+        return probe;
+    }
+
+    /// <summary>
+    /// The titles of the linked Command Library entries, by entry id. The title is not part of the
+    /// saved step, so the notice takes it from the rows the dialog resolved. Keyed by entry id and
+    /// not by step id: an imported file may repeat a step id, and an entry has one title.
+    /// </summary>
+    private Dictionary<string, string> LinkedTitleByLibraryId()
+    {
+        Dictionary<string, string> titles = new(StringComparer.Ordinal);
+        foreach (PostConnectStepItemViewModel step in PostConnectSteps)
+        {
+            if (step.IsLinked && step.CommandLibraryId is not null && step.LinkedActionTitle is not null)
+            {
+                titles.TryAdd(step.CommandLibraryId, step.LinkedActionTitle);
+            }
+        }
+
+        return titles;
+    }
+
+    /// <summary>
+    /// A web command too long to be described whole cannot be allowed from the notice: a value cut
+    /// short could hide the end of the arguments from the one who allows it.
+    /// </summary>
+    private bool CanAllowExecutionTrust()
+    {
+        if (!string.Equals(ConnectionType, "WEB", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        ServerProfileDto probe = ToDto();
+        return !ProfileExecutionTrust.CarriesLocalExecutionPayload(probe)
+            || WebExternalLaunch.FitsDescription(probe.WebExternalProgram, probe.WebExternalArguments);
+    }
+
+    /// <summary>Allows what the session runs; the choice is saved with the dialog.</summary>
+    [RelayCommand(CanExecute = nameof(CanAllowExecutionTrust))]
+    private void AllowExecutionTrust()
+    {
+        // Execute does not consult CanExecute, so the refusal is repeated here.
+        if (!CanAllowExecutionTrust())
+        {
+            return;
+        }
+
+        ExecutionConfirmed = true;
+    }
+
+    /// <summary>
+    /// Announces that the notice may have changed. Raises through the base class on purpose: it is
+    /// derived state, so it must neither pass through <see cref="OnPropertyChanged"/> again (no
+    /// recursion) nor count as an edit. Does nothing for a confirmed session.
+    /// </summary>
+    private void RaiseExecutionTrustNoticeChanged()
+    {
+        if (ExecutionConfirmed)
+        {
+            return;
+        }
+
+        base.OnPropertyChanged(ExecutionTrustNoticeTextChanged);
+        base.OnPropertyChanged(ShowExecutionTrustNoticeChanged);
+        AllowExecutionTrustCommand.NotifyCanExecuteChanged();
+    }
 
     // --- Identity ---
 
@@ -1729,6 +1868,8 @@ public partial class ServerDialogViewModel : ObservableValidator
         // Derived from the fields above and refreshed with them; never an edit of its own.
         nameof(CredentialLookupNoticeText),
         nameof(ShowCredentialLookupNotice),
+        nameof(ExecutionTrustNoticeText),
+        nameof(ShowExecutionTrustNotice),
         nameof(ShowAgentKeyForwardingWarning),
         nameof(HasChosenSshAgentKey),
         nameof(SshAgentKeyHelpText),
@@ -1744,6 +1885,14 @@ public partial class ServerDialogViewModel : ObservableValidator
             && e.PropertyName is not (nameof(CredentialLookupNoticeText) or nameof(ShowCredentialLookupNotice) or nameof(IsDirty)))
         {
             base.OnPropertyChanged(NoticeTextChanged);
+        }
+
+        // Every field can change what the session would run, so each change refreshes the notice.
+        // The refresh raises through the base class, which does not come back here: no recursion.
+        // The derived names are excluded all the same, so a refresh is never answered by another.
+        if (e.PropertyName is not (nameof(ExecutionTrustNoticeText) or nameof(ShowExecutionTrustNotice) or nameof(IsDirty)))
+        {
+            RaiseExecutionTrustNoticeChanged();
         }
 
         if (_isInitializing) return;
@@ -2614,6 +2763,30 @@ public partial class ServerDialogViewModel : ObservableValidator
     }
 
     /// <summary>
+    /// The shell executable to save: nothing for a blank field, and nothing for a profile that
+    /// named none and still shows the default shell.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="FromDto"/> shows the default shell for a profile that names none. Saving that
+    /// back would give the profile an executable it never had, which is a payload, and a payload
+    /// on an unconfirmed profile is what the execution gate asks about. A profile whose seed had
+    /// an executable, or a user who typed another one, is saved as typed.
+    /// </remarks>
+    private string? LocalShellExecutableToStore()
+    {
+        if (string.IsNullOrWhiteSpace(LocalShellExecutable))
+        {
+            return null;
+        }
+
+        bool seedNamedNone = _seed is not null && string.IsNullOrWhiteSpace(_seed.LocalShellExecutable);
+        return seedNamedNone
+            && string.Equals(LocalShellExecutable.Trim(), AppConstants.DefaultLocalShellExecutable, StringComparison.OrdinalIgnoreCase)
+                ? null
+                : LocalShellExecutable;
+    }
+
+    /// <summary>
     /// Maps the current ViewModel state to a flat DTO for persistence.
     /// </summary>
     public ServerProfileDto ToDto()
@@ -2626,7 +2799,7 @@ public partial class ServerDialogViewModel : ObservableValidator
         {
             DisplayName = DisplayName,
             Origin = Origin,
-            ExecutionConfirmed = true,
+            ExecutionConfirmed = ExecutionConfirmed,
             CredentialLookupConfirmed = CredentialLookupConfirmed,
             RemoteServer = RemoteServer,
             RemotePort = RemotePort,
@@ -2664,7 +2837,7 @@ public partial class ServerDialogViewModel : ObservableValidator
             PostConnectSteps = [.. PostConnectSteps.Select(step => step.ToModel())],
             PostConnectCommand = PostConnectCommand,
             PostConnectDelayMs = PostConnectDelayMs,
-            LocalShellExecutable = string.IsNullOrWhiteSpace(LocalShellExecutable) ? null : LocalShellExecutable,
+            LocalShellExecutable = LocalShellExecutableToStore(),
             LocalShellArguments = string.IsNullOrWhiteSpace(LocalShellArguments) ? null : LocalShellArguments,
             LocalShellWorkingDirectory = string.IsNullOrWhiteSpace(LocalShellWorkingDirectory) ? null : LocalShellWorkingDirectory,
             LocalShellElevated = ElevationMode != Core.Models.ElevationMode.None,
@@ -2851,6 +3024,7 @@ public partial class ServerDialogViewModel : ObservableValidator
             : new ServerDialogViewModel(monitorEnumerator);
         vm._seed = dto;
         vm.CredentialLookupConfirmed = dto.CredentialLookupConfirmed;
+        vm.ExecutionConfirmed = dto.ExecutionConfirmed;
         vm._isInitializing = true;
         vm.IsEditMode = true;
         vm.IsProtocolSelected = true;
