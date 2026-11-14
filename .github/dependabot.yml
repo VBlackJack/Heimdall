@@ -41,6 +41,16 @@ updates:
       - dependency-name: "JsonSchema.Net"
         update-types:
           - "version-update:semver-major"
+      # The Microsoft.* and System.* packages follow the .NET release they ship with. The
+      # solution targets net10.0, so their 11.x line belongs to the move to .NET 11, which
+      # is one decision for the whole solution and not one pull request per package.
+      # Remove these two entries when the target framework moves.
+      - dependency-name: "Microsoft.*"
+        update-types:
+          - "version-update:semver-major"
+      - dependency-name: "System.*"
+        update-types:
+          - "version-update:semver-major"
 
   - package-ecosystem: "github-actions"
     directory: "/"
