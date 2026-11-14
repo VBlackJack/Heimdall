@@ -80,6 +80,23 @@
                     AutomationProperties.Name="{loc:Translate BtnCancel}"
                     IsCancel="True" TabIndex="2" MinWidth="80" Margin="0,0,8,0"
                     Style="{DynamicResource SecondaryButtonStyle}" Click="OnCancelClick"/>
+            <Button x:Name="CloseRestoreLaterBtn" Content="{loc:Translate VaultDisableCloseRestoreLaterBtn}"
+                    AutomationProperties.Name="{loc:Translate VaultDisableCloseRestoreLaterBtn}"
+                    TabIndex="5" Margin="0,0,8,0"
+                    Visibility="{Binding IsRetryPending, Converter={StaticResource BoolToVisibilityConverter}}"
+                    Style="{DynamicResource SecondaryButtonStyle}" Click="OnCloseRestoreLaterClick"/>
+            <Button x:Name="RetryBtn" Content="{loc:Translate VaultDisableRetryBtn}"
+                    AutomationProperties.Name="{loc:Translate VaultDisableRetryBtn}"
+                    TabIndex="3" MinWidth="80" Margin="0,0,8,0"
+                    Visibility="{Binding IsRetryPending, Converter={StaticResource BoolToVisibilityConverter}}"
+                    IsEnabled="{Binding IsBusy, Converter={StaticResource InvertBoolConverter}, FallbackValue=True}"
+                    Style="{DynamicResource PrimaryButtonStyle}" Click="OnRetryClick"/>
+            <Button x:Name="DropUnreadableBtn" Content="{Binding DropButtonText}"
+                    AutomationProperties.Name="{Binding DropButtonText}"
+                    TabIndex="4" MinWidth="80" Margin="0,0,8,0"
+                    Visibility="{Binding HasUnreadable, Converter={StaticResource BoolToVisibilityConverter}}"
+                    IsEnabled="{Binding IsBusy, Converter={StaticResource InvertBoolConverter}, FallbackValue=True}"
+                    Style="{DynamicResource SecondaryButtonStyle}" Click="OnDropUnreadableClick"/>
             <Button x:Name="DisableBtn" Content="{loc:Translate VaultDisableConfirmBtn}"
                     AutomationProperties.Name="{loc:Translate VaultDisableConfirmBtn}"
                     IsDefault="True" TabIndex="1" MinWidth="80"

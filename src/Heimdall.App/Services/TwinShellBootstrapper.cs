@@ -19,6 +19,7 @@ using System.IO;
 using System.Text.Json;
 using Heimdall.App.Logging;
 using Heimdall.Core.Configuration;
+using Heimdall.Core.Security.Vault;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -54,6 +55,20 @@ internal static class TwinShellBootstrapper
     private const string ActionCountStage = "TwinShell action count";
 
     /// <summary>
+    /// Registers the store that makes the command history follow the vault in both directions, and
+    /// lets disabling the vault be refused while a row is still sealed with its key. The store
+    /// opens its own context: it is a singleton and the scoped one must not outlive its scope.
+    /// </summary>
+    /// <param name="services">The service collection.</param>
+    /// <param name="dbPath">The history database file.</param>
+    internal static void RegisterVaultStore(IServiceCollection services, string dbPath)
+    {
+        services.AddSingleton<IVaultSecretStore>(_ => new HistoryVaultSecretStore(
+            () => new TwinShellDbContext(
+                new DbContextOptionsBuilder<TwinShellDbContext>().UseSqlite($"Data Source={dbPath}").Options)));
+    }
+
+    /// <summary>
     /// Registers TwinShell persistence and core services.
     /// Call from <see cref="App.ConfigureServices"/>.
     /// </summary>
@@ -79,6 +94,8 @@ internal static class TwinShellBootstrapper
         // per scope. It is what keeps the two command-history fields that can carry what
         // the user typed out of the plain SQLite file.
         services.AddSingleton<ISecretProtector, CredentialProtectorAdapter>();
+
+        RegisterVaultStore(services, DbPath);
 
         services.AddScoped<IActionRepository, ActionRepository>();
         services.AddScoped<ICommandHistoryRepository, CommandHistoryRepository>();

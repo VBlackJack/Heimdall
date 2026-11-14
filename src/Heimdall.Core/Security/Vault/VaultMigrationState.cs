@@ -17,11 +17,11 @@
 namespace Heimdall.Core.Security.Vault;
 
 /// <summary>
-/// Resumable state of the vault's forward migration (legacy secrets -> v2). Only
-/// the forward direction is tracked: enabling the vault persists
+/// Resumable state of the vault's migrations. Enabling the vault persists
 /// <see cref="InProgress"/> before migrating so a crash is recoverable, then
-/// <see cref="Complete"/> on success. Disabling runs an idempotent reverse pass
-/// that does not use this state (it is retry-safe by construction).
+/// <see cref="Complete"/> on success. Disabling marks <see cref="InProgress"/> before it
+/// returns anything to the legacy form; if it does not finish, the next unlock runs the forward
+/// pass again (the key is intact) and clears the marker.
 /// </summary>
 public enum VaultMigrationState
 {

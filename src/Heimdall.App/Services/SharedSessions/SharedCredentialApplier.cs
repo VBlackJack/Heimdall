@@ -18,6 +18,7 @@ using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
 using Heimdall.Core.Security;
+using Heimdall.Core.Security.Vault;
 using Heimdall.Ssh;
 using Heimdall.Ssh.Agents;
 
@@ -122,7 +123,7 @@ public sealed class SharedCredentialApplier
         ArgumentNullException.ThrowIfNull(profile);
         ArgumentNullException.ThrowIfNull(settings);
 
-        var plan = new SharedCredentialPlan(_store, _agentRefused);
+        var plan = new SharedCredentialPlan(_store, _agentRefused, _seal);
         if (!SharedSessionIds.IsSharedProfile(profile))
         {
             return plan;
@@ -180,7 +181,7 @@ public sealed class SharedCredentialApplier
             gateway.SshPasswordEncrypted = _seal(answer.Password);
             if (answer.Remember)
             {
-                plan.Pending.Add((target, gateway.SshPasswordEncrypted));
+                plan.Pending.Add((target, CredentialProtector.ProtectTransient(answer.Password)));
             }
         }
 
@@ -228,7 +229,7 @@ public sealed class SharedCredentialApplier
                 ForbidRetype(profile);
                 if (answer.Remember)
                 {
-                    plan.Pending.Add((target, profile.SshPasswordEncrypted));
+                    plan.Pending.Add((target, CredentialProtector.ProtectTransient(answer.Password)));
                 }
             }
         }
@@ -343,15 +344,31 @@ public sealed class SharedCredentialApplier
     /// counts as readable: the connection asks for the vault to be unlocked, as it does for every
     /// other saved password.
     /// </summary>
-    private static bool IsReadableByTheProtector(string sealedSecret)
+    private static bool IsReadableByTheProtector(string sealedSecret) =>
+        IsReadable(ConnectionHelpers.DecryptPassword, sealedSecret, CredentialProtector.IsVaultEnabled);
+
+    /// <summary>
+    /// The decision behind <see cref="IsReadableByTheProtector"/>, with the reader and the vault
+    /// state passed in.
+    /// </summary>
+    /// <remarks>
+    /// A secret the reader refuses because the vault is locked is readable only while a vault
+    /// exists to unlock. Once the vault has been disabled its key is gone, so a secret still
+    /// sealed with it can never be opened again: it counts as unreadable, is forgotten, and the
+    /// password is asked for again like any other one this machine cannot open.
+    /// </remarks>
+    /// <param name="decrypt">The reader, which throws for a vault secret while the vault is locked.</param>
+    /// <param name="sealedSecret">The remembered secret.</param>
+    /// <param name="vaultEnabled">Whether a master-password vault is configured.</param>
+    internal static bool IsReadable(Func<string, string?> decrypt, string sealedSecret, bool vaultEnabled)
     {
         try
         {
-            return ConnectionHelpers.DecryptPassword(sealedSecret) is not null;
+            return decrypt(sealedSecret) is not null;
         }
         catch (Heimdall.Core.Security.Vault.VaultLockedException)
         {
-            return true;
+            return vaultEnabled;
         }
     }
 
@@ -415,7 +432,16 @@ public sealed class SharedCredentialApplier
         public Task RememberAsync(string password)
         {
             ArgumentException.ThrowIfNullOrEmpty(password);
-            return _owner._store.RememberAsync(_target.Kind, _target.SourceId, _target.Key, _owner._seal(password));
+            return SealAndRememberAsync(password);
+        }
+
+        private async Task SealAndRememberAsync(string password)
+        {
+            // The seal and the write are one scope for the vault: disabling it waits for this one
+            // to land. Nothing here waits on the network.
+            using IDisposable sealScope = await VaultSealGate.Shared.EnterAsync().ConfigureAwait(false);
+            await _owner._store.RememberAsync(_target.Kind, _target.SourceId, _target.Key, _owner._seal(password))
+                .ConfigureAwait(false);
         }
 
         /// <inheritdoc />
@@ -428,13 +454,16 @@ public sealed class SharedCredentialApplier
     {
         private readonly SharedSessionSecretStore _store;
         private readonly System.Collections.Concurrent.ConcurrentDictionary<SecretTarget, byte> _agentRefused;
+        private readonly Func<string, string> _seal;
 
         internal SharedCredentialPlan(
             SharedSessionSecretStore store,
-            System.Collections.Concurrent.ConcurrentDictionary<SecretTarget, byte> agentRefused)
+            System.Collections.Concurrent.ConcurrentDictionary<SecretTarget, byte> agentRefused,
+            Func<string, string> seal)
         {
             _store = store;
             _agentRefused = agentRefused;
+            _seal = seal;
         }
 
         /// <summary>The targets that got no password because the SSH agent offered keys.</summary>
@@ -442,7 +471,13 @@ public sealed class SharedCredentialApplier
 
         internal List<SecretTarget> Used { get; } = [];
 
-        internal List<(SecretTarget Target, string SealedSecret)> Pending { get; } = [];
+        /// <summary>
+        /// The passwords to remember, each held in the transient in-memory form of
+        /// <see cref="CredentialProtector.ProtectTransient"/> and never sealed with the vault key:
+        /// the connection takes seconds, and a vault disabled meanwhile would leave a blob nothing
+        /// could open. They are sealed with the protection in force when the plan is settled.
+        /// </summary>
+        internal List<(SecretTarget Target, string TransientSecret)> Pending { get; } = [];
 
         /// <summary>
         /// Keeps the passwords the user asked to remember once the server accepted them; drops the
@@ -482,14 +517,23 @@ public sealed class SharedCredentialApplier
 
             if (succeeded)
             {
-                foreach ((SecretTarget target, string sealedSecret) in Pending)
+                foreach ((SecretTarget target, string transientSecret) in Pending)
                 {
                     if (target.Kind == SharedSecretKind.Session && !sessionAuthenticated)
                     {
                         continue;
                     }
 
-                    await _store.RememberAsync(target.Kind, target.SourceId, target.Key, sealedSecret).ConfigureAwait(false);
+                    string? password = CredentialProtector.UnprotectTransient(transientSecret);
+                    if (string.IsNullOrEmpty(password))
+                    {
+                        continue;
+                    }
+
+                    // Sealed and stored inside one scope; the connect is over, so nothing waits on it.
+                    using IDisposable sealScope = await VaultSealGate.Shared.EnterAsync().ConfigureAwait(false);
+                    await _store.RememberAsync(target.Kind, target.SourceId, target.Key, _seal(password))
+                        .ConfigureAwait(false);
                 }
 
                 return;

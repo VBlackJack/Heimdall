@@ -1044,9 +1044,11 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         RefreshVaultHelloUiState();
     }
 
-    public string VaultStatusText => IsVaultEnabled
-        ? _localizer["SettingsVaultStatusEnabled"]
-        : _localizer["SettingsVaultStatusDisabled"];
+    public string VaultStatusText => IsVaultDisableIncomplete
+        ? _localizer["SettingsVaultStatusPending"]
+        : IsVaultEnabled
+            ? _localizer["SettingsVaultStatusEnabled"]
+            : _localizer["SettingsVaultStatusDisabled"];
 
     /// <summary>
     /// Why the auto-lock controls are disabled, for the accessible help text of their group; empty
@@ -1057,7 +1059,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         : _localizer["SettingsAutoLockRequiresVault"];
 
     /// <summary>Visibility flag for the "Enable" action (vault not yet configured).</summary>
-    public bool VaultDisabledActionsVisible => !IsVaultEnabled;
+    public bool VaultDisabledActionsVisible => !IsVaultEnabled && !IsVaultDisableIncomplete;
 
     /// <summary>Visibility flag for the "Change" / "Disable" actions (vault configured).</summary>
     public bool VaultEnabledActionsVisible => IsVaultEnabled;
@@ -4024,6 +4026,12 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             password => _vaultLifecycle.EnableAsync(password, Argon2idParameters.Recommended),
             _localizer);
         await _dialogService.ShowVaultEnableDialogAsync(dialogViewModel);
+        if (dialogViewModel.CompletionNotice.Length > 0)
+        {
+            // The master password is on; some stores are sealed at the next unlock.
+            _dialogService.ShowInfo(_localizer["VaultEnableTitle"], dialogViewModel.CompletionNotice);
+        }
+
         await RefreshVaultStatusAsync();
     }
 
@@ -4037,11 +4045,55 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         await RefreshVaultStatusAsync();
     }
 
+    /// <summary>
+    /// Whether a disable was undone but could not write the key back to disk: the application must
+    /// not be closed until the dialog's Retry has succeeded.
+    /// </summary>
+    public bool IsVaultDisableIncomplete => _vaultLifecycle.IsDisableIncomplete;
+
+    /// <summary>
+    /// Finishes a disable that was undone but could not write the key back to disk. Offered while
+    /// <see cref="IsVaultDisableIncomplete"/> is set; if it cannot complete, the next start restores
+    /// the vault from its journal.
+    /// </summary>
+    [RelayCommand]
+    private async Task RetryVaultRestoreAsync()
+    {
+        try
+        {
+            await _vaultLifecycle.RetryRestoreAsync();
+        }
+        catch (VaultDisableIncompleteException)
+        {
+            _dialogService.ShowWarning(_localizer["VaultDisableTitle"], _localizer["VaultDisableIncompleteError"]);
+        }
+        catch (VaultResidueException ex)
+        {
+            _dialogService.ShowWarning(
+                _localizer["VaultDisableTitle"],
+                ex.ProtectionRestored ? _localizer["VaultDisableError"] : _localizer["VaultDisableRestoreIncomplete"]);
+        }
+
+        await RefreshVaultStatusAsync();
+    }
+
     [RelayCommand]
     private async Task DisableVaultAsync()
     {
+        // The panel keeps edited gateways in memory and writes them over what is on disk when it
+        // saves. One edited before the disable and saved after it would write back the secret as
+        // the vault sealed it, which nothing could open once the key is gone.
+        if (_editedGatewayIds.Count > 0)
+        {
+            _dialogService.ShowWarning(
+                _localizer["VaultDisableTitle"],
+                _localizer["VaultDisableUnsavedGatewaysMessage"]);
+            return;
+        }
+
         VaultDisableDialogViewModel dialogViewModel = new VaultDisableDialogViewModel(
-            password => _vaultLifecycle.DisableAsync(password),
+            (password, dropUnreadable) => _vaultLifecycle.DisableAsync(password, dropUnreadable),
+            () => _vaultLifecycle.RetryRestoreAsync(),
             _localizer);
         await _dialogService.ShowVaultDisableDialogAsync(dialogViewModel);
         await RefreshVaultStatusAsync();
@@ -4097,6 +4149,9 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     public async Task RefreshVaultStatusAsync()
     {
+        OnPropertyChanged(nameof(IsVaultDisableIncomplete));
+        OnPropertyChanged(nameof(VaultDisabledActionsVisible));
+        OnPropertyChanged(nameof(VaultStatusText));
         AppSettings settings = await _configManager.LoadSettingsAsync();
         IsVaultEnabled = settings.VaultEnabled;
         IsVaultHelloEnrolled = settings.VaultHelloEnrolled;

@@ -271,7 +271,13 @@ public partial class App : System.Windows.Application
             await StartupStageTimer.RunAsync(ConfigInitStage, configManager.InitializeAsync);
 
             var localization = _serviceProvider.GetRequiredService<LocalizationManager>();
+
+            // A disable that did not finish leaves a journal: undo it before the vault state is read, so
+            // the application never starts as disabled while one exists. When the undo cannot be
+            // written yet, the start goes ahead as an enabled vault in memory.
+            VaultDisableJournal? unrestoredJournal = await VaultDisableJournal.RecoverAsync(configManager);
             var settings = await LoadStartupSettingsAsync(configManager);
+            unrestoredJournal?.ApplyTo(settings);
             _notesStoragePath = ResolveNotesStoragePath(settings, _dataRoot);
 
             await StartupStageTimer.RunAsync(
@@ -591,15 +597,43 @@ public partial class App : System.Windows.Application
             var workspaceLock = _serviceProvider.GetRequiredService<WorkspaceLockService>();
             workspaceLock.Configure(
                 settings.VaultEnabled, settings.AutoLockIdleMinutes, settings.DisconnectOnLock);
-            configManager.SettingsChanged += changed => Dispatcher.Invoke(() =>
+            // Posted, never waited for: this is raised from inside the vault operations, and a wait on
+            // the UI thread there is one more way for two threads to wait on each other.
+            configManager.SettingsChanged += changed => _ = Dispatcher.BeginInvoke(() =>
                 workspaceLock.Configure(
                     changed.VaultEnabled, changed.AutoLockIdleMinutes, changed.DisconnectOnLock));
+            workspaceLock.LockRefused += () => _ = Dispatcher.BeginInvoke(() =>
+            {
+                if (_mainViewModel is not null)
+                {
+                    _mainViewModel.StatusText = localization["VaultLockRefusedPending"];
+                }
+            });
 
             var mainWindow = _serviceProvider.GetRequiredService<MainWindow>();
             _mainViewModel = mainWindow.DataContext as MainViewModel;
             MainWindow = mainWindow;
             ShutdownMode = ShutdownMode.OnMainWindowClose;
             mainWindow.Show();
+
+            // A store the master password could not be applied to is reported in the status line,
+            // once a session; the unlock itself never waits for it.
+            var vaultStores = _serviceProvider.GetRequiredService<VaultLifecycleService>();
+            void ShowUnsealedStores(IReadOnlyList<string> storeNameKeys) =>
+                Dispatcher.BeginInvoke(() =>
+                {
+                    if (_mainViewModel is not null)
+                    {
+                        _mainViewModel.StatusText = localization.Format(
+                            "VaultStoresUnsealedNotice",
+                            string.Join(", ", storeNameKeys.Select(key => localization.GetString(key))));
+                    }
+                });
+            vaultStores.UnsealedStoresDetected += ShowUnsealedStores;
+            if (vaultStores.UnsealedStoreNameKeys.Count > 0)
+            {
+                ShowUnsealedStores(vaultStores.UnsealedStoreNameKeys);
+            }
 
             // After the unlock gate, so a Git token held by the vault can be read.
             _ = RunStartupGitSyncAsync(
@@ -778,7 +812,7 @@ public partial class App : System.Windows.Application
         // Vault lifecycle owns the session DEK holder, so a single instance.
         services.AddSingleton<ITpmPresenceService, WindowsTpmPresenceService>();
         services.AddSingleton<IVaultHelloService, WindowsVaultHelloService>();
-        services.AddSingleton<VaultLifecycleService>();
+        VaultServiceRegistration.Register(services, ApplicationDataPathResolver.Resolve());
         services.AddSingleton<WorkspaceLockService>();
 
         // SSH/Tunnel services
