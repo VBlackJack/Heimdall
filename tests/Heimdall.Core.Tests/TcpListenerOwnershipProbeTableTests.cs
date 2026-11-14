@@ -32,6 +32,7 @@ public sealed class TcpListenerOwnershipProbeTableTests
     private const uint Success = 0;
     private const uint ErrorInsufficientBuffer = 122;
     private const uint ErrorAccessDenied = 5;
+    private const uint ErrorInvalidData = 13;
     private const int Ipv4RowSize = 24;
     private const int Ipv6RowSize = 56;
     private const int CountHeaderSize = sizeof(uint);
@@ -207,6 +208,154 @@ public sealed class TcpListenerOwnershipProbeTableTests
             WindowsTcpListenerOwnershipProbe.Classify(address, ListenPort + 1, OwnerPid, [], rows));
         Assert.Equal(AfInet6, native.LastAddressFamily);
         native.AssertNothingLeaked();
+    }
+
+    [Theory]
+    [InlineData(false, 1)]
+    [InlineData(false, 100)]
+    [InlineData(true, 1)]
+    [InlineData(true, 100)]
+    public void LoadRows_CountLargerThanBuffer_IsRefusedAsInvalidDataAndFreesBuffer(bool ipv6, int extraRows)
+    {
+        byte[] table = WithCount(TwoRowTable(ipv6), 2 + extraRows);
+        using var native = new FakeNative(
+            new Step(ErrorInsufficientBuffer, table.Length),
+            new Step(Success, table.Length, table));
+
+        AssertRefusedAsInvalidData(native, ipv6);
+
+        Assert.Equal(1, native.Allocations);
+        native.AssertNothingLeaked();
+    }
+
+    [Theory]
+    [InlineData(false, -1)]
+    [InlineData(false, int.MinValue)]
+    [InlineData(false, int.MaxValue)]
+    [InlineData(true, -1)]
+    [InlineData(true, int.MinValue)]
+    [InlineData(true, int.MaxValue)]
+    public void LoadRows_NegativeOrHugeCount_IsRefusedAsInvalidDataAndFreesBuffer(bool ipv6, int count)
+    {
+        byte[] table = WithCount(TwoRowTable(ipv6), count);
+        using var native = new FakeNative(
+            new Step(ErrorInsufficientBuffer, table.Length),
+            new Step(Success, table.Length, table));
+
+        AssertRefusedAsInvalidData(native, ipv6);
+
+        native.AssertNothingLeaked();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void LoadRows_CountFittingExactly_IsParsed(bool ipv6)
+    {
+        byte[] table = TwoRowTable(ipv6);
+        using var native = new FakeNative(
+            new Step(ErrorInsufficientBuffer, table.Length),
+            new Step(Success, table.Length, table));
+
+        Assert.Equal(2, CountRows(native, ipv6));
+        native.AssertNothingLeaked();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void LoadRows_SuccessReportingSmallerSize_ParsesOnlyRowsThatFitTheReportedSize(bool ipv6)
+    {
+        byte[] full = TwoRowTable(ipv6);
+        int oneRowSize = CountHeaderSize + RowSize(ipv6);
+        byte[] oneRowAnnounced = WithCount(full, 1);
+        using var native = new FakeNative(
+            new Step(ErrorInsufficientBuffer, full.Length),
+            new Step(Success, oneRowSize, oneRowAnnounced));
+
+        Assert.Equal(1, CountRows(native, ipv6));
+        native.AssertNothingLeaked();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void LoadRows_CountFitsAllocationButNotReportedSize_IsRefusedAndFreesBuffer(bool ipv6)
+    {
+        byte[] full = TwoRowTable(ipv6);
+        int oneRowSize = CountHeaderSize + RowSize(ipv6);
+        using var native = new FakeNative(
+            new Step(ErrorInsufficientBuffer, full.Length),
+            new Step(Success, oneRowSize, full));
+
+        AssertRefusedAsInvalidData(native, ipv6);
+
+        native.AssertNothingLeaked();
+    }
+
+    [Theory]
+    [InlineData(false, 0)]
+    [InlineData(false, -5)]
+    [InlineData(true, 0)]
+    [InlineData(true, -5)]
+    public void LoadRows_SuccessReportingZeroOrNegativeSize_UsesAllocatedSize(bool ipv6, int reportedSize)
+    {
+        byte[] table = TwoRowTable(ipv6);
+        using var native = new FakeNative(
+            new Step(ErrorInsufficientBuffer, table.Length),
+            new Step(Success, reportedSize, table));
+
+        Assert.Equal(2, CountRows(native, ipv6));
+        native.AssertNothingLeaked();
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void LoadRows_ZeroOrNegativeReportedSizeWithCountBeyondAllocation_IsRefused(bool ipv6)
+    {
+        byte[] table = WithCount(TwoRowTable(ipv6), 3);
+        using var native = new FakeNative(
+            new Step(ErrorInsufficientBuffer, table.Length),
+            new Step(Success, 0, table));
+
+        AssertRefusedAsInvalidData(native, ipv6);
+
+        native.AssertNothingLeaked();
+    }
+
+    private static int RowSize(bool ipv6) => ipv6 ? Ipv6RowSize : Ipv4RowSize;
+
+    private static byte[] TwoRowTable(bool ipv6)
+        => ipv6
+            ? Ipv6Table(
+                (IPAddress.IPv6Loopback, ListenPort, TcpConnectionStateTable.ListeningState, OwnerPid),
+                (IPAddress.IPv6Loopback, ListenPort + 1, TcpConnectionStateTable.ListeningState, OtherPid))
+            : Ipv4Table(
+                (IPAddress.Loopback, ListenPort, TcpConnectionStateTable.ListeningState, OwnerPid),
+                (IPAddress.Loopback, ListenPort + 1, TcpConnectionStateTable.ListeningState, OtherPid));
+
+    private static byte[] WithCount(byte[] table, int count)
+    {
+        byte[] copy = (byte[])table.Clone();
+        BitConverter.GetBytes(count).CopyTo(copy, 0);
+        return copy;
+    }
+
+    private static int CountRows(FakeNative native, bool ipv6)
+        => ipv6
+            ? WindowsTcpListenerOwnershipProbe.LoadTcp6Rows(native).Count
+            : WindowsTcpListenerOwnershipProbe.LoadTcp4Rows(native).Count;
+
+    /// <summary>
+    /// The refusal is a Win32Exception, an ExternalException: the exact type the probe turns into Indeterminate.
+    /// </summary>
+    private static void AssertRefusedAsInvalidData(FakeNative native, bool ipv6)
+    {
+        ExternalException error = Assert.ThrowsAny<ExternalException>(() => CountRows(native, ipv6));
+
+        Win32Exception win32 = Assert.IsType<Win32Exception>(error);
+        Assert.Equal((int)ErrorInvalidData, win32.NativeErrorCode);
     }
 
     private static uint ToNetworkPort(int port)
