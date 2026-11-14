@@ -453,6 +453,13 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
     la fois précédente, y compris les modifications locales qui leur ont été apportées
   - Les mots de passe enregistrés par MobaXterm ne sont pas importés (chiffrement propriétaire) ; le
     résumé d'import les compte
+- Les fichiers de connexions mRemoteNG (Paramètres > Import) gardent l'ordre du fichier : dossiers
+  et sessions apparaissent dans l'ordre où mRemoteNG les liste, et non par ordre alphabétique. Dans
+  un dossier qui contient déjà des sessions ou des sous-dossiers, ceux-ci gardent leur place et les
+  éléments importés viennent après. L'arbre affiche toujours les sous-dossiers avant les sessions, et
+  les sessions hors de tout dossier vont dans "(Sans dossier)". Un dossier qui ne contient aucune
+  session n'est pas créé. Les identifiants ne sont pas repris du fichier : importer de nouveau le
+  même fichier ajoute ses sessions une seconde fois
 - Sources de sessions MobaXterm partagées (Paramètres > Général > Sources partagées) ;
   un guide pas à pas pour les équipes qui viennent de MobaXterm est dans
   [MOBAXTERM-SHARED-SESSIONS.md](MOBAXTERM-SHARED-SESSIONS.md) :
