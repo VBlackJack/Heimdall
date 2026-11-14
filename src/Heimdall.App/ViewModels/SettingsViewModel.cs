@@ -126,6 +126,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     // reference them. Empty for every other import format.
     private IReadOnlyList<SshGatewayDto> _mobaGateways = [];
 
+    // Set only by the branch that parsed an mRemoteNG file: the sessions and folders it adds keep
+    // the order of the file instead of showing alphabetically.
+    private bool _importKeepsSourceOrder;
+
     private string _originalTheme = "";
     private string _originalAccentTint = "Default";
 
@@ -3036,6 +3040,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
             _mobaStoredCredentialCount = 0;
             _mobaGateways = [];
+            _importKeepsSourceOrder = false;
             bool isMobaXterm = ext is ".mxtsessions" or ".ini" or ".mobaconf";
             string warningsOneKey = isMobaXterm ? "ImportMobaXtermIssuesOne" : "ImportMobaXtermWarningsOne";
             string warningsKey = isMobaXterm ? "ImportMobaXtermIssues" : "ImportMobaXtermWarnings";
@@ -3102,10 +3107,15 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                 await PersistImportedGatewaysAsync(imported, _mobaGateways);
             }
 
+            bool keepSourceOrder = _importKeepsSourceOrder;
+            List<string?> groupsBefore = [];
+            List<ServerProfileDto> added = [];
             var importResult = await _configManager.MutateServersAsync(existing =>
             {
                 int newCount = 0;
                 int updatedCount = 0;
+                added.Clear();
+                groupsBefore = keepSourceOrder ? existing.Select(candidate => candidate.Group).ToList() : [];
                 foreach (ServerProfileDto server in imported)
                 {
                     if (SharedSessionIds.IsShared(server.Id))
@@ -3133,12 +3143,29 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                     else
                     {
                         existing.Add(server);
+                        added.Add(server);
                         newCount++;
                     }
                 }
 
+                if (keepSourceOrder)
+                {
+                    // Excluding the added rows by reference is sound because the mRemoteNG parser
+                    // mints a fresh id per row, so the update-by-id branch above is never taken for
+                    // it. For a format whose ids can match, a replaced row would count as existing,
+                    // and a duplicate id inside the file would leave an orphan in "added".
+                    ImportSourceOrder.ArrangeSessions(existing, added);
+                }
+
                 return (NewCount: newCount, UpdatedCount: updatedCount);
             });
+
+            if (keepSourceOrder)
+            {
+                await PersistImportedFolderOrderAsync(
+                    groupsBefore,
+                    ImportSourceOrder.FolderPathsInFileOrder(added));
+            }
 
             int totalImported = importResult.NewCount + importResult.UpdatedCount;
             FileLogger.Info(
@@ -3374,6 +3401,42 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             _ => _localizer.Format("ImportMRemoteNgWarningNodeError", warning.NodeName, warning.Detail),
         };
 
+    /// <summary>
+    /// Persists the folder order that shows the imported folders in file order. The sessions are
+    /// already saved, so a failure here only leaves the folders alphabetical and must not turn a
+    /// successful import into an error.
+    /// </summary>
+    private async Task PersistImportedFolderOrderAsync(
+        IReadOnlyList<string?> groupsBefore,
+        IReadOnlyList<string> importedPaths)
+    {
+        try
+        {
+            AppSettings current = await _configManager.LoadSettingsAsync();
+            if (ComputeImportedFolderOrder(current, groupsBefore, importedPaths) is null)
+            {
+                return;
+            }
+
+            await _configManager.MergeSettingAsync(settings =>
+                settings.FolderOrder = ComputeImportedFolderOrder(settings, groupsBefore, importedPaths)
+                    ?? settings.FolderOrder);
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Warn($"[Import] Folder order was not saved: {ex.Message}");
+        }
+    }
+
+    private static List<string>? ComputeImportedFolderOrder(
+        AppSettings settings,
+        IReadOnlyList<string?> groupsBefore,
+        IReadOnlyList<string> importedPaths) =>
+        ImportSourceOrder.MergeFolderOrder(
+            settings.FolderOrder,
+            ImportSourceOrder.FolderPathsOf(groupsBefore.Concat(settings.EmptyGroups)),
+            importedPaths);
+
     private async Task<(List<ServerProfileDto> Servers, List<string>? Warnings)> ImportXmlAsync(
         string filePath, CancellationToken cancellationToken)
     {
@@ -3382,6 +3445,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             || content.Contains("Type=\"Connection\"", StringComparison.OrdinalIgnoreCase))
         {
             var mrnResult = MRemoteNgImporter.Parse(content);
+            _importKeepsSourceOrder = true;
             return (mrnResult.Servers, mrnResult.Warnings.Select(FormatMRemoteNgWarning).ToList());
         }
 

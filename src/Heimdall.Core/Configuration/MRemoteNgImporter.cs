@@ -319,6 +319,12 @@ public static class MRemoteNgImporter
         return true;
     }
 
+    /// <summary>The sessions and warnings read from one file.</summary>
+    /// <remarks>
+    /// <see cref="Servers"/> lists the sessions in document order, depth first: a container's
+    /// content is listed where the container stands, before the nodes that follow it. The import
+    /// relies on it to keep the file's order in the sessions tree, so the order must not change.
+    /// </remarks>
     public sealed class ImportResult
     {
         public List<ServerProfileDto> Servers { get; } = [];

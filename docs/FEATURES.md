@@ -448,6 +448,12 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
     any local edits made to them
   - Passwords stored by MobaXterm are not imported (proprietary encryption); the import summary
     counts them
+- mRemoteNG connection files (Settings > Import) keep the order of the file: folders and sessions
+  show in the order mRemoteNG lists them instead of alphabetically. In a folder that already holds
+  sessions or sub-folders, those keep their place and the imported ones follow them. The tree still
+  lists sub-folders before sessions, and sessions outside any folder go to "(No Folder)". A folder
+  that holds no session is not created. Identifiers are not taken from the file, so importing the
+  same file again adds its sessions a second time
 - Shared MobaXterm session sources (Settings > General > Shared sources); a step-by-step
   guide for teams coming from MobaXterm is in [MOBAXTERM-SHARED-SESSIONS.md](MOBAXTERM-SHARED-SESSIONS.md):
   - A source is a name and the path of a `.mxtsessions` file, typically on a team share or a

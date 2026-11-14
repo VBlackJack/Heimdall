@@ -30,6 +30,11 @@ public partial class ServerListViewModel
         new(StringComparer.OrdinalIgnoreCase);
     private List<ServerItemViewModel> _stableServerOrder = [];
 
+    // The whole inventory as the tree lists it: folders in tree order, sub-folders before the
+    // folder's own sessions. Distinct from _stableServerOrder, which is one global sort that feeds
+    // the flat list.
+    private List<ServerItemViewModel> _treeOrderServers = [];
+
     /// <summary>
     /// Set while a filter pass drives <see cref="FolderViewModel.IsExpanded"/> itself, so the
     /// expand-state handler can tell a branch the filter opened from one the user toggled.
@@ -735,6 +740,7 @@ public partial class ServerListViewModel
             .OrderBy(server => SessionOrdering.RankOf(server.SortOrder))
             .ThenBy(server => server.DisplayName, DisplayNameOrdering.Comparer)
             .ToList();
+        _treeOrderServers = ListServersInTreeOrder();
         StableTreeBuildCount++;
         FolderLayoutChanged?.Invoke();
     }
@@ -803,6 +809,7 @@ public partial class ServerListViewModel
             .OrderBy(server => SessionOrdering.RankOf(server.SortOrder))
             .ThenBy(server => server.DisplayName, DisplayNameOrdering.Comparer)
             .ToList();
+        _treeOrderServers = ListServersInTreeOrder();
 
         _stableFoldersByPath.Clear();
         foreach (StableFolderNode node in EnumerateStableFolders(_stableTreeRoot))
@@ -821,6 +828,45 @@ public partial class ServerListViewModel
 
         // A rename rekeys the folders only here, after the colour pass already told the tabs.
         FolderLayoutChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// Every session in the order the tree lists them. Any session the tree does not file (it
+    /// should not happen) follows in the global order, so the inventory stays whole.
+    /// </summary>
+    private List<ServerItemViewModel> ListServersInTreeOrder()
+    {
+        List<ServerItemViewModel> ordered = new(_allServers.Count);
+        HashSet<ServerItemViewModel> listed = new(ReferenceEqualityComparer.Instance);
+        AppendServersInTreeOrder(_stableTreeRoot, ordered, listed);
+        foreach (ServerItemViewModel server in _stableServerOrder)
+        {
+            if (listed.Add(server))
+            {
+                ordered.Add(server);
+            }
+        }
+
+        return ordered;
+    }
+
+    private static void AppendServersInTreeOrder(
+        StableFolderNode node,
+        List<ServerItemViewModel> ordered,
+        HashSet<ServerItemViewModel> listed)
+    {
+        foreach (StableFolderNode child in node.Children)
+        {
+            AppendServersInTreeOrder(child, ordered, listed);
+        }
+
+        foreach (ServerItemViewModel server in node.Servers)
+        {
+            if (listed.Add(server))
+            {
+                ordered.Add(server);
+            }
+        }
     }
 
     private static void SortStableTree(StableFolderNode node, IEnumerable<string>? folderOrder) =>
