@@ -31,9 +31,9 @@
       },
       "ThemeForge.Theme": {
         "type": "Direct",
-        "requested": "[2.1.0, )",
-        "resolved": "2.1.0",
-        "contentHash": "S67HoDY799UJZPq4kRIpVlxY8vkLFcdedxmBtJUj9748s2gThkSGvmCQKY7UlzrnAl/IW1Zodbo0iJy+rzp0eg=="
+        "requested": "[2.2.0, )",
+        "resolved": "2.2.0",
+        "contentHash": "TGW3X9bXMv7G1EbDHc+PlgRfId+2b8iJzRun60A4dY/w8cuOsC/Rmzx5FtS2af/t+Qo4emZS++g46X+6Dm+w8A=="
       },
       "BouncyCastle.Cryptography": {
         "type": "Transitive",
@@ -52,24 +52,24 @@
       },
       "Json.More.Net": {
         "type": "Transitive",
-        "resolved": "2.0.1.2",
-        "contentHash": "uF3QeiaXEfH92emz0/BWUiNtMSfxIIvgynuB0Bf1vF4s8eWTcZitBx9l+g/FDaJk5XxqBv9buQXizXKQcXFG1w=="
+        "resolved": "2.1.1",
+        "contentHash": "ZXAKl2VsdnIZeUo1PFII3Oi1m1L4YQjEyDjygHfHln5vgsjgIo749X6xWkv7qFYp8RROES+vOEfDcvvoVgs8kA=="
       },
       "JsonPointer.Net": {
         "type": "Transitive",
-        "resolved": "5.0.0",
-        "contentHash": "fm4T5w20AY6C+p5/pJr0vrXRNGgtSfHl34I1LxC9zdPwS9S3j0GiR1Mz/CVPWKDXXGDpCt1APHpCq7kn5adCfA==",
+        "resolved": "5.3.1",
+        "contentHash": "3e2OJjU0OaE26XC/klgxbJuXvteFWTDJIJv0ITYWcJEoskq7jzUwPSC1s0iz4wPPQnfN7vwwFmg2gJfwRAPwgw==",
         "dependencies": {
           "Humanizer.Core": "2.14.1",
-          "Json.More.Net": "2.0.1.2"
+          "Json.More.Net": "2.1.1"
         }
       },
       "JsonSchema.Net": {
         "type": "Transitive",
-        "resolved": "7.0.4",
-        "contentHash": "R0Hk2Tr/np4Q1NO8CBjyQsoiD1iFJyEQP20Sw7JnZCNGJoaSBe+g4b+nZqnBXPQhiqY5LGZ8JZwZkRh/eKZhEQ==",
+        "resolved": "7.4.0",
+        "contentHash": "5T3DWENwuCzLwFWz0qjXXVWA8+5+gC95OLkhqUBWpVpWBMr9gwfhWNeX8rWyr+fLQ7pIQ+lWuHIrmXRudxOOSw==",
         "dependencies": {
-          "JsonPointer.Net": "5.0.0"
+          "JsonPointer.Net": "5.3.1"
         }
       },
       "Konscious.Security.Cryptography.Argon2": {
@@ -330,7 +330,7 @@
       "twinshell.infrastructure": {
         "type": "Project",
         "dependencies": {
-          "JsonSchema.Net": "[7.0.4, )",
+          "JsonSchema.Net": "[7.4.0, )",
           "LibGit2Sharp": "[0.32.0, )",
           "TwinShell.Core": "[1.0.0, )",
           "TwinShell.Persistence": "[1.0.0, )",
