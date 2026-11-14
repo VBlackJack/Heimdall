@@ -193,9 +193,11 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
 
     /// <summary>
     /// Raised when a connection result is ready and a session tab should be created.
-    /// Parameters: sessionId, originalServerId, displayName, connectionType, session result.
+    /// Parameters: sessionId, originalServerId, displayName, connectionType, session result,
+    /// RDP mode override, and the task that completes when the external client process Heimdall
+    /// launched has exited (null when none was launched or its end cannot be observed).
     /// </summary>
-    public event Action<string, string, string, string, Core.Models.ISessionResult?, RdpModeOverride>? SessionReady;
+    public event Action<string, string, string, string, Core.Models.ISessionResult?, RdpModeOverride, Task?>? SessionReady;
 
     /// <summary>
     /// Raised when a connect that previously fired
@@ -1535,7 +1537,8 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
                     server.DisplayName,
                     serverDto.ConnectionType,
                     result.Session,
-                    rdpModeOverride);
+                    rdpModeOverride,
+                    result.ExternalClientExited);
                 lifecycleHandedOff = result.Session is not null;
                 return new BulkConnectOutcome(
                     BulkConnectOutcomeStatus.Success,

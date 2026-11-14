@@ -1016,7 +1016,8 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         string displayName,
         string connectionType,
         ISessionResult? session,
-        RdpModeOverride rdpModeOverride)
+        RdpModeOverride rdpModeOverride,
+        Task? externalClientExited)
     {
         if (!_uiDispatcher.CheckAccess())
         {
@@ -1026,7 +1027,8 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                 displayName,
                 connectionType,
                 session,
-                rdpModeOverride));
+                rdpModeOverride,
+                externalClientExited));
             return;
         }
 
@@ -1044,6 +1046,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                     externalTab.FailureDetails = null;
                     ApplyRdpModeOverride(externalTab, connectionType, rdpModeOverride);
                     externalTab.Status = SessionStatusTokens.LaunchedExternalClient;
+                    FollowExternalClient(externalTab, externalClientExited).SafeFireAndForget();
                 }
 
                 _main.StatusText = _localizer["StatusLaunchedExternalClient"];
@@ -1951,11 +1954,46 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                 connectionType);
             tab.MarkAsAdHoc(snapshot);
             tab.Status = SessionStatusTokens.LaunchedExternalClient;
+            FollowExternalClient(tab, result.ExternalClientExited).SafeFireAndForget();
             _main.StatusText = _localizer["StatusLaunchedExternalClient"];
             return;
         }
 
         _main.StatusText = result.ErrorMessage ?? _localizer["ErrorConnectionFailed"];
+    }
+
+    /// <summary>
+    /// Moves the tab of an external client session to Disconnected when the client process ends,
+    /// so the tab stops reading "launched" and stops counting as a connected session. Does nothing
+    /// when the end cannot be observed, when the tab has been closed, or when its status has moved
+    /// on from the launched one in the meantime.
+    /// </summary>
+    /// <param name="tab">The lightweight tab created for the launched client.</param>
+    /// <param name="exited">Completes when the client has exited; null when that cannot be observed.</param>
+    internal async Task FollowExternalClient(SessionTabViewModel tab, Task? exited)
+    {
+        ArgumentNullException.ThrowIfNull(tab);
+
+        if (exited is null)
+        {
+            FileLogger.Info($"External client end is not observable for sessionId={tab.ServerId}; its tab keeps the launched status.");
+            return;
+        }
+
+        SessionPaneModel pane = tab.PrimaryPane;
+        await exited.ConfigureAwait(false);
+
+        await _uiDispatcher.InvokeAsync(() =>
+        {
+            if (_disposed
+                || tab.IsClosed
+                || !string.Equals(pane.Status, SessionStatusTokens.LaunchedExternalClient, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            EmbeddedSessionManager.WriteHostStatus(tab, pane, SessionStatusTokens.Disconnected);
+        }).ConfigureAwait(false);
     }
 
     /// <summary>

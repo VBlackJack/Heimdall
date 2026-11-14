@@ -469,66 +469,80 @@ internal sealed class RdpHandler : IProtocolHandler
                     ? new CancellationTokenSource()
                     : null;
 
+            // Completed by the Exited handler on every path, so whoever follows the client can
+            // move its tab on. Continuations run asynchronously: the handler runs on a pool
+            // thread that must not execute a subscriber's code inline.
+            TaskCompletionSource exitSignal = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
             mstscProcess.Exited += (_, _) =>
             {
-                var exitCode = -1;
                 try
                 {
-                    exitCode = mstscProcess.ExitCode;
-                }
-                catch (InvalidOperationException)
-                {
-                    // The process may already be cleaned up by the OS.
-                }
+                    var exitCode = -1;
+                    try
+                    {
+                        exitCode = mstscProcess.ExitCode;
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        // The process may already be cleaned up by the OS.
+                    }
 
-                Core.Logging.FileLogger.Info(
-                    $"External mstsc.exe exited PID={mstscPid} ExitCode={exitCode} server={displayNameForExitClosure}");
+                    Core.Logging.FileLogger.Info(
+                        $"External mstsc.exe exited PID={mstscPid} ExitCode={exitCode} server={displayNameForExitClosure}");
 
-                try
-                {
-                    // Once the client is gone the watcher can only keep sweeping the desktop
-                    // with a live plaintext password, for a prompt that will never appear.
-                    autofillCancellation?.Cancel();
-                }
-                catch (ObjectDisposedException)
-                {
-                    // The autofill task already finished and disposed its own source.
-                }
-                catch (Exception ex)
-                {
-                    Core.Logging.FileLogger.Warn(
-                        $"Autofill watcher cancellation on mstsc.exe exit failed: {ex.Message}");
-                }
+                    try
+                    {
+                        // Once the client is gone the watcher can only keep sweeping the desktop
+                        // with a live plaintext password, for a prompt that will never appear.
+                        autofillCancellation?.Cancel();
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        // The autofill task already finished and disposed its own source.
+                    }
+                    catch (Exception ex)
+                    {
+                        Core.Logging.FileLogger.Warn(
+                            $"Autofill watcher cancellation on mstsc.exe exit failed: {ex.Message}");
+                    }
 
-                try
-                {
-                    stateMachineForExitClosure.TryTransition(
-                        serverIdForExitClosure,
-                        ConnectionState.Disconnected);
-                }
-                catch (Exception ex)
-                {
-                    Core.Logging.FileLogger.Warn(
-                        $"State transition on mstsc.exe exit failed: {ex.Message}");
-                }
+                    try
+                    {
+                        // By now the pipeline may have torn the entry down: ending only a tracked
+                        // session keeps this from bringing back an entry nothing removes.
+                        stateMachineForExitClosure.TryEndSession(
+                            serverIdForExitClosure,
+                            errorMessage: null);
+                    }
+                    catch (Exception ex)
+                    {
+                        Core.Logging.FileLogger.Warn(
+                            $"State transition on mstsc.exe exit failed: {ex.Message}");
+                    }
 
-                try
-                {
-                    ReleaseTunnelIfNeeded(usesTunnel, targetPort, tunnelLeaseId);
+                    try
+                    {
+                        ReleaseTunnelIfNeeded(usesTunnel, targetPort, tunnelLeaseId);
+                    }
+                    catch (Exception ex)
+                    {
+                        Core.Logging.FileLogger.Warn(
+                            $"Tunnel release on mstsc.exe exit failed: {ex.Message}");
+                    }
                 }
-                catch (Exception ex)
+                finally
                 {
-                    Core.Logging.FileLogger.Warn(
-                        $"Tunnel release on mstsc.exe exit failed: {ex.Message}");
-                }
+                    exitSignal.TrySetResult();
 
-                try
-                {
-                    mstscProcess.Dispose();
-                }
-                catch (Exception ex)
-                {
-                    Core.Logging.FileLogger.Warn($"mstsc.exe Process.Dispose failed: {ex.Message}");
+                    try
+                    {
+                        mstscProcess.Dispose();
+                    }
+                    catch (Exception ex)
+                    {
+                        Core.Logging.FileLogger.Warn($"mstsc.exe Process.Dispose failed: {ex.Message}");
+                    }
                 }
             };
             releaseTunnel = false;
@@ -602,7 +616,7 @@ internal sealed class RdpHandler : IProtocolHandler
             }, CancellationToken.None);
             deferredCleanupScheduled = true;
 
-            return new ConnectionResult(true, null, null, Warning: warning);
+            return new ConnectionResult(true, null, null, Warning: warning, ExternalClientExited: exitSignal.Task);
         }
         catch (Heimdall.Rdp.RdpGatewayAttestationException gex)
         {
