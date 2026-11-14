@@ -86,6 +86,50 @@ public sealed class SessionPaneDisconnectedOverlayTests
         Assert.True(SessionPaneControl.ShowsDisconnectedOverlay(null, hasFailureDetails: true, SessionStatusTokens.Error));
     }
 
+    // An external client (mstsc as a separate process) has no host control: its pane used to spin
+    // forever because "no host and no failure" meant "still loading". Once it reads Disconnected, the
+    // pane shows its Disconnected overlay and the spinner goes away, never both.
+    [Fact]
+    public void AnExternalClientPane_ThatDisconnected_ShowsTheDisconnectedOverlayNotTheSpinner()
+    {
+        Assert.True(SessionPaneControl.ShowsDisconnectedOverlay(null, hasFailureDetails: false, SessionStatusTokens.Disconnected));
+        Assert.False(SessionPaneControl.ShowsLoadingOverlay(null, hasFailureDetails: false, SessionStatusTokens.Disconnected));
+    }
+
+    [Theory]
+    [InlineData(SessionStatusTokens.Connecting)]
+    [InlineData(SessionStatusTokens.LaunchedExternalClient)]
+    public void AHostlessPane_StillLaunching_KeepsTheLoadingOverlay(string status)
+    {
+        Assert.True(SessionPaneControl.ShowsLoadingOverlay(null, hasFailureDetails: false, status));
+        Assert.False(SessionPaneControl.ShowsDisconnectedOverlay(null, hasFailureDetails: false, status));
+    }
+
+    [Theory]
+    [InlineData(SessionStatusTokens.Connecting)]
+    [InlineData(SessionStatusTokens.Connected)]
+    [InlineData(SessionStatusTokens.Disconnected)]
+    public void APaneWithAHost_NeverShowsTheLoadingOverlay(string status)
+    {
+        Assert.False(SessionPaneControl.ShowsLoadingOverlay(new object(), hasFailureDetails: false, status));
+    }
+
+    // The split service skips a pane with no host and no failure as "already reconnecting", so
+    // Reconnect on an exited external client inside a split would do nothing: it is not offered.
+    [Theory]
+    [InlineData(true, false, SessionStatusTokens.Disconnected, true, false)]
+    [InlineData(true, false, SessionStatusTokens.Disconnected, false, true)]
+    [InlineData(false, false, SessionStatusTokens.Disconnected, true, true)]
+    [InlineData(true, true, SessionStatusTokens.Error, true, true)]
+    [InlineData(true, false, SessionStatusTokens.Connecting, true, true)]
+    public void Reconnect_IsHiddenOnlyForAHostlessDisconnectedPaneInASplit(
+        bool hostless, bool hasFailure, string status, bool isSplit, bool expected)
+    {
+        object? host = hostless ? null : new object();
+
+        Assert.Equal(expected, SessionPaneControl.OffersReconnect(host, hasFailure, status, isSplit));
+    }
+
     private static object AllocateWithoutConstructor(Type type)
     {
         object instance = RuntimeHelpers.GetUninitializedObject(type);

@@ -70,6 +70,11 @@
                     </MultiDataTrigger.Conditions>
                     <Setter TargetName="SessionLoadingOverlay" Property="Visibility" Value="Visible"/>
                 </MultiDataTrigger>
+                <!-- A hostless tab that has ended (an external client that exited) has nothing left to
+                     wait for: it stops spinning. Declared after the trigger above so it wins. -->
+                <DataTrigger Binding="{Binding Status}" Value="{x:Static vm:SessionStatusTokens.Disconnected}">
+                    <Setter TargetName="SessionLoadingOverlay" Property="Visibility" Value="Collapsed"/>
+                </DataTrigger>
             </DataTemplate.Triggers>
         </DataTemplate>
     </Window.Resources>

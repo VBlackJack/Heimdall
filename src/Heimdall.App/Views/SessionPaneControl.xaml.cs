@@ -138,11 +138,27 @@ public partial class SessionPaneControl : UserControl
             return false;
         }
 
+        // A pane with no host that reads Disconnected is an external client that has exited (it never
+        // had a host control): there is nothing left to wait for, so the pane's overlay is its end state.
         return hasFailureDetails
+            || IsHostlessDisconnected(hostControl, status)
             || (hostControl is not null
                 && (string.Equals(status, nameof(ConnectionState.Disconnected), StringComparison.OrdinalIgnoreCase)
                     || string.Equals(status, nameof(ConnectionState.Error), StringComparison.OrdinalIgnoreCase)));
     }
+
+    /// <summary>
+    /// Whether the pane shows its loading overlay: no host yet, no failure to report, and not an
+    /// external-client pane that has already ended (which never gets a host and would spin forever).
+    /// </summary>
+    internal static bool ShowsLoadingOverlay(object? hostControl, bool hasFailureDetails, string? status)
+        => hostControl is null
+            && !hasFailureDetails
+            && !string.Equals(status, SessionStatusTokens.Disconnected, StringComparison.Ordinal);
+
+    private static bool IsHostlessDisconnected(object? hostControl, string? status)
+        => hostControl is null
+            && string.Equals(status, SessionStatusTokens.Disconnected, StringComparison.Ordinal);
 
     /// <summary>
     /// Whether the hosted view draws its own failure overlay, with its own Reconnect, Edit profile
@@ -163,11 +179,10 @@ public partial class SessionPaneControl : UserControl
             return;
         }
 
-        var hasContent = _model.HostControl is not null;
         var hasFailureDetails = _model.HasFailureDetails;
 
         // Loading: pane exists but host control not yet assigned (connection in progress)
-        LoadingOverlay.Visibility = !hasContent && !hasFailureDetails
+        LoadingOverlay.Visibility = ShowsLoadingOverlay(_model.HostControl, hasFailureDetails, _model.Status)
             ? Visibility.Visible
             : Visibility.Collapsed;
 
@@ -178,6 +193,7 @@ public partial class SessionPaneControl : UserControl
         // Recomputed with the overlay rather than once at load: the owning session is found by
         // walking the split tree, which is not populated yet when this control is first created.
         UpdateEditProfileAvailability();
+        UpdateReconnectAvailability();
     }
 
     // ── Overlay button handlers (route to MainViewModel) ─────────
@@ -305,10 +321,29 @@ public partial class SessionPaneControl : UserControl
     /// </remarks>
     private void UpdateEditProfileAvailability()
     {
+
         bool editable = TryFindOwningSession(out _, out SessionTabViewModel? session)
             && !string.IsNullOrEmpty(session.ProfileLookupServerId);
 
         EditProfileButton.Visibility = editable ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    /// <summary>
+    /// Whether the overlay's Reconnect can do anything for this pane. A pane inside a split reconnects
+    /// through the split service, which skips a pane with no host and no failure as "already
+    /// reconnecting": that is exactly an external-client pane that exited, so the button would do
+    /// nothing. Outside a split the tab reconnect closes the tab and launches again, which works.
+    /// </summary>
+    internal static bool OffersReconnect(object? hostControl, bool hasFailureDetails, string? status, bool isSplit)
+        => !(isSplit && !hasFailureDetails && IsHostlessDisconnected(hostControl, status));
+
+    private void UpdateReconnectAvailability()
+    {
+        bool isSplit = TryFindOwningSession(out _, out SessionTabViewModel? session) && session.IsSplit;
+        bool offered = _model is null
+            || OffersReconnect(_model.HostControl, _model.HasFailureDetails, _model.Status, isSplit);
+
+        ReconnectButton.Visibility = offered ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private string L(string key)
