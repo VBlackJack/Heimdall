@@ -246,6 +246,10 @@ rather than excluded:
   pool-queued continuation. It now awaits a `TaskCompletionSource`, and
   `SshShellSession` takes an optional `TimeProvider` so the test drives the
   final teardown wait from a `FakeTimeProvider` instead of wall-clock time.
+  It still bounded the caller's wait with a wall-clock duration, which a busy
+  runner exceeded once. It now asserts an order on the fake clock: `Disconnect`
+  returns once the graceful wait has elapsed and before the final wait has. With
+  the real clock the graceful wait is unchanged; a separate test covers it.
 - The three `TunnelManagerTests` lock-contention tests raced a `Task.Run` probe
   against a two-second `Task.Delay`. Winning that race required both that no
   lock was held and that the pool scheduled the probe promptly, so a saturated
