@@ -1746,6 +1746,49 @@ public partial class MainWindow
     }
 
     /// <inheritdoc />
+    async Task IContextMenuCallbacks.SortFolderAlphabeticallyAsync(FolderViewModel folder)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
+        if (DataContext is not MainViewModel vm)
+        {
+            return;
+        }
+
+        try
+        {
+            string path = folder.FullPath;
+            if (await vm.ServerList.SortFolderAlphabeticallyAsync(folder))
+            {
+                RefocusFolderRow(path);
+            }
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Error("Folder sort failed", ex);
+            vm.StatusText = string.Format(vm.Localize("StatusTreeMoveFailed"), folder.Name);
+        }
+    }
+
+    /// <inheritdoc />
+    async Task IContextMenuCallbacks.SortTopLevelAlphabeticallyAsync()
+    {
+        if (DataContext is not MainViewModel vm)
+        {
+            return;
+        }
+
+        try
+        {
+            await vm.ServerList.SortTopLevelAlphabeticallyAsync();
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Error("Top-level folder sort failed", ex);
+            vm.StatusText = vm.Localize("StatusTopLevelSortFailed");
+        }
+    }
+
+    /// <inheritdoc />
     async Task IContextMenuCallbacks.NudgeSessionAsync(ServerItemViewModel server, int delta)
     {
         ArgumentNullException.ThrowIfNull(server);

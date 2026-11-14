@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+using Heimdall.Core.Configuration;
+
 namespace Heimdall.App.ViewModels;
 
 /// <summary>
@@ -116,6 +118,64 @@ public static class FolderOrdering
         result.AddRange(reordered);
         return result;
     }
+
+    /// <summary>
+    /// The stored entries whose parent is <paramref name="parentPath"/> (empty for the top level),
+    /// in list order, a repeat keeping its first place. Only direct children count.
+    /// </summary>
+    public static List<string> ChildEntries(IEnumerable<string>? stored, string parentPath)
+    {
+        ArgumentNullException.ThrowIfNull(parentPath);
+        HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
+        List<string> entries = [];
+        foreach (string entry in stored ?? [])
+        {
+            if (IsChildEntry(entry, parentPath) && seen.Add(entry))
+            {
+                entries.Add(entry);
+            }
+        }
+
+        return entries;
+    }
+
+    /// <summary>Whether any stored entry names a direct child of <paramref name="parentPath"/>.</summary>
+    public static bool HasChildEntry(IEnumerable<string>? stored, string parentPath)
+    {
+        ArgumentNullException.ThrowIfNull(parentPath);
+        return (stored ?? []).Any(entry => IsChildEntry(entry, parentPath));
+    }
+
+    /// <summary>The stored order without the entries whose parent is <paramref name="parentPath"/>.</summary>
+    public static List<string> WithoutChildEntries(IEnumerable<string>? stored, string parentPath)
+    {
+        ArgumentNullException.ThrowIfNull(parentPath);
+        return [.. (stored ?? []).Where(entry => !IsChildEntry(entry, parentPath))];
+    }
+
+    /// <summary>
+    /// The stored order with <paramref name="entries"/> appended in their order, skipping any
+    /// that is already listed so a restore never duplicates an entry.
+    /// </summary>
+    public static List<string> WithEntriesAppended(IEnumerable<string>? stored, IEnumerable<string> entries)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+        List<string> result = [.. stored ?? []];
+        HashSet<string> listed = new(result.Where(entry => !string.IsNullOrWhiteSpace(entry)), StringComparer.OrdinalIgnoreCase);
+        foreach (string entry in entries)
+        {
+            if (!string.IsNullOrWhiteSpace(entry) && listed.Add(entry))
+            {
+                result.Add(entry);
+            }
+        }
+
+        return result;
+    }
+
+    private static bool IsChildEntry(string? entry, string parentPath) =>
+        !string.IsNullOrWhiteSpace(entry)
+        && string.Equals(FolderPath.ParentOf(entry), parentPath, StringComparison.OrdinalIgnoreCase);
 
     private static int IndexOf(IReadOnlyList<string> paths, string path)
     {
