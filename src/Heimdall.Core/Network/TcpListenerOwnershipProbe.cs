@@ -50,6 +50,16 @@ public sealed class WindowsTcpListenerOwnershipProbe : ITcpListenerOwnershipProb
     private const int TcpTableOwnerPidAll = 5;
     private const uint ErrorInsufficientBuffer = 122;
 
+    /// <summary>
+    /// Maximum number of sized <c>GetExtendedTcpTable</c> calls per table. Connections can be added between
+    /// the size query and the read, so the sized call may answer ERROR_INSUFFICIENT_BUFFER with a larger
+    /// requirement. Four attempts absorb several consecutive growth races on a busy machine while still
+    /// bounding the work; after that the probe fails exactly as it did before the retry existed.
+    /// </summary>
+    internal const int MaxTableReadAttempts = 4;
+
+    private const int Ipv6AddressBytes = 16;
+
     private WindowsTcpListenerOwnershipProbe()
     {
     }
@@ -73,8 +83,8 @@ public sealed class WindowsTcpListenerOwnershipProbe : ITcpListenerOwnershipProb
                 bindAddress,
                 port,
                 expectedProcessId,
-                LoadTcp4Rows(),
-                LoadTcp6Rows());
+                LoadTcp4Rows(Win32TcpTableNative.Instance),
+                LoadTcp6Rows(Win32TcpTableNative.Instance));
         }
         catch (ExternalException)
         {
@@ -154,10 +164,10 @@ public sealed class WindowsTcpListenerOwnershipProbe : ITcpListenerOwnershipProb
     private static int ToPort(uint port)
         => (ushort)IPAddress.NetworkToHostOrder((short)port);
 
-    private static IReadOnlyList<Tcp4RawRow> LoadTcp4Rows()
+    internal static IReadOnlyList<Tcp4RawRow> LoadTcp4Rows(ITcpTableNative native)
     {
         var result = new List<Tcp4RawRow>();
-        IntPtr buffer = LoadTable(AfInet, out int rowCount);
+        IntPtr buffer = LoadTable(native, AfInet, out int rowCount);
         try
         {
             IntPtr rowPtr = buffer + sizeof(uint);
@@ -177,16 +187,16 @@ public sealed class WindowsTcpListenerOwnershipProbe : ITcpListenerOwnershipProb
         }
         finally
         {
-            Marshal.FreeHGlobal(buffer);
+            native.Free(buffer);
         }
 
         return result;
     }
 
-    private static IReadOnlyList<Tcp6RawRow> LoadTcp6Rows()
+    internal static IReadOnlyList<Tcp6RawRow> LoadTcp6Rows(ITcpTableNative native)
     {
         var result = new List<Tcp6RawRow>();
-        IntPtr buffer = LoadTable(AfInet6, out int rowCount);
+        IntPtr buffer = LoadTable(native, AfInet6, out int rowCount);
         try
         {
             IntPtr rowPtr = buffer + sizeof(uint);
@@ -206,22 +216,16 @@ public sealed class WindowsTcpListenerOwnershipProbe : ITcpListenerOwnershipProb
         }
         finally
         {
-            Marshal.FreeHGlobal(buffer);
+            native.Free(buffer);
         }
 
         return result;
     }
 
-    private static IntPtr LoadTable(int addressFamily, out int rowCount)
+    private static IntPtr LoadTable(ITcpTableNative native, int addressFamily, out int rowCount)
     {
         int bufferSize = 0;
-        uint result = GetExtendedTcpTable(
-            IntPtr.Zero,
-            ref bufferSize,
-            true,
-            addressFamily,
-            TcpTableOwnerPidAll,
-            0);
+        uint result = native.GetExtendedTcpTable(IntPtr.Zero, ref bufferSize, addressFamily);
         if (result is not 0 and not ErrorInsufficientBuffer)
         {
             throw new Win32Exception(unchecked((int)result));
@@ -230,25 +234,70 @@ public sealed class WindowsTcpListenerOwnershipProbe : ITcpListenerOwnershipProb
         if (bufferSize <= 0)
         {
             rowCount = 0;
-            return Marshal.AllocHGlobal(sizeof(uint));
+            return native.Allocate(sizeof(uint));
         }
 
-        IntPtr buffer = Marshal.AllocHGlobal(bufferSize);
-        result = GetExtendedTcpTable(
-            buffer,
-            ref bufferSize,
-            true,
-            addressFamily,
-            TcpTableOwnerPidAll,
-            0);
-        if (result != 0)
+        for (int attempt = 1; ; attempt++)
         {
-            Marshal.FreeHGlobal(buffer);
-            throw new Win32Exception(unchecked((int)result));
-        }
+            IntPtr buffer = native.Allocate(bufferSize);
+            bool handedOver = false;
+            try
+            {
+                // On ERROR_INSUFFICIENT_BUFFER the API writes the size it now requires into bufferSize.
+                result = native.GetExtendedTcpTable(buffer, ref bufferSize, addressFamily);
+                if (result == 0)
+                {
+                    rowCount = Marshal.ReadInt32(buffer);
+                    handedOver = true;
+                    return buffer;
+                }
+            }
+            finally
+            {
+                if (!handedOver)
+                {
+                    native.Free(buffer);
+                }
+            }
 
-        rowCount = Marshal.ReadInt32(buffer);
-        return buffer;
+            if (result != ErrorInsufficientBuffer || attempt >= MaxTableReadAttempts || bufferSize <= 0)
+            {
+                throw new Win32Exception(unchecked((int)result));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Native table access and buffer ownership, so the size-then-read protocol can be tested without the network.
+    /// </summary>
+    internal interface ITcpTableNative
+    {
+        /// <summary>Calls GetExtendedTcpTable for the owner-pid, all-states table; returns the Win32 status.</summary>
+        uint GetExtendedTcpTable(IntPtr tcpTable, ref int outputBufferLength, int addressFamily);
+
+        /// <summary>Allocates an unmanaged buffer of the given size.</summary>
+        IntPtr Allocate(int size);
+
+        /// <summary>Frees a buffer returned by <see cref="Allocate"/>.</summary>
+        void Free(IntPtr buffer);
+    }
+
+    private sealed class Win32TcpTableNative : ITcpTableNative
+    {
+        internal static Win32TcpTableNative Instance { get; } = new();
+
+        public uint GetExtendedTcpTable(IntPtr tcpTable, ref int outputBufferLength, int addressFamily)
+            => WindowsTcpListenerOwnershipProbe.GetExtendedTcpTable(
+                tcpTable,
+                ref outputBufferLength,
+                true,
+                addressFamily,
+                TcpTableOwnerPidAll,
+                0);
+
+        public IntPtr Allocate(int size) => Marshal.AllocHGlobal(size);
+
+        public void Free(IntPtr buffer) => Marshal.FreeHGlobal(buffer);
     }
 
     [DllImport("iphlpapi.dll", SetLastError = true)]
@@ -274,12 +323,12 @@ public sealed class WindowsTcpListenerOwnershipProbe : ITcpListenerOwnershipProb
     [StructLayout(LayoutKind.Sequential)]
     private struct MibTcp6RowOwnerPid
     {
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)]
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = Ipv6AddressBytes)]
         public byte[] LocalAddress;
         public uint LocalScopeId;
         public uint LocalPort;
 
-        [MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)]
+        [MarshalAs(UnmanagedType.ByValArray, SizeConst = Ipv6AddressBytes)]
         public byte[] RemoteAddress;
         public uint RemoteScopeId;
         public uint RemotePort;

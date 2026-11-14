@@ -249,34 +249,47 @@ public class PlinkTunnelRunnerTests : IDisposable
     [Fact]
     public async Task StartAsync_ProcessStartFails_ResetsStateAndAllowsRetry()
     {
-        string invalidExecutablePath = Path.Combine(
+        string unstartableExecutablePath = Path.Combine(
             Path.GetTempPath(),
-            $"heimdall-invalid-plink-{Guid.NewGuid():N}.exe");
-        await File.WriteAllTextAsync(invalidExecutablePath, "not a Windows executable");
+            $"heimdall-unstartable-plink-{Guid.NewGuid():N}.exe");
+
+        // The file is held open with an exclusive lock instead of being given invalid content:
+        // CreateProcess treats a file without an MZ header as a possible 16-bit program and
+        // raises a blocking "unsupported 16-bit application" dialog on the desktop. With the
+        // lock, File.Exists stays true and the process start fails with a sharing violation
+        // when the file is opened, before any image inspection.
+        FileStream lockHandle = new(
+            unstartableExecutablePath,
+            FileMode.CreateNew,
+            FileAccess.ReadWrite,
+            FileShare.None);
 
         try
         {
             PlinkTunnelResult firstResult = await _runner.StartAsync(
-                invalidExecutablePath,
+                unstartableExecutablePath,
                 "gw.test", 22, "user", null, null,
                 "remote", 22, 10022);
 
             Assert.False(firstResult.Success);
             Assert.False(_runner.IsRunning);
             Assert.Null(_runner.ProcessId);
+            Assert.Equal(TunnelMessageKeys.MessageKeyPlinkProcessStartFailed, firstResult.MessageKey);
 
             PlinkTunnelResult retryResult = await _runner.StartAsync(
-                invalidExecutablePath,
+                unstartableExecutablePath,
                 "gw.test", 22, "user", null, null,
                 "remote", 22, 10022);
 
             Assert.False(retryResult.Success);
             Assert.False(_runner.IsRunning);
             Assert.Null(_runner.ProcessId);
+            Assert.Equal(TunnelMessageKeys.MessageKeyPlinkProcessStartFailed, retryResult.MessageKey);
         }
         finally
         {
-            File.Delete(invalidExecutablePath);
+            lockHandle.Dispose();
+            File.Delete(unstartableExecutablePath);
         }
     }
 
