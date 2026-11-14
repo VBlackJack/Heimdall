@@ -97,6 +97,45 @@ public sealed class SessionStatusTokenGuardTests
     }
 
     /// <summary>
+    /// Every tab given the launched-external-client status has to be handed to the follower that
+    /// moves it on when the client exits.
+    /// </summary>
+    /// <remarks>
+    /// Without the follower the tab reads "launched" forever and the close prompts count it as a
+    /// connected session. The count of writes must equal the count of follower calls, so a site
+    /// added later cannot forget the call.
+    /// </remarks>
+    [Fact]
+    public void EveryLaunchedExternalClientWriteIsFollowedByTheExitFollower()
+    {
+        const string LaunchedWrite = "= SessionStatusTokens.LaunchedExternalClient;";
+        const string FollowerCall = "FollowExternalClient(";
+        const string FollowerDeclaration = "Task FollowExternalClient(";
+        int writes = 0;
+        int calls = 0;
+
+        foreach (string file in EnumerateAppSources())
+        {
+            foreach (string line in File.ReadAllLines(file))
+            {
+                if (line.Contains(LaunchedWrite, StringComparison.Ordinal))
+                {
+                    writes++;
+                }
+
+                if (line.Contains(FollowerCall, StringComparison.Ordinal)
+                    && !line.Contains(FollowerDeclaration, StringComparison.Ordinal))
+                {
+                    calls++;
+                }
+            }
+        }
+
+        Assert.True(writes > 0, "The sweep found no launched-external-client write to check.");
+        Assert.Equal(writes, calls);
+    }
+
+    /// <summary>
     /// Guards the guard: the sweep has to reach the files that carry these writes.
     /// </summary>
     [Fact]

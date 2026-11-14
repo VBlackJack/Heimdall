@@ -36,13 +36,18 @@ namespace Heimdall.App.Services;
 /// no such retry ran. A Plink terminal reports success once its process started, so without this
 /// a password the server had just refused would read as a working connection.
 /// </param>
+/// <param name="ExternalClientExited">
+/// Completes when the client process Heimdall launched has exited; null when no client was launched
+/// or its end cannot be observed.
+/// </param>
 public sealed record ConnectionResult(
     bool Success,
     string? ErrorMessage,
     ISessionResult? Session,
     SessionDiagnostic? Failure = null,
     string? Warning = null,
-    SshFailureCode? FallbackFrom = null);
+    SshFailureCode? FallbackFrom = null,
+    Task? ExternalClientExited = null);
 
 /// <summary>Wraps a <see cref="ServerProfileDto"/> for embedded RDP sessions.</summary>
 /// <param name="Server">The profile the session runs on.</param>
