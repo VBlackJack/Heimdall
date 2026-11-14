@@ -14,7 +14,8 @@ All notable changes to Heimdall are documented in this file.
 
 ## 2026-11-14: The Open Ports tool reads a table again when it grows while it is read (v2026.111401)
 
-Fixes merged as #796 and #806, test work as #796, #804 and #805, Dependabot rules as #797. The
+Fixes merged as #796 and #806, test work as #796, #804 and #805, Dependabot rules as #797 and #808,
+a CI action update as #798. The
 user-facing summary is in the release notes.
 
 ### System table reads (#796, #806)
@@ -36,11 +37,14 @@ user-facing summary is in the release notes.
   and refuses a header row count that would run past the buffer. Internal seam
   `OpenPortsService.IOpenPortsTableNative`. The ownership probe has no such row-count check yet.
 
-### Dependabot (#797)
+### Dependabot and CI (#797, #798, #808)
 
 - FluentAssertions 8 and later and every major update of JsonSchema.Net are ignored: both moved to
   a license that asks for payment in commercial use (Xceed community license, Open Source
   Maintenance Fee agreement). FluentAssertions 7.x stays open. Same rule as WiX 7.
+- Major updates of `Microsoft.*` and `System.*` are ignored while the solution targets net10.0:
+  their 11.x line belongs to the move to .NET 11, one decision for the whole solution (#808).
+- `actions/setup-dotnet` 6.0.0 to 6.1.0 in the CI and packaging workflows (#798).
 
 ### Tests (#796, #804, #805)
 
