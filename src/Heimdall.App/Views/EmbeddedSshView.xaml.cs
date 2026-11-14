@@ -2077,7 +2077,9 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
         BeginInvokeIfAvailable(() =>
         {
-            if (_disposed)
+            // Queued after the end of the session when the last output chunk arrives late: the
+            // diagnostic is already in the terminal output, the status must stay ended.
+            if (_disposed || !TerminalReconnectPolicy.MayWriteHandedOffDiagnostic(CurrentPaneStatus))
             {
                 return;
             }
@@ -3377,6 +3379,12 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     {
         return string.Equals(_sessionTab?.ConnectionType, "WINRM", StringComparison.OrdinalIgnoreCase);
     }
+
+    /// <summary>The status <see cref="UpdateStatus"/> last wrote, on the pane it writes to.</summary>
+    private string? CurrentPaneStatus =>
+        _ownerPane is not null && !ReferenceEquals(_sessionTab?.PrimaryPane, _ownerPane)
+            ? _ownerPane.Status
+            : _sessionTab?.Status;
 
     private void UpdateStatus(
         string status,
