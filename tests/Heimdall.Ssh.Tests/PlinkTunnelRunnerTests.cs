@@ -313,8 +313,14 @@ public class PlinkTunnelRunnerTests : IDisposable
     public async Task TunnelPasswordFile_ForeignListenerFailsClosed()
     {
         using PasswordFileDirectory passwordFiles = new();
-        int localPort = GetAvailableLoopbackPort();
-        var listener = new TcpListener(IPAddress.Loopback, localPort);
+
+        // The foreign listener is bound on a system-assigned port and kept open for the whole test.
+        // Picking a free port number and binding it later left a window in which another test
+        // process could take the port; here the port is never free between being chosen and listened
+        // on. The listener lives in the test process, whose pid differs from the fake plink pid.
+        var listener = new TcpListener(IPAddress.Loopback, AnyAvailablePort);
+        listener.Start();
+        int localPort = ((IPEndPoint)listener.LocalEndpoint).Port;
         TaskCompletionSource startGate = new(TaskCreationOptions.RunContinuationsAsynchronously);
         FakePlinkProcess process = new()
         {
@@ -344,10 +350,6 @@ public class PlinkTunnelRunnerTests : IDisposable
             {
                 passwordFilePath = Assert.Single(passwordFiles.EnumeratePasswordFiles());
                 Assert.True(File.Exists(passwordFilePath));
-
-                // Bound while the runner is still held at process start, so the foreign listener is
-                // in place before the first attestation rather than racing it.
-                listener.Start();
             }
             finally
             {
@@ -901,9 +903,11 @@ public class PlinkTunnelRunnerTests : IDisposable
         Assert.Throws<ArgumentNullException>(() => new PlinkTunnelRunner((PlinkTunnelRunnerOptions)null!));
     }
 
+    private const int AnyAvailablePort = 0;
+
     private static int GetAvailableLoopbackPort()
     {
-        var listener = new TcpListener(IPAddress.Loopback, 0);
+        var listener = new TcpListener(IPAddress.Loopback, AnyAvailablePort);
         listener.Start();
 
         try
