@@ -50,6 +50,15 @@ internal sealed class OutputReplayGate
     private bool _bufferClosed;
     private int _subscriberFailureLogged;
 
+    // Continuations run asynchronously: Buffer runs under the delivery and state locks.
+    private readonly TaskCompletionSource _firstChunkBuffered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    /// <summary>
+    /// Completes once, when a chunk is actually stored for the first subscriber. It never
+    /// completes for live delivery, for a chunk refused by the cap, or after the buffer is closed.
+    /// </summary>
+    internal Task FirstChunkBuffered => _firstChunkBuffered.Task;
+
     /// <param name="owner">Session type name, prefixed to the log lines.</param>
     /// <param name="capBytes">Bytes held for the first subscriber.</param>
     public OutputReplayGate(string owner, int capBytes = DefaultBootstrapCapBytes)
@@ -207,6 +216,7 @@ internal sealed class OutputReplayGate
 
         _bootstrap.Add(chunk);
         _bootstrapBytes += chunk.Length;
+        _firstChunkBuffered.TrySetResult();
     }
 
     // One failing handler must neither end the read loop nor skip the handlers after it.
