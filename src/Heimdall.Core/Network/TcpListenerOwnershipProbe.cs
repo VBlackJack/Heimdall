@@ -49,6 +49,8 @@ public sealed class WindowsTcpListenerOwnershipProbe : ITcpListenerOwnershipProb
     private const int AfInet6 = 23;
     private const int TcpTableOwnerPidAll = 5;
     private const uint ErrorInsufficientBuffer = 122;
+    private const uint ErrorInvalidData = 13;
+    private const int CountHeaderSize = sizeof(uint);
 
     /// <summary>
     /// Maximum number of sized <c>GetExtendedTcpTable</c> calls per table. Connections can be added between
@@ -167,11 +169,11 @@ public sealed class WindowsTcpListenerOwnershipProbe : ITcpListenerOwnershipProb
     internal static IReadOnlyList<Tcp4RawRow> LoadTcp4Rows(ITcpTableNative native)
     {
         var result = new List<Tcp4RawRow>();
-        IntPtr buffer = LoadTable(native, AfInet, out int rowCount);
+        int rowSize = Marshal.SizeOf<MibTcpRowOwnerPid>();
+        IntPtr buffer = LoadTable(native, AfInet, rowSize, out int rowCount);
         try
         {
-            IntPtr rowPtr = buffer + sizeof(uint);
-            int rowSize = Marshal.SizeOf<MibTcpRowOwnerPid>();
+            IntPtr rowPtr = buffer + CountHeaderSize;
             for (int i = 0; i < rowCount; i++)
             {
                 MibTcpRowOwnerPid row = Marshal.PtrToStructure<MibTcpRowOwnerPid>(rowPtr);
@@ -196,11 +198,11 @@ public sealed class WindowsTcpListenerOwnershipProbe : ITcpListenerOwnershipProb
     internal static IReadOnlyList<Tcp6RawRow> LoadTcp6Rows(ITcpTableNative native)
     {
         var result = new List<Tcp6RawRow>();
-        IntPtr buffer = LoadTable(native, AfInet6, out int rowCount);
+        int rowSize = Marshal.SizeOf<MibTcp6RowOwnerPid>();
+        IntPtr buffer = LoadTable(native, AfInet6, rowSize, out int rowCount);
         try
         {
-            IntPtr rowPtr = buffer + sizeof(uint);
-            int rowSize = Marshal.SizeOf<MibTcp6RowOwnerPid>();
+            IntPtr rowPtr = buffer + CountHeaderSize;
             for (int i = 0; i < rowCount; i++)
             {
                 MibTcp6RowOwnerPid row = Marshal.PtrToStructure<MibTcp6RowOwnerPid>(rowPtr);
@@ -222,7 +224,11 @@ public sealed class WindowsTcpListenerOwnershipProbe : ITcpListenerOwnershipProb
         return result;
     }
 
-    private static IntPtr LoadTable(ITcpTableNative native, int addressFamily, out int rowCount)
+    /// <summary>
+    /// Reads one table. The announced row count is untrusted: a count that does not fit in the filled buffer
+    /// fails the read like any other table failure (the probe then answers Indeterminate).
+    /// </summary>
+    private static IntPtr LoadTable(ITcpTableNative native, int addressFamily, int rowSize, out int rowCount)
     {
         int bufferSize = 0;
         uint result = native.GetExtendedTcpTable(IntPtr.Zero, ref bufferSize, addressFamily);
@@ -234,12 +240,13 @@ public sealed class WindowsTcpListenerOwnershipProbe : ITcpListenerOwnershipProb
         if (bufferSize <= 0)
         {
             rowCount = 0;
-            return native.Allocate(sizeof(uint));
+            return native.Allocate(CountHeaderSize);
         }
 
         for (int attempt = 1; ; attempt++)
         {
-            IntPtr buffer = native.Allocate(bufferSize);
+            int allocatedSize = bufferSize;
+            IntPtr buffer = native.Allocate(allocatedSize);
             bool handedOver = false;
             try
             {
@@ -247,7 +254,8 @@ public sealed class WindowsTcpListenerOwnershipProbe : ITcpListenerOwnershipProb
                 result = native.GetExtendedTcpTable(buffer, ref bufferSize, addressFamily);
                 if (result == 0)
                 {
-                    rowCount = Marshal.ReadInt32(buffer);
+                    int capacity = bufferSize > 0 ? Math.Min(allocatedSize, bufferSize) : allocatedSize;
+                    rowCount = ReadBoundedRowCount(buffer, capacity, rowSize);
                     handedOver = true;
                     return buffer;
                 }
@@ -265,6 +273,22 @@ public sealed class WindowsTcpListenerOwnershipProbe : ITcpListenerOwnershipProb
                 throw new Win32Exception(unchecked((int)result));
             }
         }
+    }
+
+    private static int ReadBoundedRowCount(IntPtr buffer, int capacity, int rowSize)
+    {
+        if (capacity < CountHeaderSize)
+        {
+            throw new Win32Exception(unchecked((int)ErrorInvalidData));
+        }
+
+        int count = Marshal.ReadInt32(buffer);
+        if (count < 0 || CountHeaderSize + ((long)count * rowSize) > capacity)
+        {
+            throw new Win32Exception(unchecked((int)ErrorInvalidData));
+        }
+
+        return count;
     }
 
     /// <summary>
