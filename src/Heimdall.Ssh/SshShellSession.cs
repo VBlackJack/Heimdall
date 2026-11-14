@@ -51,12 +51,12 @@ public sealed class SshShellSession : IDisposable
     /// Best-effort wait for the read loop to honour cancellation before
     /// stream/client disposal begins.
     /// </summary>
-    private static readonly TimeSpan StopReadLoopGraceful = TimeSpan.FromMilliseconds(500);
+    internal static readonly TimeSpan StopReadLoopGraceful = TimeSpan.FromMilliseconds(500);
 
     /// <summary>
     /// Final wait before accepting that a native SSH.NET pipe read may be stuck.
     /// </summary>
-    private static readonly TimeSpan StopReadLoopFinal = TimeSpan.FromSeconds(2);
+    internal static readonly TimeSpan StopReadLoopFinal = TimeSpan.FromSeconds(2);
 
     private readonly OutputReplayGate _output = new(nameof(SshShellSession));
     private readonly TimeProvider _timeProvider;
@@ -78,7 +78,10 @@ public sealed class SshShellSession : IDisposable
     /// Creates a shell session.
     /// </summary>
     /// <param name="timeProvider">
-    /// Clock backing the background teardown wait. Defaults to
+    /// Clock backing both teardown waits: the caller's graceful wait for the
+    /// read loop and the background final wait. With the default
+    /// <see cref="TimeProvider.System"/> the graceful wait stays a plain timed
+    /// task wait; any other clock drives it through a token source. Defaults to
     /// <see cref="TimeProvider.System"/>, so runtime behaviour is unchanged;
     /// tests substitute a controllable clock to drive teardown without
     /// depending on wall-clock time.
@@ -725,7 +728,7 @@ public sealed class SshShellSession : IDisposable
 
         try
         {
-            if (!task.Wait(StopReadLoopGraceful))
+            if (!WaitForReadLoopGraceful(task))
             {
                 Core.Logging.FileLogger.Warn(
                     "SshShellSession: read loop did not honour cancellation within "
@@ -743,6 +746,31 @@ public sealed class SshShellSession : IDisposable
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Waits up to the graceful bound for <paramref name="task"/>. The real clock keeps
+    /// the kernel timed wait, which needs no pool thread; a substituted clock uses a
+    /// token source on that clock so a test can drive the bound.
+    /// </summary>
+    /// <returns>True when the task finished within the bound.</returns>
+    private bool WaitForReadLoopGraceful(Task task)
+    {
+        if (ReferenceEquals(_timeProvider, TimeProvider.System))
+        {
+            return task.Wait(StopReadLoopGraceful);
+        }
+
+        using CancellationTokenSource graceful = new(StopReadLoopGraceful, _timeProvider);
+        try
+        {
+            task.Wait(graceful.Token);
+            return true;
+        }
+        catch (OperationCanceledException) when (graceful.IsCancellationRequested)
+        {
+            return false;
+        }
     }
 
     private void DisposeReadLoopCancellationSource()

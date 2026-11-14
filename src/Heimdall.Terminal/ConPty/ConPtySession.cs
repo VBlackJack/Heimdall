@@ -85,6 +85,12 @@ public sealed class ConPtySession : ITerminalSession
     // unbroken prefix of the stream, and serializes the replay with the read loop's deliveries.
     private readonly OutputReplayGate _output = new(nameof(ConPtySession));
 
+    /// <summary>
+    /// Completes once the bootstrap buffer holds output; lets tests observe that state
+    /// instead of waiting a fixed delay.
+    /// </summary>
+    internal Task BootstrapOutputBuffered => _output.FirstChunkBuffered;
+
     /// <inheritdoc />
     public event Action<ReadOnlyMemory<byte>>? DataReceived
     {

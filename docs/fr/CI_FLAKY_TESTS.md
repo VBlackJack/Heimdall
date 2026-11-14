@@ -272,6 +272,11 @@ bicoeur : ils ont été réparés plutôt qu'exclus.
   `TaskCompletionSource`, et `SshShellSession` accepte un `TimeProvider`
   optionnel pour que le test pilote l'attente finale de teardown depuis un
   `FakeTimeProvider` au lieu du temps horloge.
+  Il bornait encore l'attente de l'appelant par une durée horloge, qu'un runner
+  chargé a dépassée une fois. Il vérifie maintenant un ordre sur l'horloge
+  simulée : `Disconnect` rend la main une fois l'attente courte écoulée et avant
+  la fin de l'attente finale. Avec l'horloge réelle, l'attente courte est
+  inchangée ; un test séparé la couvre.
 - Les trois tests de contention de verrou des `TunnelManagerTests` faisaient
   courir une sonde `Task.Run` contre un `Task.Delay` de deux secondes. Gagner
   cette course exigeait à la fois qu'aucun verrou ne soit détenu et que le pool
