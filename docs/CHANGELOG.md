@@ -12,6 +12,95 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-11-15: Imported sessions stay untrusted until you allow them, and mRemoteNG imports keep their order (v2026.111501)
+
+Fixes merged as #814, #816, #817 and #818, features as #819 and #820, test work as #815, dependency
+updates as #813. The user-facing summary and the upgrade notes are in the release notes.
+
+### Execution trust (#817)
+
+- **Defect.** `ServerDialogViewModel.ToDto()` wrote `ExecutionConfirmed = true` on every save and
+  `FromDto` never read the flag, so an imported profile (the sanitizer resets the flag at import)
+  became trusted when it was opened for an unrelated edit and saved. The gated values are those of
+  `ProfileExecutionTrust`: LOCAL executable, arguments, working directory, elevation; WEB external
+  program when the profile opens externally; Citrix ICA path; enabled post-connect steps, for
+  every protocol (shared profiles are approved against their commands instead,
+  `SessionCoordinator.AuthorizePostConnectAsync`).
+- **Change.** The dialog carries the flag (field default true, seeded in `FromDto`, written as it
+  is). While it is false and the probe (`ToDto()` then `PostConnectMigration.Migrate`) carries a
+  payload, `ShowExecutionTrustNotice` is true and `ExecutionTrustNoticeText` lists every gated
+  value through `ExecutionTrustDescriber`; `AllowExecutionTrustCommand` sets the flag, refused when
+  a web command is too long to show. The notice is refreshed from the `OnPropertyChanged` override
+  and from the post-connect step handlers before their `_isInitializing` guard.
+- `SaveAdHocAsProfileAsync` confirms a template that carries no payload. `LocalShellExecutableToStore`
+  keeps an absent LOCAL executable absent, so a rename adds no payload.
+- Display: values whole, through `UntrustedText.MakeVisible` with `UntrustedText.NoLengthLimit`,
+  a backslash doubled before the quote in the describer. The connect-time prompt passes the ICA
+  path and the local command through the same visibility.
+- The bar sits above the tabs of `ServerDialog.xaml`, capped at `ServerDialogNoticeMaxHeight` with
+  its own scrolling, with no live region: the text changes at every keystroke while the profile is
+  untrusted.
+- Left as it is: the LOCAL row and the connect-time prompt escape a quote without doubling a
+  backslash (`ServerListViewModel.MakeVisible`); the connect-time prompt for post-connect steps
+  shows a count, not the commands; accepting a connect-time prompt sets and persists
+  `ExecutionConfirmed` (`ConfirmAndTrustExecutionAsync`, `ConfirmAndTrustPostConnectAsync`).
+
+### External clients and WinRM (#816, #818)
+
+- **External client tab (#816).** `ConnectionResult.ExternalClientExited` is completed by
+  `RdpHandler`'s `Exited` handler after the tunnel is released; `SessionReady` carries it;
+  `SessionCoordinator.FollowExternalClient` writes `Disconnected` when the pane still reads
+  `LaunchedExternalClient` and the tab is open. At exit the handler calls `TryEndSession`: the
+  pipeline has already torn the state entry down, and the former transition re-created an entry
+  that nothing removed. A client whose end cannot be observed keeps its status.
+- **Overlay (#816).** `SessionPaneControl.ShowsLoadingOverlay` and `ShowsDisconnectedOverlay` treat
+  a hostless pane that is `Disconnected` as disconnected; `OffersReconnect` hides Reconnect for
+  such a pane in a split tab, where a pane reconnect cannot relaunch an external client.
+- **Quit census (#818).** `ShutdownDecisions` counts `Connected` and `RemoteSessionHandedOff`, the
+  two statuses that quitting ends, with an ordinal match on the status tokens.
+  `LaunchedExternalClient` is left out on purpose. This is not the set of
+  `ConnectionStateSets.IsConnected`, which the close-tab prompts use.
+- **Late WinRM diagnostic (#818).** `ObserveWinRmEarlyOutput` could write `RemoteSessionHandedOff`
+  over `Disconnected` when the error text was delivered after the process exit.
+  `TerminalReconnectPolicy.MayWriteHandedOffDiagnostic` refuses the write once the pane reads
+  `Disconnected` or `Error`.
+
+### Import order and tree sort (#819, #820)
+
+- **mRemoteNG order (#819).** The parser kept the document order; nothing wrote it where the tree
+  reads it. `ImportSourceOrder.ArrangeSessions` ranks the imported rows of a group after the
+  existing ones, which keep their visible order, and writes nothing when the result equals what
+  the tree would show or the group holds one row; a name tie counts as a difference.
+  `MergeFolderOrder` does the same per parent for `AppSettings.FolderOrder`, in the shape of
+  `FolderOrdering.Nudge`. Imported groups are stored through `FolderPath.Canonicalize`, the tree's
+  own split. The folder order is saved after the servers, in its own try/catch.
+- **Palette order (#819).** `InventoryInTreeOrder` walks the real tree through
+  `_treeOrderServers`; `_stableServerOrder` and the flat list are unchanged.
+- **Sort A to Z (#820).** `SortFolderAlphabeticallyAsync` and `SortTopLevelAlphabeticallyAsync`
+  clear one level: the `SortOrder` of direct sessions and the `FolderOrder` entries whose parent
+  is the level. `TreeOrganizationHistory.ExecuteAsync` takes an optional folder-order restore;
+  undo refuses when the level has entries again, restores the rows, then appends the entries.
+  The menu items are added only where something is arranged.
+
+### Listener ownership probe (#814)
+
+- `WindowsTcpListenerOwnershipProbe.LoadTable` takes the row size and `ReadBoundedRowCount`
+  refuses a header count that is negative or runs past the capacity (the smaller of the allocated
+  and the reported size) with `Win32Exception(ERROR_INVALID_DATA)`; `Probe` answers Indeterminate.
+
+### Dependencies (#813)
+
+- JsonSchema.Net 7.0.4 to 7.4.0 (JsonPointer.Net 5.0.0 to 5.3.1, Json.More.Net 2.0.1.2 to 2.1.1),
+  ThemeForge.Theme 2.1.0 to 2.2.0; in the test projects, FluentAssertions 6.12.2 to 7.2.2,
+  xunit.runner.visualstudio 3.1.4 to 4.0.1 and Microsoft.Extensions.TimeProvider.Testing 10.8.0 to
+  10.11.0. Licenses read in each package: MIT or Apache-2.0.
+
+### Tests (#815)
+
+- `TerminalSessionLifecycleTests.TelnetSession_StartAsync_AfterFailedConnect_CanBeRetried` keeps a
+  socket bound without listening for the failed attempt instead of connecting to a released port.
+- The fake Plink process id of `PlinkTunnelRunnerTests` skips the test host's own process id.
+
 ## 2026-11-14: The Open Ports tool reads a table again when it grows while it is read (v2026.111401)
 
 Fixes merged as #796 and #806, test work as #796, #804 and #805, Dependabot rules as #797 and #808,
