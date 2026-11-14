@@ -705,6 +705,12 @@ public sealed class ContextMenuFactory
                 vm,
                 delta => vm.ServerList.CanNudgeFolder(folder, delta),
                 delta => callbacks.NudgeFolderAsync(folder, delta));
+            AddSortAlphabeticallyItem(
+                menu.Items,
+                vm,
+                "TreeCtxSortAlphabetically",
+                vm.ServerList.CanSortFolderAlphabetically(folder),
+                () => callbacks.SortFolderAlphabeticallyAsync(folder));
 
             // Delete folder (move servers to root)
             var deleteItem = new MenuItem
@@ -720,8 +726,39 @@ public sealed class ContextMenuFactory
                     vm.ServerList.FlushExpandStateForCloseAsync));
             menu.Items.Add(deleteItem);
         }
+        else
+        {
+            // "(No Folder)": its sessions can be arranged by hand like any folder's.
+            AddSortAlphabeticallyItem(
+                menu.Items,
+                vm,
+                "TreeCtxSortAlphabetically",
+                vm.ServerList.CanSortFolderAlphabetically(folder),
+                () => callbacks.SortFolderAlphabeticallyAsync(folder));
+        }
 
         return menu;
+    }
+
+    /// <summary>
+    /// Adds a "Sort A to Z" entry only where something on that level was arranged by hand;
+    /// otherwise the menu does not carry it at all.
+    /// </summary>
+    private static void AddSortAlphabeticallyItem(
+        ItemCollection items,
+        MainViewModel vm,
+        string headerKey,
+        bool canSort,
+        Func<Task> sort)
+    {
+        if (!canSort)
+        {
+            return;
+        }
+
+        MenuItem item = new() { Header = vm.Localize(headerKey) };
+        item.Click += async (_, _) => await sort();
+        items.Add(item);
     }
 
     /// <summary>
@@ -1069,6 +1106,12 @@ public sealed class ContextMenuFactory
         var newFolderItem = new MenuItem { Header = vm.Localize("TreeCtxNewGroup") };
         newFolderItem.Click += async (_, _) => await CreateFolderFromMenuAsync(vm, parentPath: null);
         menu.Items.Add(newFolderItem);
+        AddSortAlphabeticallyItem(
+            menu.Items,
+            vm,
+            "TreeCtxSortTopLevelAlphabetically",
+            vm.ServerList.CanSortTopLevelAlphabetically(),
+            callbacks.SortTopLevelAlphabeticallyAsync);
 
         menu.Items.Add(new Separator());
         menu.Items.Add(CreateAddToolMenuItem(vm, callbacks));
