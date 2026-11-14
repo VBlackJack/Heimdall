@@ -17,7 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="JsonSchema.Net" Version="7.0.4" />
+    <PackageReference Include="JsonSchema.Net" Version="7.4.0" />
     <PackageReference Include="LibGit2Sharp" Version="0.32.0" />
     <PackageReference Include="YamlDotNet" Version="16.3.0" />
   </ItemGroup>
