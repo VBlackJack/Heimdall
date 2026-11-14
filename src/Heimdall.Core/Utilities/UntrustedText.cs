@@ -25,6 +25,9 @@ namespace Heimdall.Core.Utilities;
 /// </summary>
 public static class UntrustedText
 {
+    /// <summary>The length to pass when a value must be written out whole, never cut.</summary>
+    public const int NoLengthLimit = int.MaxValue;
+
     /// <summary>Appended when a value was cut at the maximum length.</summary>
     public const string TruncationMarker = "...";
 

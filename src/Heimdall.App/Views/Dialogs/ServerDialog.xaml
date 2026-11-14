@@ -8,6 +8,7 @@
         xmlns:vm="clr-namespace:Heimdall.App.ViewModels.Dialogs"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:sys="clr-namespace:System;assembly=System.Runtime"
         d:DataContext="{d:DesignInstance Type=vm:ServerDialogViewModel}"
         mc:Ignorable="d"
         Title="{Binding DialogTitle}"
@@ -30,6 +31,10 @@
             </ResourceDictionary.MergedDictionaries>
             <converters:NullToVisibilityConverter x:Key="NullToVisibilityConverter"/>
             <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+
+            <!-- Height cap of the execution trust notice above the tabs: the window is fixed at 750 px, so a long
+                 list of commands scrolls inside the notice instead of pushing the tabs out of view. -->
+            <sys:Double x:Key="ServerDialogNoticeMaxHeight">160</sys:Double>
 
             <!-- ServerDialog label extends DialogLabelStyle with SemiBold weight -->
             <Style x:Key="LabelStyle" TargetType="TextBlock" BasedOn="{StaticResource DialogLabelStyle}">
@@ -514,6 +519,7 @@
                       Visibility="{Binding ShowFormFields, Converter={StaticResource BoolToVisibilityConverter}}">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
@@ -561,8 +567,37 @@
                     </Button>
                 </DockPanel>
 
+                <!-- Imported session whose commands wait for the user's approval; sits above the tabs so it shows
+                     whatever the protocol and the tab. -->
+                <Border x:Name="DlgSrv_ExecutionTrustNotice"
+                        Grid.Row="1"
+                        Style="{StaticResource DialogSectionCardStyle}"
+                        BorderBrush="{DynamicResource WarningIndicatorBrush}"
+                        BorderThickness="1"
+                        Margin="0,0,0,12"
+                        Visibility="{Binding ShowExecutionTrustNotice, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <StackPanel>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled"
+                                      MaxHeight="{StaticResource ServerDialogNoticeMaxHeight}"
+                                      AutomationProperties.Name="{loc:Translate A11yServerDialogExecutionTrustNotice}">
+                            <TextBlock Text="{Binding ExecutionTrustNoticeText}"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       TextWrapping="Wrap"/>
+                        </ScrollViewer>
+                        <Button x:Name="DlgSrv_AllowExecutionTrustButton"
+                                Command="{Binding AllowExecutionTrustCommand}"
+                                Content="{loc:Translate ServerDialogExecutionTrustAllow}"
+                                Style="{StaticResource GhostButtonStyle}"
+                                HorizontalAlignment="Left"
+                                Margin="0,8,0,0"
+                                TabIndex="0"
+                                AutomationProperties.HelpText="{Binding ExecutionTrustNoticeText}"/>
+                    </StackPanel>
+                </Border>
+
                 <TabControl x:Name="MainTabControl"
-                            Grid.Row="1"
+                            Grid.Row="2"
                             AutomationProperties.Name="{loc:Translate A11yServerDialogTabs}"
                             Style="{DynamicResource ThemedTabControlStyle}">
 

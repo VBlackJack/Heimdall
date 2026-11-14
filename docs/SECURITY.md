@@ -828,6 +828,10 @@ to protect here, and nothing about key-only connections is claimed by this.
 Process exit remains the backstop, every path that frees the file goes through one gate so the
 deletion runs exactly once, and a launch that fails or is cancelled releases on the spot.
 
+### Imported profiles that run something
+
+A profile from a file can start a program on this computer (local shell executable, arguments, working directory, elevation; a web console's external program; a Citrix ICA file) or type post-connect commands into a session. Import sets `ExecutionConfirmed` to false, and while it is false Heimdall names the program it would start, or counts the post-connect commands, and asks before running it. Editing the profile does not change that: the session dialog shows a notice above its tabs listing every such value, the post-connect steps included even for a protocol whose dialog does not show them, and the profile is marked trusted only by the notice's "Allow to run" button followed by Save, or by accepting that prompt. A profile created in the dialog is trusted.
+
 ### Subprocess argument hardening
 
 `PlinkTunnelRunner` builds the plink argument list via
@@ -1077,7 +1081,7 @@ caller refuses: there is no fallback to a primitive that could replace the desti
   `dotnet format --verify-no-changes`, the blocking test lane (the suite minus
   the cases marked `CIUnstable` or `RequiresDesktop`, which run in two further
   lanes that report their failures without turning the run red), JSON locale
-  parity (every catalogue holds exactly the English key set, currently 6,200+
+  parity (every catalogue holds exactly the English key set, currently 6,300+
   keys each), and an informational `dotnet list package --vulnerable` scan.
 - Dependency scan for manual review: `dotnet list Heimdall.slnx package
   --vulnerable --include-transitive`. CI emits warnings but does not gate on

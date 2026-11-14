@@ -189,6 +189,27 @@ public sealed class ServerListExecutionTrustTests
         Assert.DoesNotContain("powershell.exe", fixture.DialogService.LastConfirmMessage, StringComparison.Ordinal);
     }
 
+    // The ICA path comes from the file, so a bidi override or a line break in it is written out.
+    [Fact]
+    public async Task ConfirmAndTrustExecutionAsync_CitrixIcaPathWithControlAndBidi_IsMadeVisible()
+    {
+        await using ServerListExecutionTrustFixture fixture = await ServerListExecutionTrustFixture.CreateAsync(false);
+        ServerProfileDto promptProfile = new()
+        {
+            Id = "citrix-2",
+            DisplayName = "Imported Citrix",
+            ConnectionType = "CITRIX",
+            CitrixIcaFilePath = "C:\\a\u202eb\nc.ica"
+        };
+
+        await fixture.ViewModel.ConfirmAndTrustExecutionAsync(promptProfile);
+
+        string message = fixture.DialogService.LastConfirmMessage;
+        Assert.DoesNotContain('\u202e', message);
+        Assert.DoesNotContain('\n', message);
+        Assert.Contains("C:\\a\\u{202e}b\\u{000a}c.ica", message, StringComparison.Ordinal);
+    }
+
     // The gate also counts arguments, working directory and elevation, so the prompt names them.
     [Fact]
     public async Task ConfirmAndTrustExecutionAsync_LocalProfile_NamesArgumentsWorkingDirectoryAndElevation()

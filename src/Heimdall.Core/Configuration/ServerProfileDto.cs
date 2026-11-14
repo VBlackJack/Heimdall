@@ -442,8 +442,9 @@ public sealed class ServerProfileDto : IJsonOnDeserialized
 
     /// <summary>
     /// True when the user has authored or explicitly vetted this profile's local-execution
-    /// payload (e.g. via the server dialog). Profiles serialized before this field, and all
-    /// imported profiles, deserialize to false. A later connect-time guard uses this flag.
+    /// payload (created in the session dialog, or allowed on its notice or at the connect-time
+    /// prompt). Profiles serialized before this field, and all imported profiles, deserialize to
+    /// false. A later connect-time guard uses this flag.
     /// </summary>
     public bool ExecutionConfirmed { get; set; }
 
