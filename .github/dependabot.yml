@@ -29,6 +29,18 @@ updates:
       - dependency-name: "WixToolset.*"
         update-types:
           - "version-update:semver-major"
+      # FluentAssertions 8 left Apache 2.0 for the Xceed community license, which asks
+      # for a paid license in commercial use. The 7.x line is still Apache 2.0 and stays
+      # open. Same rule as WiX: a license change is the owner's decision.
+      - dependency-name: "FluentAssertions"
+        versions:
+          - ">= 8.0.0"
+      # JsonSchema.Net 9 ships under an Open Source Maintenance Fee agreement and changes
+      # the API used by JsonSchemaValidator. The 8.x line was not examined, so every major
+      # update is held back until the owner has read its license.
+      - dependency-name: "JsonSchema.Net"
+        update-types:
+          - "version-update:semver-major"
 
   - package-ecosystem: "github-actions"
     directory: "/"
