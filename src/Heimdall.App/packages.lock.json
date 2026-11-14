@@ -31,9 +31,9 @@
       },
       "ThemeForge.Theme": {
         "type": "Direct",
-        "requested": "[2.1.0, )",
-        "resolved": "2.1.0",
-        "contentHash": "S67HoDY799UJZPq4kRIpVlxY8vkLFcdedxmBtJUj9748s2gThkSGvmCQKY7UlzrnAl/IW1Zodbo0iJy+rzp0eg=="
+        "requested": "[2.2.0, )",
+        "resolved": "2.2.0",
+        "contentHash": "TGW3X9bXMv7G1EbDHc+PlgRfId+2b8iJzRun60A4dY/w8cuOsC/Rmzx5FtS2af/t+Qo4emZS++g46X+6Dm+w8A=="
       },
       "BouncyCastle.Cryptography": {
         "type": "Transitive",
