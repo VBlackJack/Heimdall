@@ -590,7 +590,7 @@ public partial class EmbeddedWebView : UserControl, IDisposable, ISessionPaneOwn
 
         return dialogs.ShowConfirmAsync(
             _localizer["ConfirmWebExternalProgramTitle"],
-            _localizer.Format("ConfirmWebExternalProgramBody", _session?.DisplayName ?? string.Empty, command),
+            WebExternalLaunch.ConfirmationBody(_session?.DisplayName, command, _localizer),
             "warning");
     }
 
