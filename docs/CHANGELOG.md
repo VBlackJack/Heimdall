@@ -14,7 +14,7 @@ All notable changes to Heimdall are documented in this file.
 
 ## 2026-11-15: Imported sessions stay untrusted until you allow them, and mRemoteNG imports keep their order (v2026.111501)
 
-Fixes merged as #814, #816, #817, #818, #822 and #826, features as #819 and #820, test work as
+Fixes merged as #814, #816, #817, #818, #822, #826 and #828, features as #819 and #820, test work as
 #815, dependency updates as #813, a CI change as #824. The user-facing summary and the upgrade
 notes are in the release notes.
 
@@ -68,7 +68,7 @@ notes are in the release notes.
   parameters; `RemoteOs`, which picks the template of a linked entry, is neither shown nor part of
   the shared fingerprint.
 
-### External clients and WinRM (#816, #818)
+### External clients and WinRM (#816, #818, #828)
 
 - **External client tab (#816).** `ConnectionResult.ExternalClientExited` is completed by
   `RdpHandler`'s `Exited` handler after the tunnel is released; `SessionReady` carries it;
@@ -79,6 +79,12 @@ notes are in the release notes.
 - **Overlay (#816).** `SessionPaneControl.ShowsLoadingOverlay` and `ShowsDisconnectedOverlay` treat
   a hostless pane that is `Disconnected` as disconnected; `OffersReconnect` hides Reconnect for
   such a pane in a split tab, where a pane reconnect cannot relaunch an external client.
+- **One loading overlay (#828).** The tab template (`SessionLoadingOverlay`) and the pane
+  (`LoadingOverlay`) drew a loading overlay under the same conditions, stacked.
+  `SessionPaneControl.ShowsOwnLoadingOverlay` leaves the tab overlay alone for the sole pane of
+  an unsplit tab; a pane in a split, or with no known owner, keeps its own. A test pins the tab
+  triggers in `MainWindow.xaml` to that decision. Left as it is: in a split tab the tab overlay
+  follows the primary pane and covers the whole split.
 - **Quit census (#818).** `ShutdownDecisions` counts `Connected` and `RemoteSessionHandedOff`, the
   two statuses that quitting ends, with an ordinal match on the status tokens.
   `LaunchedExternalClient` is left out on purpose. This is not the set of
