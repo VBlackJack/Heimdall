@@ -502,6 +502,9 @@
                                                                 <!-- DisplayName falls back to the raw handler key, so a protocol
                                                                      registered without a name is still offered rather than blank. -->
                                                                 <Setter Property="Header" Value="{Binding DisplayName}"/>
+                                                                <!-- A registered handler key can hold an underscore: the template
+                                                                     keeps it, where a string header would read it as an access key. -->
+                                                                <Setter Property="HeaderTemplate" Value="{StaticResource LiteralTextTemplate}"/>
                                                                 <Setter Property="IsCheckable" Value="True"/>
                                                                 <Setter Property="IsChecked" Value="{Binding IsSelected, Mode=TwoWay}"/>
                                                                 <Setter Property="StaysOpenOnClick" Value="True"/>
@@ -3541,7 +3544,10 @@
                                                 </ItemsControl.ItemsPanel>
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
+                                                        <!-- The variable name is data: the template shows an underscore as it
+                                                             is, where a string content would read it as an access key. -->
                                                         <Button Content="{Binding AddLabel}"
+                                                                ContentTemplate="{StaticResource LiteralTextTemplate}"
                                                                 Command="{Binding DataContext.Settings.AddMissingMobaXtermVariableCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                                 CommandParameter="{Binding}"
                                                                 Style="{DynamicResource SecondaryButtonStyle}"
@@ -4219,10 +4225,15 @@
                                             </StackPanel>
                                         </DockPanel>
 
+                                        <!-- The label names known_hosts: the content stays a string, which the settings
+                                             search reads, and the template keeps its underscore, which a plain string
+                                             content would take for an access key. -->
                                         <CheckBox x:Name="Mw_SettingsSyncKnownHostsAtStartup"
                                                   Content="{loc:Translate SettingsLabelSyncKnownHostsAtStartup}"
+                                                  ContentTemplate="{StaticResource LiteralTextTemplate}"
                                                   IsChecked="{Binding Settings.SyncKnownHostsAtStartup}"
                                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                                  AutomationProperties.Name="{loc:Translate SettingsLabelSyncKnownHostsAtStartup}"
                                                   AutomationProperties.HelpText="{loc:Translate SettingsSyncKnownHostsAtStartupHint}"/>
                                         <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[SyncKnownHostsAtStartup]}"/>
                                         <TextBlock Text="{loc:Translate SettingsSyncKnownHostsAtStartupHint}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="20,4,0,12" TextWrapping="Wrap"/>

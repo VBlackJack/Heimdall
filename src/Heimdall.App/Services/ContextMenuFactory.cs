@@ -233,11 +233,10 @@ public sealed class ContextMenuFactory
     {
         var item = new MenuItem
         {
-            Header = notice,
             IsEnabled = false,
             FontStyle = FontStyles.Italic
         };
-        System.Windows.Automation.AutomationProperties.SetName(item, notice);
+        LiteralAccessText.SetLiteral(item, notice);
         return item;
     }
 
@@ -538,10 +537,8 @@ public sealed class ContextMenuFactory
 
         foreach (var tool in tools)
         {
-            var toolItem = new MenuItem
-            {
-                Header = tool.Name
-            };
+            var toolItem = new MenuItem();
+            LiteralAccessText.SetLiteral(toolItem, tool.Name);
 
             // Capture for closure
             var capturedTool = tool;
@@ -574,11 +571,13 @@ public sealed class ContextMenuFactory
         var groups = tools.GroupBy(t => t.ProviderName, StringComparer.OrdinalIgnoreCase);
         foreach (var group in groups)
         {
-            var providerMenu = new MenuItem { Header = group.Key, FontWeight = FontWeights.SemiBold };
+            var providerMenu = new MenuItem { FontWeight = FontWeights.SemiBold };
+            LiteralAccessText.SetLiteral(providerMenu, group.Key);
 
             foreach (var tool in group.OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase))
             {
-                var toolItem = new MenuItem { Header = tool.Name };
+                var toolItem = new MenuItem();
+                LiteralAccessText.SetLiteral(toolItem, tool.Name);
 
                 if (tool.DescriptionKey is not null)
                     toolItem.ToolTip = vm.Localize(tool.DescriptionKey);
@@ -954,14 +953,19 @@ public sealed class ContextMenuFactory
         List<FolderTargetNode> children = node.Children.Where(child => include(child.FullPath)).ToList();
         if (children.Count == 0)
         {
-            items.Add(createTarget(node.FullPath, node.Name));
+            MenuItem target = createTarget(node.FullPath, LiteralAccessText.Literal(node.Name));
+            LiteralAccessText.SetAutomationName(target, node.Name);
+            items.Add(target);
             return;
         }
 
-        MenuItem branch = new() { Header = node.Name };
+        MenuItem branch = new();
+        LiteralAccessText.SetLiteral(branch, node.Name);
+        string moveIntoTemplate = vm.Localize("TreeCtxMoveIntoFolder");
         MenuItem here = createTarget(
             node.FullPath,
-            string.Format(vm.Localize("TreeCtxMoveIntoFolder"), node.Name));
+            string.Format(moveIntoTemplate, LiteralAccessText.Literal(node.Name)));
+        LiteralAccessText.SetAutomationName(here, LiteralAccessText.FormatName(moveIntoTemplate, node.Name));
         branch.Items.Add(here);
         branch.Items.Add(new Separator());
         foreach (FolderTargetNode child in children)

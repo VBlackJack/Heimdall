@@ -799,7 +799,8 @@ public sealed class SessionTabContextMenuFactory
         {
             foreach (var macro in macros)
             {
-                var macroItem = new MenuItem { Header = macro.Name, Tag = macro };
+                var macroItem = new MenuItem { Tag = macro };
+                LiteralAccessText.SetLiteral(macroItem, macro.Name);
                 macroItem.Click += async (s, _) =>
                 {
                     if (s is MenuItem { Tag: TerminalMacro m })
@@ -817,7 +818,8 @@ public sealed class SessionTabContextMenuFactory
                 };
                 playMenu.Items.Add(macroItem);
 
-                var editItem = new MenuItem { Header = macro.Name, Tag = macro };
+                var editItem = new MenuItem { Tag = macro };
+                LiteralAccessText.SetLiteral(editItem, macro.Name);
                 editItem.Click += async (s, _) =>
                 {
                     if (s is not MenuItem { Tag: TerminalMacro m })
@@ -959,7 +961,8 @@ public sealed class SessionTabContextMenuFactory
                 foreach (var other in otherSessions)
                 {
                     var sourceTab = other;
-                    var sessionMenu = new MenuItem { Header = sourceTab.Title };
+                    var sessionMenu = new MenuItem();
+                    LiteralAccessText.SetLiteral(sessionMenu, sourceTab.Title);
 
                     // Merge resolution is session-scoped; profile IDs are shared by duplicate tabs.
                     string mergeId = sourceTab.ServerId;
