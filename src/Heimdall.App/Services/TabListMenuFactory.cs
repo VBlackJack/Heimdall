@@ -45,11 +45,13 @@ internal static class TabListMenuFactory
             // checkable, so IsChecked alone left it unmarked on screen. IsChecked stays for UIA.
             var item = new MenuItem
             {
-                Header = string.IsNullOrEmpty(session.AccessibleName) ? session.DisplayTitle : session.AccessibleName,
                 InputGestureText = session.TabGroupLabel,
                 IsChecked = isActive,
                 FontWeight = isActive ? FontWeights.SemiBold : FontWeights.Normal,
             };
+            LiteralAccessText.SetLiteral(
+                item,
+                string.IsNullOrEmpty(session.AccessibleName) ? session.DisplayTitle : session.AccessibleName);
             item.Click += (_, _) => connection.ActiveSession = session;
             menu.Items.Add(item);
         }

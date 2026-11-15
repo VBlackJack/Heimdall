@@ -19,6 +19,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using Heimdall.App.Services;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
 using Heimdall.Core.Security;
@@ -51,13 +52,12 @@ public static class ToolContextMenuHelper
         if (openSessionCallback is not null
             && SessionProtocolChoice.ForHost(ip, openPorts) is { } session)
         {
-            var connect = new MenuItem
-            {
-                Header = string.Format(
-                    L(localizer, "ToolCtxOpenSession"),
-                    session.Protocol,
-                    session.Destination)
-            };
+            var connect = new MenuItem();
+            LiteralAccessText.SetFormatted(
+                connect,
+                L(localizer, "ToolCtxOpenSession"),
+                session.Protocol,
+                session.Destination);
             connect.Click += (_, _) => openSessionCallback(session);
             items.Add(connect);
             AddSeparator(items);
@@ -119,7 +119,8 @@ public static class ToolContextMenuHelper
             var httpPort = openPorts.First(p => p is 443 or 8443 or 80 or 8080 or 8006 or 5000 or 3000 or 9090);
             var scheme = httpPort is DefaultPorts.HttpsStd or DefaultPorts.HttpsAlt ? "https" : "http";
             var url = $"{scheme}://{ip}:{httpPort}";
-            var browser = new MenuItem { Header = string.Format(L(localizer, "ToolCtxOpenBrowser"), url) };
+            var browser = new MenuItem();
+            LiteralAccessText.SetFormatted(browser, L(localizer, "ToolCtxOpenBrowser"), url);
             browser.Click += (_, _) =>
             {
                 Process.Start(new ProcessStartInfo

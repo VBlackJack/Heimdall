@@ -136,10 +136,13 @@
                             Padding="{StaticResource PaddingButtonPrimary}"
                             Margin="{StaticResource MarginButtonGroup}"
                             AutomationProperties.Name="{loc:Translate ToolTextCasePascal}" />
+                    <!-- The label holds a literal underscore: the template keeps it, where a string
+                         content alone would read it as an access key. -->
                     <Button x:Name="BtnSnakeCase"
+                            Content="{loc:Translate ToolTextCaseSnake}"
+                            ContentTemplate="{StaticResource LiteralTextTemplate}"
                             AutomationProperties.AutomationId="TextCase.SnakeButton"
                             TabIndex="3"
-                            Content="{loc:Translate ToolTextCaseSnake}"
                             Command="{Binding ConvertCommand}"
                             CommandParameter="{x:Static codecs:TextCaseStyle.Snake}"
                             Style="{DynamicResource SecondaryButtonStyle}"
@@ -187,9 +190,10 @@
                             Margin="{StaticResource MarginButtonGroup}"
                             AutomationProperties.Name="{loc:Translate ToolTextCaseTitle_Case}" />
                     <Button x:Name="BtnConstantCase"
+                            Content="{loc:Translate ToolTextCaseConstant}"
+                            ContentTemplate="{StaticResource LiteralTextTemplate}"
                             AutomationProperties.AutomationId="TextCase.ConstantButton"
                             TabIndex="8"
-                            Content="{loc:Translate ToolTextCaseConstant}"
                             Command="{Binding ConvertCommand}"
                             CommandParameter="{x:Static codecs:TextCaseStyle.Constant}"
                             Style="{DynamicResource SecondaryButtonStyle}"

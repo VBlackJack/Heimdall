@@ -1044,6 +1044,13 @@
         </Setter>
     </Style>
 
+    <!-- Text that is data, or a label with a literal underscore, in a control that reads access keys:
+         a content presenter builds access-key text only for string content with no template, so the
+         content stays a string (the settings search reads it) and this template draws it as it is. -->
+    <DataTemplate x:Key="LiteralTextTemplate">
+        <TextBlock Text="{Binding}"/>
+    </DataTemplate>
+
     <Style x:Key="ThemedComboBoxItemStyle" TargetType="{x:Type ComboBoxItem}">
         <Setter Property="FocusVisualStyle" Value="{StaticResource AppFocusVisualStyle}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
@@ -1063,9 +1070,11 @@
                             BorderThickness="{TemplateBinding BorderThickness}"
                             CornerRadius="{StaticResource CornerRadiusMd}"
                             SnapsToDevicePixels="True">
+                        <!-- An item is a value the user picks, never a label with a key: a gateway named
+                             gw_prod must read gw_prod here as it does in the closed box. -->
                         <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
                                           VerticalAlignment="Center"
-                                          RecognizesAccessKey="True"/>
+                                          RecognizesAccessKey="False"/>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsHighlighted" Value="True">

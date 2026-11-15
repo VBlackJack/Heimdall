@@ -1266,9 +1266,9 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard, I
         {
             var item = new MenuItem
             {
-                Header = path,
                 Icon = CreateBookmarkIcon()
             };
+            LiteralAccessText.SetLiteral(item, path);
             string capturedPath = path;
             item.Click += (_, _) => _ = NavigateRemoteAsync(capturedPath);
             menu.Items.Add(item);
@@ -1281,9 +1281,9 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard, I
         {
             var removeItem = new MenuItem
             {
-                Header = path,
                 Icon = CreateBookmarkIcon()
             };
+            LiteralAccessText.SetLiteral(removeItem, path);
             string capturedPath = path;
             removeItem.Click += (_, _) => _viewModel.RemoveBookmark(capturedPath);
             removeMenu.Items.Add(removeItem);
