@@ -518,12 +518,46 @@ et l'efface est masqué dans ce mode.
 ### Escalade sudo en SFTP et édition distante
 
 Le repli sudo du SFTP est délibérément étroit. `EmbeddedSftpViewModel` n'escalade
-que pour des exceptions typées de permission refusée
-(`SftpPermissionDeniedException` et `UnauthorizedAccessException` locale) ; les
-messages génériques `SshException("Failure")` ne déclenchent aucune opération
-privilégiée. Ce compromis accepte quelques invites de nouvelle tentative
-manuelle en échange de l'absence d'actions sudo sur des échecs qui ne relèvent
-pas des permissions.
+que lorsque le serveur refuse une opération faute de permission
+(`SftpPermissionDeniedException`, ou une suppression récursive refusée pour
+cette raison) ; les messages génériques `SshException("Failure")` ne
+déclenchent aucune opération privilégiée, pas plus qu'une
+`UnauthorizedAccessException` locale : c'est le système de fichiers local qui
+refuse, et un transfert distant privilégié échouerait sur le même chemin local.
+Ce compromis accepte quelques invites de nouvelle tentative manuelle en échange
+de l'absence d'actions sudo sur des échecs qui ne relèvent pas des permissions.
+
+Seule une suppression demande avant d'escalader, une fois par suppression, et
+la question refuse par défaut. Le téléversement, l'enregistrement depuis un
+éditeur, l'ouverture, la création de dossier, le renommage, le changement de
+permissions, le téléchargement et le listage escaladent sans demander quand le
+serveur les refuse. Le mot de passe sudo proposé est le mot de passe SSH de la
+session ; il n'est jamais ressaisi, ni écrit dans un journal ou sur une ligne
+de commande.
+
+Un changement de permissions en root ne suit jamais un lien symbolique. Un
+dossier est modifié depuis l'intérieur, après avoir vérifié qu'il est toujours
+l'élément listé ; un fichier ordinaire est modifié par un lien physique créé
+dans un dossier privé réservé à root, à côté de lui, puis supprimé. Un lien
+symbolique, un tube, une socket, un périphérique, ou un élément qui a changé
+pendant la vérification est refusé ; pour modifier la cible d'un lien, ouvrez la
+cible. Il faut GNU coreutils sur le serveur, comme pour les transferts
+privilégiés, et un dossier où root peut créer ce dossier et un lien physique ;
+sinon la modification est refusée plutôt que faite par un chemin qui pourrait
+suivre un lien. Deux limites demeurent : les liens symboliques des dossiers qui
+mènent à l'élément sont suivis, comme avant ; et un lien physique vers un autre
+fichier, placé sous le nom de l'élément par quelqu'un qui peut écrire dans son
+dossier, est le même fichier, et il est modifié.
+
+Dans une suppression ou un changement de permissions portant sur plusieurs
+éléments, un échec de sudo qu'aucun élément suivant ne peut changer (mot de
+passe refusé ou indisponible, compte non autorisé à utiliser sudo, sudo ou un
+outil nécessaire absent, authentification SSH ou clé d'hôte refusée) arrête
+l'escalade pour le reste de l'opération : les éléments restants sont quand même
+tentés avec les droits de la session, et le résumé indique combien n'ont pas été
+tentés en root. La détection lit les messages anglais de sudo : sur un serveur
+dont sudo répond dans une autre langue, un mot de passe refusé est encore tenté
+une fois par élément.
 
 Les téléversements privilégiés passent d'abord par une zone de transit : le contenu est déposé
 dans un répertoire privé (0700) de l'utilisateur connecté, sous `$TMPDIR` (`/tmp` par défaut),
