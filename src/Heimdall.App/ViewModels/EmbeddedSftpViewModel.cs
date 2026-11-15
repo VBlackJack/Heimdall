@@ -2897,7 +2897,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
         // A count is not a name: it does not go between the quotes reserved for one.
         string message = entries.Count == 1
-            ? LF("SftpConfirmDelete", entries[0].Name)
+            ? LF("SftpConfirmDelete", ExecutionTrustDescriber.Visible(entries[0].Name))
             : LF("SftpConfirmDeleteMultiple", entries.Count.ToString(CultureInfo.InvariantCulture));
 
         bool confirmed = await _dialogService.ShowConfirmAsync(
@@ -2945,8 +2945,10 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             {
                 granted = await dialogService.ShowConfirmAsync(
                     L10n("SftpConfirmSudoDeleteTitle"),
-                    LF("SftpConfirmSudoDelete", refusedName),
-                    "danger").ConfigureAwait(true);
+                    LF("SftpConfirmSudoDelete", ExecutionTrustDescriber.Visible(refusedName)),
+                    "danger",
+                    L10n("SftpConfirmSudoDeleteAccept"),
+                    L10n("SftpConfirmSudoDeleteDecline")).ConfigureAwait(true);
             }).ConfigureAwait(false);
 
             return granted;
@@ -2959,7 +2961,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             {
                 deleteToken.ThrowIfCancellationRequested();
                 attemptedCount++;
-                TransferStatusText = LF("SftpStatusDeleting", file.Name, attemptedCount, entries.Count);
+                TransferStatusText = LF("SftpStatusDeleting", ExecutionTrustDescriber.Visible(file.Name), attemptedCount, entries.Count);
                 DeleteEntryFailure? failure = await TryDeleteEntryAsync(browser, file, consent, deleteToken)
                     .ConfigureAwait(false);
                 if (failure is null)
@@ -3113,8 +3115,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 RemoteRecursiveDeleteFailureReason.ShellOrRmUnavailable =>
                     L10n("SftpDeleteRefusedShellUnavailable"),
                 RemoteRecursiveDeleteFailureReason.PermissionDenied =>
-                    LF("SftpDeleteRefusedPermissionDenied", firstFailure.Name),
-                _ => LF("SftpDeleteFailedEntry", firstFailure.Name),
+                    LF("SftpDeleteRefusedPermissionDenied", ExecutionTrustDescriber.Visible(firstFailure.Name)),
+                _ => LF("SftpDeleteFailedEntry", ExecutionTrustDescriber.Visible(firstFailure.Name)),
             };
         }
 

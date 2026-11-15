@@ -70,6 +70,25 @@ public interface IDialogService
         => ShowConfirmAsync(title, message, severity);
 
     /// <summary>
+    /// The labeled confirmation that can render above a topmost popup (e.g. the Ctrl+K
+    /// command palette). It declines by default, like the labeled overload it extends: the
+    /// decline button takes Enter and Escape, and an application that is shutting down
+    /// answers false. A default implementation ignores <paramref name="topmost"/> and
+    /// forwards to the labeled overload so existing implementations need no change.
+    /// </summary>
+    /// <param name="confirmLabel">Label for the answer that performs the act.</param>
+    /// <param name="declineLabel">Label for the answer that does nothing, and takes Enter.</param>
+    /// <param name="topmost">Whether the dialog renders above a topmost popup.</param>
+    Task<bool> ShowConfirmAsync(
+        string title,
+        string message,
+        string severity,
+        string confirmLabel,
+        string declineLabel,
+        bool topmost)
+        => ShowConfirmAsync(title, message, severity, confirmLabel, declineLabel);
+
+    /// <summary>
     /// Shows a three-choice dialog (Save / Discard / Cancel).
     /// </summary>
     /// <returns>True = Save, false = Discard, null = Cancel.</returns>

@@ -69,6 +69,16 @@ public sealed class WpfDialogService(
         string severity,
         string confirmLabel,
         string declineLabel)
+        => ShowConfirmAsync(title, message, severity, confirmLabel, declineLabel, topmost: false);
+
+    /// <inheritdoc/>
+    public Task<bool> ShowConfirmAsync(
+        string title,
+        string message,
+        string severity,
+        string confirmLabel,
+        string declineLabel,
+        bool topmost)
     {
         // Declines while shutting down, where the other overloads consent. They consent
         // because their callers are close paths that must not stall an exit; this one
@@ -85,7 +95,7 @@ public sealed class WpfDialogService(
             severity,
             confirmLabel,
             declineLabel,
-            topmost: false,
+            topmost,
             primaryIsDefault: false);
 
         return Task.FromResult(result);
