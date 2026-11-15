@@ -33,4 +33,21 @@ public interface IPostConnectStepResolver
     /// </remarks>
     Task<PostConnectResolveResult> ResolveAsync(PostConnectStep step, RemoteOs remoteOs, CancellationToken ct)
         => ResolveAsync(step, ct);
+
+    /// <summary>
+    /// The titles of the Command Library entries a profile links to, by entry id, for the question
+    /// that asks whether the profile may run them. An id with no entry is left out.
+    /// </summary>
+    /// <param name="libraryIds">The ids of the linked entries.</param>
+    /// <param name="culture">The language the titles are shown in, or null for the stored text.</param>
+    /// <param name="ct">Cancels the lookup.</param>
+    /// <remarks>
+    /// Defaults to no title, so an implementation with no library behind it needs no change; the
+    /// rows then name each entry by its id.
+    /// </remarks>
+    Task<IReadOnlyDictionary<string, string>> GetLinkedTitlesAsync(
+        IReadOnlyCollection<string> libraryIds,
+        string? culture,
+        CancellationToken ct)
+        => Task.FromResult<IReadOnlyDictionary<string, string>>(new Dictionary<string, string>(StringComparer.Ordinal));
 }

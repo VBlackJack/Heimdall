@@ -19,6 +19,7 @@ using Heimdall.Core.Logging;
 using Heimdall.Core.Models;
 using Microsoft.Extensions.DependencyInjection;
 using TwinShell.Core.Interfaces;
+using TwinShell.Core.Services;
 using CommandTemplate = TwinShell.Core.Models.CommandTemplate;
 
 namespace Heimdall.App.Services.PostConnect;
@@ -97,6 +98,37 @@ public sealed class CommandLibraryStepResolver(IServiceScopeFactory scopeFactory
                 ReasonKey = "LogPostConnectResolveBrokenInvalidParams"
             };
         }
+    }
+
+    public async Task<IReadOnlyDictionary<string, string>> GetLinkedTitlesAsync(
+        IReadOnlyCollection<string> libraryIds,
+        string? culture,
+        CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(libraryIds);
+
+        Dictionary<string, string> titles = new(StringComparer.Ordinal);
+        if (libraryIds.Count == 0)
+        {
+            return titles;
+        }
+
+        using var scope = _scopeFactory.CreateScope();
+        var actionService = scope.ServiceProvider.GetRequiredService<IActionService>();
+        foreach (string id in libraryIds)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var action = await actionService.GetActionByIdAsync(id).ConfigureAwait(false);
+            if (action is not null)
+            {
+                // The stored action holds the pivot (English) text; the title is shown in the
+                // operator's language, as the session dialog shows it.
+                titles[id] = ActionLocalizer.Localize(action, culture).Title;
+            }
+        }
+
+        return titles;
     }
 
     /// <summary>

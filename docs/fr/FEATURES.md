@@ -87,7 +87,7 @@ Le catalogue complet de ce que fait Heimdall, protocole par protocole. Si vous c
 - Un compte enregistré répond à la demande de connexion du navigateur (Basic, NTLM) sur l'hôte du profil seulement, une fois par onglet ; les formulaires de connexion dans la page ne sont pas remplis. Avec le fournisseur d'identifiants activé, un profil qui indique un utilisateur sans mot de passe enregistré le reçoit du fournisseur
 - La navigation est limitée aux adresses web, dans la page comme dans ses cadres : les liens file:, de script et de protocole personnalisé sont refusés, et une fenêtre surgissante s'ouvre dans le même onglet sous les mêmes règles
 - Une console qui répond par une erreur HTTP, ou un lien qui échoue après le chargement de la console, laisse la session ouverte : seul l'échec à joindre la console y met fin
-- **Ouvrir avec un programme externe**, par profil, pour une console qu'aucun moteur actuel n'accepte (un ancien iLO) : le programme, ou le navigateur par défaut si aucun n'est indiqué, reçoit l'adresse avec {Url}, {Host} et {Port} ; les interpréteurs de commandes sont refusés, et un profil importé qui indique un programme demande confirmation avant de le lancer, comme un profil de shell local
+- **Ouvrir avec un programme externe**, par profil, pour une console qu'aucun moteur actuel n'accepte (un ancien iLO) : le programme, ou le navigateur par défaut si aucun n'est indiqué, reçoit l'adresse avec {Url}, {Host} et {Port} ; les interpréteurs de commandes sont refusés, et un profil importé qui indique un programme demande confirmation avant de le lancer, comme un profil de shell local, dans une question qui énumère tout ce que le profil lancerait et dont la réponse par défaut est "Ne pas exécuter"
 - **Par une passerelle SSH** : le tunnel de la passerelle ouvre un proxy SOCKS et l'onglet de la console passe par lui avec le vrai nom de la console : son certificat, son épinglage, ses redirections et un nom que seul le réseau d'administration résout fonctionnent. Toutes les consoles derrière une même passerelle partagent un tunnel, libéré à la fermeture du dernier onglet ; chaque passerelle a son propre profil de navigateur, donc une connexion faite en direct n'est pas partagée avec la même console atteinte par une passerelle. L'ouverture externe par une passerelle est refusée, le programme externe ne passerait pas par le tunnel
 - Un bouton dans l'en-tête de l'onglet, et un autre sur le panneau affiché quand une console ne se charge pas, ouvre la page courante à l'extérieur avec le programme du profil ou le navigateur par défaut : la porte de sortie pour une console que le moteur intégré affiche mal ou refuse, comme un ancien iLO en TLS 1.0. Absent derrière une passerelle, où il ne pourrait pas joindre la console
 - Une console s'ouvre au zoom où elle a été laissée, gardé par profil
@@ -442,7 +442,7 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
     ce que devient chaque valeur. Une variable non résolue est conservée telle quelle et signalée
     dans le résumé d'import
   - La commande de connexion (par exemple `sudo su - www`) devient une étape post-connexion. Le
-    profil est importé avec `ExecutionConfirmed = false`, donc Heimdall demande confirmation avant
+    profil est importé avec `ExecutionConfirmed = false`, donc Heimdall demande confirmation, dans une question qui énumère chaque commande et dont la réponse par défaut est "Ne pas exécuter", avant
     de la saisir dans la session, sauf si l'utilisateur l'autorise sur l'avis de la boîte de dialogue de la session et enregistre
   - Le commentaire de la session devient les étiquettes du profil, séparées par des virgules
   - Les chemins de clé SSH ne sont jamais importés : ils appartiennent à la machine qui a écrit le
@@ -496,7 +496,7 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
     rapport les recharge aussi. Une modification de `SharedSourceReloadDebounceMs` atteint la
     surveillance des fichiers aussitôt, sans relire aucun fichier
   - Les commandes post-connexion d'une session partagée s'approuvent par utilisateur : Heimdall
-    demande avant de les saisir, retient l'approbation pour ces commandes exactes, et redemande quand
+    demande avant de les saisir, en énumérant chaque commande, retient l'approbation pour ces commandes exactes, et redemande quand
     le fichier partagé les change. Les approbations sont une confiance personnelle : elles ne sont
     jamais exportées ni importées avec les paramètres, et **Valeurs par défaut** les efface tout en
     conservant les sources elles-mêmes. Retirer une source oublie les approbations de ses sessions

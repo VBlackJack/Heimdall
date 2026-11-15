@@ -17,6 +17,7 @@
 using System.IO;
 using Heimdall.App.Services;
 using Heimdall.App.Services.Handlers;
+using Heimdall.App.Services.PostConnect;
 using Heimdall.App.Services.SharedSessions;
 using Heimdall.App.ViewModels;
 using Heimdall.App.Views;
@@ -161,6 +162,140 @@ public sealed partial class SessionCoordinatorPreMountTests
         Assert.True(await harness.Main.Session.AuthorizePostConnectAsync(local, 1));
         Assert.Equal(0, harness.DialogService.ConfirmCallCount);
         Assert.Empty((await harness.Main.ConfigManager.LoadSettingsAsync()).SharedPostConnectApprovals);
+    }
+
+    [Fact]
+    public async Task AuthorizePostConnect_LocalUnconfirmed_PromptListsCommandsAndLinkedTitle()
+    {
+        LinkedTitleResolver resolver = new(new Dictionary<string, string> { ["tail-log"] = "Tail a log" });
+        using TestHarness harness = TestHarness.Create(postConnectStepResolver: resolver);
+        ServerProfileDto local = harness.CreateServer("SSH");
+        local.PostConnectSteps = [new PostConnectStep { Input = "id" }, LinkedStep("tail-log")];
+
+        Assert.True(await harness.Main.Session.AuthorizePostConnectAsync(local, 2));
+
+        string message = harness.DialogService.LastConfirmMessage!;
+        Assert.Contains("\"id\"", message, StringComparison.Ordinal);
+        Assert.Contains("\"Tail a log\"", message, StringComparison.Ordinal);
+        Assert.Equal(["tail-log"], resolver.RequestedIds);
+        Assert.True(local.ExecutionConfirmed);
+    }
+
+    [Fact]
+    public async Task AuthorizePostConnect_TitleLookupFails_ListsTheEntryByItsId()
+    {
+        LinkedTitleResolver resolver = new(new Dictionary<string, string>()) { Fails = true };
+        using TestHarness harness = TestHarness.Create(postConnectStepResolver: resolver);
+        ServerProfileDto local = harness.CreateServer("SSH");
+        local.PostConnectSteps = [LinkedStep("tail-log")];
+
+        Assert.True(await harness.Main.Session.AuthorizePostConnectAsync(local, 1));
+
+        Assert.Contains("\"tail-log\"", harness.DialogService.LastConfirmMessage!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ConfirmExecution_LocalProfileWithLinkedStep_PromptNamesTheLinkedTitle()
+    {
+        LinkedTitleResolver resolver = new(new Dictionary<string, string> { ["tail-log"] = "Tail a log" });
+        using TestHarness harness = TestHarness.Create(postConnectStepResolver: resolver);
+        ServerProfileDto local = harness.CreateServer("LOCAL");
+        local.LocalShellExecutable = "evil.exe";
+        local.PostConnectSteps = [LinkedStep("tail-log")];
+
+        bool approved = await harness.Main.ServerList.ConnectionService.ConfirmExecution!(local);
+
+        Assert.True(approved);
+        Assert.Contains("evil.exe", harness.DialogService.LastConfirmMessage!, StringComparison.Ordinal);
+        Assert.Contains("\"Tail a log\"", harness.DialogService.LastConfirmMessage!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AuthorizePostConnect_SharedProfile_PromptKeepsEachValueOnItsRowAndListsLinkedSteps()
+    {
+        SharedSessionTestData shared = SharedSessionTestData.Create();
+        LinkedTitleResolver resolver = new(new Dictionary<string, string> { ["tail-log"] = "Tail a log" });
+        using TestHarness harness = TestHarness.Create(
+            profileLookupFactory: configManager => new ProfileLookup(configManager, shared.Provider),
+            postConnectStepResolver: resolver);
+        shared.Profile.PostConnectSteps =
+        [
+            new PostConnectStep { Input = "ls\nrm -rf /\u202e" },
+            LinkedStep("tail-log")
+        ];
+
+        Assert.True(await harness.Main.Session.AuthorizePostConnectAsync(shared.Profile, 2));
+
+        string message = harness.DialogService.LastConfirmMessage!;
+        Assert.Contains("ls\\u{000a}rm -rf /\\u{202e}", message, StringComparison.Ordinal);
+        Assert.DoesNotContain('\u202e', message);
+        Assert.Contains("\"Tail a log\"", message, StringComparison.Ordinal);
+        Assert.False(shared.Profile.ExecutionConfirmed);
+    }
+
+    [Fact]
+    public async Task AuthorizePostConnect_SlowSynchronousTitleLookup_DoesNotHoldTheCaller()
+    {
+        // The lookup blocks its thread on a gate the test opens only after the call has returned:
+        // if the lookup ran on the caller's thread, the call could not return before that. The
+        // backstop only bounds a failure; a passing run never waits for it.
+        TimeSpan lookupBound = TimeSpan.FromMilliseconds(300);
+        TimeSpan backstop = TimeSpan.FromSeconds(30);
+        ManualResetEventSlim gate = new(initialState: false);
+        LinkedTitleResolver resolver = new(new Dictionary<string, string> { ["tail-log"] = "Tail a log" })
+        {
+            Gate = gate
+        };
+        using TestHarness harness = TestHarness.Create(postConnectStepResolver: resolver);
+        harness.Main.Session.LinkedTitleLookupTimeout = lookupBound;
+        ServerProfileDto local = harness.CreateServer("SSH");
+        local.PostConnectSteps = [LinkedStep("tail-log")];
+
+        try
+        {
+            Task<bool> call = Task.Run(() => harness.Main.Session.AuthorizePostConnectAsync(local, 1));
+
+            Assert.True(await call.WaitAsync(backstop));
+            Assert.False(gate.IsSet);
+            Assert.Contains("\"tail-log\"", harness.DialogService.LastConfirmMessage!, StringComparison.Ordinal);
+        }
+        finally
+        {
+            gate.Set();
+        }
+    }
+
+    private static PostConnectStep LinkedStep(string libraryId) => new() { CommandLibraryId = libraryId };
+
+    /// <summary>A step resolver that knows the titles of some library entries, or fails to read them.</summary>
+    private sealed class LinkedTitleResolver(IReadOnlyDictionary<string, string> titles) : IPostConnectStepResolver
+    {
+        public bool Fails { get; init; }
+
+        /// <summary>When set, the lookup blocks its thread until the gate opens, to stand for a slow read.</summary>
+        public ManualResetEventSlim? Gate { get; init; }
+
+        public List<string> RequestedIds { get; } = [];
+
+        public Task<PostConnectResolveResult> ResolveAsync(PostConnectStep step, CancellationToken ct) =>
+            Task.FromResult(new PostConnectResolveResult
+            {
+                Status = PostConnectResolveStatus.Literal,
+                ResolvedInput = step.Input
+            });
+
+        public Task<IReadOnlyDictionary<string, string>> GetLinkedTitlesAsync(
+            IReadOnlyCollection<string> libraryIds,
+            string? culture,
+            CancellationToken ct)
+        {
+            RequestedIds.AddRange(libraryIds);
+            Gate?.Wait();
+
+            return Fails
+                ? throw new InvalidOperationException("The Command Library is unavailable.")
+                : Task.FromResult(titles);
+        }
     }
 }
 
