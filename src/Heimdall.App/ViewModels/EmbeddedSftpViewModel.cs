@@ -172,6 +172,9 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         _fileConflictDialogPresenter = fileConflictDialogPresenter
             ?? throw new ArgumentNullException(nameof(fileConflictDialogPresenter));
         _remoteClipboard.Changed += OnRemoteClipboardChanged;
+        RootActivity = new SftpRootActivityLog();
+        _privilegedActs = new SftpPrivilegedActRecorder(SessionOperationEmitter.Disabled, RootActivity);
+        RootActivity.Changed += OnRootActivityChanged;
         Files = [];
         PathSegments.ReplaceAll(BuildPathSegments(_currentPath));
         Bookmarks = [];
@@ -454,6 +457,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 operationHost,
                 sessionLoggingOverride)
             : SessionOperationEmitter.Disabled;
+        _privilegedActs = new SftpPrivilegedActRecorder(_sudoEmitter, RootActivity);
         SessionTab = sessionTab;
         _localizer = localizer;
         _dialogService = dialogService;
@@ -521,6 +525,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         CancelQueuedJobs();
         IsConnected = false;
         _remoteClipboard.Changed -= OnRemoteClipboardChanged;
+        DetachRootActivity();
         if (_localizer is not null && _localeChangeObserved)
         {
             _localizer.LocaleChanged -= OnLocaleChanged;
@@ -1614,7 +1619,12 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             {
                 Core.Logging.FileLogger.Info(
                     $"EmbeddedSFTP upload permission denied, falling back to sudo for {fileName}");
-                await UploadViaSudoAsync(op.LocalPath, resolved.EffectiveTargetPath, ct, resolved.Overwrite);
+                await UploadViaSudoAsync(
+                    op.LocalPath,
+                    resolved.EffectiveTargetPath,
+                    ct,
+                    resolved.Overwrite,
+                    resolved.Overwrite ? SftpRootActKind.Overwrite : SftpRootActKind.Upload);
             }
 
             tracker.CompleteFile();
@@ -2195,12 +2205,11 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     /// bypassing SFTP permission restrictions.
     /// </summary>
     internal Task DownloadViaSudoAsync(string remotePath, string localPath, CancellationToken ct, bool overwrite = true)
-        => _sudoEmitter.RunDownloadAsync(
+        => _privilegedActs.RunDownloadAsync(
             remotePath,
             localPath,
             () => DownloadViaSudoCoreAsync(remotePath, localPath, ct, overwrite),
-            () => new FileInfo(localPath).Length,
-            privileged: true);
+            () => new FileInfo(localPath).Length);
 
     private async Task DownloadViaSudoCoreAsync(string remotePath, string localPath, CancellationToken ct, bool overwrite)
     {
@@ -2463,7 +2472,12 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     /// Streams a file over SSH to a root-owned same-directory temp file, then
     /// atomically replaces the privileged target without following symlinks.
     /// </summary>
-    internal async Task UploadViaSudoAsync(string localPath, string remotePath, CancellationToken ct, bool overwrite = true)
+    internal async Task UploadViaSudoAsync(
+        string localPath,
+        string remotePath,
+        CancellationToken ct,
+        bool overwrite = true,
+        SftpRootActKind kind = SftpRootActKind.Upload)
     {
         if (_browser is null)
         {
@@ -2474,7 +2488,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         try
         {
             // Log the privileged write against the user's true target path.
-            await _sudoEmitter.RunUploadAsync(
+            await _privilegedActs.RunUploadAsync(
+                kind,
                 localPath,
                 remotePath,
                 async () =>
@@ -2505,8 +2520,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                         PrivilegedFileTransfer.CleanWriteError(result.Error),
                         "atomic write");
                 },
-                () => new FileInfo(localPath).Length,
-                privileged: true).ConfigureAwait(false);
+                () => new FileInfo(localPath).Length).ConfigureAwait(false);
         }
         finally
         {
@@ -2644,12 +2658,11 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             catch (Exception ex) when (_sshParams is not null && IsPermissionDenied(ex))
             {
                 Core.Logging.FileLogger.Info("EmbeddedSFTP mkdir permission denied, falling back to sudo");
-                await _sudoEmitter.RunMkdirAsync(
+                await _privilegedActs.RunMkdirAsync(
                     remotePath,
                     () => RunSudoCommandAsync(
                         $"mkdir -p {PathEscaper.EscapeForShell(remotePath)}",
-                        LifecycleTokenOrNone()),
-                    privileged: true);
+                        LifecycleTokenOrNone()));
             }
 
             RequestSelectAfterRefresh(remotePath);
@@ -2804,14 +2817,13 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         }
 
         bool replace = decision?.Choice == FileConflictResolutionChoice.Replace;
-        await _sudoEmitter.RunRenameAsync(
+        await _privilegedActs.RunRenameAsync(
             file.FullPath,
             resolved.EffectiveTargetPath,
             () => ExecuteSudoRenameMoveAsync(
                 file.FullPath,
                 resolved.EffectiveTargetPath,
-                replace),
-            privileged: true).ConfigureAwait(false);
+                replace)).ConfigureAwait(false);
         return true;
     }
 
@@ -3100,12 +3112,11 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 Core.Logging.FileLogger.Info(
                     $"EmbeddedSFTP delete permission denied, falling back to sudo for {file.Name}");
                 string flag = file.IsDirectory ? "-rf" : "-f";
-                await _sudoEmitter.RunDeleteAsync(
+                await _privilegedActs.RunDeleteAsync(
                     file.FullPath,
                     () => RunSudoDeleteCommandAsync(
                         $"rm {flag} {PathEscaper.EscapeForShell(file.FullPath)}",
-                        CancellationToken.None),
-                    privileged: true).ConfigureAwait(false);
+                        CancellationToken.None)).ConfigureAwait(false);
                 return null;
             }
             catch (OperationCanceledException)
@@ -3387,12 +3398,11 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             Core.Logging.FileLogger.Info("EmbeddedSFTP chmod permission denied, falling back to sudo");
             try
             {
-                await _sudoEmitter.RunChmodAsync(
+                await _privilegedActs.RunChmodAsync(
                     entry.FullPath,
                     () => RunSudoChmodCommandAsync(
                         PrivilegedFileCommands.BuildNoFollowChmodBody(entry.FullPath, octalText),
-                        LifecycleTokenOrNone()),
-                    privileged: true).ConfigureAwait(false);
+                        LifecycleTokenOrNone())).ConfigureAwait(false);
             }
             catch (Exception sudoException)
             {
@@ -3744,7 +3754,14 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         return LF(SftpListingErrorClassifier.LocaleKey(failure), path);
     }
 
-    private async Task<IReadOnlyList<SftpFileInfo>> ListDirectoryViaSudoAsync(
+    // Every privileged listing goes through here: the toggle, the automatic fallback and the
+    // download walk. The indicator counts it apart from the operations.
+    private Task<IReadOnlyList<SftpFileInfo>> ListDirectoryViaSudoAsync(
+        string path,
+        CancellationToken ct)
+        => _privilegedActs.RunListingAsync(path, () => ListDirectoryViaSudoCoreAsync(path, ct));
+
+    private async Task<IReadOnlyList<SftpFileInfo>> ListDirectoryViaSudoCoreAsync(
         string path,
         CancellationToken ct)
     {
