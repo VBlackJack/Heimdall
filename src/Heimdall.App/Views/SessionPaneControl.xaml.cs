@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Windows;
@@ -33,6 +35,8 @@ namespace Heimdall.App.Views;
 public partial class SessionPaneControl : UserControl
 {
     private SessionPaneModel? _model;
+    private SessionTabViewModel? _watchedOwner;
+    private ObservableCollection<SessionTabViewModel>? _watchedSessions;
 
     public SessionPaneControl()
     {
@@ -63,6 +67,8 @@ public partial class SessionPaneControl : UserControl
         {
             _model.PropertyChanged -= OnModelPropertyChanged;
         }
+
+        UnwatchOwner();
 
         // Release the hosted UIElement so it can be reparented in a new
         // SessionPaneControl (e.g. after a swap). Without this, the old
@@ -156,6 +162,17 @@ public partial class SessionPaneControl : UserControl
             && !hasFailureDetails
             && !string.Equals(status, SessionStatusTokens.Disconnected, StringComparison.Ordinal);
 
+    /// <summary>
+    /// Whether the pane draws its own loading overlay. The tab already draws one over its whole
+    /// content, under exactly the conditions of <see cref="ShowsLoadingOverlay"/> read from its
+    /// primary pane, so the sole pane of an unsplit tab stands aside: two stacked overlays put the
+    /// pane title on the tab's status text and show two progress bars. A pane in a split keeps its
+    /// own, and a pane whose owner is not known yet keeps it too, so no state is ever left blank.
+    /// </summary>
+    internal static bool ShowsOwnLoadingOverlay(
+        object? hostControl, bool hasFailureDetails, string? status, bool isSoleVisiblePaneOfTab)
+        => ShowsLoadingOverlay(hostControl, hasFailureDetails, status) && !isSoleVisiblePaneOfTab;
+
     private static bool IsHostlessDisconnected(object? hostControl, string? status)
         => hostControl is null
             && string.Equals(status, SessionStatusTokens.Disconnected, StringComparison.Ordinal);
@@ -174,6 +191,7 @@ public partial class SessionPaneControl : UserControl
 
         if (_model is null)
         {
+            UnwatchOwner();
             LoadingOverlay.Visibility = Visibility.Collapsed;
             DisconnectedOverlay.Visibility = Visibility.Collapsed;
             return;
@@ -181,8 +199,15 @@ public partial class SessionPaneControl : UserControl
 
         var hasFailureDetails = _model.HasFailureDetails;
 
-        // Loading: pane exists but host control not yet assigned (connection in progress)
-        LoadingOverlay.Visibility = ShowsLoadingOverlay(_model.HostControl, hasFailureDetails, _model.Status)
+        // Recomputed with the overlay rather than once at load: the owning session is found by
+        // walking the split tree, which is not populated yet when this control is first created.
+        bool ownerKnown = TryFindOwningSession(out _, out SessionTabViewModel? owner);
+        WatchOwner(owner);
+
+        // Loading: pane exists but host control not yet assigned (connection in progress). The tab
+        // draws the loading overlay for an unsplit tab, so this one is for the panes of a split.
+        LoadingOverlay.Visibility = ShowsOwnLoadingOverlay(
+                _model.HostControl, hasFailureDetails, _model.Status, ownerKnown && !owner!.IsSplit)
             ? Visibility.Visible
             : Visibility.Collapsed;
 
@@ -190,11 +215,73 @@ public partial class SessionPaneControl : UserControl
             ? Visibility.Visible
             : Visibility.Collapsed;
 
-        // Recomputed with the overlay rather than once at load: the owning session is found by
-        // walking the split tree, which is not populated yet when this control is first created.
         UpdateEditProfileAvailability();
         UpdateReconnectAvailability();
     }
+
+    /// <summary>
+    /// Follows the session that owns this pane, and the list it is found in, so the loading overlay
+    /// is recomputed when the tab is split or unsplit, or when the session is added after this
+    /// control was created.
+    /// </summary>
+    private void WatchOwner(SessionTabViewModel? owner)
+    {
+        if (!ReferenceEquals(_watchedOwner, owner))
+        {
+            if (_watchedOwner is not null)
+            {
+                _watchedOwner.PropertyChanged -= OnOwnerPropertyChanged;
+            }
+
+            _watchedOwner = owner;
+
+            if (owner is not null)
+            {
+                owner.PropertyChanged += OnOwnerPropertyChanged;
+            }
+        }
+
+        var sessions = FindMainViewModel()?.Connection.ActiveSessions;
+        if (!ReferenceEquals(_watchedSessions, sessions))
+        {
+            if (_watchedSessions is not null)
+            {
+                _watchedSessions.CollectionChanged -= OnSessionsChanged;
+            }
+
+            _watchedSessions = sessions;
+
+            if (sessions is not null)
+            {
+                sessions.CollectionChanged += OnSessionsChanged;
+            }
+        }
+    }
+
+    private void UnwatchOwner()
+    {
+        if (_watchedOwner is not null)
+        {
+            _watchedOwner.PropertyChanged -= OnOwnerPropertyChanged;
+            _watchedOwner = null;
+        }
+
+        if (_watchedSessions is not null)
+        {
+            _watchedSessions.CollectionChanged -= OnSessionsChanged;
+            _watchedSessions = null;
+        }
+    }
+
+    private void OnOwnerPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(SessionTabViewModel.IsSplit) or nameof(SessionTabViewModel.RootContent))
+        {
+            UpdateOverlays();
+        }
+    }
+
+    private void OnSessionsChanged(object? sender, NotifyCollectionChangedEventArgs e) => UpdateOverlays();
 
     // ── Overlay button handlers (route to MainViewModel) ─────────
 
