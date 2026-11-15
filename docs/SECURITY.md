@@ -466,11 +466,41 @@ current Windows identity, since the field that shows and clears it is hidden in 
 ### SFTP sudo escalation and remote editing
 
 SFTP sudo fallback is deliberately narrow. `EmbeddedSftpViewModel`
-escalates only for typed permission-denied exceptions
-(`SftpPermissionDeniedException` and local `UnauthorizedAccessException`);
-generic `SshException("Failure")` messages do not trigger privileged
-operations. This trades occasional manual retry prompts for avoiding sudo
-actions on non-permission failures.
+escalates only when the server refuses an operation for lack of permission
+(`SftpPermissionDeniedException`, or a recursive delete refused for that
+reason); generic `SshException("Failure")` messages do not trigger privileged
+operations, and neither does a local `UnauthorizedAccessException`: that is
+the local file system refusing, and a privileged remote transfer would fail on
+the same local path. This trades occasional manual retry prompts for avoiding
+sudo actions on non-permission failures.
+
+Only a delete asks before it escalates, once per deletion, and the question
+declines by default. Upload, save from an editor, open, new folder, rename,
+permission change, download and listing escalate without asking when the
+server refuses them. The sudo password offered is the session's SSH password;
+it is never typed again and never written to a log or a command line.
+
+A permission change as root never follows a symbolic link. A directory is
+changed from inside it, after checking that it is still the entry that was
+listed; a regular file is changed through a hard link made in a private
+root-only directory created beside it and removed afterwards. A symbolic link, a
+pipe, a socket, a device, or an entry that changed during the check is refused;
+to change a link's target, browse to the target. This needs GNU coreutils on the
+server, like the privileged transfers, and a folder where root can create that
+directory and a hard link; otherwise the change is refused rather than made by a
+path that could follow a link. Two limits remain: symbolic links in the folders
+that lead to the entry are followed, as before; and a hard link to another file,
+put under the entry's name by someone who can write in its folder, is the same
+file and is changed.
+
+In a deletion or a permission change of several entries, a sudo failure that no
+later entry can change (password refused or unavailable, account not allowed to
+use sudo, sudo or a required tool missing, SSH authentication or host key
+refused) stops escalation for the rest of that operation: the remaining entries
+are still tried with the session's own rights, and the summary says how many
+were not tried as root. The detection reads sudo's English messages, so on a
+server whose sudo answers in another language a refused password is still tried
+once per entry.
 
 Privileged uploads are staged first: the content goes into a private 0700 directory of the
 connecting user under `$TMPDIR` (default `/tmp`), in a 0600 file, and stays there until the

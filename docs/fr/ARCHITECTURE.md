@@ -321,14 +321,15 @@ Toutes les opérations de connexion renvoient un `ISessionResult` (défini dans 
 **Solution** : une approche à deux niveaux, utilisant des canaux d'exécution SSH en parallèle de la session SFTP.
 
 **Niveau 1 - repli automatique** (transparent pour l'utilisateur) :
-Chaque opération de fichier attrape les exceptions typées de permission refusée (`SftpPermissionDeniedException`, plus `UnauthorizedAccessException` en local pour les chemins de fichiers temporaires), puis réessaie via une exécution SSH :
-- Téléversement : SFTP vers `/tmp/` → `sudo tee` vers la cible ; le nettoyage s'exécute en commande `sudo rm -f` distincte depuis un bloc `finally`
-- Téléchargement : `sudo cat` via exécution SSH
+Chaque opération de fichier attrape l'exception typée de permission refusée du serveur (`SftpPermissionDeniedException` ; une `UnauthorizedAccessException` locale n'escalade pas), puis réessaie via une exécution SSH :
+- Téléversement : le contenu est préparé dans un répertoire privé 0700 de l'utilisateur connecté sous `$TMPDIR` (`/tmp` par défaut) ; un seul appel sudo l'installe dans un répertoire privé à côté de la destination et le renomme sur la cible (`PrivilegedFileTransfer`)
+- Téléchargement : un script exécuté en root lit le fichier sans suivre un lien symbolique et le renvoie encodé en base64
 - Edition : délègue à `RemoteFileEditor.EditFileSudoAsync`
-- Chmod/Renommage/Suppression/Mkdir : `sudo chmod`/`mv`/`rm`/`mkdir` via exécution SSH
+- Chmod : un script exécuté en root (`PrivilegedFileCommands.BuildNoFollowChmodBody`) modifie un dossier depuis l'intérieur après avoir vérifié que c'est l'élément listé, et un fichier ordinaire par un lien physique dans un dossier privé réservé à root créé à côté ; un lien symbolique ou un fichier spécial est refusé ; GNU coreutils requis
+- Renommage/Suppression/Mkdir : `sudo mv`/`rm`/`mkdir` via exécution SSH. Une suppression demande d'abord. Dans une suppression ou un changement de permissions groupé, `SudoBatchGuard` cesse d'appeler sudo après un échec qu'aucun élément suivant ne peut changer
 
 **Niveau 2 - bascule "Naviguer en root"** (déclenchée par l'utilisateur) :
-Un bouton bascule de la barre d'outils fait passer le listage de répertoire du `ListDirectory` SFTP à `sudo ls -la --time-style=long-iso` via exécution SSH. Cela permet de naviguer dans N'IMPORTE QUEL répertoire, quelles que soient les permissions.
+Un bouton bascule de la barre d'outils fait passer le listage de répertoire du `ListDirectory` SFTP à `sudo find -H <dir> -mindepth 1 -maxdepth 1 -printf` avec des enregistrements délimités par NUL via exécution SSH (`SudoDirectoryListing`). Cela permet de naviguer dans N'IMPORTE QUEL répertoire, quelles que soient les permissions.
 
 **Décisions de conception et pièges rencontrés** :
 
@@ -337,7 +338,7 @@ Un bouton bascule de la barre d'outils fait passer le listage de répertoire du 
 - **L'escalade doit rester typée** : SSH.NET peut remonter des messages `SshException("Failure")` très larges pour de nombreuses conditions sans rapport avec les permissions. Le chemin sudo ne fait délibérément aucune correspondance par sous-chaîne sur les échecs génériques ; les faux négatifs sont plus sûrs que des opérations privilégiées sur des erreurs sans rapport.
 - **Les sessions d'édition distante mettent la confiance en cache** : le téléversement d'une édition sudo utilise le `PinnedFingerprintVerifier` résolu à l'ouverture du fichier. Une rotation de clé d'hôte pendant l'édition lève `HostKeyRotatedDuringUpload`, ferme la session d'édition, et ne relance pas le TOFU à chaque enregistrement.
 - **Les tâches de téléversement ont un propriétaire** : `RemoteFileEditor` suit la tâche de téléversement active par session d'édition, propage l'annulation via `CloseEdit`/`Dispose` et observe les défaillances de tâche.
-- **Analyse de la sortie `ls -la`** : le format `--time-style=long-iso` produit **8 colonnes** (permissions, liens, propriétaire, groupe, taille, date, heure, nom). Le premier analyseur en attendait 9 et ignorait silencieusement toutes les entrées. La colonne du nom de fichier doit être la dernière portion du découpage pour gérer les espaces.
+- **Analyse de la sortie `ls -la`** (historique : le listage utilise maintenant des enregistrements `find -printf`, voir le niveau 2) : le format `--time-style=long-iso` produit **8 colonnes** (permissions, liens, propriétaire, groupe, taille, date, heure, nom). Le premier analyseur en attendait 9 et ignorait silencieusement toutes les entrées. La colonne du nom de fichier doit être la dernière portion du découpage pour gérer les espaces.
 - **Bascule sudo masquée pour FTP** : les sessions FTP n'ont pas de canal SSH, donc le bouton sudo est replié.
 
 ### 16. Système de split récursif à N panneaux
@@ -697,7 +698,7 @@ ConnectionService.ConnectAsync(server)
         |       +-- EmbeddedSftpView: file browser panel
         |               +-- SftpSessionBundle: SftpClient (file ops) + SshClient (sudo exec)
         |               +-- RemoteFileEditor: FileSystemWatcher auto-upload (2s debounce)
-        |               +-- Sudo fallback: permission denied -> sudo cat/sudo tee via SSH exec
+        |               +-- Sudo fallback: permission denied -> staged install / no-follow read via SSH exec
         |
         +-- Citrix?
         |       +-- EmbeddedCitrixView: StoreBrowse session tab
