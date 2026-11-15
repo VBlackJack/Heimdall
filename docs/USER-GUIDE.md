@@ -269,6 +269,9 @@ remote machine on the other.
   keeps a local copy while that editor is open and uploads each save; closing the pane while a
   file is still open there asks you first. If the server refuses an upload (permission denied,
   for example), the pane says why once and tries again the next time you save.
+- When the server refuses an action and Heimdall does it as root (sudo), a **root** badge appears
+  next to the **sudo** toggle and stays until you close the pane. Click it, or press Enter on it,
+  to see the latest actions attempted as root and whether they worked.
 - In the built-in editor, **Ctrl+S** saves and **Ctrl+W** closes. A file that is not UTF-8 opens
   as Latin-1 and says so in the editor's status bar.
 
