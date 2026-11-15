@@ -588,10 +588,7 @@ public partial class EmbeddedWebView : UserControl, IDisposable, ISessionPaneOwn
             return Task.FromResult(false);
         }
 
-        return dialogs.ShowConfirmAsync(
-            _localizer["ConfirmWebExternalProgramTitle"],
-            WebExternalLaunch.ConfirmationBody(_session?.DisplayName, command, _localizer),
-            "warning");
+        return WebExternalLaunch.AskAsync(dialogs, _session?.DisplayName, command, _localizer);
     }
 
     private async void OnOpenExternallyClick(object sender, RoutedEventArgs e)

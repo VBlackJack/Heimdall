@@ -49,6 +49,18 @@ internal static class WebExternalLaunch
     /// <summary>The localization key of the body of the question asked before the external program starts.</summary>
     private const string ConfirmationBodyKey = "ConfirmWebExternalProgramBody";
 
+    /// <summary>The localization key of the title of the question asked before the external program starts.</summary>
+    private const string ConfirmationTitleKey = "ConfirmWebExternalProgramTitle";
+
+    /// <summary>The localization key of the button that lets the external program start.</summary>
+    private const string AllowLabelKey = "ConfirmExecutionTrustAllow";
+
+    /// <summary>The localization key of the button that starts nothing, and takes Enter.</summary>
+    private const string DeclineLabelKey = "ConfirmExecutionTrustDecline";
+
+    /// <summary>The severity the question is shown with.</summary>
+    private const string ConfirmationSeverity = "warning";
+
     /// <summary>What wraps a program that holds a space or a quote when it is shown.</summary>
     private const char ProgramQuote = '"';
 
@@ -141,6 +153,27 @@ internal static class WebExternalLaunch
     {
         ArgumentNullException.ThrowIfNull(localizer);
         return localizer.Format(ConfirmationBodyKey, ExecutionTrustDescriber.Visible(displayName), command);
+    }
+
+    /// <summary>
+    /// Asks the question that gates the external program of an unconfirmed profile, with the same
+    /// labeled buttons as the connect-time trust question: declining is the default, Escape and
+    /// the close box decline, and a shutdown in progress answers no.
+    /// </summary>
+    public static Task<bool> AskAsync(
+        IDialogService dialogs,
+        string? displayName,
+        string command,
+        LocalizationManager localizer)
+    {
+        ArgumentNullException.ThrowIfNull(dialogs);
+        ArgumentNullException.ThrowIfNull(localizer);
+        return dialogs.ShowConfirmAsync(
+            localizer[ConfirmationTitleKey],
+            ConfirmationBody(displayName, command, localizer),
+            ConfirmationSeverity,
+            localizer[AllowLabelKey],
+            localizer[DeclineLabelKey]);
     }
 
     /// <summary>
