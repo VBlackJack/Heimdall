@@ -443,7 +443,8 @@ public sealed class ProfileImportService(
                     GatewayMergedCount = gatewayReconciliation.MergedCount,
                     GatewayOrphanCount = gatewayReconciliation.OrphanReferences.Count,
                     UnconfirmedLookupCount = settings.UseExternalCredentialProvider
-                        ? appliedServers.Count(server => !server.CredentialLookupConfirmed)
+                        ? appliedServers.Count(server => !server.CredentialLookupConfirmed
+                            && CredentialLookupConfirmation.ProtocolHasLookup(server.ConnectionType))
                         : 0
                 },
                 GatewaysToAdd: gatewayReconciliation.GatewaysToAdd);

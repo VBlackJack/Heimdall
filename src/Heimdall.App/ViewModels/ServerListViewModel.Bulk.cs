@@ -1577,6 +1577,22 @@ public partial class ServerListViewModel
                         cancelled = true;
                         break;
 
+                    case BulkConnectOutcomeStatus.Declined:
+                        if (IsExternalCommandTooLong(candidate.ServerDto))
+                        {
+                            // Refused before any question, with its own error: no choice was
+                            // made, so it is a failure of this server.
+                            failedCount++;
+                            Core.Logging.FileLogger.Warn(
+                                $"ConnectServersBulkCoreAsync refused '{candidate.Server.DisplayName}': external command too long.");
+                            break;
+                        }
+
+                        // The user answered "do not run" for this server: skipped, not failed, and
+                        // the rest of the run still goes ahead.
+                        skips.Add(BulkConnectSkipReason.CancelledByUser);
+                        break;
+
                     case BulkConnectOutcomeStatus.Cancelled:
                         // Only this server's attempt was abandoned (its tab closed or its Cancel
                         // pressed); the rest of the run still goes ahead.

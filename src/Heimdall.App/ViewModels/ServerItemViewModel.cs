@@ -593,6 +593,7 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
 
     partial void OnConnectionTypeChanged(string value)
     {
+        OnPropertyChanged(nameof(NeedsCredentialLookupConfirmation));
         OnPropertyChanged(nameof(SshKeyText));
         OnPropertyChanged(nameof(ConnectionTypeBadge));
         OnPropertyChanged(nameof(ProtocolDisplayName));
@@ -623,9 +624,12 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
 
     /// <summary>
     /// Whether this row is a local session whose credential lookup still waits for the user.
+    /// A protocol with no lookup never waits: there is nothing to confirm.
     /// </summary>
     public bool NeedsCredentialLookupConfirmation
-        => !IsShared && _sourceDto is { CredentialLookupConfirmed: false };
+        => !IsShared
+            && _sourceDto is { CredentialLookupConfirmed: false } source
+            && CredentialLookupConfirmation.ProtocolHasLookup(source.ConnectionType);
 
     /// <summary>Takes a confirmation the inventory has just persisted.</summary>
     internal void ApplyCredentialLookupConfirmed()
@@ -746,7 +750,7 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
         }
     }
 
-    private static string FormatEndpoint(ServerProfileDto dto)
+    internal static string FormatEndpoint(ServerProfileDto dto)
     {
         var type = dto.ConnectionType?.ToUpperInvariant();
         if (type is "LOCAL" or "CITRIX")

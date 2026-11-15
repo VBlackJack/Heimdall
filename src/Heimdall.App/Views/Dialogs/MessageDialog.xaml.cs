@@ -25,6 +25,12 @@ namespace Heimdall.App.Views.Dialogs;
 /// </summary>
 public partial class MessageDialog : Window
 {
+    /// <summary>Resource key of the accent-filled button style.</summary>
+    internal const string AccentButtonStyleKey = "PrimaryButtonStyle";
+
+    /// <summary>Resource key of the plain button style.</summary>
+    internal const string PlainButtonStyleKey = "SecondaryButtonStyle";
+
     public bool Result { get; private set; }
 
     /// <summary>
@@ -92,7 +98,27 @@ public partial class MessageDialog : Window
         dialog.BtnTertiary.IsCancel = roles.TertiaryIsCancel;
         dialog.BtnPrimary.IsDefault = roles.PrimaryIsDefault;
         dialog.BtnSecondary.IsDefault = roles.SecondaryIsDefault;
+
+        ConfirmButtonStyles styles = DescribeConfirmButtonStyles(primaryIsDefault);
+        dialog.BtnPrimary.SetResourceReference(StyleProperty, styles.PrimaryStyleKey);
+        dialog.BtnSecondary.SetResourceReference(StyleProperty, styles.SecondaryStyleKey);
     }
+
+    /// <summary>Style resource key each confirm button wears.</summary>
+    /// <param name="PrimaryStyleKey">Key of the accepting button's style.</param>
+    /// <param name="SecondaryStyleKey">Key of the declining button's style.</param>
+    internal readonly record struct ConfirmButtonStyles(string PrimaryStyleKey, string SecondaryStyleKey);
+
+    /// <summary>Decides which confirm button carries the accent: the one Enter presses.</summary>
+    /// <param name="primaryIsDefault">Whether Enter accepts.</param>
+    /// <remarks>
+    /// The accent follows the default button, as on the multi-answer question, so the filled
+    /// button is never the one Enter does not press.
+    /// </remarks>
+    internal static ConfirmButtonStyles DescribeConfirmButtonStyles(bool primaryIsDefault)
+        => primaryIsDefault
+            ? new ConfirmButtonStyles(AccentButtonStyleKey, PlainButtonStyleKey)
+            : new ConfirmButtonStyles(PlainButtonStyleKey, AccentButtonStyleKey);
 
     /// <summary>Which keyboard role each confirm button carries.</summary>
     /// <param name="PrimaryIsDefault">Whether Enter accepts.</param>
@@ -301,7 +327,7 @@ public partial class MessageDialog : Window
             };
             button.SetResourceReference(
                 StyleProperty,
-                isDefault ? "PrimaryButtonStyle" : "SecondaryButtonStyle");
+                isDefault ? AccentButtonStyleKey : PlainButtonStyleKey);
             System.Windows.Automation.AutomationProperties.SetName(button, label);
             button.Click += (_, _) =>
             {

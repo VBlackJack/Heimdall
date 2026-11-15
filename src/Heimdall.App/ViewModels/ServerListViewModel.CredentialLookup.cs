@@ -36,7 +36,9 @@ public partial class ServerListViewModel
         ArgumentNullException.ThrowIfNull(servers);
 
         List<ServerItemViewModel> pending = [.. servers
-            .Where(server => !server.IsShared && CredentialLookupConfirmation.NeedsConfirmation(server.SourceProfile))
+            .Where(server => !server.IsShared
+                && CredentialLookupConfirmation.NeedsConfirmation(server.SourceProfile)
+                && CredentialLookupConfirmation.ProtocolHasLookup(server.SourceProfile?.ConnectionType))
             .DistinctBy(server => server.Id, StringComparer.Ordinal)];
         if (pending.Count == 0)
         {

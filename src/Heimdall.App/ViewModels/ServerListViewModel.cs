@@ -473,11 +473,11 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     {
         ArgumentNullException.ThrowIfNull(profile);
 
-        if (string.Equals(profile.ConnectionType, "WEB", StringComparison.OrdinalIgnoreCase)
-            && !WebExternalLaunch.FitsDescription(profile.WebExternalProgram, profile.WebExternalArguments))
+        if (IsExternalCommandTooLong(profile))
         {
             // A description cut short could hide the end of the arguments from the one who
-            // confirms, so nothing is asked.
+            // confirms, so nothing is asked. The error shown here is the whole report: the
+            // connect that asked reads the same predicate and adds no "you chose" status line.
             _dialogService.ShowError(
                 _localizer["ConfirmExecutionImportedTitle"],
                 _localizer[WebExternalLaunch.CommandTooLongErrorKey]);
@@ -513,6 +513,14 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
 
         return true;
     }
+
+    /// <summary>
+    /// Whether the external command of a WEB profile is too long to be listed whole, the one case
+    /// where the trust question is refused before it is asked.
+    /// </summary>
+    internal static bool IsExternalCommandTooLong(ServerProfileDto profile)
+        => string.Equals(profile.ConnectionType, "WEB", StringComparison.OrdinalIgnoreCase)
+            && !WebExternalLaunch.FitsDescription(profile.WebExternalProgram, profile.WebExternalArguments);
 
     private const string ExecutionTrustBodyKey = "ConfirmExecutionTrustBody";
 
@@ -1452,6 +1460,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
                     outcome,
                     _localizer["ErrorConnectionTitle"],
                     outcome.ErrorMessage ?? _localizer["ErrorConnectionFailed"]),
+                BulkConnectOutcomeStatus.Declined => ReportDeclinedConnect(serverDto),
                 BulkConnectOutcomeStatus.Cancelled => false,
                 BulkConnectOutcomeStatus.UnsupportedType => false,
                 _ => false
@@ -1461,7 +1470,8 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             // own message ("connection refused", "authentication failed") replaced the vault's on
             // the status line. The vault failure is the cause, so it has the last word. The same
             // holds for the note that an unconfirmed session was not looked up at all.
-            if (!connected && quietVaultFailure is not null)
+            if (!connected && quietVaultFailure is not null
+                && outcome.Status != BulkConnectOutcomeStatus.Declined)
             {
                 StatusMessageRequested?.Invoke(quietVaultFailure);
             }
@@ -1472,6 +1482,22 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         {
             _connectingServerIds.Remove(server.Id);
         }
+    }
+
+    /// <summary>
+    /// Says on the status line that a connection was not made because the user declined the trust
+    /// question. No modal: declining is a choice, not an error. A command too long to be listed
+    /// was refused with its own error before any question, so it adds nothing.
+    /// </summary>
+    private bool ReportDeclinedConnect(ServerProfileDto serverDto)
+    {
+        if (!IsExternalCommandTooLong(serverDto))
+        {
+            StatusMessageRequested?.Invoke(
+                _localizer.Format("StatusExecutionDeclined", VisibleProfileName(serverDto)));
+        }
+
+        return false;
     }
 
     /// <summary>
@@ -1669,6 +1695,18 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
                     null,
                     Authenticated: result.Session is SshSessionResult or SftpSessionBundle,
                     FallbackFrom: result.FallbackFrom);
+            }
+
+            if (result.Declined)
+            {
+                // A choice, not a failure: the row keeps the state it had (the finally block
+                // tears down the attempt's own state) and no error is raised.
+                if (sessionStartFired)
+                {
+                    SessionStartFailed?.Invoke(sessionId);
+                }
+
+                return new BulkConnectOutcome(BulkConnectOutcomeStatus.Declined, result.ErrorMessage);
             }
 
             server.ConnectionState = "Error";
@@ -1918,6 +1956,13 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         // bulk connect) stay silent.
         if (!serverDto.CredentialLookupConfirmed && !SharedSessionIds.IsSharedProfile(serverDto))
         {
+            // A protocol with no lookup has nothing to confirm and no menu action to clear a
+            // note: stay silent. Nothing is sent to the provider either way.
+            if (!CredentialLookupConfirmation.ProtocolHasLookup(serverDto.ConnectionType))
+            {
+                return false;
+            }
+
             if (!skipOnFailure)
             {
                 // Through the quiet-report channel when there is one, so a connection that then
@@ -3320,7 +3365,13 @@ internal enum BulkConnectOutcomeStatus
     PreflightFailed,
     ConnectionFailed,
     Cancelled,
-    UnsupportedType
+    UnsupportedType,
+
+    /// <summary>
+    /// The user answered the trust question with "do not run": a choice, so the row keeps the
+    /// state it had and nothing reports an error.
+    /// </summary>
+    Declined
 }
 
 /// <summary>How a failed connection attempt is put in front of the user.</summary>

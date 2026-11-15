@@ -38,6 +38,7 @@ internal static class ExecutionTrustDescriber
     private const string IcaFileKey = "ServerDialogExecutionTrustIcaFile";
     private const string CommandKey = "ServerDialogExecutionTrustCommand";
     private const string LibraryCommandKey = "ServerDialogExecutionTrustLibraryCommand";
+    private const string PostConnectNotRunKey = "ServerDialogExecutionTrustPostConnectNotRun";
 
     /// <summary>Joins the parameters of a linked Command Library entry.</summary>
     private const string ParameterSeparator = ", ";
@@ -61,6 +62,7 @@ internal static class ExecutionTrustDescriber
         ArgumentNullException.ThrowIfNull(localizer);
 
         List<string> rows = [];
+        bool addedStepRow = false;
 
         if (ProfileExecutionTrust.CarriesLocalExecutionPayload(profile))
         {
@@ -77,11 +79,20 @@ internal static class ExecutionTrustDescriber
             if (!string.IsNullOrWhiteSpace(step.CommandLibraryId))
             {
                 rows.Add(DescribeLibraryStep(step, step.CommandLibraryId, linkedTitles, localizer));
+                addedStepRow = true;
             }
             else if (!string.IsNullOrWhiteSpace(step.Input))
             {
                 rows.Add(localizer.Format(CommandKey, Visible(step.Input)));
+                addedStepRow = true;
             }
+        }
+
+        // Every step stays listed, because the one Allow flag covers them. Only an embedded SSH
+        // session types them, so any other type gets one fixed line saying so (no profile data).
+        if (addedStepRow && !string.Equals(profile.ConnectionType, "SSH", StringComparison.OrdinalIgnoreCase))
+        {
+            rows.Add(localizer[PostConnectNotRunKey]);
         }
 
         return string.Join(Environment.NewLine, rows);
