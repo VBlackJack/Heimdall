@@ -14,8 +14,8 @@ All notable changes to Heimdall are documented in this file.
 
 ## 2026-11-15: Imported sessions stay untrusted until you allow them, and mRemoteNG imports keep their order (v2026.111501)
 
-Fixes merged as #814, #816, #817 and #818, features as #819 and #820, test work as #815, dependency
-updates as #813. The user-facing summary and the upgrade notes are in the release notes.
+Fixes merged as #814, #816, #817, #818 and #822, features as #819 and #820, test work as #815,
+dependency updates as #813. The user-facing summary and the upgrade notes are in the release notes.
 
 ### Execution trust (#817)
 
@@ -42,8 +42,30 @@ updates as #813. The user-facing summary and the upgrade notes are in the releas
   untrusted.
 - Left as it is: the LOCAL row and the connect-time prompt escape a quote without doubling a
   backslash (`ServerListViewModel.MakeVisible`); the connect-time prompt for post-connect steps
-  shows a count, not the commands; accepting a connect-time prompt sets and persists
-  `ExecutionConfirmed` (`ConfirmAndTrustExecutionAsync`, `ConfirmAndTrustPostConnectAsync`).
+  shows a count, not the commands: that last point is the subject of #822 below.
+
+### Connect-time trust questions (#822)
+
+- **Defect.** Accepting a connect-time question sets and persists `ExecutionConfirmed`
+  (`ConfirmAndTrustExecutionAsync`, `ConfirmAndTrustPostConnectAsync`), but the post-connect
+  question showed only a count. Both used the Yes/No confirm, whose default is Yes and which
+  answers true without asking while the application shuts down.
+- **Change.** Both questions list every gated value through `ExecutionTrustDescriber`
+  (`ConfirmExecutionTrustBody`, `ConfirmPostConnectTrustBody`), on a copy migrated by `AsLoaded`
+  so a legacy `PostConnectCommand` is a row. `ConfirmSharedPostConnectAsync` uses the same rows;
+  `SharedPostConnectTrust` is unchanged. All three call the labeled confirm
+  (`ConfirmExecutionTrustAllow`, `ConfirmExecutionTrustDecline`), where declining is the default
+  and the answer during shutdown.
+- `VisibleProfileName` escapes the name with the describer's `Visible`.
+  `PersistExecutionTrustAsync` saves only when the stored profile's `GatedValues` equal those of
+  the profile shown. `LoadLinkedTitlesAsync` looks the titles of linked steps up off the UI
+  thread within `LinkedTitleLookupTimeout`, through the new
+  `IPostConnectStepResolver.GetLinkedTitlesAsync`.
+- A profile whose only gated payload is an ICA path keeps the one-sentence body
+  (`IsSingleIcaFilePayload`): two existing tests pin that sentence.
+- Left as it is: one flag covers every kind of payload; a linked step is approved by title and
+  parameters; `RemoteOs`, which picks the template of a linked entry, is neither shown nor part of
+  the shared fingerprint.
 
 ### External clients and WinRM (#816, #818)
 
