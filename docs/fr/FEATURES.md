@@ -457,9 +457,11 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
   et sessions apparaissent dans l'ordre où mRemoteNG les liste, et non par ordre alphabétique. Dans
   un dossier qui contient déjà des sessions ou des sous-dossiers, ceux-ci gardent leur place et les
   éléments importés viennent après. L'arbre affiche toujours les sous-dossiers avant les sessions, et
-  les sessions hors de tout dossier vont dans "(Sans dossier)". Un dossier qui ne contient aucune
-  session n'est pas créé. Les identifiants ne sont pas repris du fichier : importer de nouveau le
-  même fichier ajoute ses sessions une seconde fois
+  les sessions hors de tout dossier vont dans "(Sans dossier)". Un dossier du fichier qui ne
+  contient aucune session est créé vide, à sa place, sauf si Heimdall a déjà un dossier de ce nom à
+  cet endroit ; de même pour un dossier dont toutes les sessions ont été écartées. Les identifiants
+  ne sont pas repris du fichier : importer de nouveau le même fichier ajoute ses sessions une
+  seconde fois
 - Sources de sessions MobaXterm partagées (Paramètres > Général > Sources partagées) ;
   un guide pas à pas pour les équipes qui viennent de MobaXterm est dans
   [MOBAXTERM-SHARED-SESSIONS.md](MOBAXTERM-SHARED-SESSIONS.md) :

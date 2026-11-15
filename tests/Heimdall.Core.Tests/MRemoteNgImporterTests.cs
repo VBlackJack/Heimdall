@@ -726,4 +726,45 @@ public class MRemoteNgImporterTests
             },
             result.Servers.Select(server => (server.DisplayName, server.Group)).ToArray());
     }
+
+    [Fact]
+    public void Parse_ListsEveryContainerInDocumentOrder()
+    {
+        var xml = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <mrng:Connections xmlns:mrng="http://mremoteng.org" Name="Connections" ConfVersion="2.6">
+              <Node Name="Later" Type="Container" />
+              <Node Name=" Prod " Type="Container">
+                <Node Name="web" Type="Connection" Hostname="web.example.com" Protocol="SSH2" />
+                <Node Name="Spare" Type="Container" />
+              </Node>
+              <Node Name="Alpha" Type="Container">
+                <Node Name="Inner" Type="Container">
+                  <Node Name="Deep" Type="Container" />
+                </Node>
+              </Node>
+            </mrng:Connections>
+            """;
+
+        var result = MRemoteNgImporter.Parse(xml);
+
+        Assert.Equal(
+            ["Later", "Prod", "Prod/Spare", "Alpha", "Alpha/Inner", "Alpha/Inner/Deep"],
+            result.Containers);
+    }
+
+    [Fact]
+    public void Parse_RootIsNotAContainer()
+    {
+        var xml = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <mrng:Connections xmlns:mrng="http://mremoteng.org" Name="Root" ConfVersion="2.6">
+              <Node Name="Connections" Type="Container" />
+            </mrng:Connections>
+            """;
+
+        var result = MRemoteNgImporter.Parse(xml);
+
+        Assert.Equal(["Connections"], result.Containers);
+    }
 }

@@ -130,6 +130,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     // the order of the file instead of showing alphabetically.
     private bool _importKeepsSourceOrder;
 
+    // Every container path of the mRemoteNG file in document order, parents first, whether or not
+    // it holds a session. Empty for every other import format.
+    private IReadOnlyList<string> _importContainers = [];
+
     private string _originalTheme = "";
     private string _originalAccentTint = "Default";
 
@@ -3041,6 +3045,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             _mobaStoredCredentialCount = 0;
             _mobaGateways = [];
             _importKeepsSourceOrder = false;
+            _importContainers = [];
             bool isMobaXterm = ext is ".mxtsessions" or ".ini" or ".mobaconf";
             string warningsOneKey = isMobaXterm ? "ImportMobaXtermIssuesOne" : "ImportMobaXtermWarningsOne";
             string warningsKey = isMobaXterm ? "ImportMobaXtermIssues" : "ImportMobaXtermWarnings";
@@ -3052,7 +3057,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                 _ => throw new InvalidOperationException($"Unsupported import extension reached legacy parser: {ext}")
             };
 
-            if (imported.Count == 0)
+            if (imported.Count == 0 && _importContainers.Count == 0)
             {
                 ShowImportWarningsOrNothingFound(importWarnings, warningsOneKey, warningsKey);
                 return;
@@ -3075,13 +3080,34 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                 importWarnings.AddRange(validationFailures);
             }
 
-            if (imported.Count == 0)
+            // A file that holds no session can still hold folders to create. They are worked out
+            // here, against what Heimdall has now, because the confirmation question counts them.
+            List<string?> existingGroups = [];
+            IReadOnlyList<string> pendingFolders = [];
+            if (imported.Count == 0 && _importContainers.Count > 0)
+            {
+                List<ServerProfileDto> existingServers = await _configManager.LoadServersAsync();
+                AppSettings existingSettings = await _configManager.LoadSettingsAsync();
+                existingGroups = existingServers.Select(candidate => candidate.Group).ToList();
+                pendingFolders = ImportSourceOrder.EmptyFoldersToCreate(
+                    _importContainers,
+                    ImportSourceOrder.FolderPathsOf(existingGroups.Concat(existingSettings.EmptyGroups)));
+            }
+
+            if (imported.Count == 0 && pendingFolders.Count == 0)
             {
                 ShowImportWarningsOrNothingFound(importWarnings, warningsOneKey, warningsKey);
                 return;
             }
 
-            var confirmMessage = ext is ".mxtsessions" or ".ini" or ".mobaconf"
+            bool foldersOnly = imported.Count == 0;
+            var confirmMessage = foldersOnly
+                ? _localizer.FormatCount(
+                    pendingFolders.Count,
+                    "ConfirmImportEmptyFoldersMessageOne",
+                    "ConfirmImportEmptyFoldersMessage",
+                    pendingFolders.Count)
+                : ext is ".mxtsessions" or ".ini" or ".mobaconf"
                 ? _localizer.FormatCount(
                     imported.Count,
                     "ConfirmImportMobaXtermMessageOne",
@@ -3099,6 +3125,13 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
             if (!confirmed)
             {
+                if (foldersOnly && importWarnings is { Count: > 0 })
+                {
+                    // The sessions of the file were all refused: say why, since the user is
+                    // about to leave without importing anything.
+                    ShowImportWarningsOrNothingFound(importWarnings, warningsOneKey, warningsKey);
+                }
+
                 return;
             }
 
@@ -3108,9 +3141,11 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             }
 
             bool keepSourceOrder = _importKeepsSourceOrder;
-            List<string?> groupsBefore = [];
+            List<string?> groupsBefore = existingGroups;
             List<ServerProfileDto> added = [];
-            var importResult = await _configManager.MutateServersAsync(existing =>
+            (int NewCount, int UpdatedCount) importResult = foldersOnly
+                ? (0, 0)
+                : await _configManager.MutateServersAsync(existing =>
             {
                 int newCount = 0;
                 int updatedCount = 0;
@@ -3160,26 +3195,51 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                 return (NewCount: newCount, UpdatedCount: updatedCount);
             });
 
+            int createdFolders = 0;
             if (keepSourceOrder)
             {
-                await PersistImportedFolderOrderAsync(
+                // With sessions, the folders are a refinement of an import that is already saved:
+                // a failure only leaves them out. Without any, the folders are the whole import.
+                createdFolders = await PersistImportedFoldersAsync(
                     groupsBefore,
-                    ImportSourceOrder.FolderPathsInFileOrder(added));
+                    added.Select(server => server.Group).ToList(),
+                    _importContainers,
+                    failureIsFatal: foldersOnly) ?? 0;
+            }
+
+            if (foldersOnly && createdFolders == 0)
+            {
+                ShowImportWarningsOrNothingFound(importWarnings, warningsOneKey, warningsKey);
+                return;
             }
 
             int totalImported = importResult.NewCount + importResult.UpdatedCount;
             FileLogger.Info(
-                $"Imported {totalImported} server(s) from {filePath} ({importResult.NewCount} new, {importResult.UpdatedCount} updated)");
+                $"Imported {totalImported} server(s) and {createdFolders} empty folder(s) from {filePath} "
+                + $"({importResult.NewCount} new, {importResult.UpdatedCount} updated)");
 
-            var statusMessage = _localizer.Format(
-                "StatusImportBreakdown",
-                totalImported,
-                importResult.NewCount,
-                importResult.UpdatedCount);
+            var statusMessage = foldersOnly
+                ? string.Empty
+                : _localizer.Format(
+                    "StatusImportBreakdown",
+                    totalImported,
+                    importResult.NewCount,
+                    importResult.UpdatedCount);
+
+            if (createdFolders > 0)
+            {
+                string foldersLine = _localizer.FormatCount(
+                    createdFolders,
+                    "ImportEmptyFoldersCreatedOne",
+                    "ImportEmptyFoldersCreated",
+                    createdFolders);
+                statusMessage = statusMessage.Length == 0 ? foldersLine : statusMessage + "\n" + foldersLine;
+            }
 
             if (importWarnings is { Count: > 0 })
             {
-                statusMessage += "\n\n" + FormatImportWarnings(importWarnings, warningsOneKey, warningsKey);
+                string warningsBlock = FormatImportWarnings(importWarnings, warningsOneKey, warningsKey);
+                statusMessage = statusMessage.Length == 0 ? warningsBlock : statusMessage + "\n\n" + warningsBlock;
             }
 
             if (ext is ".mxtsessions" or ".ini" or ".mobaconf")
@@ -3402,50 +3462,86 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         };
 
     /// <summary>
-    /// Persists the folder order that shows the imported folders in file order. The sessions are
-    /// already saved, so a failure here only leaves the folders alphabetical and must not turn a
-    /// successful import into an error.
+    /// Persists what an mRemoteNG import does to the folders: the order that shows the file's
+    /// folders in file order, and the empty folders the file holds. Both go in one settings write.
     /// </summary>
-    private async Task PersistImportedFolderOrderAsync(
+    /// <param name="groupsBefore">The groups of the sessions Heimdall held before the import.</param>
+    /// <param name="addedGroups">The groups of the sessions the import added.</param>
+    /// <param name="containers">Every container path of the file, parents first.</param>
+    /// <param name="failureIsFatal">
+    /// Whether a failure is raised. It is not when the sessions are already saved, so a failure only
+    /// leaves the folders alphabetical and must not turn a successful import into an error.
+    /// </param>
+    /// <returns>
+    /// The number of empty folders written, or <see langword="null"/> when a failure was swallowed.
+    /// </returns>
+    private async Task<int?> PersistImportedFoldersAsync(
         IReadOnlyList<string?> groupsBefore,
-        IReadOnlyList<string> importedPaths)
+        IReadOnlyList<string?> addedGroups,
+        IReadOnlyList<string> containers,
+        bool failureIsFatal)
     {
         try
         {
             AppSettings current = await _configManager.LoadSettingsAsync();
-            if (ComputeImportedFolderOrder(current, groupsBefore, importedPaths) is null)
+            (List<string>? order, IReadOnlyList<string> toCreate) =
+                PlanImportedFolders(current, groupsBefore, addedGroups, containers);
+            if (order is null && toCreate.Count == 0)
             {
-                return;
+                return 0;
             }
 
+            int created = 0;
             await _configManager.MergeSettingAsync(settings =>
-                settings.FolderOrder = ComputeImportedFolderOrder(settings, groupsBefore, importedPaths)
-                    ?? settings.FolderOrder);
+            {
+                // The order is worked out before the new folders are added: once they are in the
+                // settings they count as existing and would get no rank.
+                (List<string>? freshOrder, IReadOnlyList<string> freshFolders) =
+                    PlanImportedFolders(settings, groupsBefore, addedGroups, containers);
+                if (freshOrder is not null)
+                {
+                    settings.FolderOrder = freshOrder;
+                }
+
+                settings.EmptyGroups.AddRange(freshFolders);
+                created = freshFolders.Count;
+            });
+            return created;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!failureIsFatal)
         {
-            FileLogger.Warn($"[Import] Folder order was not saved: {ex.Message}");
+            FileLogger.Warn($"[Import] Folder order and empty folders were not saved: {ex.Message}");
+            return null;
         }
     }
 
-    private static List<string>? ComputeImportedFolderOrder(
+    private static (List<string>? Order, IReadOnlyList<string> ToCreate) PlanImportedFolders(
         AppSettings settings,
         IReadOnlyList<string?> groupsBefore,
-        IReadOnlyList<string> importedPaths) =>
-        ImportSourceOrder.MergeFolderOrder(
+        IReadOnlyList<string?> addedGroups,
+        IReadOnlyList<string> containers)
+    {
+        List<string>? order = ImportSourceOrder.MergeFolderOrder(
             settings.FolderOrder,
             ImportSourceOrder.FolderPathsOf(groupsBefore.Concat(settings.EmptyGroups)),
-            importedPaths);
+            ImportSourceOrder.PathsInFileOrder(containers));
+        IReadOnlyList<string> toCreate = ImportSourceOrder.EmptyFoldersToCreate(
+            containers,
+            ImportSourceOrder.FolderPathsOf(groupsBefore.Concat(addedGroups).Concat(settings.EmptyGroups)));
+        return (order, toCreate);
+    }
 
     private async Task<(List<ServerProfileDto> Servers, List<string>? Warnings)> ImportXmlAsync(
         string filePath, CancellationToken cancellationToken)
     {
         var content = await File.ReadAllTextAsync(filePath, cancellationToken);
         if (content.Contains("<Connections", StringComparison.OrdinalIgnoreCase)
-            || content.Contains("Type=\"Connection\"", StringComparison.OrdinalIgnoreCase))
+            || content.Contains("Type=\"Connection\"", StringComparison.OrdinalIgnoreCase)
+            || content.Contains("Type=\"Container\"", StringComparison.OrdinalIgnoreCase))
         {
             var mrnResult = MRemoteNgImporter.Parse(content);
             _importKeepsSourceOrder = true;
+            _importContainers = mrnResult.Containers;
             return (mrnResult.Servers, mrnResult.Warnings.Select(FormatMRemoteNgWarning).ToList());
         }
 

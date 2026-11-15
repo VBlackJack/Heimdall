@@ -90,6 +90,7 @@ public static class MRemoteNgImporter
                 var newPath = string.IsNullOrWhiteSpace(groupPath)
                     ? containerName
                     : $"{groupPath}/{containerName}";
+                result.Containers.Add(newPath);
                 ParseNodes(node, newPath, result);
             }
             else if (string.Equals(type, "Connection", StringComparison.OrdinalIgnoreCase))
@@ -319,15 +320,19 @@ public static class MRemoteNgImporter
         return true;
     }
 
-    /// <summary>The sessions and warnings read from one file.</summary>
+    /// <summary>The sessions, containers and warnings read from one file.</summary>
     /// <remarks>
     /// <see cref="Servers"/> lists the sessions in document order, depth first: a container's
     /// content is listed where the container stands, before the nodes that follow it. The import
     /// relies on it to keep the file's order in the sessions tree, so the order must not change.
+    /// <see cref="Containers"/> lists every container path in document order, parents before
+    /// children, as the file spells it (a container's name is trimmed and joined to its parent's
+    /// path with a slash). Whether the container holds a session is not recorded.
     /// </remarks>
     public sealed class ImportResult
     {
         public List<ServerProfileDto> Servers { get; } = [];
+        public List<string> Containers { get; } = [];
         public List<ImportWarning> Warnings { get; } = [];
     }
 
