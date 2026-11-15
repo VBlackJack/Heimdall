@@ -280,4 +280,35 @@ public sealed class ImportSourceOrderTests
         Assert.Equal(["Other/b", "Other/a", "Lab", "Ops", "Other", "Zeta", "Alpha"], order);
         Assert.Null(Merge(["Ghost", "Other/b", "Other/a"], groupsBefore, "Other"));
     }
+
+    [Fact]
+    public void EmptyFoldersToCreate_SkipsExistingAndOccupiedFolders()
+    {
+        HashSet<string> existing = ImportSourceOrder.FolderPathsOf(["Prod/Web", "Alpha", "OPS"]);
+
+        IReadOnlyList<string> created = ImportSourceOrder.EmptyFoldersToCreate(
+            ["Later", "Prod", "Prod/Spare", "Broken", "Alpha", "ops"],
+            existing);
+
+        Assert.Equal(["Later", "Prod/Spare", "Broken"], created);
+    }
+
+    [Fact]
+    public void EmptyFoldersToCreate_CanonicalisesAndDeduplicates()
+    {
+        IReadOnlyList<string> created = ImportSourceOrder.EmptyFoldersToCreate(
+            ["A\\B", " A/B ", "a/b", "", "X//Y"],
+            ImportSourceOrder.FolderPathsOf([]));
+
+        Assert.Equal(["A/B", "X/Y"], created);
+    }
+
+    [Fact]
+    public void PathsInFileOrder_ListsParentsFirst()
+    {
+        IReadOnlyList<string> paths = ImportSourceOrder.PathsInFileOrder(
+            ["Zeta/Sub2", "Alpha", "zeta", "Zeta/Sub1/Deep", null, ""]);
+
+        Assert.Equal(["Zeta", "Zeta/Sub2", "Alpha", "Zeta/Sub1", "Zeta/Sub1/Deep"], paths);
+    }
 }

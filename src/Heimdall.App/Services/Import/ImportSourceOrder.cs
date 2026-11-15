@@ -128,14 +128,55 @@ internal static class ImportSourceOrder
     {
         ArgumentNullException.ThrowIfNull(rows);
 
+        return PathsInFileOrder(rows.Select(row => row.Group));
+    }
+
+    /// <summary>
+    /// The canonical folder paths the given paths pass through, each once, in order of first
+    /// appearance. A parent is listed before its children.
+    /// </summary>
+    public static IReadOnlyList<string> PathsInFileOrder(IEnumerable<string?> groups)
+    {
+        ArgumentNullException.ThrowIfNull(groups);
+
         HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
         List<string> ordered = [];
-        foreach (ServerProfileDto row in rows)
+        foreach (string? group in groups)
         {
-            AddPrefixes(row.Group, seen, ordered);
+            AddPrefixes(group, seen, ordered);
         }
 
         return ordered;
+    }
+
+    /// <summary>
+    /// The containers of the file that become empty folders: canonical, not blank, not already a
+    /// folder, each once (first spelling) and in file order.
+    /// </summary>
+    /// <param name="containersInFileOrder">Every container path of the file, parents first.</param>
+    /// <param name="existingFolders">
+    /// Every folder path already in use, compared without case: the prefixes of the existing
+    /// session groups and of the stored empty folders.
+    /// </param>
+    public static IReadOnlyList<string> EmptyFoldersToCreate(
+        IReadOnlyList<string> containersInFileOrder,
+        IReadOnlySet<string> existingFolders)
+    {
+        ArgumentNullException.ThrowIfNull(containersInFileOrder);
+        ArgumentNullException.ThrowIfNull(existingFolders);
+
+        HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
+        List<string> toCreate = [];
+        foreach (string container in containersInFileOrder)
+        {
+            string path = FolderPath.Canonicalize(container);
+            if (path.Length > 0 && !existingFolders.Contains(path) && seen.Add(path))
+            {
+                toCreate.Add(path);
+            }
+        }
+
+        return toCreate;
     }
 
     /// <summary>Every canonical folder path the groups pass through, as a case-insensitive set.</summary>
