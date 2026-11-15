@@ -318,14 +318,21 @@ public sealed class ConnectionService : IConnectionService
 
         if (ProfileExecutionTrust.RequiresExecutionConfirmation(server))
         {
-            bool approved = _confirmExecution is not null
-                && await _confirmExecution(server).ConfigureAwait(false);
+            // Only an answer counts as a decline: with nothing to ask, the refusal is a plain error.
+            Func<ServerProfileDto, Task<bool>>? confirm = _confirmExecution;
+            bool askable = confirm is not null;
+            bool approved = confirm is not null
+                && await confirm(server).ConfigureAwait(false);
 
             if (!approved)
             {
                 Core.Logging.FileLogger.Info(
                     $"Connection to '{server.DisplayName}' blocked: unconfirmed local-execution payload (protocol={protocol}).");
-                return new ConnectionResult(false, _localizer["StatusExecutionBlockedUnconfirmed"], null);
+                return new ConnectionResult(
+                    false,
+                    _localizer["StatusExecutionBlockedUnconfirmed"],
+                    null,
+                    Declined: askable);
             }
         }
 

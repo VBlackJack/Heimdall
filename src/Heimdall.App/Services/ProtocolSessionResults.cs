@@ -40,6 +40,11 @@ namespace Heimdall.App.Services;
 /// Completes when the client process Heimdall launched has exited; null when no client was launched
 /// or its end cannot be observed.
 /// </param>
+/// <param name="Declined">
+/// True when the user answered the trust question with "do not run": a choice, not a failure, so
+/// callers show a plain status rather than an error. False for every other failure, including the
+/// fail-closed refusal made when nothing was there to ask.
+/// </param>
 public sealed record ConnectionResult(
     bool Success,
     string? ErrorMessage,
@@ -47,7 +52,8 @@ public sealed record ConnectionResult(
     SessionDiagnostic? Failure = null,
     string? Warning = null,
     SshFailureCode? FallbackFrom = null,
-    Task? ExternalClientExited = null);
+    Task? ExternalClientExited = null,
+    bool Declined = false);
 
 /// <summary>Wraps a <see cref="ServerProfileDto"/> for embedded RDP sessions.</summary>
 /// <param name="Server">The profile the session runs on.</param>

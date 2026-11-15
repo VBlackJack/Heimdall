@@ -258,7 +258,11 @@ public partial class ServerDialogViewModel : ObservableValidator
     private bool _credentialLookupConfirmed = true;
 
     /// <summary>Whether the bar offering to allow the lookup is shown.</summary>
-    public bool ShowCredentialLookupNotice => IsEditMode && !CredentialLookupConfirmed;
+    public bool ShowCredentialLookupNotice
+        => IsEditMode && !CredentialLookupConfirmed && CredentialLookupConfirmation.ProtocolHasLookup(ConnectionType);
+
+    private static readonly System.ComponentModel.PropertyChangedEventArgs ShowCredentialLookupNoticeChanged =
+        new(nameof(ShowCredentialLookupNotice));
 
     /// <summary>
     /// The bar's text: the entry the provider would be asked for and where the session connects.
@@ -1885,6 +1889,11 @@ public partial class ServerDialogViewModel : ObservableValidator
             && e.PropertyName is not (nameof(CredentialLookupNoticeText) or nameof(ShowCredentialLookupNotice) or nameof(IsDirty)))
         {
             base.OnPropertyChanged(NoticeTextChanged);
+        }
+
+        if (e.PropertyName == nameof(ConnectionType))
+        {
+            base.OnPropertyChanged(ShowCredentialLookupNoticeChanged);
         }
 
         // Every field can change what the session would run, so each change refreshes the notice.

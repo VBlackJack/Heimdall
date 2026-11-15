@@ -2363,6 +2363,9 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             if (!await AuthorizePostConnectAsync(server, runnableSteps).ConfigureAwait(false))
             {
                 FileLogger.Info($"Post-connect skipped for {displayName}: commands not approved.");
+                InvokeOnUi(() => _main.StatusText = _localizer.Format(
+                    "StatusPostConnectDeclined",
+                    ExecutionTrustDescriber.Visible(displayName)));
                 return;
             }
 

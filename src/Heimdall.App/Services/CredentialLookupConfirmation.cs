@@ -68,6 +68,22 @@ internal static class CredentialLookupConfirmation
 
     private static string Visible(string? value) => UntrustedText.MakeVisible(value, MaxValueLength);
 
+    /// <summary>
+    /// Whether the credential provider can ever be asked for a session of this type.
+    /// </summary>
+    /// <remarks>
+    /// Mirrors the types for which <c>ServerListViewModel.GetCredentialTarget</c> can return a
+    /// target; LOCAL, CITRIX and TELNET never reach the provider, so confirming a lookup for them
+    /// would ask the user about something that cannot happen.
+    /// </remarks>
+    internal static bool ProtocolHasLookup(string? connectionType)
+        => connectionType is not null && LookupProtocols.Contains(connectionType);
+
+    private static readonly HashSet<string> LookupProtocols = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "SSH", "SFTP", "RDP", "WINRM", "FTP", "VNC", "WEB"
+    };
+
     /// <summary>Whether a session still waits for the user to confirm its lookup.</summary>
     internal static bool NeedsConfirmation(ServerProfileDto? profile)
         => profile is { CredentialLookupConfirmed: false } && !SharedSessionIds.IsSharedProfile(profile);
