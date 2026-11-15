@@ -67,7 +67,7 @@ internal static class ExecutionTrustDescriber
             rows.Add(DescribeExecutionRow(profile, localizer));
         }
 
-        foreach (PostConnectStep? step in profile.PostConnectSteps)
+        foreach (PostConnectStep? step in profile.PostConnectSteps ?? [])
         {
             if (step is null || !step.Enabled)
             {
@@ -135,7 +135,7 @@ internal static class ExecutionTrustDescriber
     /// then a quote is escaped, so a value ending in a backslash cannot turn the escaped quote
     /// after it into a closing one.
     /// </summary>
-    private static string Visible(string? value)
+    internal static string Visible(string? value)
     {
         // The backslash is doubled on the raw value, before the visible escapes (which contain
         // backslashes of their own) are written, so those are not doubled in turn.

@@ -87,7 +87,7 @@ The complete catalogue of what Heimdall does, protocol by protocol. If you are l
 - A stored account answers the browser's sign-in prompt (Basic, NTLM) of the profile's own host only, once per tab; sign-in forms inside the page are not filled. With the credential provider on, a profile that names a user and stores no password gets it from the provider
 - Navigation is limited to web addresses, in the page and in its frames: file:, script and custom-protocol links are refused, and a popup opens in the same tab under the same rules
 - A console that answers with an HTTP error, or a link that fails after the console has loaded, leaves the session up: only failing to reach the console at all ends it
-- **Open with an external program**, per profile, for a console no current engine accepts (an old iLO): the program, or the default browser when none is named, gets the address with {Url}, {Host} and {Port}; command interpreters are refused, and an imported profile that names a program asks for confirmation before running it, like a local shell profile
+- **Open with an external program**, per profile, for a console no current engine accepts (an old iLO): the program, or the default browser when none is named, gets the address with {Url}, {Host} and {Port}; command interpreters are refused, and an imported profile that names a program asks for confirmation before running it, like a local shell profile, in a question that lists everything the profile would run and whose default answer is "Do not run"
 - **Through an SSH gateway**: the gateway's tunnel opens a SOCKS proxy and the console's tab goes through it with the console's real name, so its certificate, its pin, its redirects and a name only the admin network resolves all work. Every console behind one gateway shares one tunnel, released when the last tab closes; each gateway has a browser profile of its own, so a sign-in made directly is not shared with the same console reached through a gateway. Opening externally through a gateway is refused, since the external program would not use the tunnel
 - A button in the tab header, and another on the panel shown when a console cannot be loaded, opens the current page externally with the profile's program or the default browser: the way out for a console the embedded engine renders badly or refuses, such as an old iLO speaking TLS 1.0. Not offered behind a gateway, where it could not reach the console
 - A console opens at the zoom it was last left at, kept per profile
@@ -439,7 +439,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
     variable is kept as written and reported in the import summary
   - The login command (for example `sudo su - www`) becomes a post-connect step. The profile is
     imported with `ExecutionConfirmed = false`, so Heimdall asks for confirmation before typing it
-    into the session, unless the user allows it on the session dialog's notice and saves
+    into the session, in a question that lists every command it would run and whose default answer is "Do not run", unless the user allows it on the session dialog's notice and saves
   - The session comment becomes the profile's tags, comma-separated
   - SSH key paths are never imported: they belong to the machine that wrote the file, and a UNC
     path would make this machine authenticate to a remote file server when the key is read
@@ -484,7 +484,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
     MobaXterm import variables or to the report thresholds reloads them too. A change to
     `SharedSourceReloadDebounceMs` reaches the file watch at once, without reading any file
   - Post-connect commands of a shared session are approved per user: Heimdall asks before typing
-    them, remembers the approval for those exact commands, and asks again when the shared file
+    them, listing each command, remembers the approval for those exact commands, and asks again when the shared file
     changes them. The approvals are personal trust: they are never exported or imported with the
     settings, and **Reset defaults** clears them, while it keeps the sources themselves. Removing a
     source forgets the approvals of its sessions

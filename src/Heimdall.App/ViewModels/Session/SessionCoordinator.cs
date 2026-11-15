@@ -127,6 +127,16 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
     private readonly AsyncLocal<string?> _manualReconnectProfileId = new();
     private readonly IPostConnectSequenceRunner _postConnectSequenceRunner;
     private readonly IPostConnectStepResolver _postConnectStepResolver;
+
+    /// <summary>The longest the lookup of linked entry titles may hold a trust question back.</summary>
+    private static readonly TimeSpan DefaultLinkedTitleLookupTimeout = TimeSpan.FromSeconds(5);
+
+    /// <summary>How long the lookup may hold a trust question back; settable for tests.</summary>
+    internal TimeSpan LinkedTitleLookupTimeout { get; set; } = DefaultLinkedTitleLookupTimeout;
+
+    /// <summary>No title known: the rows of a trust question name a linked entry by its id.</summary>
+    private static readonly IReadOnlyDictionary<string, string> EmptyLinkedTitles =
+        new Dictionary<string, string>(StringComparer.Ordinal);
     private readonly IUiDispatcher _uiDispatcher;
     private readonly Dictionary<string, ConnectingSessionCancellation> _connectingCancellations = [];
 
@@ -254,8 +264,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         _main.ServerList.ConnectionService.PlinkRetryStarting = OnPlinkRetryStarting;
 
         // Wire connect-time execution-trust confirmation relay
-        _main.ServerList.ConnectionService.ConfirmExecution =
-            profile => _main.ServerList.ConfirmAndTrustExecutionAsync(profile);
+        _main.ServerList.ConnectionService.ConfirmExecution = ConfirmExecutionWithTitlesAsync;
 
         // Wire broadcast relay so terminal views can fan out input
         _embeddedSessionManager.BroadcastCallback = BroadcastToAllTerminals;
@@ -2406,8 +2415,15 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             return _sharedPostConnectTrust is not null
                 && await _sharedPostConnectTrust.AuthorizeAsync(
                         server,
-                        () => ConfirmOnUiThreadAsync(
-                            () => _main.ServerList.ConfirmSharedPostConnectAsync(server, runnableSteps)))
+                        async () =>
+                        {
+                            // Read only when the question is asked: an approved profile never needs them.
+                            IReadOnlyDictionary<string, string> titles =
+                                await LoadLinkedTitlesAsync(server).ConfigureAwait(false);
+                            return await ConfirmOnUiThreadAsync(
+                                    () => _main.ServerList.ConfirmSharedPostConnectAsync(server, runnableSteps, titles))
+                                .ConfigureAwait(false);
+                        })
                     .ConfigureAwait(false);
         }
 
@@ -2416,9 +2432,61 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             return true;
         }
 
+        IReadOnlyDictionary<string, string> linkedTitles = await LoadLinkedTitlesAsync(server).ConfigureAwait(false);
         return await ConfirmOnUiThreadAsync(
-                () => _main.ServerList.ConfirmAndTrustPostConnectAsync(server, runnableSteps))
+                () => _main.ServerList.ConfirmAndTrustPostConnectAsync(server, runnableSteps, linkedTitles))
             .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The connect-time question about a profile's program: the titles of its linked entries are
+    /// read first, so the list names them.
+    /// </summary>
+    /// <remarks>
+    /// No <c>ConfigureAwait(false)</c>: the caller is on the UI context and the dialog is shown
+    /// from it.
+    /// </remarks>
+    private async Task<bool> ConfirmExecutionWithTitlesAsync(ServerProfileDto profile)
+    {
+        IReadOnlyDictionary<string, string> titles = await LoadLinkedTitlesAsync(profile);
+        return await _main.ServerList.ConfirmAndTrustExecutionAsync(profile, titles);
+    }
+
+    /// <summary>
+    /// The titles of the Command Library entries the enabled steps of <paramref name="profile"/>
+    /// link to, by entry id. Never throws and never waits long: on any failure the list names an
+    /// entry by its id.
+    /// </summary>
+    private async Task<IReadOnlyDictionary<string, string>> LoadLinkedTitlesAsync(ServerProfileDto profile)
+    {
+        List<string> libraryIds = (profile.PostConnectSteps ?? [])
+            .Where(step => step is { Enabled: true } && !string.IsNullOrWhiteSpace(step.CommandLibraryId))
+            .Select(step => step.CommandLibraryId!)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        if (libraryIds.Count == 0 || _postConnectStepResolver is null)
+        {
+            return EmptyLinkedTitles;
+        }
+
+        try
+        {
+            // Off the UI thread: a library read that completes synchronously would otherwise hold
+            // the window for as long as the database takes, and the bound below could not fire.
+            // The lookup touches no UI state; the continuation returns to the caller's context.
+            string culture = _localizer.CurrentLocale;
+            IPostConnectStepResolver resolver = _postConnectStepResolver;
+            using var timeout = new CancellationTokenSource(LinkedTitleLookupTimeout);
+            return await Task
+                .Run(() => resolver.GetLinkedTitlesAsync(libraryIds, culture, timeout.Token), timeout.Token)
+                .WaitAsync(timeout.Token);
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Warn($"Could not read the titles of the linked Command Library entries: {ex.Message}");
+            return EmptyLinkedTitles;
+        }
     }
 
     internal void ClearPostConnectStateOnUiThread(SessionTabViewModel tab)

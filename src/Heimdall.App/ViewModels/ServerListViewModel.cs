@@ -461,45 +461,47 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     /// <summary>
     /// Confirms and best-effort persists trust for a profile carrying local-execution payload.
     /// </summary>
-    internal async Task<bool> ConfirmAndTrustExecutionAsync(ServerProfileDto profile)
+    /// <remarks>
+    /// The one flag approves every gated value of the profile, post-connect commands included, so
+    /// the question lists all of them as the dialog notice does. Declining is the default answer.
+    /// </remarks>
+    /// <param name="profile">The profile about to connect.</param>
+    /// <param name="linkedTitles">The titles of its linked Command Library entries, by entry id.</param>
+    internal async Task<bool> ConfirmAndTrustExecutionAsync(
+        ServerProfileDto profile,
+        IReadOnlyDictionary<string, string>? linkedTitles = null)
     {
         ArgumentNullException.ThrowIfNull(profile);
 
-        // The prompt names what would run: for a web profile the program and its arguments, for
-        // a Citrix profile the ICA file the shell would open, which is not a program at all.
-        string body;
-        if (string.Equals(profile.ConnectionType, "CITRIX", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(profile.ConnectionType, "WEB", StringComparison.OrdinalIgnoreCase)
+            && !WebExternalLaunch.FitsDescription(profile.WebExternalProgram, profile.WebExternalArguments))
         {
-            body = _localizer.Format(
-                "ConfirmExecutionImportedIcaBody",
-                profile.DisplayName,
-                UntrustedText.MakeVisible(profile.CitrixIcaFilePath, UntrustedText.NoLengthLimit));
+            // A description cut short could hide the end of the arguments from the one who
+            // confirms, so nothing is asked.
+            _dialogService.ShowError(
+                _localizer["ConfirmExecutionImportedTitle"],
+                _localizer[WebExternalLaunch.CommandTooLongErrorKey]);
+            return false;
         }
-        else
-        {
-            if (string.Equals(profile.ConnectionType, "WEB", StringComparison.OrdinalIgnoreCase)
-                && !WebExternalLaunch.FitsDescription(profile.WebExternalProgram, profile.WebExternalArguments))
-            {
-                // A description cut short could hide the end of the arguments from the one who
-                // confirms, so nothing is asked.
-                _dialogService.ShowError(
-                    _localizer["ConfirmExecutionImportedTitle"],
-                    _localizer[WebExternalLaunch.CommandTooLongErrorKey]);
-                return false;
-            }
 
-            string executable = string.Equals(profile.ConnectionType, "WEB", StringComparison.OrdinalIgnoreCase)
-                ? WebExternalLaunch.DescribeCommand(profile.WebExternalProgram, profile.WebExternalArguments)
-                : DescribeLocalShellExecution(profile, _localizer);
-            body = _localizer.Format(
-                "ConfirmExecutionImportedBody",
-                profile.DisplayName,
-                executable);
-        }
+        // What the question describes: the profile as the next load would see it, so a legacy
+        // post-connect command is shown as the step it becomes.
+        ServerProfileDto shown = AsLoaded(profile);
+        string body = IsSingleIcaFilePayload(shown)
+            ? _localizer.Format(
+                IcaFileBodyKey,
+                VisibleProfileName(shown),
+                UntrustedText.MakeVisible(shown.CitrixIcaFilePath, UntrustedText.NoLengthLimit))
+            : _localizer.Format(
+                ExecutionTrustBodyKey,
+                VisibleProfileName(shown),
+                ExecutionTrustDescriber.Describe(shown, linkedTitles ?? EmptyLinkedTitles, _localizer));
         bool confirmed = await _dialogService.ShowConfirmAsync(
             _localizer["ConfirmExecutionImportedTitle"],
             body,
-            "warning");
+            "warning",
+            _localizer["ConfirmExecutionTrustAllow"],
+            _localizer["ConfirmExecutionTrustDecline"]);
 
         if (!confirmed)
         {
@@ -507,10 +509,82 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         }
 
         profile.ExecutionConfirmed = true;
-        await PersistExecutionTrustAsync(profile);
+        await PersistExecutionTrustAsync(profile, shown);
 
         return true;
     }
+
+    private const string ExecutionTrustBodyKey = "ConfirmExecutionTrustBody";
+
+    private const string IcaFileBodyKey = "ConfirmExecutionImportedIcaBody";
+
+    /// <summary>
+    /// Whether the only value the gate asks about is a Citrix ICA file path.
+    /// </summary>
+    /// <remarks>
+    /// The one-sentence ICA body then shows the whole payload on a single line. Any other gated
+    /// value, an enabled post-connect step above all, needs the list of rows, because the one
+    /// flag approves it too. <paramref name="profile"/> is the profile as <see cref="AsLoaded"/>
+    /// returns it, so a legacy command has already become a step and counts here.
+    /// </remarks>
+    private static bool IsSingleIcaFilePayload(ServerProfileDto profile)
+        => string.Equals(profile.ConnectionType, "CITRIX", StringComparison.OrdinalIgnoreCase)
+            && ProfileExecutionTrust.CarriesLocalExecutionPayload(profile)
+            && !ProfileExecutionTrust.CarriesPostConnectPayload(profile);
+
+    /// <summary>
+    /// The profile as the next load would see it: a legacy post-connect command turned into the
+    /// steps it becomes, the way loading does, so a command is listed and compared whether or not
+    /// the object came through loading. The profile itself when there is nothing to turn.
+    /// </summary>
+    private static ServerProfileDto AsLoaded(ServerProfileDto profile)
+    {
+        if (profile.PostConnectSteps is not { Count: 0 } || string.IsNullOrWhiteSpace(profile.PostConnectCommand))
+        {
+            return profile;
+        }
+
+        ServerProfileDto copy = profile.CloneFaithfully();
+        PostConnectMigration.Migrate(copy);
+        return copy;
+    }
+
+    /// <summary>
+    /// What the execution gate asks about for the type of <paramref name="profile"/>, as one
+    /// comparable value: the fields the gate tests for that type and the post-connect steps.
+    /// </summary>
+    private static string GatedValues(ServerProfileDto profile)
+    {
+        string type = (profile.ConnectionType ?? string.Empty).ToUpperInvariant();
+        object?[] own = type switch
+        {
+            "LOCAL" =>
+            [
+                profile.LocalShellExecutable,
+                profile.LocalShellArguments,
+                profile.LocalShellWorkingDirectory,
+                profile.EffectiveElevationMode
+            ],
+            "WEB" => [profile.WebOpenExternally, profile.WebExternalProgram, profile.WebExternalArguments],
+            "CITRIX" => [profile.CitrixIcaFilePath],
+            _ => []
+        };
+
+        return System.Text.Json.JsonSerializer.Serialize(
+            new object?[] { type, own, PostConnectFingerprint.Compute(profile.PostConnectSteps) });
+    }
+
+    /// <summary>No linked entry titles known: the rows name each linked entry by its id.</summary>
+    private static readonly IReadOnlyDictionary<string, string> EmptyLinkedTitles =
+        new Dictionary<string, string>(StringComparer.Ordinal);
+
+    /// <summary>
+    /// The display name of a profile as the header of a trust question shows it: written out
+    /// visibly and escaped as the rows are, so a name from a file can neither start a row of its
+    /// own nor close the quotes the body puts around it.
+    /// </summary>
+    private static string VisibleProfileName(ServerProfileDto profile)
+        => ExecutionTrustDescriber.Visible(profile.DisplayName);
 
     /// <summary>
     /// Describes everything a LOCAL profile would run, matching what the execution gate counts:
@@ -564,20 +638,34 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     /// <summary>
     /// Confirms and best-effort persists trust for imported post-connect commands.
     /// </summary>
-    internal async Task<bool> ConfirmAndTrustPostConnectAsync(ServerProfileDto profile, int commandCount)
+    /// <remarks>
+    /// The header gives the count; the list under it holds every gated value of the profile, so
+    /// accepting approves exactly what was shown. Declining is the default answer.
+    /// </remarks>
+    /// <param name="profile">The profile whose steps are about to run.</param>
+    /// <param name="commandCount">How many steps would run.</param>
+    /// <param name="linkedTitles">The titles of its linked Command Library entries, by entry id.</param>
+    internal async Task<bool> ConfirmAndTrustPostConnectAsync(
+        ServerProfileDto profile,
+        int commandCount,
+        IReadOnlyDictionary<string, string>? linkedTitles = null)
     {
         ArgumentNullException.ThrowIfNull(profile);
 
+        ServerProfileDto shown = AsLoaded(profile);
         string body = _localizer.FormatCount(
             commandCount,
-            "ConfirmPostConnectImportedBodyOne",
-            "ConfirmPostConnectImportedBody",
-            profile.DisplayName,
-            commandCount);
+            "ConfirmPostConnectTrustBodyOne",
+            "ConfirmPostConnectTrustBody",
+            VisibleProfileName(shown),
+            commandCount,
+            ExecutionTrustDescriber.Describe(shown, linkedTitles ?? EmptyLinkedTitles, _localizer));
         bool confirmed = await _dialogService.ShowConfirmAsync(
             _localizer["ConfirmPostConnectImportedTitle"],
             body,
-            "warning");
+            "warning",
+            _localizer["ConfirmExecutionTrustAllow"],
+            _localizer["ConfirmExecutionTrustDecline"]);
 
         if (!confirmed)
         {
@@ -585,7 +673,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         }
 
         profile.ExecutionConfirmed = true;
-        await PersistExecutionTrustAsync(profile);
+        await PersistExecutionTrustAsync(profile, shown);
 
         return true;
     }
@@ -594,27 +682,48 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     /// Asks whether the post-connect commands of a shared session may run. Persists nothing: the
     /// caller records the approval against the commands it was given.
     /// </summary>
-    internal Task<bool> ConfirmSharedPostConnectAsync(ServerProfileDto profile, int commandCount)
+    /// <param name="profile">The shared profile.</param>
+    /// <param name="commandCount">How many steps would run.</param>
+    /// <param name="linkedTitles">The titles of its linked Command Library entries, by entry id.</param>
+    internal Task<bool> ConfirmSharedPostConnectAsync(
+        ServerProfileDto profile,
+        int commandCount,
+        IReadOnlyDictionary<string, string>? linkedTitles = null)
     {
         ArgumentNullException.ThrowIfNull(profile);
 
+        // Every value comes from a file other people can edit: the rows are the describer's, so a
+        // line break, bidi or zero-width character cannot forge one and linked entries are listed.
+        ServerProfileDto shown = AsLoaded(profile);
         string body = _localizer.FormatCount(
             commandCount,
             "ConfirmPostConnectSharedBodyOne",
             "ConfirmPostConnectSharedBody",
-            profile.DisplayName,
+            VisibleProfileName(shown),
             commandCount,
-            string.Join(Environment.NewLine, profile.PostConnectSteps
-                .Where(step => step.Enabled && !string.IsNullOrWhiteSpace(step.Input))
-                .Select(step => step.Input)));
+            ExecutionTrustDescriber.Describe(shown, linkedTitles ?? EmptyLinkedTitles, _localizer));
+
+        // The labeled overload: declining is the default answer and the one taken while the
+        // application closes, where the plain overload would approve and the caller record it.
         return _dialogService.ShowConfirmAsync(
             _localizer["ConfirmPostConnectSharedTitle"],
             body,
-            "warning");
+            "warning",
+            _localizer["ConfirmExecutionTrustAllow"],
+            _localizer["ConfirmExecutionTrustDecline"]);
     }
 
-    private async Task PersistExecutionTrustAsync(ServerProfileDto profile)
+    /// <summary>
+    /// Records the approval on the stored profile, only if the stored profile still carries what
+    /// <paramref name="shown"/> described.
+    /// </summary>
+    /// <remarks>
+    /// When the stored profile changed while the question was open, nothing is written: the
+    /// connection just allowed proceeds with what was shown, and the next connect asks again.
+    /// </remarks>
+    private async Task PersistExecutionTrustAsync(ServerProfileDto profile, ServerProfileDto shown)
     {
+        string shownValues = GatedValues(shown);
         try
         {
             await _configManager.MutateServersAsync(servers =>
@@ -633,12 +742,20 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
                 ServerProfileDto? stored = servers.FirstOrDefault(
                     server => string.Equals(server.Id, inventoryId, StringComparison.Ordinal));
 
-                if (stored is not null)
+                if (stored is null)
                 {
-                    stored.ExecutionConfirmed = true;
+                    return false;
                 }
 
-                return stored is not null;
+                if (!string.Equals(GatedValues(AsLoaded(stored)), shownValues, StringComparison.Ordinal))
+                {
+                    Core.Logging.FileLogger.Warn(
+                        $"Execution-trust for '{profile.DisplayName}' not saved: the stored profile changed after the question was shown.");
+                    return false;
+                }
+
+                stored.ExecutionConfirmed = true;
+                return true;
             });
         }
         catch (Exception ex)
