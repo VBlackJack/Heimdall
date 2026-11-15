@@ -71,6 +71,23 @@ public static class PrivilegedFileCommands
     /// <summary>The exit status a shell gives a command it could not find.</summary>
     public const int CommandNotFoundExitStatus = 127;
 
+    /// <summary>
+    /// Exit status of a privileged script that refused a target that is not a regular file the
+    /// script could verify (a symbolic link, a special file, an entry that changed under it).
+    /// Kept in step with the literal the scripts exit with; a test pins the two.
+    /// </summary>
+    public const int NonRegularTargetExitStatus = 73;
+
+    /// <summary>
+    /// The first line the root-side chmod writes to standard error when it refuses an entry. With
+    /// <see cref="NonRegularTargetExitStatus"/> it tells a refusal of the entry from every other
+    /// failure that happens to end with the same status: both must be present.
+    /// </summary>
+    public const string EntryRefusedMarker = "HEIMDALL-ENTRY-REFUSED";
+
+    // The same status as text: a constant string cannot be built from the integer. A test pins the two.
+    private const string NonRegularTargetExitStatusText = "73";
+
     private const string PasswordMode = "password";
     private const string NoPasswordMode = "none";
     private const string BangPlaceholder = "^";
@@ -156,6 +173,82 @@ public static class PrivilegedFileCommands
         "base64 <&3; exec 3<&-; "
         + "cd /; rmdir -- \"$work\" 2>/dev/null || :; trap - EXIT HUP INT TERM";
 
+    /// <summary>The refusal reason tokens the script prints after the marker. A test pins them to the script.</summary>
+    public const string RefusalReasonLink = "link";
+
+    /// <summary>The target is a file that is neither regular nor a directory.</summary>
+    public const string RefusalReasonSpecial = "special";
+
+    /// <summary>The entry is not the one that was listed.</summary>
+    public const string RefusalReasonChanged = "changed";
+
+    /// <summary>The server cannot do the safe method here (no hard link, no private directory).</summary>
+    public const string RefusalReasonUnverifiable = "unverifiable";
+
+    /// <summary>The request itself is not valid (mode, entry name).</summary>
+    public const string RefusalReasonInvalid = "invalid";
+
+    /// <summary>
+    /// The script root runs to change the permissions of one entry without following a link.
+    /// Positional parameters: the octal mode (<c>$1</c>) and the target (<c>$2</c>).
+    /// </summary>
+    /// <remarks>
+    /// A directory is changed through the working directory the script holds after checking that it
+    /// is the entry it listed. A regular file is changed through a hard link made inside a private
+    /// root-only directory next to it: <c>ln -P -T</c> links a symbolic link itself rather than what
+    /// it points to, so a link swapped in at the last moment is seen as one and refused, and the
+    /// only operand of the file chmod is that private link.
+    /// <para>
+    /// The private directory is trusted only after it is entered and verified: root-owned, mode 700
+    /// (2700 where the parent is setgid), the held parent as its parent, the same device, and empty.
+    /// Only then are <c>entered</c> and <c>work</c> set, and only then may the cleanup remove
+    /// <c>source</c> or the directory: before that the shell may still be in the user's own
+    /// directory, or in a directory an attacker put in place of ours, and what is there is not ours.
+    /// A failed verification therefore leaves our own directory behind, empty, rather than risk
+    /// removing a foreign one. The cleanup clears both flags, so a second run does nothing. The
+    /// signal traps exit, so the cleanup never lets the script carry on after a signal. The script
+    /// holds no <c>!</c> and no newline, and takes every path as a positional parameter.
+    /// </para>
+    /// </remarks>
+    private const string NoFollowChmodScript =
+        "set -eu; umask 077; mode=$1; target=$2; work=; entered=0; pdev=; "
+        + ToolingProbe
+        + "refuse() { printf '%s %s\\n' '" + EntryRefusedMarker + "' \"$1\" >&2; "
+        + "printf '%s\\n' \"Refusing: $2\" >&2; exit " + NonRegularTargetExitStatusText + "; }; "
+        + "cleanup() { if [ \"$entered\" = 1 ]; then rm -f -- source || :; entered=0; fi; cd /; "
+        + "if [ -n \"$work\" ]; then rmdir -- \"$work\" 2>/dev/null || :; work=; fi; }; "
+        + "case \"$mode\" in [0-7]|[0-7][0-7]|[0-7][0-7][0-7]|[0-7][0-7][0-7][0-7]) ;; "
+        + "*) refuse " + RefusalReasonInvalid + " 'invalid mode.';; esac; "
+        + "case \"$target\" in /*) ;; *) target=$PWD/$target ;; esac; "
+        + "case \"$target\" in */*) dir=${target%/*}; [ -n \"$dir\" ] || dir=/ ;; *) dir=. ;; esac; "
+        + "name=${target##*/}; case \"$name\" in ''|.|..) refuse " + RefusalReasonInvalid + " 'no entry name.';; esac; "
+        + "cd -P -- \"$dir\" || refuse " + RefusalReasonChanged + " 'the parent directory changed during the check.'; "
+        + "parent=$(stat -c %d:%i .) || refuse " + RefusalReasonChanged + " 'the parent directory changed during the check.'; "
+        + "pdev=$(stat -c %d .) || refuse " + RefusalReasonChanged + " 'the parent directory changed during the check.'; "
+        + "if [ -L \"./$name\" ]; then refuse " + RefusalReasonLink + " 'symbolic link.'; fi; "
+        + "if [ -d \"./$name\" ]; then "
+        + "held=$(stat -c %d:%i -- \"./$name\") || refuse " + RefusalReasonChanged + " 'the directory changed during the check.'; "
+        + "cd -P -- \"./$name\" || refuse " + RefusalReasonChanged + " 'the directory changed during the check.'; "
+        + "[ \"$(stat -c %d:%i .)\" = \"$held\" ] || refuse " + RefusalReasonChanged + " 'the directory changed during the check.'; "
+        + "chmod -- \"$mode\" .; exit 0; fi; "
+        + "[ -f \"./$name\" ] || refuse " + RefusalReasonSpecial + " 'not a regular file or directory.'; "
+        + "trap cleanup EXIT; trap 'exit 129' HUP INT TERM; "
+        + "made=$(mktemp -d -- \"./.heimdall-chmod.XXXXXXXXXX\") || refuse " + RefusalReasonUnverifiable + " 'the private directory could not be created.'; "
+        + "candidate=$PWD/${made#./}; "
+        + "cd -P -- \"$made\" || refuse " + RefusalReasonUnverifiable + " 'the private directory could not be entered.'; "
+        + "case \"$(stat -c %u:%a .)\" in 0:700|0:2700) ;; "
+        + "*) refuse " + RefusalReasonUnverifiable + " 'the private directory is not private to root.';; esac; "
+        + "[ \"$(stat -c %d:%i ..)\" = \"$parent\" ] && [ \"$(stat -c %d .)\" = \"$pdev\" ] "
+        + "|| refuse " + RefusalReasonUnverifiable + " 'the private directory could not be verified.'; "
+        + "listing=$(ls -A) || refuse " + RefusalReasonUnverifiable + " 'the private directory could not be listed.'; "
+        + "[ -z \"$listing\" ] || refuse " + RefusalReasonUnverifiable + " 'the private directory is not empty.'; "
+        + "if [ -e source ] || [ -L source ]; then refuse " + RefusalReasonUnverifiable + " 'the private directory is not empty.'; fi; "
+        + "work=$candidate; entered=1; "
+        + "ln -P -T -- \"../$name\" source || refuse " + RefusalReasonUnverifiable + " 'the file could not be pinned.'; "
+        + "if [ -L source ]; then refuse " + RefusalReasonLink + " 'symbolic link.'; fi; "
+        + "[ -f source ] || refuse " + RefusalReasonSpecial + " 'not a regular file.'; "
+        + "chmod -- \"$mode\" source; cleanup; trap - EXIT HUP INT TERM";
+
     /// <summary>
     /// Builds a root-side streamed write that commits with a same-directory atomic rename.
     /// </summary>
@@ -189,6 +282,68 @@ public static class PrivilegedFileCommands
         return BuildShellBody(
             NoFollowReadPrefix + sizeCheck + NoFollowReadSuffix,
             sourceRemotePath);
+    }
+
+    /// <summary>
+    /// Builds a root-side permission change that never follows a symbolic link: the entry is
+    /// refused when it is a link or a special file, or when it is not the entry that was listed.
+    /// </summary>
+    /// <param name="targetRemotePath">The entry to change.</param>
+    /// <param name="octalMode">One to four octal digits.</param>
+    /// <exception cref="ArgumentException">The path is blank or the mode is not octal.</exception>
+    public static string BuildNoFollowChmodBody(string targetRemotePath, string octalMode)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(targetRemotePath);
+        if (!SftpPermissionMode.TryParseOctal(octalMode, out _))
+        {
+            throw new ArgumentException(
+                "The mode must be one to four octal digits.",
+                nameof(octalMode));
+        }
+
+        // A "!" in a file name is escaped the way every history-expanding login shell reads it:
+        // outside the quotes. The script itself holds none.
+        string target = PathEscaper.EscapeForShell(targetRemotePath)
+            .Replace("!", "'\\!'", StringComparison.Ordinal);
+
+        return string.Join(
+            ' ',
+            "sh",
+            "-c",
+            PathEscaper.EscapeForShell(NoFollowChmodScript),
+            "sh",
+            PathEscaper.EscapeForShell(octalMode),
+            target);
+    }
+
+    /// <summary>
+    /// Reads why the permission change script refused an entry, from the token after the marker.
+    /// A missing or unknown token is read as the cautious answer: the safe method was not possible.
+    /// </summary>
+    public static EntryRefusalReason ParseEntryRefusalReason(string? stderr)
+    {
+        if (string.IsNullOrEmpty(stderr))
+        {
+            return EntryRefusalReason.Unverifiable;
+        }
+
+        int marker = stderr.IndexOf(EntryRefusedMarker, StringComparison.Ordinal);
+        if (marker < 0)
+        {
+            return EntryRefusalReason.Unverifiable;
+        }
+
+        string rest = stderr[(marker + EntryRefusedMarker.Length)..].TrimStart(' ');
+        int end = rest.IndexOfAny([' ', '\r', '\n']);
+        string token = end < 0 ? rest : rest[..end];
+        return token switch
+        {
+            RefusalReasonLink => EntryRefusalReason.Link,
+            RefusalReasonSpecial => EntryRefusalReason.Special,
+            RefusalReasonChanged => EntryRefusalReason.Changed,
+            RefusalReasonInvalid => EntryRefusalReason.Invalid,
+            _ => EntryRefusalReason.Unverifiable,
+        };
     }
 
     internal static string BuildPasswordSudoInvocation(string privilegedBody)
@@ -571,6 +726,25 @@ public static class PrivilegedFileTransfer
         }
     }
 
+    /// <summary>Whether sudo's standard error says the account may not use sudo.</summary>
+    public static bool IsSudoNotPermittedMessage(string? stderr)
+    {
+        return !string.IsNullOrEmpty(stderr) && ContainsAny(stderr, NotPermittedMessages);
+    }
+
+    /// <summary>
+    /// Whether a command ended with "command not found" for sudo itself: the status alone would
+    /// also name any other missing command.
+    /// </summary>
+    public static bool IsSudoMissing(int exitStatus, string? stderr)
+    {
+        return exitStatus == PrivilegedFileCommands.CommandNotFoundExitStatus
+            && !string.IsNullOrEmpty(stderr)
+            && stderr.Contains(SudoCommandName, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private const string SudoCommandName = "sudo";
+
     private static readonly string[] PasswordRejectedMessages =
     [
         "incorrect password attempt",
@@ -809,6 +983,27 @@ public static class PrivilegedFileTransfer
             throw;
         }
     }
+}
+
+/// <summary>
+/// Why the root-side permission change refused an entry.
+/// </summary>
+public enum EntryRefusalReason
+{
+    /// <summary>The server cannot do the safe method here, or the check could not be completed.</summary>
+    Unverifiable,
+
+    /// <summary>The entry is a symbolic link.</summary>
+    Link,
+
+    /// <summary>The entry is neither a regular file nor a directory.</summary>
+    Special,
+
+    /// <summary>The entry is no longer the one that was listed.</summary>
+    Changed,
+
+    /// <summary>The request was not valid: the mode, or no entry name.</summary>
+    Invalid,
 }
 
 /// <summary>
