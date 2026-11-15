@@ -89,6 +89,9 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard, I
     private RemoteFileEditor? _editor;
     // Records the editor's privileged (sudo) saves, which bypass both the decorator and the ViewModel.
     private SessionOperationEmitter _operationEmitter = SessionOperationEmitter.Disabled;
+    // The funnel for the acts the view itself runs as root: it journals through the emitter above
+    // and records into the same root activity log as the ViewModel's, so the badge sees both.
+    private SftpPrivilegedActRecorder _privilegedActs;
     private SessionTabViewModel? _sessionTab;
     private SessionPaneModel? _ownerPane;
     private LocalizationManager? _localizer;
@@ -249,6 +252,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard, I
 
         _hostKeyVerifier = hostKeyVerifier;
         _viewModel = new EmbeddedSftpViewModel(uiDispatcher, remoteClipboard);
+        _privilegedActs = new SftpPrivilegedActRecorder(SessionOperationEmitter.Disabled, _viewModel.RootActivity);
 
         // Built here rather than at InitializeSession so a pane is guarded for its whole lifetime:
         // the delegates read the fields below when the arbiter calls them, not now.
@@ -411,6 +415,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard, I
                 operationHost,
                 SessionLoggingOverride)
             : SessionOperationEmitter.Disabled;
+        _privilegedActs = new SftpPrivilegedActRecorder(_operationEmitter, _viewModel.RootActivity);
 
         _viewModel.AttachStateStore(
             (Application.Current as App)?.Services?.GetService<ISftpBrowserStateStore>());
@@ -1221,6 +1226,7 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard, I
         PrivilegeBookmarksSeparator.Visibility = inlineActions;
         BtnBookmarkMenu.Visibility = inlineActions;
         BtnSudoModeText.Visibility = inlineActions;
+        RootActivityLabel.Visibility = inlineActions;
         BtnFollowSshDirectoryText.Visibility = inlineActions;
         BtnOverflowMenu.Visibility = overflow;
     }
@@ -1581,7 +1587,11 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard, I
             {
                 Core.Logging.FileLogger.Info(
                     $"EmbeddedSFTP external edit permission denied, falling back to sudo for {file.Name}");
-                await _editor.EditFileSudoAsync(file.FullPath, _sshParams);
+                RemoteFileEditor sudoEditor = _editor;
+                SshConnectionParams sudoParams = _sshParams;
+                await _privilegedActs.RunEditOpenAsync(
+                    file.FullPath,
+                    () => sudoEditor.EditFileSudoAsync(file.FullPath, sudoParams));
             }
         }
         catch (ExternalEditorLaunchException ex)
@@ -1693,7 +1703,11 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard, I
 
                 if (_editor is not null)
                 {
-                    await _editor.EditFileSudoAsync(file.FullPath, _sshParams);
+                    RemoteFileEditor sudoEditor = _editor;
+                    SshConnectionParams sudoParams = _sshParams;
+                    await _privilegedActs.RunEditOpenAsync(
+                        file.FullPath,
+                        () => sudoEditor.EditFileSudoAsync(file.FullPath, sudoParams));
                     CleanupEditTempDir(tempPath);
                     return;
                 }
@@ -1827,7 +1841,8 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard, I
                                 await _viewModel.UploadViaSudoAsync(
                                     localPath,
                                     remotePath,
-                                    inlineEditorCancellation);
+                                    inlineEditorCancellation,
+                                    kind: SftpRootActKind.InlineSave);
                                 if (_disposed || inlineEditorCancellation.IsCancellationRequested)
                                 {
                                     return false;
@@ -2580,12 +2595,11 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard, I
 
         try
         {
-            _operationEmitter.EmitUploadCompleted(
+            _privilegedActs.RecordEditorSave(
                 evt.LocalPath,
                 evt.RemotePath,
                 evt.Success,
-                () => new FileInfo(evt.LocalPath).Length,
-                privileged: true);
+                () => new FileInfo(evt.LocalPath).Length);
         }
         catch (Exception ex)
         {

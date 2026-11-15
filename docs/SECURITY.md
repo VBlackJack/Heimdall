@@ -480,6 +480,13 @@ permission change, download and listing escalate without asking when the
 server refuses them. The sudo password offered is the session's SSH password;
 it is never typed again and never written to a log or a command line.
 
+These escalations are not hidden: from the first one, a "root" badge stays in
+the pane's toolbar until the pane closes, and its list names the latest
+operations attempted as root with their outcome and time; directory listings as
+root are counted apart, on one line. The badge starts again from zero when the
+pane is rebuilt, for example after a reconnect, and the existence checks of a
+rename as root are not counted.
+
 A permission change as root never follows a symbolic link. A directory is
 changed from inside it, after checking that it is still the entry that was
 listed; a regular file is changed through a hard link made in a private

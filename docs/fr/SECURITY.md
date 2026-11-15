@@ -535,6 +535,13 @@ serveur les refuse. Le mot de passe sudo proposé est le mot de passe SSH de la
 session ; il n'est jamais ressaisi, ni écrit dans un journal ou sur une ligne
 de commande.
 
+Ces escalades ne sont pas cachées : dès la première, un badge "root" reste dans
+la barre d'outils du volet jusqu'à sa fermeture, et sa liste nomme les dernières
+opérations tentées en root avec leur résultat et leur heure ; les listages de
+dossiers en root sont comptés à part, sur une ligne. Le badge repart de zéro
+quand le volet est reconstruit, par exemple après une reconnexion, et les
+vérifications d'existence d'un renommage en root ne sont pas comptées.
+
 Un changement de permissions en root ne suit jamais un lien symbolique. Un
 dossier est modifié depuis l'intérieur, après avoir vérifié qu'il est toujours
 l'élément listé ; un fichier ordinaire est modifié par un lien physique créé
