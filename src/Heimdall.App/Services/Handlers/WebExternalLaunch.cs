@@ -15,9 +15,11 @@
  */
 
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Text.RegularExpressions;
 using Heimdall.Core.Configuration;
+using Heimdall.Core.Localization;
 using Heimdall.Core.Security;
 using Heimdall.Core.Utilities;
 
@@ -43,6 +45,15 @@ internal static class WebExternalLaunch
 
     /// <summary>The localization key of the refusal of a program the shell would resolve to a share or a device.</summary>
     public const string NetworkPathErrorKey = "ErrorWebExternalNetworkPathRefused";
+
+    /// <summary>The localization key of the body of the question asked before the external program starts.</summary>
+    private const string ConfirmationBodyKey = "ConfirmWebExternalProgramBody";
+
+    /// <summary>What wraps a program that holds a space or a quote when it is shown.</summary>
+    private const char ProgramQuote = '"';
+
+    /// <summary>How many quote characters wrap a quoted program.</summary>
+    private const int ProgramQuoteCount = 2;
 
     /// <summary>A URI scheme: two or more characters before the colon, since a single letter is a drive designator.</summary>
     private const string SchemePattern = "^[A-Za-z][A-Za-z0-9+.-]+:";
@@ -80,12 +91,14 @@ internal static class WebExternalLaunch
 
     /// <summary>
     /// The program and arguments as a confirmation shows them. Both come from a profile that may
-    /// have been imported, so control, format and line-separator characters are written out
-    /// visibly instead of starting a new line or hiding part of the command.
+    /// have been imported, so control, format, line-separator, unassigned and blank-looking
+    /// characters are written out visibly instead of starting a new line or hiding part of the
+    /// command, and a long run of one character is shown with its count. A program that holds a
+    /// space or a quote is wrapped in quotes with the quote escaped; a plain one is shown as it is.
     /// </summary>
     public static string DescribeCommand(string? program, string? arguments)
     {
-        string shownProgram = UntrustedText.MakeVisible(program, MaxDescribedProgramLength);
+        string shownProgram = ShownProgram(program, MaxDescribedProgramLength);
         string shownArguments = UntrustedText.MakeVisible(arguments, MaxDescribedArgumentsLength);
         return $"{shownProgram} {shownArguments}".Trim();
     }
@@ -96,8 +109,39 @@ internal static class WebExternalLaunch
     /// launch is refused instead of shown cut.
     /// </summary>
     public static bool FitsDescription(string? program, string? arguments) =>
-        UntrustedText.MakeVisible(program, int.MaxValue).Length <= MaxDescribedProgramLength
-        && UntrustedText.MakeVisible(arguments, int.MaxValue).Length <= MaxDescribedArgumentsLength;
+        ShownProgram(program, UntrustedText.NoLengthLimit).Length <= MaxDescribedProgramLength
+        && UntrustedText.MakeVisible(arguments, UntrustedText.NoLengthLimit).Length <= MaxDescribedArgumentsLength;
+
+    /// <summary>
+    /// The program as the confirmation shows it. One that holds a space or a quote is wrapped in
+    /// quotes with the quote escaped, so where it ends and its arguments begin is not left to the
+    /// reader; a plain program name is shown as it is. The quotes count in <paramref name="maxLength"/>.
+    /// </summary>
+    private static string ShownProgram(string? program, int maxLength)
+    {
+        if (string.IsNullOrEmpty(program) || !program.Any(IsSpaceOrQuote))
+        {
+            return UntrustedText.MakeVisible(program, maxLength);
+        }
+
+        int innerLength = maxLength == UntrustedText.NoLengthLimit ? maxLength : Math.Max(0, maxLength - ProgramQuoteCount);
+        return ProgramQuote + UntrustedText.MakeVisible(UntrustedText.EscapeForDoubleQuotes(program), innerLength) + ProgramQuote;
+    }
+
+    private static bool IsSpaceOrQuote(char character) =>
+        character == ProgramQuote || char.GetUnicodeCategory(character) == UnicodeCategory.SpaceSeparator;
+
+    /// <summary>
+    /// The body of the question asked before a tab starts the external program of its profile.
+    /// The profile name comes from a file that may have been imported, so it is made visible and
+    /// escaped as the rows of the other trust questions are, and cannot close the quotes the body
+    /// puts around it.
+    /// </summary>
+    public static string ConfirmationBody(string? displayName, string command, LocalizationManager localizer)
+    {
+        ArgumentNullException.ThrowIfNull(localizer);
+        return localizer.Format(ConfirmationBodyKey, ExecutionTrustDescriber.Visible(displayName), command);
+    }
 
     /// <summary>
     /// Whether <paramref name="program"/> would be resolved by the shell to something other than a

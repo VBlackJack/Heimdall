@@ -605,7 +605,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         parts.Add(
             string.IsNullOrWhiteSpace(profile.LocalShellExecutable)
                 ? DefaultLocalShellExecutable
-                : MakeVisible(profile.LocalShellExecutable));
+                : MakeVisible(profile.LocalShellExecutable, closedByQuote: false));
 
         if (!string.IsNullOrWhiteSpace(profile.LocalShellArguments))
         {
@@ -622,17 +622,18 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
 
     /// <summary>
     /// Makes a value shown in the trust prompt unable to break the line or imitate another
-    /// field: line breaks and tabs become visible escapes and a double quote is escaped. Any
-    /// other control, bidi, zero-width or line-separator character is then written out by
-    /// <see cref="UntrustedText"/>, without truncation.
+    /// field: a double quote is escaped (a backslash before it or at the end of the value is
+    /// doubled first, so it cannot cancel the escape), then line breaks and tabs become visible
+    /// escapes. <paramref name="closedByQuote"/> is false for the program, which the row shows
+    /// bare: only the arguments and the working directory sit between quotes. Any other control, bidi, zero-width, blank-looking or line-separator character is
+    /// then written out by <see cref="UntrustedText"/>, without truncation.
     /// </summary>
-    private static string MakeVisible(string value)
+    private static string MakeVisible(string value, bool closedByQuote = true)
         => UntrustedText.MakeVisible(
-            value
+            UntrustedText.EscapeForDoubleQuotes(value, closedByQuote)
                 .Replace("\r", "\\r", StringComparison.Ordinal)
                 .Replace("\n", "\\n", StringComparison.Ordinal)
-                .Replace("\t", "\\t", StringComparison.Ordinal)
-                .Replace("\"", "\\\"", StringComparison.Ordinal),
+                .Replace("\t", "\\t", StringComparison.Ordinal),
             UntrustedText.NoLengthLimit);
 
     /// <summary>
