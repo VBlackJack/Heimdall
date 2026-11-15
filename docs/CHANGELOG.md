@@ -14,8 +14,9 @@ All notable changes to Heimdall are documented in this file.
 
 ## 2026-11-15: Imported sessions stay untrusted until you allow them, and mRemoteNG imports keep their order (v2026.111501)
 
-Fixes merged as #814, #816, #817, #818 and #822, features as #819 and #820, test work as #815,
-dependency updates as #813. The user-facing summary and the upgrade notes are in the release notes.
+Fixes merged as #814, #816, #817, #818, #822 and #826, features as #819 and #820, test work as
+#815, dependency updates as #813, a CI change as #824. The user-facing summary and the upgrade
+notes are in the release notes.
 
 ### Execution trust (#817)
 
@@ -116,6 +117,30 @@ dependency updates as #813. The user-facing summary and the upgrade notes are in
   ThemeForge.Theme 2.1.0 to 2.2.0; in the test projects, FluentAssertions 6.12.2 to 7.2.2,
   xunit.runner.visualstudio 3.1.4 to 4.0.1 and Microsoft.Extensions.TimeProvider.Testing 10.8.0 to
   10.11.0. Licenses read in each package: MIT or Apache-2.0.
+
+### Untrusted text (#826)
+
+- `UntrustedText.MakeVisible` also escapes unassigned code points, lone surrogates (by their own
+  value), space separators other than U+0020 (a lone U+00A0, U+202F or U+3000 is kept; inside a
+  run of two or more it is escaped), the hand list `InvisibleCodePoints`, and a variation
+  selector that does not follow a non-ASCII non-mark rune or a keycap base (a supplementary one:
+  a letter of category Lo). A run of more than `MaxPlainSpaceRun` spaces, or of more than
+  `MaxRepeatedEscapesWrittenOut` identical escapes, is written once with its count inside the
+  braces. No normalization: the text shown is the text that runs.
+- `UntrustedText.EscapeForDoubleQuotes` applies the Windows command-line rule (a backslash run is
+  doubled before a quote, and at the end of a value that a quote closes). The local command row
+  uses it; the program position is not quoted and keeps a trailing backslash single.
+- `WebExternalLaunch.ShownProgram` quotes a program that holds a space separator or a quote;
+  `FitsDescription` measures the text `DescribeCommand` shows. `ConfirmationBody` escapes the
+  profile name, which `EmbeddedWebView` passed raw.
+- No existing test is changed. Left as it is: a row forged with visible filler that wraps (a row
+  marker would close it); full backslash doubling in the local row; a lone typographic space
+  inside a path.
+
+### CI (#824)
+
+- The blocking test step passes `--blame-hang-timeout 10m --blame-hang-dump-type none`: a test
+  that hangs ends its test host and is named, instead of costing the step timeout with no name.
 
 ### Tests (#815)
 
