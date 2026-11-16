@@ -12,6 +12,77 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-11-16: Heimdall asks before it acts as root, and four questions decline by default (v2026.111601)
+
+Features merged as #825, #833 and #835, fixes as #829, #830, #831, #832 and #834, plus the hardening of
+the privileged transfer scripts merged with these notes. The user-facing summary and the upgrade notes are
+in the release notes.
+
+### Consent before a root retry (#835)
+
+- **Before.** Eleven sites of the SFTP browser caught `IsPermissionDenied` and retried through sudo with no
+  question, except delete (`SudoEscalationConsent`, once per batch).
+- **Change.** `AppSettings.SftpSudoFallback` (`Never`, `Ask`, `Automatic`; default `Ask`, also for an
+  existing settings file, through `TolerantEnumConverter`). `SftpSudoFallbackPolicy` reads the DWORD
+  `SftpSudoFallbackMax` under `HKLM\Software\Policies\Heimdall` once, on first use; the effective mode is the
+  stricter of the two and reaches the panes as a live `Func<SftpSudoFallbackMode>` through
+  `EmbeddedSessionManager` and `Initialize`. An unwired view model behaves as `Automatic`.
+- `SftpSudoFallbackGate` decides before every sudo call; `SftpSudoConsentScope` (action, job, batch, edit
+  session, editor document) asks at most once, declining by default, one question at a time per pane, and
+  carries a `SudoBatchGuard` so uploads and downloads stop sudo after a batch-fatal failure. Delete asks in
+  `Ask` and `Automatic`. Listings the pane starts by itself (mount, follow-SSH-directory, refresh after an
+  operation, `RefreshAfterOperationAsync`) never ask. A yes to a listing question sets `SudoMode`; the toggle
+  lists only, and is cleared and disabled under `Never`, refreshed in open panes on `SettingsChanged`.
+- Refusals throw `SftpSudoNotRunException`, shown as the server's refusal plus a note. The security posture
+  card gains a line (`Automatic` is the risky state) and a `Managed` state when the cap lowers the choice.
+- Tests: a funnel guard keeps every escalation site behind the gate, a wiring guard on
+  `EmbeddedSessionManager`, the gate matrix, per-site behaviour, the policy reader, settings and posture.
+
+### Root activity badge (#833)
+
+- `SftpRootActivityLog` and `SftpPrivilegedActRecorder`, the only code allowed to pass `privileged: true` to
+  `SessionOperationEmitter`; every escalation site goes through it. A badge after the sudo toggle shows the
+  count of acts attempted as root and the latest twenty; listings are counted apart. No behaviour change.
+
+### Root permission change and batch stop (#832)
+
+- Root chmod no longer runs `sudo chmod <mode> <path>`: `PrivilegedFileCommands.BuildNoFollowChmodBody`
+  changes a directory from inside it after comparing device and inode, and a regular file through a hard link
+  in a verified private directory beside it; a link, a special file or a changed entry exits 73 with
+  `HEIMDALL-ENTRY-REFUSED`, mapped to `SudoEntryRefusedException`.
+- `SudoBatchGuard`: in delete and chmod batches, after a batch-fatal sudo failure, sudo is not called again;
+  the summary counts the entries not tried as root.
+
+### Privileged transfer scripts
+
+- The root scripts behind sudo upload, save, download and open-for-edit are hardened. A server where their
+  temporary folder cannot be verified refuses the transfer ("Transfer failed.", reason in the log).
+
+### Questions that decline by default (#830, #831)
+
+- The web console's external program question, the SFTP delete-as-root question, the dangerous command
+  question and the broadcast question use the labeled confirm: decline is the default, Escape, the close box
+  and a shutdown decline. Remote names go through `ExecutionTrustDescriber.Visible`; the broadcast command is
+  shown through `UntrustedText.MakeVisible` and read once.
+
+### Trust question follow-ups (#829)
+
+- `ConnectionResult.Declined` for a confirm answered no: no error dialog, row state kept, one status line;
+  bulk connect counts it as skipped. The confirm accent follows the default button. Post-connect rows listed
+  for every session type with a note row. No ":3389" and no lookup notice for protocols without a
+  saved-password lookup.
+
+### Underscores shown as they are (#834)
+
+- `LiteralAccessText` doubles the underscores of data headers and sets the automation name to the real
+  text; `LiteralTextTemplate` for buttons and check boxes keeps the content a string; the themed combo item
+  no longer recognises access keys.
+
+### mRemoteNG empty folders (#825)
+
+- `MRemoteNgImporter.ImportResult.Containers` and `ImportSourceOrder.EmptyFoldersToCreate`: a container with
+  no session becomes an empty folder in the file's order; a folders-only file asks first.
+
 ## 2026-11-15: Imported sessions stay untrusted until you allow them, and mRemoteNG imports keep their order (v2026.111501)
 
 Fixes merged as #814, #816, #817, #818, #822, #826 and #828, features as #819 and #820, test work as
