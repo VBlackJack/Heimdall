@@ -1529,7 +1529,7 @@ public sealed class EmbeddedSftpViewModelTests
 
         Assert.Equal(["/srv/denied", "/srv/safe.txt"], browser.DeleteCalls);
         Assert.Equal(1, sudoCallCount);
-        Assert.Equal("rm -rf '/srv/denied'", sudoCommand);
+        Assert.Equal(PrivilegedFileCommands.BuildHeldDeleteBody("/srv/denied"), sudoCommand);
         Assert.Equal(1, browser.ListDirectoryCallCount);
         Assert.Equal(localizer.Format("SftpDeleteFailedEntry", "denied"), viewModel.StatusText);
         Assert.False(viewModel.IsErrorStatus);

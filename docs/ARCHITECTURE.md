@@ -325,7 +325,7 @@ Every file operation catches the server's typed permission-denied exception (`Sf
 - Download: a script run as root reads the file without following a symbolic link and returns it base64-encoded
 - Edit: delegates to `RemoteFileEditor.EditFileSudoAsync`
 - Chmod: a script run as root (`PrivilegedFileCommands.BuildNoFollowChmodBody`) changes a directory from inside it after checking it is the listed entry, and a regular file through a hard link in a private root-only directory beside it; a symbolic link or a special file is refused; GNU coreutils required
-- Rename/Delete/Mkdir: `sudo mv`/`rm`/`mkdir` via SSH exec. A delete asks first. In delete and chmod batches, `SudoBatchGuard` stops calling sudo after a failure no later entry can change
+- Rename/Mkdir: `sudo mv`/`mkdir` via SSH exec. Delete: `PrivilegedFileCommands.BuildHeldDeleteBody` walks to the parent with `HeldParentWalk` and removes the entry by its last name from the held folder (`rm -f` for a file, refused if a folder took its name; `rm -rf` for a folder); it asks first and, like chmod, needs GNU coreutils on the server. In delete and chmod batches, `SudoBatchGuard` stops calling sudo after a failure no later entry can change
 
 **Tier 2 - "Browse as root" toggle** (user-initiated):
 Listing only: it never lets a write skip the question, it is disabled under Never, and a yes to a listing question turns it on.

@@ -275,7 +275,7 @@ public sealed class EmbeddedSftpSudoChmodAndBatchTests
         ]);
 
         Assert.Equal(["/srv/a", "/srv/b", "/srv/c"], harness.Browser.DeleteCalls);
-        Assert.Equal(["rm -rf '/srv/a'"], harness.DeleteCommands);
+        Assert.Equal([PrivilegedFileCommands.BuildHeldDeleteBody("/srv/a")], harness.DeleteCommands);
         Assert.Equal(1, harness.EscalationPromptCount);
         Assert.Equal(
             harness.Localizer.FormatCount(
@@ -307,7 +307,13 @@ public sealed class EmbeddedSftpSudoChmodAndBatchTests
             Entry("c", "/srv/c", RemoteEntryKind.Directory),
         ]);
 
-        Assert.Equal(["rm -rf '/srv/a'", "rm -rf '/srv/b'", "rm -rf '/srv/c'"], harness.DeleteCommands);
+        Assert.Equal(
+            [
+                PrivilegedFileCommands.BuildHeldDeleteBody("/srv/a"),
+                PrivilegedFileCommands.BuildHeldDeleteBody("/srv/b"),
+                PrivilegedFileCommands.BuildHeldDeleteBody("/srv/c"),
+            ],
+            harness.DeleteCommands);
         Assert.Equal(1, harness.EscalationPromptCount);
         Assert.Equal(
             harness.Localizer.FormatCount(3, "SftpDeletePartialSummaryOne", "SftpDeletePartialSummary", 3, 3),
