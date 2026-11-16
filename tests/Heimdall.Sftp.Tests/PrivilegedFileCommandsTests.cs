@@ -214,10 +214,13 @@ public sealed class PrivilegedFileCommandsTests
 
         Assert.Contains("umask 077", command, StringComparison.Ordinal);
         Assert.Contains(
-            "mktemp -d -- \"$dir/.heimdall-write.XXXXXXXXXX\"",
+            "mktemp -d -- \"./.heimdall-write.XXXXXXXXXX\"",
             command,
             StringComparison.Ordinal);
-        Assert.Contains("chmod 700 -- \"$work\"", command, StringComparison.Ordinal);
+        Assert.DoesNotContain("mktemp -d -- \"$dir", command, StringComparison.Ordinal);
+        Assert.DoesNotContain("chmod 700", command, StringComparison.Ordinal);
+        Assert.DoesNotContain("cd -- \"$work\"", command, StringComparison.Ordinal);
+        Assert.Contains("cd -P -- \"$made\"", command, StringComparison.Ordinal);
         Assert.Contains("ln -P -- \"$target\" original", command, StringComparison.Ordinal);
         Assert.Contains("[ -L original ]", command, StringComparison.Ordinal);
         Assert.Contains("original_owner=$(stat -c %u:%g -- original)", command, StringComparison.Ordinal);
@@ -228,8 +231,10 @@ public sealed class PrivilegedFileCommandsTests
         Assert.Contains("chmod -- \"$original_mode\" payload", command, StringComparison.Ordinal);
         Assert.Contains("[ -L \"$target\" ]", command, StringComparison.Ordinal);
         Assert.Contains("mv -fT -- payload \"$target\"", command, StringComparison.Ordinal);
-        Assert.Contains("sync -f \"$dir\"", command, StringComparison.Ordinal);
-        Assert.Contains("trap cleanup EXIT HUP INT TERM", command, StringComparison.Ordinal);
+        Assert.Contains("sync -f ..", command, StringComparison.Ordinal);
+        // The script text is quoted for the shell, so each single quote comes back as quote, backslash, quote, quote.
+        Assert.Contains("trap cleanup EXIT; trap '\\''exit 129'\\'' HUP INT TERM", command, StringComparison.Ordinal);
+        Assert.DoesNotContain("trap cleanup EXIT HUP INT TERM", command, StringComparison.Ordinal);
         Assert.DoesNotContain(RemoteTempPaths.Prefix, command, StringComparison.Ordinal);
         Assert.DoesNotContain("sudo tee", command, StringComparison.Ordinal);
 
