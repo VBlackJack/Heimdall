@@ -635,7 +635,13 @@ public sealed partial class EmbeddedSftpViewModel
 
         try
         {
-            UploadPlanOutcome outcome = await UploadPlannedEntriesAsync(job.LocalPaths, job.RemoteDirectory, ct);
+            // One scope per job: the question names the job, and its answer covers every file.
+            SftpSudoConsentScope sudoScope = new(SftpRootActKind.Upload, SftpSudoScopeKind.Job, job.Title);
+            UploadPlanOutcome outcome = await UploadPlannedEntriesAsync(
+                job.LocalPaths,
+                job.RemoteDirectory,
+                ct,
+                sudoScope);
             refreshAfterTransfer = outcome.Completed;
             status = outcome.Completed ? SftpTransferJobStatus.Completed : SftpTransferJobStatus.Cancelled;
             if (!outcome.Completed)
@@ -707,12 +713,12 @@ public sealed partial class EmbeddedSftpViewModel
                 // written, unawaited, so the message the user needed was wiped by the listing
                 // of a directory that now held part of their batch. The listing first, then
                 // the verdict, as the last message written.
-                await Refresh();
+                await RefreshAfterOperationAsync();
                 finalReport();
             }
             else if (refreshAfterTransfer)
             {
-                await Refresh();
+                await RefreshAfterOperationAsync();
                 if (pendingOperationWarnings.Count == 0)
                 {
                     UpdateStatus(L10n("SftpStatusTransferComplete"));
@@ -767,13 +773,17 @@ public sealed partial class EmbeddedSftpViewModel
         _downloadBatchProgress = default;
         BeginPreparing();
 
+        // One scope per job, for the folder walk and the files alike: it asks at most once, and a
+        // failure that cannot change from one entry to the next stops root for the rest of the job.
+        SftpSudoConsentScope sudoScope = new(SftpRootActKind.Download, SftpSudoScopeKind.Job, job.Title);
+
         try
         {
             RemoteDownloadPlan plan = await RemoteDownloadTreePlanner
                 .PlanAsync(
                     job.RemoteEntries,
                     job.LocalDirectory,
-                    (directory, token) => ListDirectoryWithSudoFallbackAsync(browser, directory, token),
+                    (directory, token) => ListDirectoryWithSudoFallbackAsync(browser, directory, token, sudoScope),
                     ResolveContainedLocalChild,
                     ReportDownloadScan,
                     ct)
@@ -852,9 +862,18 @@ public sealed partial class EmbeddedSftpViewModel
                 }
                 catch (Exception ex) when (_sshParams is not null && IsPermissionDenied(ex))
                 {
+                    await RequireSudoAsync(SftpRootActKind.Download, op.RemotePath, sudoScope, ex, ct);
                     Core.Logging.FileLogger.Info(
                         $"EmbeddedSFTP download permission denied, falling back to sudo for {fileName}");
-                    await DownloadViaSudoAsync(op.RemotePath, step.EffectiveTargetPath, ct, step.Overwrite);
+                    try
+                    {
+                        await DownloadViaSudoAsync(op.RemotePath, step.EffectiveTargetPath, ct, step.Overwrite);
+                    }
+                    catch (Exception sudoException) when (sudoException is not OperationCanceledException)
+                    {
+                        sudoScope.Guard.Record(sudoException);
+                        throw;
+                    }
                 }
 
                 tracker.CompleteFile();
@@ -966,7 +985,8 @@ public sealed partial class EmbeddedSftpViewModel
     private async Task<IReadOnlyList<SftpFileInfo>> ListDirectoryWithSudoFallbackAsync(
         IRemoteBrowser browser,
         string path,
-        CancellationToken ct)
+        CancellationToken ct,
+        SftpSudoConsentScope scope)
     {
         try
         {
@@ -974,9 +994,18 @@ public sealed partial class EmbeddedSftpViewModel
         }
         catch (Exception ex) when (_sshParams is not null && IsPermissionDenied(ex))
         {
+            await RequireSudoAsync(SftpRootActKind.Listing, path, scope, ex, ct).ConfigureAwait(false);
             Core.Logging.FileLogger.Info(
                 $"EmbeddedSFTP download listing permission denied, falling back to sudo for {path}");
-            return await ListDirectoryViaSudoAsync(path, ct).ConfigureAwait(false);
+            try
+            {
+                return await ListDirectoryViaSudoAsync(path, ct).ConfigureAwait(false);
+            }
+            catch (Exception sudoException) when (sudoException is not OperationCanceledException)
+            {
+                scope.Guard.Record(sudoException);
+                throw;
+            }
         }
     }
 
@@ -1062,21 +1091,21 @@ public sealed partial class EmbeddedSftpViewModel
                 moved++;
             }
 
-            await Refresh().ConfigureAwait(false);
+            await RefreshAfterOperationAsync().ConfigureAwait(false);
             await RunOnUiAsync(() => UpdateStatus(moved == 0
                 ? L10n("SftpStatusMoveNothing")
                 : LFC(moved, "SftpStatusMoveCompleteOne", "SftpStatusMoveComplete", moved))).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
-            await Refresh().ConfigureAwait(false);
+            await RefreshAfterOperationAsync().ConfigureAwait(false);
             await RunOnUiAsync(() => UpdateStatus(L10n("SftpStatusTransferCancelled"))).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
             Core.Logging.FileLogger.Warn(
                 $"EmbeddedSFTP drag move failed [{ex.GetType().Name}]: {ex.Message}");
-            await Refresh().ConfigureAwait(false);
+            await RefreshAfterOperationAsync().ConfigureAwait(false);
             await RunOnUiAsync(() => SetTransferError(ex)).ConfigureAwait(false);
         }
         finally

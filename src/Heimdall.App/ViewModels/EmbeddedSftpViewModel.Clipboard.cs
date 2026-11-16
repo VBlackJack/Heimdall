@@ -257,7 +257,7 @@ public sealed partial class EmbeddedSftpViewModel
             }
 
             await RunOnUiAsync(() => UpdateStatus(L10n("SftpStatusPasteComplete")));
-            await Refresh().ConfigureAwait(false);
+            await RefreshAfterOperationAsync().ConfigureAwait(false);
 
             if (skippedUnsupportedPaths.Count > 0)
             {
@@ -530,7 +530,7 @@ public sealed partial class EmbeddedSftpViewModel
     {
         try
         {
-            await Refresh().ConfigureAwait(false);
+            await RefreshAfterOperationAsync().ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -817,7 +817,7 @@ public sealed partial class EmbeddedSftpViewModel
             }
 
             await RunOnUiAsync(() => UpdateStatus(L10n("SftpStatusDuplicateComplete")));
-            await Refresh().ConfigureAwait(false);
+            await RefreshAfterOperationAsync().ConfigureAwait(false);
 
             if (skippedUnsupportedPaths.Count > 0)
             {

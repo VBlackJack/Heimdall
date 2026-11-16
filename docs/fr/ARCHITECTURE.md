@@ -320,8 +320,8 @@ Toutes les opérations de connexion renvoient un `ISessionResult` (défini dans 
 
 **Solution** : une approche à deux niveaux, utilisant des canaux d'exécution SSH en parallèle de la session SFTP.
 
-**Niveau 1 - repli automatique** (transparent pour l'utilisateur) :
-Chaque opération de fichier attrape l'exception typée de permission refusée du serveur (`SftpPermissionDeniedException` ; une `UnauthorizedAccessException` locale n'escalade pas), puis réessaie via une exécution SSH :
+**Niveau 1 - repli sur une opération refusée** (contrôlé) :
+Chaque opération de fichier attrape l'exception typée de permission refusée du serveur (`SftpPermissionDeniedException` ; une `UnauthorizedAccessException` locale n'escalade pas). Avant tout appel à sudo, `SftpSudoFallbackGate` décide selon le mode effectif (`AppSettings.SftpSudoFallback` plafonné par `SftpSudoFallbackPolicy`, lu dans `HKLM\Software\Policies\Heimdall` `SftpSudoFallbackMax`) : Jamais refuse, Demander pose une question par `SftpSudoConsentScope` (une action, un transfert, un lot, une session d'édition, un document d'éditeur), Automatique réessaie sans question sauf une suppression. Les listages qui ne viennent pas de l'utilisateur (ouverture du volet, suivi du répertoire SSH, rafraîchissement après une opération) ne demandent jamais. Un test d'entonnoir garde chaque point d'escalade derrière ce contrôle. Ensuite l'opération réessaie via une exécution SSH :
 - Téléversement : le contenu est préparé dans un répertoire privé 0700 de l'utilisateur connecté sous `$TMPDIR` (`/tmp` par défaut) ; un seul appel sudo l'installe dans un répertoire privé à côté de la destination et le renomme sur la cible (`PrivilegedFileTransfer`)
 - Téléchargement : un script exécuté en root lit le fichier sans suivre un lien symbolique et le renvoie encodé en base64
 - Edition : délègue à `RemoteFileEditor.EditFileSudoAsync`
@@ -329,6 +329,7 @@ Chaque opération de fichier attrape l'exception typée de permission refusée d
 - Renommage/Suppression/Mkdir : `sudo mv`/`rm`/`mkdir` via exécution SSH. Une suppression demande d'abord. Dans une suppression ou un changement de permissions groupé, `SudoBatchGuard` cesse d'appeler sudo après un échec qu'aucun élément suivant ne peut changer
 
 **Niveau 2 - bascule "Naviguer en root"** (déclenchée par l'utilisateur) :
+Listage seulement : elle ne permet jamais à une écriture d'éviter la question, elle est désactivée sous Jamais, et un oui à une question de listage l'active.
 Un bouton bascule de la barre d'outils fait passer le listage de répertoire du `ListDirectory` SFTP à `sudo find -H <dir> -mindepth 1 -maxdepth 1 -printf` avec des enregistrements délimités par NUL via exécution SSH (`SudoDirectoryListing`). Cela permet de naviguer dans N'IMPORTE QUEL répertoire, quelles que soient les permissions.
 
 **Décisions de conception et pièges rencontrés** :

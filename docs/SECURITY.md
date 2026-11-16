@@ -474,11 +474,42 @@ the local file system refusing, and a privileged remote transfer would fail on
 the same local path. This trades occasional manual retry prompts for avoiding
 sudo actions on non-permission failures.
 
-Only a delete asks before it escalates, once per deletion, and the question
-declines by default. Upload, save from an editor, open, new folder, rename,
-permission change, download and listing escalate without asking when the
-server refuses them. The sudo password offered is the session's SSH password;
-it is never typed again and never written to a log or a command line.
+Whether a refused operation is run again as root is a setting, **SFTP: retry refused
+operations as root** (Settings, SFTP), with three values:
+
+- **Ask first** (the default, also for an upgraded installation): one question per
+  action, declining by default, that names the act and the path ("Upload as
+  root" / "Do not upload"). A transfer job asks once, its folder walk included;
+  a deletion or a permission change of several entries asks once; opening a
+  file in an editor asks once and says that the later saves of that editor are
+  also written as root. A yes to a listing question turns the pane's **sudo**
+  toggle on, so the folder and its refreshes are then listed as root without
+  asking again.
+- **Automatic (no question)**: the earlier behaviour, root without a question, except a
+  delete, which always asks. The security posture card flags this value.
+- **Never**: sudo is never called; the server's refusal is shown with a line
+  saying root was not tried, and a delete counts the entry as not deleted in
+  its summary. The pane's **sudo** toggle is disabled.
+
+Some listings are not started by you and never ask: the first listing when a
+pane opens, a folder followed from the terminal's working directory (a path the
+server prints), and the refresh that follows an operation. Under Ask first they are
+not run as root, the status line says so, and the pane falls back as it does
+for any refused listing. The **sudo** toggle only lists folders as root: it
+never lets a write skip the question.
+
+An organisation can cap the setting with the DWORD value
+`SftpSudoFallbackMax` under `HKLM\Software\Policies\Heimdall` (0 Never, 1 Ask,
+2 Automatic). The stricter of the user's choice and the cap applies, the looser
+choices are disabled in Settings with a line saying the value is managed, and
+the posture card shows the effective value. The value is read once, the first
+time it is needed; a change takes effect after a restart.
+This is not a security boundary: a user with a shell on the server can run
+sudo there directly, and the server's sudoers rules remain the real control.
+
+The sudo password offered is the session's SSH password; it is never typed
+again and never written to a log or a command line. Without a stored password
+(a key or an agent), the command runs only where sudo needs no password.
 
 These escalations are not hidden: from the first one, a "root" badge stays in
 the pane's toolbar until the pane closes, and its list names the latest
@@ -1118,7 +1149,7 @@ caller refuses: there is no fallback to a primitive that could replace the desti
   `dotnet format --verify-no-changes`, the blocking test lane (the suite minus
   the cases marked `CIUnstable` or `RequiresDesktop`, which run in two further
   lanes that report their failures without turning the run red), JSON locale
-  parity (every catalogue holds exactly the English key set, currently 6,300+
+  parity (every catalogue holds exactly the English key set, currently 6,400+
   keys each), and an informational `dotnet list package --vulnerable` scan.
 - Dependency scan for manual review: `dotnet list Heimdall.slnx package
   --vulnerable --include-transitive`. CI emits warnings but does not gate on

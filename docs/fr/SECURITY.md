@@ -527,13 +527,49 @@ refuse, et un transfert distant privilégié échouerait sur le même chemin loc
 Ce compromis accepte quelques invites de nouvelle tentative manuelle en échange
 de l'absence d'actions sudo sur des échecs qui ne relèvent pas des permissions.
 
-Seule une suppression demande avant d'escalader, une fois par suppression, et
-la question refuse par défaut. Le téléversement, l'enregistrement depuis un
-éditeur, l'ouverture, la création de dossier, le renommage, le changement de
-permissions, le téléchargement et le listage escaladent sans demander quand le
-serveur les refuse. Le mot de passe sudo proposé est le mot de passe SSH de la
-session ; il n'est jamais ressaisi, ni écrit dans un journal ou sur une ligne
-de commande.
+Relancer en root une opération refusée dépend d'un réglage, **SFTP : réessayer
+en root les opérations refusées** (Paramètres, SFTP), à trois valeurs :
+
+- **Demander d'abord** (par défaut, y compris après une mise à jour) : une
+  question par action, qui refuse par défaut et nomme l'acte et le chemin
+  ("Envoyer en tant que root" / "Ne pas envoyer"). Un transfert demande une
+  fois, parcours de dossier compris ; une suppression ou un changement de
+  permissions de plusieurs entrées demande une fois ; ouvrir un fichier dans un
+  éditeur demande une fois et précise que les enregistrements suivants de cet
+  éditeur seront aussi écrits en root. Un oui à une question de listage active
+  le bouton **sudo** du volet : le dossier et ses rafraîchissements sont alors
+  listés en root sans nouvelle question.
+- **Automatique (sans question)** : le comportement antérieur, root sans
+  question, sauf la suppression, qui demande toujours. La carte de posture de
+  sécurité signale cette valeur.
+- **Jamais** : sudo n'est jamais appelé ; le refus du serveur s'affiche avec
+  une ligne qui dit que root n'a pas été essayé, et une suppression compte
+  l'entrée comme non supprimée dans son bilan. Le bouton **sudo** du volet est
+  désactivé.
+
+Certains listages ne viennent pas de vous et ne demandent jamais : le premier
+listage à l'ouverture d'un volet, un dossier suivi depuis le répertoire courant
+du terminal (un chemin affiché par le serveur), et le rafraîchissement qui suit
+une opération. En mode Demander d'abord, ils ne passent pas en root, la ligne
+d'état le dit, et le volet se replie comme pour tout listage refusé. Le bouton
+**sudo** ne fait que lister les dossiers en root : il ne permet jamais à une
+écriture d'éviter la question.
+
+Une organisation peut plafonner ce réglage avec la valeur DWORD
+`SftpSudoFallbackMax` sous `HKLM\Software\Policies\Heimdall` (0 Jamais,
+1 Demander, 2 Automatique). Le plus strict du choix de l'utilisateur et du
+plafond s'applique, les choix plus larges sont désactivés dans les Paramètres
+avec une ligne qui dit que la valeur est gérée, et la carte de posture montre la
+valeur effective. La valeur est lue une fois, à son premier usage ; une
+modification prend effet au redémarrage. Ce n'est pas une
+frontière de sécurité : un utilisateur qui a un shell sur le serveur peut y
+lancer sudo directement, et les règles sudoers du serveur restent le vrai
+contrôle.
+
+Le mot de passe sudo proposé est le mot de passe SSH de la session ; il n'est
+jamais ressaisi, ni écrit dans un journal ou sur une ligne de commande. Sans
+mot de passe enregistré (une clé ou un agent), la commande ne réussit que là où
+sudo ne demande pas de mot de passe.
 
 Ces escalades ne sont pas cachées : dès la première, un badge "root" reste dans
 la barre d'outils du volet jusqu'à sa fermeture, et sa liste nomme les dernières
@@ -1241,7 +1277,7 @@ remplacer la destination.
   bloquante (la suite moins les cas marqués `CIUnstable` ou `RequiresDesktop`,
   qui tournent dans deux autres lanes signalant leurs échecs sans faire rougir
   l'exécution), la parité des locales JSON (chaque catalogue porte exactement
-  le jeu de clés anglais, actuellement 6 300+ clés) et une analyse informative
+  le jeu de clés anglais, actuellement 6 400+ clés) et une analyse informative
   `dotnet list package --vulnerable`.
 - Analyse des dépendances pour revue manuelle : `dotnet list Heimdall.slnx
   package --vulnerable --include-transitive`. La CI émet des avertissements mais

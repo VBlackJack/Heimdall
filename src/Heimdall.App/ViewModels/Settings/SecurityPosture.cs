@@ -15,6 +15,7 @@
  */
 
 using System.Globalization;
+using Heimdall.Core.Models;
 
 namespace Heimdall.App.ViewModels.Settings;
 
@@ -33,6 +34,7 @@ public enum SecurityPostureKey
     WindowsHelloOnConnect,
     UpdateChecks,
     KnownHostsSync,
+    SftpSudoFallback,
 }
 
 /// <summary>The state a posture line reports, worded by the view model.</summary>
@@ -48,6 +50,9 @@ public enum SecurityPostureState
     Never,
     RequiresVault,
     Policy,
+    Ask,
+    Automatic,
+    Managed,
 }
 
 /// <summary>The security-relevant values the posture card is computed from.</summary>
@@ -67,7 +72,9 @@ public sealed record SecurityPostureInputs(
     bool RequireCredentialGuard,
     bool RequireWindowsHelloOnConnect,
     bool UpdateChecks,
-    bool KnownHostsSync);
+    bool KnownHostsSync,
+    SftpSudoFallbackMode SftpSudoFallback = SftpSudoFallbackMode.Ask,
+    SftpSudoFallbackMode? SftpSudoFallbackCap = null);
 
 /// <summary>
 /// One line of the posture card: what it is about, the state it is in, whether that state is the
@@ -121,6 +128,9 @@ public static class SecurityPosture
     /// <summary>The control that manages an enabled vault.</summary>
     internal const string VaultChangeTarget = "Mw_SettingsVaultChangeBtn";
 
+    /// <summary>The control that sets whether a refused SFTP operation is retried as root.</summary>
+    internal const string SftpSudoFallbackTarget = "Mw_SettingsSftpSudoFallback";
+
     /// <summary>Every target a line can name, so a guard can check each one exists.</summary>
     public static IReadOnlyList<string> AllTargetSettingIds { get; } =
     [
@@ -137,6 +147,7 @@ public static class SecurityPosture
         "Mw_SettingsRequireWindowsHello",
         "Mw_SettingsUpdateCheckEnabled",
         "Mw_SettingsSyncKnownHostsAtStartup",
+        SftpSudoFallbackTarget,
     ];
 
     /// <summary>Evaluates every line of the card, in the order the card shows them.</summary>
@@ -188,7 +199,37 @@ public static class SecurityPosture
                 "Mw_SettingsRequireWindowsHello"),
             OnOff(SecurityPostureKey.UpdateChecks, inputs.UpdateChecks, riskyWhenOn: false, riskyWhenOff: true, "Mw_SettingsUpdateCheckEnabled"),
             OnOff(SecurityPostureKey.KnownHostsSync, inputs.KnownHostsSync, riskyWhenOn: true, riskyWhenOff: false, "Mw_SettingsSyncKnownHostsAtStartup"),
+            SftpSudoFallback(inputs),
         ];
+    }
+
+    /// <summary>
+    /// The SFTP root fallback shows what applies, not what was chosen: the stricter of the user's
+    /// choice and the organisation cap. Only Automatic is risky, because it runs as root with no
+    /// question; Ask is the default and Never is the strictest. A cap that actually lowers the
+    /// value is reported as managed, a state of its own, distinct from the PowerShell policy.
+    /// </summary>
+    private static SecurityPostureItem SftpSudoFallback(SecurityPostureInputs inputs)
+    {
+        SftpSudoFallbackMode effective = inputs.SftpSudoFallbackCap is { } cap && cap < inputs.SftpSudoFallback
+            ? cap
+            : inputs.SftpSudoFallback;
+        bool managed = effective != inputs.SftpSudoFallback;
+        SecurityPostureState state = managed
+            ? SecurityPostureState.Managed
+            : effective switch
+            {
+                SftpSudoFallbackMode.Never => SecurityPostureState.Never,
+                SftpSudoFallbackMode.Automatic => SecurityPostureState.Automatic,
+                _ => SecurityPostureState.Ask,
+            };
+
+        return new SecurityPostureItem(
+            SecurityPostureKey.SftpSudoFallback,
+            state,
+            effective == SftpSudoFallbackMode.Automatic,
+            SftpSudoFallbackTarget,
+            effective.ToString());
     }
 
     /// <summary>How many lines need attention.</summary>

@@ -319,8 +319,8 @@ All connection operations return an `ISessionResult` (defined in `Heimdall.Core/
 
 **Solution**: Two-tier approach using SSH exec channels alongside the SFTP session:
 
-**Tier 1 - Automatic fallback** (transparent to user):
-Every file operation catches the server's typed permission-denied exception (`SftpPermissionDeniedException`; a local `UnauthorizedAccessException` does not escalate), then retries via SSH exec:
+**Tier 1 - Fallback on a refused operation** (gated):
+Every file operation catches the server's typed permission-denied exception (`SftpPermissionDeniedException`; a local `UnauthorizedAccessException` does not escalate). Before any sudo call, `SftpSudoFallbackGate` decides from the effective mode (`AppSettings.SftpSudoFallback` capped by `SftpSudoFallbackPolicy`, read from `HKLM\Software\Policies\Heimdall` `SftpSudoFallbackMax`): Never refuses, Ask asks once per `SftpSudoConsentScope` (an action, a transfer job, a batch, an edit session, an editor document), Automatic retries without a question except a delete. Listings not started by the user (pane mount, follow-SSH-directory, refresh after an operation) never ask. A funnel guard test keeps every escalation site behind the gate. Then the operation is retried via SSH exec:
 - Upload: the content is staged in a private 0700 directory of the connecting user under `$TMPDIR` (default `/tmp`); one sudo call installs it into a private directory beside the destination and renames it over the target (`PrivilegedFileTransfer`)
 - Download: a script run as root reads the file without following a symbolic link and returns it base64-encoded
 - Edit: delegates to `RemoteFileEditor.EditFileSudoAsync`
@@ -328,6 +328,7 @@ Every file operation catches the server's typed permission-denied exception (`Sf
 - Rename/Delete/Mkdir: `sudo mv`/`rm`/`mkdir` via SSH exec. A delete asks first. In delete and chmod batches, `SudoBatchGuard` stops calling sudo after a failure no later entry can change
 
 **Tier 2 - "Browse as root" toggle** (user-initiated):
+Listing only: it never lets a write skip the question, it is disabled under Never, and a yes to a listing question turns it on.
 Toolbar toggle button switches directory listing from SFTP `ListDirectory` to `sudo find -H <dir> -mindepth 1 -maxdepth 1 -printf` with NUL-delimited records via SSH exec (`SudoDirectoryListing`). Enables browsing ANY directory regardless of permissions.
 
 **Key design decisions and pitfalls encountered**:

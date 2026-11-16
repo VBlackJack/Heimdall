@@ -350,11 +350,13 @@
                     <ToggleButton x:Name="BtnSudoMode"
                                   Command="{Binding ToggleSudoModeCommand}"
                                   IsChecked="{Binding SudoMode, Mode=OneWay}"
-                                  ToolTip="{loc:Translate SftpSudoModeTooltip}"
+                                  IsEnabled="{Binding IsSudoModeAvailable}"
+                                  ToolTip="{Binding SudoModeTooltip}"
+                                  ToolTipService.ShowOnDisabled="True"
                                   Style="{DynamicResource ToolbarToggleButtonStyle}"
                                   MinHeight="{StaticResource SftpToolbarButtonMinHeight}"
                                   FontSize="{StaticResource FontSizeCaption}"
-                                  AutomationProperties.Name="{loc:Translate SftpSudoModeTooltip}">
+                                  AutomationProperties.Name="{Binding SudoModeTooltip}">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="&#xE7EF;" FontFamily="{StaticResource FontFamilyIcons}" FontSize="{StaticResource FontSizeBody}"
                                        VerticalAlignment="Center" Margin="0,0,4,0"/>

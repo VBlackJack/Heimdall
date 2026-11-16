@@ -173,6 +173,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             ?? throw new ArgumentNullException(nameof(fileConflictDialogPresenter));
         _remoteClipboard.Changed += OnRemoteClipboardChanged;
         RootActivity = new SftpRootActivityLog();
+        _sudoGate = new SftpSudoFallbackGate(AskSudoQuestionAsync);
         _privilegedActs = new SftpPrivilegedActRecorder(SessionOperationEmitter.Disabled, RootActivity);
         RootActivity.Changed += OnRootActivityChanged;
         Files = [];
@@ -436,7 +437,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         Func<bool>? sessionLoggingEnabledProvider = null,
         string? operationProtocol = null,
         string? operationHost = null,
-        bool? sessionLoggingOverride = null)
+        bool? sessionLoggingOverride = null,
+        Func<SftpSudoFallbackMode>? sftpSudoFallbackProvider = null)
     {
         ArgumentNullException.ThrowIfNull(browser);
         ArgumentNullException.ThrowIfNull(sessionTab);
@@ -458,8 +460,11 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 sessionLoggingOverride)
             : SessionOperationEmitter.Disabled;
         _privilegedActs = new SftpPrivilegedActRecorder(_sudoEmitter, RootActivity);
+        _sudoGate.SetModeProvider(sftpSudoFallbackProvider);
         SessionTab = sessionTab;
         _localizer = localizer;
+        ObserveLocaleChanges();
+        RefreshSudoModeAvailability();
         _dialogService = dialogService;
         _sshParams = sshParams;
         _hostKeyStore = hostKeyStore;
@@ -860,6 +865,15 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     }
 
     /// <summary>
+    /// Reloads the current directory after an operation of the pane. The user did not ask for this
+    /// listing, so it never raises the question of listing as root.
+    /// </summary>
+    internal Task RefreshAfterOperationAsync()
+    {
+        return LoadDirectoryCoreAsync(CurrentPath, pushToHistory: false, initiator: SftpSudoInitiator.Background);
+    }
+
+    /// <summary>
     /// Navigates to the path entered in the path bar.
     /// </summary>
     public Task NavigateToPath(string? path)
@@ -879,9 +893,14 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
     private Task NavigateToPathCore(string? path, bool redactPathInLogs)
     {
+        // A path read from the terminal output is not something the user typed: it never asks for root.
         return string.IsNullOrWhiteSpace(path)
             ? Task.CompletedTask
-            : LoadDirectoryCoreAsync(path.Trim(), pushToHistory: true, redactPathInLogs: redactPathInLogs);
+            : LoadDirectoryCoreAsync(
+                path.Trim(),
+                pushToHistory: true,
+                redactPathInLogs: redactPathInLogs,
+                initiator: redactPathInLogs ? SftpSudoInitiator.Background : SftpSudoInitiator.User);
     }
 
     /// <summary>
@@ -900,7 +919,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             await LoadDirectoryCoreAsync(
                 targetPath,
                 pushToHistory: false,
-                suppressErrorStatus: true).ConfigureAwait(false);
+                suppressErrorStatus: true,
+                initiator: SftpSudoInitiator.Background).ConfigureAwait(false);
             if (string.Equals(CurrentPath, targetPath, StringComparison.Ordinal))
             {
                 return;
@@ -910,7 +930,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 $"EmbeddedSFTP initial path restore failed for '{targetPath}', falling back to '{homePath}'.");
         }
 
-        await LoadDirectoryCoreAsync(homePath, pushToHistory: false).ConfigureAwait(false);
+        await LoadDirectoryCoreAsync(homePath, pushToHistory: false, initiator: SftpSudoInitiator.Background)
+            .ConfigureAwait(false);
     }
 
     [RelayCommand]
@@ -1069,11 +1090,27 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     [RelayCommand]
     public async Task ToggleSudoMode()
     {
+        // The button can be switched off while the setting is Never, never on.
+        if (!SudoMode && !IsSudoModeAvailable)
+        {
+            await RunOnUiAsync(() => UpdateStatus(L10n(SftpSudoConsentLocaleKeys.ModeNeverTooltip)));
+            return;
+        }
+
+        bool turnedOff = false;
         await RunOnUiAsync(() =>
         {
             SudoMode = !SudoMode;
+            turnedOff = !SudoMode;
             UpdateStatus(L10n(SudoMode ? "SftpSudoModeEnabled" : "SftpSudoModeDisabled"));
         });
+
+        // Turning the button off never asks: the listing that follows is not a request for root.
+        if (turnedOff)
+        {
+            await RefreshAfterOperationAsync().ConfigureAwait(false);
+            return;
+        }
 
         await Refresh().ConfigureAwait(false);
     }
@@ -1110,13 +1147,18 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
 
         _securityNoticeKey = key;
+        ObserveLocaleChanges();
+
+        ShowSecurityNotice(_localizer?[key] ?? key);
+    }
+
+    private void ObserveLocaleChanges()
+    {
         if (_localizer is not null && !_localeChangeObserved)
         {
             _localizer.LocaleChanged += OnLocaleChanged;
             _localeChangeObserved = true;
         }
-
-        ShowSecurityNotice(_localizer?[key] ?? key);
     }
 
     private void OnLocaleChanged(string locale)
@@ -1126,6 +1168,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         {
             _ = RunOnUiAsync(() => ShowSecurityNotice(_localizer[key]));
         }
+
+        RefreshSudoModeAvailability();
     }
 
     public void ShowSecurityNotice(string message)
@@ -1154,6 +1198,16 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     public string DescribeTransferError(Exception ex)
     {
         ArgumentNullException.ThrowIfNull(ex);
+
+        if (ex is SftpSudoNotRunException notRun)
+        {
+            return DescribeSudoNotRun(notRun, DescribeTransferError(notRun.Refusal));
+        }
+
+        if (ex is SudoBatchStoppedException stopped)
+        {
+            return DescribeTransferError(stopped.StoppingFailure);
+        }
 
         if (ex is LocalDestinationExistsException or RemoteDestinationExistsException)
         {
@@ -1414,8 +1468,13 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     private async Task<UploadPlanOutcome> UploadPlannedEntriesAsync(
         IReadOnlyList<string> localPaths,
         string targetRemoteDir,
-        CancellationToken ct)
+        CancellationToken ct,
+        SftpSudoConsentScope? consentScope = null)
     {
+        // One scope for the whole job: it asks at most once, and a failure that cannot change from
+        // one file to the next stops root for the files after it.
+        SftpSudoConsentScope sudoScope = consentScope
+            ?? new SftpSudoConsentScope(SftpRootActKind.Upload, SftpSudoScopeKind.Job, targetRemoteDir);
         List<string> skippedUnsupportedTargets = [];
         List<string> skippedLocalReparsePoints = [];
         List<string> skippedUnavailableSources = [];
@@ -1617,14 +1676,28 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             }
             catch (Exception ex) when (_sshParams is not null && IsPermissionDenied(ex))
             {
+                await RequireSudoAsync(
+                    resolved.Overwrite ? SftpRootActKind.Overwrite : SftpRootActKind.Upload,
+                    resolved.EffectiveTargetPath,
+                    sudoScope,
+                    ex,
+                    ct);
                 Core.Logging.FileLogger.Info(
                     $"EmbeddedSFTP upload permission denied, falling back to sudo for {fileName}");
-                await UploadViaSudoAsync(
-                    op.LocalPath,
-                    resolved.EffectiveTargetPath,
-                    ct,
-                    resolved.Overwrite,
-                    resolved.Overwrite ? SftpRootActKind.Overwrite : SftpRootActKind.Upload);
+                try
+                {
+                    await UploadViaSudoAsync(
+                        op.LocalPath,
+                        resolved.EffectiveTargetPath,
+                        ct,
+                        resolved.Overwrite,
+                        resolved.Overwrite ? SftpRootActKind.Overwrite : SftpRootActKind.Upload);
+                }
+                catch (Exception sudoException) when (sudoException is not OperationCanceledException)
+                {
+                    sudoScope.Guard.Record(sudoException);
+                    throw;
+                }
             }
 
             tracker.CompleteFile();
@@ -2657,6 +2730,12 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             }
             catch (Exception ex) when (_sshParams is not null && IsPermissionDenied(ex))
             {
+                await RequireSudoAsync(
+                    SftpRootActKind.NewFolder,
+                    remotePath,
+                    new SftpSudoConsentScope(SftpRootActKind.NewFolder),
+                    ex,
+                    LifecycleTokenOrNone());
                 Core.Logging.FileLogger.Info("EmbeddedSFTP mkdir permission denied, falling back to sudo");
                 await _privilegedActs.RunMkdirAsync(
                     remotePath,
@@ -2667,7 +2746,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
             RequestSelectAfterRefresh(remotePath);
             await RunOnUiAsync(() => UpdateStatus(L10n("SftpSuccessMkdir")));
-            await Refresh().ConfigureAwait(false);
+            await RefreshAfterOperationAsync().ConfigureAwait(false);
         }
         catch (Exception ex)
         {
@@ -2725,6 +2804,13 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             }
             catch (Exception ex) when (_sshParams is not null && IsPermissionDenied(ex))
             {
+                // Before the probes: they are sudo calls too.
+                await RequireSudoAsync(
+                    SftpRootActKind.Rename,
+                    file.FullPath,
+                    new SftpSudoConsentScope(SftpRootActKind.Rename),
+                    ex,
+                    LifecycleTokenOrNone());
                 Core.Logging.FileLogger.Info("EmbeddedSFTP rename permission denied, falling back to sudo");
                 bool renamed = await RenameEntryViaSudoAsync(file, newPath);
                 if (!renamed)
@@ -2735,7 +2821,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
             RequestSelectAfterRefresh(newPath);
             await RunOnUiAsync(() => UpdateStatus(L10n("SftpSuccessRename")));
-            await Refresh().ConfigureAwait(false);
+            await RefreshAfterOperationAsync().ConfigureAwait(false);
         }
         catch (SudoRenameCollisionException)
         {
@@ -2972,31 +3058,12 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             deleteCts.Token);
         CancellationToken deleteToken = deleteLinked.Token;
         IRemoteBrowser browser = _browser;
-        IDialogService dialogService = _dialogService;
         List<DeleteEntryFailure> failures = [];
-        SudoBatchGuard sudoGuard = new();
+        // One scope for the whole deletion: the first answer settles it, and the question says so.
+        SftpSudoConsentScope consent = new(SftpRootActKind.Delete);
+        SudoBatchGuard sudoGuard = consent.Guard;
         int deletedCount = 0;
         int attemptedCount = 0;
-
-        SudoEscalationConsent consent = new(async refusedName =>
-        {
-            bool granted = false;
-
-            // The loop runs off the UI thread, and this dialog service is blocking-then
-            // -Task.FromResult, so the question has to be marshalled rather than awaited
-            // where the refusal was caught.
-            await _uiDispatcher.InvokeAsync(async () =>
-            {
-                granted = await dialogService.ShowConfirmAsync(
-                    L10n("SftpConfirmSudoDeleteTitle"),
-                    LF("SftpConfirmSudoDelete", ExecutionTrustDescriber.Visible(refusedName)),
-                    "danger",
-                    L10n("SftpConfirmSudoDeleteAccept"),
-                    L10n("SftpConfirmSudoDeleteDecline")).ConfigureAwait(true);
-            }).ConfigureAwait(false);
-
-            return granted;
-        });
 
         try
         {
@@ -3021,7 +3088,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             if (failures.Count == 0)
             {
                 await RunOnUiAsync(() => UpdateStatus(L10n("SftpSuccessDelete")));
-                await Refresh().ConfigureAwait(false);
+                await RefreshAfterOperationAsync().ConfigureAwait(false);
                 return;
             }
 
@@ -3034,7 +3101,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
             if (!ShouldSkipRefreshAfterStoppedBatch(sudoGuard))
             {
-                await Refresh().ConfigureAwait(false);
+                await RefreshAfterOperationAsync().ConfigureAwait(false);
             }
 
             await RunOnUiAsync(() => ShowOperationWarning(summary)).ConfigureAwait(false);
@@ -3043,7 +3110,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         {
             // The user's own act: what was already deleted stays deleted, so the listing is
             // refreshed and the status says how far the deletion got.
-            await Refresh().ConfigureAwait(false);
+            await RefreshAfterOperationAsync().ConfigureAwait(false);
             int doneBeforeCancel = deletedCount;
             await RunOnUiAsync(() => UpdateStatus(
                 LF("SftpStatusDeleteCancelled", doneBeforeCancel, entries.Count))).ConfigureAwait(false);
@@ -3062,7 +3129,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     private async Task<DeleteEntryFailure?> TryDeleteEntryAsync(
         IRemoteBrowser browser,
         SftpFileInfo file,
-        SudoEscalationConsent consent,
+        SftpSudoConsentScope consent,
         SudoBatchGuard sudoGuard,
         CancellationToken ct)
     {
@@ -3085,13 +3152,18 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         catch (Exception ex) when (_sshParams is not null && IsPermissionDenied(ex))
         {
             // Escalating is a different act from the delete that was asked for: a
-            // recursive removal running as root, which nothing undoes. Listing escalates
-            // on the same signal without asking, and that stays as it is - reading a
-            // directory you do not own is reversible, and this is not.
-            if (!await consent.IsGrantedAsync(file.Name).ConfigureAwait(false))
+            // recursive removal running as root, which nothing undoes. It asks in Ask and in
+            // Automatic alike, and is refused in Never.
+            SftpSudoDecision decision = await DecideSudoAsync(
+                SftpRootActKind.Delete,
+                file.Name,
+                consent,
+                ct).ConfigureAwait(false);
+            if (decision is not (SftpSudoDecision.Allowed or SftpSudoDecision.AllowedAfterQuestion
+                or SftpSudoDecision.BatchStopped))
             {
                 Core.Logging.FileLogger.Info(
-                    $"EmbeddedSFTP sudo deletion declined by the user for '{file.Name}'.");
+                    $"EmbeddedSFTP sudo deletion not run for '{file.Name}': {decision}.");
                 return new DeleteEntryFailure(
                     file.Name,
                     RemoteRecursiveDeleteFailureReason.PermissionDenied);
@@ -3099,7 +3171,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
             // An earlier entry showed that sudo cannot succeed in this batch: asking again would
             // repeat the same refusal, and with a password it would repeat the wrong attempt.
-            if (sudoGuard.IsStopped)
+            if (decision == SftpSudoDecision.BatchStopped || sudoGuard.IsStopped)
             {
                 Core.Logging.FileLogger.Info(
                     $"EmbeddedSFTP sudo deletion not tried for '{file.Name}': sudo already failed in this batch.");
@@ -3188,7 +3260,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     /// refreshing after a batch that proved sudo cannot succeed would only repeat the failure.
     /// </summary>
     internal bool ShouldSkipRefreshAfterStoppedBatch(SudoBatchGuard sudoGuard)
-        => SudoMode && sudoGuard.StoppedOnAuthentication;
+        => IsListingAsRoot && sudoGuard.StoppedOnAuthentication;
 
     private string GetDeleteFailureSummary(
         IReadOnlyList<DeleteEntryFailure> failures,
@@ -3278,7 +3350,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         // refresh, so the entries already changed were shown with their old mode.
         List<string> failedNames = [];
         Exception? firstFailure = null;
-        SudoBatchGuard sudoGuard = new();
+        SftpSudoConsentScope chmodScope = new(SftpRootActKind.PermissionChange);
+        SudoBatchGuard sudoGuard = chmodScope.Guard;
         int notAttemptedCount = 0;
 
         try
@@ -3287,7 +3360,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             {
                 try
                 {
-                    await ChmodEntryAsync(entry, mode, newPerms, sudoGuard).ConfigureAwait(false);
+                    await ChmodEntryAsync(entry, mode, newPerms, chmodScope).ConfigureAwait(false);
                 }
                 catch (SudoBatchStoppedException)
                 {
@@ -3308,7 +3381,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             if (failedNames.Count == 0)
             {
                 await RunOnUiAsync(() => UpdateStatus(L10n("SftpChmodSuccess")));
-                await Refresh().ConfigureAwait(false);
+                await RefreshAfterOperationAsync().ConfigureAwait(false);
                 return;
             }
 
@@ -3342,7 +3415,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                     entries.Count);
             if (!ShouldSkipRefreshAfterStoppedBatch(sudoGuard))
             {
-                await Refresh().ConfigureAwait(false);
+                await RefreshAfterOperationAsync().ConfigureAwait(false);
             }
 
             await RunOnUiAsync(() => ShowOperationWarning(summary)).ConfigureAwait(false);
@@ -3363,8 +3436,9 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         SftpFileInfo entry,
         short mode,
         string octalText,
-        SudoBatchGuard sudoGuard)
+        SftpSudoConsentScope scope)
     {
+        SudoBatchGuard sudoGuard = scope.Guard;
         try
         {
             await _browser!.ChmodAsync(entry.FullPath, mode, LifecycleTokenOrNone()).ConfigureAwait(false);
@@ -3393,6 +3467,20 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 await RefuseChmodWithoutSudoAsync(
                     entry.FullPath,
                     new SudoBatchStoppedException(sudoGuard.StoppingFailure!)).ConfigureAwait(false);
+            }
+
+            SftpSudoDecision decision = await DecideSudoAsync(
+                SftpRootActKind.PermissionChange,
+                entry.FullPath,
+                scope,
+                LifecycleTokenOrNone()).ConfigureAwait(false);
+            if (!decision.IsAllowed())
+            {
+                Core.Logging.FileLogger.Info(
+                    $"EmbeddedSFTP chmod as root not run for '{entry.FullPath}': {decision}.");
+                await RefuseChmodWithoutSudoAsync(
+                    entry.FullPath,
+                    new SftpSudoNotRunException(decision, ex)).ConfigureAwait(false);
             }
 
             Core.Logging.FileLogger.Info("EmbeddedSFTP chmod permission denied, falling back to sudo");
@@ -3624,7 +3712,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         string path,
         bool pushToHistory,
         bool suppressErrorStatus = false,
-        bool redactPathInLogs = false)
+        bool redactPathInLogs = false,
+        SftpSudoInitiator initiator = SftpSudoInitiator.User)
     {
         if (!TryCaptureLifecycleToken(out CancellationToken ct)
             || _browser is null
@@ -3657,7 +3746,17 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
             IReadOnlyList<SftpFileInfo> entries;
 
-            if (SudoMode && _sshParams is not null)
+            // One scope per listing: whatever this load asks, it asks once.
+            SftpSudoConsentScope listingScope = new(SftpRootActKind.Listing);
+            if (SudoMode
+                && _sshParams is not null
+                && (await DecideSudoAsync(
+                    SftpRootActKind.Listing,
+                    path,
+                    listingScope,
+                    ct,
+                    initiator,
+                    paneArmed: true).ConfigureAwait(false)).IsAllowed())
             {
                 entries = await ListDirectoryViaSudoAsync(path, ct).ConfigureAwait(false);
             }
@@ -3669,9 +3768,27 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 }
                 catch (Exception ex) when (_sshParams is not null && IsPermissionDenied(ex))
                 {
+                    SftpSudoDecision decision = await DecideSudoAsync(
+                        SftpRootActKind.Listing,
+                        path,
+                        listingScope,
+                        ct,
+                        initiator).ConfigureAwait(false);
+                    if (!decision.IsAllowed())
+                    {
+                        throw new SftpSudoNotRunException(decision, ex);
+                    }
+
                     Core.Logging.FileLogger.Info(redactPathInLogs
                         ? "EmbeddedSFTP listdir permission denied, falling back to sudo."
                         : $"EmbeddedSFTP listdir permission denied, falling back to sudo for {path}");
+                    if (decision == SftpSudoDecision.AllowedAfterQuestion)
+                    {
+                        // A yes to the listing question is the same consent as the sudo button:
+                        // the pane shows it, and the folders after this one list as root unasked.
+                        await RunOnUiAsync(() => SudoMode = true).ConfigureAwait(false);
+                    }
+
                     entries = await ListDirectoryViaSudoAsync(path, ct).ConfigureAwait(false);
                 }
             }
@@ -3750,6 +3867,11 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     /// </summary>
     internal string DescribeListingFailure(string path, Exception ex)
     {
+        if (ex is SftpSudoNotRunException notRun)
+        {
+            return DescribeSudoNotRun(notRun, DescribeListingFailure(path, notRun.Refusal));
+        }
+
         SftpListingFailure failure = SftpListingErrorClassifier.Classify(ex, _browser?.IsConnected == true);
         return LF(SftpListingErrorClassifier.LocaleKey(failure), path);
     }
@@ -3865,30 +3987,6 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         OnPropertyChanged(nameof(Clipboard));
         OnPropertyChanged(nameof(HasClipboard));
         PasteCommand.NotifyCanExecuteChanged();
-    }
-
-    /// <summary>
-    /// One answer per delete batch, for the question "your account was refused, do it as
-    /// root instead?".
-    /// </summary>
-    /// <remarks>
-    /// Asking inside the per-entry loop would put a dialog in front of the user for every
-    /// denied file in a multi-selection, so the first answer settles the whole deletion
-    /// and the prompt says as much.
-    /// </remarks>
-    private sealed class SudoEscalationConsent(Func<string, Task<bool>> ask)
-    {
-        private bool? _answer;
-
-        public async Task<bool> IsGrantedAsync(string firstRefusedName)
-        {
-            if (_answer is null)
-            {
-                _answer = await ask(firstRefusedName).ConfigureAwait(false);
-            }
-
-            return _answer.Value;
-        }
     }
 
     private sealed record DeleteEntryFailure(
