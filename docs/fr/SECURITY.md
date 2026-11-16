@@ -623,6 +623,39 @@ aussi le commit final : une cible libre ou un renommage automatique n'autorise p
 remplacement. La façon dont chaque transport crée un nouveau fichier est décrite plus
 bas, sous "Garanties de validation des remontées distantes".
 
+Le répertoire privé créé à côté de la destination est vérifié avant usage, avec les
+mêmes briques que le changement de permissions en root : root tient le dossier de la
+destination, crée le répertoire relativement à lui, y entre, et vérifie qu'il
+appartient au compte qui exécute le script, que les autres comptes ne peuvent pas le
+modifier, qu'il se trouve dans le dossier tenu sur le même périphérique, et qu'il est
+vide ; le script se l'attribue ensuite et atteint la destination par le dossier tenu,
+qu'il vérifie de
+nouveau juste avant le renommage. Une lecture privilégiée (téléchargement, ouverture
+pour édition) entre dans son répertoire privé de la même façon. Un signal n'arrête le
+script qu'après son nettoyage, qui ne retire que ce que cette exécution a créé. La
+recherche des commandes ne garde que les entrées absolues de `PATH`, dans ces
+scripts, l'installateur et le changement de permissions en root. Là où le répertoire
+ne peut pas appartenir à root sans que les autres comptes puissent le modifier (NFS
+avec root squashing, un montage CIFS ou vfat dont le propriétaire fixe n'est pas root
+ou dont les droits fixes laissent les autres écrire), le transfert s'arrête sur
+"Transfer failed.", le journal donne la raison, et le répertoire vide reste en place.
+De v2026.072501 à v2026.111501, les scripts entraient dans ce répertoire sans le
+vérifier : un compte capable d'écrire dans le dossier de la destination pouvait faire
+aboutir ailleurs une écriture ou une lecture en root ; les versions antérieures
+écrivaient et lisaient par le nom de la destination et suivaient un lien symbolique
+placé là.
+
+Limites qui restent : les liens symboliques dans les dossiers au-dessus de la
+destination sont suivis ; un lien physique placé sous le nom de la destination par un
+compte qui peut écrire dans son dossier est remplacé comme un autre fichier : le
+fichier lié n'est pas modifié, mais le nouveau fichier reprend son propriétaire, son
+mode et ses attributs étendus, donc là où le noyau ne protège pas les liens physiques
+(`fs.protected_hardlinks=0`) un lien vers un programme setuid, ou doté de capacités,
+fait du contenu envoyé un tel programme ; dans le même cas, un lien physique sous le
+nom d'un fichier lu en root renvoie le fichier lié ; un compte qui peut écrire dans le
+dossier peut supprimer le répertoire de travail vide et faire échouer le transfert ;
+un nouveau fichier écrit en root appartient à root avec le mode 0600.
+
 La connexion privilégiée passe par la même connexion annulable que les autres
 connexions SFTP : Annuler l'atteint pendant la négociation. Chaque commande
 privilégiée est bornée : `PrivilegedFileTransfer.ControlCommandTimeout` (dix minutes)

@@ -560,6 +560,34 @@ unoccupied target or automatic rename never authorizes replacement. How each
 transport creates a new file is described under "Remote upload commit guarantees"
 below.
 
+The private directory beside the destination is verified before it is used, with the
+same building blocks as the root permission change: root holds the destination's
+folder, creates the directory relative to it, enters it, and checks that it belongs
+to the account running the script, cannot be written by other accounts, sits in the
+held folder on the same device, and is empty; the script then claims it and reaches the
+destination through the held folder, which it checks again just before the rename. A
+privileged read (download, open for edit) enters its private directory the same way.
+A signal ends the script only after its cleanup, which removes only what that run
+created. Command search keeps only the absolute entries of `PATH`, in these scripts,
+the installer and the root permission change. Where the directory cannot come out
+owned by root and unwritable by other accounts (NFS with root squashing, a CIFS or
+vfat mount whose fixed owner is not root or whose fixed mode lets others write), the
+transfer stops with "Transfer failed.", the log gives the reason, and the empty
+directory stays behind. From v2026.072501 to v2026.111501 the scripts entered that
+directory without checking it, so an account able to write in the destination's
+folder could make a root write or read land elsewhere; earlier versions wrote and
+read through the destination's name and followed a symbolic link put there.
+
+Limits that remain: symbolic links in the folders above the destination are followed;
+a hard link put at the destination's name by an account that can write in its folder
+is replaced like any file: the linked file is not changed, but the new file takes its
+owner, mode and extended attributes, so where the kernel does not protect hard links
+(`fs.protected_hardlinks=0`) a link to a setuid program, or to one with file
+capabilities, makes the uploaded content such a program; in the same case, a hard link
+at the name of a file read as root returns the linked file; an account that can write
+in the folder can remove the empty work directory and make the transfer fail; a new
+file written as root belongs to root with mode 0600.
+
 The privileged connection goes through the same cancellable connect as the other
 SFTP connections, so Cancel reaches it during the handshake. Every privileged
 command is bounded: `PrivilegedFileTransfer.ControlCommandTimeout` (ten minutes)
