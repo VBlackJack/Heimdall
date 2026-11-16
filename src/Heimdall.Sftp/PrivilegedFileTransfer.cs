@@ -21,7 +21,7 @@ using Renci.SshNet;
 namespace Heimdall.Sftp;
 
 /// <summary>
-/// Builds privileged file commands that avoid attacker-writable staging paths.
+/// Builds privileged file commands that never stage content in a shared directory.
 /// </summary>
 public static class PrivilegedFileCommands
 {
@@ -88,6 +88,12 @@ public static class PrivilegedFileCommands
     // The same status as text: a constant string cannot be built from the integer. A test pins the two.
     private const string NonRegularTargetExitStatusText = "73";
 
+    // The status of a refused read, as text for the same reason. A test pins it to the script.
+    private const string NonRegularSourceExitStatusText = "74";
+
+    // The status of a missing tool, as text for the same reason. A test pins it to the script.
+    private const string ToolingUnavailableExitStatusText = "77";
+
     private const string PasswordMode = "password";
     private const string NoPasswordMode = "none";
     private const string BangPlaceholder = "^";
@@ -104,19 +110,110 @@ public static class PrivilegedFileCommands
         + "case \"$(stat --version 2>/dev/null)\" in *GNU*) ;; *) "
         + "printf '%s\\n' 'Refusing: GNU coreutils are required for a privileged transfer.' >&2; exit 77;; esac; ";
 
+    // The refusal helper of the two scripts below. It writes the reason on standard error and ends
+    // the script, and the shell's exit trap then runs the cleanup. The reason token (its first
+    // argument) is only read by the permission change script, so it is ignored here. A write
+    // refuses with 73 and a read with 74: the statuses each path already reported for a refused
+    // entry. Neither prints the marker that the permission change uses, which would be read as a
+    // refusal of that kind.
+    private const string WriteRefuseFunction =
+        "refuse() { printf '%s\\n' \"Refusing: $2\" >&2; exit " + NonRegularTargetExitStatusText + "; }; ";
+
+    private const string ReadRefuseFunction =
+        "refuse() { printf '%s\\n' \"Refusing: $2\" >&2; exit " + NonRegularSourceExitStatusText + "; }; ";
+
+    // The command search path of the two scripts, reduced to its absolute entries before any
+    // command is looked up. An empty or relative entry would resolve a command name in the
+    // current directory, which the scripts change. No directory is added: a server keeps its
+    // tools where it keeps them. Only shell built-ins run here, and the pattern expansion is
+    // switched off while the entries are split.
+    private const string AbsolutePathOnly =
+        "set -f; IFS=:; clean_path=; for entry in ${PATH-}; do "
+        + "case \"$entry\" in /*) clean_path=${clean_path:+$clean_path:}$entry ;; esac; done; unset IFS; set +f; "
+        + "[ -n \"$clean_path\" ] || { printf '%s\\n' "
+        + "'Refusing: no absolute directory is listed in the command search path.' >&2; exit "
+        + ToolingUnavailableExitStatusText + "; }; PATH=$clean_path; ";
+
+    // The name of the marker directory a run creates inside its work directory once the work
+    // directory is verified. Creating it is an all-or-nothing step, so two runs that ended up in
+    // the same work directory cannot both go on.
+    private const string ClaimName = "claim";
+
+    // The last part of both cleanups, which also closes the function: remove the work directory
+    // by its own name, relative to the directory that holds it, if that directory is the held
+    // parent and the work directory is empty. It is gated on the
+    // work variable, which holds the name only once the directory has been verified, and it clears
+    // the variable so a second run does nothing.
+    private const string RemoveWorkDirectory =
+        "if [ -n \"$work\" ]; then w=$work; work=; cd -P .. 2>/dev/null "
+        + "&& [ \"$(stat -c %d:%i .)\" = \"$parent\" ] && rmdir -- \"./$w\" 2>/dev/null || :; fi; cd /; }; ";
+
+    // What the cleanup removes from the work directory, in addition to the files of the script.
+    private const string RemoveClaim = "rmdir -- " + ClaimName + " 2>/dev/null || :; ";
+
+    /// <summary>
+    /// The first half of the entry procedure shared by the privileged write and read: it finds the
+    /// entry name, holds the parent directory and arms the exit and signal handlers. It needs the
+    /// <c>refuse</c> and <c>cleanup</c> functions, the <c>target</c> and <c>dir</c> variables, and
+    /// is followed by the creation of the work directory and by <see cref="VerifiedEntryClosing"/>.
+    /// </summary>
+    internal const string VerifiedEntryOpening =
+        "name=${target##*/}; case \"$name\" in ''|.|..) refuse " + RefusalReasonInvalid + " 'no entry name.';; esac; "
+        + "me=$(id -u) || refuse " + RefusalReasonUnverifiable + " 'the account could not be identified.'; "
+        + "cd -P -- \"$dir\" || refuse " + RefusalReasonChanged + " 'the parent directory changed during the check.'; "
+        + "parent=$(stat -c %d:%i .) || refuse " + RefusalReasonChanged + " 'the parent directory changed during the check.'; "
+        + "pdev=$(stat -c %d .) || refuse " + RefusalReasonChanged + " 'the parent directory changed during the check.'; "
+        + "trap cleanup EXIT; trap 'exit 129' HUP INT TERM; ";
+
+    /// <summary>
+    /// The second half of the shared entry procedure. The work directory is trusted only after it
+    /// is entered and checked: owned by the running account, not writable by group or others,
+    /// inside the held parent on the same device, and empty. Only then are <c>entered</c> and
+    /// <c>work</c> set, and from then on the cleanup may remove the files this script made and the
+    /// directory itself: before that, the cleanup removes nothing. A last step creates the marker
+    /// directory named by <c>ClaimName</c>, which fails if another run already did. The entry is
+    /// afterwards reached as <c>../$name</c>, relative to the directory the script holds.
+    /// </summary>
+    internal const string VerifiedEntryClosing =
+        "cd -P -- \"$made\" || refuse " + RefusalReasonUnverifiable + " 'the private directory could not be entered.'; "
+        + "info=$(stat -c %u:%a .) || refuse " + RefusalReasonUnverifiable + " 'the private directory could not be verified.'; "
+        + "owner=${info%%:*}; perm=${info#*:}; "
+        + "case \"$perm\" in [0-7][0-7][0-7]|[0-7][0-7][0-7][0-7]) ;; "
+        + "*) refuse " + RefusalReasonUnverifiable + " 'the private directory could not be verified.';; esac; "
+        + "[ \"$owner\" = \"$me\" ] && [ $((0$perm & 022)) -eq 0 ] "
+        + "|| refuse " + RefusalReasonUnverifiable + " 'the private directory is not private to the account.'; "
+        + "[ \"$(stat -c %d:%i ..)\" = \"$parent\" ] && [ \"$(stat -c %d .)\" = \"$pdev\" ] "
+        + "|| refuse " + RefusalReasonUnverifiable + " 'the private directory could not be verified.'; "
+        + "listing=$(ls -A) || refuse " + RefusalReasonUnverifiable + " 'the private directory could not be listed.'; "
+        + "[ -z \"$listing\" ] || refuse " + RefusalReasonUnverifiable + " 'the private directory is not empty.'; "
+        + "mkdir -- " + ClaimName + " || refuse " + RefusalReasonUnverifiable + " 'the private directory is in use.'; "
+        + "work=${made#./}; entered=1; target=../$name; ";
+
+    private const string WriteWorkDirectoryCreation =
+        "made=$(mktemp -d -- \"./.heimdall-write.XXXXXXXXXX\") || refuse "
+        + RefusalReasonUnverifiable + " 'the private directory could not be created.'; ";
+
+    private const string ReadWorkDirectoryCreation =
+        "made=$(mktemp -d -- \"./.heimdall-read.XXXXXXXXXX\") || refuse "
+        + RefusalReasonUnverifiable + " 'the private directory could not be created.'; ";
+
     private const string AtomicWriteScript =
-        "set -eu; umask 077; target=$1; "
+        "set -eu; umask 077; target=$1; work=; entered=0; pdev=; "
+        + AbsolutePathOnly
         + ToolingProbe
+        + WriteRefuseFunction
+        + "cleanup() { if [ \"$entered\" = 1 ]; then rm -f -- original payload || :; " + RemoveClaim + "entered=0; fi; "
+        + RemoveWorkDirectory
         + "case \"$target\" in /*) ;; *) target=$PWD/$target ;; esac; "
         + "case \"$target\" in */*) dir=${target%/*}; [ -n \"$dir\" ] || dir=/ ;; *) dir=. ;; esac; "
-        + "work=$(mktemp -d -- \"$dir/.heimdall-write.XXXXXXXXXX\"); "
-        + "chmod 700 -- \"$work\"; cd -- \"$work\"; "
-        + "cleanup() { rm -f -- original payload; cd /; rmdir -- \"$work\" 2>/dev/null || :; }; "
-        + "trap cleanup EXIT HUP INT TERM; "
+        + VerifiedEntryOpening
+        + WriteWorkDirectoryCreation
+        + VerifiedEntryClosing
         + "preserve_metadata=0; "
         + "if [ -e \"$target\" ] || [ -L \"$target\" ]; then "
         + "if [ \"$replace\" -eq 0 ]; then printf '%s\\n' 'Refusing existing destination.' >&2; exit 78; fi; "
-        + "if ln -P -- \"$target\" original 2>/dev/null; then :; else ln -- \"$target\" original; fi; "
+        + "ln -P -- \"$target\" original "
+        + "|| refuse " + RefusalReasonUnverifiable + " 'the file could not be pinned.'; "
         + "if [ -L original ] || [ ! -f original ]; then "
         + "printf '%s\\n' 'Refusing non-regular or symbolic-link target.' >&2; exit 73; fi; "
         + "original_owner=$(stat -c %u:%g -- original); "
@@ -146,32 +243,38 @@ public static class PrivilegedFileCommands
         // After the metadata, so what reaches the disk is the file as it will be published.
         + "sync -f payload; "
         + "rm -f -- original; "
+        // The directory held since the entry is checked again right before the rename, so the
+        // payload is only ever published into the directory it was prepared for.
+        + "[ \"$(stat -c %d:%i ..)\" = \"$parent\" ] "
+        + "|| refuse " + RefusalReasonChanged + " 'the parent directory changed during the write.'; "
         + "if [ -L \"$target\" ]; then "
         + "printf '%s\\n' 'Refusing symbolic-link target.' >&2; exit 73; fi; "
         + "if [ \"$replace\" -eq 1 ]; then mv -fT -- payload \"$target\"; "
         + "else if ln -T -- payload \"$target\"; then :; "
         + "else if [ -e \"$target\" ] || [ -L \"$target\" ]; then exit 78; else exit 1; fi; fi; "
         + "rm -f -- payload; fi; "
-        + "cd /; rmdir -- \"$work\" 2>/dev/null || :; "
-        + "trap - EXIT HUP INT TERM; sync -f \"$dir\"";
+        + "sync -f ..; cleanup; trap - EXIT HUP INT TERM";
 
     private const string NoFollowReadPrefix =
-        "set -eu; umask 077; target=$1; "
+        "set -eu; umask 077; target=$1; work=; entered=0; pdev=; "
+        + AbsolutePathOnly
         + ToolingProbe
+        + ReadRefuseFunction
+        + "cleanup() { if [ \"$entered\" = 1 ]; then rm -f -- source || :; " + RemoveClaim + "entered=0; fi; "
+        + RemoveWorkDirectory
         + "case \"$target\" in /*) ;; *) target=$PWD/$target ;; esac; "
         + "case \"$target\" in */*) dir=${target%/*}; [ -n \"$dir\" ] || dir=/ ;; *) dir=. ;; esac; "
-        + "work=$(mktemp -d -- \"$dir/.heimdall-read.XXXXXXXXXX\"); "
-        + "chmod 700 -- \"$work\"; cd -- \"$work\"; "
-        + "cleanup() { rm -f -- source; cd /; rmdir -- \"$work\" 2>/dev/null || :; }; "
-        + "trap cleanup EXIT HUP INT TERM; "
-        + "if ln -P -- \"$target\" source 2>/dev/null; then :; else ln -- \"$target\" source; fi; "
+        + VerifiedEntryOpening
+        + ReadWorkDirectoryCreation
+        + VerifiedEntryClosing
+        + "if ln -P -- \"$target\" source 2>/dev/null; then :; else "
+        + "ln -- \"$target\" source || refuse " + RefusalReasonUnverifiable + " 'the file could not be pinned.'; fi; "
         + "if [ -L source ] || [ ! -f source ]; then "
-        + "printf '%s\\n' 'Refusing non-regular or symbolic-link source.' >&2; exit 74; fi; "
+        + "printf '%s\\n' 'Refusing non-regular or symbolic-link source.' >&2; exit " + NonRegularSourceExitStatusText + "; fi; "
         + "exec 3< source; rm -f -- source; ";
 
     private const string NoFollowReadSuffix =
-        "base64 <&3; exec 3<&-; "
-        + "cd /; rmdir -- \"$work\" 2>/dev/null || :; trap - EXIT HUP INT TERM";
+        "base64 <&3; exec 3<&-; cleanup; trap - EXIT HUP INT TERM";
 
     /// <summary>The refusal reason tokens the script prints after the marker. A test pins them to the script.</summary>
     public const string RefusalReasonLink = "link";
@@ -196,14 +299,14 @@ public static class PrivilegedFileCommands
     /// A directory is changed through the working directory the script holds after checking that it
     /// is the entry it listed. A regular file is changed through a hard link made inside a private
     /// root-only directory next to it: <c>ln -P -T</c> links a symbolic link itself rather than what
-    /// it points to, so a link swapped in at the last moment is seen as one and refused, and the
+    /// it points to, so a link found there is seen as one and refused, and the
     /// only operand of the file chmod is that private link.
     /// <para>
     /// The private directory is trusted only after it is entered and verified: root-owned, mode 700
     /// (2700 where the parent is setgid), the held parent as its parent, the same device, and empty.
     /// Only then are <c>entered</c> and <c>work</c> set, and only then may the cleanup remove
     /// <c>source</c> or the directory: before that the shell may still be in the user's own
-    /// directory, or in a directory an attacker put in place of ours, and what is there is not ours.
+    /// directory, or in a directory other than the one it created, and what is there is not its own.
     /// A failed verification therefore leaves our own directory behind, empty, rather than risk
     /// removing a foreign one. The cleanup clears both flags, so a second run does nothing. The
     /// signal traps exit, so the cleanup never lets the script carry on after a signal. The script
@@ -212,6 +315,7 @@ public static class PrivilegedFileCommands
     /// </remarks>
     private const string NoFollowChmodScript =
         "set -eu; umask 077; mode=$1; target=$2; work=; entered=0; pdev=; "
+        + AbsolutePathOnly
         + ToolingProbe
         + "refuse() { printf '%s %s\\n' '" + EntryRefusedMarker + "' \"$1\" >&2; "
         + "printf '%s\\n' \"Refusing: $2\" >&2; exit " + NonRegularTargetExitStatusText + "; }; "
@@ -405,6 +509,7 @@ public static class PrivilegedFileCommands
     /// </remarks>
     internal const string StagedInstallScript =
         "printf '%s\\n' '" + InstallStartedMarker + "' >&2; "
+        + AbsolutePathOnly
         + "replace=$1; target=$2; staged=$3; uid=$4; "
         + ToolingProbe
         + "case \"$staged\" in */*) ;; *) "
