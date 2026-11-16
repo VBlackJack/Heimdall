@@ -269,7 +269,12 @@ remote machine on the other.
   keeps a local copy while that editor is open and uploads each save; closing the pane while a
   file is still open there asks you first. If the server refuses an upload (permission denied,
   for example), the pane says why once and tries again the next time you save.
-- When the server refuses an action and Heimdall does it as root (sudo), a **root** badge appears
+- When the server refuses an action, Heimdall asks before it runs it again as root (sudo). The
+  question names the act and the path, and **Enter** declines. A transfer, a multiple delete or
+  an edit session asks once. Settings, SFTP, **retry refused operations as root** offers
+  **Ask first** (the default), **Automatic (no question)** (a delete still asks) and **Never**. Your
+  organisation may have limited this choice.
+- When Heimdall does an action as root, a **root** badge appears
   next to the **sudo** toggle and stays until you close the pane. Click it, or press Enter on it,
   to see the latest actions attempted as root and whether they worked.
 - In the built-in editor, **Ctrl+S** saves and **Ctrl+W** closes. A file that is not UTF-8 opens

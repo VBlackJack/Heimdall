@@ -18,6 +18,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using Heimdall.App.ViewModels.Settings;
 using Heimdall.Core.Configuration;
 using PostureRules = Heimdall.App.ViewModels.Settings.SecurityPosture;
+using SftpSudoFallbackMode = Heimdall.Core.Models.SftpSudoFallbackMode;
 
 namespace Heimdall.App.ViewModels;
 
@@ -46,6 +47,7 @@ public partial class SettingsViewModel
         nameof(RequireWindowsHelloOnConnect),
         nameof(UpdateCheckEnabled),
         nameof(SyncKnownHostsAtStartup),
+        nameof(SftpSudoFallback),
     };
 
     /// <summary>The full stop a warning sentence ends with.</summary>
@@ -92,9 +94,11 @@ public partial class SettingsViewModel
         RequireCredentialGuard,
         RequireWindowsHelloOnConnect,
         UpdateCheckEnabled,
-        SyncKnownHostsAtStartup);
+        SyncKnownHostsAtStartup,
+        ParseSftpSudoFallback(SftpSudoFallback),
+        SftpSudoFallbackCap);
 
-    private static SecurityPostureInputs PostureInputsOf(AppSettings settings) => new(
+    private SecurityPostureInputs PostureInputsOf(AppSettings settings) => new(
         settings.RdpDefaultNla,
         settings.RdpDefaultStrictServerAuthentication,
         settings.FileShareEnableTftp,
@@ -106,7 +110,9 @@ public partial class SettingsViewModel
         settings.RequireCredentialGuard,
         settings.RequireWindowsHelloOnConnect,
         settings.UpdateCheckEnabled,
-        settings.SyncKnownHostsAtStartup);
+        settings.SyncKnownHostsAtStartup,
+        settings.SftpSudoFallback,
+        _sftpSudoFallbackPolicy.Cap);
 
     /// <summary>Recomputes every line and the overall line from the pending and saved values.</summary>
     private void RefreshSecurityPosture()
@@ -191,6 +197,11 @@ public partial class SettingsViewModel
         SecurityPostureState.Never => _localizer["SecurityPostureStateNever"],
         SecurityPostureState.RequiresVault => _localizer["SecurityPostureStateRequiresVault"],
         SecurityPostureState.Policy => PowerShellPolicyText(item.Detail),
+        SecurityPostureState.Ask => SftpSudoFallbackModeText(SftpSudoFallbackMode.Ask),
+        SecurityPostureState.Automatic => SftpSudoFallbackModeText(SftpSudoFallbackMode.Automatic),
+        SecurityPostureState.Managed => _localizer.Format(
+            "SecurityPostureStateManaged",
+            SftpSudoFallbackModeText(ParseSftpSudoFallback(item.Detail))),
         _ => string.Empty,
     };
 
@@ -219,6 +230,7 @@ public partial class SettingsViewModel
         SecurityPostureKey.WindowsHelloOnConnect => "SecurityPostureLabelWindowsHello",
         SecurityPostureKey.UpdateChecks => "SecurityPostureLabelUpdateChecks",
         SecurityPostureKey.KnownHostsSync => "SecurityPostureLabelKnownHostsSync",
+        SecurityPostureKey.SftpSudoFallback => "SecurityPostureLabelSftpSudoFallback",
         _ => throw new ArgumentOutOfRangeException(nameof(key), key, null),
     };
 
@@ -233,6 +245,7 @@ public partial class SettingsViewModel
         SecurityPostureKey.AutoLock => "SecurityPostureWarningAutoLock",
         SecurityPostureKey.UpdateChecks => "SecurityPostureWarningUpdateChecks",
         SecurityPostureKey.KnownHostsSync => "SecurityPostureWarningKnownHostsSync",
+        SecurityPostureKey.SftpSudoFallback => "SecurityPostureWarningSftpSudoFallback",
         _ => throw new ArgumentOutOfRangeException(nameof(key), key, null),
     };
 }

@@ -4135,6 +4135,17 @@
                                         <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[SftpAutoOpenOnSsh]}"/>
                                         <CheckBox x:Name="Mw_SettingsSftpFollowSshDirectory" Content="{loc:Translate SettingsLabelSftpFollowSshDirectory}" IsChecked="{Binding Settings.SftpFollowSshDirectory}" IsEnabled="{Binding Settings.SftpBrowserEnabled}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,8,0,0" AutomationProperties.Name="{loc:Translate SettingsLabelSftpFollowSshDirectory}"/>
                                         <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[SftpFollowSshDirectory]}"/>
+                                        <TextBlock x:Name="Mw_SettingsSftpSudoFallbackLabel" Text="{loc:Translate SettingsLabelSftpSudoFallback}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,12,0,4"/>
+                                        <ComboBox x:Name="Mw_SettingsSftpSudoFallback" SelectedValue="{Binding Settings.SftpSudoFallback}" SelectedValuePath="Tag" MinWidth="260" HorizontalAlignment="Left" IsEnabled="{Binding Settings.SftpBrowserEnabled}"
+                                                  AutomationProperties.LabeledBy="{x:Reference Mw_SettingsSftpSudoFallbackLabel}"
+                                                  AutomationProperties.HelpText="{loc:Translate SettingsSftpSudoFallbackHint}">
+                                            <ComboBoxItem Content="{loc:Translate SettingsSftpSudoFallbackNever}" Tag="Never" AutomationProperties.Name="{loc:Translate SettingsSftpSudoFallbackNever}"/>
+                                            <ComboBoxItem Content="{loc:Translate SettingsSftpSudoFallbackAsk}" Tag="Ask" IsEnabled="{Binding Settings.IsSftpSudoFallbackAskAllowed}" AutomationProperties.Name="{loc:Translate SettingsSftpSudoFallbackAsk}"/>
+                                            <ComboBoxItem Content="{loc:Translate SettingsSftpSudoFallbackAutomatic}" Tag="Automatic" IsEnabled="{Binding Settings.IsSftpSudoFallbackAutomaticAllowed}" AutomationProperties.Name="{loc:Translate SettingsSftpSudoFallbackAutomatic}"/>
+                                        </ComboBox>
+                                        <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[SftpSudoFallback]}"/>
+                                        <TextBlock x:Name="Mw_SettingsSftpSudoFallbackHint" Text="{loc:Translate SettingsSftpSudoFallbackHint}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                        <TextBlock x:Name="Mw_SettingsSftpSudoFallbackCap" Text="{Binding Settings.SftpSudoFallbackCapText}" Visibility="{Binding Settings.IsSftpSudoFallbackCapped, Converter={StaticResource BoolToVisibilityConverter}}" Foreground="{DynamicResource WarningTextBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                                     </StackPanel>
                                 </Border>
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
@@ -5032,6 +5043,7 @@
                                         <controls:SecurityPostureLineView DataContext="{Binding Settings.SecurityPosture[WindowsHelloOnConnect]}"/>
                                         <controls:SecurityPostureLineView DataContext="{Binding Settings.SecurityPosture[UpdateChecks]}"/>
                                         <controls:SecurityPostureLineView DataContext="{Binding Settings.SecurityPosture[KnownHostsSync]}"/>
+                                        <controls:SecurityPostureLineView DataContext="{Binding Settings.SecurityPosture[SftpSudoFallback]}"/>
                                     </StackPanel>
                                 </Border>
                                     </StackPanel>

@@ -36,6 +36,7 @@ using Heimdall.Core.Rdp;
 using Heimdall.Core.Security;
 using Heimdall.Core.Security.Vault;
 using Heimdall.Core.Updates;
+using SftpSudoFallbackMode = Heimdall.Core.Models.SftpSudoFallbackMode;
 using SshAgentPreferenceEnum = Heimdall.Core.Ssh.SshAgentPreference;
 
 namespace Heimdall.App.ViewModels;
@@ -99,6 +100,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     };
 
     private readonly IConfigManager _configManager;
+    private readonly SftpSudoFallbackPolicy _sftpSudoFallbackPolicy;
     private readonly LocalizationManager _localizer;
     private readonly IDialogService _dialogService;
     private readonly PinManager _pinManager;
@@ -449,6 +451,11 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     [ObservableProperty]
     private bool _sftpFollowSshDirectory;
+
+    /// <summary>The user's choice, as the name of a <see cref="SftpSudoFallbackMode"/>.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SftpSudoFallbackCapText))]
+    private string _sftpSudoFallback = nameof(SftpSudoFallbackMode.Ask);
 
     [ObservableProperty]
     private string _x11ServerPath = "";
@@ -1047,6 +1054,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     {
         OnPropertyChanged(nameof(VaultStatusText));
         OnPropertyChanged(nameof(AutoLockAvailabilityHint));
+        OnPropertyChanged(nameof(SftpSudoFallbackCapText));
         OnPropertyChanged(nameof(VaultDisabledActionsVisible));
         OnPropertyChanged(nameof(VaultEnabledActionsVisible));
         RefreshVaultHelloUiState();
@@ -1424,8 +1432,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         TrustedWebCertificatesSettingsViewModel? trustedWebCertificates = null,
         Services.SharedSessions.ISharedSessionProvider? sharedSessions = null,
         Services.SharedSessions.SharedSessionSecretStore? sharedSecrets = null,
-        IGitIdentityReader? gitIdentityReader = null)
+        IGitIdentityReader? gitIdentityReader = null,
+        SftpSudoFallbackPolicy? sftpSudoFallbackPolicy = null)
     {
+        _sftpSudoFallbackPolicy = sftpSudoFallbackPolicy ?? new SftpSudoFallbackPolicy();
         _configManager = configManager;
         _gitIdentityReader = gitIdentityReader;
         _sharedSessions = sharedSessions;
@@ -1853,6 +1863,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             SftpBrowserEnabled = settings.SftpBrowserEnabled;
             SftpAutoOpenOnSsh = settings.SftpAutoOpenOnSsh;
             SftpFollowSshDirectory = settings.SftpFollowSshDirectory;
+            SftpSudoFallback = settings.SftpSudoFallback.ToString();
             X11ServerPath = settings.X11ServerPath ?? "";
             X11AutoStart = settings.X11AutoStart;
             SysinternalsPath = settings.SysinternalsPath ?? "";
@@ -2333,6 +2344,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         settings.SftpBrowserEnabled = SftpBrowserEnabled;
         settings.SftpAutoOpenOnSsh = SftpAutoOpenOnSsh;
         settings.SftpFollowSshDirectory = SftpFollowSshDirectory;
+        settings.SftpSudoFallback = ParseSftpSudoFallback(SftpSudoFallback);
         settings.X11ServerPath = string.IsNullOrWhiteSpace(X11ServerPath) ? null : X11ServerPath;
         settings.X11AutoStart = X11AutoStart;
         settings.SysinternalsPath = string.IsNullOrWhiteSpace(SysinternalsPath) ? null : SysinternalsPath;

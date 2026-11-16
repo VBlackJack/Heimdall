@@ -67,6 +67,7 @@ internal static class SettingsLabelCatalog
         [nameof(AppSettings.SftpAutoOpenOnSsh)] = new("SettingsLabelAutoOpenSftp", "SettingsTabSshSftp", "SettingsSshSubTabSftpX11"),
         [nameof(AppSettings.SftpBrowserEnabled)] = new("SettingsLabelSftpBrowserEnabled", "SettingsTabSshSftp", "SettingsSshSubTabSftpX11"),
         [nameof(AppSettings.SftpFollowSshDirectory)] = new("SettingsLabelSftpFollowSshDirectory", "SettingsTabSshSftp", "SettingsSshSubTabSftpX11"),
+        [nameof(AppSettings.SftpSudoFallback)] = new("SettingsLabelSftpSudoFallback", "SettingsTabSshSftp", "SettingsSshSubTabSftpX11"),
         [nameof(AppSettings.X11AutoStart)] = new("SettingsLabelX11AutoStart", "SettingsTabSshSftp", "SettingsSshSubTabSftpX11"),
         [nameof(AppSettings.X11ServerPath)] = new("SettingsLabelX11ServerPath", "SettingsTabSshSftp", "SettingsSshSubTabSftpX11"),
         [nameof(AppSettings.RdpArtifactCleanupDelayMs)] = new("SettingsLabelRdpArtifactCleanupDelay", "SettingsTabRdp", "SettingsRdpSubTabBehavior"),

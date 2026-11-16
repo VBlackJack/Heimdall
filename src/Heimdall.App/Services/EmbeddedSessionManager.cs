@@ -66,8 +66,19 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
     /// </remarks>
     private readonly PooledRdpHostProvider _rdpHostProvider;
     private bool _disposed;
+
+    // The live SFTP panes, held weakly so a closed pane is never kept alive by the manager: the
+    // sudo button of each one is refreshed when the sudo setting changes.
+    private readonly object _sftpViewModelsLock = new();
+    private readonly List<WeakReference<EmbeddedSftpViewModel>> _sftpViewModels = [];
     private readonly ISessionOperationLog _sessionOperationLog;
     private readonly ConfigManager _configManager;
+
+    /// <summary>
+    /// The live effective mode of the SFTP root-fallback setting (the setting capped by the
+    /// organisation policy), handed to every file pane so it reads it at each act.
+    /// </summary>
+    private readonly Func<SftpSudoFallbackMode>? _sftpSudoFallbackProvider;
 
     /// <summary>
     /// The pins of web console certificates. The app's singleton, so a trust given in one tab
@@ -182,8 +193,10 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
         ConfigManager configManager,
         WebCertificateTrust? webCertificateTrust = null,
         WebZoomMemory? webZoomMemory = null,
-        SharedCredentialApplier? sharedCredentials = null)
+        SharedCredentialApplier? sharedCredentials = null,
+        Func<SftpSudoFallbackMode>? sftpSudoFallbackProvider = null)
     {
+        _sftpSudoFallbackProvider = sftpSudoFallbackProvider;
         _sharedCredentials = sharedCredentials;
         _webCertificateTrust = webCertificateTrust ?? new WebCertificateTrust();
         _webZoomMemory = webZoomMemory ?? new WebZoomMemory();
@@ -200,6 +213,54 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
         _rdpHostProvider = new PooledRdpHostProvider(
             () => PooledRdpHostProvider.ResolveCapacity(_configManager?.CurrentSettings),
             () => PooledRdpHostProvider.ResolveIdleExpiry(_configManager?.CurrentSettings));
+        SubscribeToSettings();
+    }
+
+    // Tests build the manager without a configuration source, hence the guard.
+    private void SubscribeToSettings()
+    {
+        if (_configManager is not null)
+        {
+            _configManager.SettingsChanged += OnSettingsChanged;
+        }
+    }
+
+    /// <summary>
+    /// Registers an SFTP pane so its sudo button follows the setting; the registration is weak.
+    /// </summary>
+    internal void TrackSftpViewModel(EmbeddedSftpViewModel viewModel)
+    {
+        ArgumentNullException.ThrowIfNull(viewModel);
+
+        lock (_sftpViewModelsLock)
+        {
+            _ = _sftpViewModels.RemoveAll(static reference => !reference.TryGetTarget(out _));
+            _sftpViewModels.Add(new WeakReference<EmbeddedSftpViewModel>(viewModel));
+        }
+    }
+
+    private void OnSettingsChanged(AppSettings settings)
+    {
+        _ = settings;
+
+        List<EmbeddedSftpViewModel> live = [];
+        lock (_sftpViewModelsLock)
+        {
+            _ = _sftpViewModels.RemoveAll(static reference => !reference.TryGetTarget(out _));
+            foreach (WeakReference<EmbeddedSftpViewModel> reference in _sftpViewModels)
+            {
+                if (reference.TryGetTarget(out EmbeddedSftpViewModel? viewModel))
+                {
+                    live.Add(viewModel);
+                }
+            }
+        }
+
+        // Each pane reads the setting live and marshals the change to its own UI dispatcher.
+        foreach (EmbeddedSftpViewModel viewModel in live)
+        {
+            viewModel.RefreshSudoModeAvailability();
+        }
     }
 
     /// <summary>The pool the RDP session views draw their controls from. Exposed for diagnostics and tests.</summary>
@@ -214,6 +275,16 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
         }
 
         _disposed = true;
+        if (_configManager is not null)
+        {
+            _configManager.SettingsChanged -= OnSettingsChanged;
+        }
+
+        lock (_sftpViewModelsLock)
+        {
+            _sftpViewModels.Clear();
+        }
+
         _rdpHostProvider.Dispose();
     }
 
@@ -1151,7 +1222,8 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
             // session logging takes effect without a restart.
             SessionLoggingEnabledProvider = () =>
                 _configManager.CurrentSettings?.SessionLoggingEnabled ?? false,
-            SessionLoggingOverride = sessionLoggingOverride
+            SessionLoggingOverride = sessionLoggingOverride,
+            SftpSudoFallbackProvider = _sftpSudoFallbackProvider
         };
         view.InitializeSession(
             browser, tab, displayName, string.Empty,
@@ -1173,6 +1245,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
             }
         };
 
+        TrackSftpViewModel(view.ViewModel);
         WireSplitRequested(view, tab);
         WireReconnectRequested(view, tab);
         WireSessionEnded(view, tab);

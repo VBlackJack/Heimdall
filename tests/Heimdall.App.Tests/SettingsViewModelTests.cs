@@ -4931,9 +4931,11 @@ public sealed partial class SettingsViewModelTests : IDisposable
         IBrowserLauncher? browserLauncher = null,
         Heimdall.App.Services.SharedSessions.ISharedSessionProvider? sharedSessions = null,
         Heimdall.App.Services.SharedSessions.SharedSessionSecretStore? sharedSecrets = null,
-        IGitIdentityReader? gitIdentityReader = null)
+        IGitIdentityReader? gitIdentityReader = null,
+        SftpSudoFallbackPolicy? sftpSudoFallbackPolicy = null)
     {
         localizer ??= new LocalizationManager();
+        sftpSudoFallbackPolicy ??= new SftpSudoFallbackPolicy(() => null);
         dialog ??= new FakeDialogService();
         updateService ??= new FakeUpdateService();
         appVersionProvider ??= new AppVersionProvider("2026.061501");
@@ -4969,7 +4971,8 @@ public sealed partial class SettingsViewModelTests : IDisposable
             profileImportService,
             sharedSessions: sharedSessions,
             sharedSecrets: sharedSecrets,
-            gitIdentityReader: gitIdentityReader);
+            gitIdentityReader: gitIdentityReader,
+            sftpSudoFallbackPolicy: sftpSudoFallbackPolicy);
     }
 
     // ── Git sync author prefill (D-03) ────────────────────────────

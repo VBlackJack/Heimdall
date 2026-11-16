@@ -295,7 +295,12 @@ machine d'un côté, la machine distante de l'autre.
   enregistrement ; fermer le volet pendant qu'un fichier y est encore ouvert vous demande d'abord.
   Si le serveur refuse un envoi (permission refusée, par exemple), le volet le dit une fois et
   réessaie au prochain enregistrement.
-- Quand le serveur refuse une action et qu'Heimdall la fait en root (sudo), un badge **root**
+- Quand le serveur refuse une action, Heimdall demande avant de la relancer en root (sudo). La
+  question nomme l'acte et le chemin, et **Entrée** refuse. Un transfert, une suppression multiple
+  ou une session d'édition demande une fois. Paramètres, SFTP, **réessayer en root les opérations
+  refusées** propose **Demander d'abord** (par défaut), **Automatique (sans question)** (une
+  suppression demande toujours) et **Jamais**. Votre organisation a pu limiter ce choix.
+- Quand Heimdall fait une action en root, un badge **root**
   apparaît à côté de la bascule **sudo** et reste jusqu'à la fermeture du volet. Cliquez dessus,
   ou appuyez sur Entrée, pour voir les dernières actions tentées en root et si elles ont réussi.
 - Dans l'éditeur intégré, **Ctrl+S** enregistre et **Ctrl+W** ferme. Un fichier qui n'est pas en
