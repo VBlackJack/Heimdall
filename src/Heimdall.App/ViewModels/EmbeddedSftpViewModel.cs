@@ -660,6 +660,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
         if (_pendingSelectPath is { } pendingPath)
         {
+            selectedPaths.Clear();
             selectedPaths.Add(pendingPath);
             _pendingSelectPath = null;
         }
