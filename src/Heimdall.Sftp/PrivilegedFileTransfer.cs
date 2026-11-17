@@ -26,7 +26,7 @@ namespace Heimdall.Sftp;
 /// </summary>
 public static class PrivilegedFileCommands
 {
-    /// <summary>A creation-only privileged upload encountered an occupied destination.</summary>
+    /// <summary>A creation-only privileged upload, root create-folder or rename found the destination name occupied.</summary>
     public const int DestinationExistsExitStatus = 78;
     /// <summary>Exit status used when a privileged edit exceeds its configured size limit.</summary>
     public const int FileTooLargeExitStatus = 75;
@@ -113,6 +113,9 @@ public static class PrivilegedFileCommands
 
     // The status of a missing tool, as text for the same reason. A test pins it to the script.
     private const string ToolingUnavailableExitStatusText = "77";
+
+    // The status of a destination that is taken, as text for the same reason. A test pins it to the scripts.
+    private const string DestinationExistsExitStatusText = "78";
 
     private const string PasswordMode = "password";
     private const string NoPasswordMode = "none";
@@ -204,7 +207,7 @@ public static class PrivilegedFileCommands
 
     /// <summary>
     /// The component walk of the parent folder shared by the privileged write, read, permission
-    /// change and delete. It needs the <c>refuse</c> and <c>deny</c> functions, the <c>dir</c>
+    /// change, delete, create-folder and rename. It needs the <c>refuse</c> and <c>deny</c> functions, the <c>dir</c>
     /// variable (an absolute path) and the <c>me</c> variable (the running account), and leaves the
     /// shell inside the folder, held, as the plain <c>cd -P</c> of the whole path used to.
     /// </summary>
@@ -414,6 +417,22 @@ public static class PrivilegedFileCommands
     /// <summary>The file has other hard links and sits in a folder that others can write to.</summary>
     public const string RefusalReasonHardLink = "hardlink";
 
+    // The shared start of the scripts that act on one entry by its name in a parent folder they
+    // hold: the command search path, the tooling probe, the refusal functions, the split of the
+    // target into a folder and a name (an empty name, "." and ".." are refused as invalid) and the
+    // walk of the parent. It expects the target in the variable target.
+    private const string HeldEntryPrologue =
+        AbsolutePathOnly
+        + ToolingProbe
+        + "refuse() { printf '%s %s\\n' '" + EntryRefusedMarker + "' \"$1\" >&2; "
+        + "printf '%s\\n' \"Refusing: $2\" >&2; exit " + NonRegularTargetExitStatusText + "; }; "
+        + EntryDenyFunction
+        + "case \"$target\" in /*) ;; *) target=$PWD/$target ;; esac; "
+        + "case \"$target\" in */*) dir=${target%/*}; [ -n \"$dir\" ] || dir=/ ;; *) dir=. ;; esac; "
+        + "name=${target##*/}; case \"$name\" in ''|.|..|*/*) refuse " + RefusalReasonInvalid + " 'no entry name.';; esac; "
+        + "me=$(id -u) || refuse " + RefusalReasonUnverifiable + " 'the account could not be identified.'; "
+        + HeldParentWalk;
+
     /// <summary>
     /// The script root runs to delete one entry (a file, a link or a folder with its content) by its
     /// name in a parent folder it holds. Positional parameter: the absolute path (<c>$1</c>).
@@ -427,16 +446,7 @@ public static class PrivilegedFileCommands
     /// </remarks>
     private const string HeldDeleteScript =
         "set -eu; umask 077; target=$1; "
-        + AbsolutePathOnly
-        + ToolingProbe
-        + "refuse() { printf '%s %s\\n' '" + EntryRefusedMarker + "' \"$1\" >&2; "
-        + "printf '%s\\n' \"Refusing: $2\" >&2; exit " + NonRegularTargetExitStatusText + "; }; "
-        + EntryDenyFunction
-        + "case \"$target\" in /*) ;; *) target=$PWD/$target ;; esac; "
-        + "case \"$target\" in */*) dir=${target%/*}; [ -n \"$dir\" ] || dir=/ ;; *) dir=. ;; esac; "
-        + "name=${target##*/}; case \"$name\" in ''|.|..|*/*) refuse " + RefusalReasonInvalid + " 'no entry name.';; esac; "
-        + "me=$(id -u) || refuse " + RefusalReasonUnverifiable + " 'the account could not be identified.'; "
-        + HeldParentWalk;
+        + HeldEntryPrologue;
 
     // The tail of the delete of a file or a link: a folder at that name is refused, untouched.
     private const string HeldDeleteFileTail =
@@ -612,6 +622,106 @@ public static class PrivilegedFileCommands
             "sh",
             target);
     }
+
+    // The start of the script that creates one folder: no umask change, so the folder gets the
+    // mode the server's own default gives it. An existing entry at that name, a link included,
+    // ends the script with the "exists" status before mkdir runs.
+    private const string HeldMkdirScript =
+        "set -eu; target=$1; "
+        + HeldEntryPrologue
+        + "if [ -e \"./$name\" ] || [ -L \"./$name\" ]; then printf '%s\\n' "
+        + "'Refusing: an entry with that name already exists.' >&2; exit " + DestinationExistsExitStatusText + "; fi; "
+        + "mkdir -- \"./$name\" || { if [ -e \"./$name\" ] || [ -L \"./$name\" ]; then printf '%s\\n' "
+        + "'Refusing: an entry with that name already exists.' >&2; exit " + DestinationExistsExitStatusText + "; fi; exit 1; }";
+
+    // The start of the script that renames one entry inside the parent folder it holds: the new
+    // name is a plain name, never a path, and differs from the current one (one case: the last
+    // pattern is the current name, quoted so it matches literally).
+    private const string HeldRenameScript =
+        "set -eu; umask 077; target=$1; to=$2; "
+        + HeldEntryPrologue
+        + "case \"$to\" in ''|.|..|*/*|\"$name\") refuse " + RefusalReasonInvalid + " 'no new name.';; esac; ";
+
+    // Replace: the destination name is taken over by the entry.
+    private const string HeldRenameReplaceTail = "mv -T -- \"./$name\" \"./$to\"";
+
+    // No replace: nothing is overwritten. When both names are still present afterwards the move
+    // did not happen because the destination was taken, which the exit status 78 tells the caller.
+    private const string HeldRenameKeepTail =
+        "rc=0; mv -nT -- \"./$name\" \"./$to\" || rc=$?; "
+        + "if { [ -e \"./$name\" ] || [ -L \"./$name\" ]; } && { [ -e \"./$to\" ] || [ -L \"./$to\" ]; }; then "
+        + "printf '%s\\n' 'Refusing: an entry with the new name already exists.' >&2; exit "
+        + DestinationExistsExitStatusText + "; fi; exit \"$rc\"";
+
+    /// <summary>
+    /// Builds a root-side folder creation that reaches the parent folder through
+    /// <see cref="HeldParentWalk"/> and creates the folder by its name from that held folder.
+    /// </summary>
+    /// <param name="remotePath">The absolute path of the folder to create.</param>
+    /// <remarks>
+    /// The name is the last component of the path; a name that is empty, <c>.</c> or <c>..</c> is
+    /// refused. An entry already at that name (a link included) ends the script with
+    /// <see cref="DestinationExistsExitStatus"/>. A missing parent folder is refused with
+    /// <see cref="NonRegularTargetExitStatus"/> like any other refusal of the walk.
+    /// </remarks>
+    /// <exception cref="ArgumentException">The path is blank.</exception>
+    public static string BuildHeldMkdirBody(string remotePath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(remotePath);
+
+        return string.Join(
+            ' ',
+            "sh",
+            "-c",
+            PathEscaper.EscapeForShell(HeldMkdirScript),
+            "sh",
+            EscapeHeldArgument(remotePath));
+    }
+
+    /// <summary>
+    /// Builds a root-side rename of one entry inside its own folder, reached through
+    /// <see cref="HeldParentWalk"/>: <c>mv</c> of <c>./name</c> to <c>./newname</c> from the held folder.
+    /// </summary>
+    /// <param name="remotePath">The absolute path of the entry to rename.</param>
+    /// <param name="newName">The new name: one component, not a path.</param>
+    /// <param name="replace">
+    /// <see langword="true"/> to take over an existing destination; <see langword="false"/> to leave
+    /// both entries untouched and exit with <see cref="DestinationExistsExitStatus"/> when the
+    /// destination exists.
+    /// </param>
+    /// <exception cref="ArgumentException">
+    /// The path is blank, or the new name is empty, <c>.</c>, <c>..</c>, holds a <c>/</c>, or equals
+    /// the current name.
+    /// </exception>
+    public static string BuildHeldRenameBody(string remotePath, string newName, bool replace)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(remotePath);
+        ArgumentException.ThrowIfNullOrEmpty(newName);
+        if (newName is "." or ".." || newName.Contains('/', StringComparison.Ordinal))
+        {
+            throw new ArgumentException("The new name must be a single path component.", nameof(newName));
+        }
+
+        string currentName = remotePath[(remotePath.LastIndexOf('/') + 1)..];
+        if (string.Equals(currentName, newName, StringComparison.Ordinal))
+        {
+            throw new ArgumentException("The new name must differ from the current name.", nameof(newName));
+        }
+
+        return string.Join(
+            ' ',
+            "sh",
+            "-c",
+            PathEscaper.EscapeForShell(HeldRenameScript + (replace ? HeldRenameReplaceTail : HeldRenameKeepTail)),
+            "sh",
+            EscapeHeldArgument(remotePath),
+            EscapeHeldArgument(newName));
+    }
+
+    // A "!" in a file name is escaped the way every history-expanding login shell reads it:
+    // outside the quotes. The scripts themselves hold none.
+    private static string EscapeHeldArgument(string value) =>
+        PathEscaper.EscapeForShell(value).Replace("!", "'\\!'", StringComparison.Ordinal);
 
     /// <summary>
     /// Reads why a write or a read was refused for its path or its file, when the script said so.

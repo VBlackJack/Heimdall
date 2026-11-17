@@ -51,7 +51,7 @@ public sealed class EmbeddedSftpRootActivityViewModelTests
         Harness harness = await Harness.CreateAsync("en");
         harness.Dialog.Input = "new.txt";
         harness.ViewModel.CurrentPath = "/remote";
-        Queue<int> exitStatuses = new([1, 0, 1]);
+        Queue<int> exitStatuses = new([1, 0]);
         List<string> commands = [];
         harness.ViewModel.SetSudoRenameCommandExecutor((command, _) =>
         {
@@ -61,7 +61,7 @@ public sealed class EmbeddedSftpRootActivityViewModelTests
 
         await harness.ViewModel.RenameEntryAsync(Entry("old.txt", "/remote/old.txt", RemoteEntryKind.File));
 
-        Assert.Equal(3, commands.Count);
+        Assert.Equal(2, commands.Count);
         SftpRootActivityEntry entry = Assert.Single(harness.ViewModel.RootActivityEntries);
         Assert.Equal("Rename: /remote/old.txt to /remote/new.txt (succeeded)", entry.Text);
         Assert.False(entry.IsSummary);

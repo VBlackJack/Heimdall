@@ -39,7 +39,6 @@ public sealed class EmbeddedSftpSudoRenameConflictTests
         [
             Result(exitStatus: 1),
             Result(exitStatus: 0),
-            Result(exitStatus: 1),
         ]);
         PermissionDeniedRenameBrowser browser = new();
         EmbeddedSftpViewModel viewModel = CreateViewModel(browser, presenter, executor);
@@ -50,8 +49,7 @@ public sealed class EmbeddedSftpSudoRenameConflictTests
         Assert.Equal(
         [
             "test -e '/remote/new.txt' -o -L '/remote/new.txt'",
-            "mv -nT '/remote/old.txt' '/remote/new.txt'",
-            "test -e '/remote/old.txt' -o -L '/remote/old.txt'",
+            PrivilegedFileCommands.BuildHeldRenameBody("/remote/old.txt", "new.txt", replace: false),
         ], executor.Commands);
         Assert.Equal("SftpStatusReady", viewModel.StatusText);
         Assert.False(viewModel.IsErrorStatus);
@@ -78,7 +76,10 @@ public sealed class EmbeddedSftpSudoRenameConflictTests
             "test -e '/remote/new.txt' -o -L '/remote/new.txt'",
             "test -d '/remote/new.txt'",
         ], executor.Commands);
-        Assert.DoesNotContain(executor.Commands, command => command.StartsWith("mv ", StringComparison.Ordinal));
+        Assert.DoesNotContain(
+            executor.Commands,
+            command => command == PrivilegedFileCommands.BuildHeldRenameBody("/remote/old.txt", "new.txt", replace: false)
+                || command == PrivilegedFileCommands.BuildHeldRenameBody("/remote/old.txt", "new.txt", replace: true));
         Assert.Equal("SftpStatusTransferCancelled", viewModel.StatusText);
         Assert.Equal(0, browser.ListDirectoryCallCount);
     }
@@ -101,7 +102,6 @@ public sealed class EmbeddedSftpSudoRenameConflictTests
             Result(exitStatus: 1),
             Result(exitStatus: 1),
             Result(exitStatus: 0),
-            Result(exitStatus: 1),
         ]);
         PermissionDeniedRenameBrowser browser = new();
         EmbeddedSftpViewModel viewModel = CreateViewModel(browser, presenter, executor);
@@ -116,8 +116,7 @@ public sealed class EmbeddedSftpSudoRenameConflictTests
             "test -e '/remote/new (copy).txt' -o -L '/remote/new (copy).txt'",
             "test -d '/remote/new (copy).txt'",
             "test -e '/remote/new (copy 2).txt' -o -L '/remote/new (copy 2).txt'",
-            "mv -nT '/remote/old.txt' '/remote/new (copy 2).txt'",
-            "test -e '/remote/old.txt' -o -L '/remote/old.txt'",
+            PrivilegedFileCommands.BuildHeldRenameBody("/remote/old.txt", "new (copy 2).txt", replace: false),
         ], executor.Commands);
         Assert.False(viewModel.IsErrorStatus);
         Assert.Equal(1, browser.ListDirectoryCallCount);
@@ -131,8 +130,7 @@ public sealed class EmbeddedSftpSudoRenameConflictTests
         RecordingSudoExecutor executor = new(
         [
             Result(exitStatus: 1),
-            Result(exitStatus: 0),
-            Result(exitStatus: 0),
+            Result(exitStatus: PrivilegedFileCommands.DestinationExistsExitStatus),
         ]);
         PermissionDeniedRenameBrowser browser = new();
         EmbeddedSftpViewModel viewModel = CreateViewModel(browser, presenter, executor);

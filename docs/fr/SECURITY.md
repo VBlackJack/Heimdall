@@ -643,8 +643,8 @@ aboutir ailleurs une écriture ou une lecture en root ; les versions antérieure
 écrivaient et lisaient par le nom de la destination et suivaient un lien symbolique
 placé là.
 
-Root atteint le dossier d'une entrée qu'il écrit, lit, supprime ou dont il change les
-permissions en parcourant le chemin depuis `/`, un dossier à la fois, en tenant chaque
+Root atteint le dossier d'une entrée qu'il écrit, lit, supprime, crée, renomme ou dont
+il change les permissions en parcourant le chemin depuis `/`, un dossier à la fois, en tenant chaque
 dossier avant l'étape suivante. Un lien symbolique rencontré n'est suivi que si le
 lien appartient à root ou au compte qui a appelé sudo, et si le dossier qui le contient
 appartient à root ou à ce compte et ne peut pas être modifié par les autres comptes ;
@@ -657,7 +657,13 @@ moins de trois chiffres est traité comme ouvert ; sur un dossier doté d'une AC
 bits du mode montrent le masque de l'ACL, et les ACL NFSv4 ne sont pas vues. Une
 suppression en root retire l'entrée du dossier qu'elle tient, par son seul dernier nom,
 refuse un fichier dont un dossier a pris le nom et, comme le changement de permissions
-en root, demande GNU coreutils sur le serveur : sur BusyBox ou BSD elle est refusée.
+en root, demande GNU coreutils sur le serveur : sur BusyBox ou BSD elle est refusée. Une
+création de dossier et un renommage en root fonctionnent de la même façon, depuis le
+dossier tenu, et demandent aussi GNU coreutils : un nom déjà pris est signalé, jamais
+remplacé, sauf si vous avez choisi de remplacer un fichier. Les vérifications qui
+cherchent un nom existant avant un renommage lisent le chemin tel qu'il est donné (un
+`!` y est échappé) ; le
+renommage lui-même, non.
 
 L'écriture, la lecture ou le changement de permissions d'une entrée qui a un autre
 lien physique est refusé quand son dossier peut être modifié par un compte autre que
@@ -666,8 +672,7 @@ les fichiers de paquets sous `/usr`, continuent de fonctionner.
 
 Limites qui restent : un compte qui peut écrire dans le dossier peut supprimer le
 répertoire de travail vide et faire échouer le transfert ; un nouveau fichier écrit en
-root appartient à root avec le mode 0600 ; quand root crée un dossier ou renomme une
-entrée, il l'atteint encore par le chemin tel qu'il est donné, liens compris.
+root appartient à root avec le mode 0600.
 
 La connexion privilégiée passe par la même connexion annulable que les autres
 connexions SFTP : Annuler l'atteint pendant la négociation. Chaque commande

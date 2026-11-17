@@ -112,6 +112,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     private Func<string, CancellationToken, Task<SudoRenameCommandResult>>? _sudoRenameCommandExecutor;
     private Func<string, CancellationToken, Task>? _sudoDeleteCommandExecutor = null;
     private Func<string, CancellationToken, Task>? _sudoChmodCommandExecutor;
+    private Func<string, CancellationToken, Task>? _sudoMkdirCommandExecutor = null;
     private ISftpBrowserStateStore? _stateStore;
     private IRemoteBrowser? _browser;
     // Emits operation records for the SFTP sudo fallbacks (which bypass the decorated browser).
@@ -1246,6 +1247,19 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         if (ex is PrivilegedTransferRefusedException transferRefusal)
         {
             return DescribeTransferRefusal(transferRefusal.Reason, transferRefusal.RemotePath);
+        }
+
+        if (ex is SudoEntryRefusedException entryRefusal)
+        {
+            string shownPath = entryRefusal.RemotePath;
+            return entryRefusal.Reason switch
+            {
+                EntryRefusalReason.PathLink or EntryRefusalReason.HardLink =>
+                    DescribeTransferRefusal(entryRefusal.Reason, shownPath),
+                EntryRefusalReason.Changed =>
+                    LF("SftpRootRefusedChanged", ExecutionTrustDescriber.Visible(shownPath)),
+                _ => LF("SftpRootRefusedEntry", ExecutionTrustDescriber.Visible(shownPath)),
+            };
         }
 
         if (ex is SudoEditFileTooLargeException tooLargeException)
@@ -2658,7 +2672,10 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             && PrivilegedFileCommands.HasEntryRefusalMarker(error))
         {
             Core.Logging.FileLogger.Warn($"EmbeddedSFTP sudo {operationLabel} refused the entry: {error}");
-            throw new SudoEntryRefusedException(PrivilegedFileCommands.ParseEntryRefusalReason(error), error);
+            throw new SudoEntryRefusedException(
+                PrivilegedFileCommands.ParseEntryRefusalReason(error),
+                error,
+                remotePath);
         }
 
         // Before the sudo wording is read: a path or a hard link refusal belongs to the entry, and a
@@ -2694,6 +2711,13 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         {
             Core.Logging.FileLogger.Warn($"EmbeddedSFTP sudo {operationLabel} refused by the tooling probe: {error}");
             throw new SudoToolingUnavailableException(error);
+        }
+
+        // The script found an entry at the name it was to create.
+        if (exitStatus == PrivilegedFileCommands.DestinationExistsExitStatus)
+        {
+            Core.Logging.FileLogger.Warn($"EmbeddedSFTP sudo {operationLabel} refused: an entry already holds the name");
+            throw new SudoDestinationExistsException();
         }
 
         throw new InvalidOperationException(
@@ -2740,9 +2764,9 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             return;
         }
 
+        string remotePath = CombineRemotePath(CurrentPath, folderName);
         try
         {
-            string remotePath = CombineRemotePath(CurrentPath, folderName);
             try
             {
                 await _browser.CreateDirectoryAsync(remotePath, LifecycleTokenOrNone());
@@ -2758,14 +2782,33 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 Core.Logging.FileLogger.Info("EmbeddedSFTP mkdir permission denied, falling back to sudo");
                 await _privilegedActs.RunMkdirAsync(
                     remotePath,
-                    () => RunSudoCommandAsync(
-                        $"mkdir -p {PathEscaper.EscapeForShell(remotePath)}",
-                        LifecycleTokenOrNone()));
+                    async () =>
+                    {
+                        string mkdirBody = PrivilegedFileCommands.BuildHeldMkdirBody(remotePath);
+                        CancellationToken mkdirToken = LifecycleTokenOrNone();
+                        try
+                        {
+                            await (_sudoMkdirCommandExecutor is null
+                                ? RunSudoCommandAsync(mkdirBody, mkdirToken)
+                                : _sudoMkdirCommandExecutor(mkdirBody, mkdirToken)).ConfigureAwait(false);
+                        }
+                        catch (SudoEntryRefusedException refusal) when (refusal.RemotePath.Length == 0)
+                        {
+                            // The generic runner does not know the path; the message names it.
+                            throw new SudoEntryRefusedException(refusal.Reason, refusal.RemoteDiagnostic, remotePath);
+                        }
+                    });
             }
 
             RequestSelectAfterRefresh(remotePath);
             await RunOnUiAsync(() => UpdateStatus(L10n("SftpSuccessMkdir")));
             await RefreshAfterOperationAsync().ConfigureAwait(false);
+        }
+        catch (SudoDestinationExistsException)
+        {
+            Core.Logging.FileLogger.Warn("EmbeddedSFTP mkdir refused: an entry already holds the name");
+            await RunOnUiAsync(() =>
+                SetErrorStatus(LF("SftpErrorMkdirExists", ExecutionTrustDescriber.Visible(remotePath))));
         }
         catch (Exception ex)
         {
@@ -2816,7 +2859,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
         try
         {
-            string newPath = CombineRemotePath(CurrentPath, newName);
+            string newPath = CombineRemotePath(GetParentPath(file.FullPath), newName);
             try
             {
                 await _browser.RenameAsync(file.FullPath, newPath, LifecycleTokenOrNone());
@@ -2959,26 +3002,34 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         string targetPath,
         bool replace)
     {
+        string newName = ExtractRenameTargetName(sourcePath, targetPath);
         SudoRenameCommandResult moveResult = await ExecuteSudoRenameCommandAsync(
-                SudoRenameCommands.BuildMove(sourcePath, targetPath, replace),
+                PrivilegedFileCommands.BuildHeldRenameBody(sourcePath, newName, replace),
                 CancellationToken.None)
             .ConfigureAwait(false);
-        EnsureSudoSucceeded(moveResult.ExitStatus, moveResult.StandardError, "rename");
 
-        if (replace)
-        {
-            return;
-        }
-
-        SudoRenameCommandResult sourceResult = await ExecuteSudoRenameCommandAsync(
-                SudoRenameCommands.BuildExistenceProbe(sourcePath),
-                CancellationToken.None)
-            .ConfigureAwait(false);
-        EnsureSudoProbeCompleted(sourceResult, "rename outcome probe");
-        if (sourceResult.ExitStatus == 0)
+        // Before the generic check: the script's own status, both names still in place.
+        if (moveResult.ExitStatus == PrivilegedFileCommands.DestinationExistsExitStatus)
         {
             throw new SudoRenameCollisionException();
         }
+
+        EnsureSudoSucceeded(moveResult.ExitStatus, moveResult.StandardError, "rename", sourcePath);
+    }
+
+    /// <summary>
+    /// The new name of a rename: the last component of the target, which must sit in the folder of
+    /// the source. A rename never moves an entry to another folder.
+    /// </summary>
+    private static string ExtractRenameTargetName(string sourcePath, string targetPath)
+    {
+        string parent = GetParentPath(sourcePath);
+        if (!string.Equals(GetParentPath(targetPath), parent, StringComparison.Ordinal))
+        {
+            throw new ArgumentException("A rename stays in the folder of the entry.", nameof(targetPath));
+        }
+
+        return targetPath[(targetPath.LastIndexOf('/') + 1)..];
     }
 
     private async Task<SudoRenameCommandResult> ExecuteSudoRenameCommandAsync(
@@ -4088,8 +4139,11 @@ internal sealed record SudoRenameCommandResult(
     string StandardOutput,
     string StandardError);
 
-/// <summary>Raised when a no-clobber rename exits successfully without moving its source.</summary>
+/// <summary>Raised when a no-clobber rename finds both the source and the destination in place.</summary>
 internal sealed class SudoRenameCollisionException : InvalidOperationException;
+
+/// <summary>Raised when a privileged script stopped because an entry already holds the name it was to create.</summary>
+internal sealed class SudoDestinationExistsException : InvalidOperationException;
 
 internal static class SudoRenameCommands
 {
@@ -4097,7 +4151,8 @@ internal static class SudoRenameCommands
     internal static string BuildExistenceProbe(string targetPath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(targetPath);
-        string escapedPath = PathEscaper.EscapeForShell(targetPath);
+        string escapedPath = PathEscaper.EscapeForShell(targetPath)
+            .Replace("!", "'\\!'", StringComparison.Ordinal);
         return $"test -e {escapedPath} -o -L {escapedPath}";
     }
 
@@ -4105,17 +4160,9 @@ internal static class SudoRenameCommands
     internal static string BuildDirectoryProbe(string targetPath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(targetPath);
-        return $"test -d {PathEscaper.EscapeForShell(targetPath)}";
-    }
-
-    /// <summary>Builds an exact-target move, adding no-clobber unless replacement was selected.</summary>
-    internal static string BuildMove(string sourcePath, string targetPath, bool replace)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
-        ArgumentException.ThrowIfNullOrWhiteSpace(targetPath);
-
-        string flags = replace ? "-T" : "-nT";
-        return $"mv {flags} {PathEscaper.EscapeForShell(sourcePath)} {PathEscaper.EscapeForShell(targetPath)}";
+        string escapedPath = PathEscaper.EscapeForShell(targetPath)
+            .Replace("!", "'\\!'", StringComparison.Ordinal);
+        return $"test -d {escapedPath}";
     }
 }
 
