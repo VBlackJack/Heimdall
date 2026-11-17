@@ -736,8 +736,11 @@
                                 </ItemsControl.ItemContainerStyle>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
+                                        <!-- A broadcast target (session name and connection type) is data: the
+                                             template keeps its underscores. -->
                                         <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}"
                                                   Content="{Binding AccessibleName}"
+                                                  ContentTemplate="{StaticResource LiteralTextTemplate}"
                                                   AutomationProperties.Name="{Binding AccessibleName}"
                                                   FontSize="{StaticResource FontSizeCaption}"
                                                   Margin="0,2"/>

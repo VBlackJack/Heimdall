@@ -470,7 +470,8 @@ public partial class PortScannerView : UserControl, IToolView
             {
                 var scheme = row.Port is 443 or 8443 ? "https" : "http";
                 var url = $"{scheme}://{host}:{row.Port}";
-                var browser = new MenuItem { Header = string.Format(L("ToolCtxOpenBrowser"), url) };
+                var browser = new MenuItem();
+                LiteralAccessText.SetFormatted(browser, L("ToolCtxOpenBrowser"), url);
                 browser.Click += (_, _) =>
                 {
                     System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo

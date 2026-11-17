@@ -308,6 +308,44 @@ public sealed class EmbeddedSftpBrowsingStateTests
     }
 
     [Fact]
+    public async Task RequestSelectAfterRefresh_ReplacesThePreviousSelection()
+    {
+        ScriptedRemoteBrowser browser = new();
+        browser.AddDirectory("/d", SftpTestKit.File("/d/a.txt"), SftpTestKit.Directory("/d/new"));
+        EmbeddedSftpViewModel viewModel = SftpTestKit.CreateViewModel(browser);
+        await viewModel.LoadDirectoryAsync("/d");
+        SftpFileInfo a = viewModel.Files.Single(file => file.Name == "a.txt");
+        viewModel.SetSelection([a], a);
+        List<IReadOnlyList<SftpFileInfo>> restores = [];
+        viewModel.SelectionRestoreRequested += restores.Add;
+
+        viewModel.RequestSelectAfterRefresh("/d/new");
+        await viewModel.Refresh();
+
+        Assert.Equal(["/d/new"], Assert.Single(restores).Select(file => file.FullPath));
+    }
+
+    [Fact]
+    public async Task CreateFolder_ReplacesThePreviousSelectionWithTheNewFolder()
+    {
+        (IDialogService dialog, ScriptedDialogProxy script) = ScriptedDialogProxy.Create();
+        script.Input = (_, _, _) => "made";
+        ScriptedRemoteBrowser browser = new();
+        browser.AddDirectory("/d", SftpTestKit.File("/d/a.txt"));
+        EmbeddedSftpViewModel viewModel = SftpTestKit.CreateViewModel(browser, dialogService: dialog);
+        await viewModel.LoadDirectoryAsync("/d");
+        SftpFileInfo a = viewModel.Files.Single(file => file.Name == "a.txt");
+        viewModel.SetSelection([a], a);
+        browser.AddDirectory("/d", SftpTestKit.File("/d/a.txt"), SftpTestKit.Directory("/d/made"));
+        List<IReadOnlyList<SftpFileInfo>> restores = [];
+        viewModel.SelectionRestoreRequested += restores.Add;
+
+        await viewModel.CreateFolderAsync();
+
+        Assert.Equal(["/d/made"], Assert.Single(restores).Select(file => file.FullPath));
+    }
+
+    [Fact]
     public async Task Rename_AsksForANewNameNotAFolderName()
     {
         (IDialogService dialog, ScriptedDialogProxy script) = ScriptedDialogProxy.Create();

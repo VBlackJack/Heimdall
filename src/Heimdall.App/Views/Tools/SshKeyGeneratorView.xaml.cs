@@ -15,6 +15,7 @@
  */
 
 using System.Buffers.Binary;
+using System.IO;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
@@ -230,7 +231,7 @@ public partial class SshKeyGeneratorView : UserControl, IToolView
 
         if (dialog.ShowDialog() == true)
         {
-            Heimdall.Core.Security.SshKeyFileWriter.WritePublicKey(dialog.FileName, _publicKeyOpenSsh);
+            TrySaveKey(() => Heimdall.Core.Security.SshKeyFileWriter.WritePublicKey(dialog.FileName, _publicKeyOpenSsh));
         }
     }
 
@@ -251,7 +252,24 @@ public partial class SshKeyGeneratorView : UserControl, IToolView
 
         if (dialog.ShowDialog() == true)
         {
-            Heimdall.Core.Security.SshKeyFileWriter.WritePrivateKey(dialog.FileName, _privateKeyPem);
+            TrySaveKey(() => Heimdall.Core.Security.SshKeyFileWriter.WritePrivateKey(dialog.FileName, _privateKeyPem));
+        }
+    }
+
+    /// <summary>
+    /// Runs a key save and shows the tool's validation message when the file cannot be written,
+    /// instead of letting the error escape the click handler.
+    /// </summary>
+    private void TrySaveKey(Action save)
+    {
+        try
+        {
+            save();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Heimdall.Core.Logging.FileLogger.Warn($"Saving an SSH key failed: {ex.Message}");
+            ShowValidation(L("ToolSshKeyGenSaveFailed"));
         }
     }
 

@@ -97,14 +97,20 @@ public sealed class ConPtySessionTests
         }
     }
 
+    private static async Task<bool> AsCompletion(Task task)
+    {
+        await task;
+        return true;
+    }
+
     [Fact]
     [Trait("Category", "CIUnstable")]
     public async Task DataReceived_SubscriberAddedAfterBootstrapOutput_ReplaysBufferedOutput()
     {
         // Producer: ConPtySession bootstrap buffering. StartReadLoop routes bytes
-        // through DeliverOrBuffer (ConPtySession.cs): with no subscriber yet they are
-        // buffered by BufferBootstrapChunk, and the DataReceived add-accessor replays
-        // the buffer to the first subscriber. Before this fix the bytes were dropped,
+        // through OutputReplayGate.Deliver (via _output in ConPtySession.cs): with no
+        // subscriber yet they are buffered by the gate, and the DataReceived add-accessor
+        // replays the buffer to the first subscriber. Before this fix the bytes were dropped,
         // so a late subscriber (the real Local Shell case) never saw the prompt.
         //
         // Uses an INTERACTIVE shell so the bootstrap prompt is emitted to the ConPTY
@@ -123,9 +129,11 @@ public sealed class ConPtySessionTests
                 TerminalTestHelpers.ResolvePowerShellExecutable(),
                 "-NoLogo -NoProfile");
 
-            // Let the interactive shell print its prompt into the bootstrap buffer
+            // Wait until the interactive shell's first chunk sits in the bootstrap buffer
             // before any subscriber attaches (no subscriber == buffered, not delivered).
-            await Task.Delay(1500);
+            await TerminalTestHelpers.AwaitProcessEventAsync(
+                AsCompletion(session.BootstrapOutputBuffered),
+                "BootstrapOutputBuffered");
 
             StringBuilder output = new();
             object outputLock = new object();
@@ -149,11 +157,10 @@ public sealed class ConPtySessionTests
             // direct delivery ahead of it. So anything present the instant the subscription
             // returns was replayed, and anything delivered live can only arrive afterwards.
             //
-            // Without this check the test does not test replay. If the shell had not printed
-            // yet when the wait above expired, its output reached the subscriber LIVE, the
-            // non-emptiness assertion below passed, and no buffer was ever replayed. That is
-            // precisely the slow-runner case this test exists to cover, and it was the case in
-            // which the test could not fail.
+            // Without this check the test does not test replay: output that reached the
+            // subscriber LIVE would satisfy the non-emptiness assertion below with no buffer
+            // ever replayed. The event wait above guarantees the buffer held a chunk before
+            // the subscription, so a non-empty replay here is deterministic.
             int bufferedAtSubscription;
             lock (outputLock)
             {
@@ -165,6 +172,8 @@ public sealed class ConPtySessionTests
                 "Nothing was replayed when the subscription attached, so any output observed "
                     + "below was delivered live and the bootstrap buffer was never exercised.");
 
+            // The first buffered chunk may be only the console host's opening sequences, not
+            // the prompt: this proves replay of buffered output, not replay of the prompt.
             string text = await TerminalTestHelpers.AwaitProcessEventAsync(
                 outputObserved.Task,
                 "DataReceivedReplay");

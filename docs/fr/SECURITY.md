@@ -518,14 +518,103 @@ et l'efface est masqué dans ce mode.
 ### Escalade sudo en SFTP et édition distante
 
 Le repli sudo du SFTP est délibérément étroit. `EmbeddedSftpViewModel` n'escalade
-que pour des exceptions typées de permission refusée
-(`SftpPermissionDeniedException` et `UnauthorizedAccessException` locale) ; les
-messages génériques `SshException("Failure")` ne déclenchent aucune opération
-privilégiée. Ce compromis accepte quelques invites de nouvelle tentative
-manuelle en échange de l'absence d'actions sudo sur des échecs qui ne relèvent
-pas des permissions.
+que lorsque le serveur refuse une opération faute de permission
+(`SftpPermissionDeniedException`, ou une suppression récursive refusée pour
+cette raison) ; les messages génériques `SshException("Failure")` ne
+déclenchent aucune opération privilégiée, pas plus qu'une
+`UnauthorizedAccessException` locale : c'est le système de fichiers local qui
+refuse, et un transfert distant privilégié échouerait sur le même chemin local.
+Ce compromis accepte quelques invites de nouvelle tentative manuelle en échange
+de l'absence d'actions sudo sur des échecs qui ne relèvent pas des permissions.
 
-Les téléversements privilégiés écrivent dans un répertoire privé voisin de la cible.
+Relancer en root une opération refusée dépend d'un réglage, **SFTP : réessayer
+en root les opérations refusées** (Paramètres, SFTP), à trois valeurs :
+
+- **Demander d'abord** (par défaut, y compris après une mise à jour) : une
+  question par action, qui refuse par défaut et nomme l'acte et le chemin
+  ("Envoyer en tant que root" / "Ne pas envoyer"). Un transfert demande une
+  fois, parcours de dossier compris ; une suppression ou un changement de
+  permissions de plusieurs entrées demande une fois ; ouvrir un fichier dans un
+  éditeur demande une fois et précise que les enregistrements suivants de cet
+  éditeur seront aussi écrits en root. Un oui à une question de listage active
+  le bouton **sudo** du volet : le dossier et ses rafraîchissements sont alors
+  listés en root sans nouvelle question.
+- **Automatique (sans question)** : le comportement antérieur, root sans
+  question, sauf la suppression, qui demande toujours. La carte de posture de
+  sécurité signale cette valeur.
+- **Jamais** : sudo n'est jamais appelé ; le refus du serveur s'affiche avec
+  une ligne qui dit que root n'a pas été essayé, et une suppression compte
+  l'entrée comme non supprimée dans son bilan. Le bouton **sudo** du volet est
+  désactivé.
+
+Certains listages ne viennent pas de vous et ne demandent jamais : le premier
+listage à l'ouverture d'un volet, un dossier suivi depuis le répertoire courant
+du terminal (un chemin affiché par le serveur), et le rafraîchissement qui suit
+une opération. En mode Demander d'abord, ils ne passent pas en root, la ligne
+d'état le dit, et le volet se replie comme pour tout listage refusé. Le bouton
+**sudo** ne fait que lister les dossiers en root : il ne permet jamais à une
+écriture d'éviter la question.
+
+Une organisation peut plafonner ce réglage avec la valeur DWORD
+`SftpSudoFallbackMax` sous `HKLM\Software\Policies\Heimdall` (0 Jamais,
+1 Demander, 2 Automatique). Le plus strict du choix de l'utilisateur et du
+plafond s'applique, les choix plus larges sont désactivés dans les Paramètres
+avec une ligne qui dit que la valeur est gérée, et la carte de posture montre la
+valeur effective. La valeur est lue une fois, à son premier usage ; une
+modification prend effet au redémarrage. Ce n'est pas une
+frontière de sécurité : un utilisateur qui a un shell sur le serveur peut y
+lancer sudo directement, et les règles sudoers du serveur restent le vrai
+contrôle.
+
+Le mot de passe sudo proposé est le mot de passe SSH de la session ; il n'est
+jamais ressaisi, ni écrit dans un journal ou sur une ligne de commande. Sans
+mot de passe enregistré (une clé ou un agent), la commande ne réussit que là où
+sudo ne demande pas de mot de passe.
+
+Ces escalades ne sont pas cachées : dès la première, un badge "root" reste dans
+la barre d'outils du volet jusqu'à sa fermeture, et sa liste nomme les dernières
+opérations tentées en root avec leur résultat et leur heure ; les listages de
+dossiers en root sont comptés à part, sur une ligne. Le badge repart de zéro
+quand le volet est reconstruit, par exemple après une reconnexion, et les
+vérifications d'existence d'un renommage en root ne sont pas comptées.
+
+Un changement de permissions en root ne suit jamais un lien symbolique. Un
+dossier est modifié depuis l'intérieur, après avoir vérifié qu'il est toujours
+l'élément listé ; un fichier ordinaire est modifié par un lien physique créé
+dans un dossier privé réservé à root, à côté de lui, puis supprimé. Un lien
+symbolique, un tube, une socket, un périphérique, ou un élément qui a changé
+pendant la vérification est refusé ; pour modifier la cible d'un lien, ouvrez la
+cible. Il faut GNU coreutils sur le serveur, comme pour les transferts
+privilégiés, et un dossier où root peut créer ce dossier et un lien physique ;
+sinon la modification est refusée plutôt que faite par un chemin qui pourrait
+suivre un lien. Les dossiers qui mènent à l'élément et un lien physique à son nom
+sont traités comme décrit plus bas pour les transferts privilégiés.
+
+Dans une suppression ou un changement de permissions portant sur plusieurs
+éléments, un échec de sudo qu'aucun élément suivant ne peut changer (mot de
+passe refusé ou indisponible, compte non autorisé à utiliser sudo, sudo ou un
+outil nécessaire absent, authentification SSH ou clé d'hôte refusée) arrête
+l'escalade pour le reste de l'opération : les éléments restants sont quand même
+tentés avec les droits de la session, et le résumé indique combien n'ont pas été
+tentés en root. La détection lit les messages anglais de sudo. Chaque sudo lancé
+par le navigateur l'est sous la forme `env LC_ALL=C sudo` (le téléversement
+exporte `LC_ALL=C` avant ses appels sudo) : sudo répond donc en anglais quelle que
+soit la langue du serveur, et un mot de passe refusé arrête aussi le lot sur ces
+serveurs.
+
+Les téléversements privilégiés passent d'abord par une zone de transit : le contenu est déposé
+dans un répertoire privé (0700) de l'utilisateur connecté, sous `$TMPDIR` (`/tmp` par défaut),
+dans un fichier 0600, et il y reste jusqu'à la fin de l'installation. Une connexion tuée ou une
+coupure de courant peut laisser ce répertoire, et le contenu, sur le serveur. Un fichier déposé
+dont la taille diffère de celle attendue est refusé avant tout sudo, de sorte qu'une lecture
+interrompue n'est jamais installée. Un appel sudo installe ensuite le fichier dans un répertoire
+privé voisin de la destination et le renomme par-dessus la cible. L'installation est d'abord
+tentée sans mot de passe et sans entrée ; le mot de passe n'est proposé qu'une fois, par un tube
+qui ne porte que cette ligne, si bien qu'il ne peut ni atterrir dans le fichier ni rester non lu
+sur l'entrée de sudo. L'installateur refuse un répertoire de dépôt qui est un lien symbolique,
+qui n'appartient pas à l'appelant ou qui peut être modifié par d'autres comptes, et vérifie,
+sur le descripteur qu'il ouvre, que le fichier déposé est un fichier ordinaire de l'appelant,
+avec un seul lien ; le nettoyage est fait par l'utilisateur connecté lui-même, jamais par root.
 Un remplacement accepté utilise un renommage atomique ; une création seule publie
 par lien physique exclusif (`ln -T`, qui refuse une destination devenue un
 répertoire au lieu de créer le lien à l'intérieur). Le nettoyage ne retire que les
@@ -533,6 +622,67 @@ fichiers temporaires. Les décisions de conflit des transferts ordinaires atteig
 aussi le commit final : une cible libre ou un renommage automatique n'autorise pas de
 remplacement. La façon dont chaque transport crée un nouveau fichier est décrite plus
 bas, sous "Garanties de validation des remontées distantes".
+
+Le répertoire privé créé à côté de la destination est vérifié avant usage, avec les
+mêmes briques que le changement de permissions en root : root tient le dossier de la
+destination, crée le répertoire relativement à lui, y entre, et vérifie qu'il
+appartient au compte qui exécute le script, que les autres comptes ne peuvent pas le
+modifier, qu'il se trouve dans le dossier tenu sur le même périphérique, et qu'il est
+vide ; le script se l'attribue ensuite et atteint la destination par le dossier tenu,
+qu'il vérifie de
+nouveau juste avant le renommage. Une lecture privilégiée (téléchargement, ouverture
+pour édition) entre dans son répertoire privé de la même façon. Un signal n'arrête le
+script qu'après son nettoyage, qui ne retire que ce que cette exécution a créé. La
+recherche des commandes ne garde que les entrées absolues de `PATH`, dans ces
+scripts, l'installateur et le changement de permissions en root. Là où le répertoire
+ne peut pas appartenir à root sans que les autres comptes puissent le modifier (NFS
+avec root squashing, un montage CIFS ou vfat dont le propriétaire fixe n'est pas root
+ou dont les droits fixes laissent les autres écrire), le transfert s'arrête sur
+"Transfer failed.", le journal donne la raison, et le répertoire vide reste en place.
+De v2026.072501 à v2026.111501, les scripts entraient dans ce répertoire sans le
+vérifier : un compte capable d'écrire dans le dossier de la destination pouvait faire
+aboutir ailleurs une écriture ou une lecture en root ; les versions antérieures
+écrivaient et lisaient par le nom de la destination et suivaient un lien symbolique
+placé là.
+
+Root atteint le dossier d'une entrée qu'il écrit, lit, supprime, crée, renomme ou dont
+il change les permissions en parcourant le chemin depuis `/`, un dossier à la fois, en tenant chaque
+dossier avant l'étape suivante. Un lien symbolique rencontré n'est suivi que si le
+lien appartient à root ou au compte qui a appelé sudo, et si le dossier qui le contient
+appartient à root ou à ce compte et ne peut pas être modifié par les autres comptes ;
+sa cible est parcourue de la même façon, et plus de 40 liens arrêtent le parcours. Tout
+autre lien est refusé, et le message dit qu'un dossier au-dessus de l'entrée est
+atteint par un lien qu'un autre compte contrôle : ouvrez plutôt le dossier par son
+chemin réel. Un lien qui appartient à un autre compte, comme un lien extrait d'une
+archive, est refusé même dans un dossier fermé. Un dossier dont le mode s'affiche avec
+moins de trois chiffres est traité comme ouvert ; sur un dossier doté d'une ACL POSIX, les
+bits du mode montrent le masque de l'ACL, et les ACL NFSv4 ne sont pas vues. Une
+suppression en root retire l'entrée du dossier qu'elle tient, par son seul dernier nom,
+refuse un fichier dont un dossier a pris le nom et, comme le changement de permissions
+en root, demande GNU coreutils sur le serveur : sur BusyBox ou BSD elle est refusée. Une
+création de dossier et un renommage en root fonctionnent de la même façon, depuis le
+dossier tenu, et demandent aussi GNU coreutils : un nom déjà pris est signalé, jamais
+remplacé, sauf si vous avez choisi de remplacer un fichier. Les vérifications qui
+cherchent un nom existant avant un renommage lisent le chemin tel qu'il est donné (un
+`!` y est échappé) ; le
+renommage lui-même, non.
+
+L'écriture, la lecture ou le changement de permissions d'une entrée qui a un autre
+lien physique est refusé quand son dossier peut être modifié par un compte autre que
+root, l'appelant et le propriétaire de l'entrée ; le message le dit. Les liens physiques dans des dossiers fermés aux autres comptes, comme
+les fichiers de paquets sous `/usr`, continuent de fonctionner.
+
+Limites qui restent : un compte qui peut écrire dans le dossier peut supprimer le
+répertoire de travail vide et faire échouer le transfert.
+
+Un fichier qui en remplace un autre garde son propriétaire, son mode, ses horodatages
+et ses attributs étendus. Un nouveau fichier écrit en root appartient à root, avec le
+gid du dossier quand le dossier est setgid, et prend le mode 0644, comme avec
+`sudo cp`, là où le système de fichiers le permet. Dans un dossier qui a une ACL par
+défaut, le nouveau fichier garde plutôt ce que cette ACL lui donne. Un secret téléversé
+comme nouveau fichier est donc lisible par tous les comptes tant que vous n'avez pas
+changé ses permissions ; le changement de permissions en root le fait sans suivre de
+lien.
 
 La connexion privilégiée passe par la même connexion annulable que les autres
 connexions SFTP : Annuler l'atteint pendant la négociation. Chaque commande
@@ -771,6 +921,25 @@ préférence de l'utilisateur entre les agents est un réglage d'exécution
 (`AppSettings.SshAgentPreference`) ; les changements prennent effet à la
 prochaine tentative de connexion, sans redémarrage de l'application.
 
+Une session peut désigner la seule clé d'agent qu'elle présente
+(`ServerProfileDto.SshAgentKeyFingerprint`, une empreinte `SHA256:`). La clé est
+cherchée dans les agents que Heimdall est réglé pour utiliser avant tout tunnel ou
+toute demande, avec une attente bornée hors du thread appelant ; un agent qui ne
+répond pas à temps ne détient rien qui puisse être présenté. Une clé trouvée dans
+aucun agent est refusée, sans repli sur les autres clés. Le choix limite les clés
+d'agent seulement : il n'agit ni sur un mot de passe enregistré, ni sur un fichier de
+clé, ni sur l'authentification interactive au clavier. Les sauts de passerelle et les
+tunnels ne le reçoivent pas et présentent toujours toutes les clés de l'agent. La
+valeur est locale à la machine : l'assainisseur des profils partagés la retire, tout
+import l'efface et l'export des réglages la supprime. Avec le transfert d'agent activé,
+l'hôte distant peut quand même utiliser toutes les clés de l'agent, quelle que soit la
+clé désignée par la session. Sur le chemin Plink (transfert d'agent avec Pageant, nouvel
+essai après un échec du client intégré), la clé est remise à Plink sous la forme d'un
+fichier de clé publique d'une ligne, seulement si la clé est dans Pageant, d'un type que
+Plink sait lire, si aucun fichier de clé n'est configuré et si Plink est la version
+fournie ; sinon la session est refusée. Le mode PuTTY externe avec une clé choisie est
+refusé.
+
 `OpenSshPipeAgent.SendRequest` repose sur des entrées/sorties de tube
 asynchrones (`NamedPipeClientStream` ouvert avec `PipeOptions.Asynchronous`) et
 sur un jeton lié de délai/annulation, en remplacement du `ReadTimeout` au
@@ -885,9 +1054,15 @@ un. **Un profil qui s'authentifie par clé et sans mot de passe n'est pas concer
 jamais le fichier, il n'a donc rien à protéger ici, et rien n'est affirmé ici au sujet des
 connexions par clé seule.
 
+**Une réponse vide au mot de passe n'écrit aucun fichier.** Quand une session a un nom d'utilisateur mais ni mot de passe enregistré ni clé, la demande de mot de passe peut recevoir une réponse vide, pour se connecter avec Kerberos ou une clé Pageant. Heimdall n'écrit alors aucun fichier de mot de passe et lance Plink en mode batch (`-batch`) : aucune invite ne peut attendre sur une console cachée et aucun mot de passe n'est envoyé. Si le serveur n'accepte aucune des deux méthodes, Plink se termine aussitôt et le terminal en donne la raison.
+
 La fin du processus reste le filet de sécurité, tous les chemins qui libèrent le fichier passent par
 une barrière unique afin que la suppression s'exécute exactement une fois, et un lancement qui
 échoue ou qui est annulé libère sur-le-champ.
+
+### Profils importés qui exécutent quelque chose
+
+Un profil issu d'un fichier peut démarrer un programme sur cet ordinateur (exécutable du shell local, arguments, répertoire de travail, élévation ; programme externe d'une console web ; fichier ICA Citrix) ou saisir des commandes post-connexion dans une session. L'import met `ExecutionConfirmed` à faux, et tant qu'il l'est, Heimdall énumère chaque valeur qu'il lancerait, commandes post-connexion comprises, comme l'avis de la boîte de dialogue (pour une session dont l'unique valeur de ce genre est un fichier ICA Citrix, il nomme ce fichier en une phrase), et demande confirmation avant de les lancer. L'acceptation à la connexion enregistre l'approbation, et la réponse par défaut, qui est aussi celle prise pendant que Heimdall se ferme, est "Ne pas exécuter". Modifier le profil n'y change rien : la boîte de dialogue de la session affiche au-dessus de ses onglets un avis qui énumère chacune de ces valeurs, étapes post-connexion comprises, même pour un protocole dont la boîte de dialogue ne les montre pas, et le profil n'est marqué comme approuvé que par le bouton "Autoriser l'exécution" de l'avis suivi de l'enregistrement, ou par l'acceptation de cette confirmation. Un profil créé dans la boîte de dialogue est approuvé.
 
 ### Durcissement des arguments de sous-processus
 
@@ -1163,7 +1338,7 @@ remplacer la destination.
   bloquante (la suite moins les cas marqués `CIUnstable` ou `RequiresDesktop`,
   qui tournent dans deux autres lanes signalant leurs échecs sans faire rougir
   l'exécution), la parité des locales JSON (chaque catalogue porte exactement
-  le jeu de clés anglais, actuellement 6 200+ clés) et une analyse informative
+  le jeu de clés anglais, actuellement 6 400+ clés) et une analyse informative
   `dotnet list package --vulnerable`.
 - Analyse des dépendances pour revue manuelle : `dotnet list Heimdall.slnx
   package --vulnerable --include-transitive`. La CI émet des avertissements mais

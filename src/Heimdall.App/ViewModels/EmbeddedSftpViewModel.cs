@@ -111,6 +111,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     private readonly IFileConflictDialogPresenter _fileConflictDialogPresenter;
     private Func<string, CancellationToken, Task<SudoRenameCommandResult>>? _sudoRenameCommandExecutor;
     private Func<string, CancellationToken, Task>? _sudoDeleteCommandExecutor = null;
+    private Func<string, CancellationToken, Task>? _sudoChmodCommandExecutor;
+    private Func<string, CancellationToken, Task>? _sudoMkdirCommandExecutor = null;
     private ISftpBrowserStateStore? _stateStore;
     private IRemoteBrowser? _browser;
     // Emits operation records for the SFTP sudo fallbacks (which bypass the decorated browser).
@@ -171,6 +173,10 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         _fileConflictDialogPresenter = fileConflictDialogPresenter
             ?? throw new ArgumentNullException(nameof(fileConflictDialogPresenter));
         _remoteClipboard.Changed += OnRemoteClipboardChanged;
+        RootActivity = new SftpRootActivityLog();
+        _sudoGate = new SftpSudoFallbackGate(AskSudoQuestionAsync);
+        _privilegedActs = new SftpPrivilegedActRecorder(SessionOperationEmitter.Disabled, RootActivity);
+        RootActivity.Changed += OnRootActivityChanged;
         Files = [];
         PathSegments.ReplaceAll(BuildPathSegments(_currentPath));
         Bookmarks = [];
@@ -432,7 +438,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         Func<bool>? sessionLoggingEnabledProvider = null,
         string? operationProtocol = null,
         string? operationHost = null,
-        bool? sessionLoggingOverride = null)
+        bool? sessionLoggingOverride = null,
+        Func<SftpSudoFallbackMode>? sftpSudoFallbackProvider = null)
     {
         ArgumentNullException.ThrowIfNull(browser);
         ArgumentNullException.ThrowIfNull(sessionTab);
@@ -453,8 +460,12 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 operationHost,
                 sessionLoggingOverride)
             : SessionOperationEmitter.Disabled;
+        _privilegedActs = new SftpPrivilegedActRecorder(_sudoEmitter, RootActivity);
+        _sudoGate.SetModeProvider(sftpSudoFallbackProvider);
         SessionTab = sessionTab;
         _localizer = localizer;
+        ObserveLocaleChanges();
+        RefreshSudoModeAvailability();
         _dialogService = dialogService;
         _sshParams = sshParams;
         _hostKeyStore = hostKeyStore;
@@ -488,6 +499,13 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             ?? throw new ArgumentNullException(nameof(commandExecutor));
     }
 
+    /// <summary>Overrides the privileged chmod command channel for focused tests.</summary>
+    internal void SetSudoChmodCommandExecutor(Func<string, CancellationToken, Task> commandExecutor)
+    {
+        _sudoChmodCommandExecutor = commandExecutor
+            ?? throw new ArgumentNullException(nameof(commandExecutor));
+    }
+
     /// <summary>
     /// Marks the view model as disposed so future async operations short-circuit.
     /// </summary>
@@ -513,6 +531,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         CancelQueuedJobs();
         IsConnected = false;
         _remoteClipboard.Changed -= OnRemoteClipboardChanged;
+        DetachRootActivity();
         if (_localizer is not null && _localeChangeObserved)
         {
             _localizer.LocaleChanged -= OnLocaleChanged;
@@ -642,6 +661,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
         if (_pendingSelectPath is { } pendingPath)
         {
+            selectedPaths.Clear();
             selectedPaths.Add(pendingPath);
             _pendingSelectPath = null;
         }
@@ -847,6 +867,15 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     }
 
     /// <summary>
+    /// Reloads the current directory after an operation of the pane. The user did not ask for this
+    /// listing, so it never raises the question of listing as root.
+    /// </summary>
+    internal Task RefreshAfterOperationAsync()
+    {
+        return LoadDirectoryCoreAsync(CurrentPath, pushToHistory: false, initiator: SftpSudoInitiator.Background);
+    }
+
+    /// <summary>
     /// Navigates to the path entered in the path bar.
     /// </summary>
     public Task NavigateToPath(string? path)
@@ -866,9 +895,14 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
     private Task NavigateToPathCore(string? path, bool redactPathInLogs)
     {
+        // A path read from the terminal output is not something the user typed: it never asks for root.
         return string.IsNullOrWhiteSpace(path)
             ? Task.CompletedTask
-            : LoadDirectoryCoreAsync(path.Trim(), pushToHistory: true, redactPathInLogs: redactPathInLogs);
+            : LoadDirectoryCoreAsync(
+                path.Trim(),
+                pushToHistory: true,
+                redactPathInLogs: redactPathInLogs,
+                initiator: redactPathInLogs ? SftpSudoInitiator.Background : SftpSudoInitiator.User);
     }
 
     /// <summary>
@@ -887,7 +921,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             await LoadDirectoryCoreAsync(
                 targetPath,
                 pushToHistory: false,
-                suppressErrorStatus: true).ConfigureAwait(false);
+                suppressErrorStatus: true,
+                initiator: SftpSudoInitiator.Background).ConfigureAwait(false);
             if (string.Equals(CurrentPath, targetPath, StringComparison.Ordinal))
             {
                 return;
@@ -897,7 +932,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 $"EmbeddedSFTP initial path restore failed for '{targetPath}', falling back to '{homePath}'.");
         }
 
-        await LoadDirectoryCoreAsync(homePath, pushToHistory: false).ConfigureAwait(false);
+        await LoadDirectoryCoreAsync(homePath, pushToHistory: false, initiator: SftpSudoInitiator.Background)
+            .ConfigureAwait(false);
     }
 
     [RelayCommand]
@@ -1056,11 +1092,27 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     [RelayCommand]
     public async Task ToggleSudoMode()
     {
+        // The button can be switched off while the setting is Never, never on.
+        if (!SudoMode && !IsSudoModeAvailable)
+        {
+            await RunOnUiAsync(() => UpdateStatus(L10n(SftpSudoConsentLocaleKeys.ModeNeverTooltip)));
+            return;
+        }
+
+        bool turnedOff = false;
         await RunOnUiAsync(() =>
         {
             SudoMode = !SudoMode;
+            turnedOff = !SudoMode;
             UpdateStatus(L10n(SudoMode ? "SftpSudoModeEnabled" : "SftpSudoModeDisabled"));
         });
+
+        // Turning the button off never asks: the listing that follows is not a request for root.
+        if (turnedOff)
+        {
+            await RefreshAfterOperationAsync().ConfigureAwait(false);
+            return;
+        }
 
         await Refresh().ConfigureAwait(false);
     }
@@ -1097,13 +1149,18 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         ArgumentException.ThrowIfNullOrWhiteSpace(key);
 
         _securityNoticeKey = key;
+        ObserveLocaleChanges();
+
+        ShowSecurityNotice(_localizer?[key] ?? key);
+    }
+
+    private void ObserveLocaleChanges()
+    {
         if (_localizer is not null && !_localeChangeObserved)
         {
             _localizer.LocaleChanged += OnLocaleChanged;
             _localeChangeObserved = true;
         }
-
-        ShowSecurityNotice(_localizer?[key] ?? key);
     }
 
     private void OnLocaleChanged(string locale)
@@ -1113,6 +1170,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         {
             _ = RunOnUiAsync(() => ShowSecurityNotice(_localizer[key]));
         }
+
+        RefreshSudoModeAvailability();
     }
 
     public void ShowSecurityNotice(string message)
@@ -1142,6 +1201,16 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     {
         ArgumentNullException.ThrowIfNull(ex);
 
+        if (ex is SftpSudoNotRunException notRun)
+        {
+            return DescribeSudoNotRun(notRun, DescribeTransferError(notRun.Refusal));
+        }
+
+        if (ex is SudoBatchStoppedException stopped)
+        {
+            return DescribeTransferError(stopped.StoppingFailure);
+        }
+
         if (ex is LocalDestinationExistsException or RemoteDestinationExistsException)
         {
             return L10n("SftpErrorDestinationChanged");
@@ -1157,9 +1226,40 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             return GetSudoAuthenticationErrorMessage(sudoException.Kind);
         }
 
+        if (ex is PrivilegedWriteFailedException writeFailure)
+        {
+            return writeFailure.Kind switch
+            {
+                PrivilegedWriteFailureKind.PasswordRejected => GetSudoAuthenticationErrorMessage(SudoFailureKind.PasswordRejected),
+                PrivilegedWriteFailureKind.PasswordUnavailable => GetSudoAuthenticationErrorMessage(SudoFailureKind.PasswordUnavailable),
+                PrivilegedWriteFailureKind.NotPermitted => L10n("ErrorSudoNotPermitted"),
+                PrivilegedWriteFailureKind.SudoMissing => L10n("ErrorSudoMissing"),
+                PrivilegedWriteFailureKind.StagingFailed => L10n("SftpErrorSudoStagingFailed"),
+                _ => L10n("ErrorSudoAuthenticationFailed"),
+            };
+        }
+
         if (ex is SudoToolingUnavailableException)
         {
             return L10n("SftpErrorSudoToolingUnavailable");
+        }
+
+        if (ex is PrivilegedTransferRefusedException transferRefusal)
+        {
+            return DescribeTransferRefusal(transferRefusal.Reason, transferRefusal.RemotePath);
+        }
+
+        if (ex is SudoEntryRefusedException entryRefusal)
+        {
+            string shownPath = entryRefusal.RemotePath;
+            return entryRefusal.Reason switch
+            {
+                EntryRefusalReason.PathLink or EntryRefusalReason.HardLink =>
+                    DescribeTransferRefusal(entryRefusal.Reason, shownPath),
+                EntryRefusalReason.Changed =>
+                    LF("SftpRootRefusedChanged", ExecutionTrustDescriber.Visible(shownPath)),
+                _ => LF("SftpRootRefusedEntry", ExecutionTrustDescriber.Visible(shownPath)),
+            };
         }
 
         if (ex is SudoEditFileTooLargeException tooLargeException)
@@ -1388,8 +1488,13 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     private async Task<UploadPlanOutcome> UploadPlannedEntriesAsync(
         IReadOnlyList<string> localPaths,
         string targetRemoteDir,
-        CancellationToken ct)
+        CancellationToken ct,
+        SftpSudoConsentScope? consentScope = null)
     {
+        // One scope for the whole job: it asks at most once, and a failure that cannot change from
+        // one file to the next stops root for the files after it.
+        SftpSudoConsentScope sudoScope = consentScope
+            ?? new SftpSudoConsentScope(SftpRootActKind.Upload, SftpSudoScopeKind.Job, targetRemoteDir);
         List<string> skippedUnsupportedTargets = [];
         List<string> skippedLocalReparsePoints = [];
         List<string> skippedUnavailableSources = [];
@@ -1591,9 +1696,28 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             }
             catch (Exception ex) when (_sshParams is not null && IsPermissionDenied(ex))
             {
+                await RequireSudoAsync(
+                    resolved.Overwrite ? SftpRootActKind.Overwrite : SftpRootActKind.Upload,
+                    resolved.EffectiveTargetPath,
+                    sudoScope,
+                    ex,
+                    ct);
                 Core.Logging.FileLogger.Info(
                     $"EmbeddedSFTP upload permission denied, falling back to sudo for {fileName}");
-                await UploadViaSudoAsync(op.LocalPath, resolved.EffectiveTargetPath, ct, resolved.Overwrite);
+                try
+                {
+                    await UploadViaSudoAsync(
+                        op.LocalPath,
+                        resolved.EffectiveTargetPath,
+                        ct,
+                        resolved.Overwrite,
+                        resolved.Overwrite ? SftpRootActKind.Overwrite : SftpRootActKind.Upload);
+                }
+                catch (Exception sudoException) when (sudoException is not OperationCanceledException)
+                {
+                    sudoScope.Guard.Record(sudoException);
+                    throw;
+                }
             }
 
             tracker.CompleteFile();
@@ -2174,12 +2298,11 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     /// bypassing SFTP permission restrictions.
     /// </summary>
     internal Task DownloadViaSudoAsync(string remotePath, string localPath, CancellationToken ct, bool overwrite = true)
-        => _sudoEmitter.RunDownloadAsync(
+        => _privilegedActs.RunDownloadAsync(
             remotePath,
             localPath,
             () => DownloadViaSudoCoreAsync(remotePath, localPath, ct, overwrite),
-            () => new FileInfo(localPath).Length,
-            privileged: true);
+            () => new FileInfo(localPath).Length);
 
     private async Task DownloadViaSudoCoreAsync(string remotePath, string localPath, CancellationToken ct, bool overwrite)
     {
@@ -2206,7 +2329,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                     commandCancellation,
                     localPath,
                     ct,
-                    overwrite);
+                    overwrite,
+                    remotePath);
 
                 if (authenticateViaStdin)
                 {
@@ -2272,7 +2396,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         CancellationTokenSource commandCancellation,
         string localPath,
         CancellationToken ct,
-        bool overwrite = true)
+        bool overwrite = true,
+        string? remotePath = null)
     {
         ArgumentNullException.ThrowIfNull(standardOutput);
         ArgumentNullException.ThrowIfNull(standardError);
@@ -2304,7 +2429,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 await destination.FlushAsync(commandCancellation.Token).ConfigureAwait(false);
             }
 
-            EnsureSudoSucceeded(exitStatusProvider(), standardErrorText, "base64");
+            EnsureSudoSucceeded(exitStatusProvider(), standardErrorText, "base64", remotePath);
             ct.ThrowIfCancellationRequested();
             AtomicLocalFile.Commit(tempPath, localPath, overwrite);
         }
@@ -2442,7 +2567,12 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     /// Streams a file over SSH to a root-owned same-directory temp file, then
     /// atomically replaces the privileged target without following symlinks.
     /// </summary>
-    internal async Task UploadViaSudoAsync(string localPath, string remotePath, CancellationToken ct, bool overwrite = true)
+    internal async Task UploadViaSudoAsync(
+        string localPath,
+        string remotePath,
+        CancellationToken ct,
+        bool overwrite = true,
+        SftpRootActKind kind = SftpRootActKind.Upload)
     {
         if (_browser is null)
         {
@@ -2453,7 +2583,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         try
         {
             // Log the privileged write against the user's true target path.
-            await _sudoEmitter.RunUploadAsync(
+            await _privilegedActs.RunUploadAsync(
+                kind,
                 localPath,
                 remotePath,
                 async () =>
@@ -2465,30 +2596,51 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                         FileShare.Read,
                         bufferSize: 81920,
                         FileOptions.Asynchronous | FileOptions.SequentialScan);
-                    string writeBody = SudoUploadCommands.Build(remotePath, overwrite);
                     PrivilegedCommandResult result = await PrivilegedFileTransfer.ExecuteAtomicWriteAsync(
                             ssh,
-                            writeBody,
+                            remotePath,
+                            overwrite,
                             content,
                             _sshParams?.Password,
                             ct)
                         .ConfigureAwait(false);
 
+                    ThrowIfWriteStageFailed(result);
                     if (!overwrite && result.ExitStatus == PrivilegedFileCommands.DestinationExistsExitStatus)
                     {
                         throw new RemoteDestinationExistsException(remotePath);
                     }
                     EnsureSudoSucceeded(
                         result.ExitStatus,
-                        result.Error,
-                        "atomic write");
+                        PrivilegedFileTransfer.CleanWriteError(result.Error),
+                        "atomic write",
+                        remotePath);
                 },
-                () => new FileInfo(localPath).Length,
-                privileged: true).ConfigureAwait(false);
+                () => new FileInfo(localPath).Length).ConfigureAwait(false);
         }
         finally
         {
             SafeDisconnect(ssh);
+        }
+    }
+
+    /// <summary>
+    /// Raises the error for a privileged write that failed before the installer ran: a refused or
+    /// unavailable password keeps the authentication error, the other stages keep their own kind.
+    /// </summary>
+    internal static void ThrowIfWriteStageFailed(PrivilegedCommandResult result)
+    {
+        try
+        {
+            PrivilegedFileTransfer.EnsureStageSucceeded(result);
+        }
+        catch (PrivilegedWriteFailedException ex) when (ex.Kind == PrivilegedWriteFailureKind.PasswordRejected)
+        {
+            throw new SudoAuthenticationException(SudoFailureKind.PasswordRejected, ex.RemoteError, ex);
+        }
+        catch (PrivilegedWriteFailedException ex) when (ex.Kind == PrivilegedWriteFailureKind.PasswordUnavailable)
+        {
+            throw new SudoAuthenticationException(SudoFailureKind.PasswordUnavailable, ex.RemoteError, ex);
         }
     }
 
@@ -2501,7 +2653,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     internal static void EnsureSudoSucceeded(
         int exitStatus,
         string? stderr,
-        string operationLabel)
+        string operationLabel,
+        string? remotePath = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(operationLabel);
 
@@ -2511,10 +2664,45 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         }
 
         string error = stderr ?? string.Empty;
+        // First: the marker proves sudo already let the script run, so a file name echoed in the
+        // script's own stderr ("sorry, try again", "not in the sudoers") cannot be read as a sudo
+        // refusal. The status alone is shared with other refusals, so the marker must be there too,
+        // at the start of a line.
+        if (exitStatus == PrivilegedFileCommands.NonRegularTargetExitStatus
+            && PrivilegedFileCommands.HasEntryRefusalMarker(error))
+        {
+            Core.Logging.FileLogger.Warn($"EmbeddedSFTP sudo {operationLabel} refused the entry: {error}");
+            throw new SudoEntryRefusedException(
+                PrivilegedFileCommands.ParseEntryRefusalReason(error),
+                error,
+                remotePath);
+        }
+
+        // Before the sudo wording is read: a path or a hard link refusal belongs to the entry, and a
+        // folder name in its message can look like a sudo message.
+        EntryRefusalReason? transferRefusal = PrivilegedFileCommands.ParseTransferRefusal(error, exitStatus);
+        if (transferRefusal is not null)
+        {
+            Core.Logging.FileLogger.Warn($"EmbeddedSFTP sudo {operationLabel} refused the path: {error}");
+            throw new PrivilegedTransferRefusedException(transferRefusal.Value, remotePath ?? string.Empty);
+        }
+
         SudoFailureKind failureKind = ClassifySudoStderr(error);
         if (failureKind is SudoFailureKind.PasswordUnavailable or SudoFailureKind.PasswordRejected)
         {
             throw new SudoAuthenticationException(failureKind, error);
+        }
+
+        // Settled by the account or the server, not by the entry: the same answer for every entry
+        // of a batch, so these carry their own kinds and a batch can stop on them.
+        if (PrivilegedFileTransfer.IsSudoNotPermittedMessage(error))
+        {
+            throw new SudoAuthenticationException(SudoFailureKind.NotPermitted, error);
+        }
+
+        if (PrivilegedFileTransfer.IsSudoMissing(exitStatus, error))
+        {
+            throw new SudoAuthenticationException(SudoFailureKind.SudoMissing, error);
         }
 
         // The script refused before staging anything because a tool it needs is missing, or the
@@ -2523,6 +2711,13 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         {
             Core.Logging.FileLogger.Warn($"EmbeddedSFTP sudo {operationLabel} refused by the tooling probe: {error}");
             throw new SudoToolingUnavailableException(error);
+        }
+
+        // The script found an entry at the name it was to create.
+        if (exitStatus == PrivilegedFileCommands.DestinationExistsExitStatus)
+        {
+            Core.Logging.FileLogger.Warn($"EmbeddedSFTP sudo {operationLabel} refused: an entry already holds the name");
+            throw new SudoDestinationExistsException();
         }
 
         throw new InvalidOperationException(
@@ -2569,27 +2764,51 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             return;
         }
 
+        string remotePath = CombineRemotePath(CurrentPath, folderName);
         try
         {
-            string remotePath = CombineRemotePath(CurrentPath, folderName);
             try
             {
                 await _browser.CreateDirectoryAsync(remotePath, LifecycleTokenOrNone());
             }
             catch (Exception ex) when (_sshParams is not null && IsPermissionDenied(ex))
             {
-                Core.Logging.FileLogger.Info("EmbeddedSFTP mkdir permission denied, falling back to sudo");
-                await _sudoEmitter.RunMkdirAsync(
+                await RequireSudoAsync(
+                    SftpRootActKind.NewFolder,
                     remotePath,
-                    () => RunSudoCommandAsync(
-                        $"mkdir -p {PathEscaper.EscapeForShell(remotePath)}",
-                        LifecycleTokenOrNone()),
-                    privileged: true);
+                    new SftpSudoConsentScope(SftpRootActKind.NewFolder),
+                    ex,
+                    LifecycleTokenOrNone());
+                Core.Logging.FileLogger.Info("EmbeddedSFTP mkdir permission denied, falling back to sudo");
+                await _privilegedActs.RunMkdirAsync(
+                    remotePath,
+                    async () =>
+                    {
+                        string mkdirBody = PrivilegedFileCommands.BuildHeldMkdirBody(remotePath);
+                        CancellationToken mkdirToken = LifecycleTokenOrNone();
+                        try
+                        {
+                            await (_sudoMkdirCommandExecutor is null
+                                ? RunSudoCommandAsync(mkdirBody, mkdirToken)
+                                : _sudoMkdirCommandExecutor(mkdirBody, mkdirToken)).ConfigureAwait(false);
+                        }
+                        catch (SudoEntryRefusedException refusal) when (refusal.RemotePath.Length == 0)
+                        {
+                            // The generic runner does not know the path; the message names it.
+                            throw new SudoEntryRefusedException(refusal.Reason, refusal.RemoteDiagnostic, remotePath);
+                        }
+                    });
             }
 
             RequestSelectAfterRefresh(remotePath);
             await RunOnUiAsync(() => UpdateStatus(L10n("SftpSuccessMkdir")));
-            await Refresh().ConfigureAwait(false);
+            await RefreshAfterOperationAsync().ConfigureAwait(false);
+        }
+        catch (SudoDestinationExistsException)
+        {
+            Core.Logging.FileLogger.Warn("EmbeddedSFTP mkdir refused: an entry already holds the name");
+            await RunOnUiAsync(() =>
+                SetErrorStatus(LF("SftpErrorMkdirExists", ExecutionTrustDescriber.Visible(remotePath))));
         }
         catch (Exception ex)
         {
@@ -2640,13 +2859,20 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
         try
         {
-            string newPath = CombineRemotePath(CurrentPath, newName);
+            string newPath = CombineRemotePath(GetParentPath(file.FullPath), newName);
             try
             {
                 await _browser.RenameAsync(file.FullPath, newPath, LifecycleTokenOrNone());
             }
             catch (Exception ex) when (_sshParams is not null && IsPermissionDenied(ex))
             {
+                // Before the probes: they are sudo calls too.
+                await RequireSudoAsync(
+                    SftpRootActKind.Rename,
+                    file.FullPath,
+                    new SftpSudoConsentScope(SftpRootActKind.Rename),
+                    ex,
+                    LifecycleTokenOrNone());
                 Core.Logging.FileLogger.Info("EmbeddedSFTP rename permission denied, falling back to sudo");
                 bool renamed = await RenameEntryViaSudoAsync(file, newPath);
                 if (!renamed)
@@ -2657,7 +2883,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
             RequestSelectAfterRefresh(newPath);
             await RunOnUiAsync(() => UpdateStatus(L10n("SftpSuccessRename")));
-            await Refresh().ConfigureAwait(false);
+            await RefreshAfterOperationAsync().ConfigureAwait(false);
         }
         catch (SudoRenameCollisionException)
         {
@@ -2739,14 +2965,13 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         }
 
         bool replace = decision?.Choice == FileConflictResolutionChoice.Replace;
-        await _sudoEmitter.RunRenameAsync(
+        await _privilegedActs.RunRenameAsync(
             file.FullPath,
             resolved.EffectiveTargetPath,
             () => ExecuteSudoRenameMoveAsync(
                 file.FullPath,
                 resolved.EffectiveTargetPath,
-                replace),
-            privileged: true).ConfigureAwait(false);
+                replace)).ConfigureAwait(false);
         return true;
     }
 
@@ -2777,26 +3002,34 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         string targetPath,
         bool replace)
     {
+        string newName = ExtractRenameTargetName(sourcePath, targetPath);
         SudoRenameCommandResult moveResult = await ExecuteSudoRenameCommandAsync(
-                SudoRenameCommands.BuildMove(sourcePath, targetPath, replace),
+                PrivilegedFileCommands.BuildHeldRenameBody(sourcePath, newName, replace),
                 CancellationToken.None)
             .ConfigureAwait(false);
-        EnsureSudoSucceeded(moveResult.ExitStatus, moveResult.StandardError, "rename");
 
-        if (replace)
-        {
-            return;
-        }
-
-        SudoRenameCommandResult sourceResult = await ExecuteSudoRenameCommandAsync(
-                SudoRenameCommands.BuildExistenceProbe(sourcePath),
-                CancellationToken.None)
-            .ConfigureAwait(false);
-        EnsureSudoProbeCompleted(sourceResult, "rename outcome probe");
-        if (sourceResult.ExitStatus == 0)
+        // Before the generic check: the script's own status, both names still in place.
+        if (moveResult.ExitStatus == PrivilegedFileCommands.DestinationExistsExitStatus)
         {
             throw new SudoRenameCollisionException();
         }
+
+        EnsureSudoSucceeded(moveResult.ExitStatus, moveResult.StandardError, "rename", sourcePath);
+    }
+
+    /// <summary>
+    /// The new name of a rename: the last component of the target, which must sit in the folder of
+    /// the source. A rename never moves an entry to another folder.
+    /// </summary>
+    private static string ExtractRenameTargetName(string sourcePath, string targetPath)
+    {
+        string parent = GetParentPath(sourcePath);
+        if (!string.Equals(GetParentPath(targetPath), parent, StringComparison.Ordinal))
+        {
+            throw new ArgumentException("A rename stays in the folder of the entry.", nameof(targetPath));
+        }
+
+        return targetPath[(targetPath.LastIndexOf('/') + 1)..];
     }
 
     private async Task<SudoRenameCommandResult> ExecuteSudoRenameCommandAsync(
@@ -2863,7 +3096,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
         // A count is not a name: it does not go between the quotes reserved for one.
         string message = entries.Count == 1
-            ? LF("SftpConfirmDelete", entries[0].Name)
+            ? LF("SftpConfirmDelete", ExecutionTrustDescriber.Visible(entries[0].Name))
             : LF("SftpConfirmDeleteMultiple", entries.Count.ToString(CultureInfo.InvariantCulture));
 
         bool confirmed = await _dialogService.ShowConfirmAsync(
@@ -2895,28 +3128,12 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             deleteCts.Token);
         CancellationToken deleteToken = deleteLinked.Token;
         IRemoteBrowser browser = _browser;
-        IDialogService dialogService = _dialogService;
         List<DeleteEntryFailure> failures = [];
+        // One scope for the whole deletion: the first answer settles it, and the question says so.
+        SftpSudoConsentScope consent = new(SftpRootActKind.Delete);
+        SudoBatchGuard sudoGuard = consent.Guard;
         int deletedCount = 0;
         int attemptedCount = 0;
-
-        SudoEscalationConsent consent = new(async refusedName =>
-        {
-            bool granted = false;
-
-            // The loop runs off the UI thread, and this dialog service is blocking-then
-            // -Task.FromResult, so the question has to be marshalled rather than awaited
-            // where the refusal was caught.
-            await _uiDispatcher.InvokeAsync(async () =>
-            {
-                granted = await dialogService.ShowConfirmAsync(
-                    L10n("SftpConfirmSudoDeleteTitle"),
-                    LF("SftpConfirmSudoDelete", refusedName),
-                    "danger").ConfigureAwait(true);
-            }).ConfigureAwait(false);
-
-            return granted;
-        });
 
         try
         {
@@ -2925,8 +3142,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             {
                 deleteToken.ThrowIfCancellationRequested();
                 attemptedCount++;
-                TransferStatusText = LF("SftpStatusDeleting", file.Name, attemptedCount, entries.Count);
-                DeleteEntryFailure? failure = await TryDeleteEntryAsync(browser, file, consent, deleteToken)
+                TransferStatusText = LF("SftpStatusDeleting", ExecutionTrustDescriber.Visible(file.Name), attemptedCount, entries.Count);
+                DeleteEntryFailure? failure = await TryDeleteEntryAsync(browser, file, consent, sudoGuard, deleteToken)
                     .ConfigureAwait(false);
                 if (failure is null)
                 {
@@ -2941,25 +3158,29 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             if (failures.Count == 0)
             {
                 await RunOnUiAsync(() => UpdateStatus(L10n("SftpSuccessDelete")));
-                await Refresh().ConfigureAwait(false);
+                await RefreshAfterOperationAsync().ConfigureAwait(false);
                 return;
             }
 
-            string summary = GetDeleteFailureSummary(failures, entries.Count);
+            string summary = GetDeleteFailureSummary(failures, entries.Count, sudoGuard);
             if (deletedCount == 0)
             {
                 await RunOnUiAsync(() => SetErrorStatus(summary)).ConfigureAwait(false);
                 return;
             }
 
-            await Refresh().ConfigureAwait(false);
+            if (!ShouldSkipRefreshAfterStoppedBatch(sudoGuard))
+            {
+                await RefreshAfterOperationAsync().ConfigureAwait(false);
+            }
+
             await RunOnUiAsync(() => ShowOperationWarning(summary)).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
             // The user's own act: what was already deleted stays deleted, so the listing is
             // refreshed and the status says how far the deletion got.
-            await Refresh().ConfigureAwait(false);
+            await RefreshAfterOperationAsync().ConfigureAwait(false);
             int doneBeforeCancel = deletedCount;
             await RunOnUiAsync(() => UpdateStatus(
                 LF("SftpStatusDeleteCancelled", doneBeforeCancel, entries.Count))).ConfigureAwait(false);
@@ -2978,7 +3199,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     private async Task<DeleteEntryFailure?> TryDeleteEntryAsync(
         IRemoteBrowser browser,
         SftpFileInfo file,
-        SudoEscalationConsent consent,
+        SftpSudoConsentScope consent,
+        SudoBatchGuard sudoGuard,
         CancellationToken ct)
     {
         if (SftpPathGuard.IsProtectedRoot(file.FullPath))
@@ -3000,16 +3222,30 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         catch (Exception ex) when (_sshParams is not null && IsPermissionDenied(ex))
         {
             // Escalating is a different act from the delete that was asked for: a
-            // recursive removal running as root, which nothing undoes. Listing escalates
-            // on the same signal without asking, and that stays as it is - reading a
-            // directory you do not own is reversible, and this is not.
-            if (!await consent.IsGrantedAsync(file.Name).ConfigureAwait(false))
+            // recursive removal running as root, which nothing undoes. It asks in Ask and in
+            // Automatic alike, and is refused in Never.
+            SftpSudoDecision decision = await DecideSudoAsync(
+                SftpRootActKind.Delete,
+                file.Name,
+                consent,
+                ct).ConfigureAwait(false);
+            if (decision is not (SftpSudoDecision.Allowed or SftpSudoDecision.AllowedAfterQuestion
+                or SftpSudoDecision.BatchStopped))
             {
                 Core.Logging.FileLogger.Info(
-                    $"EmbeddedSFTP sudo deletion declined by the user for '{file.Name}'.");
+                    $"EmbeddedSFTP sudo deletion not run for '{file.Name}': {decision}.");
                 return new DeleteEntryFailure(
                     file.Name,
                     RemoteRecursiveDeleteFailureReason.PermissionDenied);
+            }
+
+            // An earlier entry showed that sudo cannot succeed in this batch: asking again would
+            // repeat the same refusal, and with a password it would repeat the wrong attempt.
+            if (decision == SftpSudoDecision.BatchStopped || sudoGuard.IsStopped)
+            {
+                Core.Logging.FileLogger.Info(
+                    $"EmbeddedSFTP sudo deletion not tried for '{file.Name}': sudo already failed in this batch.");
+                return new DeleteEntryFailure(file.Name, null, SudoNotAttempted: true);
             }
 
             try
@@ -3017,13 +3253,11 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 SftpPathGuard.ThrowIfProtectedRoot(file.FullPath, "sudo delete");
                 Core.Logging.FileLogger.Info(
                     $"EmbeddedSFTP delete permission denied, falling back to sudo for {file.Name}");
-                string flag = file.IsDirectory ? "-rf" : "-f";
-                await _sudoEmitter.RunDeleteAsync(
+                await _privilegedActs.RunDeleteAsync(
                     file.FullPath,
                     () => RunSudoDeleteCommandAsync(
-                        $"rm {flag} {PathEscaper.EscapeForShell(file.FullPath)}",
-                        CancellationToken.None),
-                    privileged: true).ConfigureAwait(false);
+                        PrivilegedFileCommands.BuildHeldDeleteBody(file.FullPath, file.IsDirectory),
+                        CancellationToken.None)).ConfigureAwait(false);
                 return null;
             }
             catch (OperationCanceledException)
@@ -3035,7 +3269,14 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 Core.Logging.FileLogger.Warn(
                     $"EmbeddedSFTP sudo deletion failed for '{file.FullPath}' "
                     + $"[{sudoException.GetType().Name}]: {sudoException.Message}");
-                return new DeleteEntryFailure(file.Name, null);
+                sudoGuard.Record(sudoException);
+                EntryRefusalReason? refusal = sudoException switch
+                {
+                    SudoEntryRefusedException entryRefused => entryRefused.Reason,
+                    PrivilegedTransferRefusedException transferRefused => transferRefused.Reason,
+                    _ => null,
+                };
+                return new DeleteEntryFailure(file.Name, null, Refusal: refusal);
             }
         }
         catch (RemoteRecursiveDeleteException ex)
@@ -3060,16 +3301,90 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             : _sudoDeleteCommandExecutor(command, ct);
     }
 
+    /// <summary>
+    /// The sentence for an entry root refused: a link, a special file or a changed entry is named
+    /// as such; anything the server could not verify says the safe method is not available there.
+    /// </summary>
+    private string DescribeEntryRefusal(SudoEntryRefusedException refusal, string entryName)
+    {
+        if (refusal.Reason is EntryRefusalReason.PathLink or EntryRefusalReason.HardLink)
+        {
+            return DescribeTransferRefusal(refusal.Reason, entryName);
+        }
+
+        string key = refusal.Reason is EntryRefusalReason.Link
+            or EntryRefusalReason.Special
+            or EntryRefusalReason.Changed
+            ? "SftpChmodRootRefusedEntry"
+            : "SftpChmodRootRefusedUnverifiable";
+        return LF(key, ExecutionTrustDescriber.Visible(entryName));
+    }
+
+    /// <summary>
+    /// The sentence for a path or a hard link refusal, naming the entry as it can be shown.
+    /// </summary>
+    internal string DescribeTransferRefusal(EntryRefusalReason reason, string path)
+    {
+        string key = reason == EntryRefusalReason.HardLink
+            ? "SftpRootRefusedHardLink"
+            : "SftpRootRefusedPathLink";
+        return LF(key, ExecutionTrustDescriber.Visible(path));
+    }
+
+    /// <summary>
+    /// The sentence for a batch that stopped calling sudo: why, and how many entries that needed it
+    /// were not tried again.
+    /// </summary>
+    private string DescribeSudoBatchStopped(SudoBatchGuard sudoGuard, int notAttemptedCount)
+    {
+        string reason = DescribeTransferError(sudoGuard.StoppingFailure!);
+        return LFC(
+            notAttemptedCount,
+            "SftpSudoBatchStoppedOne",
+            "SftpSudoBatchStopped",
+            reason,
+            notAttemptedCount);
+    }
+
+    /// <summary>
+    /// In sudo browsing mode the listing itself goes through sudo with the same password, so
+    /// refreshing after a batch that proved sudo cannot succeed would only repeat the failure.
+    /// </summary>
+    internal bool ShouldSkipRefreshAfterStoppedBatch(SudoBatchGuard sudoGuard)
+        => IsListingAsRoot && sudoGuard.StoppedOnAuthentication;
+
     private string GetDeleteFailureSummary(
         IReadOnlyList<DeleteEntryFailure> failures,
-        int totalCount)
+        int totalCount,
+        SudoBatchGuard sudoGuard)
     {
+        if (sudoGuard.IsStopped)
+        {
+            int notAttemptedCount = failures.Count(failure => failure.SudoNotAttempted);
+            if (notAttemptedCount > 0)
+            {
+                return DescribeSudoBatchStopped(sudoGuard, notAttemptedCount);
+            }
+
+            if (failures.Count == 1)
+            {
+                return DescribeTransferError(sudoGuard.StoppingFailure!);
+            }
+        }
+
         DeleteEntryFailure firstFailure = failures[0];
         if (failures.Count == 1)
         {
             if (totalCount == 1 && firstFailure.IsProtectedRoot)
             {
                 return L10n("SftpErrorProtectedRoot");
+            }
+
+            if (firstFailure.Refusal is EntryRefusalReason refusal)
+            {
+                return refusal is EntryRefusalReason.PathLink or EntryRefusalReason.HardLink
+                    ? DescribeTransferRefusal(refusal, firstFailure.Name)
+                    : LF("SftpDeleteRootRefusedEntry", ExecutionTrustDescriber.Visible(firstFailure.Name));
             }
 
             return firstFailure.Reason switch
@@ -3079,8 +3394,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 RemoteRecursiveDeleteFailureReason.ShellOrRmUnavailable =>
                     L10n("SftpDeleteRefusedShellUnavailable"),
                 RemoteRecursiveDeleteFailureReason.PermissionDenied =>
-                    LF("SftpDeleteRefusedPermissionDenied", firstFailure.Name),
-                _ => LF("SftpDeleteFailedEntry", firstFailure.Name),
+                    LF("SftpDeleteRefusedPermissionDenied", ExecutionTrustDescriber.Visible(firstFailure.Name)),
+                _ => LF("SftpDeleteFailedEntry", ExecutionTrustDescriber.Visible(firstFailure.Name)),
             };
         }
 
@@ -3133,6 +3448,9 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         // refresh, so the entries already changed were shown with their old mode.
         List<string> failedNames = [];
         Exception? firstFailure = null;
+        SftpSudoConsentScope chmodScope = new(SftpRootActKind.PermissionChange);
+        SudoBatchGuard sudoGuard = chmodScope.Guard;
+        int notAttemptedCount = 0;
 
         try
         {
@@ -3140,7 +3458,14 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             {
                 try
                 {
-                    await ChmodEntryAsync(entry, mode, newPerms).ConfigureAwait(false);
+                    await ChmodEntryAsync(entry, mode, newPerms, chmodScope).ConfigureAwait(false);
+                }
+                catch (SudoBatchStoppedException)
+                {
+                    // Not a failure of this entry: root was not tried because an earlier entry
+                    // showed it cannot succeed here.
+                    failedNames.Add(entry.Name);
+                    notAttemptedCount++;
                 }
                 catch (Exception ex) when (ex is not (OperationCanceledException or NotSupportedException))
                 {
@@ -3154,23 +3479,43 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             if (failedNames.Count == 0)
             {
                 await RunOnUiAsync(() => UpdateStatus(L10n("SftpChmodSuccess")));
-                await Refresh().ConfigureAwait(false);
+                await RefreshAfterOperationAsync().ConfigureAwait(false);
                 return;
             }
 
             if (failedNames.Count == entries.Count)
             {
-                await RunOnUiAsync(() => SetTransferError(firstFailure!));
+                if (sudoGuard.IsStopped && notAttemptedCount > 0)
+                {
+                    string stoppedSummary = DescribeSudoBatchStopped(sudoGuard, notAttemptedCount);
+                    await RunOnUiAsync(() => SetErrorStatus(stoppedSummary));
+                }
+                else if (firstFailure is SudoEntryRefusedException refusal)
+                {
+                    string refusedSummary = DescribeEntryRefusal(refusal, failedNames[0]);
+                    await RunOnUiAsync(() => SetErrorStatus(refusedSummary));
+                }
+                else
+                {
+                    await RunOnUiAsync(() => SetTransferError(firstFailure!));
+                }
+
                 return;
             }
 
-            string summary = LFC(
-                failedNames.Count,
-                "SftpChmodPartialSummaryOne",
-                "SftpChmodPartialSummary",
-                failedNames.Count,
-                entries.Count);
-            await Refresh().ConfigureAwait(false);
+            string summary = sudoGuard.IsStopped && notAttemptedCount > 0
+                ? DescribeSudoBatchStopped(sudoGuard, notAttemptedCount)
+                : LFC(
+                    failedNames.Count,
+                    "SftpChmodPartialSummaryOne",
+                    "SftpChmodPartialSummary",
+                    failedNames.Count,
+                    entries.Count);
+            if (!ShouldSkipRefreshAfterStoppedBatch(sudoGuard))
+            {
+                await RefreshAfterOperationAsync().ConfigureAwait(false);
+            }
+
             await RunOnUiAsync(() => ShowOperationWarning(summary)).ConfigureAwait(false);
         }
         catch (NotSupportedException)
@@ -3185,22 +3530,93 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         }
     }
 
-    private async Task ChmodEntryAsync(SftpFileInfo entry, short mode, string octalText)
+    private async Task ChmodEntryAsync(
+        SftpFileInfo entry,
+        short mode,
+        string octalText,
+        SftpSudoConsentScope scope)
     {
+        SudoBatchGuard sudoGuard = scope.Guard;
         try
         {
             await _browser!.ChmodAsync(entry.FullPath, mode, LifecycleTokenOrNone()).ConfigureAwait(false);
         }
         catch (Exception ex) when (_sshParams is not null && IsPermissionDenied(ex))
         {
-            Core.Logging.FileLogger.Info("EmbeddedSFTP chmod permission denied, falling back to sudo");
-            await _sudoEmitter.RunChmodAsync(
+            // Root must never follow a link: the account was refused, and a link (or a special
+            // file) is exactly what a plain root chmod would follow to somewhere else. The kind
+            // comes from the listing, so a bare "not a file or directory" is refused here and the
+            // script checks it again on the server.
+            if (entry.Kind is not (RemoteEntryKind.File or RemoteEntryKind.Directory))
+            {
+                Core.Logging.FileLogger.Warn(
+                    $"EmbeddedSFTP chmod as root refused for '{entry.FullPath}': {entry.Kind}.");
+                await RefuseChmodWithoutSudoAsync(
+                    entry.FullPath,
+                    new SudoEntryRefusedException(
+                        entry.Kind == RemoteEntryKind.SymbolicLink ? EntryRefusalReason.Link : EntryRefusalReason.Special,
+                        entry.Kind.ToString())).ConfigureAwait(false);
+            }
+
+            if (sudoGuard.IsStopped)
+            {
+                Core.Logging.FileLogger.Info(
+                    $"EmbeddedSFTP chmod as root not tried for '{entry.FullPath}': sudo already failed in this batch.");
+                await RefuseChmodWithoutSudoAsync(
+                    entry.FullPath,
+                    new SudoBatchStoppedException(sudoGuard.StoppingFailure!)).ConfigureAwait(false);
+            }
+
+            SftpSudoDecision decision = await DecideSudoAsync(
+                SftpRootActKind.PermissionChange,
                 entry.FullPath,
-                () => RunSudoCommandAsync(
-                    $"chmod {octalText} {PathEscaper.EscapeForShell(entry.FullPath)}",
-                    LifecycleTokenOrNone()),
-                privileged: true).ConfigureAwait(false);
+                scope,
+                LifecycleTokenOrNone()).ConfigureAwait(false);
+            if (!decision.IsAllowed())
+            {
+                Core.Logging.FileLogger.Info(
+                    $"EmbeddedSFTP chmod as root not run for '{entry.FullPath}': {decision}.");
+                await RefuseChmodWithoutSudoAsync(
+                    entry.FullPath,
+                    new SftpSudoNotRunException(decision, ex)).ConfigureAwait(false);
+            }
+
+            Core.Logging.FileLogger.Info("EmbeddedSFTP chmod permission denied, falling back to sudo");
+            try
+            {
+                await _privilegedActs.RunChmodAsync(
+                    entry.FullPath,
+                    () => RunSudoChmodCommandAsync(
+                        PrivilegedFileCommands.BuildNoFollowChmodBody(entry.FullPath, octalText),
+                        LifecycleTokenOrNone())).ConfigureAwait(false);
+            }
+            catch (Exception sudoException)
+            {
+                sudoGuard.Record(sudoException);
+                throw;
+            }
         }
+    }
+
+    /// <summary>
+    /// Records the chmod the user asked for as failed, without any sudo call, and rethrows
+    /// <paramref name="refusal"/>.
+    /// </summary>
+    private async Task RefuseChmodWithoutSudoAsync(string path, Exception refusal)
+    {
+        await _sudoEmitter.RunChmodAsync(path, () => Task.FromException(refusal), privileged: false)
+            .ConfigureAwait(false);
+
+        // Not reached: the operation above always fails. Kept so a refusal can never fall through
+        // to the sudo call that follows it.
+        throw refusal;
+    }
+
+    private Task RunSudoChmodCommandAsync(string command, CancellationToken ct)
+    {
+        return _sudoChmodCommandExecutor is null
+            ? RunSudoCommandAsync(command, ct)
+            : _sudoChmodCommandExecutor(command, ct);
     }
 
     /// <summary>
@@ -3286,8 +3702,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     internal static string BuildSudoInvocation(string privilegedBody, bool authenticateViaStdin)
     {
         return authenticateViaStdin
-            ? $"sudo -S -p '' {privilegedBody}"
-            : $"sudo {privilegedBody}";
+            ? $"{PrivilegedFileCommands.SudoProgram} -S -p '' {privilegedBody}"
+            : $"{PrivilegedFileCommands.SudoProgram} {privilegedBody}";
     }
 
     internal static SudoFailureKind ClassifySudoStderr(string? stderr)
@@ -3394,7 +3810,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         string path,
         bool pushToHistory,
         bool suppressErrorStatus = false,
-        bool redactPathInLogs = false)
+        bool redactPathInLogs = false,
+        SftpSudoInitiator initiator = SftpSudoInitiator.User)
     {
         if (!TryCaptureLifecycleToken(out CancellationToken ct)
             || _browser is null
@@ -3427,7 +3844,17 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
 
             IReadOnlyList<SftpFileInfo> entries;
 
-            if (SudoMode && _sshParams is not null)
+            // One scope per listing: whatever this load asks, it asks once.
+            SftpSudoConsentScope listingScope = new(SftpRootActKind.Listing);
+            if (SudoMode
+                && _sshParams is not null
+                && (await DecideSudoAsync(
+                    SftpRootActKind.Listing,
+                    path,
+                    listingScope,
+                    ct,
+                    initiator,
+                    paneArmed: true).ConfigureAwait(false)).IsAllowed())
             {
                 entries = await ListDirectoryViaSudoAsync(path, ct).ConfigureAwait(false);
             }
@@ -3439,9 +3866,27 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 }
                 catch (Exception ex) when (_sshParams is not null && IsPermissionDenied(ex))
                 {
+                    SftpSudoDecision decision = await DecideSudoAsync(
+                        SftpRootActKind.Listing,
+                        path,
+                        listingScope,
+                        ct,
+                        initiator).ConfigureAwait(false);
+                    if (!decision.IsAllowed())
+                    {
+                        throw new SftpSudoNotRunException(decision, ex);
+                    }
+
                     Core.Logging.FileLogger.Info(redactPathInLogs
                         ? "EmbeddedSFTP listdir permission denied, falling back to sudo."
                         : $"EmbeddedSFTP listdir permission denied, falling back to sudo for {path}");
+                    if (decision == SftpSudoDecision.AllowedAfterQuestion)
+                    {
+                        // A yes to the listing question is the same consent as the sudo button:
+                        // the pane shows it, and the folders after this one list as root unasked.
+                        await RunOnUiAsync(() => SudoMode = true).ConfigureAwait(false);
+                    }
+
                     entries = await ListDirectoryViaSudoAsync(path, ct).ConfigureAwait(false);
                 }
             }
@@ -3520,11 +3965,23 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     /// </summary>
     internal string DescribeListingFailure(string path, Exception ex)
     {
+        if (ex is SftpSudoNotRunException notRun)
+        {
+            return DescribeSudoNotRun(notRun, DescribeListingFailure(path, notRun.Refusal));
+        }
+
         SftpListingFailure failure = SftpListingErrorClassifier.Classify(ex, _browser?.IsConnected == true);
         return LF(SftpListingErrorClassifier.LocaleKey(failure), path);
     }
 
-    private async Task<IReadOnlyList<SftpFileInfo>> ListDirectoryViaSudoAsync(
+    // Every privileged listing goes through here: the toggle, the automatic fallback and the
+    // download walk. The indicator counts it apart from the operations.
+    private Task<IReadOnlyList<SftpFileInfo>> ListDirectoryViaSudoAsync(
+        string path,
+        CancellationToken ct)
+        => _privilegedActs.RunListingAsync(path, () => ListDirectoryViaSudoCoreAsync(path, ct));
+
+    private async Task<IReadOnlyList<SftpFileInfo>> ListDirectoryViaSudoCoreAsync(
         string path,
         CancellationToken ct)
     {
@@ -3630,34 +4087,12 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         PasteCommand.NotifyCanExecuteChanged();
     }
 
-    /// <summary>
-    /// One answer per delete batch, for the question "your account was refused, do it as
-    /// root instead?".
-    /// </summary>
-    /// <remarks>
-    /// Asking inside the per-entry loop would put a dialog in front of the user for every
-    /// denied file in a multi-selection, so the first answer settles the whole deletion
-    /// and the prompt says as much.
-    /// </remarks>
-    private sealed class SudoEscalationConsent(Func<string, Task<bool>> ask)
-    {
-        private bool? _answer;
-
-        public async Task<bool> IsGrantedAsync(string firstRefusedName)
-        {
-            if (_answer is null)
-            {
-                _answer = await ask(firstRefusedName).ConfigureAwait(false);
-            }
-
-            return _answer.Value;
-        }
-    }
-
     private sealed record DeleteEntryFailure(
         string Name,
         RemoteRecursiveDeleteFailureReason? Reason,
-        bool IsProtectedRoot = false);
+        bool IsProtectedRoot = false,
+        bool SudoNotAttempted = false,
+        EntryRefusalReason? Refusal = null);
 
     private string L10n(string key) => _localizer?.GetString(key) ?? key;
 
@@ -3674,6 +4109,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         {
             SudoFailureKind.PasswordUnavailable => L10n("ErrorSudoPasswordUnavailable"),
             SudoFailureKind.PasswordRejected => L10n("ErrorSudoPasswordRejected"),
+            SudoFailureKind.NotPermitted => L10n("ErrorSudoNotPermitted"),
+            SudoFailureKind.SudoMissing => L10n("ErrorSudoMissing"),
             _ => L10n("ErrorSudoAuthenticationFailed"),
         };
     }
@@ -3689,6 +4126,8 @@ internal enum SudoFailureKind
     None,
     PasswordUnavailable,
     PasswordRejected,
+    NotPermitted,
+    SudoMissing,
 }
 
 /// <summary>Completed result from the privileged channel used by sudo rename.</summary>
@@ -3700,8 +4139,11 @@ internal sealed record SudoRenameCommandResult(
     string StandardOutput,
     string StandardError);
 
-/// <summary>Raised when a no-clobber rename exits successfully without moving its source.</summary>
+/// <summary>Raised when a no-clobber rename finds both the source and the destination in place.</summary>
 internal sealed class SudoRenameCollisionException : InvalidOperationException;
+
+/// <summary>Raised when a privileged script stopped because an entry already holds the name it was to create.</summary>
+internal sealed class SudoDestinationExistsException : InvalidOperationException;
 
 internal static class SudoRenameCommands
 {
@@ -3709,7 +4151,8 @@ internal static class SudoRenameCommands
     internal static string BuildExistenceProbe(string targetPath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(targetPath);
-        string escapedPath = PathEscaper.EscapeForShell(targetPath);
+        string escapedPath = PathEscaper.EscapeForShell(targetPath)
+            .Replace("!", "'\\!'", StringComparison.Ordinal);
         return $"test -e {escapedPath} -o -L {escapedPath}";
     }
 
@@ -3717,17 +4160,9 @@ internal static class SudoRenameCommands
     internal static string BuildDirectoryProbe(string targetPath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(targetPath);
-        return $"test -d {PathEscaper.EscapeForShell(targetPath)}";
-    }
-
-    /// <summary>Builds an exact-target move, adding no-clobber unless replacement was selected.</summary>
-    internal static string BuildMove(string sourcePath, string targetPath, bool replace)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
-        ArgumentException.ThrowIfNullOrWhiteSpace(targetPath);
-
-        string flags = replace ? "-T" : "-nT";
-        return $"mv {flags} {PathEscaper.EscapeForShell(sourcePath)} {PathEscaper.EscapeForShell(targetPath)}";
+        string escapedPath = PathEscaper.EscapeForShell(targetPath)
+            .Replace("!", "'\\!'", StringComparison.Ordinal);
+        return $"test -d {escapedPath}";
     }
 }
 

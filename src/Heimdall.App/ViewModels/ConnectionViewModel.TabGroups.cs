@@ -17,6 +17,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Heimdall.Core.Configuration;
 
 namespace Heimdall.App.ViewModels;
 
@@ -50,6 +51,29 @@ public partial class ConnectionViewModel
     private const string TabGroupHeaderHiddenDisconnectedOneKey = "SessionTabGroupHeaderHiddenDisconnectedOneA11y";
     private const string TabGroupHeaderShownOneKey = "SessionTabGroupHeaderShownOneA11y";
     private const string TabGroupHeaderHiddenOneKey = "SessionTabGroupHeaderHiddenOneA11y";
+
+    private const string ToolsTabGroupLabelKey = "SessionTabGroupTools";
+
+    // The tools group is not a folder: it is announced with wording of its own.
+    private const string ToolsChipExpandedKey = "SessionTabGroupToolsChipExpandedA11y";
+    private const string ToolsChipCollapsedKey = "SessionTabGroupToolsChipCollapsedA11y";
+    private const string ToolsChipLoneKey = "SessionTabGroupToolsChipLoneA11y";
+    private const string ToolsHeaderShownKey = "SessionTabGroupToolsHeaderShownA11y";
+    private const string ToolsHeaderShownOneKey = "SessionTabGroupToolsHeaderShownOneA11y";
+    private const string ToolsHeaderHiddenKey = "SessionTabGroupToolsHeaderHiddenA11y";
+    private const string ToolsHeaderHiddenOneKey = "SessionTabGroupToolsHeaderHiddenOneA11y";
+    private const string ToolsHeaderHiddenFailedKey = "SessionTabGroupToolsHeaderHiddenFailedA11y";
+    private const string ToolsHeaderHiddenFailedOneKey = "SessionTabGroupToolsHeaderHiddenFailedOneA11y";
+    private const string ToolsHeaderHiddenDisconnectedKey = "SessionTabGroupToolsHeaderHiddenDisconnectedA11y";
+    private const string ToolsHeaderHiddenDisconnectedOneKey = "SessionTabGroupToolsHeaderHiddenDisconnectedOneA11y";
+
+    /// <summary>
+    /// The key of the group that gathers the tool tabs. A local folder key never starts with a
+    /// slash (its segments are joined, empty ones dropped) and a shared one starts with
+    /// <see cref="ServerListViewModel.SharedFolderKeyPrefix"/>, so no folder can take this key,
+    /// whatever its name.
+    /// </summary>
+    internal const string ToolsTabGroupKey = "/tools";
 
     private readonly HashSet<string> _collapsedTabGroups = new(StringComparer.OrdinalIgnoreCase);
 
@@ -471,6 +495,10 @@ public partial class ConnectionViewModel
         return null;
     }
 
+    /// <summary>True when <paramref name="key"/> is the key of the group that gathers the tool tabs.</summary>
+    internal static bool IsToolsTabGroup(string? key)
+        => string.Equals(key, ToolsTabGroupKey, StringComparison.Ordinal);
+
     private static bool IsInTabGroup(SessionTabViewModel session, string key)
         => string.Equals(session.TabGroupKey, key, StringComparison.OrdinalIgnoreCase);
 
@@ -483,6 +511,15 @@ public partial class ConnectionViewModel
             && !string.IsNullOrWhiteSpace(lookupId)
                 ? _tabGroupResolver(lookupId)
                 : null;
+
+        // A tool has no folder: the ones the resolver left loose are gathered in one group.
+        if (group is null
+            && GroupTabsByFolder
+            && !session.IsPinned
+            && ConnectionTypeCatalog.IsToolConnectionType(session.ConnectionType))
+        {
+            group = new SessionTabGroupInfo(ToolsTabGroupKey, _localizer[ToolsTabGroupLabelKey], string.Empty);
+        }
 
         session.TabGroupKey = group?.Key;
         session.TabGroupLabel = group?.Label ?? string.Empty;
@@ -536,9 +573,12 @@ public partial class ConnectionViewModel
             session.IsHiddenInCollapsedGroup = collapsed && (ownRow || !head);
             // The same test the toggle makes: with no tab left to select outside the group, a
             // click on the chip leaves it open, and the chip used to give no reason why.
+            bool tools = IsToolsTabGroup(key);
             string chipKey = collapsed
-                ? TabGroupChipCollapsedKey
-                : NearestTabOutsideGroup(ActiveSessions, key) is null ? TabGroupChipLoneKey : TabGroupChipExpandedKey;
+                ? tools ? ToolsChipCollapsedKey : TabGroupChipCollapsedKey
+                : NearestTabOutsideGroup(ActiveSessions, key) is null
+                    ? tools ? ToolsChipLoneKey : TabGroupChipLoneKey
+                    : tools ? ToolsChipExpandedKey : TabGroupChipExpandedKey;
             session.TabGroupAccessibleName = _localizer.Format(chipKey, key);
         }
 
@@ -600,14 +640,33 @@ public partial class ConnectionViewModel
         header.Attention = attention;
 
         string key = header.Key;
+        bool tools = IsToolsTabGroup(key);
         header.AccessibleName = attention switch
         {
-            _ when shown => _localizer.FormatCount(count, TabGroupHeaderShownOneKey, TabGroupHeaderShownKey, key, count),
+            _ when shown => _localizer.FormatCount(
+                count,
+                tools ? ToolsHeaderShownOneKey : TabGroupHeaderShownOneKey,
+                tools ? ToolsHeaderShownKey : TabGroupHeaderShownKey,
+                key,
+                count),
             SessionTabGroupAttention.Failed => _localizer.FormatCount(
-                count, TabGroupHeaderHiddenFailedOneKey, TabGroupHeaderHiddenFailedKey, key, count),
+                count,
+                tools ? ToolsHeaderHiddenFailedOneKey : TabGroupHeaderHiddenFailedOneKey,
+                tools ? ToolsHeaderHiddenFailedKey : TabGroupHeaderHiddenFailedKey,
+                key,
+                count),
             SessionTabGroupAttention.Disconnected => _localizer.FormatCount(
-                count, TabGroupHeaderHiddenDisconnectedOneKey, TabGroupHeaderHiddenDisconnectedKey, key, count),
-            _ => _localizer.FormatCount(count, TabGroupHeaderHiddenOneKey, TabGroupHeaderHiddenKey, key, count),
+                count,
+                tools ? ToolsHeaderHiddenDisconnectedOneKey : TabGroupHeaderHiddenDisconnectedOneKey,
+                tools ? ToolsHeaderHiddenDisconnectedKey : TabGroupHeaderHiddenDisconnectedKey,
+                key,
+                count),
+            _ => _localizer.FormatCount(
+                count,
+                tools ? ToolsHeaderHiddenOneKey : TabGroupHeaderHiddenOneKey,
+                tools ? ToolsHeaderHiddenKey : TabGroupHeaderHiddenKey,
+                key,
+                count),
         };
     }
 

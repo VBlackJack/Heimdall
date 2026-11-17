@@ -279,7 +279,8 @@ public sealed partial class SessionCoordinatorPreMountTests : IDisposable
             Func<IConfigManager, IProfileLookup>? profileLookupFactory = null,
             Func<string, LocalizationManager, SharedCredentialApplier>? sharedCredentialsFactory = null,
             ISessionWindowService? sessionWindows = null,
-            Heimdall.App.Services.WorkspaceLockService? workspaceLock = null)
+            Heimdall.App.Services.WorkspaceLockService? workspaceLock = null,
+            IPostConnectStepResolver? postConnectStepResolver = null)
         {
             string rootPath = Path.Combine(
                 Path.GetTempPath(),
@@ -382,7 +383,7 @@ public sealed partial class SessionCoordinatorPreMountTests : IDisposable
                 new HeimdallThemeService(configManager),
                 sessionRestore ?? new RecordingSessionRestoreCoordinator(),
                 new FakePostConnectSequenceRunner(),
-                new FakePostConnectStepResolver(),
+                postConnectStepResolver ?? new FakePostConnectStepResolver(),
                 toolRegistry,
                 splitService,
                 new ToolsTabPopulationService(toolRegistry),

@@ -104,3 +104,7 @@ public sealed class CredentialProviderKindJsonConverter()
 /// <summary>Tolerant converter for <see cref="VaultMigrationState"/>.</summary>
 public sealed class VaultMigrationStateJsonConverter()
     : TolerantEnumConverter<VaultMigrationState>(VaultMigrationState.None);
+
+/// <summary>Tolerant converter for <see cref="SftpSudoFallbackMode"/>; an unknown value asks.</summary>
+public sealed class SftpSudoFallbackModeJsonConverter()
+    : TolerantEnumConverter<SftpSudoFallbackMode>(SftpSudoFallbackMode.Ask);

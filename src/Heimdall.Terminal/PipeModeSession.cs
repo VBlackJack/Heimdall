@@ -16,6 +16,7 @@
 
 using System.Diagnostics;
 using System.Text;
+using Heimdall.Core.Terminal;
 
 namespace Heimdall.Terminal;
 
@@ -25,26 +26,31 @@ namespace Heimdall.Terminal;
 /// required for plink SSH where ConPTY breaks arrow keys.
 /// The -t flag on plink forces remote PTY allocation.
 /// </summary>
-public sealed class PipeModeSession : ITerminalSession
+public sealed class PipeModeSession : ITerminalSession, IFirstOutputSignal
 {
     private Process? _process;
     private Task? _readLoop;
     private Task? _stderrLoop;
     private CancellationTokenSource? _cts;
     private bool _disposed;
+    private int _disposedFlag;
     private readonly object _processExitedLock = new();
     private Action<int>? _processExited;
     private bool _processExitedRaised;
     private int _processExitCode;
-    private readonly object _dataLock = new();
-    private readonly object _deliveryLock = new();
-    private Action<ReadOnlyMemory<byte>>? _dataReceived;
-    private List<byte[]>? _bootstrapBuffer = new();
-    private int _bootstrapBufferedBytes;
-    private bool _dataSubscriberAttached;
-    private bool _bootstrapCapLogged;
+    private readonly object _firstOutputLock = new();
+    private Action? _firstOutputReceived;
+    private bool _firstOutputRaised;
+    private readonly OutputReplayGate _output = new(nameof(PipeModeSession));
 
     public event Action<ReadOnlyMemory<byte>>? DataReceived
+    {
+        add => _output.AddMemory(value);
+        remove => _output.RemoveMemory(value);
+    }
+
+    /// <inheritdoc />
+    public event Action? FirstOutputReceived
     {
         add
         {
@@ -53,37 +59,19 @@ public sealed class PipeModeSession : ITerminalSession
                 return;
             }
 
-            lock (_deliveryLock)
+            bool invokeImmediately;
+            lock (_firstOutputLock)
             {
-                bool firstSubscriber;
-                byte[][] replay;
-                Action<ReadOnlyMemory<byte>>? target;
-                lock (_dataLock)
+                invokeImmediately = _firstOutputRaised;
+                if (!invokeImmediately)
                 {
-                    _dataReceived += value;
-                    target = _dataReceived;
-                    firstSubscriber = !_dataSubscriberAttached;
-                    if (firstSubscriber)
-                    {
-                        _dataSubscriberAttached = true;
-                        replay = _bootstrapBuffer is { Count: > 0 }
-                            ? _bootstrapBuffer.ToArray()
-                            : [];
-                        _bootstrapBuffer = null;
-                    }
-                    else
-                    {
-                        replay = [];
-                    }
+                    _firstOutputReceived += value;
                 }
+            }
 
-                if (firstSubscriber)
-                {
-                    foreach (byte[] chunk in replay)
-                    {
-                        SafeInvokeDataReceived(target, chunk.AsMemory());
-                    }
-                }
+            if (invokeImmediately)
+            {
+                SafeInvokeFirstOutputHandler(value);
             }
         }
         remove
@@ -93,9 +81,9 @@ public sealed class PipeModeSession : ITerminalSession
                 return;
             }
 
-            lock (_dataLock)
+            lock (_firstOutputLock)
             {
-                _dataReceived -= value;
+                _firstOutputReceived -= value;
             }
         }
     }
@@ -144,6 +132,16 @@ public sealed class PipeModeSession : ITerminalSession
     public int? ProcessId => _process?.Id;
     public Dictionary<string, string>? EnvironmentVariables { get; set; }
 
+    /// <summary>
+    /// The width the session was launched with, or <see langword="null"/> before it started. The
+    /// remote PTY keeps this size for the whole session (see <see cref="Resize"/>), so an owner that
+    /// sees the terminal grow or shrink can tell that the session did not follow.
+    /// </summary>
+    public int? LaunchColumns { get; private set; }
+
+    /// <summary>The height the session was launched with, or <see langword="null"/> before it started.</summary>
+    public int? LaunchRows { get; private set; }
+
     /// <inheritdoc />
     /// <remarks>
     /// <paramref name="columns"/> and <paramref name="rows"/> are the size the caller knows
@@ -168,6 +166,8 @@ public sealed class PipeModeSession : ITerminalSession
 
         cancellationToken.ThrowIfCancellationRequested();
 
+        LaunchColumns = columns;
+        LaunchRows = rows;
         _cts = new CancellationTokenSource();
         bool processStarted = false;
 
@@ -264,18 +264,39 @@ public sealed class PipeModeSession : ITerminalSession
         KillProcess();
     }
 
+    /// <summary>
+    /// Raised once when the session is disposed, after the process was killed. Disposal detaches
+    /// the exit notification, so an owner holding a temporary file for the process cannot rely on
+    /// <see cref="ProcessExited"/> to learn that the session ended when its tab is closed.
+    /// </summary>
+    public event Action? Disposed;
+
     public void Dispose()
     {
-        if (_disposed) return;
+        if (Interlocked.Exchange(ref _disposedFlag, 1) != 0) return;
         _disposed = true;
 
         _cts?.Cancel();
         KillProcess();
 
-        lock (_dataLock)
+        // Each subscriber in its own try: one that throws must not skip the next.
+        Action? subscribers = Disposed;
+        if (subscribers is not null)
         {
-            _bootstrapBuffer = null;
+            foreach (Action subscriber in subscribers.GetInvocationList().Cast<Action>())
+            {
+                try
+                {
+                    subscriber();
+                }
+                catch (Exception ex)
+                {
+                    Heimdall.Core.Logging.FileLogger.Warn($"[PipeModeSession] Disposed subscriber: {ex.Message}");
+                }
+            }
         }
+
+        _output.Release();
 
         if (_process is not null)
         {
@@ -334,11 +355,53 @@ public sealed class PipeModeSession : ITerminalSession
 
                 byte[] copy = new byte[bytesRead];
                 Buffer.BlockCopy(buffer, 0, copy, 0, bytesRead);
-                DeliverOrBuffer(copy);
+                _output.Deliver(copy);
+
+                // After the delivery: "raised" implies the chunk was delivered or buffered, so a
+                // reaction to the signal that subscribes to DataReceived still gets it in the replay.
+                RaiseFirstOutputOnce();
             }
         }
         catch (OperationCanceledException) { /* Expected when session is disposed or cancelled */ }
         catch (Exception ex) { Heimdall.Core.Logging.FileLogger.Warn($"[PipeModeSession] ReadStreamLoop: {ex.Message}"); }
+    }
+
+    private void RaiseFirstOutputOnce()
+    {
+        Action? handlers;
+        lock (_firstOutputLock)
+        {
+            if (_firstOutputRaised)
+            {
+                return;
+            }
+
+            _firstOutputRaised = true;
+            handlers = _firstOutputReceived;
+            _firstOutputReceived = null;
+        }
+
+        if (handlers is null)
+        {
+            return;
+        }
+
+        foreach (Action handler in handlers.GetInvocationList().Cast<Action>())
+        {
+            SafeInvokeFirstOutputHandler(handler);
+        }
+    }
+
+    private static void SafeInvokeFirstOutputHandler(Action handler)
+    {
+        try
+        {
+            handler();
+        }
+        catch (Exception ex)
+        {
+            Heimdall.Core.Logging.FileLogger.Warn($"[PipeModeSession] FirstOutputReceived subscriber: {ex.Message}");
+        }
     }
 
     private void OnProcessExited(object? sender, EventArgs e)
@@ -346,70 +409,6 @@ public sealed class PipeModeSession : ITerminalSession
         int exitCode = 0;
         try { exitCode = _process?.ExitCode ?? -1; } catch (Exception ex) { Heimdall.Core.Logging.FileLogger.Warn($"[PipeModeSession] OnProcessExited: {ex.Message}"); }
         SafeInvokeProcessExitedOnce(exitCode);
-    }
-
-    private void DeliverOrBuffer(byte[] chunk)
-    {
-        lock (_deliveryLock)
-        {
-            Action<ReadOnlyMemory<byte>>? target;
-            lock (_dataLock)
-            {
-                if (!_dataSubscriberAttached)
-                {
-                    BufferBootstrapChunk(chunk);
-                    return;
-                }
-
-                target = _dataReceived;
-            }
-
-            SafeInvokeDataReceived(target, chunk.AsMemory());
-        }
-    }
-
-    private void BufferBootstrapChunk(byte[] chunk)
-    {
-        if (_bootstrapBuffer is null)
-        {
-            return;
-        }
-
-        if (_bootstrapBufferedBytes + chunk.Length > Heimdall.Core.Configuration.AppConstants.MaxConPtyBootstrapBufferBytes)
-        {
-            if (!_bootstrapCapLogged)
-            {
-                _bootstrapCapLogged = true;
-                Heimdall.Core.Logging.FileLogger.Warn(
-                    "[PipeModeSession] Bootstrap output exceeded " +
-                    $"{Heimdall.Core.Configuration.AppConstants.MaxConPtyBootstrapBufferBytes} bytes " +
-                    "before a subscriber attached; dropping further bootstrap bytes.");
-            }
-
-            return;
-        }
-
-        _bootstrapBuffer.Add(chunk);
-        _bootstrapBufferedBytes += chunk.Length;
-    }
-
-    private static void SafeInvokeDataReceived(
-        Action<ReadOnlyMemory<byte>>? handler,
-        ReadOnlyMemory<byte> data)
-    {
-        if (handler is null)
-        {
-            return;
-        }
-
-        try
-        {
-            handler(data);
-        }
-        catch (Exception ex)
-        {
-            Heimdall.Core.Logging.FileLogger.Warn($"[PipeModeSession] DataReceived subscriber: {ex.Message}");
-        }
     }
 
     private void SafeInvokeProcessExitedOnce(int exitCode)

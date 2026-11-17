@@ -36,6 +36,7 @@ using Heimdall.Core.Rdp;
 using Heimdall.Core.Security;
 using Heimdall.Core.Security.Vault;
 using Heimdall.Core.Updates;
+using SftpSudoFallbackMode = Heimdall.Core.Models.SftpSudoFallbackMode;
 using SshAgentPreferenceEnum = Heimdall.Core.Ssh.SshAgentPreference;
 
 namespace Heimdall.App.ViewModels;
@@ -70,7 +71,11 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                                 JsonNamingPolicy.CamelCase.ConvertName(nameof(ServerProfileDto.WebPasswordEncrypted)),
                                 JsonNamingPolicy.CamelCase.ConvertName(nameof(ServerProfileDto.SshKeyPassphraseEncrypted)),
                                 JsonNamingPolicy.CamelCase.ConvertName(nameof(ServerProfileDto.VncPassword)),
-                                JsonNamingPolicy.CamelCase.ConvertName(nameof(ServerProfileDto.CitrixLaunchCommandLine))
+                                JsonNamingPolicy.CamelCase.ConvertName(nameof(ServerProfileDto.CitrixLaunchCommandLine)),
+
+                                // Not a secret: a choice made from this machine's agent, which means
+                                // nothing on another one and must not travel in an export.
+                                JsonNamingPolicy.CamelCase.ConvertName(nameof(ServerProfileDto.SshAgentKeyFingerprint))
                             ]);
                         return;
                     }
@@ -95,6 +100,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     };
 
     private readonly IConfigManager _configManager;
+    private readonly SftpSudoFallbackPolicy _sftpSudoFallbackPolicy;
     private readonly LocalizationManager _localizer;
     private readonly IDialogService _dialogService;
     private readonly PinManager _pinManager;
@@ -121,6 +127,14 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     // The gateways the last MobaXterm parse synthesized, persisted before the profiles that
     // reference them. Empty for every other import format.
     private IReadOnlyList<SshGatewayDto> _mobaGateways = [];
+
+    // Set only by the branch that parsed an mRemoteNG file: the sessions and folders it adds keep
+    // the order of the file instead of showing alphabetically.
+    private bool _importKeepsSourceOrder;
+
+    // Every container path of the mRemoteNG file in document order, parents first, whether or not
+    // it holds a session. Empty for every other import format.
+    private IReadOnlyList<string> _importContainers = [];
 
     private string _originalTheme = "";
     private string _originalAccentTint = "Default";
@@ -438,6 +452,11 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     [ObservableProperty]
     private bool _sftpFollowSshDirectory;
 
+    /// <summary>The user's choice, as the name of a <see cref="SftpSudoFallbackMode"/>.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SftpSudoFallbackCapText))]
+    private string _sftpSudoFallback = nameof(SftpSudoFallbackMode.Ask);
+
     [ObservableProperty]
     private string _x11ServerPath = "";
 
@@ -475,7 +494,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     /// The six tool paths were accepted as typed and failed only at use: a mistyped Plink path
     /// surfaced as a connection that fell back or failed, far from the field that caused it.
     /// </remarks>
-    public bool IsPlinkPathMissing => IsFileMissing(PlinkPath);
+    public bool IsPlinkPathMissing =>
+        !IsLegacyPlinkDefault(PlinkPath) && IsFileMissing(PlinkPath);
 
     /// <summary>True when a PuTTY path is typed and no file is there.</summary>
     public bool IsPuttyPathMissing => IsFileMissing(PuttyPath);
@@ -497,6 +517,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
     /// <summary>True when a Citrix cache folder is typed and does not exist.</summary>
     public bool IsCitrixCacheDirectoryMissing => IsFolderMissing(CitrixCacheDirectory);
+
+    // The legacy default means "use the bundled Plink", so it is never reported as a missing file.
+    private static bool IsLegacyPlinkDefault(string? path) =>
+        !string.IsNullOrWhiteSpace(path) && ConnectionHelpers.IsSamePath(path, AppSettings.LegacyPlinkPath);
 
     private bool IsFileMissing(string? path) =>
         !string.IsNullOrWhiteSpace(path) && !FileExists(Environment.ExpandEnvironmentVariables(path.Trim()));
@@ -1030,6 +1054,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     {
         OnPropertyChanged(nameof(VaultStatusText));
         OnPropertyChanged(nameof(AutoLockAvailabilityHint));
+        OnPropertyChanged(nameof(SftpSudoFallbackCapText));
         OnPropertyChanged(nameof(VaultDisabledActionsVisible));
         OnPropertyChanged(nameof(VaultEnabledActionsVisible));
         RefreshVaultHelloUiState();
@@ -1409,8 +1434,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         TrustedWebCertificatesSettingsViewModel? trustedWebCertificates = null,
         Services.SharedSessions.ISharedSessionProvider? sharedSessions = null,
         Services.SharedSessions.SharedSessionSecretStore? sharedSecrets = null,
-        IGitIdentityReader? gitIdentityReader = null)
+        IGitIdentityReader? gitIdentityReader = null,
+        SftpSudoFallbackPolicy? sftpSudoFallbackPolicy = null)
     {
+        _sftpSudoFallbackPolicy = sftpSudoFallbackPolicy ?? new SftpSudoFallbackPolicy();
         _configManager = configManager;
         _gitIdentityReader = gitIdentityReader;
         _sharedSessions = sharedSessions;
@@ -1838,6 +1865,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             SftpBrowserEnabled = settings.SftpBrowserEnabled;
             SftpAutoOpenOnSsh = settings.SftpAutoOpenOnSsh;
             SftpFollowSshDirectory = settings.SftpFollowSshDirectory;
+            SftpSudoFallback = settings.SftpSudoFallback.ToString();
             X11ServerPath = settings.X11ServerPath ?? "";
             X11AutoStart = settings.X11AutoStart;
             SysinternalsPath = settings.SysinternalsPath ?? "";
@@ -2318,6 +2346,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         settings.SftpBrowserEnabled = SftpBrowserEnabled;
         settings.SftpAutoOpenOnSsh = SftpAutoOpenOnSsh;
         settings.SftpFollowSshDirectory = SftpFollowSshDirectory;
+        settings.SftpSudoFallback = ParseSftpSudoFallback(SftpSudoFallback);
         settings.X11ServerPath = string.IsNullOrWhiteSpace(X11ServerPath) ? null : X11ServerPath;
         settings.X11AutoStart = X11AutoStart;
         settings.SysinternalsPath = string.IsNullOrWhiteSpace(SysinternalsPath) ? null : SysinternalsPath;
@@ -3029,6 +3058,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
             _mobaStoredCredentialCount = 0;
             _mobaGateways = [];
+            _importKeepsSourceOrder = false;
+            _importContainers = [];
             bool isMobaXterm = ext is ".mxtsessions" or ".ini" or ".mobaconf";
             string warningsOneKey = isMobaXterm ? "ImportMobaXtermIssuesOne" : "ImportMobaXtermWarningsOne";
             string warningsKey = isMobaXterm ? "ImportMobaXtermIssues" : "ImportMobaXtermWarnings";
@@ -3040,7 +3071,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                 _ => throw new InvalidOperationException($"Unsupported import extension reached legacy parser: {ext}")
             };
 
-            if (imported.Count == 0)
+            if (imported.Count == 0 && _importContainers.Count == 0)
             {
                 ShowImportWarningsOrNothingFound(importWarnings, warningsOneKey, warningsKey);
                 return;
@@ -3063,13 +3094,34 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                 importWarnings.AddRange(validationFailures);
             }
 
-            if (imported.Count == 0)
+            // A file that holds no session can still hold folders to create. They are worked out
+            // here, against what Heimdall has now, because the confirmation question counts them.
+            List<string?> existingGroups = [];
+            IReadOnlyList<string> pendingFolders = [];
+            if (imported.Count == 0 && _importContainers.Count > 0)
+            {
+                List<ServerProfileDto> existingServers = await _configManager.LoadServersAsync();
+                AppSettings existingSettings = await _configManager.LoadSettingsAsync();
+                existingGroups = existingServers.Select(candidate => candidate.Group).ToList();
+                pendingFolders = ImportSourceOrder.EmptyFoldersToCreate(
+                    _importContainers,
+                    ImportSourceOrder.FolderPathsOf(existingGroups.Concat(existingSettings.EmptyGroups)));
+            }
+
+            if (imported.Count == 0 && pendingFolders.Count == 0)
             {
                 ShowImportWarningsOrNothingFound(importWarnings, warningsOneKey, warningsKey);
                 return;
             }
 
-            var confirmMessage = ext is ".mxtsessions" or ".ini" or ".mobaconf"
+            bool foldersOnly = imported.Count == 0;
+            var confirmMessage = foldersOnly
+                ? _localizer.FormatCount(
+                    pendingFolders.Count,
+                    "ConfirmImportEmptyFoldersMessageOne",
+                    "ConfirmImportEmptyFoldersMessage",
+                    pendingFolders.Count)
+                : ext is ".mxtsessions" or ".ini" or ".mobaconf"
                 ? _localizer.FormatCount(
                     imported.Count,
                     "ConfirmImportMobaXtermMessageOne",
@@ -3087,6 +3139,13 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
 
             if (!confirmed)
             {
+                if (foldersOnly && importWarnings is { Count: > 0 })
+                {
+                    // The sessions of the file were all refused: say why, since the user is
+                    // about to leave without importing anything.
+                    ShowImportWarningsOrNothingFound(importWarnings, warningsOneKey, warningsKey);
+                }
+
                 return;
             }
 
@@ -3095,10 +3154,17 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                 await PersistImportedGatewaysAsync(imported, _mobaGateways);
             }
 
-            var importResult = await _configManager.MutateServersAsync(existing =>
+            bool keepSourceOrder = _importKeepsSourceOrder;
+            List<string?> groupsBefore = existingGroups;
+            List<ServerProfileDto> added = [];
+            (int NewCount, int UpdatedCount) importResult = foldersOnly
+                ? (0, 0)
+                : await _configManager.MutateServersAsync(existing =>
             {
                 int newCount = 0;
                 int updatedCount = 0;
+                added.Clear();
+                groupsBefore = keepSourceOrder ? existing.Select(candidate => candidate.Group).ToList() : [];
                 foreach (ServerProfileDto server in imported)
                 {
                     if (SharedSessionIds.IsShared(server.Id))
@@ -3126,26 +3192,68 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                     else
                     {
                         existing.Add(server);
+                        added.Add(server);
                         newCount++;
                     }
+                }
+
+                if (keepSourceOrder)
+                {
+                    // Excluding the added rows by reference is sound because the mRemoteNG parser
+                    // mints a fresh id per row, so the update-by-id branch above is never taken for
+                    // it. For a format whose ids can match, a replaced row would count as existing,
+                    // and a duplicate id inside the file would leave an orphan in "added".
+                    ImportSourceOrder.ArrangeSessions(existing, added);
                 }
 
                 return (NewCount: newCount, UpdatedCount: updatedCount);
             });
 
+            int createdFolders = 0;
+            if (keepSourceOrder)
+            {
+                // With sessions, the folders are a refinement of an import that is already saved:
+                // a failure only leaves them out. Without any, the folders are the whole import.
+                createdFolders = await PersistImportedFoldersAsync(
+                    groupsBefore,
+                    added.Select(server => server.Group).ToList(),
+                    _importContainers,
+                    failureIsFatal: foldersOnly) ?? 0;
+            }
+
+            if (foldersOnly && createdFolders == 0)
+            {
+                ShowImportWarningsOrNothingFound(importWarnings, warningsOneKey, warningsKey);
+                return;
+            }
+
             int totalImported = importResult.NewCount + importResult.UpdatedCount;
             FileLogger.Info(
-                $"Imported {totalImported} server(s) from {filePath} ({importResult.NewCount} new, {importResult.UpdatedCount} updated)");
+                $"Imported {totalImported} server(s) and {createdFolders} empty folder(s) from {filePath} "
+                + $"({importResult.NewCount} new, {importResult.UpdatedCount} updated)");
 
-            var statusMessage = _localizer.Format(
-                "StatusImportBreakdown",
-                totalImported,
-                importResult.NewCount,
-                importResult.UpdatedCount);
+            var statusMessage = foldersOnly
+                ? string.Empty
+                : _localizer.Format(
+                    "StatusImportBreakdown",
+                    totalImported,
+                    importResult.NewCount,
+                    importResult.UpdatedCount);
+
+            if (createdFolders > 0)
+            {
+                string foldersLine = _localizer.FormatCount(
+                    createdFolders,
+                    "ImportEmptyFoldersCreatedOne",
+                    "ImportEmptyFoldersCreated",
+                    createdFolders);
+                statusMessage = statusMessage.Length == 0 ? foldersLine : statusMessage + "\n" + foldersLine;
+            }
 
             if (importWarnings is { Count: > 0 })
             {
-                statusMessage += "\n\n" + FormatImportWarnings(importWarnings, warningsOneKey, warningsKey);
+                string warningsBlock = FormatImportWarnings(importWarnings, warningsOneKey, warningsKey);
+                statusMessage = statusMessage.Length == 0 ? warningsBlock : statusMessage + "\n\n" + warningsBlock;
             }
 
             if (ext is ".mxtsessions" or ".ini" or ".mobaconf")
@@ -3367,14 +3475,87 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             _ => _localizer.Format("ImportMRemoteNgWarningNodeError", warning.NodeName, warning.Detail),
         };
 
+    /// <summary>
+    /// Persists what an mRemoteNG import does to the folders: the order that shows the file's
+    /// folders in file order, and the empty folders the file holds. Both go in one settings write.
+    /// </summary>
+    /// <param name="groupsBefore">The groups of the sessions Heimdall held before the import.</param>
+    /// <param name="addedGroups">The groups of the sessions the import added.</param>
+    /// <param name="containers">Every container path of the file, parents first.</param>
+    /// <param name="failureIsFatal">
+    /// Whether a failure is raised. It is not when the sessions are already saved, so a failure only
+    /// leaves the folders alphabetical and must not turn a successful import into an error.
+    /// </param>
+    /// <returns>
+    /// The number of empty folders written, or <see langword="null"/> when a failure was swallowed.
+    /// </returns>
+    private async Task<int?> PersistImportedFoldersAsync(
+        IReadOnlyList<string?> groupsBefore,
+        IReadOnlyList<string?> addedGroups,
+        IReadOnlyList<string> containers,
+        bool failureIsFatal)
+    {
+        try
+        {
+            AppSettings current = await _configManager.LoadSettingsAsync();
+            (List<string>? order, IReadOnlyList<string> toCreate) =
+                PlanImportedFolders(current, groupsBefore, addedGroups, containers);
+            if (order is null && toCreate.Count == 0)
+            {
+                return 0;
+            }
+
+            int created = 0;
+            await _configManager.MergeSettingAsync(settings =>
+            {
+                // The order is worked out before the new folders are added: once they are in the
+                // settings they count as existing and would get no rank.
+                (List<string>? freshOrder, IReadOnlyList<string> freshFolders) =
+                    PlanImportedFolders(settings, groupsBefore, addedGroups, containers);
+                if (freshOrder is not null)
+                {
+                    settings.FolderOrder = freshOrder;
+                }
+
+                settings.EmptyGroups.AddRange(freshFolders);
+                created = freshFolders.Count;
+            });
+            return created;
+        }
+        catch (Exception ex) when (!failureIsFatal)
+        {
+            FileLogger.Warn($"[Import] Folder order and empty folders were not saved: {ex.Message}");
+            return null;
+        }
+    }
+
+    private static (List<string>? Order, IReadOnlyList<string> ToCreate) PlanImportedFolders(
+        AppSettings settings,
+        IReadOnlyList<string?> groupsBefore,
+        IReadOnlyList<string?> addedGroups,
+        IReadOnlyList<string> containers)
+    {
+        List<string>? order = ImportSourceOrder.MergeFolderOrder(
+            settings.FolderOrder,
+            ImportSourceOrder.FolderPathsOf(groupsBefore.Concat(settings.EmptyGroups)),
+            ImportSourceOrder.PathsInFileOrder(containers));
+        IReadOnlyList<string> toCreate = ImportSourceOrder.EmptyFoldersToCreate(
+            containers,
+            ImportSourceOrder.FolderPathsOf(groupsBefore.Concat(addedGroups).Concat(settings.EmptyGroups)));
+        return (order, toCreate);
+    }
+
     private async Task<(List<ServerProfileDto> Servers, List<string>? Warnings)> ImportXmlAsync(
         string filePath, CancellationToken cancellationToken)
     {
         var content = await File.ReadAllTextAsync(filePath, cancellationToken);
         if (content.Contains("<Connections", StringComparison.OrdinalIgnoreCase)
-            || content.Contains("Type=\"Connection\"", StringComparison.OrdinalIgnoreCase))
+            || content.Contains("Type=\"Connection\"", StringComparison.OrdinalIgnoreCase)
+            || content.Contains("Type=\"Container\"", StringComparison.OrdinalIgnoreCase))
         {
             var mrnResult = MRemoteNgImporter.Parse(content);
+            _importKeepsSourceOrder = true;
+            _importContainers = mrnResult.Containers;
             return (mrnResult.Servers, mrnResult.Warnings.Select(FormatMRemoteNgWarning).ToList());
         }
 

@@ -80,6 +80,9 @@ Index of all issues encountered during development and their solutions.
 63. [VNC - The Server Asks for a Username or a Password](#vnc-credentials-required)
 64. [WebView2 - The Pointer Disappears When a Terminal Is Closed](#webview2-pointer-hidden-after-close)
 65. [SSH - "Too many authentication failures"](#ssh-too-many-authentication-failures)
+66. [SSH - "The agent key chosen for this session ... is not loaded"](#ssh-agent-key-not-loaded)
+67. [SSH - A Session With a Chosen Agent Key Is Refused on the Plink Path](#ssh-agent-key-plink-refused)
+68. [SSH - Signing in with Kerberos or a Pageant Key Through Plink](#ssh-plink-kerberos-pageant)
 
 ---
 
@@ -1060,7 +1063,7 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 **Solution**:
 
 1. Check the log. `at the reported <cols>x<rows>` followed by `[PlinkSizeSession] Created Plink size session ... carrying <cols>x<rows>` means the size was sent. `at the default 80x24: the terminal page did not report its size within ... ms` means the page loaded too slowly: raise `PlinkInitialSizeWaitMs` in the settings file. For the warning above: if it is there, check that the current user can write under `HKCU\Software\SimonTatham\PuTTY\Sessions` (a policy or security product may block it).
-2. Resize before connecting, not after: the size is taken once, at launch. Resizing the window after start cannot reach the remote PTY on this path; reconnect to apply a new size.
+2. Resize before connecting, not after: the size is taken once, at launch. Resizing the window after start cannot reach the remote PTY on this path; reconnect to apply a new size. The "Width fixed: N cols" badge in the header says exactly that. A session that retries through Plink after a failed embedded sign-in no longer raises it by itself: the pending SFTP panel is withdrawn first, so the terminal starts at the full tab width when the tab is displayed while it connects (a tab connecting in the background or in a minimised window can still start at the split width and show the badge: reconnect it once displayed; see entry 68).
 3. In the remote shell, `stty cols <n> rows <m>` sets the size by hand for the current session.
 
 **Files**: `Services/Handlers/PlinkSizeSession.cs`, `Services/PlinkSizeSessionJanitor.cs`, `Heimdall.Ssh/Plink/PlinkSizeSessionNaming.cs`, `Services/Handlers/SshHandler.cs` (`ConnectSshViaPlinkAsync`, `BuildPipeModeArguments`), `Heimdall.Terminal/PipeModeSession.cs`
@@ -1245,8 +1248,93 @@ Do **not** use `IServiceProvider.QueryService` for this case. On `MsTscAx.MsTscA
 **Solution**:
 
 1. Load fewer keys in the agent: remove the keys the server does not know.
-2. Give the session its own key file in the session dialog, so the agent is not needed for that server.
-3. If the server is yours, raise `MaxAuthTries` in `sshd_config` and reload `sshd`.
-4. If the session also stores a password, check that it is the right one: a refused password spends at least one attempt before the agent keys are tried.
+2. Name the one key the server accepts in the session dialog (the "Agent key" list on the SSH/SFTP credentials card). Only that key is offered, so the others spend no attempt. See [entry 66](#ssh-agent-key-not-loaded) if the connection is then refused because the key is not loaded.
+3. Give the session its own key file in the session dialog, so the agent is not needed for that server.
+4. If the server is yours, raise `MaxAuthTries` in `sshd_config` and reload `sshd`.
+5. If the session also stores a password, check that it is the right one: a refused password spends at least one attempt before the agent keys are tried.
 
 **Files**: `Heimdall.Ssh/Agents/SshAgentAlgorithmSource.cs`, `Heimdall.Ssh/SshConnectionFactory.cs` (`TryCreateAgentAuth`), `Heimdall.Ssh/FailureClassifier.cs`
+
+---
+
+<a id="ssh-agent-key-not-loaded"></a>
+## 66. SSH - "The agent key chosen for this session ... is not loaded"
+
+**Symptom**: Connecting an SSH or SFTP session fails at once, before any host key question or password prompt, with "The agent key chosen for this session (SHA256:...) is not loaded in any SSH agent Heimdall is set to use. Load it, or choose another key in the session's settings." The message names the fingerprint of the key the session asks for. The same message appears on the SFTP side panel of the session.
+
+**Root cause**: The session names one agent key (the "Agent key" list in the session dialog) and Heimdall found no key with that fingerprint. It does not fall back to the other keys of the agent, because the point of the choice is to offer that key only. The usual causes are:
+
+- The key is not loaded: the agent was restarted, the machine was rebooted, or the key was never added.
+- The agent that holds the key is not one Heimdall is set to use. The choice is made in `Settings > SSH & SFTP > Connection > SSH agent preference`.
+- The agent did not answer within the short wait Heimdall allows before it dials, so the key was treated as not loaded. Try again.
+- The configuration was copied from another machine as a whole file: the key was chosen from the agent of that machine. An import never sets the choice, but a copied settings file can carry it.
+- The stored fingerprint was edited by hand and is not of the form `SHA256:` followed by 43 characters.
+
+**Solution**:
+
+1. Load the key in the agent (Pageant: Add Key; Windows OpenSSH Agent: `ssh-add`), then connect again.
+2. Check `Settings > SSH & SFTP > Connection > SSH agent preference` and make sure the agent that holds the key is allowed.
+3. Open the session in the session dialog and look at the "Agent key" list. A saved key that is not loaded stays listed as "Not loaded now: ...". Pick the key you want, or "Any key (default)" to offer every key of the agent again.
+4. If the server closes connections after a few attempts, see [entry 65](#ssh-too-many-authentication-failures): naming the key is the remedy, and it needs the key to be loaded.
+
+**Files**: `Services/Handlers/SshAgentKeyPreflight.cs`, `Services/Handlers/SshHandler.cs`, `Services/Handlers/SftpHandler.cs`, `Heimdall.Ssh/SshConnectionFactory.cs` (`ResolveChosenAgentKey`), `Heimdall.Ssh/Agents/SshAgentRegistry.cs` (`FindIdentity`)
+
+---
+
+<a id="ssh-agent-key-plink-refused"></a>
+## 67. SSH - A Session With a Chosen Agent Key Is Refused on the Plink Path
+
+**Symptom**: A session that names one agent key fails to open and the message is one of these:
+
+- "The agent key chosen for this session (SHA256:...) is not loaded in Pageant, which this connection needs. Load it in Pageant, or choose another key in the session's settings."
+- "The agent key chosen for this session (SHA256:...) is of a type Plink cannot be limited to, and this connection goes through Plink. Turn off agent forwarding, or choose another key."
+- "This session names one agent key and also a key file, and this connection goes through Plink, which takes only one of the two. Remove the key file, clear the chosen agent key, or turn off agent forwarding."
+- "This session names one agent key, and the Plink program in use is not the one shipped with Heimdall, so it cannot be trusted to offer only that key. Use the bundled Plink, or clear the chosen agent key."
+- "This session names one agent key, and the program used for this connection cannot be limited to it. Switch the session to the embedded terminal, or clear the chosen key."
+
+**Root cause**: Plink is used when agent forwarding is on (it forwards Pageant) and as the retry after a failure of the embedded client. Plink can only reach Pageant, and Heimdall limits it to the chosen key by handing it that key's public half through `-i`. It refuses to start when it cannot guarantee that only that key is offered, rather than offering every key of Pageant:
+
+- The key is in the Windows OpenSSH Agent but not in Pageant.
+- The key is a type Plink cannot read from a public key file, such as a hardware "sk" key. Among certificates, only an Ed25519 certificate is accepted on the Plink path.
+- The session also has a key file: Plink takes one `-i` only.
+- The Plink in use is not the build shipped with Heimdall (a different `plink.exe` path in `Settings > SSH & SFTP`).
+- The session is set to external PuTTY, which cannot be told which agent key to use.
+
+After a failure of the embedded client, the retry through Plink is simply skipped when Plink cannot be limited to the chosen key, and the embedded client's own error is shown.
+
+**Solution**:
+
+1. Load the key in Pageant, or turn off agent forwarding so the embedded client is used.
+2. For a key type Plink cannot be limited to, turn off agent forwarding or choose another key.
+3. Remove the key file from the session, or clear the chosen agent key.
+4. Point `Path to plink.exe` back to the Plink shipped with Heimdall (or reset the field to its default), or clear the chosen agent key.
+5. For external PuTTY, switch the session to the embedded terminal, or clear the chosen key.
+
+**Files**: `Services/Handlers/SshAgentKeyPreflight.cs` (`RefusalForPlink`), `Services/Handlers/SshHandler.cs`
+
+---
+
+<a id="ssh-plink-kerberos-pageant"></a>
+## 68. SSH - Signing in with Kerberos or a Pageant Key Through Plink
+
+**Symptom**: One of these:
+
+- A session with a user name, no stored password and no key file shows "SSH password required" although your Windows sign-in (Kerberos) or a Pageant key would be enough.
+- On an older version, answering that prompt with nothing ends with "Connection was cancelled", unless Pageant holds a key.
+- The terminal shows "This connection was started without a password, for Kerberos or a Pageant key. If the server refused the sign-in, connect again and type your password, or store it in the session."
+
+**Root cause**: The prompt appears when the connection goes through Plink: after the embedded client failed to authenticate, or with agent forwarding and Pageant. The prompt always says "Leave it empty to sign in with Kerberos (your Windows sign-in) or a key held by Pageant." An empty answer launches Plink with no password file and in batch mode (`-batch`). Plink then tries Kerberos (GSSAPI through Windows SSPI) and the keys of Pageant (with an agent key chosen on the session, only that key is offered). No password is written to disk and none is sent to the server. Batch mode makes Plink exit at once ("FATAL ERROR: Cannot answer interactive prompts in batch mode") when the server accepts neither; without it Plink would wait forever on a prompt that is shown nowhere, and the terminal would stay blank. The failure line above is Heimdall's explanation of that exit. Before this behavior, an empty answer cancelled the connection unless Pageant held a key, so a Kerberos user had to type a dummy password.
+
+**Solution**:
+
+1. For Kerberos or a Pageant key, leave the prompt empty and confirm.
+2. If the server refused the sign-in (the failure line above), connect again and type your password, or store it in the session.
+3. Cancel still cancels, and a typed password behaves as before.
+
+**Limits**:
+
+- A server that asks a second factor (keyboard-interactive) after Kerberos is not supported with an empty answer: Plink runs in batch mode and cannot answer it. Typing the password instead was not tried.
+- The embedded client and the SFTP side panel do not do Kerberos, and the panel cannot ask for a password or a one-time code either: it uses the same embedded client and the same credentials. So when the retry through Plink starts, Heimdall withdraws the SFTP side panel that "Auto-open SFTP panel on SSH connection" had put in the tab (it is not opened), and, when the tab is displayed, the terminal takes the full width of the tab before Plink starts: no "Width fixed" badge. A tab that connects in the background (bulk connect, sessions restored at startup, or after switching to another tab before the retry starts) or in a minimised window is not laid out again: the session can still start at the width of the split and show the badge. Reconnect it once the tab is displayed to apply the full width. Once connected, the status bar says that the SFTP panel was not opened because the embedded client could not sign in to this server. Sessions that go through Plink only because of agent forwarding with Pageant keep their SFTP panel, which signs in with the agent. An SFTP session can still be opened by hand, in its own tab or split beside the terminal; with Kerberos it cannot sign in either. Splitting the tab by hand makes the terminal pane narrower than the width Plink started with, so the "Width fixed: N cols" badge appears: reconnect to apply the new width.
+- A session with no user name is still refused before the prompt: set a user name in the session.
+
+**Files**: `Services/Handlers/SshHandler.cs`, `Views/EmbeddedSshView.xaml.cs`, `Services/TerminalReconnectPolicy.cs`

@@ -61,27 +61,64 @@ internal static class ConnectionHelpers
     }
 
     /// <summary>
-    /// Resolves the path to plink.exe: uses the user-configured path if valid,
-    /// otherwise falls back to the embedded tool copy.
+    /// Resolves the path to plink.exe. A path the user chose wins; the legacy default (or a blank
+    /// setting) means "not chosen", so the bundled copy wins over a PuTTY installed on the machine:
+    /// only the bundled build is the attested one. The legacy path is used only when no bundled
+    /// copy exists.
     /// </summary>
     internal static string? ResolvePlinkPath(string? settingsPath)
+        => ResolvePlinkPath(settingsPath, AppContext.BaseDirectory);
+
+    /// <remarks>
+    /// <paramref name="legacyDefault"/> is a seam: tests cannot create a file under Program Files.
+    /// </remarks>
+    internal static string? ResolvePlinkPath(
+        string? settingsPath,
+        string baseDirectory,
+        string legacyDefault = AppSettings.LegacyPlinkPath)
     {
-        if (!string.IsNullOrWhiteSpace(settingsPath) && File.Exists(settingsPath))
+        bool userChosen = !string.IsNullOrWhiteSpace(settingsPath)
+            && !IsSamePath(settingsPath, legacyDefault);
+        if (userChosen && File.Exists(settingsPath))
         {
             return settingsPath;
         }
 
         var embeddedPath = Path.Combine(
-            AppContext.BaseDirectory,
+            baseDirectory,
             AppConstants.EmbeddedToolsSubdir,
             "plink.exe");
         if (File.Exists(embeddedPath))
         {
-            Core.Logging.FileLogger.Info($"Using embedded plink: {embeddedPath}");
+            Core.Logging.FileLogger.Debug($"Using embedded plink: {embeddedPath}");
             return embeddedPath;
         }
 
+        if (!string.IsNullOrWhiteSpace(settingsPath) && File.Exists(settingsPath))
+        {
+            return settingsPath;
+        }
+
         return null;
+    }
+
+    internal static bool IsSamePath(string path, string other)
+    {
+        try
+        {
+            return string.Equals(
+                Path.TrimEndingDirectorySeparator(Path.GetFullPath(path.Trim())),
+                Path.TrimEndingDirectorySeparator(Path.GetFullPath(other)),
+                StringComparison.OrdinalIgnoreCase);
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+        catch (NotSupportedException)
+        {
+            return false;
+        }
     }
 
     /// <summary>

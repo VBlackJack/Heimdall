@@ -8,6 +8,7 @@
         xmlns:vm="clr-namespace:Heimdall.App.ViewModels.Dialogs"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:sys="clr-namespace:System;assembly=System.Runtime"
         d:DataContext="{d:DesignInstance Type=vm:ServerDialogViewModel}"
         mc:Ignorable="d"
         Title="{Binding DialogTitle}"
@@ -30,6 +31,10 @@
             </ResourceDictionary.MergedDictionaries>
             <converters:NullToVisibilityConverter x:Key="NullToVisibilityConverter"/>
             <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+
+            <!-- Height cap of the execution trust notice above the tabs: the window is fixed at 750 px, so a long
+                 list of commands scrolls inside the notice instead of pushing the tabs out of view. -->
+            <sys:Double x:Key="ServerDialogNoticeMaxHeight">160</sys:Double>
 
             <!-- ServerDialog label extends DialogLabelStyle with SemiBold weight -->
             <Style x:Key="LabelStyle" TargetType="TextBlock" BasedOn="{StaticResource DialogLabelStyle}">
@@ -514,6 +519,7 @@
                       Visibility="{Binding ShowFormFields, Converter={StaticResource BoolToVisibilityConverter}}">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
 
@@ -561,8 +567,37 @@
                     </Button>
                 </DockPanel>
 
+                <!-- Imported session whose commands wait for the user's approval; sits above the tabs so it shows
+                     whatever the protocol and the tab. -->
+                <Border x:Name="DlgSrv_ExecutionTrustNotice"
+                        Grid.Row="1"
+                        Style="{StaticResource DialogSectionCardStyle}"
+                        BorderBrush="{DynamicResource WarningIndicatorBrush}"
+                        BorderThickness="1"
+                        Margin="0,0,0,12"
+                        Visibility="{Binding ShowExecutionTrustNotice, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <StackPanel>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                      HorizontalScrollBarVisibility="Disabled"
+                                      MaxHeight="{StaticResource ServerDialogNoticeMaxHeight}"
+                                      AutomationProperties.Name="{loc:Translate A11yServerDialogExecutionTrustNotice}">
+                            <TextBlock Text="{Binding ExecutionTrustNoticeText}"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       TextWrapping="Wrap"/>
+                        </ScrollViewer>
+                        <Button x:Name="DlgSrv_AllowExecutionTrustButton"
+                                Command="{Binding AllowExecutionTrustCommand}"
+                                Content="{loc:Translate ServerDialogExecutionTrustAllow}"
+                                Style="{StaticResource GhostButtonStyle}"
+                                HorizontalAlignment="Left"
+                                Margin="0,8,0,0"
+                                TabIndex="0"
+                                AutomationProperties.HelpText="{Binding ExecutionTrustNoticeText}"/>
+                    </StackPanel>
+                </Border>
+
                 <TabControl x:Name="MainTabControl"
-                            Grid.Row="1"
+                            Grid.Row="2"
                             AutomationProperties.Name="{loc:Translate A11yServerDialogTabs}"
                             Style="{DynamicResource ThemedTabControlStyle}">
 
@@ -589,6 +624,24 @@
                         </TabItem.Header>
                         <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                             <StackPanel Margin="{StaticResource SpacingSm}">
+                                <!-- Imported session whose credential lookup still waits for the user -->
+                                <Border x:Name="DlgSrv_CredentialLookupNotice"
+                                        Style="{StaticResource DialogSectionCardStyle}"
+                                        BorderBrush="{DynamicResource WarningIndicatorBrush}"
+                                        BorderThickness="1"
+                                        Visibility="{Binding ShowCredentialLookupNotice, Converter={StaticResource BoolToVisibilityConverter}}">
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding CredentialLookupNoticeText}"
+                                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                                   TextWrapping="Wrap"/>
+                                        <Button x:Name="DlgSrv_AllowCredentialLookupButton"
+                                                Command="{Binding AllowCredentialLookupCommand}"
+                                                Content="{loc:Translate ServerDialogCredentialLookupAllow}"
+                                                Style="{StaticResource GhostButtonStyle}"
+                                                HorizontalAlignment="Left"
+                                                Margin="0,8,0,0"/>
+                                    </StackPanel>
+                                </Border>
                                 <!-- Connection basics: Name, Type, Host, Port -->
                                 <Border Style="{StaticResource DialogSectionCardStyle}">
                                     <StackPanel>
@@ -1134,6 +1187,39 @@
                                                                Foreground="{DynamicResource TextPrimaryBrush}"/>
                                                 </StackPanel>
                                             </Button>
+                                        </Border>
+                                        <!-- The one agent key this session offers. Declared before the passphrase box
+                                             so that, sharing its tab index, it comes first. -->
+                                        <TextBlock x:Name="DlgSrv_BasicSshAgentKeyLabel"
+                                                   Text="{loc:Translate ServerDialogLabelSshAgentKey}"
+                                                   Style="{StaticResource LabelStyle}"
+                                                   Margin="0,12,0,4"/>
+                                        <ComboBox x:Name="DlgSrv_SshAgentKeyCombo"
+                                                  TabIndex="13"
+                                                  AutomationProperties.Name="{Binding Text, ElementName=DlgSrv_BasicSshAgentKeyLabel}"
+                                                  AutomationProperties.HelpText="{Binding SshAgentKeyHelpText}"
+                                                  ItemsSource="{Binding SshAgentKeyChoices}"
+                                                  SelectedItem="{Binding SelectedSshAgentKeyChoice, Mode=TwoWay}"
+                                                  DisplayMemberPath="DisplayText"
+                                                  Style="{StaticResource DialogFormComboBoxStyle}"/>
+                                        <TextBlock x:Name="DlgSrv_SshAgentKeyHint"
+                                                   Text="{loc:Translate ServerDialogSshAgentKeyHint}"
+                                                   Style="{StaticResource DialogHintTextStyle}"
+                                                   Margin="0,8,0,0"
+                                                   TextWrapping="Wrap"
+                                                   Visibility="{Binding HasChosenSshAgentKey, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                        <Border x:Name="DlgSrv_SshAgentKeyForwardingNotice"
+                                                Margin="0,8,0,0"
+                                                CornerRadius="{StaticResource CornerRadiusSm}"
+                                                Padding="8,4"
+                                                BorderBrush="{DynamicResource WarningIndicatorBrush}"
+                                                BorderThickness="1"
+                                                Visibility="{Binding ShowAgentKeyForwardingWarning, Converter={StaticResource BoolToVisibilityConverter}}">
+                                            <TextBlock Text="{Binding AgentKeyForwardingWarningText, NotifyOnTargetUpdated=True}"
+                                                       AutomationProperties.LiveSetting="Polite"
+                                                       behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"
+                                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                                       TextWrapping="Wrap"/>
                                         </Border>
                                         <StackPanel Visibility="{Binding HasSshKeyPath, Converter={StaticResource BoolToVisibilityConverter}}">
                                             <TextBlock x:Name="DlgSrv_BasicSshKeyPassphraseLabel"

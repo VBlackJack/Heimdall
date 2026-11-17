@@ -15,6 +15,7 @@
  */
 
 using System.Net;
+using System.Net.Sockets;
 using System.Text;
 using Heimdall.Terminal;
 
@@ -27,6 +28,8 @@ public sealed class TerminalSessionLifecycleTests
     private const byte Sb = 250;
     private const byte Se = 240;
     private const byte Naws = 31;
+    private const int AnyAvailablePort = 0;
+    private const int ListenBacklog = 1;
 
     [Fact]
     public async Task PipeModeSession_Dispose_TerminatesRunningProcess()
@@ -60,24 +63,29 @@ public sealed class TerminalSessionLifecycleTests
     [Fact]
     public async Task TelnetSession_StartAsync_AfterFailedConnect_CanBeRetried()
     {
-        int port = TerminalTestHelpers.ReserveLoopbackPort();
+        // The port is held by a socket that is bound but not yet listening. Connections to such a
+        // port are refused, and no other process can bind it, so the first connect fails every time
+        // instead of depending on a port number that was released and might be taken meanwhile. The
+        // same socket then starts listening for the retry, so the port is never free in between.
+        using Socket reservation = new(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+        reservation.ExclusiveAddressUse = true;
+        reservation.Bind(new IPEndPoint(IPAddress.Loopback, AnyAvailablePort));
+        int port = ((IPEndPoint)reservation.LocalEndPoint!).Port;
         TelnetSession session = new(IPAddress.Loopback.ToString(), port, connectTimeoutMs: 250);
 
         await Assert.ThrowsAnyAsync<Exception>(() => session.StartAsync(string.Empty, string.Empty));
 
-        TcpListener listener = new(IPAddress.Loopback, port);
-        listener.Start();
-        Task<TcpClient> acceptTask = listener.AcceptTcpClientAsync();
+        reservation.Listen(ListenBacklog);
+        Task<Socket> acceptTask = reservation.AcceptAsync();
 
         try
         {
             await session.StartAsync(string.Empty, string.Empty);
-            using TcpClient acceptedClient = await acceptTask.WaitAsync(TimeSpan.FromSeconds(5));
+            using Socket acceptedClient = await acceptTask.WaitAsync(TimeSpan.FromSeconds(5));
         }
         finally
         {
             session.Dispose();
-            listener.Stop();
         }
     }
 

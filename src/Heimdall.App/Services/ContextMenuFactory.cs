@@ -115,6 +115,11 @@ public sealed class ContextMenuFactory
                 vm.Localize("TreeCtxDuplicate"),
                 vm.ServerList.DuplicateServerCommand,
                 server));
+            if (server.NeedsCredentialLookupConfirmation)
+            {
+                menu.Items.Add(CreateConfirmCredentialLookupItem(vm, [server]));
+            }
+
             menu.Items.Add(CreateFavoriteMenuItem(vm, [server]));
             menu.Items.Add(new Separator());
             menu.Items.Add(CreateMoveToGroupMenu(vm, server));
@@ -208,6 +213,19 @@ public sealed class ContextMenuFactory
     }
 
     /// <summary>
+    /// The "Confirm credential lookup..." entry: shown only where at least one targeted session
+    /// is an imported one still waiting for the user's confirmation.
+    /// </summary>
+    private static MenuItem CreateConfirmCredentialLookupItem(
+        MainViewModel vm,
+        IReadOnlyList<ServerItemViewModel> servers)
+    {
+        MenuItem item = new() { Header = vm.Localize("TreeCtxConfirmCredentialLookup") };
+        item.Click += async (_, _) => _ = await vm.ServerList.ConfirmCredentialLookupAsync(servers);
+        return item;
+    }
+
+    /// <summary>
     /// A disabled line saying a shared session or folder is read-only, standing where the entries
     /// that would change it are left out.
     /// </summary>
@@ -215,11 +233,10 @@ public sealed class ContextMenuFactory
     {
         var item = new MenuItem
         {
-            Header = notice,
             IsEnabled = false,
             FontStyle = FontStyles.Italic
         };
-        System.Windows.Automation.AutomationProperties.SetName(item, notice);
+        LiteralAccessText.SetLiteral(item, notice);
         return item;
     }
 
@@ -268,6 +285,13 @@ public sealed class ContextMenuFactory
         menu.Items.Add(writeEntries[0]);
         menu.Items.Add(writeEntries[1]);
         menu.Items.Add(writeEntries[2]);
+        if (bulkContext.Items.Any(item => item.NeedsCredentialLookupConfirmation))
+        {
+            MenuItem confirmLookup = CreateConfirmCredentialLookupItem(vm, bulkContext.Items);
+            writeEntries.Add(confirmLookup);
+            menu.Items.Add(confirmLookup);
+        }
+
         menu.Items.Add(new Separator());
         MenuItem moveMenu = CreateBulkMoveToGroupMenu(vm, bulkContext);
         writeEntries.Add(moveMenu);
@@ -513,10 +537,8 @@ public sealed class ContextMenuFactory
 
         foreach (var tool in tools)
         {
-            var toolItem = new MenuItem
-            {
-                Header = tool.Name
-            };
+            var toolItem = new MenuItem();
+            LiteralAccessText.SetLiteral(toolItem, tool.Name);
 
             // Capture for closure
             var capturedTool = tool;
@@ -549,11 +571,13 @@ public sealed class ContextMenuFactory
         var groups = tools.GroupBy(t => t.ProviderName, StringComparer.OrdinalIgnoreCase);
         foreach (var group in groups)
         {
-            var providerMenu = new MenuItem { Header = group.Key, FontWeight = FontWeights.SemiBold };
+            var providerMenu = new MenuItem { FontWeight = FontWeights.SemiBold };
+            LiteralAccessText.SetLiteral(providerMenu, group.Key);
 
             foreach (var tool in group.OrderBy(t => t.Name, StringComparer.OrdinalIgnoreCase))
             {
-                var toolItem = new MenuItem { Header = tool.Name };
+                var toolItem = new MenuItem();
+                LiteralAccessText.SetLiteral(toolItem, tool.Name);
 
                 if (tool.DescriptionKey is not null)
                     toolItem.ToolTip = vm.Localize(tool.DescriptionKey);
@@ -656,6 +680,10 @@ public sealed class ContextMenuFactory
         addSubItem.Click += async (_, _) => await CreateFolderFromMenuAsync(vm, folder.FullPath);
         menu.Items.Add(addSubItem);
         menu.Items.Add(CreateAddToolMenuItem(vm, callbacks, folder.FullPath));
+        if (allServers.Any(server => server.NeedsCredentialLookupConfirmation))
+        {
+            menu.Items.Add(CreateConfirmCredentialLookupItem(vm, allServers));
+        }
 
         menu.Items.Add(new Separator());
 
@@ -676,6 +704,12 @@ public sealed class ContextMenuFactory
                 vm,
                 delta => vm.ServerList.CanNudgeFolder(folder, delta),
                 delta => callbacks.NudgeFolderAsync(folder, delta));
+            AddSortAlphabeticallyItem(
+                menu.Items,
+                vm,
+                "TreeCtxSortAlphabetically",
+                vm.ServerList.CanSortFolderAlphabetically(folder),
+                () => callbacks.SortFolderAlphabeticallyAsync(folder));
 
             // Delete folder (move servers to root)
             var deleteItem = new MenuItem
@@ -691,8 +725,39 @@ public sealed class ContextMenuFactory
                     vm.ServerList.FlushExpandStateForCloseAsync));
             menu.Items.Add(deleteItem);
         }
+        else
+        {
+            // "(No Folder)": its sessions can be arranged by hand like any folder's.
+            AddSortAlphabeticallyItem(
+                menu.Items,
+                vm,
+                "TreeCtxSortAlphabetically",
+                vm.ServerList.CanSortFolderAlphabetically(folder),
+                () => callbacks.SortFolderAlphabeticallyAsync(folder));
+        }
 
         return menu;
+    }
+
+    /// <summary>
+    /// Adds a "Sort A to Z" entry only where something on that level was arranged by hand;
+    /// otherwise the menu does not carry it at all.
+    /// </summary>
+    private static void AddSortAlphabeticallyItem(
+        ItemCollection items,
+        MainViewModel vm,
+        string headerKey,
+        bool canSort,
+        Func<Task> sort)
+    {
+        if (!canSort)
+        {
+            return;
+        }
+
+        MenuItem item = new() { Header = vm.Localize(headerKey) };
+        item.Click += async (_, _) => await sort();
+        items.Add(item);
     }
 
     /// <summary>
@@ -888,14 +953,19 @@ public sealed class ContextMenuFactory
         List<FolderTargetNode> children = node.Children.Where(child => include(child.FullPath)).ToList();
         if (children.Count == 0)
         {
-            items.Add(createTarget(node.FullPath, node.Name));
+            MenuItem target = createTarget(node.FullPath, LiteralAccessText.Literal(node.Name));
+            LiteralAccessText.SetAutomationName(target, node.Name);
+            items.Add(target);
             return;
         }
 
-        MenuItem branch = new() { Header = node.Name };
+        MenuItem branch = new();
+        LiteralAccessText.SetLiteral(branch, node.Name);
+        string moveIntoTemplate = vm.Localize("TreeCtxMoveIntoFolder");
         MenuItem here = createTarget(
             node.FullPath,
-            string.Format(vm.Localize("TreeCtxMoveIntoFolder"), node.Name));
+            string.Format(moveIntoTemplate, LiteralAccessText.Literal(node.Name)));
+        LiteralAccessText.SetAutomationName(here, LiteralAccessText.FormatName(moveIntoTemplate, node.Name));
         branch.Items.Add(here);
         branch.Items.Add(new Separator());
         foreach (FolderTargetNode child in children)
@@ -1040,6 +1110,12 @@ public sealed class ContextMenuFactory
         var newFolderItem = new MenuItem { Header = vm.Localize("TreeCtxNewGroup") };
         newFolderItem.Click += async (_, _) => await CreateFolderFromMenuAsync(vm, parentPath: null);
         menu.Items.Add(newFolderItem);
+        AddSortAlphabeticallyItem(
+            menu.Items,
+            vm,
+            "TreeCtxSortTopLevelAlphabetically",
+            vm.ServerList.CanSortTopLevelAlphabetically(),
+            callbacks.SortTopLevelAlphabeticallyAsync);
 
         menu.Items.Add(new Separator());
         menu.Items.Add(CreateAddToolMenuItem(vm, callbacks));

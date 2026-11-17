@@ -314,7 +314,7 @@ public sealed class SessionWindowService : ISessionWindowService
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(vm);
 
-        if (!session.IsSplit) return;
+        if (!session.IsSplit || RefuseWhilePendingCompanion(session, vm)) return;
 
         SessionPaneModel? secondaryPane = session.SecondaryPaneOrNull;
         if (secondaryPane is not null && secondaryPane.HostControl is not null)
@@ -338,7 +338,7 @@ public sealed class SessionWindowService : ISessionWindowService
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(vm);
 
-        if (!EnsureInMainWindow(session, vm))
+        if (RefuseWhilePendingCompanion(session, vm) || !EnsureInMainWindow(session, vm))
         {
             return;
         }
@@ -356,7 +356,7 @@ public sealed class SessionWindowService : ISessionWindowService
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(vm);
 
-        if (!session.IsSplit) return;
+        if (!session.IsSplit || RefuseWhilePendingCompanion(session, vm)) return;
 
         SessionPaneModel? secondaryPane = session.SecondaryPaneOrNull;
         if (secondaryPane is not null)
@@ -392,8 +392,25 @@ public sealed class SessionWindowService : ISessionWindowService
     /// Extracts a specific pane from the split tree into a new tab and
     /// then immediately detaches that tab to a floating window.
     /// </summary>
+    /// <summary>
+    /// Refuses a layout command while the tab still waits for its SFTP companion; see
+    /// <see cref="SessionTabViewModel.HasPendingCompanion"/>.
+    /// </summary>
+    private static bool RefuseWhilePendingCompanion(SessionTabViewModel session, MainViewModel vm)
+    {
+        if (!session.HasPendingCompanion)
+        {
+            return false;
+        }
+
+        vm.StatusText = vm.GetLocalizer()["SplitBlockedByPendingCompanion"];
+        return true;
+    }
+
     private void DetachPaneToFloatingWindow(SessionTabViewModel session, string paneId, MainViewModel vm)
     {
+        if (RefuseWhilePendingCompanion(session, vm)) return;
+
         var pane = SplitTreeHelper.FindPane(session.RootContent, paneId);
         if (pane is null || pane.HostControl is null) return;
 
@@ -417,6 +434,8 @@ public sealed class SessionWindowService : ISessionWindowService
     /// </summary>
     private static void DetachPaneToTab(SessionTabViewModel session, string paneId, MainViewModel vm)
     {
+        if (RefuseWhilePendingCompanion(session, vm)) return;
+
         var pane = SplitTreeHelper.FindPane(session.RootContent, paneId);
         if (pane is null) return;
 

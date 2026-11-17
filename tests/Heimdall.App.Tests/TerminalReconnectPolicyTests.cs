@@ -41,6 +41,86 @@ public sealed class TerminalReconnectPolicyTests
             TerminalReconnectPolicy.ResolveWinRmNotEnteredMessageKey(connectionType, exitCode));
     }
 
+    /// <remarks>
+    /// Output and exit arrive on separate threads: a late diagnostic chunk was queued after the
+    /// disconnect and wrote the handed-off status over a dead session.
+    /// </remarks>
+    [Theory]
+    [InlineData(Heimdall.App.ViewModels.SessionStatusTokens.Disconnected, false)]
+    [InlineData(Heimdall.App.ViewModels.SessionStatusTokens.Error, false)]
+    [InlineData("disconnected", false)]
+    [InlineData(Heimdall.App.ViewModels.SessionStatusTokens.Connected, true)]
+    [InlineData(Heimdall.App.ViewModels.SessionStatusTokens.RemoteSessionHandedOff, true)]
+    [InlineData(Heimdall.App.ViewModels.SessionStatusTokens.Connecting, true)]
+    [InlineData("", true)]
+    [InlineData(null, true)]
+    public void MayWriteHandedOffDiagnostic_NeverOverAnEndedSession(string? currentPaneStatus, bool expected)
+    {
+        Assert.Equal(expected, TerminalReconnectPolicy.MayWriteHandedOffDiagnostic(currentPaneStatus));
+    }
+
+    [Theory]
+    [InlineData(true, 1, true, false, SshLocalizationKeys.ErrorSshPasswordlessSignInFailed)]
+    [InlineData(true, 1, true, true, null)]
+    [InlineData(true, 0, true, false, null)]
+    [InlineData(false, 1, true, false, null)]
+    [InlineData(true, 1, false, false, null)]
+    [InlineData(true, 0, false, false, null)]
+    public void ResolveCredentialFreeExitMessageKey_OnlyForCredentialFreeFailureInsideWindow(
+        bool credentialFree,
+        int exitCode,
+        bool connectTimeExit,
+        bool userInitiatedDisconnect,
+        string? expected)
+    {
+        Assert.Equal(
+            expected,
+            TerminalReconnectPolicy.ResolveCredentialFreeExitMessageKey(
+                credentialFree, exitCode, connectTimeExit, userInitiatedDisconnect));
+    }
+
+    [Theory]
+    [InlineData("reason", "Process exited with code 1", "reason\nProcess exited with code 1")]
+    [InlineData("reason", null, "reason")]
+    [InlineData("reason", "  ", "reason")]
+    [InlineData(null, "Process exited with code 1", "Process exited with code 1")]
+    [InlineData("", "Process exited with code 1", "Process exited with code 1")]
+    [InlineData(null, null, null)]
+    public void ComposePanelDetail_PutsReasonFirstAndKeepsExitDetailOnItsOwnLine(
+        string? reason,
+        string? disconnectDetail,
+        string? expected)
+    {
+        Assert.Equal(expected, TerminalReconnectPolicy.ComposePanelDetail(reason, disconnectDetail));
+    }
+
+    [Fact]
+    public void ComposePanelDetail_CredentialFreeRefusal_CarriesTheSentenceAndTheExitCode()
+    {
+        string? key = TerminalReconnectPolicy.ResolveCredentialFreeExitMessageKey(true, 1, true, false);
+        SshSessionDisconnectInfo disconnect = TerminalReconnectPolicy.ClassifyProcessExit(1, true, true);
+
+        string? detail = TerminalReconnectPolicy.ComposePanelDetail(key, disconnect.MessageKey);
+
+        Assert.NotNull(detail);
+        Assert.StartsWith(SshLocalizationKeys.ErrorSshPasswordlessSignInFailed, detail);
+        Assert.EndsWith(SshLocalizationKeys.SshDisconnectProcessExited, detail);
+    }
+
+    [Fact]
+    public void ResolveCredentialFreeExitMessageKey_WhenItReturnsAKey_AutoReconnectIsOffForTheSameExit()
+    {
+        const bool suppress = true;
+        string? key = TerminalReconnectPolicy.ResolveCredentialFreeExitMessageKey(true, 1, suppress, false);
+        SshSessionDisconnectInfo disconnect = TerminalReconnectPolicy.ClassifyProcessExit(
+            1,
+            autoReconnectOnProcessExit: true,
+            suppressAutoReconnect: suppress);
+
+        Assert.NotNull(key);
+        Assert.False(SshReconnectPolicy.AllowsAutoReconnect(disconnect));
+    }
+
     [Fact]
     public void ClassifyProcessExit_ZeroExit_ReturnsCleanDisconnect()
     {

@@ -53,7 +53,8 @@ public sealed class PlinkPasswordFileReleaseTests
 
         // Arming alone must not touch the file: the launcher may not have opened it yet.
         Assert.Empty(deleted);
-        Assert.Equal(1, session.DataSubscribers);
+        Assert.Equal(1, session.FirstOutputSubscribers);
+        Assert.Equal(0, session.DataSubscribers);
         Assert.Equal(1, session.ExitSubscribers);
     }
 
@@ -79,6 +80,7 @@ public sealed class PlinkPasswordFileReleaseTests
         // A launcher whose -pwfile timing was never measured may print before it reads the file, so
         // its output proves nothing and must not be listened to at all.
         Assert.Equal(0, session.DataSubscribers);
+        Assert.Equal(0, session.FirstOutputSubscribers);
 
         session.RaiseData([0x24]);
         session.RaiseData([0x20, 0x0A]);
@@ -131,6 +133,7 @@ public sealed class PlinkPasswordFileReleaseTests
         handle.Release();
 
         Assert.Equal(0, session.DataSubscribers);
+        Assert.Equal(0, session.FirstOutputSubscribers);
         Assert.Equal(0, session.ExitSubscribers);
         Assert.Equal([PasswordFile], deleted);
     }
@@ -190,6 +193,19 @@ public sealed class PlinkPasswordFileReleaseTests
         await Task.WhenAll(data, exit);
 
         Assert.Single(deleted);
+    }
+
+    [Fact]
+    public void Attested_SessionWithoutTheFirstOutputSignal_IsRefusedWithoutThePath()
+    {
+        PlainTerminalSession session = new();
+
+        ArgumentException thrown = Assert.Throws<ArgumentException>(
+            () => PlinkPasswordFileRelease.Arm(session, PasswordFile, _ => { }, Attested));
+
+        Assert.DoesNotContain(PasswordFile, thrown.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("heimdall-plink-pw", thrown.Message, StringComparison.Ordinal);
+        Assert.Equal(0, session.ExitSubscribers);
     }
 
     [Fact]
@@ -396,11 +412,42 @@ public sealed class PlinkPasswordFileReleaseTests
     /// Counts live subscribers so the oracles can see the unsubscription, which a handler that only
     /// guards on a flag would leave in place.
     /// </summary>
-    private sealed class FakeTerminalSession : ITerminalSession
+    private sealed class FakeTerminalSession : ITerminalSession, IFirstOutputSignal
     {
         private readonly object _sync = new();
         private Action<ReadOnlyMemory<byte>>? _data;
         private Action<int>? _exit;
+        private Action? _firstOutput;
+        private bool _firstOutputRaised;
+
+        // Faithful to the real session: a handler added after the signal was raised is invoked at
+        // once, inside the add, and the handler list is cleared once the signal has been raised.
+        public event Action? FirstOutputReceived
+        {
+            add
+            {
+                bool invokeNow;
+                lock (_sync)
+                {
+                    invokeNow = _firstOutputRaised;
+                    if (!invokeNow)
+                    {
+                        _firstOutput += value;
+                    }
+                }
+
+                if (invokeNow)
+                {
+                    value?.Invoke();
+                }
+            }
+            remove { lock (_sync) { _firstOutput -= value; } }
+        }
+
+        public int FirstOutputSubscribers
+        {
+            get { lock (_sync) { return _firstOutput?.GetInvocationList().Length ?? 0; } }
+        }
 
         public event Action<ReadOnlyMemory<byte>>? DataReceived
         {
@@ -433,11 +480,19 @@ public sealed class PlinkPasswordFileReleaseTests
         public void RaiseData(byte[] chunk)
         {
             Action<ReadOnlyMemory<byte>>? handler;
+            Action? firstOutputHandler = null;
             lock (_sync)
             {
                 handler = _data;
+                if (!_firstOutputRaised)
+                {
+                    _firstOutputRaised = true;
+                    firstOutputHandler = _firstOutput;
+                    _firstOutput = null;
+                }
             }
 
+            firstOutputHandler?.Invoke();
             handler?.Invoke(chunk.AsMemory());
         }
 
@@ -451,6 +506,63 @@ public sealed class PlinkPasswordFileReleaseTests
 
             handler?.Invoke(exitCode);
         }
+
+        public Task StartAsync(
+            string executable,
+            string arguments,
+            int columns = 80,
+            int rows = 24,
+            string? workingDirectory = null,
+            CancellationToken cancellationToken = default)
+            => Task.CompletedTask;
+
+        public void Write(ReadOnlySpan<byte> data)
+        {
+        }
+
+        public void Write(string text)
+        {
+        }
+
+        public void Resize(int columns, int rows)
+        {
+        }
+
+        public void Kill()
+        {
+        }
+
+        public void Dispose()
+        {
+        }
+    }
+
+    /// <summary>
+    /// A session that does not implement the first-output signal.
+    /// </summary>
+    private sealed class PlainTerminalSession : ITerminalSession
+    {
+        private Action<int>? _exit;
+
+        public event Action<ReadOnlyMemory<byte>>? DataReceived
+        {
+            add { }
+            remove { }
+        }
+
+        public event Action<int>? ProcessExited
+        {
+            add { _exit += value; }
+            remove { _exit -= value; }
+        }
+
+        public int ExitSubscribers => _exit?.GetInvocationList().Length ?? 0;
+
+        public bool IsRunning => true;
+
+        public int? ProcessId => 4242;
+
+        public Dictionary<string, string>? EnvironmentVariables { get; set; }
 
         public Task StartAsync(
             string executable,

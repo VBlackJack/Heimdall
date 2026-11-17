@@ -48,6 +48,22 @@ public sealed class SessionTabContextMenuFactory
     /// <summary>Locale key of the "Active mode" caption that opens the resolution header.</summary>
     private const string ActiveModeLabelKey = "RdpResolutionActiveModeLabel";
 
+    private const string CloseFolderTabsKey = "SessionCloseFolderTabs";
+    private const string CloseToolTabsKey = "SessionTabGroupToolsCloseTabs";
+    private const string CollapseFolderTabsKey = "SessionCollapseTabGroup";
+    private const string ExpandFolderTabsKey = "SessionExpandTabGroup";
+    private const string CollapseToolTabsKey = "SessionTabGroupToolsCollapseTabs";
+    private const string ExpandToolTabsKey = "SessionTabGroupToolsExpandTabs";
+
+    // The tools group is not a folder: its items say "tool tabs".
+    private static string CollapseItemKey(SessionTabViewModel session)
+    {
+        bool tools = ConnectionViewModel.IsToolsTabGroup(session.TabGroupKey);
+        return session.IsTabGroupCollapsed
+            ? tools ? ExpandToolTabsKey : ExpandFolderTabsKey
+            : tools ? CollapseToolTabsKey : CollapseFolderTabsKey;
+    }
+
     /// <summary>
     /// Initialises a new <see cref="SessionTabContextMenuFactory"/>.
     /// </summary>
@@ -340,7 +356,7 @@ public sealed class SessionTabContextMenuFactory
 
         var collapseItem = new MenuItem
         {
-            Header = vm.Localize(session.IsTabGroupCollapsed ? "SessionExpandTabGroup" : "SessionCollapseTabGroup"),
+            Header = vm.Localize(CollapseItemKey(session)),
             Command = vm.Connection.ToggleTabGroupCollapsedCommand,
             CommandParameter = session
         };
@@ -648,7 +664,7 @@ public sealed class SessionTabContextMenuFactory
             var detachSecondaryItem = new MenuItem
             {
                 Header = vm.Localize("SplitDetachSecondary"),
-                IsEnabled = session.SecondaryHostControl is not null
+                IsEnabled = session.SecondaryHostControl is not null && !session.HasPendingCompanion
             };
             detachSecondaryItem.Click += (_, _) => callbacks.DetachSecondaryToFloatingWindow(session);
             menu.Items.Add(detachSecondaryItem);
@@ -783,7 +799,8 @@ public sealed class SessionTabContextMenuFactory
         {
             foreach (var macro in macros)
             {
-                var macroItem = new MenuItem { Header = macro.Name, Tag = macro };
+                var macroItem = new MenuItem { Tag = macro };
+                LiteralAccessText.SetLiteral(macroItem, macro.Name);
                 macroItem.Click += async (s, _) =>
                 {
                     if (s is MenuItem { Tag: TerminalMacro m })
@@ -801,7 +818,8 @@ public sealed class SessionTabContextMenuFactory
                 };
                 playMenu.Items.Add(macroItem);
 
-                var editItem = new MenuItem { Header = macro.Name, Tag = macro };
+                var editItem = new MenuItem { Tag = macro };
+                LiteralAccessText.SetLiteral(editItem, macro.Name);
                 editItem.Click += async (s, _) =>
                 {
                     if (s is not MenuItem { Tag: TerminalMacro m })
@@ -885,7 +903,10 @@ public sealed class SessionTabContextMenuFactory
         if (session.TabGroupKey is { } folder)
         {
             IReadOnlyList<SessionTabViewModel> folderTargets = SessionsInFolder(ordered.ToList(), folder);
-            var closeFolderItem = new MenuItem { Header = vm.Localize("SessionCloseFolderTabs") };
+            var closeFolderItem = new MenuItem
+            {
+                Header = vm.Localize(ConnectionViewModel.IsToolsTabGroup(folder) ? CloseToolTabsKey : CloseFolderTabsKey)
+            };
             closeFolderItem.Click += async (_, _) =>
             {
                 await vm.Connection.CloseSessionsAsync(
@@ -940,7 +961,8 @@ public sealed class SessionTabContextMenuFactory
                 foreach (var other in otherSessions)
                 {
                     var sourceTab = other;
-                    var sessionMenu = new MenuItem { Header = sourceTab.Title };
+                    var sessionMenu = new MenuItem();
+                    LiteralAccessText.SetLiteral(sessionMenu, sourceTab.Title);
 
                     // Merge resolution is session-scoped; profile IDs are shared by duplicate tabs.
                     string mergeId = sourceTab.ServerId;
@@ -963,18 +985,22 @@ public sealed class SessionTabContextMenuFactory
         }
         else
         {
-            var unsplit = new MenuItem { Header = vm.Localize("SplitUnsplit") };
+            // Layout commands wait for the SFTP companion: the SSH session is found by the first pane.
+            bool layoutAvailable = !session.HasPendingCompanion;
+
+            var unsplit = new MenuItem { Header = vm.Localize("SplitUnsplit"), IsEnabled = layoutAvailable };
             unsplit.Click += (_, _) => callbacks.UnsplitSession(session);
             menu.Items.Add(unsplit);
 
-            var swapItem = new MenuItem { Header = vm.Localize("SplitSwapPanes") };
+            var swapItem = new MenuItem { Header = vm.Localize("SplitSwapPanes"), IsEnabled = layoutAvailable };
             swapItem.Click += async (_, _) => await vm.SwapSplitPanesAsync(session);
             menu.Items.Add(swapItem);
 
             var toggleItem = new MenuItem
             {
                 Header = vm.Localize("SplitToggleOrientation"),
-                InputGestureText = "Ctrl+Shift+O"
+                InputGestureText = "Ctrl+Shift+O",
+                IsEnabled = layoutAvailable
             };
             toggleItem.Click += (_, _) => vm.ToggleSplitOrientation(session);
             menu.Items.Add(toggleItem);

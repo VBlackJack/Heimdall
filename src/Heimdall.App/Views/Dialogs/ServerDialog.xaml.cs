@@ -570,6 +570,7 @@ public partial class ServerDialog : Window
         System.Windows.Automation.AutomationProperties.SetLabeledBy(DlgSrv_WinRmIdentityCombo, DlgSrv_WinRmIdentityLabel);
         System.Windows.Automation.AutomationProperties.SetLabeledBy(DlgSrv_WinRmUsernameBox, DlgSrv_BasicWinRmUsernameLabel);
         System.Windows.Automation.AutomationProperties.SetLabeledBy(DlgSrv_SshKeyPathBox, DlgSrv_BasicSshKeyLabel);
+        System.Windows.Automation.AutomationProperties.SetLabeledBy(DlgSrv_SshAgentKeyCombo, DlgSrv_BasicSshAgentKeyLabel);
         DlgSrv_BasicBrowseBtn.Content = _localizer["ServerDialogBtnBrowse"];
         // SSH auth hints are bound to computed ViewModel properties.
         DlgSrv_BasicVncCredentialsTitle.Text = _localizer["ServerDialogVncCredentials"];

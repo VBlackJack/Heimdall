@@ -952,7 +952,7 @@ public sealed class ServerListBulkActionTests : IDisposable
         var startFailedCount = 0;
         fixture.ViewModel.SessionStarting += (_, _, _, _, _, _, placeholderCancellation) =>
             placeholderCancellation.Cancel();
-        fixture.ViewModel.SessionReady += (_, _, _, _, _, _) => readyCount++;
+        fixture.ViewModel.SessionReady += (_, _, _, _, _, _, _) => readyCount++;
         fixture.ViewModel.SessionStartFailed += _ => startFailedCount++;
 
         await fixture.ViewModel.ConnectCommand.ExecuteAsync(fixture.ServerById("alpha"));

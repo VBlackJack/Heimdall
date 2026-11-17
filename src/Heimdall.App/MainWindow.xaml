@@ -70,6 +70,11 @@
                     </MultiDataTrigger.Conditions>
                     <Setter TargetName="SessionLoadingOverlay" Property="Visibility" Value="Visible"/>
                 </MultiDataTrigger>
+                <!-- A hostless tab that has ended (an external client that exited) has nothing left to
+                     wait for: it stops spinning. Declared after the trigger above so it wins. -->
+                <DataTrigger Binding="{Binding Status}" Value="{x:Static vm:SessionStatusTokens.Disconnected}">
+                    <Setter TargetName="SessionLoadingOverlay" Property="Visibility" Value="Collapsed"/>
+                </DataTrigger>
             </DataTemplate.Triggers>
         </DataTemplate>
     </Window.Resources>
@@ -497,6 +502,9 @@
                                                                 <!-- DisplayName falls back to the raw handler key, so a protocol
                                                                      registered without a name is still offered rather than blank. -->
                                                                 <Setter Property="Header" Value="{Binding DisplayName}"/>
+                                                                <!-- A registered handler key can hold an underscore: the template
+                                                                     keeps it, where a string header would read it as an access key. -->
+                                                                <Setter Property="HeaderTemplate" Value="{StaticResource LiteralTextTemplate}"/>
                                                                 <Setter Property="IsCheckable" Value="True"/>
                                                                 <Setter Property="IsChecked" Value="{Binding IsSelected, Mode=TwoWay}"/>
                                                                 <Setter Property="StaysOpenOnClick" Value="True"/>
@@ -3536,7 +3544,10 @@
                                                 </ItemsControl.ItemsPanel>
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
+                                                        <!-- The variable name is data: the template shows an underscore as it
+                                                             is, where a string content would read it as an access key. -->
                                                         <Button Content="{Binding AddLabel}"
+                                                                ContentTemplate="{StaticResource LiteralTextTemplate}"
                                                                 Command="{Binding DataContext.Settings.AddMissingMobaXtermVariableCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                                                 CommandParameter="{Binding}"
                                                                 Style="{DynamicResource SecondaryButtonStyle}"
@@ -4124,6 +4135,17 @@
                                         <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[SftpAutoOpenOnSsh]}"/>
                                         <CheckBox x:Name="Mw_SettingsSftpFollowSshDirectory" Content="{loc:Translate SettingsLabelSftpFollowSshDirectory}" IsChecked="{Binding Settings.SftpFollowSshDirectory}" IsEnabled="{Binding Settings.SftpBrowserEnabled}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,8,0,0" AutomationProperties.Name="{loc:Translate SettingsLabelSftpFollowSshDirectory}"/>
                                         <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[SftpFollowSshDirectory]}"/>
+                                        <TextBlock x:Name="Mw_SettingsSftpSudoFallbackLabel" Text="{loc:Translate SettingsLabelSftpSudoFallback}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,12,0,4"/>
+                                        <ComboBox x:Name="Mw_SettingsSftpSudoFallback" SelectedValue="{Binding Settings.SftpSudoFallback}" SelectedValuePath="Tag" MinWidth="260" HorizontalAlignment="Left" IsEnabled="{Binding Settings.SftpBrowserEnabled}"
+                                                  AutomationProperties.LabeledBy="{x:Reference Mw_SettingsSftpSudoFallbackLabel}"
+                                                  AutomationProperties.HelpText="{loc:Translate SettingsSftpSudoFallbackHint}">
+                                            <ComboBoxItem Content="{loc:Translate SettingsSftpSudoFallbackNever}" Tag="Never" AutomationProperties.Name="{loc:Translate SettingsSftpSudoFallbackNever}"/>
+                                            <ComboBoxItem Content="{loc:Translate SettingsSftpSudoFallbackAsk}" Tag="Ask" IsEnabled="{Binding Settings.IsSftpSudoFallbackAskAllowed}" AutomationProperties.Name="{loc:Translate SettingsSftpSudoFallbackAsk}"/>
+                                            <ComboBoxItem Content="{loc:Translate SettingsSftpSudoFallbackAutomatic}" Tag="Automatic" IsEnabled="{Binding Settings.IsSftpSudoFallbackAutomaticAllowed}" AutomationProperties.Name="{loc:Translate SettingsSftpSudoFallbackAutomatic}"/>
+                                        </ComboBox>
+                                        <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[SftpSudoFallback]}"/>
+                                        <TextBlock x:Name="Mw_SettingsSftpSudoFallbackHint" Text="{loc:Translate SettingsSftpSudoFallbackHint}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                        <TextBlock x:Name="Mw_SettingsSftpSudoFallbackCap" Text="{Binding Settings.SftpSudoFallbackCapText}" Visibility="{Binding Settings.IsSftpSudoFallbackCapped, Converter={StaticResource BoolToVisibilityConverter}}" Foreground="{DynamicResource WarningTextBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                                     </StackPanel>
                                 </Border>
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
@@ -4214,10 +4236,15 @@
                                             </StackPanel>
                                         </DockPanel>
 
+                                        <!-- The label names known_hosts: the content stays a string, which the settings
+                                             search reads, and the template keeps its underscore, which a plain string
+                                             content would take for an access key. -->
                                         <CheckBox x:Name="Mw_SettingsSyncKnownHostsAtStartup"
                                                   Content="{loc:Translate SettingsLabelSyncKnownHostsAtStartup}"
+                                                  ContentTemplate="{StaticResource LiteralTextTemplate}"
                                                   IsChecked="{Binding Settings.SyncKnownHostsAtStartup}"
                                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                                  AutomationProperties.Name="{loc:Translate SettingsLabelSyncKnownHostsAtStartup}"
                                                   AutomationProperties.HelpText="{loc:Translate SettingsSyncKnownHostsAtStartupHint}"/>
                                         <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[SyncKnownHostsAtStartup]}"/>
                                         <TextBlock Text="{loc:Translate SettingsSyncKnownHostsAtStartupHint}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="20,4,0,12" TextWrapping="Wrap"/>
@@ -5016,6 +5043,7 @@
                                         <controls:SecurityPostureLineView DataContext="{Binding Settings.SecurityPosture[WindowsHelloOnConnect]}"/>
                                         <controls:SecurityPostureLineView DataContext="{Binding Settings.SecurityPosture[UpdateChecks]}"/>
                                         <controls:SecurityPostureLineView DataContext="{Binding Settings.SecurityPosture[KnownHostsSync]}"/>
+                                        <controls:SecurityPostureLineView DataContext="{Binding Settings.SecurityPosture[SftpSudoFallback]}"/>
                                     </StackPanel>
                                 </Border>
                                     </StackPanel>

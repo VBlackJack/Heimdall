@@ -692,4 +692,79 @@ public class MRemoteNgImporterTests
         Assert.Equal("Fine", Assert.Single(result.Servers).DisplayName);
         Assert.Single(result.Warnings);
     }
+
+    [Fact]
+    public void Parse_ListsSessionsInDocumentOrder_AcrossNestedContainers()
+    {
+        var xml = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <mrng:Connections xmlns:mrng="http://mremoteng.org" Name="Connections" ConfVersion="2.6">
+              <Node Name="Zeta" Type="Container">
+                <Node Name="web-b" Type="Connection" Hostname="b.example.com" Protocol="SSH2" />
+                <Node Name="Sub2" Type="Container"><Node Name="x" Type="Connection" Hostname="x.example.com" Protocol="SSH2" /></Node>
+                <Node Name="Sub1" Type="Container"><Node Name="y" Type="Connection" Hostname="y.example.com" Protocol="SSH2" /></Node>
+                <Node Name="web-a" Type="Connection" Hostname="a.example.com" Protocol="SSH2" />
+              </Node>
+              <Node Name="Alpha" Type="Container"><Node Name="db" Type="Connection" Hostname="db.example.com" Protocol="RDP" /></Node>
+              <Node Name="root-z" Type="Connection" Hostname="z.example.com" Protocol="RDP" />
+              <Node Name="root-a" Type="Connection" Hostname="r.example.com" Protocol="RDP" />
+            </mrng:Connections>
+            """;
+
+        var result = MRemoteNgImporter.Parse(xml);
+
+        Assert.Equal(
+            new[]
+            {
+                ("web-b", "Zeta"),
+                ("x", "Zeta/Sub2"),
+                ("y", "Zeta/Sub1"),
+                ("web-a", "Zeta"),
+                ("db", "Alpha"),
+                ("root-z", null),
+                ("root-a", null),
+            },
+            result.Servers.Select(server => (server.DisplayName, server.Group)).ToArray());
+    }
+
+    [Fact]
+    public void Parse_ListsEveryContainerInDocumentOrder()
+    {
+        var xml = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <mrng:Connections xmlns:mrng="http://mremoteng.org" Name="Connections" ConfVersion="2.6">
+              <Node Name="Later" Type="Container" />
+              <Node Name=" Prod " Type="Container">
+                <Node Name="web" Type="Connection" Hostname="web.example.com" Protocol="SSH2" />
+                <Node Name="Spare" Type="Container" />
+              </Node>
+              <Node Name="Alpha" Type="Container">
+                <Node Name="Inner" Type="Container">
+                  <Node Name="Deep" Type="Container" />
+                </Node>
+              </Node>
+            </mrng:Connections>
+            """;
+
+        var result = MRemoteNgImporter.Parse(xml);
+
+        Assert.Equal(
+            ["Later", "Prod", "Prod/Spare", "Alpha", "Alpha/Inner", "Alpha/Inner/Deep"],
+            result.Containers);
+    }
+
+    [Fact]
+    public void Parse_RootIsNotAContainer()
+    {
+        var xml = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <mrng:Connections xmlns:mrng="http://mremoteng.org" Name="Root" ConfVersion="2.6">
+              <Node Name="Connections" Type="Container" />
+            </mrng:Connections>
+            """;
+
+        var result = MRemoteNgImporter.Parse(xml);
+
+        Assert.Equal(["Connections"], result.Containers);
+    }
 }

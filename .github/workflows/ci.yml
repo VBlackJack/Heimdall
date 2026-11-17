@@ -205,7 +205,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Setup .NET 10
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           global-json-file: global.json
 
@@ -235,6 +235,12 @@ jobs:
           npm test
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      # A test that never returns used to cost the whole step timeout and leave no
+      # name behind: on 2026-11-14 one test project stopped reporting and the step
+      # was cut after 25 minutes, with nothing in the log to say which test it was.
+      # --blame-hang-timeout ends the test host when a single test runs longer than
+      # the bound and names that test in the output. No dump is taken: the name is
+      # what was missing, and a dump of the host would be large.
       - name: Test with coverage
         timeout-minutes: 25
         run: >
@@ -244,6 +250,8 @@ jobs:
           --collect:"XPlat Code Coverage"
           --logger trx
           --results-directory TestResults
+          --blame-hang-timeout 10m
+          --blame-hang-dump-type none
 
       # Informational pass for tests tagged CIUnstable. These pass on dev
       # machines but flake on the GitHub Actions Windows runner due to

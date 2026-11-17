@@ -1085,6 +1085,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
             var tab = Connection.AddSession(dto.Id, dto.DisplayName, connType);
             tab.MarkAsAdHoc(dto);
             tab.Status = SessionStatusTokens.LaunchedExternalClient;
+            Session.FollowExternalClient(tab, result.ExternalClientExited).SafeFireAndForget();
             StatusText = _localizer["StatusLaunchedExternalClient"];
         }
         else

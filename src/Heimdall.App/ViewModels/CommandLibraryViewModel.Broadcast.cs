@@ -20,6 +20,7 @@ using CommunityToolkit.Mvvm.Input;
 using Heimdall.App.Services;
 using Heimdall.App.ViewModels.CommandLibrary;
 using Heimdall.Core.Models;
+using Heimdall.Core.Utilities;
 using TwinShell.Core.Enums;
 
 namespace Heimdall.App.ViewModels;
@@ -204,6 +205,10 @@ public sealed partial class CommandLibraryViewModel
             return;
         }
 
+        // Read once: the text that is shown, and the text that is sent after the modal question,
+        // must be the same value even if the generated command changes while the dialog is open.
+        string command = GeneratedCommand;
+
         // The ids are taken before the confirmation and re-resolved by the broadcaster after it,
         // so a tab closed while the dialog was up reports as unreached instead of sending to
         // whichever tab has since taken its place.
@@ -229,8 +234,10 @@ public sealed partial class CommandLibraryViewModel
             _localizer.Format(
                 "ToolCmdLibBroadcastConfirmMessage",
                 chosen.Count,
-                GeneratedCommand),
-            "warning");
+                UntrustedText.MakeVisible(command, UntrustedText.NoLengthLimit)),
+            "warning",
+            _localizer.Format("ToolCmdLibBroadcastSendToCount", chosen.Count),
+            LocalizeKey("ToolCmdLibBroadcastConfirmDecline"));
 
         if (!confirmed)
         {
@@ -241,7 +248,7 @@ public sealed partial class CommandLibraryViewModel
         var unreachedIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (var (id, displayName) in chosen)
         {
-            if (!CommandBroadcaster!.Send(id, GeneratedCommand))
+            if (!CommandBroadcaster!.Send(id, command))
             {
                 unreached.Add(displayName);
                 unreachedIds.Add(id);

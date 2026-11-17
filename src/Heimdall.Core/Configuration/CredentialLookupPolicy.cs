@@ -14,22 +14,23 @@
  * limitations under the License.
  */
 
-using Heimdall.App.ViewModels;
+namespace Heimdall.Core.Configuration;
 
-namespace Heimdall.App.Tests;
-
-public sealed class SudoRenameCommandsTests
+/// <summary>
+/// The names an external credential provider can be asked for a profile's password under.
+/// </summary>
+public static class CredentialLookupPolicy
 {
-    [Theory]
-    [InlineData(false, "mv -nT '/srv/source item' '/srv/target item'")]
-    [InlineData(true, "mv -T '/srv/source item' '/srv/target item'")]
-    public void BuildMove_EmitsExactCommandForDecision(bool replace, string expected)
+    /// <summary>
+    /// The entry name a confirmed local profile is looked up by: its vault entry name, else its
+    /// display name.
+    /// </summary>
+    public static string NameBasedTitle(ServerProfileDto profile)
     {
-        string command = SudoRenameCommands.BuildMove(
-            "/srv/source item",
-            "/srv/target item",
-            replace);
+        ArgumentNullException.ThrowIfNull(profile);
 
-        Assert.Equal(expected, command);
+        return string.IsNullOrWhiteSpace(profile.VaultEntryName)
+            ? profile.DisplayName
+            : profile.VaultEntryName;
     }
 }

@@ -34,6 +34,8 @@
         <sys:Double x:Key="SftpHeaderTitleMaxWidth">300</sys:Double>
         <sys:Double x:Key="SftpHeaderEndpointMaxWidth">250</sys:Double>
         <sys:Double x:Key="SftpSecurityBadgeMaxWidth">240</sys:Double>
+        <sys:Double x:Key="SftpRootMenuTextMaxWidth">480</sys:Double>
+        <sys:Double x:Key="SftpRootTooltipMaxWidth">420</sys:Double>
         <!-- WCAG 2.5.8 sets the floor of a pointer target at 24 px; 28 keeps the toolbar compact. -->
         <sys:Double x:Key="SftpToolbarButtonMinHeight">28</sys:Double>
         <sys:Double x:Key="SftpColumnWidthName">320</sys:Double>
@@ -348,11 +350,13 @@
                     <ToggleButton x:Name="BtnSudoMode"
                                   Command="{Binding ToggleSudoModeCommand}"
                                   IsChecked="{Binding SudoMode, Mode=OneWay}"
-                                  ToolTip="{loc:Translate SftpSudoModeTooltip}"
+                                  IsEnabled="{Binding IsSudoModeAvailable}"
+                                  ToolTip="{Binding SudoModeTooltip}"
+                                  ToolTipService.ShowOnDisabled="True"
                                   Style="{DynamicResource ToolbarToggleButtonStyle}"
                                   MinHeight="{StaticResource SftpToolbarButtonMinHeight}"
                                   FontSize="{StaticResource FontSizeCaption}"
-                                  AutomationProperties.Name="{loc:Translate SftpSudoModeTooltip}">
+                                  AutomationProperties.Name="{Binding SudoModeTooltip}">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="&#xE7EF;" FontFamily="{StaticResource FontFamilyIcons}" FontSize="{StaticResource FontSizeBody}"
                                        VerticalAlignment="Center" Margin="0,0,4,0"/>
@@ -371,6 +375,111 @@
                             </TextBlock>
                         </StackPanel>
                     </ToggleButton>
+
+                    <!-- Root badge: appears at the first act this pane ran through sudo and stays until the pane
+                         closes. It opens the list of those acts, like the toolbar's other menu buttons. The icon
+                         is the live region: its name is constant, so one sentence is heard when the badge first
+                         appears and not one per operation. -->
+                    <Button x:Name="BtnRootActivity"
+                            Style="{DynamicResource GhostButtonStyle}"
+                            MinHeight="{StaticResource SftpToolbarButtonMinHeight}"
+                            Padding="{StaticResource SftpButtonPadding}"
+                            FontSize="{StaticResource FontSizeCaption}"
+                            Click="OnToolbarMenuButtonClick"
+                            Visibility="{Binding HasRootActivity, Converter={StaticResource BoolToVisibilityConverter}}"
+                            AutomationProperties.Name="{Binding RootActivitySummary}">
+                        <!-- The themed tooltip does not wrap its text, so the sentence is wrapped here. -->
+                        <Button.ToolTip>
+                            <ToolTip>
+                                <TextBlock x:Name="RootActivityTooltipText"
+                                           Text="{Binding RootActivitySummary}"
+                                           TextWrapping="Wrap"
+                                           MaxWidth="{StaticResource SftpRootTooltipMaxWidth}"/>
+                            </ToolTip>
+                        </Button.ToolTip>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock x:Name="RootActivityIcon"
+                                       Text="&#xE7BA;"
+                                       FontFamily="{StaticResource FontFamilyIcons}"
+                                       FontSize="{StaticResource FontSizeBody}"
+                                       Foreground="{DynamicResource WarningTextBrush}"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,4,0"
+                                       AutomationProperties.Name="{loc:Translate SftpRootBadgeAnnouncement}"
+                                       AutomationProperties.LiveSetting="Polite"
+                                       behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"/>
+                            <TextBlock x:Name="RootActivityLabel"
+                                       Text="{loc:Translate SftpRootBadgeLabel}"
+                                       FontSize="{StaticResource FontSizeCaption}"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource WarningTextBrush}"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock x:Name="RootActivityCount"
+                                       Text="{Binding RootOperationCountText}"
+                                       FontSize="{StaticResource FontSizeCaption}"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource WarningTextBrush}"
+                                       VerticalAlignment="Center"
+                                       Margin="4,0,0,0"
+                                       Visibility="{Binding HasRootOperations, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                        </StackPanel>
+                        <Button.ContextMenu>
+                            <ContextMenu x:Name="RootActivityContextMenu"
+                                         DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                         ItemsSource="{Binding RootActivityEntries}"
+                                         AutomationProperties.Name="{loc:Translate A11ySftpRootActivityMenu}">
+                                <ContextMenu.ItemContainerStyle>
+                                    <Style TargetType="{x:Type MenuItem}" BasedOn="{StaticResource ThemedMenuItemStyle}">
+                                        <!-- The header is the entry itself, shown by a template: a raw string
+                                             header is read for access keys, which would swallow the first
+                                             underscore of a path and show a path that is not the one that was
+                                             used. The path takes the width that is left and is trimmed; the
+                                             time sits at the right, and only once for a screen reader, in the
+                                             automation name below. -->
+                                        <Setter Property="Header" Value="{Binding}"/>
+                                        <Setter Property="HeaderTemplate">
+                                            <Setter.Value>
+                                                <DataTemplate>
+                                                    <Grid MaxWidth="{StaticResource SftpRootMenuTextMaxWidth}">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Grid.Column="0"
+                                                                   Text="{Binding Text}"
+                                                                   TextTrimming="CharacterEllipsis"/>
+                                                        <TextBlock Grid.Column="1"
+                                                                   Text="{Binding TimeText}"
+                                                                   HorizontalAlignment="Right"
+                                                                   Margin="12,0,0,0"
+                                                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                        <Setter Property="ToolTip">
+                                            <Setter.Value>
+                                                <ToolTip>
+                                                    <TextBlock Text="{Binding Text}"
+                                                               TextWrapping="Wrap"
+                                                               MaxWidth="{StaticResource SftpRootTooltipMaxWidth}"/>
+                                                </ToolTip>
+                                            </Setter.Value>
+                                        </Setter>
+                                        <Setter Property="AutomationProperties.Name" Value="{Binding AutomationName}"/>
+                                        <!-- The listing line stands for every listing, not for one operation: it is
+                                             set apart by weight and by the theme's border. -->
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsSummary}" Value="True">
+                                                <Setter Property="FontWeight" Value="SemiBold"/>
+                                                <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </ContextMenu.ItemContainerStyle>
+                            </ContextMenu>
+                        </Button.ContextMenu>
+                    </Button>
 
                     <ToggleButton x:Name="BtnFollowSshDirectory"
                                   Checked="OnFollowSshDirectoryToggled"

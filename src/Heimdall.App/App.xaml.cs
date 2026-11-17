@@ -842,6 +842,18 @@ public partial class App : System.Windows.Application
             sp.GetRequiredService<HttpClient>(),
             sp.GetRequiredService<IAppVersionProvider>().Current?.ToString() ?? "unknown"));
         services.AddSingleton<IVariantDetector>(_ => new VariantDetector());
+        // The organisation cap on running refused SFTP operations as root: read once from the
+        // machine policy key, so one instance serves every pane. The provider below is what a pane
+        // calls on each act: the stricter of the live setting and that cap, so a change in Settings
+        // applies to panes that are already open.
+        services.AddSingleton<SftpSudoFallbackPolicy>(_ => new SftpSudoFallbackPolicy());
+        services.AddSingleton<Func<Heimdall.Core.Models.SftpSudoFallbackMode>>(sp =>
+        {
+            SftpSudoFallbackPolicy policy = sp.GetRequiredService<SftpSudoFallbackPolicy>();
+            ConfigManager configManager = sp.GetRequiredService<ConfigManager>();
+            return () => policy.Effective(
+                configManager.CurrentSettings?.SftpSudoFallback ?? Heimdall.Core.Models.SftpSudoFallbackMode.Ask);
+        });
         services.AddSingleton<IUpdateService>(sp => new UpdateService(
             sp.GetRequiredService<IGitHubReleaseClient>(),
             sp.GetRequiredService<IVariantDetector>(),

@@ -292,6 +292,10 @@ public partial class ServerDialogViewModel
         // _isInitializing, and it empties the list through Clear, which reports Reset.
         OnPropertyChanged(nameof(HasNoPostConnectSteps));
 
+        // The notice lists the steps whatever the protocol, and adding, removing or loading one
+        // reaches no other property, so it is refreshed here, before the guards.
+        RaiseExecutionTrustNoticeChanged();
+
         if (_isInitializing)
         {
             return;
@@ -310,6 +314,10 @@ public partial class ServerDialogViewModel
 
     private void OnPostConnectStepPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
+        // Editing a step does not pass through this view model's own change notification, and
+        // resolving a linked title runs with tracking suspended: the notice is refreshed first.
+        RaiseExecutionTrustNoticeChanged();
+
         if (_isInitializing)
         {
             return;
@@ -419,6 +427,9 @@ public partial class ServerDialogViewModel
                 }
             }
         });
+
+        // The titles the notice shows for linked steps are known only now.
+        RaiseExecutionTrustNoticeChanged();
     }
 }
 

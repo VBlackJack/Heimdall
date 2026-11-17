@@ -1577,6 +1577,22 @@ public partial class ServerListViewModel
                         cancelled = true;
                         break;
 
+                    case BulkConnectOutcomeStatus.Declined:
+                        if (IsExternalCommandTooLong(candidate.ServerDto))
+                        {
+                            // Refused before any question, with its own error: no choice was
+                            // made, so it is a failure of this server.
+                            failedCount++;
+                            Core.Logging.FileLogger.Warn(
+                                $"ConnectServersBulkCoreAsync refused '{candidate.Server.DisplayName}': external command too long.");
+                            break;
+                        }
+
+                        // The user answered "do not run" for this server: skipped, not failed, and
+                        // the rest of the run still goes ahead.
+                        skips.Add(BulkConnectSkipReason.CancelledByUser);
+                        break;
+
                     case BulkConnectOutcomeStatus.Cancelled:
                         // Only this server's attempt was abandoned (its tab closed or its Cancel
                         // pressed); the rest of the run still goes ahead.
@@ -1813,7 +1829,17 @@ public partial class ServerListViewModel
         RefreshLookupCollections(settings);
 
         var anchorId = plan.FocusId ?? _selectionAnchor?.Id;
-        RebuildStableTreeProjection();
+        if (plan.OrderOnly && plan.ToRemove.Count == 0 && plan.ToAppend.Count == 0)
+        {
+            // Rows only changed rank inside their own folder: keep the folder instances so the
+            // tree rows are not regenerated and the scroll offset survives.
+            ResortStableTreeProjection();
+        }
+        else
+        {
+            RebuildStableTreeProjection();
+        }
+
         ApplyFilter(plan.FocusId);
 
         if (plan.FinalSelectionIds is not null)
@@ -2046,7 +2072,8 @@ public partial class ServerListViewModel
         string? PrimarySelectionId,
         string? FocusId,
         string? StatusKey,
-        object[]? StatusArgs)
+        object[]? StatusArgs,
+        bool OrderOnly = false)
     {
         public bool IsNoOp => ToRemove.Count == 0
                            && ToUpdate.Count == 0

@@ -36,13 +36,24 @@ namespace Heimdall.App.Services;
 /// no such retry ran. A Plink terminal reports success once its process started, so without this
 /// a password the server had just refused would read as a working connection.
 /// </param>
+/// <param name="ExternalClientExited">
+/// Completes when the client process Heimdall launched has exited; null when no client was launched
+/// or its end cannot be observed.
+/// </param>
+/// <param name="Declined">
+/// True when the user answered the trust question with "do not run": a choice, not a failure, so
+/// callers show a plain status rather than an error. False for every other failure, including the
+/// fail-closed refusal made when nothing was there to ask.
+/// </param>
 public sealed record ConnectionResult(
     bool Success,
     string? ErrorMessage,
     ISessionResult? Session,
     SessionDiagnostic? Failure = null,
     string? Warning = null,
-    SshFailureCode? FallbackFrom = null);
+    SshFailureCode? FallbackFrom = null,
+    Task? ExternalClientExited = null,
+    bool Declined = false);
 
 /// <summary>Wraps a <see cref="ServerProfileDto"/> for embedded RDP sessions.</summary>
 /// <param name="Server">The profile the session runs on.</param>
@@ -83,7 +94,14 @@ public sealed record SshSessionResult(
 public sealed record TerminalSessionResult(
     Heimdall.Terminal.ITerminalSession Session,
     string? Endpoint = null,
-    bool? SessionLoggingOverride = null) : ISessionResult;
+    bool? SessionLoggingOverride = null) : ISessionResult
+{
+    /// <summary>
+    /// True when plink was launched with no password file and no private key file, in batch mode, so
+    /// Kerberos or an agent key decides the sign-in.
+    /// </summary>
+    public bool CredentialFreeLaunch { get; init; }
+}
 
 /// <summary>
 /// Bundles an SFTP browser session with the SSH connection parameters needed for sudo operations.

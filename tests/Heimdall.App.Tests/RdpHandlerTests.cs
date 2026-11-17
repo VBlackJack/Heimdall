@@ -1157,6 +1157,112 @@ public sealed class RdpHandlerTests : IDisposable
     }
 
     [Fact]
+    public async Task ConnectAsync_ForceExternal_ExitSignalCompletesWhenTheClientExits()
+    {
+        FakeLaunchedRdpClientProcess process = new FakeLaunchedRdpClientProcess(4242);
+        TrackingRdpExternalClientLauncher launcher = new TrackingRdpExternalClientLauncher
+        {
+            ProcessToReturn = process
+        };
+        RdpHandler handler = CreateHandler(launcher);
+        AppSettings settings = new AppSettings
+        {
+            RdpArtifactCleanupDelayMs = 1,
+            RdpCredentialAutofillTimeoutMs = 1
+        };
+
+        ConnectionResult result = await handler.ConnectAsync(
+            CreateServer("Embedded"),
+            settings,
+            CancellationToken.None,
+            RdpModeOverride.ForceExternal);
+
+        Assert.True(result.Success);
+        Assert.NotNull(result.ExternalClientExited);
+        Assert.False(result.ExternalClientExited.IsCompleted);
+
+        process.RaiseExited();
+
+        await result.ExternalClientExited.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.True(result.ExternalClientExited.IsCompletedSuccessfully);
+    }
+
+    [Fact]
+    public async Task ConnectAsync_ForceExternal_ExitAfterTeardownLeavesNoStateEntry()
+    {
+        const string ServerId = "rdp-test";
+        ConnectionStateMachine stateMachine = new ConnectionStateMachine();
+        FakeLaunchedRdpClientProcess process = new FakeLaunchedRdpClientProcess(4242);
+        TrackingRdpExternalClientLauncher launcher = new TrackingRdpExternalClientLauncher
+        {
+            ProcessToReturn = process
+        };
+        RdpHandler handler = new RdpHandler(
+            new PassThroughTunnelService(),
+            stateMachine,
+            new LocalizationManager(),
+            launcher);
+        AppSettings settings = new AppSettings
+        {
+            RdpArtifactCleanupDelayMs = 1,
+            RdpCredentialAutofillTimeoutMs = 1
+        };
+        stateMachine.TryTransition(ServerId, ConnectionState.Initializing);
+
+        ConnectionResult result = await handler.ConnectAsync(
+            CreateServer("Embedded"),
+            settings,
+            CancellationToken.None,
+            RdpModeOverride.ForceExternal);
+
+        Assert.True(result.Success);
+        Assert.Equal(ConnectionState.LaunchedExternalClient, stateMachine.GetStateData(ServerId)?.CurrentState);
+
+        // The pipeline tears the entry down once the launch is handed to the shell.
+        stateMachine.Teardown(ServerId);
+        process.RaiseExited();
+
+        Assert.Null(stateMachine.GetStateData(ServerId));
+    }
+
+    [Fact]
+    public async Task ConnectAsync_ForceExternal_ExitBeforeTeardownMovesTheEntryToDisconnected()
+    {
+        const string ServerId = "rdp-test";
+        ConnectionStateMachine stateMachine = new ConnectionStateMachine();
+        FakeLaunchedRdpClientProcess process = new FakeLaunchedRdpClientProcess(4242);
+        TrackingRdpExternalClientLauncher launcher = new TrackingRdpExternalClientLauncher
+        {
+            ProcessToReturn = process
+        };
+        RdpHandler handler = new RdpHandler(
+            new PassThroughTunnelService(),
+            stateMachine,
+            new LocalizationManager(),
+            launcher);
+        AppSettings settings = new AppSettings
+        {
+            RdpArtifactCleanupDelayMs = 1,
+            RdpCredentialAutofillTimeoutMs = 1
+        };
+        stateMachine.TryTransition(ServerId, ConnectionState.Initializing);
+
+        await handler.ConnectAsync(
+            CreateServer("Embedded"),
+            settings,
+            CancellationToken.None,
+            RdpModeOverride.ForceExternal);
+
+        // Proves the handler really got there: without it the final assertion could hold on an
+        // entry that never left Disconnected.
+        Assert.Equal(ConnectionState.LaunchedExternalClient, stateMachine.GetStateData(ServerId)?.CurrentState);
+
+        process.RaiseExited();
+
+        Assert.Equal(ConnectionState.Disconnected, stateMachine.GetStateData(ServerId)?.CurrentState);
+    }
+
+    [Fact]
     public void CreateStartInfo_ResolvesMstscUnderTheSystemDirectoryWithAnExplicitWorkingDirectory()
     {
         string systemDirectory = Environment.GetFolderPath(Environment.SpecialFolder.System);

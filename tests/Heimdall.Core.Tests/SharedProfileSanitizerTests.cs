@@ -53,6 +53,7 @@ public sealed class SharedProfileSanitizerTests
         nameof(ServerProfileDto.WinRmPasswordEncrypted), nameof(ServerProfileDto.WinRmUseSsl),
         nameof(ServerProfileDto.WinRmSkipCertificateCheck), nameof(ServerProfileDto.WinRmIdentityMode),
         nameof(ServerProfileDto.SshMode), nameof(ServerProfileDto.SshAgentForwarding),
+        nameof(ServerProfileDto.SshAgentKeyFingerprint),
         nameof(ServerProfileDto.SshKeyPath), nameof(ServerProfileDto.SshPasswordEncrypted),
         nameof(ServerProfileDto.SshKeyPassphraseEncrypted), nameof(ServerProfileDto.SshCompression),
         nameof(ServerProfileDto.SshX11Forwarding), nameof(ServerProfileDto.SocksProxyPort),

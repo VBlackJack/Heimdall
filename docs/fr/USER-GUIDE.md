@@ -93,6 +93,28 @@ fait passer pour elle. Sur cette demande, le bouton mis en avant est **Rejeter**
 Entrée refuse la connexion. Accepter la nouvelle clé, ou ne lui faire confiance que pour cette
 session, demande un clic délibéré.
 
+### Choisir la clé d'agent SSH qu'une session présente
+
+Par défaut, une session présente au serveur toutes les clés de votre agent SSH (Pageant ou l'agent OpenSSH de Windows). Un serveur qui ferme la connexion après quelques échecs peut épuiser ses tentatives avant que la bonne clé soit essayée. Désignez la clé pour l'éviter.
+
+1. Ouvrez la session dans la fenêtre de la session, sur la carte des identifiants SSH/SFTP.
+2. Choisissez la clé dans la liste **Clé d'agent**. Le choix par défaut est **N'importe quelle clé (par défaut)**.
+3. Enregistrez.
+
+À quoi s'attendre :
+
+- Seule cette clé est présentée au serveur. Un mot de passe enregistré, un fichier de clé et l'authentification interactive au clavier fonctionnent comme avant : le choix ne limite que les clés d'agent.
+- Si la clé n'est chargée dans aucun agent que Heimdall est réglé pour utiliser, la connexion est refusée avant toute demande, avec un message qui nomme l'empreinte SHA256 de la clé. Heimdall ne se rabat pas sur les autres clés. Voir le [dépannage](TROUBLESHOOTING.md#ssh-agent-key-not-loaded).
+- Le choix s'applique au terminal SSH, aux sessions SFTP et au panneau latéral SFTP d'une session. Il ne s'applique pas aux sauts de passerelle ni aux tunnels : ils présentent toujours toutes les clés de l'agent.
+- Le choix reste sur cette machine. Il n'est pas écrit dans les fichiers de sessions partagés, tout import l'efface, et l'export des réglages l'omet. Une version plus ancienne de Heimdall l'ignore et présente toutes les clés.
+- Avec le transfert d'agent activé, l'hôte distant peut quand même utiliser toutes les clés de l'agent. La fenêtre vous en avertit.
+- Une session qui passe par Plink (transfert d'agent avec Pageant, ou nouvel essai après un échec du client intégré) exige que la clé soit dans Pageant, d'un type auquel Plink peut être limité (pas une clé matérielle "sk"), et qu'aucun fichier de clé ne soit configuré sur la session. Voir le [dépannage](TROUBLESHOOTING.md#ssh-agent-key-plink-refused).
+- Le mode PuTTY externe ne peut pas être limité à une clé : une session qui en désigne une y est refusée.
+
+### Se connecter par Plink avec Kerberos ou une clé Pageant
+
+Quand une session a un nom d'utilisateur, aucun mot de passe enregistré et aucun fichier de clé, et que la connexion passe par Plink (après un échec d'authentification du client intégré, ou avec le transfert d'agent et Pageant), Heimdall demande "Mot de passe SSH requis". Laissez-le vide pour vous connecter avec Kerberos (votre session Windows) ou une clé chargée dans Pageant. Heimdall lance alors Plink sans fichier de mot de passe et en mode batch : aucun fichier de mot de passe n'est écrit et aucun mot de passe n'est envoyé. Si le serveur n'accepte ni l'un ni l'autre, le terminal le dit ; reconnectez-vous et saisissez votre mot de passe, ou enregistrez-le dans la session. Annuler annule toujours. Un serveur qui demande un second facteur après Kerberos n'est pas pris en charge sur ce chemin, et le panneau latéral SFTP ne peut pas s'authentifier ainsi (il utilise le même client intégré et ne peut rien demander). Quand le nouvel essai par Plink démarre, le panneau SFTP que "Ouvrir le panneau SFTP automatiquement lors d'une connexion SSH" aurait ouvert n'est pas ouvert et le terminal utilise toute la largeur de l'onglet quand l'onglet est affiché ; la barre d'état vous le dit une fois connecté. Une session SFTP peut toujours être ouverte à la main, dans son propre onglet ou à côté du terminal ; avec Kerberos, elle ne peut pas non plus s'authentifier. Une session qui passe par Plink uniquement pour le transfert d'agent avec Pageant garde son panneau SFTP. Voir le [dépannage](TROUBLESHOOTING.md#ssh-plink-kerberos-pageant).
+
 ### Consoles web
 
 Choisissez **Web** en ajoutant une session, pour un iLO, un iDRAC, un commutateur ou la page
@@ -273,6 +295,14 @@ machine d'un côté, la machine distante de l'autre.
   enregistrement ; fermer le volet pendant qu'un fichier y est encore ouvert vous demande d'abord.
   Si le serveur refuse un envoi (permission refusée, par exemple), le volet le dit une fois et
   réessaie au prochain enregistrement.
+- Quand le serveur refuse une action, Heimdall demande avant de la relancer en root (sudo). La
+  question nomme l'acte et le chemin, et **Entrée** refuse. Un transfert, une suppression multiple
+  ou une session d'édition demande une fois. Paramètres, SFTP, **réessayer en root les opérations
+  refusées** propose **Demander d'abord** (par défaut), **Automatique (sans question)** (une
+  suppression demande toujours) et **Jamais**. Votre organisation a pu limiter ce choix.
+- Quand Heimdall fait une action en root, un badge **root**
+  apparaît à côté de la bascule **sudo** et reste jusqu'à la fermeture du volet. Cliquez dessus,
+  ou appuyez sur Entrée, pour voir les dernières actions tentées en root et si elles ont réussi.
 - Dans l'éditeur intégré, **Ctrl+S** enregistre et **Ctrl+W** ferme. Un fichier qui n'est pas en
   UTF-8 s'ouvre en Latin-1 et le dit dans la barre d'état de l'éditeur.
 

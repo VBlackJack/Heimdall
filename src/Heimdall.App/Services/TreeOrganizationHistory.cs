@@ -16,9 +16,17 @@
 
 using System.Security.Cryptography;
 using System.Text.Json;
+using Heimdall.App.ViewModels;
 using Heimdall.Core.Configuration;
 
 namespace Heimdall.App.Services;
+
+/// <summary>
+/// The manual folder order entries a change removed, so an undo can put them back.
+/// </summary>
+/// <param name="ParentPath">The folder whose direct sub-folders the entries rank (empty for the top level).</param>
+/// <param name="Entries">The removed entries, in their stored order.</param>
+public sealed record FolderOrderRestore(string ParentPath, IReadOnlyList<string> Entries);
 
 /// <summary>One-level undo containing only organization fields, never connection credentials.</summary>
 public sealed class TreeOrganizationHistory(IConfigManager config)
@@ -41,7 +49,8 @@ public sealed class TreeOrganizationHistory(IConfigManager config)
 
     public async Task<T> ExecuteAsync<T>(Func<Task<T>> operation,
         Func<T, FolderRenamePlan?>? reverseFolder = null,
-        IReadOnlyCollection<string>? serverIds = null)
+        IReadOnlyCollection<string>? serverIds = null,
+        Func<T, FolderOrderRestore?>? restoreFolderOrder = null)
     {
         await _gate.WaitAsync();
         try
@@ -58,10 +67,17 @@ public sealed class TreeOrganizationHistory(IConfigManager config)
                 Dictionary<string, Row> changed = before
                     .Where(pair => scope.Contains(pair.Key) && after.TryGetValue(pair.Key, out Row? value) && pair.Value != value)
                     .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
-                if (reverse is not null || changed.Count > 0)
+                FolderOrderRestore? orderRestore = restoreFolderOrder?.Invoke(result);
+                if (orderRestore is { Entries.Count: 0 })
+                {
+                    orderRestore = null;
+                }
+
+                if (reverse is not null || changed.Count > 0 || orderRestore is not null)
                 {
                     _entry = new(changed, after, reverse,
-                        reverse is null ? "" : MetadataFingerprint(await config.LoadSettingsAsync()));
+                        reverse is null ? "" : MetadataFingerprint(await config.LoadSettingsAsync()),
+                        orderRestore);
                     RecordedCount++;
                 }
             }
@@ -95,27 +111,51 @@ public sealed class TreeOrganizationHistory(IConfigManager config)
                 return true;
             }
 
-            return await config.MutateServersAsync(inventory =>
+            // A removed folder order is put back only on a level nobody has arranged since: any
+            // entry under that parent now means the user rearranged it, and appending the old ones
+            // would mix two arrangements. The check runs before any write, so a refusal changes nothing.
+            if (entry.OrderRestore is { } orderRestore
+                && FolderOrdering.HasChildEntry((await config.LoadSettingsAsync()).FolderOrder, orderRestore.ParentPath))
             {
-                Dictionary<string, ServerProfileDto> byId = inventory.ToDictionary(row => row.Id, StringComparer.Ordinal);
-                foreach ((string id, Row before) in entry.Before)
-                {
-                    if (!byId.TryGetValue(id, out ServerProfileDto? dto)
-                        || !MatchesChangedFields(Row.From(dto), entry.After[id], before)) return false;
-                }
-                foreach ((string id, Row before) in entry.Before)
-                {
-                    ServerProfileDto dto = byId[id];
-                    Row after = entry.After[id];
-                    if (before.Name != after.Name) dto.DisplayName = before.Name;
-                    if (before.Group != after.Group) dto.Group = before.Group;
-                    if (before.Order != after.Order) dto.SortOrder = before.Order;
-                }
-                return true;
+                return false;
+            }
+
+            // A change that only removed folder order entries has no row to put back.
+            bool rowsRestored = entry.Before.Count == 0 && entry.OrderRestore is not null
+                || await RestoreRowsAsync(entry);
+            if (!rowsRestored || entry.OrderRestore is not { } restore) return rowsRestored;
+
+            // Rows first: their conflict check is atomic with their write. Appending cannot
+            // duplicate, and re-checks the level under the settings lock.
+            await config.MergeSettingAsync(settings =>
+            {
+                if (FolderOrdering.HasChildEntry(settings.FolderOrder, restore.ParentPath)) return;
+                settings.FolderOrder = FolderOrdering.WithEntriesAppended(settings.FolderOrder, restore.Entries);
             });
+            return true;
         }
         finally { _gate.Release(); }
     }
+
+    private Task<bool> RestoreRowsAsync(UndoEntry entry) =>
+        config.MutateServersAsync(inventory =>
+        {
+            Dictionary<string, ServerProfileDto> byId = inventory.ToDictionary(row => row.Id, StringComparer.Ordinal);
+            foreach ((string id, Row before) in entry.Before)
+            {
+                if (!byId.TryGetValue(id, out ServerProfileDto? dto)
+                    || !MatchesChangedFields(Row.From(dto), entry.After[id], before)) return false;
+            }
+            foreach ((string id, Row before) in entry.Before)
+            {
+                ServerProfileDto dto = byId[id];
+                Row after = entry.After[id];
+                if (before.Name != after.Name) dto.DisplayName = before.Name;
+                if (before.Group != after.Group) dto.Group = before.Group;
+                if (before.Order != after.Order) dto.SortOrder = before.Order;
+            }
+            return true;
+        });
 
     private static bool MatchesChangedFields(Row current, Row after, Row before) =>
         (before.Name == after.Name || current.Name == after.Name)
@@ -140,5 +180,5 @@ public sealed class TreeOrganizationHistory(IConfigManager config)
         public static Row From(ServerProfileDto dto) => new(dto.DisplayName, dto.Group, dto.SortOrder);
     }
     private sealed record UndoEntry(Dictionary<string, Row> Before, Dictionary<string, Row> After,
-        FolderRenamePlan? ReverseFolder, string Metadata);
+        FolderRenamePlan? ReverseFolder, string Metadata, FolderOrderRestore? OrderRestore = null);
 }

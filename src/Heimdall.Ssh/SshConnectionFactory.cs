@@ -717,6 +717,11 @@ public static class SshConnectionFactory
         SshAgentRegistry agentRegistry,
         ICollection<IDisposable>? ownedResources)
     {
+        // A session that names one agent key is refused here, before any method is built or any
+        // key file is read, so a configured password or key file cannot let the connection
+        // proceed without the key the session asked for. Nothing below catches this exception.
+        ISshAgentKey? chosenAgentKey = ResolveChosenAgentKey(connectionParams, agentRegistry);
+
         var methods = new List<AuthenticationMethod>();
 
         // Private key authentication (with optional passphrase)
@@ -744,9 +749,13 @@ public static class SshConnectionFactory
         // auth methods when available, so SSH.NET can fall back to an agent if
         // key file or password auth is rejected.
         {
-            var agentMethod = TryCreateAgentAuth(
-                connectionParams.Username,
-                agentRegistry);
+            var agentMethod = chosenAgentKey is not null
+                ? new PrivateKeyAuthenticationMethod(
+                    connectionParams.Username,
+                    SshAgentAlgorithmSource.BuildSources([chosenAgentKey]))
+                : TryCreateAgentAuth(
+                    connectionParams.Username,
+                    agentRegistry);
             if (agentMethod is not null)
             {
                 methods.Add(agentMethod);
@@ -760,6 +769,38 @@ public static class SshConnectionFactory
         }
 
         return methods;
+    }
+
+    /// <summary>
+    /// Resolves the agent key a session names, or returns null when it names none.
+    /// </summary>
+    /// <exception cref="SshAgentKeyNotLoadedException">
+    /// The fingerprint is malformed, or no reachable agent holds the key. There is no fallback.
+    /// </exception>
+    private static ISshAgentKey? ResolveChosenAgentKey(
+        SshConnectionParams connectionParams,
+        SshAgentRegistry agentRegistry)
+    {
+        string? fingerprint = connectionParams.AgentKeyFingerprint;
+        if (fingerprint is null)
+        {
+            return null;
+        }
+
+        ArgumentNullException.ThrowIfNull(agentRegistry);
+
+        SshAgentIdentityMatch? match = SshAgentKeyFingerprints.IsWellFormed(fingerprint)
+            ? agentRegistry.FindIdentity(fingerprint)
+            : null;
+        if (match is null)
+        {
+            Core.Logging.FileLogger.Warn(
+                $"SSH agent key {fingerprint} chosen for {connectionParams.Host}:{connectionParams.Port} is not loaded; connection refused.");
+            throw new SshAgentKeyNotLoadedException(fingerprint);
+        }
+
+        Core.Logging.FileLogger.Info($"SSH agent {match.AgentName}: offering only the chosen key {fingerprint}");
+        return match.Key;
     }
 
     private static string? ResolveKeyPassphrase(SshConnectionParams connectionParams)

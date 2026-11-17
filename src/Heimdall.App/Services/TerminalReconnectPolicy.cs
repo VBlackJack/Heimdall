@@ -15,6 +15,7 @@
  */
 
 using Heimdall.App.Localization;
+using Heimdall.App.ViewModels;
 using Heimdall.Ssh;
 
 namespace Heimdall.App.Services;
@@ -54,6 +55,51 @@ internal static class TerminalReconnectPolicy
             && exitCode == Heimdall.App.Services.WinRm.WinRmPowerShellLaunchBuilder.RemoteSessionNotEnteredExitCode
                 ? "ErrorWinRmSessionNotEntered"
                 : null;
+
+    /// <summary>
+    /// Locale key of the hint shown when a session launched without any credential (Kerberos or
+    /// a Pageant key) ended with a failure inside the connect-time window, or null otherwise.
+    /// <paramref name="connectTimeExit"/> is the result of
+    /// <see cref="SuppressesConnectTimeProcessExit"/>, so the window is defined in one place.
+    /// A user-initiated disconnect kills the process with a non-zero code, which is not a
+    /// server refusal, so it never gets the hint.
+    /// </summary>
+    public static string? ResolveCredentialFreeExitMessageKey(
+        bool credentialFree,
+        int exitCode,
+        bool connectTimeExit,
+        bool userInitiatedDisconnect)
+        => credentialFree && exitCode != 0 && connectTimeExit && !userInitiatedDisconnect
+            ? SshLocalizationKeys.ErrorSshPasswordlessSignInFailed
+            : null;
+
+    /// <summary>
+    /// Text of the disconnected panel's detail block: the resolved reason first, then the
+    /// generic disconnect detail (the exit code) on a second line. Either part may be absent.
+    /// </summary>
+    public static string? ComposePanelDetail(string? reason, string? disconnectDetail)
+    {
+        bool hasReason = !string.IsNullOrWhiteSpace(reason);
+        bool hasDetail = !string.IsNullOrWhiteSpace(disconnectDetail);
+        if (hasReason && hasDetail)
+        {
+            return reason + "\n" + disconnectDetail;
+        }
+
+        return hasReason ? reason : hasDetail ? disconnectDetail : null;
+    }
+
+    /// <summary>
+    /// Whether a late early-output diagnostic may still write the handed-off status. The session
+    /// output and its exit are delivered by separate threads, so the last chunk can reach the
+    /// dispatcher after the end of the session was already applied: writing the handed-off status
+    /// then would leave a dead session looking alive (no Reconnect, Disconnect shown, counted at
+    /// quit). The pane status is the fact that the session is over: it is written on the
+    /// dispatcher only, and a re-attach writes the connected status again, which lifts the guard.
+    /// </summary>
+    public static bool MayWriteHandedOffDiagnostic(string? currentPaneStatus)
+        => !string.Equals(currentPaneStatus, SessionStatusTokens.Disconnected, StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(currentPaneStatus, SessionStatusTokens.Error, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Classifies a terminal process exit into a disconnect info: exit code 0 is a clean
@@ -96,6 +142,24 @@ internal static class TerminalReconnectPolicy
             && !hasTerminalInput
             && processRuntime >= TimeSpan.Zero
             && processRuntime <= effectiveExitWindow;
+    }
+
+    /// <summary>
+    /// Whether a shell session that ended <paramref name="sinceAttach"/> after it was attached
+    /// should skip auto-reconnect. A device that closes right after opening the shell (a session
+    /// limit, an access list) would otherwise be retried at the shortest delay forever, because
+    /// every attach restarts the attempt count. A session the user typed into is a real session.
+    /// </summary>
+    public static bool SuppressesConnectTimeShellDisconnect(
+        bool hasTerminalInput,
+        TimeSpan sinceAttach,
+        TimeSpan? connectTimeExitWindow = null)
+    {
+        TimeSpan effectiveExitWindow = connectTimeExitWindow ?? ConnectTimeExitWindow;
+
+        return !hasTerminalInput
+            && sinceAttach >= TimeSpan.Zero
+            && sinceAttach <= effectiveExitWindow;
     }
 
     public static TimeSpan ResolveConnectTimeExitWindow(int? configuredSeconds)

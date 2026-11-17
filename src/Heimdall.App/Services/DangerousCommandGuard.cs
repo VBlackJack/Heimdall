@@ -66,6 +66,8 @@ public static class DangerousCommandGuard
             localize("ConfirmDangerousSendTitle"),
             localize("ConfirmDangerousSendMessage"),
             "warning",
+            localize("ConfirmDangerousSendAccept"),
+            localize("ConfirmDangerousSendDecline"),
             topmost);
     }
 }

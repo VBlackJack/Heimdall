@@ -53,6 +53,7 @@ public partial class ServerListViewModel
         TreeOrganizationChange.FolderRename => "TreeUxChangedFolderRename",
         TreeOrganizationChange.FolderMove => "TreeUxChangedFolderMove",
         TreeOrganizationChange.Reorder => "TreeUxChangedReorder",
+        TreeOrganizationChange.FolderSort => "TreeUxChangedFolderSort",
         _ => "TreeUxChangedMove",
     }];
 
@@ -197,16 +198,18 @@ public partial class ServerListViewModel
     /// <param name="operation">The change itself.</param>
     /// <param name="reverseFolder">How to reverse a folder path change, when it is one.</param>
     /// <param name="serverIds">The sessions whose organization fields the change may touch.</param>
+    /// <param name="restoreFolderOrder">The folder order entries the change removed, to put back on undo.</param>
     public async Task<T> WithOrganizationUndoAsync<T>(
         TreeOrganizationChange change,
         Func<Task<T>> operation,
         Func<T, FolderRenamePlan?>? reverseFolder = null,
-        IReadOnlyCollection<string>? serverIds = null)
+        IReadOnlyCollection<string>? serverIds = null,
+        Func<T, FolderOrderRestore?>? restoreFolderOrder = null)
     {
         int recordedBefore = OrganizationHistory.RecordedCount;
         try
         {
-            return await OrganizationHistory.ExecuteAsync(operation, reverseFolder, serverIds);
+            return await OrganizationHistory.ExecuteAsync(operation, reverseFolder, serverIds, restoreFolderOrder);
         }
         finally
         {
@@ -271,4 +274,7 @@ public enum TreeOrganizationChange
 
     /// <summary>A folder moved under another parent.</summary>
     FolderMove,
+
+    /// <summary>One level put back in alphabetical order.</summary>
+    FolderSort,
 }

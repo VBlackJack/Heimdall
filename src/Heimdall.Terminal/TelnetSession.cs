@@ -17,6 +17,7 @@
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Channels;
+using Heimdall.Core.Terminal;
 
 namespace Heimdall.Terminal;
 
@@ -108,8 +109,22 @@ public sealed class TelnetSession : ITerminalSession
     private int _columns;
     private int _rows;
 
-    public event Action<ReadOnlyMemory<byte>>? DataReceived;
-    public event Action<int>? ProcessExited;
+    // The read loop starts inside StartAsync, before any caller can subscribe: the gate keeps
+    // the banner for the first subscriber and the latch tells a late one the peer already closed.
+    private readonly OutputReplayGate _output = new(nameof(TelnetSession));
+    private readonly ExitLatch<int> _exit = new(nameof(TelnetSession));
+
+    public event Action<ReadOnlyMemory<byte>>? DataReceived
+    {
+        add => _output.AddMemory(value);
+        remove => _output.RemoveMemory(value);
+    }
+
+    public event Action<int>? ProcessExited
+    {
+        add => _exit.Add(value);
+        remove => _exit.Remove(value);
+    }
 
     public bool IsRunning => !_disposed && _isRunning;
     public int? ProcessId => null;
@@ -292,6 +307,8 @@ public sealed class TelnetSession : ITerminalSession
         _disposed = true;
         _intentionalClose = true;
 
+        // No subscriber will consume output still waiting for a first one.
+        _output.Release();
         _cts?.Cancel();
         CloseConnection();
 
@@ -366,7 +383,7 @@ public sealed class TelnetSession : ITerminalSession
         int exitCode = readFailed && !_intentionalClose && !ct.IsCancellationRequested
             ? AbnormalExitCode
             : CleanExitCode;
-        SafeInvokeProcessExited(exitCode);
+        _exit.Fire(exitCode);
     }
 
     /// <summary>
@@ -693,30 +710,6 @@ public sealed class TelnetSession : ITerminalSession
     {
         if (data.IsEmpty) return;
         byte[] copy = data.ToArray();
-        SafeInvokeDataReceived(copy);
-    }
-
-    private void SafeInvokeDataReceived(ReadOnlyMemory<byte> data)
-    {
-        try
-        {
-            DataReceived?.Invoke(data);
-        }
-        catch (Exception ex)
-        {
-            Heimdall.Core.Logging.FileLogger.Warn($"[TelnetSession] DataReceived subscriber: {ex.Message}");
-        }
-    }
-
-    private void SafeInvokeProcessExited(int exitCode)
-    {
-        try
-        {
-            ProcessExited?.Invoke(exitCode);
-        }
-        catch (Exception ex)
-        {
-            Heimdall.Core.Logging.FileLogger.Warn($"[TelnetSession] ProcessExited subscriber: {ex.Message}");
-        }
+        _output.Deliver(copy);
     }
 }

@@ -66,7 +66,7 @@ public sealed class SessionRestoreCoordinator : ISessionRestoreCoordinator
             SnapshotRestoreDialogViewModel dialogVm = new(
                 _localizer,
                 snapshot,
-                host.RestorableServers);
+                await ResolveServersAsync(host, snapshot));
             dialogResult = await _dialogService.ShowSnapshotRestoreDialogAsync(dialogVm);
         }
         catch (Exception ex)
@@ -136,6 +136,34 @@ public sealed class SessionRestoreCoordinator : ISessionRestoreCoordinator
                     "WarningSnapshotRestorePartial",
                     restoredCount,
                     selectedSessions.Count));
+        }
+    }
+
+    /// <summary>
+    /// The servers the dialog names the snapshot's sessions from: the host's own resolution of
+    /// their identifiers when it offers one, else (or when that lookup fails) its restorable list.
+    /// </summary>
+    private static async Task<IEnumerable<ServerItemViewModel>> ResolveServersAsync(
+        ISessionRestoreHost host,
+        SessionSnapshotFile snapshot)
+    {
+        if (host is not ISessionRestoreServerResolver resolver)
+        {
+            return host.RestorableServers;
+        }
+
+        try
+        {
+            string[] ids = snapshot.Sessions
+                .Select(session => session.ServerId)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            return await resolver.ResolveAsync(ids);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            FileLogger.Warn($"Session restore could not resolve the snapshot's servers: {ex.Message}");
+            return host.RestorableServers;
         }
     }
 }

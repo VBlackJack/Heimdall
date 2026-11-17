@@ -249,34 +249,47 @@ public class PlinkTunnelRunnerTests : IDisposable
     [Fact]
     public async Task StartAsync_ProcessStartFails_ResetsStateAndAllowsRetry()
     {
-        string invalidExecutablePath = Path.Combine(
+        string unstartableExecutablePath = Path.Combine(
             Path.GetTempPath(),
-            $"heimdall-invalid-plink-{Guid.NewGuid():N}.exe");
-        await File.WriteAllTextAsync(invalidExecutablePath, "not a Windows executable");
+            $"heimdall-unstartable-plink-{Guid.NewGuid():N}.exe");
+
+        // The file is held open with an exclusive lock instead of being given invalid content:
+        // CreateProcess treats a file without an MZ header as a possible 16-bit program and
+        // raises a blocking "unsupported 16-bit application" dialog on the desktop. With the
+        // lock, File.Exists stays true and the process start fails with a sharing violation
+        // when the file is opened, before any image inspection.
+        FileStream lockHandle = new(
+            unstartableExecutablePath,
+            FileMode.CreateNew,
+            FileAccess.ReadWrite,
+            FileShare.None);
 
         try
         {
             PlinkTunnelResult firstResult = await _runner.StartAsync(
-                invalidExecutablePath,
+                unstartableExecutablePath,
                 "gw.test", 22, "user", null, null,
                 "remote", 22, 10022);
 
             Assert.False(firstResult.Success);
             Assert.False(_runner.IsRunning);
             Assert.Null(_runner.ProcessId);
+            Assert.Equal(TunnelMessageKeys.MessageKeyPlinkProcessStartFailed, firstResult.MessageKey);
 
             PlinkTunnelResult retryResult = await _runner.StartAsync(
-                invalidExecutablePath,
+                unstartableExecutablePath,
                 "gw.test", 22, "user", null, null,
                 "remote", 22, 10022);
 
             Assert.False(retryResult.Success);
             Assert.False(_runner.IsRunning);
             Assert.Null(_runner.ProcessId);
+            Assert.Equal(TunnelMessageKeys.MessageKeyPlinkProcessStartFailed, retryResult.MessageKey);
         }
         finally
         {
-            File.Delete(invalidExecutablePath);
+            lockHandle.Dispose();
+            File.Delete(unstartableExecutablePath);
         }
     }
 
@@ -300,8 +313,15 @@ public class PlinkTunnelRunnerTests : IDisposable
     public async Task TunnelPasswordFile_ForeignListenerFailsClosed()
     {
         using PasswordFileDirectory passwordFiles = new();
-        int localPort = GetAvailableLoopbackPort();
-        var listener = new TcpListener(IPAddress.Loopback, localPort);
+
+        // The foreign listener is bound on a system-assigned port and kept open for the whole test.
+        // Picking a free port number and binding it later left a window in which another test
+        // process could take the port; here the port is never free between being chosen and listened
+        // on. The listener lives in the test process; the pid of the fake plink process differs from
+        // it because FakePlinkProcess never hands out Environment.ProcessId.
+        var listener = new TcpListener(IPAddress.Loopback, AnyAvailablePort);
+        listener.Start();
+        int localPort = ((IPEndPoint)listener.LocalEndpoint).Port;
         TaskCompletionSource startGate = new(TaskCreationOptions.RunContinuationsAsynchronously);
         FakePlinkProcess process = new()
         {
@@ -331,10 +351,6 @@ public class PlinkTunnelRunnerTests : IDisposable
             {
                 passwordFilePath = Assert.Single(passwordFiles.EnumeratePasswordFiles());
                 Assert.True(File.Exists(passwordFilePath));
-
-                // Bound while the runner is still held at process start, so the foreign listener is
-                // in place before the first attestation rather than racing it.
-                listener.Start();
             }
             finally
             {
@@ -888,9 +904,11 @@ public class PlinkTunnelRunnerTests : IDisposable
         Assert.Throws<ArgumentNullException>(() => new PlinkTunnelRunner((PlinkTunnelRunnerOptions)null!));
     }
 
+    private const int AnyAvailablePort = 0;
+
     private static int GetAvailableLoopbackPort()
     {
-        var listener = new TcpListener(IPAddress.Loopback, 0);
+        var listener = new TcpListener(IPAddress.Loopback, AnyAvailablePort);
         listener.Start();
 
         try
@@ -1195,7 +1213,21 @@ public class PlinkTunnelRunnerTests : IDisposable
 
         public event EventHandler? Exited;
 
-        public int Id { get; } = Interlocked.Increment(ref _nextProcessId);
+        /// <summary>
+        /// Hands out the next fake process id, never the id of the test host itself.
+        /// </summary>
+        /// <remarks>
+        /// Tests bind their listeners inside the test host, so the real ownership probe attributes
+        /// them to <see cref="Environment.ProcessId"/>. A fake id equal to it would make a foreign
+        /// listener look owned by the fake plink process.
+        /// </remarks>
+        private static int NextProcessId()
+        {
+            int id = Interlocked.Increment(ref _nextProcessId);
+            return id == Environment.ProcessId ? Interlocked.Increment(ref _nextProcessId) : id;
+        }
+
+        public int Id { get; } = NextProcessId();
 
         public bool HasExited { get; private set; }
 

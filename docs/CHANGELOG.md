@@ -12,6 +12,622 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-11-17: Root folder creation and rename check the folders on their way (v2026.111702)
+
+Fixes merged as #840 and #841. The user-facing summary and the upgrade notes are in the release notes.
+
+### Root create-folder and rename (#840)
+
+- `PrivilegedFileCommands.BuildHeldMkdirBody(path)` and `BuildHeldRenameBody(path, newName, replace)` share
+  `HeldEntryPrologue` with the held delete: they reach the parent through `HeldParentWalk` and act from the held
+  folder (`mkdir --`, `mv -nT` / `mv -T`). An existing name exits 78 (`DestinationExistsExitStatus`), mapped to
+  `SudoDestinationExistsException` for create-folder and `SudoRenameCollisionException` for rename; `-p` is gone.
+- The rename destination is computed from the entry's own folder; the outcome probe after the move is removed;
+  the existence probes escape `!`. `SudoRenameCommands.BuildMove` and its tests are removed.
+- Refusals go through one `DescribeTransferError` branch for `SudoEntryRefusedException` (keys
+  `SftpRootRefusedEntry`, `SftpRootRefusedChanged`, `SftpErrorMkdirExists`).
+- Existing assertions that pinned the old `mv` text, the dropped probe and the sudo call count were changed as
+  approved.
+
+### New root file mode and sudo locale (#841)
+
+- The root atomic write script publishes a new file with mode 0644 (best effort), only when neither the work
+  directory nor the payload lists an ACL and the payload is still 0600; a replaced file keeps owner, mode,
+  timestamps and xattrs.
+- `PrivilegedFileCommands.SudoProgram` (`env LC_ALL=C sudo`) starts every sudo of the SFTP browser
+  (`BuildPasswordSudoInvocation`, `BuildNonInteractiveSudoInvocation`, `EmbeddedSftpViewModel.BuildSudoInvocation`);
+  the staged outer script already exported `LC_ALL=C`. Four assertions that pinned the sudo text now carry the
+  prefix, as approved.
+- SECURITY and ARCHITECTURE (EN, FR) describe both changes.
+
+## 2026-11-17: Root actions in the SFTP browser check the folders on their way (v2026.111701)
+
+A fix merged as #838, documentation as #837, plus the root path checks merged with these notes. The
+user-facing summary and the upgrade notes are in the release notes.
+
+### Root path checks
+
+- The root scripts of `PrivilegedFileCommands` (write, read, permission change, and the new
+  `BuildHeldDeleteBody(remotePath, recursive)`) reach the entry's folder through `HeldParentWalk`: one folder
+  at a time from `/`, a symbolic link followed only when the link and the folder holding it belong to root or
+  the caller (`SUDO_UID`), the folder having no group or other write bit, at most 40 links.
+- A write, read or permission change refuses an entry with more than one link when its folder is open to
+  accounts other than root, the caller and the entry's owner.
+- Refusals print `HEIMDALL-TRANSFER-REFUSED <reason>` (write 73, read 74) or `HEIMDALL-ENTRY-REFUSED
+  <reason>` (permission change and delete, 73), read at the start of a line only
+  (`ParseTransferRefusal`, `HasEntryRefusalMarker`); `PrivilegedTransferRefusedException` and
+  `EntryRefusalReason.PathLink` / `HardLink` map to localized messages (`SftpRootRefusedPathLink`,
+  `SftpRootRefusedHardLink`, `SftpDeleteRootRefusedEntry`). They are never batch-fatal and the editors do not
+  retry them.
+- Root delete runs the held delete script: `rm -f` for a file (refused, untouched, when the name is a folder),
+  `rm -rf` for a folder, by the entry's last name from the held folder. Three assertions that pinned the old delete
+  command text now check that this builder is used. SECURITY and ARCHITECTURE (EN, FR) describe the rules.
+
+### Selection after a new folder (#838)
+
+- `EmbeddedSftpViewModel.ApplyFilterAndSort`: the entry requested by `RequestSelectAfterRefresh` replaces the
+  selection instead of being added to the kept one.
+
+### Documentation (#837)
+
+- SECURITY (EN, FR) describes the verified work directory of the root transfers, earlier versions, and limits.
+
+## 2026-11-16: Heimdall asks before it acts as root, and four questions decline by default (v2026.111601)
+
+Features merged as #825, #833 and #835, fixes as #829, #830, #831, #832 and #834, plus the hardening of
+the privileged transfer scripts merged with these notes. The user-facing summary and the upgrade notes are
+in the release notes.
+
+### Consent before a root retry (#835)
+
+- **Before.** Eleven sites of the SFTP browser caught `IsPermissionDenied` and retried through sudo with no
+  question, except delete (`SudoEscalationConsent`, once per batch).
+- **Change.** `AppSettings.SftpSudoFallback` (`Never`, `Ask`, `Automatic`; default `Ask`, also for an
+  existing settings file, through `TolerantEnumConverter`). `SftpSudoFallbackPolicy` reads the DWORD
+  `SftpSudoFallbackMax` under `HKLM\Software\Policies\Heimdall` once, on first use; the effective mode is the
+  stricter of the two and reaches the panes as a live `Func<SftpSudoFallbackMode>` through
+  `EmbeddedSessionManager` and `Initialize`. An unwired view model behaves as `Automatic`.
+- `SftpSudoFallbackGate` decides before every sudo call; `SftpSudoConsentScope` (action, job, batch, edit
+  session, editor document) asks at most once, declining by default, one question at a time per pane, and
+  carries a `SudoBatchGuard` so uploads and downloads stop sudo after a batch-fatal failure. Delete asks in
+  `Ask` and `Automatic`. Listings the pane starts by itself (mount, follow-SSH-directory, refresh after an
+  operation, `RefreshAfterOperationAsync`) never ask. A yes to a listing question sets `SudoMode`; the toggle
+  lists only, and is cleared and disabled under `Never`, refreshed in open panes on `SettingsChanged`.
+- Refusals throw `SftpSudoNotRunException`, shown as the server's refusal plus a note. The security posture
+  card gains a line (`Automatic` is the risky state) and a `Managed` state when the cap lowers the choice.
+- Tests: a funnel guard keeps every escalation site behind the gate, a wiring guard on
+  `EmbeddedSessionManager`, the gate matrix, per-site behaviour, the policy reader, settings and posture.
+
+### Root activity badge (#833)
+
+- `SftpRootActivityLog` and `SftpPrivilegedActRecorder`, the only code allowed to pass `privileged: true` to
+  `SessionOperationEmitter`; every escalation site goes through it. A badge after the sudo toggle shows the
+  count of acts attempted as root and the latest twenty; listings are counted apart. No behaviour change.
+
+### Root permission change and batch stop (#832)
+
+- Root chmod no longer runs `sudo chmod <mode> <path>`: `PrivilegedFileCommands.BuildNoFollowChmodBody`
+  changes a directory from inside it after comparing device and inode, and a regular file through a hard link
+  in a verified private directory beside it; a link, a special file or a changed entry exits 73 with
+  `HEIMDALL-ENTRY-REFUSED`, mapped to `SudoEntryRefusedException`.
+- `SudoBatchGuard`: in delete and chmod batches, after a batch-fatal sudo failure, sudo is not called again;
+  the summary counts the entries not tried as root.
+
+### Privileged transfer scripts
+
+- The root scripts behind sudo upload, save, download and open-for-edit are hardened. A server where their
+  temporary folder cannot be verified refuses the transfer ("Transfer failed.", reason in the log).
+
+### Questions that decline by default (#830, #831)
+
+- The web console's external program question, the SFTP delete-as-root question, the dangerous command
+  question and the broadcast question use the labeled confirm: decline is the default, Escape, the close box
+  and a shutdown decline. Remote names go through `ExecutionTrustDescriber.Visible`; the broadcast command is
+  shown through `UntrustedText.MakeVisible` and read once.
+
+### Trust question follow-ups (#829)
+
+- `ConnectionResult.Declined` for a confirm answered no: no error dialog, row state kept, one status line;
+  bulk connect counts it as skipped. The confirm accent follows the default button. Post-connect rows listed
+  for every session type with a note row. No ":3389" and no lookup notice for protocols without a
+  saved-password lookup.
+
+### Underscores shown as they are (#834)
+
+- `LiteralAccessText` doubles the underscores of data headers and sets the automation name to the real
+  text; `LiteralTextTemplate` for buttons and check boxes keeps the content a string; the themed combo item
+  no longer recognises access keys.
+
+### mRemoteNG empty folders (#825)
+
+- `MRemoteNgImporter.ImportResult.Containers` and `ImportSourceOrder.EmptyFoldersToCreate`: a container with
+  no session becomes an empty folder in the file's order; a folders-only file asks first.
+
+## 2026-11-15: Imported sessions stay untrusted until you allow them, and mRemoteNG imports keep their order (v2026.111501)
+
+Fixes merged as #814, #816, #817, #818, #822, #826 and #828, features as #819 and #820, test work as
+#815, dependency updates as #813, a CI change as #824. The user-facing summary and the upgrade
+notes are in the release notes.
+
+### Execution trust (#817)
+
+- **Defect.** `ServerDialogViewModel.ToDto()` wrote `ExecutionConfirmed = true` on every save and
+  `FromDto` never read the flag, so an imported profile (the sanitizer resets the flag at import)
+  became trusted when it was opened for an unrelated edit and saved. The gated values are those of
+  `ProfileExecutionTrust`: LOCAL executable, arguments, working directory, elevation; WEB external
+  program when the profile opens externally; Citrix ICA path; enabled post-connect steps, for
+  every protocol (shared profiles are approved against their commands instead,
+  `SessionCoordinator.AuthorizePostConnectAsync`).
+- **Change.** The dialog carries the flag (field default true, seeded in `FromDto`, written as it
+  is). While it is false and the probe (`ToDto()` then `PostConnectMigration.Migrate`) carries a
+  payload, `ShowExecutionTrustNotice` is true and `ExecutionTrustNoticeText` lists every gated
+  value through `ExecutionTrustDescriber`; `AllowExecutionTrustCommand` sets the flag, refused when
+  a web command is too long to show. The notice is refreshed from the `OnPropertyChanged` override
+  and from the post-connect step handlers before their `_isInitializing` guard.
+- `SaveAdHocAsProfileAsync` confirms a template that carries no payload. `LocalShellExecutableToStore`
+  keeps an absent LOCAL executable absent, so a rename adds no payload.
+- Display: values whole, through `UntrustedText.MakeVisible` with `UntrustedText.NoLengthLimit`,
+  a backslash doubled before the quote in the describer. The connect-time prompt passes the ICA
+  path and the local command through the same visibility.
+- The bar sits above the tabs of `ServerDialog.xaml`, capped at `ServerDialogNoticeMaxHeight` with
+  its own scrolling, with no live region: the text changes at every keystroke while the profile is
+  untrusted.
+- Left as it is: the LOCAL row and the connect-time prompt escape a quote without doubling a
+  backslash (`ServerListViewModel.MakeVisible`); the connect-time prompt for post-connect steps
+  shows a count, not the commands: that last point is the subject of #822 below.
+
+### Connect-time trust questions (#822)
+
+- **Defect.** Accepting a connect-time question sets and persists `ExecutionConfirmed`
+  (`ConfirmAndTrustExecutionAsync`, `ConfirmAndTrustPostConnectAsync`), but the post-connect
+  question showed only a count. Both used the Yes/No confirm, whose default is Yes and which
+  answers true without asking while the application shuts down.
+- **Change.** Both questions list every gated value through `ExecutionTrustDescriber`
+  (`ConfirmExecutionTrustBody`, `ConfirmPostConnectTrustBody`), on a copy migrated by `AsLoaded`
+  so a legacy `PostConnectCommand` is a row. `ConfirmSharedPostConnectAsync` uses the same rows;
+  `SharedPostConnectTrust` is unchanged. All three call the labeled confirm
+  (`ConfirmExecutionTrustAllow`, `ConfirmExecutionTrustDecline`), where declining is the default
+  and the answer during shutdown.
+- `VisibleProfileName` escapes the name with the describer's `Visible`.
+  `PersistExecutionTrustAsync` saves only when the stored profile's `GatedValues` equal those of
+  the profile shown. `LoadLinkedTitlesAsync` looks the titles of linked steps up off the UI
+  thread within `LinkedTitleLookupTimeout`, through the new
+  `IPostConnectStepResolver.GetLinkedTitlesAsync`.
+- A profile whose only gated payload is an ICA path keeps the one-sentence body
+  (`IsSingleIcaFilePayload`): two existing tests pin that sentence.
+- Left as it is: one flag covers every kind of payload; a linked step is approved by title and
+  parameters; `RemoteOs`, which picks the template of a linked entry, is neither shown nor part of
+  the shared fingerprint.
+
+### External clients and WinRM (#816, #818, #828)
+
+- **External client tab (#816).** `ConnectionResult.ExternalClientExited` is completed by
+  `RdpHandler`'s `Exited` handler after the tunnel is released; `SessionReady` carries it;
+  `SessionCoordinator.FollowExternalClient` writes `Disconnected` when the pane still reads
+  `LaunchedExternalClient` and the tab is open. At exit the handler calls `TryEndSession`: the
+  pipeline has already torn the state entry down, and the former transition re-created an entry
+  that nothing removed. A client whose end cannot be observed keeps its status.
+- **Overlay (#816).** `SessionPaneControl.ShowsLoadingOverlay` and `ShowsDisconnectedOverlay` treat
+  a hostless pane that is `Disconnected` as disconnected; `OffersReconnect` hides Reconnect for
+  such a pane in a split tab, where a pane reconnect cannot relaunch an external client.
+- **One loading overlay (#828).** The tab template (`SessionLoadingOverlay`) and the pane
+  (`LoadingOverlay`) drew a loading overlay under the same conditions, stacked.
+  `SessionPaneControl.ShowsOwnLoadingOverlay` leaves the tab overlay alone for the sole pane of
+  an unsplit tab; a pane in a split, or with no known owner, keeps its own. A test pins the tab
+  triggers in `MainWindow.xaml` to that decision. Left as it is: in a split tab the tab overlay
+  follows the primary pane and covers the whole split.
+- **Quit census (#818).** `ShutdownDecisions` counts `Connected` and `RemoteSessionHandedOff`, the
+  two statuses that quitting ends, with an ordinal match on the status tokens.
+  `LaunchedExternalClient` is left out on purpose. This is not the set of
+  `ConnectionStateSets.IsConnected`, which the close-tab prompts use.
+- **Late WinRM diagnostic (#818).** `ObserveWinRmEarlyOutput` could write `RemoteSessionHandedOff`
+  over `Disconnected` when the error text was delivered after the process exit.
+  `TerminalReconnectPolicy.MayWriteHandedOffDiagnostic` refuses the write once the pane reads
+  `Disconnected` or `Error`.
+
+### Import order and tree sort (#819, #820)
+
+- **mRemoteNG order (#819).** The parser kept the document order; nothing wrote it where the tree
+  reads it. `ImportSourceOrder.ArrangeSessions` ranks the imported rows of a group after the
+  existing ones, which keep their visible order, and writes nothing when the result equals what
+  the tree would show or the group holds one row; a name tie counts as a difference.
+  `MergeFolderOrder` does the same per parent for `AppSettings.FolderOrder`, in the shape of
+  `FolderOrdering.Nudge`. Imported groups are stored through `FolderPath.Canonicalize`, the tree's
+  own split. The folder order is saved after the servers, in its own try/catch.
+- **Palette order (#819).** `InventoryInTreeOrder` walks the real tree through
+  `_treeOrderServers`; `_stableServerOrder` and the flat list are unchanged.
+- **Sort A to Z (#820).** `SortFolderAlphabeticallyAsync` and `SortTopLevelAlphabeticallyAsync`
+  clear one level: the `SortOrder` of direct sessions and the `FolderOrder` entries whose parent
+  is the level. `TreeOrganizationHistory.ExecuteAsync` takes an optional folder-order restore;
+  undo refuses when the level has entries again, restores the rows, then appends the entries.
+  The menu items are added only where something is arranged.
+
+### Listener ownership probe (#814)
+
+- `WindowsTcpListenerOwnershipProbe.LoadTable` takes the row size and `ReadBoundedRowCount`
+  refuses a header count that is negative or runs past the capacity (the smaller of the allocated
+  and the reported size) with `Win32Exception(ERROR_INVALID_DATA)`; `Probe` answers Indeterminate.
+
+### Dependencies (#813)
+
+- JsonSchema.Net 7.0.4 to 7.4.0 (JsonPointer.Net 5.0.0 to 5.3.1, Json.More.Net 2.0.1.2 to 2.1.1),
+  ThemeForge.Theme 2.1.0 to 2.2.0; in the test projects, FluentAssertions 6.12.2 to 7.2.2,
+  xunit.runner.visualstudio 3.1.4 to 4.0.1 and Microsoft.Extensions.TimeProvider.Testing 10.8.0 to
+  10.11.0. Licenses read in each package: MIT or Apache-2.0.
+
+### Untrusted text (#826)
+
+- `UntrustedText.MakeVisible` also escapes unassigned code points, lone surrogates (by their own
+  value), space separators other than U+0020 (a lone U+00A0, U+202F or U+3000 is kept; inside a
+  run of two or more it is escaped), the hand list `InvisibleCodePoints`, and a variation
+  selector that does not follow a non-ASCII non-mark rune or a keycap base (a supplementary one:
+  a letter of category Lo). A run of more than `MaxPlainSpaceRun` spaces, or of more than
+  `MaxRepeatedEscapesWrittenOut` identical escapes, is written once with its count inside the
+  braces. No normalization: the text shown is the text that runs.
+- `UntrustedText.EscapeForDoubleQuotes` applies the Windows command-line rule (a backslash run is
+  doubled before a quote, and at the end of a value that a quote closes). The local command row
+  uses it; the program position is not quoted and keeps a trailing backslash single.
+- `WebExternalLaunch.ShownProgram` quotes a program that holds a space separator or a quote;
+  `FitsDescription` measures the text `DescribeCommand` shows. `ConfirmationBody` escapes the
+  profile name, which `EmbeddedWebView` passed raw.
+- No existing test is changed. Left as it is: a row forged with visible filler that wraps (a row
+  marker would close it); full backslash doubling in the local row; a lone typographic space
+  inside a path.
+
+### CI (#824)
+
+- The blocking test step passes `--blame-hang-timeout 10m --blame-hang-dump-type none`: a test
+  that hangs ends its test host and is named, instead of costing the step timeout with no name.
+
+### Tests (#815)
+
+- `TerminalSessionLifecycleTests.TelnetSession_StartAsync_AfterFailedConnect_CanBeRetried` keeps a
+  socket bound without listening for the failed attempt instead of connecting to a released port.
+- The fake Plink process id of `PlinkTunnelRunnerTests` skips the test host's own process id.
+
+## 2026-11-14: The Open Ports tool reads a table again when it grows while it is read (v2026.111401)
+
+Fixes merged as #796 and #806, test work as #796, #804 and #805, Dependabot rules as #797 and #808,
+a CI action update as #798. The
+user-facing summary is in the release notes.
+
+### System table reads (#796, #806)
+
+- **Listener ownership probe (#796).** `WindowsTcpListenerOwnershipProbe.LoadTable` called
+  `GetExtendedTcpTable` for the size, then once with that size. Connections added in between give
+  ERROR_INSUFFICIENT_BUFFER, the probe answered Indeterminate, and `WaitForPortBindAsync` keeps the
+  last answer, so a port owned by another process could be reported as
+  `TunnelPortOwnershipIndeterminate` instead of `TunnelPortOwnedByDifferentProcess`. Both codes map
+  to the same message key (`ErrorSshTunnelPortOwnershipUnattested`, also used for
+  `TunnelPortNotListening`); the one visible difference is that with Indeterminate an exited Plink
+  whose stderr names a known cause is reported by that cause instead. A healthy tunnel was only
+  delayed: the loop probes again after `_portCheckInterval`. The sized read is retried at the size
+  the API reports, up to `MaxTableReadAttempts` (4), behind the internal seam
+  `WindowsTcpListenerOwnershipProbe.ITcpTableNative`.
+- **Open Ports tool (#806).** `OpenPortsService` had the same pattern in four copies (TCP and UDP,
+  IPv4 and IPv6), and a failed read gave an empty list for that table with no log. One generic
+  `LoadRows<TRow>` over `TryReadTable` now retries the same way, frees every buffer on every path,
+  and refuses a header row count that would run past the buffer. Internal seam
+  `OpenPortsService.IOpenPortsTableNative`. The ownership probe has no such row-count check yet.
+
+### Dependabot and CI (#797, #798, #808)
+
+- FluentAssertions 8 and later and every major update of JsonSchema.Net are ignored: both moved to
+  a license that asks for payment in commercial use (Xceed community license, Open Source
+  Maintenance Fee agreement). FluentAssertions 7.x stays open. Same rule as WiX 7.
+- Major updates of `Microsoft.*` and `System.*` are ignored while the solution targets net10.0:
+  their 11.x line belongs to the move to .NET 11, one decision for the whole solution (#808).
+- `actions/setup-dotnet` 6.0.0 to 6.1.0 in the CI and packaging workflows (#798).
+
+### Tests (#796, #804, #805)
+
+- `PlinkTunnelRunnerTests.StartAsync_ProcessStartFails_ResetsStateAndAllowsRetry` started a text
+  file named `.exe`; on 64-bit Windows that raises a "16-bit application" dialog owned by the test
+  host, which held an unattended run for twenty minutes. The file is now held with an exclusive
+  lock, so the start fails on open with a sharing violation and no dialog appears (#796).
+- `ConPtySessionTests.DataReceived_SubscriberAddedAfterBootstrapOutput_ReplaysBufferedOutput`
+  awaits the new internal `ConPtySession.BootstrapOutputBuffered`, backed by
+  `OutputReplayGate.FirstChunkBuffered`, instead of sleeping 1.5 s. It keeps its
+  `CIUnstable` tag for now (#804).
+- `SshShellSessionTeardownTests.Disconnect_StuckReadLoop_DoesNotBlockCallerForFinalWait` asserts an
+  order on the fake clock instead of a 1.5 s wall-clock bound. With a substituted clock
+  `SshShellSession` runs its graceful wait on that clock; with the real clock the wait is the same
+  timed task wait as before. Two tests added: the two bounds keep their values, and a stuck read
+  loop on the real clock (#804).
+- `PlinkTunnelRunnerDrainReproTests`, control C-04: cause of its occasional failure under load not
+  established. The failure message now carries the read counters, the thread-pool state and the
+  child's state (#804).
+- `PlinkTunnelRunnerTests.TunnelPasswordFile_ForeignListenerFailsClosed` binds its foreign listener
+  first, on a system-assigned port, instead of on a port it had released (#805).
+- `TcpListenerOwnershipProbeTableTests` and `OpenPortsServiceTableTests` drive the two readers
+  through their native seams with real table layouts.
+
+## 2026-11-13: Plink terminals start at the full width of their pane (v2026.111302)
+
+Fixes merged as #790, dependency updates as #791. The user-facing summary and the upgrade notes are
+in the release notes.
+
+### SSH through Plink (#790)
+
+- **Hidden-surface width.** While a session connects the terminal surface is hidden and the
+  WebView2 keeps its creation box. The host sends the page the pane box (`viewport:W,H`) and the
+  page sizes `#terminal` to it before fitting. `#terminal` is a flex item of a `body` as wide as
+  the window, with the default shrink, so a box wider than the window was shrunk back and the fit
+  addon, which reads the computed width of the terminal's parent, measured the window. Measured:
+  `page box 1066x1225@1; host WebView 1439x1024 visible=False`, Plink launched at 149 columns,
+  `first shown size 203x59 vs host-derived 149x59: MISMATCH`. `flex-shrink: 0` on `#terminal` in
+  `terminal.html`; after it, 203 columns and `match`. Present since the viewport protocol of
+  v2026.111201 for any pane wider than the creation box. Rows are the cross axis and were not
+  clamped.
+- **Pending SFTP companion on a Plink retry.** `SshHandler.PlinkRetryStarting`, relayed by
+  `ConnectionService`, fires when the embedded client failed to authenticate and the connect is
+  retried through Plink; not on the direct Plink path of agent forwarding with Pageant.
+  `SessionCoordinator.OnPlinkRetryStarting` withdraws the placeholder pane and the companion
+  profile, and `CompleteReadySession` skips `AutoOpenSftpAsync` for that session and sets
+  `StatusSftpCompanionNotOpenedAfterPlinkRetry`. The companion could not connect: same SSH.NET
+  client, same credentials, `AllowCredentialPrompt` false.
+- **Waiting for the wider size.** For the selected tab whose page had already reported,
+  `TerminalSizeReport.ArmWiderReport()` is armed before the tree changes, and
+  `ResolveConnectingTerminalSizeAsync` awaits it within the caller's wait
+  (`PlinkInitialSizeWaitMs`). It completes on a usable report with strictly more columns than the
+  size held when armed, because a report of the split width can still be in flight. The zero-wait
+  read of the embedded dial does not consume it. A tab that is not selected is not waited for.
+
+### Dependencies (#791)
+
+- Microsoft.EntityFrameworkCore.Sqlite, Microsoft.Extensions.Caching.Memory,
+  Microsoft.Extensions.DependencyInjection and its Abstractions,
+  Microsoft.Extensions.Logging.Abstractions, System.Management and
+  System.Security.Cryptography.ProtectedData 10.0.14 to 10.0.15; Microsoft.NET.Test.Sdk 17.14.1 to
+  17.14.2; FluentFTP 54.2.0 to 55.1.0; LibGit2Sharp 0.31.0 to 0.32.0. Each update is followed by a
+  commit refreshing the lock files of the dependent projects: restore runs in locked mode and
+  Dependabot refreshes only the lock file of the project it touches (NU1004).
+
+### Tests (#790)
+
+- `TerminalHtmlViewportLayoutTests` reads the page: the `#terminal` rule, the sizing it protects in
+  `handleViewportMessage`, and what the vendored fit addon measures.
+- `SshHandlerPlinkRetryStartingTests`, and additions to `TerminalSizeReportTests` and
+  `SessionCoordinatorCompanionLayoutTests`.
+- Seen failing once in CI and passing on rerun, left as it is:
+  `SshShellSessionTeardownTests.Disconnect_StuckReadLoop_DoesNotBlockCallerForFinalWait`.
+
+## 2026-11-13: Kerberos through Plink, bundled Plink first, first output kept for every terminal (v2026.111301)
+
+Fixes merged as #776, #777, #778, #781, #782 and #783. The user-facing summary and the upgrade notes
+are in the release notes.
+
+### SSH through Plink (#776, #781, #782, #783)
+
+- **Bundled Plink first (#781).** `ConnectionHelpers.ResolvePlinkPath` returned the `PlinkPath`
+  setting whenever that file existed, and the setting defaults to
+  `C:\Program Files\PuTTY\plink.exe`, so a machine with PuTTY installed never ran the bundled,
+  attested build. `AppSettings.LegacyPlinkPath` now counts as not chosen: the bundled Plink comes
+  first, a user-chosen existing path still wins, and the legacy default is the last fallback when
+  the bundled copy is missing. `SettingsViewModel.IsPlinkPathMissing` is false for the legacy
+  default. `settings.default.json` is pinned to the constant by a test. In external PuTTY mode the
+  host key probe now runs the bundled Plink while `putty.exe` is still resolved from the raw
+  setting.
+- **First output kept on an attested launch (#781).** `PlinkPasswordFileRelease` and
+  `PlinkSizeSession` subscribed to `PipeModeSession.DataReceived` before the process started. As the
+  first subscriber they disarmed the bootstrap buffer of the output gate, so the view got no replay.
+  `IFirstOutputSignal.FirstOutputReceived` (`Heimdall.Terminal`) is latched, raised once after the
+  first chunk is delivered or buffered, and independent from the replay; both handles listen to it.
+  A late subscriber is invoked inside the add. Proven by a test on the real session, red on the
+  previous handles.
+- **Empty answer to the Plink prompt (#776, #782).** With a user name, no stored password and no
+  key file, the prompt carries `SshPlinkPasswordPromptPasswordlessHint` and an empty answer launches
+  Plink with no password file and with `-batch` (`TerminalSessionResult.CredentialFreeLaunch`).
+  Measured with the bundled Plink 0.83 launched with redirected streams and no window: without
+  `-batch`, a refused sign-in leaves Plink waiting on a console nobody sees, having written only its
+  user name line; with `-batch` it exits 1 with "Cannot answer interactive prompts in batch mode".
+  #776 first allowed the empty answer only when Pageant held an identity and without `-batch`; #782
+  replaced that rule and removed `SshAgentKeyPreflight.AgentHoldsAnyIdentityAsync` and
+  `SshAgentRegistry.HoldsAnyIdentity`. A session with no user name is still refused before the
+  prompt. A typed or stored password and a key file are unchanged, without `-batch`.
+- **Refusal explained (#782, #783).** A non-zero exit of a credential-free launch inside the
+  connect-time window, not asked by the user, prints `ErrorSshPasswordlessSignInFailed` in the
+  terminal (`TerminalReconnectPolicy.ResolveCredentialFreeExitMessageKey`) and puts it in the
+  detail of the disconnected panel, above the exit code (`ComposePanelDetail`). The detail is a
+  polite live region. Both view materialization paths carry the flag.
+- **Password file lifetime (#776).** The release of the temporary password file is also tied to
+  `PipeModeSession.Disposed`.
+- Kerberos was measured on a Windows Server 2022 domain controller with OpenSSH for Windows 8.1 and
+  GSSAPI, client and server on the same machine. Not measured: a Linux sshd, delegation, a gateway
+  tunnel.
+
+### Terminals (#776, #777)
+
+- **One output gate for every session type (#777).** `ShellOutputGate` (`Heimdall.Ssh`) became
+  `OutputReplayGate` in `Heimdall.Core/Terminal` and is used by `SshShellSession`, `TelnetSession`,
+  `ConPtySession` and `PipeModeSession`. Telnet now buffers output produced before the first
+  subscriber (it dropped it); ConPTY and pipe sessions already buffered it but kept appending after
+  an overflow, and the buffer now closes for good at the first overflow so the replay is a
+  contiguous prefix. A throwing subscriber is logged and no longer skips the others.
+  `TelnetSession` latches its end of session (`ExitLatch<T>`), so a late subscriber still learns
+  that the device closed. Verified on scripted streams.
+- **WebView2 user data folder per install (#776).** `WebView2Helper.EmbeddedUserDataFolderFor`
+  keys the folder by data root, install folder and runtime
+  (`%TEMP%\Heimdall\WebView2\<12 hex>\<subfolder>`). Folders of previous versions are left in place.
+
+### Tests (#778, #781, #782)
+
+- Three load-sensitive tests are deterministic (#778):
+  `SftpCompanionReconnect_BringsTheRowBackToConnected` waits for the attached companion pane, not
+  the placeholder; `StartAsync_StderrReadLateAfterTheExit_StillNamesTheRefusal` drives a
+  `TimeProvider` injected in `PlinkTunnelRunner` and a gated stream; `DialogInitialFocusTests`
+  asserts logical focus, takes the thread's Win32 focus, then keeps the keyboard focus assertion.
+- Two tests that pinned the release handles on `DataReceived` now assert the first-output
+  subscription and no data subscription (#781). The tests of #776 that pinned "an empty answer
+  cancels unless Pageant holds a key" follow the new rule (#782).
+- Seen failing once each under heavy load and passing alone, left as they are:
+  `PlinkTunnelRunnerTests.TunnelPasswordFile_ForeignListenerFailsClosed`,
+  `ConPtySessionTests.DataReceived_SubscriberAddedAfterBootstrapOutput_ReplaysBufferedOutput`,
+  `PlinkTunnelRunnerDrainReproTests.C04_Control_WhileTheConnectTokenIsLive_AStderrBurstIsDrainedAndTheChildKeepsRunningCommands`.
+
+## 2026-11-12: Tools tab group, agent key per session, terminal width, credential lookup confirmation (v2026.111201)
+
+Fixes and additions, merged as #764, #766, #769, #770, #771, #772, #773 and #774. The user-facing
+summary and the upgrade notes are in the release notes.
+
+### Tab strip (#772)
+
+- `ConnectionViewModel.TabGroups`: with tab grouping on, tool tabs that the folder resolver leaves
+  ungrouped and that are not pinned get the `/tools` group. A local folder key never starts with `/`
+  and a shared one starts with `::shared:`, so no folder can collide, whatever its name. Dedicated
+  accessible names and menu wording (`SessionTabGroupTools*`, en/fr/es). In the own-row layout the
+  group has its header and folds with the others; tool tabs used to stay visible whatever folder was
+  shown.
+
+### SSH (#771, #772, #773, #774)
+
+- **Early shell output (#772).** `SshShellSession` raised `DataReceived` before the terminal view
+  could subscribe, so a device that prints its prompt once showed a blank terminal until Enter.
+  `ShellOutputGate` (`Heimdall.Ssh`) buffers output until the first subscriber, capped at 256 KiB as
+  a contiguous prefix, and replays it in order under one delivery lock.
+  `SshShellSession.Disconnected` is latched and delivered once to a late subscriber. A throwing
+  `DataReceived` subscriber no longer ends the read loop; it is logged once. Verified on a scripted
+  stream, not on real equipment.
+- **Auto-reconnect (#772).** `TerminalReconnectPolicy.SuppressesConnectTimeShellDisconnect`, called
+  from `EmbeddedSshView`: an SSH.NET shell that disconnects within `SshConnectTimeExitWindowSeconds`
+  (15 by default) with nothing typed is not redialled, the rule plink sessions already had.
+- **Agent key per session (#773).** `ServerProfileDto.SshAgentKeyFingerprint` (`SHA256:` plus 43
+  base64 characters), null meaning every key. The SSH.NET shell, SFTP and the SFTP companion offer
+  only that key. A key no agent holds is refused before any tunnel, host key prompt or password
+  prompt (`SshFailureCode.AgentKeyNotLoaded`, never retried, never auto-reconnected). Plink gets the
+  key as a one-line public key file through `-i`, only when the key is in Pageant, is one of the
+  seven base types or the Ed25519 certificate (the set measured against the bundled plink 0.83; any
+  other type is refused because plink tries every Pageant key when it cannot read the file), no key
+  file is configured and plink is the attested bundled build. External PuTTY with a chosen key is
+  refused. Agent lookups before the dial are bounded and run off the calling thread. The shared
+  sanitizer drops the field, every import clears it, the settings export strips it. A cancellation
+  while deciding whether plink can honour the key now releases the tunnel reference.
+  `PipeModeSession` raises `Disposed` exactly once under concurrent disposal, and one failing
+  subscriber no longer skips the next. Troubleshooting entries 66 and 67 (and 65 pointing to the
+  Agent key list), English and French. `SharedProfileSanitizerTests` lists the property among those
+  dropped from shared files.
+- **Plink launch width (#774).** A plink pipe session keeps its launch size for good. It was
+  launched at 80x24 whenever the terminal page had not reported a size, and otherwise at a size
+  measured while the terminal surface was hidden behind the connecting veil (see the next item),
+  which was not the pane's. The full tab width, when the SFTP side panel then split the tab, was an
+  additional mismatch. An SSH tab that will open the panel is now split
+  before the connect, the panel shown as loading, filled in place when SFTP connects and removed
+  when it does not. Layout commands (split, swap, toggle, merge, detach) are refused while the panel
+  loads, and a merge from a tab still connecting is refused. When the page did not report in time,
+  the fallback is the size of the replaced terminal, then the last size reported by any terminal
+  (application wide), then the default; sizes under 20x5 are never kept, and the log names the
+  source. The page no longer reports xterm's built-in 80x24 when it had nothing to measure.
+- **Hidden surface (#774).** While a session connects the terminal surface is hidden behind the
+  connecting veil; WPF arranges a hidden element but does not position its native window, so the
+  WebView2 kept its creation bounds and the page fitted to that box (243x81 reported for a pane of
+  76 columns). The host now sends the pane's box (`viewport:W,H`, computed from the layout with each
+  edge rounded to a device pixel) while the surface is hidden and `viewport:` once shown; `ready:`
+  never carries a size. The log compares the first size from real bounds with the size derived while
+  hidden (`match` or `MISMATCH`). A pipe session whose width differs from its launch width shows a
+  badge in the session header, full sentence in the tooltip. Hand tested on a debug build against
+  OpenSSH 9.2 at 100% display scaling; 125% and 150% and a startup restore of many tabs were not
+  tried. Bulk connect keeps its previous sequence.
+- **Plink host key probe (#771).** The probe passed no manual host key, so on a host cached in
+  PuTTY's registry plink accepted the key, authenticated through Pageant and held a shell until its
+  timeout. It now runs `-v -batch -noagent -noshare -N -ssh -P <port> -hostkey SHA256:<43 x A>`:
+  plink prints the presented key, refuses it and exits before user authentication, with standard
+  input closed at once. The output is read strictly (one fingerprint line, the key on the next line,
+  the refusal after it, the fatal error last, nothing past the key exchange, a process that ended by
+  itself); otherwise no result, and a first connection is refused as before. Measured on the bundled
+  plink 0.83 against OpenSSH 9.2 in a container; that transcript is the fixture of the tests. With
+  GSSAPI key exchange no host key is sent and plink can still authenticate with Kerberos during the
+  probe; the result is discarded then. A host cached in PuTTY's registry was not measured. The
+  previous parser is kept with its tests and no longer called.
+
+### Session tree and import (#769)
+
+- Moving a session up or down rebuilt the whole tree. A change of order alone now moves the row in
+  place; a move to another folder still rebuilds. After a move the row is scrolled into view only
+  when its own line is not visible, measured on the line and not on a folder with all its content.
+  The scrolling itself is not covered by a test.
+- The KeePass 2 (KPScript) and KeePassXC credential provider presets start with the quoted path
+  under Program Files when the program is there, and with the bare name otherwise. A saved command
+  is still recognised as its preset whatever folder its path names.
+- The import preview showed the RDP port field (3389 by default) for a session that is not RDP; it
+  shows the port the session uses.
+
+### Credential lookup (#764)
+
+- With an external credential provider, a profile's password is looked up under its vault entry
+  name or its display name. An imported file chooses both and the host, and can supply the gateway;
+  the network scanner names a session after a reverse DNS answer.
+  `ServerProfileDto.CredentialLookupConfirmed` (true by default, so existing profiles and files
+  without the field are unchanged) is cleared by every import (JSON, mRemoteNG, MobaXterm, RDCMan,
+  .rdp including Replace, PuTTY, OpenSSH config), the network scanner and the Citrix cache scanner.
+  While false, the profile makes no lookup in the provider on connect, restore, reconnect, bulk
+  connect or the SFTP companion; shared sessions are unchanged. An earlier revision looked the
+  profile up by host; that was still open to a crafted file.
+- "Confirm credential lookup..." on a session, a selection or a folder lists the entry and the
+  destination (protocol, host, port, user, gateway chain, RD Gateway) for at most ten profiles at a
+  time; a row is confirmed only if the stored profile still matches what was shown. Declining is the
+  default. Values are shown with control and format characters made visible and long values cut.
+- The session dialog keeps the state it loaded and shows a notice with an "Allow lookup" button.
+  Renaming an unconfirmed profile no longer freezes the file's name as its vault entry. The line
+  saying the lookup is off is the last status once an interactive connect has ended; restore,
+  reconnect, bulk connect and the SFTP companion stay silent.
+- Not covered: profiles imported before this change keep the lookup by name; shared sessions are
+  still looked up by host with a gateway the shared file can supply; a command preset built on
+  `{Host}` instead of `{Title}`. Hand tested through the UI on an empty data directory with a logging
+  command provider: 7 of 8 checks passed, 1 partial (the status line, fixed afterwards).
+
+### SFTP (#766)
+
+- A privileged write sent the sudo password and then the content on the remote standard input, and
+  the sudo running the write could read its password from that stream; with a wrong password sudo
+  read lines of the content as further attempts. The write is now one remote command, a constant
+  outer script and a constant inner script, every value a positional parameter. As the connecting
+  user, the content is staged in a private 0700 directory under `$TMPDIR`, its size is checked, then
+  ONE sudo runs: first `sudo -n`, and only if that did not start the installer is the password piped
+  to `sudo -S`, so sudo's input never carries the content. As root, the installer opens the staged
+  file and checks on the open descriptor that it is a regular file owned by the caller with a single
+  link in a directory only the caller can write, then the existing atomic replace runs. A truncated
+  content is refused before install. Failures are told apart (rejected password, password or
+  terminal required, not in sudoers, sudo missing, no temporary space, installer refusals). The
+  remote editor reports a rejected password once, without retry on the debounce timer, and a local
+  write failure no longer hides it when the remote side exited before reading. A first revision
+  (`sudo -v` then `sudo -n`) failed under `timestamp_timeout=0` and `verifypw=any`.
+- Limits: the descriptor check needs GNU `stat` and `/proc`, otherwise the write is refused; the
+  staged content sits in a 0600 file of the connecting user until the install ends and a killed
+  connection or a power loss can leave it there; a POSIX `sh` is needed on the server.
+- `SudoInvocations_ConsumePasswordBeforeStreamingPayload` was updated with the owner's approval and
+  keeps its name; it pins the new script. 21 tests run the real scripts in `sh` against a fake
+  `sudo`. `PrivilegedSudoRealHostTests` (opt-in, `HEIMDALL_SUDO_TEST_CONTAINER`) ran 15 of 15
+  against sudo 1.9.13p3 in a Debian 12 container; a real SSH session from the application, fish or
+  tcsh as login shell, other sudo versions and SELinux were not exercised.
+
+### Work that is no longer lost, and safeguards (#770)
+
+- `JsonSyncService`: a pending update of a template that belongs to a built-in action is skipped,
+  counted and reported; the title and danger level stayed while the command was rewritten.
+- The SSH key generator deleted the existing file before writing; keys are now written beside the
+  target and put in place once complete, and an IO error is shown in the tool instead of escaping.
+- `NotesToolViewModel`: moving the open note with unsaved edits wrote them to the old place and
+  showed stale text. It is saved first, then moved; the back and forward history follows a move and
+  a rename.
+- Web session external program: the description shown before the start makes control characters
+  visible; a program on a network or device path, given as a file URI or wrapped in quotes, is
+  refused, and so is a command too long to be shown in full. A portable browser started from a
+  network share is therefore refused, as for the Citrix SelfService path.
+- Session restore dialog: with a filter active, hidden and shared sessions were listed as an unknown
+  server; names are resolved from the whole inventory and the shared sessions.
+- Not changed: IPv6 targets in the gateway tools. The report was checked and is wrong: those tools
+  have never accepted an IPv6 literal, so supporting it would be a feature.
+
+### Tests (#766, #771, #774)
+
+- The staging-directory test of #766 defines a `stat` shell function around the installer instead
+  of putting a fake `stat` first on PATH, which the CI runner's real `stat` bypassed, and fails if
+  the simulation has no effect.
+- `SessionCoordinatorPreMountTests.SftpCompanionReconnect_BringsTheRowBackToConnected` timed out
+  once (5 s) in a full run made on a loaded machine; it passed five times alone and in the next full
+  run. `PlinkTunnelRunnerTests.TunnelPasswordFile_ForeignListenerFailsClosed` failed once in a full
+  run of #771 and passed on the rerun.
+
 ## 2026-11-11: data-loss and safeguard fixes, SSH agent key attempts (v2026.111101)
 
 Fixes only, merged as #760, #761, #762, #765 and #767. The user-facing summary and the upgrade notes

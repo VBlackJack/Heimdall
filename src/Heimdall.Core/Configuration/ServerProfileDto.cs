@@ -30,6 +30,7 @@ public sealed class ServerProfileDto : IJsonOnDeserialized
     private int _winRmPort = DefaultPorts.WinRmHttp;
     private int _sshPort = DefaultPorts.Ssh;
     private string? _sshKeyPassphraseEncrypted;
+    private string? _sshAgentKeyFingerprint;
     private RdpResolutionMode _rdpResolutionMode = RdpResolutionMode.FitWindow;
     private int? _rdpFixedWidth;
     private int? _rdpFixedHeight;
@@ -269,6 +270,19 @@ public sealed class ServerProfileDto : IJsonOnDeserialized
 
     public string SshMode { get; set; } = "Embedded";
     public bool SshAgentForwarding { get; set; }
+
+    /// <summary>
+    /// The one SSH agent key this session offers, as a fingerprint in the form <c>ssh-add -l</c>
+    /// prints: <c>SHA256:</c> followed by 43 unpadded base64 characters. Null means any key of the
+    /// agent. Local to this machine: an import never sets it and a shared file never carries it.
+    /// </summary>
+    public string? SshAgentKeyFingerprint
+    {
+        get => _sshAgentKeyFingerprint;
+
+        // A hand-edited blank value means "any key", like an absent one, wherever it came from.
+        set => _sshAgentKeyFingerprint = string.IsNullOrWhiteSpace(value) ? null : value;
+    }
     public string? SshKeyPath { get; set; }
     public string? SshPasswordEncrypted { get; set; }
     public string? SshKeyPassphraseEncrypted
@@ -428,10 +442,19 @@ public sealed class ServerProfileDto : IJsonOnDeserialized
 
     /// <summary>
     /// True when the user has authored or explicitly vetted this profile's local-execution
-    /// payload (e.g. via the server dialog). Profiles serialized before this field, and all
-    /// imported profiles, deserialize to false. A later connect-time guard uses this flag.
+    /// payload (created in the session dialog, or allowed on its notice or at the connect-time
+    /// prompt). Profiles serialized before this field, and all imported profiles, deserialize to
+    /// false. A later connect-time guard uses this flag.
     /// </summary>
     public bool ExecutionConfirmed { get; set; }
+
+    /// <summary>
+    /// True when the user has vetted the names this profile looks a stored secret up by. An
+    /// imported profile controls both its names and its host, so until the user opens and saves
+    /// it, the external credential provider is asked under the host name only. Profiles stored
+    /// before this field, and files that omit it, read as true; the import boundary sets it false.
+    /// </summary>
+    public bool CredentialLookupConfirmed { get; set; } = true;
 
     /// <summary>
     /// Returns the effective elevation mode: if <see cref="ElevationMode"/> is

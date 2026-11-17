@@ -2564,6 +2564,24 @@ public sealed partial class SettingsViewModelTests : IDisposable
         Assert.False(viewModel.IsSysinternalsPathMissing);
     }
 
+    // The legacy default means "use the bundled Plink": no warning under it, whatever the machine has.
+    [Fact]
+    public void PlinkPath_LegacyDefaultWithNoFile_IsNotReportedMissing()
+    {
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config);
+        viewModel.FileExists = static _ => false;
+
+        viewModel.PlinkPath = AppSettings.LegacyPlinkPath;
+        Assert.False(viewModel.IsPlinkPathMissing);
+
+        viewModel.PlinkPath = AppSettings.LegacyPlinkPath.ToUpperInvariant().Replace('\\', '/');
+        Assert.False(viewModel.IsPlinkPathMissing);
+
+        viewModel.PlinkPath = @"C:\Tool\plink.exe";
+        Assert.True(viewModel.IsPlinkPathMissing);
+    }
+
     // Save answered with nothing but a button going grey. It now says so, once, and the line goes
     // with the next edit so it never describes a panel that has changed since.
     [Fact]
@@ -4913,9 +4931,11 @@ public sealed partial class SettingsViewModelTests : IDisposable
         IBrowserLauncher? browserLauncher = null,
         Heimdall.App.Services.SharedSessions.ISharedSessionProvider? sharedSessions = null,
         Heimdall.App.Services.SharedSessions.SharedSessionSecretStore? sharedSecrets = null,
-        IGitIdentityReader? gitIdentityReader = null)
+        IGitIdentityReader? gitIdentityReader = null,
+        SftpSudoFallbackPolicy? sftpSudoFallbackPolicy = null)
     {
         localizer ??= new LocalizationManager();
+        sftpSudoFallbackPolicy ??= new SftpSudoFallbackPolicy(() => null);
         dialog ??= new FakeDialogService();
         updateService ??= new FakeUpdateService();
         appVersionProvider ??= new AppVersionProvider("2026.061501");
@@ -4951,7 +4971,8 @@ public sealed partial class SettingsViewModelTests : IDisposable
             profileImportService,
             sharedSessions: sharedSessions,
             sharedSecrets: sharedSecrets,
-            gitIdentityReader: gitIdentityReader);
+            gitIdentityReader: gitIdentityReader,
+            sftpSudoFallbackPolicy: sftpSudoFallbackPolicy);
     }
 
     // ── Git sync author prefill (D-03) ────────────────────────────

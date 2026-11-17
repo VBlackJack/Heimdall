@@ -94,6 +94,11 @@ public static class FailureClassifier
             OperationCanceledException =>
                 new SshFailureInfo(SshFailureCode.AuthTimeout, "Connection cancelled.", false, ex),
 
+            // The session named an agent key that is not loaded: retrying cannot help, and the
+            // message must name the key. Ahead of the generic arm below, which is its base type.
+            SshAgentKeyNotLoadedException notLoaded =>
+                new SshFailureInfo(SshFailureCode.AgentKeyNotLoaded, notLoaded.Message, true, ex),
+
             SshException sshEx =>
                 ClassifySshException(sshEx, connectionParams),
 
@@ -138,6 +143,15 @@ public static class FailureClassifier
             _ => $"ErrorSsh{info.Code}"
         };
         var localized = localizer(key);
+
+        // The one place the fingerprint enters the template, which receives it raw. A plain
+        // replacement and not a composite format: the value comes from a file a person can edit,
+        // and braces in it must neither throw nor be read as a placeholder.
+        if (localized is not null && info.OriginalException is SshAgentKeyNotLoadedException notLoaded)
+        {
+            localized = localized.Replace("{0}", notLoaded.Fingerprint, StringComparison.Ordinal);
+        }
+
         return prefix + (localized ?? info.Message);
     }
 

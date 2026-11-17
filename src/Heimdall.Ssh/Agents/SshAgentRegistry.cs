@@ -43,11 +43,22 @@ public readonly record struct SshAgentObservation(
     bool HasPlinkCompatibleAgent,
     bool HasAnyNonPlinkAgent);
 
+/// <summary>An agent identity found by fingerprint, with the agent that holds it.</summary>
+/// <param name="Key">The identity.</param>
+/// <param name="AgentName">The name of the agent holding it (see <c>PageantAgent.AgentName</c>).</param>
+public sealed record SshAgentIdentityMatch(ISshAgentKey Key, string AgentName);
+
 /// <summary>
 /// Enumerates SSH agents in the configured priority order.
 /// </summary>
 public sealed class SshAgentRegistry
 {
+    /// <summary>
+    /// How long a caller that must not hang (a handler about to refuse or proceed) waits for an
+    /// agent to list its identities before treating the answer as "not loaded".
+    /// </summary>
+    public const int IdentityLookupTimeoutMs = 750;
+
     private readonly IReadOnlyList<ISshAgent> _agents;
     private readonly Func<SshAgentPreference> _preferenceProvider;
 
@@ -96,6 +107,54 @@ public sealed class SshAgentRegistry
             if (key is not null)
             {
                 return key;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Finds the identity whose public key has exactly <paramref name="fingerprint"/>, searching
+    /// every available agent in preference order. An agent whose identity request fails is skipped.
+    /// </summary>
+    /// <returns>The identity and the name of the agent holding it, or null when none does.</returns>
+    public SshAgentIdentityMatch? FindIdentity(string fingerprint) => FindIdentity(fingerprint, agentName: null);
+
+    /// <summary>
+    /// Same search, restricted to the agent called <paramref name="agentName"/> (null for all).
+    /// A key held by two agents is reported by the first one in preference order by the
+    /// unrestricted overload, which is not the answer to "is it in Pageant".
+    /// </summary>
+    public SshAgentIdentityMatch? FindIdentity(string fingerprint, string? agentName)
+    {
+        ArgumentNullException.ThrowIfNull(fingerprint);
+
+        foreach (var agent in GetAvailableAgents())
+        {
+            if (agentName is not null && !string.Equals(agent.Name, agentName, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            IReadOnlyList<ISshAgentKey> identities;
+            try
+            {
+                identities = agent.GetIdentities();
+            }
+            catch (Exception ex)
+            {
+                Core.Logging.FileLogger.Warn($"SSH agent {agent.Name}: identity lookup failed: {ex.Message}");
+                continue;
+            }
+
+            var key = identities.FirstOrDefault(identity =>
+                string.Equals(
+                    SshAgentKeyFingerprints.Compute(identity.PublicKeyBlob),
+                    fingerprint,
+                    StringComparison.Ordinal));
+            if (key is not null)
+            {
+                return new SshAgentIdentityMatch(key, agent.Name);
             }
         }
 

@@ -25,6 +25,7 @@ using Heimdall.Core.Ssh;
 using Heimdall.Core.StateMachine;
 using Heimdall.Sftp;
 using Heimdall.Ssh;
+using Heimdall.Ssh.Agents;
 
 namespace Heimdall.App.Services.Handlers;
 
@@ -40,6 +41,7 @@ internal sealed class SftpHandler : IProtocolHandler
     private readonly IHostKeyVerifier _hostKeyVerifier;
     private readonly IDialogService _dialogService;
     private readonly ConnectBrowserDelegate _connectBrowser;
+    private readonly Func<SshAgentPreference, SshAgentRegistry> _agentRegistryFactory;
 
     /// <summary>How the handler reaches a remote host. Substitutable for tests only.</summary>
     internal delegate Task ConnectBrowserDelegate(
@@ -59,6 +61,10 @@ internal sealed class SftpHandler : IProtocolHandler
     /// Test seam only, defaulted to the real call. Follows the precedent already used by
     /// the SSH and WinRM handlers.
     /// </param>
+    /// <param name="agentRegistryFactory">
+    /// Test seam only, defaulted to the real agents. Used to check, before any prompt or tunnel,
+    /// that the agent key a session names is loaded.
+    /// </param>
     public SftpHandler(
         ITunnelService tunnelService,
         ConnectionStateMachine connectionSm,
@@ -66,7 +72,8 @@ internal sealed class SftpHandler : IProtocolHandler
         HostKeyStore hostKeyStore,
         IHostKeyVerifier hostKeyVerifier,
         IDialogService dialogService,
-        ConnectBrowserDelegate? connectBrowser = null)
+        ConnectBrowserDelegate? connectBrowser = null,
+        Func<SshAgentPreference, SshAgentRegistry>? agentRegistryFactory = null)
     {
         ArgumentNullException.ThrowIfNull(dialogService);
         _tunnelService = tunnelService;
@@ -78,6 +85,7 @@ internal sealed class SftpHandler : IProtocolHandler
         _connectBrowser = connectBrowser
             ?? ((browser, sshParams, store, verifier, token) =>
                 browser.ConnectAsync(sshParams, store, verifier, token));
+        _agentRegistryFactory = agentRegistryFactory ?? SshAgentRegistry.CreateDefault;
     }
 
     public string Protocol => "SFTP";
@@ -143,6 +151,27 @@ internal sealed class SftpHandler : IProtocolHandler
                     usernameMsg));
         }
 
+        // A session that names an agent key nobody holds is refused here: before the tunnel, the
+        // host-key prompt and the password dialog the failure path would otherwise open.
+        if (server.SshAgentKeyFingerprint is { } chosenFingerprint
+            && await SshAgentKeyPreflight.LocateAsync(
+                    chosenFingerprint,
+                    _agentRegistryFactory(settings.SshAgentPreference),
+                    ct: ct)
+                .ConfigureAwait(false) is null)
+        {
+            string keyMsg = _localizer.Format(SshLocalizationKeys.ErrorSshAgentKeyNotLoaded, chosenFingerprint);
+            _connectionSm.SetError(server.Id, keyMsg);
+            return new ConnectionResult(
+                false,
+                keyMsg,
+                null,
+                SshSessionDiagnosticFactory.CreatePreflightFailure(
+                    SshLocalizationKeys.ErrorSshAgentKeyNotLoaded,
+                    keyMsg,
+                    SshFailureCode.AgentKeyNotLoaded));
+        }
+
         TunnelSetupOutcome tunnelOutcome =
             await _tunnelService.SetupTunnelIfNeededAsync(server, port, settings, ct)
                 .ConfigureAwait(false);
@@ -179,6 +208,7 @@ internal sealed class SftpHandler : IProtocolHandler
             KeyPassphrase = ConnectionHelpers.DecryptPassword(server.SshKeyPassphraseEncrypted),
             KeyPath = string.IsNullOrWhiteSpace(server.SshKeyPath) ? null : server.SshKeyPath,
             SshAgentPreference = settings.SshAgentPreference,
+            AgentKeyFingerprint = server.SshAgentKeyFingerprint,
             UseLegacyPasswordAsKeyPassphrase = server.UsesLegacySshCredentialMapping,
             LegacyCredentialName = server.DisplayName,
             AgentForwarding = server.SshAgentForwarding,

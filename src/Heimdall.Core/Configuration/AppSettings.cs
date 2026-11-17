@@ -39,6 +39,12 @@ public sealed class AppSettings
     /// </summary>
     public const string FactoryDefaultTheme = "Magellan";
 
+    /// <summary>
+    /// Historical default of <see cref="PlinkPath"/>. A value equal to it means the user never
+    /// chose a plink, so the bundled copy takes precedence over a PuTTY installed on the machine.
+    /// </summary>
+    public const string LegacyPlinkPath = @"C:\Program Files\PuTTY\plink.exe";
+
     public int SchemaVersion { get; set; } = CurrentSchemaVersion;
 
     [JsonExtensionData]
@@ -57,7 +63,7 @@ public sealed class AppSettings
     public string AccentTint { get; set; } = "Default";
 
     // Tools (legacy Plink paths, kept for import compatibility)
-    public string PlinkPath { get; set; } = @"C:\Program Files\PuTTY\plink.exe";
+    public string PlinkPath { get; set; } = LegacyPlinkPath;
     public string? PuttyPath { get; set; }
     public string? PsftpPath { get; set; }
 
@@ -314,6 +320,15 @@ public sealed class AppSettings
     public bool SftpBrowserEnabled { get; set; } = true;
     public bool SftpAutoOpenOnSsh { get; set; } = true;
     public bool SftpFollowSshDirectory { get; set; }
+
+    /// <summary>
+    /// Whether a file operation the SFTP browser was refused may be retried as root through
+    /// sudo. Defaults to <see cref="SftpSudoFallbackMode.Ask"/> for everyone, upgrades included;
+    /// an organisation cap can only make the effective value stricter.
+    /// </summary>
+    [JsonConverter(typeof(SftpSudoFallbackModeJsonConverter))]
+    public SftpSudoFallbackMode SftpSudoFallback { get; set; } = SftpSudoFallbackMode.Ask;
+
     public string ExternalEditorPath { get; set; } = @"%windir%\system32\notepad.exe";
     public bool PreventSleepDuringSession { get; set; } = true;
     public bool SessionLoggingEnabled { get; set; }

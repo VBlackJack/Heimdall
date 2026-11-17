@@ -90,12 +90,20 @@ public sealed partial class SessionCoordinatorPreMountTests
         await sftp.Started.Task.WaitAsync(TestTimeout);
         string sftpSessionId = sftp.LastServer!.Id;
         WalkHandlerToConnected(harness, sftpSessionId, ConnectionState.LaunchingSftp);
+        // The companion pane exists as a placeholder before the connect completes; the real attach
+        // happens later, after the connect task completes, so wait for the attached pane, not just
+        // the matching key.
+        SessionPaneModel placeholder = CompanionOf(tab);
+        Assert.True(placeholder.IsPendingCompanion);
         sftp.Result.SetResult(SuccessWithTerminalSession());
         await WaitUntilAsync(() => SplitTreeHelper.EnumerateLeaves(tab.RootContent)
-            .Any(leaf => string.Equals(leaf.ServerId, sftpSessionId, StringComparison.Ordinal)));
+            .Any(leaf => string.Equals(leaf.ServerId, sftpSessionId, StringComparison.Ordinal)
+                && !leaf.IsPendingCompanion
+                && leaf.HostControl is not null));
         SessionPaneModel sftpPane = Assert.Single(
             SplitTreeHelper.EnumerateLeaves(tab.RootContent),
             leaf => string.Equals(leaf.ServerId, sftpSessionId, StringComparison.Ordinal));
+        Assert.Same(placeholder, sftpPane);
 
         ServerItemViewModel row = Assert.Single(harness.Main.ServerList.Servers);
         Assert.True(harness.StateMachine.TryEndSession(sshSessionId, null));

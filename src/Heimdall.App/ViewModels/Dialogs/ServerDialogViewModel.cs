@@ -20,6 +20,7 @@ using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Heimdall.App.Services;
+using Heimdall.App.Services.Handlers;
 using Heimdall.App.Services.WinRm;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
@@ -40,6 +41,12 @@ public enum SshAgentChipState
     Warn,
     Ok
 }
+
+/// <summary>
+/// One entry of the "Agent key" list: the fingerprint it stands for (null for "any key") and the
+/// text shown for it.
+/// </summary>
+public sealed record SshAgentKeyChoice(string? Fingerprint, string DisplayText);
 
 public enum SshTestChipState
 {
@@ -101,6 +108,8 @@ public partial class ServerDialogViewModel : ObservableValidator
             _localizer = value;
             OnPropertyChanged(nameof(ConnectionTypeDisplayName));
             OnPropertyChanged(nameof(SshAuthHint));
+            OnPropertyChanged(nameof(SshAgentKeyHelpText));
+            OnPropertyChanged(nameof(AgentKeyForwardingWarningText));
             OnPropertyChanged(nameof(SshKeyPassphraseHint));
             OnPropertyChanged(nameof(SessionKindLabel));
             OnPropertyChanged(nameof(GatewayToServerLabel));
@@ -109,6 +118,7 @@ public partial class ServerDialogViewModel : ObservableValidator
             RaiseWinRmHintsChanged();
             OnPropertyChanged(nameof(RdpResizeEnableDelayPlaceholder));
             RefreshAvailableMonitors();
+            RebuildSshAgentKeyChoices();
             RefreshAgentChipIfNeeded();
         });
     }
@@ -126,6 +136,7 @@ public partial class ServerDialogViewModel : ObservableValidator
             AppSettings settings = value;
             RunWithoutDirtyTracking(() =>
             {
+                _noticeSettings = settings;
                 _defaultRdpTunnelPort = settings.DefaultRdpTunnelPort;
                 _defaultSshTunnelPort = settings.DefaultSshTunnelPort;
                 _defaultRdpResizeEnableDelayMs = settings.RdpResizeEnableDelayMs;
@@ -212,6 +223,7 @@ public partial class ServerDialogViewModel : ObservableValidator
         OnPropertyChanged(nameof(ShowProtocolSelector));
         OnPropertyChanged(nameof(ShowFormFields));
         OnPropertyChanged(nameof(CanSwitchToAuto));
+        OnPropertyChanged(nameof(ShowCredentialLookupNotice));
         TryApplyRdpDialogAdvancedDefault();
     }
 
@@ -233,6 +245,193 @@ public partial class ServerDialogViewModel : ObservableValidator
     {
         ClearValidationState();
         IsProtocolSelected = false;
+    }
+
+    // --- Credential lookup confirmation ---
+
+    /// <summary>
+    /// Whether the external credential provider may be asked for this session. A session created
+    /// here is confirmed; an imported one keeps its value until the user allows the lookup.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowCredentialLookupNotice))]
+    private bool _credentialLookupConfirmed = true;
+
+    /// <summary>Whether the bar offering to allow the lookup is shown.</summary>
+    public bool ShowCredentialLookupNotice
+        => IsEditMode && !CredentialLookupConfirmed && CredentialLookupConfirmation.ProtocolHasLookup(ConnectionType);
+
+    private static readonly System.ComponentModel.PropertyChangedEventArgs ShowCredentialLookupNoticeChanged =
+        new(nameof(ShowCredentialLookupNotice));
+
+    /// <summary>
+    /// The bar's text: the entry the provider would be asked for and where the session connects.
+    /// </summary>
+    public string CredentialLookupNoticeText
+    {
+        get
+        {
+            if (_localizer is null)
+            {
+                return string.Empty;
+            }
+
+            // Built from what the dialog holds now, so the key and the destination shown are the
+            // ones that would be saved with the "Allow lookup" choice.
+            IReadOnlyList<CredentialLookupRow> rows = CredentialLookupConfirmation.BuildRows(
+                [ToDto()],
+                _noticeSettings ?? new AppSettings());
+            return _localizer.Format(
+                "ServerDialogCredentialLookupNotice",
+                CredentialLookupConfirmation.FormatRows(rows, _localizer));
+        }
+    }
+
+    private AppSettings? _noticeSettings;
+
+    private static readonly System.ComponentModel.PropertyChangedEventArgs NoticeTextChanged =
+        new(nameof(CredentialLookupNoticeText));
+
+    /// <summary>Allows the lookup; the choice is saved with the dialog.</summary>
+    [RelayCommand]
+    private void AllowCredentialLookup() => CredentialLookupConfirmed = true;
+
+    // --- Execution trust ---
+
+    private const string ExecutionTrustNoticeKey = "ServerDialogExecutionTrustNotice";
+
+    /// <summary>
+    /// Whether what this session runs (a local program, a Citrix ICA file, post-connect commands)
+    /// was written or vetted by the user. A session created here is confirmed; an imported one
+    /// keeps its value until the user allows it on the notice, so renaming and saving an imported
+    /// session cannot turn its payload into a trusted one.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowExecutionTrustNotice))]
+    private bool _executionConfirmed = true;
+
+    /// <summary>
+    /// Whether the bar offering to allow what the session runs is shown: only while the session is
+    /// unconfirmed and the dialog holds something that is gated at connect time. Nothing is
+    /// computed once the session is confirmed.
+    /// </summary>
+    public bool ShowExecutionTrustNotice
+    {
+        get
+        {
+            if (ExecutionConfirmed)
+            {
+                return false;
+            }
+
+            ServerProfileDto probe = BuildExecutionTrustProbe();
+            return ProfileExecutionTrust.CarriesLocalExecutionPayload(probe)
+                || ProfileExecutionTrust.CarriesPostConnectPayload(probe);
+        }
+    }
+
+    /// <summary>
+    /// The bar's text: every value the session would run, as the dialog holds it now, so the
+    /// values listed are the ones the Allow choice would save.
+    /// </summary>
+    public string ExecutionTrustNoticeText
+    {
+        get
+        {
+            if (_localizer is null || ExecutionConfirmed)
+            {
+                return string.Empty;
+            }
+
+            ServerProfileDto probe = BuildExecutionTrustProbe();
+            return _localizer.Format(
+                ExecutionTrustNoticeKey,
+                ExecutionTrustDescriber.Describe(probe, LinkedTitleByLibraryId(), _localizer));
+        }
+    }
+
+    private static readonly System.ComponentModel.PropertyChangedEventArgs ExecutionTrustNoticeTextChanged =
+        new(nameof(ExecutionTrustNoticeText));
+
+    private static readonly System.ComponentModel.PropertyChangedEventArgs ShowExecutionTrustNoticeChanged =
+        new(nameof(ShowExecutionTrustNotice));
+
+    /// <summary>
+    /// The profile as the next load would see it: what the dialog would save, with a legacy
+    /// post-connect command turned into steps the way loading does, so the notice lists the same
+    /// commands the connect-time gate will count.
+    /// </summary>
+    private ServerProfileDto BuildExecutionTrustProbe()
+    {
+        // ToDto builds a new object with its own step list, so migrating it touches nothing else.
+        ServerProfileDto probe = ToDto();
+        PostConnectMigration.Migrate(probe);
+        return probe;
+    }
+
+    /// <summary>
+    /// The titles of the linked Command Library entries, by entry id. The title is not part of the
+    /// saved step, so the notice takes it from the rows the dialog resolved. Keyed by entry id and
+    /// not by step id: an imported file may repeat a step id, and an entry has one title.
+    /// </summary>
+    private Dictionary<string, string> LinkedTitleByLibraryId()
+    {
+        Dictionary<string, string> titles = new(StringComparer.Ordinal);
+        foreach (PostConnectStepItemViewModel step in PostConnectSteps)
+        {
+            if (step.IsLinked && step.CommandLibraryId is not null && step.LinkedActionTitle is not null)
+            {
+                titles.TryAdd(step.CommandLibraryId, step.LinkedActionTitle);
+            }
+        }
+
+        return titles;
+    }
+
+    /// <summary>
+    /// A web command too long to be described whole cannot be allowed from the notice: a value cut
+    /// short could hide the end of the arguments from the one who allows it.
+    /// </summary>
+    private bool CanAllowExecutionTrust()
+    {
+        if (!string.Equals(ConnectionType, "WEB", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        ServerProfileDto probe = ToDto();
+        return !ProfileExecutionTrust.CarriesLocalExecutionPayload(probe)
+            || WebExternalLaunch.FitsDescription(probe.WebExternalProgram, probe.WebExternalArguments);
+    }
+
+    /// <summary>Allows what the session runs; the choice is saved with the dialog.</summary>
+    [RelayCommand(CanExecute = nameof(CanAllowExecutionTrust))]
+    private void AllowExecutionTrust()
+    {
+        // Execute does not consult CanExecute, so the refusal is repeated here.
+        if (!CanAllowExecutionTrust())
+        {
+            return;
+        }
+
+        ExecutionConfirmed = true;
+    }
+
+    /// <summary>
+    /// Announces that the notice may have changed. Raises through the base class on purpose: it is
+    /// derived state, so it must neither pass through <see cref="OnPropertyChanged"/> again (no
+    /// recursion) nor count as an edit. Does nothing for a confirmed session.
+    /// </summary>
+    private void RaiseExecutionTrustNoticeChanged()
+    {
+        if (ExecutionConfirmed)
+        {
+            return;
+        }
+
+        base.OnPropertyChanged(ExecutionTrustNoticeTextChanged);
+        base.OnPropertyChanged(ShowExecutionTrustNoticeChanged);
+        AllowExecutionTrustCommand.NotifyCanExecuteChanged();
     }
 
     // --- Identity ---
@@ -461,7 +660,137 @@ public partial class ServerDialogViewModel : ObservableValidator
     private bool _sshX11Forwarding;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowAgentKeyForwardingWarning))]
+    [NotifyPropertyChangedFor(nameof(AgentKeyForwardingWarningText))]
     private bool _sshAgentForwarding;
+
+    /// <summary>
+    /// The one agent key this session offers, as a fingerprint; null means any key. The single
+    /// source of truth: the list below only displays it, and a refresh of that list never writes it.
+    /// Kept as it is when the dialog edits a profile type that shows no agent field.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowAgentKeyForwardingWarning))]
+    [NotifyPropertyChangedFor(nameof(AgentKeyForwardingWarningText))]
+    [NotifyPropertyChangedFor(nameof(HasChosenSshAgentKey))]
+    [NotifyPropertyChangedFor(nameof(SshAgentKeyHelpText))]
+    private string? _sshAgentKeyFingerprint;
+
+    /// <summary>Agent forwarding hands the remote host the whole agent, so a chosen key does not limit it.</summary>
+    public bool ShowAgentKeyForwardingWarning => SshAgentForwarding && HasChosenSshAgentKey;
+
+    /// <summary>
+    /// The warning text, empty while it does not apply. The notice announces itself when this text
+    /// is written into it, which a text that never changes (only its visibility) would not do.
+    /// </summary>
+    public string AgentKeyForwardingWarningText =>
+        ShowAgentKeyForwardingWarning ? L("ServerDialogSshAgentKeyForwardingWarning") : "";
+
+    /// <summary>Whether a specific key is chosen, so the hint describing its effect applies.</summary>
+    public bool HasChosenSshAgentKey => !string.IsNullOrWhiteSpace(SshAgentKeyFingerprint);
+
+    /// <summary>The hint for assistive technology, only while a key is chosen (blank otherwise).</summary>
+    public string SshAgentKeyHelpText => HasChosenSshAgentKey ? L("ServerDialogSshAgentKeyHint") : "";
+
+    private IReadOnlyList<SshAgentKeyChoice> _sshAgentKeyChoices = [];
+
+    private SshAgentKeyChoice? _selectedSshAgentKeyChoice;
+
+    private bool _isRebuildingSshAgentKeyChoices;
+
+    private IReadOnlyList<ProbedAgentKey> _loadedAgentKeys = [];
+
+    /// <summary>The entries of the "Agent key" list: any key, the loaded keys, and the saved key when it is not loaded.</summary>
+    public IReadOnlyList<SshAgentKeyChoice> SshAgentKeyChoices => _sshAgentKeyChoices;
+
+    /// <summary>
+    /// The entry the list shows as selected. Only a real user pick reaches
+    /// <see cref="SshAgentKeyFingerprint"/>.
+    /// </summary>
+    /// <remarks>
+    /// When the list is rebuilt the control pushes null into the selection. Taking that at its
+    /// word would erase the saved fingerprint and the next save would silently widen the session to
+    /// every key of the agent. "Any key" is a real entry, so a user can never legitimately select
+    /// nothing: a null, and any write during a rebuild, is ignored and the control is re-synchronised.
+    /// </remarks>
+    public SshAgentKeyChoice? SelectedSshAgentKeyChoice
+    {
+        get => _selectedSshAgentKeyChoice;
+        set
+        {
+            if (_isRebuildingSshAgentKeyChoices || ReferenceEquals(value, _selectedSshAgentKeyChoice))
+            {
+                return;
+            }
+
+            if (value is null)
+            {
+                RunWithoutDirtyTracking(() => OnPropertyChanged(nameof(SelectedSshAgentKeyChoice)));
+                return;
+            }
+
+            _selectedSshAgentKeyChoice = value;
+            OnPropertyChanged();
+            SshAgentKeyFingerprint = value.Fingerprint;
+        }
+    }
+
+    partial void OnSshAgentKeyFingerprintChanged(string? value)
+    {
+        // A pick from the list already is the selection; anything else (hydration) must be shown.
+        if (_selectedSshAgentKeyChoice is not null && _selectedSshAgentKeyChoice.Fingerprint == value)
+        {
+            return;
+        }
+
+        RebuildSshAgentKeyChoices();
+    }
+
+    /// <summary>
+    /// Rebuilds the list from the last probe and the saved fingerprint. The selected entry exists
+    /// before the control sees the new list, and the saved value is kept even when no loaded key
+    /// matches it (agent down, probe failed, key not loaded).
+    /// </summary>
+    private void RebuildSshAgentKeyChoices()
+    {
+        RunWithoutDirtyTracking(() =>
+        {
+            _isRebuildingSshAgentKeyChoices = true;
+            try
+            {
+                List<SshAgentKeyChoice> choices = [new(null, L("ServerDialogSshAgentKeyAny"))];
+                choices.AddRange(_loadedAgentKeys.Select(key => new SshAgentKeyChoice(
+                    key.Fingerprint,
+                    string.Format(
+                        CultureInfo.CurrentCulture,
+                        L("ServerDialogSshAgentKeyItem"),
+                        string.IsNullOrWhiteSpace(key.Comment) ? L("ServerDialogSshAgentKeyNoComment") : key.Comment,
+                        key.KeyType,
+                        key.Fingerprint))));
+
+                // A blank value means "any key", like null.
+                string? saved = HasChosenSshAgentKey ? SshAgentKeyFingerprint : null;
+                SshAgentKeyChoice? selected = choices.FirstOrDefault(
+                    choice => string.Equals(choice.Fingerprint, saved, StringComparison.Ordinal));
+                if (selected is null)
+                {
+                    selected = new SshAgentKeyChoice(
+                        saved,
+                        string.Format(CultureInfo.CurrentCulture, L("ServerDialogSshAgentKeyNotLoaded"), saved));
+                    choices.Add(selected);
+                }
+
+                _selectedSshAgentKeyChoice = selected;
+                _sshAgentKeyChoices = choices;
+                OnPropertyChanged(nameof(SshAgentKeyChoices));
+                OnPropertyChanged(nameof(SelectedSshAgentKeyChoice));
+            }
+            finally
+            {
+                _isRebuildingSshAgentKeyChoices = false;
+            }
+        });
+    }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(RequiresSshUsername))]
@@ -906,7 +1235,7 @@ public partial class ServerDialogViewModel : ObservableValidator
         SshAgentPreference preference = _sshAgentPreference;
         Func<SshAgentPreference, SshAgentRegistry> registryFactory = AgentRegistryFactory;
 
-        IReadOnlyList<(string Name, int KeyCount)>? agents;
+        IReadOnlyList<ProbedAgent>? agents;
         try
         {
             agents = await Task.Run(() => ProbeAgents(registryFactory(preference)));
@@ -926,7 +1255,11 @@ public partial class ServerDialogViewModel : ObservableValidator
 
         (SshAgentChipState state, string text) = agents is null
             ? (SshAgentChipState.Off, L("ServerDialogAgentChipOff"))
-            : DescribeAgents(agents);
+            : DescribeAgents([.. agents.Select(agent => (agent.Name, agent.Keys.Count))]);
+
+        // The chip text is the last thing a probe writes: whoever waits on it finds the list ready.
+        _loadedAgentKeys = MergeKeysByFingerprint(agents);
+        RebuildSshAgentKeyChoices();
         AgentChipState = state;
         AgentChipText = text;
     }
@@ -954,13 +1287,28 @@ public partial class ServerDialogViewModel : ObservableValidator
         _agentProbeGeneration++;
         AgentChipState = SshAgentChipState.Off;
         AgentChipText = "";
+        _loadedAgentKeys = [];
+        RebuildSshAgentKeyChoices();
     }
 
-    /// <summary>The available agents and how many identities each holds. Blocking; run off the UI thread.</summary>
-    private static IReadOnlyList<(string Name, int KeyCount)> ProbeAgents(SshAgentRegistry registry) =>
+    /// <summary>One identity an agent reported, with the fingerprint the session stores for it.</summary>
+    private sealed record ProbedAgentKey(string AgentName, string Comment, string KeyType, string Fingerprint);
+
+    private sealed record ProbedAgent(string Name, IReadOnlyList<ProbedAgentKey> Keys);
+
+    /// <summary>The available agents and the identities each holds. Blocking; run off the UI thread.</summary>
+    private static IReadOnlyList<ProbedAgent> ProbeAgents(SshAgentRegistry registry) =>
         registry.GetAvailableAgents()
-            .Select(agent => (agent.Name, KeyCount: SafeGetIdentityCount(agent)))
+            .Select(agent => new ProbedAgent(agent.Name, SafeGetIdentities(agent)))
             .ToList();
+
+    /// <summary>A key held by two agents is one choice: the session names the key, not where it lives.</summary>
+    private static IReadOnlyList<ProbedAgentKey> MergeKeysByFingerprint(IReadOnlyList<ProbedAgent>? agents) =>
+        agents is null
+            ? []
+            : [.. agents
+                .SelectMany(agent => agent.Keys)
+                .DistinctBy(key => key.Fingerprint, StringComparer.Ordinal)];
 
     private (SshAgentChipState State, string Text) DescribeAgents(IReadOnlyList<(string Name, int KeyCount)> counts)
     {
@@ -981,15 +1329,20 @@ public partial class ServerDialogViewModel : ObservableValidator
             string.Format(CultureInfo.CurrentCulture, L("ServerDialogAgentChipOk"), displayAgent, totalKeys));
     }
 
-    private static int SafeGetIdentityCount(ISshAgent agent)
+    private static IReadOnlyList<ProbedAgentKey> SafeGetIdentities(ISshAgent agent)
     {
         try
         {
-            Task<int> task = Task.Run(() => agent.GetIdentities().Count);
+            Task<IReadOnlyList<ProbedAgentKey>> task = Task.Run<IReadOnlyList<ProbedAgentKey>>(() =>
+                [.. agent.GetIdentities().Select(key => new ProbedAgentKey(
+                    agent.Name,
+                    key.Comment,
+                    key.KeyType,
+                    SshAgentKeyFingerprints.Compute(key.PublicKeyBlob)))]);
             if (!task.Wait(TimeSpan.FromMilliseconds(AgentIdentityProbeTimeoutMs)))
             {
                 FileLogger.Warn($"SSH agent {agent.Name}: identity lookup timed out.");
-                return 0;
+                return [];
             }
 
             return task.GetAwaiter().GetResult();
@@ -997,7 +1350,7 @@ public partial class ServerDialogViewModel : ObservableValidator
         catch (Exception ex)
         {
             FileLogger.Warn($"SSH agent {agent.Name}: identity lookup failed: {ex.GetBaseException().Message}");
-            return 0;
+            return [];
         }
     }
 
@@ -1510,15 +1863,46 @@ public partial class ServerDialogViewModel : ObservableValidator
         // test or letting the agent chip probe must not claim the profile was edited.
         nameof(AgentChipState),
         nameof(AgentChipText),
+        nameof(SshAgentKeyChoices),
         nameof(TestChipState),
         nameof(TestChipText),
         nameof(IsTestingReachability),
         nameof(IsTestingRdpConnection),
+
+        // Derived from the fields above and refreshed with them; never an edit of its own.
+        nameof(CredentialLookupNoticeText),
+        nameof(ShowCredentialLookupNotice),
+        nameof(ExecutionTrustNoticeText),
+        nameof(ShowExecutionTrustNotice),
+        nameof(ShowAgentKeyForwardingWarning),
+        nameof(HasChosenSshAgentKey),
+        nameof(SshAgentKeyHelpText),
+        nameof(AgentKeyForwardingWarningText),
     };
 
     protected override void OnPropertyChanged(System.ComponentModel.PropertyChangedEventArgs e)
     {
         base.OnPropertyChanged(e);
+
+        if (!CredentialLookupConfirmed
+            && IsEditMode
+            && e.PropertyName is not (nameof(CredentialLookupNoticeText) or nameof(ShowCredentialLookupNotice) or nameof(IsDirty)))
+        {
+            base.OnPropertyChanged(NoticeTextChanged);
+        }
+
+        if (e.PropertyName == nameof(ConnectionType))
+        {
+            base.OnPropertyChanged(ShowCredentialLookupNoticeChanged);
+        }
+
+        // Every field can change what the session would run, so each change refreshes the notice.
+        // The refresh raises through the base class, which does not come back here: no recursion.
+        // The derived names are excluded all the same, so a refresh is never answered by another.
+        if (e.PropertyName is not (nameof(ExecutionTrustNoticeText) or nameof(ShowExecutionTrustNotice) or nameof(IsDirty)))
+        {
+            RaiseExecutionTrustNoticeChanged();
+        }
 
         if (_isInitializing) return;
         if (e.PropertyName is null) return;
@@ -2388,6 +2772,30 @@ public partial class ServerDialogViewModel : ObservableValidator
     }
 
     /// <summary>
+    /// The shell executable to save: nothing for a blank field, and nothing for a profile that
+    /// named none and still shows the default shell.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="FromDto"/> shows the default shell for a profile that names none. Saving that
+    /// back would give the profile an executable it never had, which is a payload, and a payload
+    /// on an unconfirmed profile is what the execution gate asks about. A profile whose seed had
+    /// an executable, or a user who typed another one, is saved as typed.
+    /// </remarks>
+    private string? LocalShellExecutableToStore()
+    {
+        if (string.IsNullOrWhiteSpace(LocalShellExecutable))
+        {
+            return null;
+        }
+
+        bool seedNamedNone = _seed is not null && string.IsNullOrWhiteSpace(_seed.LocalShellExecutable);
+        return seedNamedNone
+            && string.Equals(LocalShellExecutable.Trim(), AppConstants.DefaultLocalShellExecutable, StringComparison.OrdinalIgnoreCase)
+                ? null
+                : LocalShellExecutable;
+    }
+
+    /// <summary>
     /// Maps the current ViewModel state to a flat DTO for persistence.
     /// </summary>
     public ServerProfileDto ToDto()
@@ -2400,7 +2808,8 @@ public partial class ServerDialogViewModel : ObservableValidator
         {
             DisplayName = DisplayName,
             Origin = Origin,
-            ExecutionConfirmed = true,
+            ExecutionConfirmed = ExecutionConfirmed,
+            CredentialLookupConfirmed = CredentialLookupConfirmed,
             RemoteServer = RemoteServer,
             RemotePort = RemotePort,
             LocalPort = LocalPort,
@@ -2429,6 +2838,7 @@ public partial class ServerDialogViewModel : ObservableValidator
             SshCompression = SshCompression,
             SshX11Forwarding = SshX11Forwarding,
             SshAgentForwarding = SshAgentForwarding,
+            SshAgentKeyFingerprint = SshAgentKeyFingerprint,
             SocksProxyPort = SocksProxyPort,
             RemoteBindPort = RemoteBindPort,
             RemoteLocalPort = RemoteLocalPort,
@@ -2436,7 +2846,7 @@ public partial class ServerDialogViewModel : ObservableValidator
             PostConnectSteps = [.. PostConnectSteps.Select(step => step.ToModel())],
             PostConnectCommand = PostConnectCommand,
             PostConnectDelayMs = PostConnectDelayMs,
-            LocalShellExecutable = string.IsNullOrWhiteSpace(LocalShellExecutable) ? null : LocalShellExecutable,
+            LocalShellExecutable = LocalShellExecutableToStore(),
             LocalShellArguments = string.IsNullOrWhiteSpace(LocalShellArguments) ? null : LocalShellArguments,
             LocalShellWorkingDirectory = string.IsNullOrWhiteSpace(LocalShellWorkingDirectory) ? null : LocalShellWorkingDirectory,
             LocalShellElevated = ElevationMode != Core.Models.ElevationMode.None,
@@ -2622,6 +3032,8 @@ public partial class ServerDialogViewModel : ObservableValidator
             ? new ServerDialogViewModel()
             : new ServerDialogViewModel(monitorEnumerator);
         vm._seed = dto;
+        vm.CredentialLookupConfirmed = dto.CredentialLookupConfirmed;
+        vm.ExecutionConfirmed = dto.ExecutionConfirmed;
         vm._isInitializing = true;
         vm.IsEditMode = true;
         vm.IsProtocolSelected = true;
@@ -2653,6 +3065,7 @@ public partial class ServerDialogViewModel : ObservableValidator
         vm.SshCompression = dto.SshCompression;
         vm.SshX11Forwarding = dto.SshX11Forwarding;
         vm.SshAgentForwarding = dto.SshAgentForwarding;
+        vm.SshAgentKeyFingerprint = dto.SshAgentKeyFingerprint;
         vm.SocksProxyPort = dto.SocksProxyPort;
         vm.RemoteBindPort = dto.RemoteBindPort;
         vm.RemoteLocalPort = dto.RemoteLocalPort;

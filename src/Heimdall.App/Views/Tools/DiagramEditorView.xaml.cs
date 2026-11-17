@@ -418,7 +418,8 @@ public partial class DiagramEditorView : UserControl, IToolView, IRecoverableUns
 
         foreach (var path in paths)
         {
-            var entry = new MenuItem { Header = Path.GetFileName(path), ToolTip = path };
+            var entry = new MenuItem { ToolTip = path };
+            LiteralAccessText.SetLiteral(entry, Path.GetFileName(path));
             var captured = path;
             entry.Click += (_, _) => OpenDocument(captured);
             recent.Items.Add(entry);

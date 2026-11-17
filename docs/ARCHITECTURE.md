@@ -319,15 +319,17 @@ All connection operations return an `ISessionResult` (defined in `Heimdall.Core/
 
 **Solution**: Two-tier approach using SSH exec channels alongside the SFTP session:
 
-**Tier 1 - Automatic fallback** (transparent to user):
-Every file operation catches typed permission-denied exceptions (`SftpPermissionDeniedException`, plus local `UnauthorizedAccessException` for temp-file paths), then retries via SSH exec:
-- Upload: SFTP to `/tmp/` → `sudo tee` to target; cleanup runs as a separate `sudo rm -f` command from a `finally` path
-- Download: `sudo cat` via SSH exec
+**Tier 1 - Fallback on a refused operation** (gated):
+Every file operation catches the server's typed permission-denied exception (`SftpPermissionDeniedException`; a local `UnauthorizedAccessException` does not escalate). Before any sudo call, `SftpSudoFallbackGate` decides from the effective mode (`AppSettings.SftpSudoFallback` capped by `SftpSudoFallbackPolicy`, read from `HKLM\Software\Policies\Heimdall` `SftpSudoFallbackMax`): Never refuses, Ask asks once per `SftpSudoConsentScope` (an action, a transfer job, a batch, an edit session, an editor document), Automatic retries without a question except a delete. Listings not started by the user (pane mount, follow-SSH-directory, refresh after an operation) never ask. A funnel guard test keeps every escalation site behind the gate. Then the operation is retried via SSH exec:
+- Upload: the content is staged in a private 0700 directory of the connecting user under `$TMPDIR` (default `/tmp`); one sudo call installs it into a private directory beside the destination and renames it over the target (`PrivilegedFileTransfer`); a replaced file keeps its owner, mode, timestamps and xattrs, a new file is published with mode 0644 where the file system allows it (group from a setgid folder; a folder's default ACL wins)
+- Download: a script run as root reads the file without following a symbolic link and returns it base64-encoded
 - Edit: delegates to `RemoteFileEditor.EditFileSudoAsync`
-- Chmod/Rename/Delete/Mkdir: `sudo chmod`/`mv`/`rm`/`mkdir` via SSH exec
+- Chmod: a script run as root (`PrivilegedFileCommands.BuildNoFollowChmodBody`) changes a directory from inside it after checking it is the listed entry, and a regular file through a hard link in a private root-only directory beside it; a symbolic link or a special file is refused; GNU coreutils required
+- Mkdir and rename: `BuildHeldMkdirBody` and `BuildHeldRenameBody` walk to the parent with `HeldParentWalk` and act from the held folder (`mkdir --`, `mv -nT`/`mv -T`; without Replace, an existing name exits 78); the existence probes before a rename read the path as given. Delete: `PrivilegedFileCommands.BuildHeldDeleteBody` walks to the parent with `HeldParentWalk` and removes the entry by its last name from the held folder (`rm -f` for a file, refused if a folder took its name; `rm -rf` for a folder); it asks first and, like chmod, needs GNU coreutils on the server. In delete and chmod batches, `SudoBatchGuard` stops calling sudo after a failure no later entry can change; every sudo is started as `env LC_ALL=C sudo` (`PrivilegedFileCommands.SudoProgram`; the upload's outer script exports `LC_ALL=C` itself), so the messages it classifies are English on every server
 
 **Tier 2 - "Browse as root" toggle** (user-initiated):
-Toolbar toggle button switches directory listing from SFTP `ListDirectory` to `sudo ls -la --time-style=long-iso` via SSH exec. Enables browsing ANY directory regardless of permissions.
+Listing only: it never lets a write skip the question, it is disabled under Never, and a yes to a listing question turns it on.
+Toolbar toggle button switches directory listing from SFTP `ListDirectory` to `sudo find -H <dir> -mindepth 1 -maxdepth 1 -printf` with NUL-delimited records via SSH exec (`SudoDirectoryListing`). Enables browsing ANY directory regardless of permissions.
 
 **Key design decisions and pitfalls encountered**:
 
@@ -336,7 +338,7 @@ Toolbar toggle button switches directory listing from SFTP `ListDirectory` to `s
 - **Escalation must stay typed**: SSH.NET can surface broad `SshException("Failure")` messages for many non-permission conditions. The sudo path intentionally does not substring-match generic failures; false negatives are safer than privileged operations on unrelated errors.
 - **Remote edit sessions cache trust**: sudo edit upload uses the `PinnedFingerprintVerifier` resolved at file-open time. Host-key rotation during an edit raises `HostKeyRotatedDuringUpload`, closes the edit session, and does not re-run TOFU on every save.
 - **Upload tasks are owned**: `RemoteFileEditor` tracks the active upload task per edit session, propagates cancellation through `CloseEdit`/`Dispose`, and observes task faults.
-- **`ls -la` output parsing**: The `--time-style=long-iso` format produces **8 columns** (permissions, links, owner, group, size, date, time, name). Early parser expected 9 columns and silently skipped all entries. Filename column must be the last split part to handle spaces.
+- **`ls -la` output parsing** (historical: the listing now uses `find -printf` records, see Tier 2): The `--time-style=long-iso` format produces **8 columns** (permissions, links, owner, group, size, date, time, name). Early parser expected 9 columns and silently skipped all entries. Filename column must be the last split part to handle spaces.
 - **Sudo toggle hidden for FTP**: FTP sessions have no SSH channel, so the sudo button is collapsed.
 
 ### 16. Recursive N-Pane Split System
@@ -692,7 +694,7 @@ ConnectionService.ConnectAsync(server)
         |       +-- EmbeddedSftpView: file browser panel
         |               +-- SftpSessionBundle: SftpClient (file ops) + SshClient (sudo exec)
         |               +-- RemoteFileEditor: FileSystemWatcher auto-upload (2s debounce)
-        |               +-- Sudo fallback: permission denied -> sudo cat/sudo tee via SSH exec
+        |               +-- Sudo fallback: permission denied -> staged install / no-follow read via SSH exec
         |
         +-- Citrix?
         |       +-- EmbeddedCitrixView: StoreBrowse session tab

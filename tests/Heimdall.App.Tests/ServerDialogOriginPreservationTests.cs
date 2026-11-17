@@ -147,6 +147,181 @@ public sealed class ServerDialogOriginPreservationTests
         Assert.True(dto.ExecutionConfirmed);
     }
 
+    // An imported profile that runs something stays untrusted through the Edit dialog: renaming it
+    // and saving must not mark its payload as vetted.
+    [Fact]
+    public async Task EditServer_ImportedProfile_Rename_PersistsUntrusted()
+    {
+        ServerProfileDto stored = new()
+        {
+            Id = "server-1",
+            DisplayName = "Imported shell",
+            ConnectionType = "LOCAL",
+            RemoteServer = "localhost",
+            LocalShellExecutable = "evil.exe",
+            ExecutionConfirmed = false
+        };
+        await using ServerListFixture fixture = await ServerListFixture.CreateAsync(stored, stored);
+        fixture.ViewModel.LoadServers(await fixture.ConfigManager.LoadServersAsync(), new AppSettings());
+        fixture.DialogService.ReturnSubmittedViewModel = true;
+        fixture.DialogService.DuringServerDialogAsync = dialogVm =>
+        {
+            Assert.True(dialogVm.ShowExecutionTrustNotice);
+            dialogVm.DisplayName = "Renamed";
+            return Task.CompletedTask;
+        };
+
+        bool edited = await fixture.ViewModel.EditServerByIdAsync(stored.Id, CancellationToken.None);
+
+        Assert.True(edited);
+        ServerProfileDto persisted = Assert.Single(await fixture.ConfigManager.LoadServersAsync());
+        Assert.Equal("Renamed", persisted.DisplayName);
+        Assert.Equal("evil.exe", persisted.LocalShellExecutable);
+        Assert.False(persisted.ExecutionConfirmed);
+    }
+
+    // The post-connect editor is shown for SSH only, but the steps of any protocol are saved
+    // and run, so renaming an imported RDP profile must not vet them.
+    [Fact]
+    public async Task EditServer_ImportedRdpWithStep_Rename_PersistsUntrusted()
+    {
+        ServerProfileDto stored = new()
+        {
+            Id = "server-1",
+            DisplayName = "Imported RDP",
+            ConnectionType = "RDP",
+            RemoteServer = "rdp.example.com",
+            PostConnectSteps = [new PostConnectStep { Id = "s1", Input = "calc.exe" }],
+            ExecutionConfirmed = false
+        };
+        await using ServerListFixture fixture = await ServerListFixture.CreateAsync(stored, stored);
+        fixture.ViewModel.LoadServers(await fixture.ConfigManager.LoadServersAsync(), new AppSettings());
+        fixture.DialogService.ReturnSubmittedViewModel = true;
+        fixture.DialogService.DuringServerDialogAsync = dialogVm =>
+        {
+            Assert.True(dialogVm.ShowExecutionTrustNotice);
+            dialogVm.DisplayName = "Renamed";
+            return Task.CompletedTask;
+        };
+
+        await fixture.ViewModel.EditServerByIdAsync(stored.Id, CancellationToken.None);
+
+        ServerProfileDto persisted = Assert.Single(await fixture.ConfigManager.LoadServersAsync());
+        Assert.Equal("Renamed", persisted.DisplayName);
+        Assert.Equal("calc.exe", Assert.Single(persisted.PostConnectSteps).Input);
+        Assert.False(persisted.ExecutionConfirmed);
+    }
+
+    [Fact]
+    public async Task EditServer_ImportedProfile_AllowThenSave_PersistsTrusted()
+    {
+        ServerProfileDto stored = new()
+        {
+            Id = "server-1",
+            DisplayName = "Imported shell",
+            ConnectionType = "LOCAL",
+            RemoteServer = "localhost",
+            LocalShellExecutable = "evil.exe",
+            ExecutionConfirmed = false
+        };
+        await using ServerListFixture fixture = await ServerListFixture.CreateAsync(stored, stored);
+        fixture.ViewModel.LoadServers(await fixture.ConfigManager.LoadServersAsync(), new AppSettings());
+        fixture.DialogService.ReturnSubmittedViewModel = true;
+        fixture.DialogService.DuringServerDialogAsync = dialogVm =>
+        {
+            dialogVm.AllowExecutionTrustCommand.Execute(null);
+            return Task.CompletedTask;
+        };
+
+        await fixture.ViewModel.EditServerByIdAsync(stored.Id, CancellationToken.None);
+
+        Assert.True(Assert.Single(await fixture.ConfigManager.LoadServersAsync()).ExecutionConfirmed);
+    }
+
+    [Fact]
+    public async Task EditServer_CancelledAfterAllow_PersistsNothing()
+    {
+        ServerProfileDto stored = new()
+        {
+            Id = "server-1",
+            DisplayName = "Imported shell",
+            ConnectionType = "LOCAL",
+            RemoteServer = "localhost",
+            LocalShellExecutable = "evil.exe",
+            ExecutionConfirmed = false
+        };
+        await using ServerListFixture fixture = await ServerListFixture.CreateAsync(stored, stored);
+        fixture.ViewModel.LoadServers(await fixture.ConfigManager.LoadServersAsync(), new AppSettings());
+        fixture.DialogService.ReturnSubmittedViewModel = true;
+        fixture.DialogService.ReturnCancelled = true;
+        fixture.DialogService.DuringServerDialogAsync = dialogVm =>
+        {
+            dialogVm.AllowExecutionTrustCommand.Execute(null);
+            Assert.True(dialogVm.ExecutionConfirmed);
+            return Task.CompletedTask;
+        };
+
+        await fixture.ViewModel.EditServerByIdAsync(stored.Id, CancellationToken.None);
+
+        Assert.False(Assert.Single(await fixture.ConfigManager.LoadServersAsync()).ExecutionConfirmed);
+    }
+
+    // "Save as profile" starts from a transient template that carries the DTO default (false).
+    // What the user types into the Add dialog is what they vetted, so the profile is trusted.
+    [Fact]
+    public async Task SaveAdHoc_UserAddsStep_PersistsTrusted()
+    {
+        ServerItemViewModel typed = new()
+        {
+            RemoteServer = "typed.example.com",
+            DisplayName = "typed.example.com",
+            ConnectionType = "SSH"
+        };
+        ServerProfileDto template = MainViewModel.BuildTransientProfile(typed, "SSH");
+        await using ServerListFixture fixture = await ServerListFixture.CreateAsync(template);
+        fixture.DialogService.ReturnSubmittedViewModel = true;
+        fixture.DialogService.DuringServerDialogAsync = dialogVm =>
+        {
+            Assert.False(dialogVm.ShowExecutionTrustNotice);
+            dialogVm.AddPostConnectStepCommand.Execute(null);
+            dialogVm.PostConnectSteps[0].Input = "uptime";
+            return Task.CompletedTask;
+        };
+
+        await fixture.ViewModel.SaveAdHocAsProfileCommand.ExecuteAsync(template);
+
+        ServerProfileDto persisted = Assert.Single(await fixture.ConfigManager.LoadServersAsync());
+        Assert.Equal("uptime", Assert.Single(persisted.PostConnectSteps).Input);
+        Assert.True(persisted.ExecutionConfirmed);
+    }
+
+    // A template that does carry something the gate counts keeps its flag, and the dialog asks.
+    [Fact]
+    public async Task SaveAdHoc_TemplateCarryingAPayload_KeepsTheNotice_AndPersistsUntrusted()
+    {
+        ServerProfileDto template = new()
+        {
+            Id = "adhoc-1",
+            DisplayName = "carrying",
+            RemoteServer = "carrying.example.com",
+            ConnectionType = "SSH",
+            PostConnectSteps = [new PostConnectStep { Id = "s1", Input = "rm -rf /" }]
+        };
+        await using ServerListFixture fixture = await ServerListFixture.CreateAsync(template);
+        fixture.DialogService.ReturnSubmittedViewModel = true;
+        bool noticeShown = false;
+        fixture.DialogService.DuringServerDialogAsync = dialogVm =>
+        {
+            noticeShown = dialogVm.ShowExecutionTrustNotice;
+            return Task.CompletedTask;
+        };
+
+        await fixture.ViewModel.SaveAdHocAsProfileCommand.ExecuteAsync(template);
+
+        Assert.True(noticeShown);
+        Assert.False(Assert.Single(await fixture.ConfigManager.LoadServersAsync()).ExecutionConfirmed);
+    }
+
     [Fact]
     public async Task ServerListViewModel_AddServer_SetsOriginToManual()
     {
@@ -543,6 +718,9 @@ public sealed class ServerDialogOriginPreservationTests
 
         public bool ReturnSubmittedViewModel { get; set; }
 
+        /// <summary>Answers as the user who closes the dialog without saving.</summary>
+        public bool ReturnCancelled { get; set; }
+
         /// <summary>
         /// Runs while the server dialog is still open, before it reports its result.
         /// </summary>
@@ -580,7 +758,7 @@ public sealed class ServerDialogOriginPreservationTests
             ServerProfileDto submittedServer = ReturnSubmittedViewModel && editVm is not null
                 ? editVm.ToDto()
                 : dialogServer;
-            return new ServerDialogResult(submittedServer, true);
+            return ReturnCancelled ? null : new ServerDialogResult(submittedServer, true);
         }
 
         public GatewayDialogResult? GatewayDialogResultToReturn { get; set; }

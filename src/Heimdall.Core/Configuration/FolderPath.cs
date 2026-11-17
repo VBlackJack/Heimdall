@@ -165,6 +165,29 @@ public static class FolderPath
         return true;
     }
 
+    /// <summary>
+    /// The canonical spelling of a folder path: the whole string trimmed, backslashes turned into
+    /// slashes, empty segments dropped, the rest joined with a slash.
+    /// </summary>
+    /// <remarks>
+    /// It mirrors the split the sessions tree applies to a group, so a path canonicalized here is
+    /// the very path the tree builds a folder under. Segments are not trimmed, as in the tree. A
+    /// null, empty or blank path is the top level and yields an empty string.
+    /// </remarks>
+    public static string Canonicalize(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return string.Empty;
+        }
+
+        return string.Join(
+            Separator,
+            path.Trim()
+                .Replace(AlternateSeparator, Separator)
+                .Split(Separator, StringSplitOptions.RemoveEmptyEntries));
+    }
+
     /// <summary>The path above <paramref name="path"/>, or empty for a top-level folder.</summary>
     public static string ParentOf(string path)
     {

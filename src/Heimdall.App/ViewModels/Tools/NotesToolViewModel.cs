@@ -214,15 +214,59 @@ internal sealed partial class NotesToolViewModel : ObservableObject, IDisposable
         await ReloadAsync(CurrentNotePath).ConfigureAwait(true);
     }
 
-    public async Task<string> MoveNoteToFolderAsync(string filePath, string targetFolder)
+    /// <summary>
+    /// Moves a note into <paramref name="targetFolder"/>. When it is the open note, its unsaved
+    /// edits are written first, so the move carries them.
+    /// </summary>
+    /// <returns>The new path, or null when the edits could not be saved and the user kept the note
+    /// open: nothing is moved then.</returns>
+    public async Task<string?> MoveNoteToFolderAsync(string filePath, string targetFolder)
     {
         ThrowIfDisposed();
+        bool movesCurrentNote = string.Equals(CurrentNotePath, filePath, StringComparison.OrdinalIgnoreCase);
+        if (movesCurrentNote && !await TrySaveOrConfirmDiscardAsync().ConfigureAwait(true))
+        {
+            return null;
+        }
+
         var newPath = await _storage.MoveNoteToFolderAsync(filePath, targetFolder).ConfigureAwait(true);
-        var preferredPath = string.Equals(CurrentNotePath, filePath, StringComparison.OrdinalIgnoreCase)
-            ? newPath
-            : CurrentNotePath;
-        await ReloadAsync(preferredPath).ConfigureAwait(true);
+        if (movesCurrentNote)
+        {
+            CurrentNotePath = newPath;
+            RewriteHistoryPath(filePath, newPath);
+
+            // What the editor shows is what the file holds now: after a declined save and a
+            // discard the screen would otherwise keep the discarded text as if it were clean.
+            CurrentMarkdown = await _storage.LoadNoteAsync(newPath).ConfigureAwait(true);
+            IsDirty = false;
+        }
+
+        await ReloadAsync(movesCurrentNote ? newPath : CurrentNotePath).ConfigureAwait(true);
         return newPath;
+    }
+
+    /// <summary>
+    /// Points the back and forward history at <paramref name="newPath"/> wherever it holds
+    /// <paramref name="oldPath"/>, after the note was moved or renamed: otherwise going back would
+    /// open a blank note at the old path and the next autosave would recreate it.
+    /// </summary>
+    private void RewriteHistoryPath(string oldPath, string newPath)
+    {
+        RewriteStack(_backStack, oldPath, newPath);
+        RewriteStack(_forwardStack, oldPath, newPath);
+        UpdateNavigationState();
+    }
+
+    private static void RewriteStack(Stack<string> stack, string oldPath, string newPath)
+    {
+        // Stack enumeration runs from the top, so pushing the reversed copy restores the order.
+        string[] entries = stack.Reverse().Select(entry =>
+            string.Equals(entry, oldPath, StringComparison.OrdinalIgnoreCase) ? newPath : entry).ToArray();
+        stack.Clear();
+        foreach (string entry in entries)
+        {
+            stack.Push(entry);
+        }
     }
 
     public async Task OpenLinkedNoteAsync(string noteReference)
@@ -430,8 +474,10 @@ internal sealed partial class NotesToolViewModel : ObservableObject, IDisposable
                 return;
             }
 
-            var newPath = await _storage.RenameNoteAsync(CurrentNotePath, newName).ConfigureAwait(true);
+            var oldPath = CurrentNotePath;
+            var newPath = await _storage.RenameNoteAsync(oldPath, newName).ConfigureAwait(true);
             CurrentNotePath = newPath;
+            RewriteHistoryPath(oldPath, newPath);
             await ReloadAsync(newPath).ConfigureAwait(true);
             SetStatus(string.Format(L("ToolNotesStatusRenamed"), _storage.GetRelativePath(newPath)));
         }

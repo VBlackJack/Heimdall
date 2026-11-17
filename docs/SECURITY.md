@@ -466,13 +466,91 @@ current Windows identity, since the field that shows and clears it is hidden in 
 ### SFTP sudo escalation and remote editing
 
 SFTP sudo fallback is deliberately narrow. `EmbeddedSftpViewModel`
-escalates only for typed permission-denied exceptions
-(`SftpPermissionDeniedException` and local `UnauthorizedAccessException`);
-generic `SshException("Failure")` messages do not trigger privileged
-operations. This trades occasional manual retry prompts for avoiding sudo
-actions on non-permission failures.
+escalates only when the server refuses an operation for lack of permission
+(`SftpPermissionDeniedException`, or a recursive delete refused for that
+reason); generic `SshException("Failure")` messages do not trigger privileged
+operations, and neither does a local `UnauthorizedAccessException`: that is
+the local file system refusing, and a privileged remote transfer would fail on
+the same local path. This trades occasional manual retry prompts for avoiding
+sudo actions on non-permission failures.
 
-Privileged uploads stream into a private directory beside the destination.
+Whether a refused operation is run again as root is a setting, **SFTP: retry refused
+operations as root** (Settings, SFTP), with three values:
+
+- **Ask first** (the default, also for an upgraded installation): one question per
+  action, declining by default, that names the act and the path ("Upload as
+  root" / "Do not upload"). A transfer job asks once, its folder walk included;
+  a deletion or a permission change of several entries asks once; opening a
+  file in an editor asks once and says that the later saves of that editor are
+  also written as root. A yes to a listing question turns the pane's **sudo**
+  toggle on, so the folder and its refreshes are then listed as root without
+  asking again.
+- **Automatic (no question)**: the earlier behaviour, root without a question, except a
+  delete, which always asks. The security posture card flags this value.
+- **Never**: sudo is never called; the server's refusal is shown with a line
+  saying root was not tried, and a delete counts the entry as not deleted in
+  its summary. The pane's **sudo** toggle is disabled.
+
+Some listings are not started by you and never ask: the first listing when a
+pane opens, a folder followed from the terminal's working directory (a path the
+server prints), and the refresh that follows an operation. Under Ask first they are
+not run as root, the status line says so, and the pane falls back as it does
+for any refused listing. The **sudo** toggle only lists folders as root: it
+never lets a write skip the question.
+
+An organisation can cap the setting with the DWORD value
+`SftpSudoFallbackMax` under `HKLM\Software\Policies\Heimdall` (0 Never, 1 Ask,
+2 Automatic). The stricter of the user's choice and the cap applies, the looser
+choices are disabled in Settings with a line saying the value is managed, and
+the posture card shows the effective value. The value is read once, the first
+time it is needed; a change takes effect after a restart.
+This is not a security boundary: a user with a shell on the server can run
+sudo there directly, and the server's sudoers rules remain the real control.
+
+The sudo password offered is the session's SSH password; it is never typed
+again and never written to a log or a command line. Without a stored password
+(a key or an agent), the command runs only where sudo needs no password.
+
+These escalations are not hidden: from the first one, a "root" badge stays in
+the pane's toolbar until the pane closes, and its list names the latest
+operations attempted as root with their outcome and time; directory listings as
+root are counted apart, on one line. The badge starts again from zero when the
+pane is rebuilt, for example after a reconnect, and the existence checks of a
+rename as root are not counted.
+
+A permission change as root never follows a symbolic link. A directory is
+changed from inside it, after checking that it is still the entry that was
+listed; a regular file is changed through a hard link made in a private
+root-only directory created beside it and removed afterwards. A symbolic link, a
+pipe, a socket, a device, or an entry that changed during the check is refused;
+to change a link's target, browse to the target. This needs GNU coreutils on the
+server, like the privileged transfers, and a folder where root can create that
+directory and a hard link; otherwise the change is refused rather than made by a
+path that could follow a link. The folders that lead to the entry and a hard link
+at its name are handled as described below for the privileged transfers.
+
+In a deletion or a permission change of several entries, a sudo failure that no
+later entry can change (password refused or unavailable, account not allowed to
+use sudo, sudo or a required tool missing, SSH authentication or host key
+refused) stops escalation for the rest of that operation: the remaining entries
+are still tried with the session's own rights, and the summary says how many
+were not tried as root. The detection reads sudo's English messages. Every sudo
+the browser runs is started as `env LC_ALL=C sudo` (the upload exports
+`LC_ALL=C` before its sudo calls), so sudo answers in English whatever the
+server's language, and a refused password stops the batch there too.
+
+Privileged uploads are staged first: the content goes into a private 0700 directory of the
+connecting user under `$TMPDIR` (default `/tmp`), in a 0600 file, and stays there until the
+install finishes. A killed connection or a power loss can leave that directory, and the
+content, on the server. A staged file whose size differs from the expected one is refused
+before any sudo runs, so a read that stopped early is never installed. One sudo call then
+installs the file into a private directory beside the destination and renames it over the
+target. The install is tried first without a password and with no input; the password is
+offered, once, through a pipe that carries only that line, so it can neither reach the file
+nor sit unread on sudo's input. The installer refuses a staging directory that is a symbolic
+link, is not owned by the caller, or can be written by other accounts, and checks, on the
+descriptor it opens, that the staged file is a regular file of the caller with a single link;
+the connecting user's own cleanup removes the staging directory, root never does.
 Accepted replacements use atomic rename; creation-only transfers publish by an
 exclusive hard link (`ln -T`, which refuses a destination that has become a
 directory instead of linking inside it). Cleanup removes only the staging files.
@@ -480,6 +558,60 @@ Ordinary upload and download conflict decisions also reach the final commit: an
 unoccupied target or automatic rename never authorizes replacement. How each
 transport creates a new file is described under "Remote upload commit guarantees"
 below.
+
+The private directory beside the destination is verified before it is used, with the
+same building blocks as the root permission change: root holds the destination's
+folder, creates the directory relative to it, enters it, and checks that it belongs
+to the account running the script, cannot be written by other accounts, sits in the
+held folder on the same device, and is empty; the script then claims it and reaches the
+destination through the held folder, which it checks again just before the rename. A
+privileged read (download, open for edit) enters its private directory the same way.
+A signal ends the script only after its cleanup, which removes only what that run
+created. Command search keeps only the absolute entries of `PATH`, in these scripts,
+the installer and the root permission change. Where the directory cannot come out
+owned by root and unwritable by other accounts (NFS with root squashing, a CIFS or
+vfat mount whose fixed owner is not root or whose fixed mode lets others write), the
+transfer stops with "Transfer failed.", the log gives the reason, and the empty
+directory stays behind. From v2026.072501 to v2026.111501 the scripts entered that
+directory without checking it, so an account able to write in the destination's
+folder could make a root write or read land elsewhere; earlier versions wrote and
+read through the destination's name and followed a symbolic link put there.
+
+Root reaches the folder of an entry it writes, reads, deletes, creates, renames or
+changes the permissions of by walking the path from `/`, one folder at a time, holding each
+folder before the next step. A symbolic link on the way is followed only when the
+link belongs to root or to the account that called sudo, and the folder holding it
+belongs to root or to that account and cannot be written by other accounts; its
+target is walked the same way, and more than 40 links end the walk. Any other link is
+refused, and the message says that a folder above the entry is reached through a link
+another account controls: open the folder by its real path instead. A link owned by
+another account, such as one unpacked from an archive, is refused even in a closed
+folder. A folder whose mode is printed with fewer than three digits is treated as
+open; on a folder with a POSIX ACL the mode bits show the ACL mask, and NFSv4 ACLs are not seen. A root
+delete removes the entry from the folder it holds, by its last name only, refuses a file
+whose name a folder took, and, like the root permission change, needs GNU coreutils on
+the server: on BusyBox or BSD it is refused. A root folder creation and a root rename
+work the same way, from the held folder, and need GNU coreutils too: a name that is
+already taken is reported, never replaced, unless you chose to replace a file. The
+checks that look for an existing name before a rename read the path as given (a
+`!` in it is escaped); the rename itself does not.
+
+A write, read or permission change of an entry with another hard link is refused
+when its folder can be written by an account other than root, the caller and the
+entry's owner; the message says so. Hard
+links in folders closed to other accounts, such as package files under `/usr`,
+keep working.
+
+Limits that remain: an account that can write in the folder can remove the empty work
+directory and make the transfer fail.
+
+A file that replaces another keeps its owner, mode, timestamps and extended
+attributes. A new file written as root belongs to root, with the folder's gid when
+the folder is setgid, and gets mode 0644, as `sudo cp` gave it, where the file system
+allows it. In a folder with a default ACL, the new file keeps what that ACL gives it
+instead. A secret uploaded as a new file is therefore readable by every account until
+you change its permissions; the root permission change does that without following a
+link.
 
 The privileged connection goes through the same cancellable connect as the other
 SFTP connections, so Cancel reaches it during the handshake. Every privileged
@@ -691,6 +823,21 @@ real requests have a 5 s timeout. Pipe-not-found and timeout both return
 setting (`AppSettings.SshAgentPreference`); changes take effect on the next
 connection attempt without app restart.
 
+A session can name the one agent key it offers (`ServerProfileDto.SshAgentKeyFingerprint`,
+a `SHA256:` fingerprint). The key is looked up in the agents Heimdall is set to use before
+any tunnel or prompt, with a bounded wait off the calling thread; an agent that does not
+answer in time holds nothing that can be offered. A key found in no agent is refused with
+no fallback to the other keys. The choice limits agent keys only: it does not affect a
+stored password, a key file or keyboard-interactive sign-in. Gateway hops and tunnels do not
+receive it and still offer every agent key. The value is local to the machine: the shared
+profile sanitizer drops it, every import clears it and the settings export strips it. With
+agent forwarding on, the remote host can still use every key of the agent, whatever key the
+session names. On the Plink path (agent forwarding with Pageant, retry after an embedded
+client failure) the key is handed to Plink as a one-line public key file, only when the key
+is in Pageant, of a type Plink can parse, no key file is configured and Plink is the
+bundled build; otherwise the session is refused. External PuTTY mode with a chosen key is
+refused.
+
 `OpenSshPipeAgent.SendRequest` is built on async pipe I/O
 (`NamedPipeClientStream` opened with `PipeOptions.Asynchronous`) and a
 linked timeout/cancellation token, replacing the best-effort `ReadTimeout`
@@ -797,8 +944,14 @@ without a key, or neither password nor key, since that path goes on to ask for o
 authenticates with a key and no password is untouched** - it never writes the file, so it has nothing
 to protect here, and nothing about key-only connections is claimed by this.
 
+**An empty password answer writes no file.** When a session has a user name but no stored password and no key, the password prompt can be answered with nothing, to sign in with Kerberos or a Pageant key. Heimdall then writes no password file and starts Plink in batch mode (`-batch`), so no prompt can wait on a hidden console and no password is sent. If the server accepts neither method, Plink exits at once and the terminal says why.
+
 Process exit remains the backstop, every path that frees the file goes through one gate so the
 deletion runs exactly once, and a launch that fails or is cancelled releases on the spot.
+
+### Imported profiles that run something
+
+A profile from a file can start a program on this computer (local shell executable, arguments, working directory, elevation; a web console's external program; a Citrix ICA file) or type post-connect commands into a session. Import sets `ExecutionConfirmed` to false, and while it is false Heimdall lists every value it would run, the post-connect commands included, as the dialog notice does (for a session whose only such value is a Citrix ICA file, it names that file in one sentence), and asks before running it. Accepting at connect saves the approval, and the default answer, which is also the one taken while Heimdall is closing, is "Do not run". Editing the profile does not change that: the session dialog shows a notice above its tabs listing every such value, the post-connect steps included even for a protocol whose dialog does not show them, and the profile is marked trusted only by the notice's "Allow to run" button followed by Save, or by accepting that prompt. A profile created in the dialog is trusted.
 
 ### Subprocess argument hardening
 
@@ -1049,7 +1202,7 @@ caller refuses: there is no fallback to a primitive that could replace the desti
   `dotnet format --verify-no-changes`, the blocking test lane (the suite minus
   the cases marked `CIUnstable` or `RequiresDesktop`, which run in two further
   lanes that report their failures without turning the run red), JSON locale
-  parity (every catalogue holds exactly the English key set, currently 6,200+
+  parity (every catalogue holds exactly the English key set, currently 6,400+
   keys each), and an informational `dotnet list package --vulnerable` scan.
 - Dependency scan for manual review: `dotnet list Heimdall.slnx package
   --vulnerable --include-transitive`. CI emits warnings but does not gate on

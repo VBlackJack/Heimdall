@@ -523,6 +523,20 @@ public sealed class TreeInteractionState
             : Theming.DropInsertion.Before;
 
     /// <summary>
+    /// Whether a row must be scrolled into view: its vertical extent is not inside the visible area
+    /// of the tree, or it has no arranged size yet. Only top and bottom are compared; a row that is
+    /// clipped sideways is still on screen.
+    /// </summary>
+    /// <param name="row">The row's bounds, in the same coordinate space as <paramref name="viewport"/>.</param>
+    /// <param name="viewport">The visible area of the tree, scroll bars excluded.</param>
+    public static bool NeedsBringIntoView(Rect row, Rect viewport) =>
+        row.IsEmpty
+        || row.Height <= 0
+        || row.Width <= 0
+        || row.Top < viewport.Top
+        || row.Bottom > viewport.Bottom;
+
+    /// <summary>
     /// Whether <paramref name="dragged"/> can be placed relative to <paramref name="anchor"/>:
     /// a row cannot be positioned relative to itself.
     /// </summary>

@@ -52,6 +52,9 @@ public static class SharedProfileSanitizer
     public static IReadOnlySet<string> KeptProfileProperties { get; } = new HashSet<string>(StringComparer.Ordinal)
     {
         nameof(ServerProfileDto.Id),
+        // Safe to keep: a shared profile is always looked up by host (the lookup checks for a shared
+        // profile first), so the flag has no effect on it.
+        nameof(ServerProfileDto.CredentialLookupConfirmed),
         nameof(ServerProfileDto.DisplayName),
         nameof(ServerProfileDto.Group),
         nameof(ServerProfileDto.ConnectionType),
@@ -105,6 +108,7 @@ public static class SharedProfileSanitizer
         var profile = new ServerProfileDto
         {
             Id = source.Id,
+            CredentialLookupConfirmed = source.CredentialLookupConfirmed,
             DisplayName = source.DisplayName,
             Group = source.Group,
             ConnectionType = connectionType,

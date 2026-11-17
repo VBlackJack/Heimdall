@@ -14,8 +14,10 @@
  * limitations under the License.
  */
 
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Threading;
 using Heimdall.App.UiTests.Infrastructure;
 using Heimdall.App.ViewModels.Dialogs;
@@ -32,6 +34,8 @@ namespace Heimdall.App.UiTests.Views;
 [Collection(DesktopUiCollection.Name)]
 public sealed class DialogInitialFocusTests
 {
+    private const string User32Library = "user32.dll";
+
     [StaFact]
     [Trait("Category", "RequiresDesktop")]
     public void NewTunnelDialog_FocusesTheGatewayList()
@@ -86,6 +90,23 @@ public sealed class DialogInitialFocusTests
                 Dispatcher.CurrentDispatcher.Invoke(DispatcherPriority.ApplicationIdle, new Action(() => { }));
 
                 FrameworkElement expected = Assert.IsAssignableFrom<FrameworkElement>(dialog.FindName(expectedName));
+
+                // Logical focus is set by the dialog itself and does not depend on which process owns the foreground.
+                Assert.True(
+                    ReferenceEquals(expected, FocusManager.GetFocusedElement(dialog)),
+                    $"Expected the logical focus on {expectedName}, found "
+                    + (FocusManager.GetFocusedElement(dialog) is FrameworkElement logical
+                        ? $"{logical.GetType().Name} '{logical.Name}'"
+                        : FocusManager.GetFocusedElement(dialog)?.GetType().Name ?? "nothing")
+                    + ".");
+
+                // Keyboard focus only holds while the dialog window has Win32 focus on this thread; that focus is
+                // per thread and needs no foreground, so it is claimed here instead of relying on the desktop.
+                IntPtr dialogHandle = new WindowInteropHelper(dialog).Handle;
+                SetFocus(dialogHandle);
+                Assert.True(
+                    dialogHandle == GetFocus(),
+                    "The dialog window did not take this thread's Win32 focus (GetFocus returned " + GetFocus() + ", dialog handle " + dialogHandle + ").");
                 Assert.True(
                     ReferenceEquals(expected, Keyboard.FocusedElement),
                     $"Expected the keyboard on {expectedName} (enabled {expected.IsEnabled}, visible {expected.IsVisible}, focusable {expected.Focusable}), found "
@@ -100,4 +121,10 @@ public sealed class DialogInitialFocusTests
             }
         });
     }
+
+    [DllImport(User32Library)]
+    private static extern IntPtr SetFocus(IntPtr hWnd);
+
+    [DllImport(User32Library)]
+    private static extern IntPtr GetFocus();
 }

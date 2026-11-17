@@ -1531,6 +1531,94 @@ public sealed class SplitServiceTests : IDisposable
         Assert.Equal("Connected", pane.Status);
     }
 
+    /// <summary>
+    /// A pane reconnect connects first and creates its terminal afterwards, so no page exists to
+    /// measure. The Plink launch that follows cannot resize, so it has to start at the size the
+    /// replaced terminal had: the size is left under the key the connect runs with.
+    /// </summary>
+    [Fact]
+    public async Task ReconnectPane_LeavesThePreviousPaneSizeUnderTheConnectKey()
+    {
+        const int previousColumns = 132;
+        const int previousRows = 41;
+        TerminalSizeHints hints = new();
+        TerminalSizeLookup? lookupAtConnect = null;
+        RecordingConnectionService connectionService = new()
+        {
+            // What the SSH handler's size lookup does for this connect: no view exists, so the hint decides.
+            OnSshConnect = server => lookupAtConnect = TerminalSizeReport.ResolveAsync(
+                null, TimeSpan.FromMilliseconds(100), CancellationToken.None, hints, server.Id).GetAwaiter().GetResult(),
+        };
+        SplitService sut = CreateSplitService(connectionService);
+        sut.SizeHints = hints;
+
+        await _configManager.SaveServersAsync(new List<ServerProfileDto>
+        {
+            new()
+            {
+                Id = "server-1",
+                DisplayName = "Server 1",
+                ConnectionType = "SSH",
+                RemoteServer = "server.example.com",
+                SshUsername = "operator"
+            }
+        });
+
+        const string paneSessionId = "ssh-server-1-pane-session";
+        SessionPaneModel pane = MakePane(paneId: "pane-1", serverId: paneSessionId, connectionType: "SSH");
+        pane.OriginalServerId = "server-1";
+        pane.Title = "Server 1";
+        pane.HostControl = new SizedHost(new TerminalSize(previousColumns, previousRows));
+
+        SessionTabViewModel session = new() { RootContent = pane };
+        sut.ActiveSessionsProvider = () => new ObservableCollection<SessionTabViewModel> { session };
+
+        Exception? ex = await Record.ExceptionAsync(() => sut.ReconnectPaneAsync(session, pane.PaneId));
+
+        Assert.Null(ex);
+        Assert.NotNull(lookupAtConnect);
+        Assert.Equal(TerminalSizeSource.PreviousView, lookupAtConnect.Source);
+        Assert.Equal(new TerminalSize(previousColumns, previousRows), lookupAtConnect.Size);
+    }
+
+    /// <summary>
+    /// A reconnect that ends without its connect asking for the size (a failure before the
+    /// launch) must not leave the size behind for a later, unrelated connect of the same pane.
+    /// </summary>
+    [Fact]
+    public async Task FailedReconnect_LeavesNoHint()
+    {
+        TerminalSizeHints hints = new();
+        RecordingConnectionService connectionService = new();
+        SplitService sut = CreateSplitService(connectionService);
+        sut.SizeHints = hints;
+
+        await _configManager.SaveServersAsync(new List<ServerProfileDto>
+        {
+            new()
+            {
+                Id = "server-1",
+                DisplayName = "Server 1",
+                ConnectionType = "SSH",
+                RemoteServer = "server.example.com",
+                SshUsername = "operator"
+            }
+        });
+
+        const string paneSessionId = "ssh-server-1-pane-session";
+        SessionPaneModel pane = MakePane(paneId: "pane-1", serverId: paneSessionId, connectionType: "SSH");
+        pane.OriginalServerId = "server-1";
+        pane.Title = "Server 1";
+        pane.HostControl = new SizedHost(new TerminalSize(132, 41));
+
+        SessionTabViewModel session = new() { RootContent = pane };
+        sut.ActiveSessionsProvider = () => new ObservableCollection<SessionTabViewModel> { session };
+
+        await sut.ReconnectPaneAsync(session, pane.PaneId);
+
+        Assert.Null(hints.PreviousFor(paneSessionId));
+    }
+
     [Fact]
     public async Task ReconnectPaneAsync_UsesPaneProtocolAndStateKey_ForSftpCompanionOfSshProfile()
     {
@@ -2179,6 +2267,12 @@ public sealed class SplitServiceTests : IDisposable
         public void Dispose() => Disposed = true;
     }
 
+    private sealed class SizedHost(TerminalSize size) : IDisposable, ITerminalSizeSource
+    {
+        public TerminalSize? LastKnownTerminalSize { get; } = size;
+        public void Dispose() { }
+    }
+
     private sealed class DisposableHost : IDisposable
     {
         public bool Disposed { get; private set; }
@@ -2299,6 +2393,7 @@ public sealed class SplitServiceTests : IDisposable
             _successfulWinRmSession = successfulWinRmSession;
         }
 
+        public Action<ServerProfileDto>? OnSshConnect { get; init; }
         public bool ConnectInvoked { get; private set; }
         public string? LastProtocol { get; private set; }
         public ServerProfileDto? LastServer { get; private set; }
@@ -2319,6 +2414,7 @@ public sealed class SplitServiceTests : IDisposable
         {
             SshStateAtDispatch = _stateMachine?.GetState(server.Id);
             LastSshSettings = settings;
+            OnSshConnect?.Invoke(server);
             return RecordConnectAsync("SSH", server, ct);
         }
 

@@ -289,6 +289,123 @@ public sealed partial class SessionCoordinatorPreMountTests
         Assert.Null(harness.StateMachine.GetStateData("session-rdp-forced-external"));
     }
 
+    private static TaskCompletionSource NewExitSignal() => new();
+
+    private static async Task<SessionTabViewModel> LaunchForcedExternalAsync(
+        TestHarness harness,
+        string sessionId,
+        Task? exited)
+    {
+        ControlledProtocolHandler rdpHandler = harness.GetHandler("RDP");
+        rdpHandler.Reset();
+        rdpHandler.Result.SetResult(new ConnectionResult(true, null, null, ExternalClientExited: exited));
+
+        BulkConnectOutcome outcome = await harness.RunPipelineAsync(
+            harness.CreateServer("RDP"),
+            sessionId,
+            RdpModeOverride.ForceExternal).WaitAsync(TestTimeout);
+
+        Assert.Equal(BulkConnectOutcomeStatus.Success, outcome.Status);
+        return harness.Main.Connection.ActiveSessions.Single(
+            t => string.Equals(t.ServerId, sessionId, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ForcedExternal_ClientExits_TabReadsDisconnectedAndStopsCounting()
+    {
+        using TestHarness harness = TestHarness.Create();
+        TaskCompletionSource exit = NewExitSignal();
+
+        SessionTabViewModel tab = await LaunchForcedExternalAsync(harness, "session-external-exit", exit.Task);
+        Assert.Equal(SessionStatusTokens.LaunchedExternalClient, tab.Status);
+        Assert.True(ConnectionStateSets.IsConnected(tab.Status));
+
+        exit.SetResult();
+
+        await WaitUntilAsync(() => tab.Status == SessionStatusTokens.Disconnected);
+        Assert.False(ConnectionStateSets.IsConnected(tab.Status));
+        Assert.Contains(tab, harness.Main.Connection.ActiveSessions);
+    }
+
+    [Fact]
+    public async Task ForcedExternal_ClientExitedBeforeTheTabExisted_TabReadsDisconnected()
+    {
+        using TestHarness harness = TestHarness.Create();
+
+        SessionTabViewModel tab = await LaunchForcedExternalAsync(
+            harness,
+            "session-external-already-exited",
+            Task.CompletedTask);
+
+        await WaitUntilAsync(() => tab.Status == SessionStatusTokens.Disconnected);
+        Assert.False(ConnectionStateSets.IsConnected(tab.Status));
+    }
+
+    [Fact]
+    public async Task ForcedExternal_SameProfileTwice_EachTabFollowsItsOwnClient()
+    {
+        using TestHarness harness = TestHarness.Create();
+        TaskCompletionSource firstExit = NewExitSignal();
+        TaskCompletionSource secondExit = NewExitSignal();
+
+        SessionTabViewModel first = await LaunchForcedExternalAsync(harness, "session-external-first", firstExit.Task);
+        SessionTabViewModel second = await LaunchForcedExternalAsync(harness, "session-external-second", secondExit.Task);
+
+        firstExit.SetResult();
+
+        await WaitUntilAsync(() => first.Status == SessionStatusTokens.Disconnected);
+        Assert.Equal(SessionStatusTokens.LaunchedExternalClient, second.Status);
+    }
+
+    [Fact]
+    public async Task ForcedExternal_TabClosedFirst_NothingIsWritten()
+    {
+        using TestHarness harness = TestHarness.Create();
+        TaskCompletionSource exit = NewExitSignal();
+        SessionTabViewModel tab = await LaunchForcedExternalAsync(harness, "session-external-closed", null);
+        int statusChanges = 0;
+        tab.PrimaryPane.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(Heimdall.Core.Models.SessionPaneModel.Status))
+            {
+                statusChanges++;
+            }
+        };
+
+        tab.MarkClosed();
+        Task follower = harness.Main.Session.FollowExternalClient(tab, exit.Task);
+        exit.SetResult();
+        await follower.WaitAsync(TestTimeout);
+
+        Assert.Equal(0, statusChanges);
+        Assert.Equal(SessionStatusTokens.LaunchedExternalClient, tab.Status);
+    }
+
+    [Fact]
+    public async Task ForcedExternal_StatusMovedOn_IsNotOverwritten()
+    {
+        using TestHarness harness = TestHarness.Create();
+        TaskCompletionSource exit = NewExitSignal();
+        SessionTabViewModel tab = await LaunchForcedExternalAsync(harness, "session-external-moved-on", null);
+        tab.Status = SessionStatusTokens.Error;
+
+        Task follower = harness.Main.Session.FollowExternalClient(tab, exit.Task);
+        exit.SetResult();
+        await follower.WaitAsync(TestTimeout);
+
+        Assert.Equal(SessionStatusTokens.Error, tab.Status);
+    }
+
+    [Fact]
+    public async Task ForcedExternal_ExitNotObservable_TabKeepsTheLaunchedStatus()
+    {
+        using TestHarness harness = TestHarness.Create();
+
+        SessionTabViewModel tab = await LaunchForcedExternalAsync(harness, "session-external-unobservable", null);
+
+        Assert.Equal(SessionStatusTokens.LaunchedExternalClient, tab.Status);
+    }
+
     [Fact]
     public async Task RunConnectionPipelineAsync_SshFailure_RemovesPlaceholderTab()
     {

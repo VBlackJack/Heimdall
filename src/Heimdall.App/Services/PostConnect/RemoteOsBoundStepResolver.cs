@@ -30,4 +30,10 @@ internal sealed class RemoteOsBoundStepResolver(IPostConnectStepResolver inner, 
 
     public Task<PostConnectResolveResult> ResolveAsync(PostConnectStep step, CancellationToken ct)
         => _inner.ResolveAsync(step, remoteOs, ct);
+
+    public Task<IReadOnlyDictionary<string, string>> GetLinkedTitlesAsync(
+        IReadOnlyCollection<string> libraryIds,
+        string? culture,
+        CancellationToken ct)
+        => _inner.GetLinkedTitlesAsync(libraryIds, culture, ct);
 }

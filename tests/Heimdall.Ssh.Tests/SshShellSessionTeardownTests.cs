@@ -16,6 +16,7 @@
 
 using System.Diagnostics;
 using System.Reflection;
+using System.Threading.Channels;
 using Microsoft.Extensions.Time.Testing;
 using Renci.SshNet;
 
@@ -32,21 +33,11 @@ public sealed class SshShellSessionTeardownTests
     /// </summary>
     private static readonly TimeSpan TeardownTimeout = TimeSpan.FromSeconds(30);
 
-    /// <summary>
-    /// Longest the caller may block while the read loop is stuck. Well below
-    /// the session's own two-second final wait, which is what the test proves
-    /// the caller does not pay for.
-    /// </summary>
-    private static readonly TimeSpan MaxCallerBlockingTime = TimeSpan.FromSeconds(1.5);
+    /// <summary>Pinned value of the caller's graceful wait for the read loop.</summary>
+    private static readonly TimeSpan ExpectedGracefulWait = TimeSpan.FromMilliseconds(500);
 
-    /// <summary>
-    /// Amount the controllable clock jumps per pump iteration. Comfortably past
-    /// the session's final wait so a single applied step releases it.
-    /// </summary>
-    private static readonly TimeSpan ClockStep = TimeSpan.FromSeconds(5);
-
-    /// <summary>Gap between two clock pump iterations.</summary>
-    private static readonly TimeSpan ClockPumpInterval = TimeSpan.FromMilliseconds(10);
+    /// <summary>Pinned value of the background final wait.</summary>
+    private static readonly TimeSpan ExpectedFinalWait = TimeSpan.FromSeconds(2);
 
     [Fact]
     public void Dispose_OnUnconnectedSession_DoesNotThrow()
@@ -132,7 +123,7 @@ public sealed class SshShellSessionTeardownTests
     [Fact]
     public async Task Disconnect_StuckReadLoop_DoesNotBlockCallerForFinalWait()
     {
-        var timeProvider = new FakeTimeProvider();
+        var timeProvider = new TimerRecordingTimeProvider();
         var session = CreateSessionWithReadLoop(Task.Delay(Timeout.InfiniteTimeSpan), timeProvider);
         var disconnectCount = 0;
         var notified = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -142,15 +133,70 @@ public sealed class SshShellSessionTeardownTests
             notified.TrySetResult();
         };
 
-        var stopwatch = Stopwatch.StartNew();
-        session.Disconnect();
-        stopwatch.Stop();
+        TaskCompletionSource returned = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        Thread caller = new(() =>
+        {
+            try
+            {
+                session.Disconnect();
+                returned.TrySetResult();
+            }
+            catch (Exception ex)
+            {
+                returned.TrySetException(ex);
+            }
+        })
+        {
+            IsBackground = true,
+        };
+        caller.Start();
+
+        // The caller's graceful wait is the first timer made through the clock.
+        TimeSpan gracefulDue = await timeProvider.NextTimerDueTimeAsync(CancellationToken.None)
+            .AsTask().WaitAsync(TeardownTimeout);
+        Assert.Equal(SshShellSession.StopReadLoopGraceful, gracefulDue);
+        Assert.False(returned.Task.IsCompleted);
+
+        timeProvider.Advance(SshShellSession.StopReadLoopGraceful);
+        await returned.Task.WaitAsync(TeardownTimeout);
+        Assert.False(
+            notified.Task.IsCompleted,
+            "Disconnect returned only after the clean disconnect was announced: the caller paid the final wait.");
+
+        TimeSpan finalDue = await timeProvider.NextTimerDueTimeAsync(CancellationToken.None)
+            .AsTask().WaitAsync(TeardownTimeout);
+        Assert.Equal(SshShellSession.StopReadLoopFinal, finalDue);
+        timeProvider.Advance(SshShellSession.StopReadLoopFinal);
+        await notified.Task.WaitAsync(TeardownTimeout);
 
         Assert.True(
-            stopwatch.Elapsed < MaxCallerBlockingTime,
-            $"Disconnect took {stopwatch.ElapsedMilliseconds} ms with a stuck read loop.");
+            notified.Task.IsCompleted,
+            "Background teardown did not complete clean disconnect notification.");
+        Assert.Equal(1, Volatile.Read(ref disconnectCount));
+    }
 
-        await PumpClockUntilCompletedAsync(timeProvider, notified.Task, TeardownTimeout);
+    // Lengthening either wait is a deliberate decision: update these expectations with it.
+    [Fact]
+    public void TeardownWaits_KeepTheirDocumentedValues()
+    {
+        Assert.Equal(ExpectedGracefulWait, SshShellSession.StopReadLoopGraceful);
+        Assert.Equal(ExpectedFinalWait, SshShellSession.StopReadLoopFinal);
+    }
+
+    [Fact]
+    public async Task Disconnect_StuckReadLoop_WithRealClock_ReturnsAndNotifiesOnce()
+    {
+        var session = CreateSessionWithReadLoop(Task.Delay(Timeout.InfiniteTimeSpan));
+        var disconnectCount = 0;
+        var notified = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        session.Disconnected += _ =>
+        {
+            Interlocked.Increment(ref disconnectCount);
+            notified.TrySetResult();
+        };
+
+        await Task.Run(session.Disconnect).WaitAsync(TeardownTimeout);
+        await notified.Task.WaitAsync(TeardownTimeout);
 
         Assert.True(
             notified.Task.IsCompleted,
@@ -210,27 +256,6 @@ public sealed class SshShellSessionTeardownTests
         Assert.Equal(1, stream.DisposeCount);
     }
 
-    /// <summary>
-    /// Advances the controllable clock until <paramref name="completion"/> finishes.
-    /// The session registers its final-wait timer from a thread-pool thread, so a
-    /// single advance could land before that registration and leave the delay
-    /// pending for ever. Repeating the advance makes the wait independent of when
-    /// the pool happens to schedule the background teardown; the wall-clock bound
-    /// is only a failure backstop, never the synchronisation point.
-    /// </summary>
-    private static async Task PumpClockUntilCompletedAsync(
-        FakeTimeProvider timeProvider,
-        Task completion,
-        TimeSpan timeout)
-    {
-        var stopwatch = Stopwatch.StartNew();
-        while (!completion.IsCompleted && stopwatch.Elapsed < timeout)
-        {
-            timeProvider.Advance(ClockStep);
-            await Task.WhenAny(completion, Task.Delay(ClockPumpInterval)).ConfigureAwait(false);
-        }
-    }
-
     private static SshShellSession CreateSessionWithReadLoop(
         Task readLoopTask,
         TimeProvider? timeProvider = null)
@@ -267,6 +292,57 @@ public sealed class SshShellSessionTeardownTests
             BindingFlags.Instance | BindingFlags.NonPublic);
         Assert.NotNull(method);
         method!.Invoke(session, null);
+    }
+
+    /// <summary>
+    /// Records the due time of every timer the session creates, in creation order,
+    /// so a test can wait for a specific wait to be registered and then move the
+    /// clock exactly that far. A timer made idle and armed later through
+    /// <see cref="ITimer.Change"/> is recorded when it is armed.
+    /// </summary>
+    private sealed class TimerRecordingTimeProvider : FakeTimeProvider
+    {
+        private readonly Channel<TimeSpan> _dueTimes = Channel.CreateUnbounded<TimeSpan>();
+
+        public ValueTask<TimeSpan> NextTimerDueTimeAsync(CancellationToken cancellationToken)
+        {
+            return _dueTimes.Reader.ReadAsync(cancellationToken);
+        }
+
+        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+        {
+            ITimer timer = base.CreateTimer(callback, state, dueTime, period);
+            Record(dueTime);
+            return new RecordingTimer(timer, Record);
+        }
+
+        private void Record(TimeSpan dueTime)
+        {
+            if (dueTime != Timeout.InfiniteTimeSpan)
+            {
+                _dueTimes.Writer.TryWrite(dueTime);
+            }
+        }
+
+        private sealed class RecordingTimer(ITimer inner, Action<TimeSpan> record) : ITimer
+        {
+            public bool Change(TimeSpan dueTime, TimeSpan period)
+            {
+                bool changed = inner.Change(dueTime, period);
+                record(dueTime);
+                return changed;
+            }
+
+            public void Dispose()
+            {
+                inner.Dispose();
+            }
+
+            public ValueTask DisposeAsync()
+            {
+                return inner.DisposeAsync();
+            }
+        }
     }
 
     private sealed class FakeShellStream(Func<bool> isGateHeld) : ISshShellStream

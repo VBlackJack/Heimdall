@@ -88,6 +88,28 @@ someone.** It can mean the machine was rebuilt, or that something is impersonati
 prompt the highlighted button is **Reject**: pressing Enter refuses the connection. Accepting the
 new key, or trusting it for this session only, takes a deliberate click.
 
+### Choosing the SSH agent key a session offers
+
+By default a session offers every key of your SSH agent (Pageant or the Windows OpenSSH Agent) to the server. A server that closes a connection after a few failed attempts can run out of attempts before the right key comes up. Name the key to avoid that.
+
+1. Open the session in the session dialog, on the SSH/SFTP credentials card.
+2. Pick the key in the **Agent key** list. The default is **Any key (default)**.
+3. Save.
+
+What to expect:
+
+- Only that key is offered to the server. A stored password, a key file and keyboard-interactive sign-in work as before: the choice limits agent keys only.
+- If the key is not loaded in an agent Heimdall is set to use, the connection is refused before any prompt, with a message that names the key's SHA256 fingerprint. Heimdall does not fall back to the other keys. See [Troubleshooting](TROUBLESHOOTING.md#ssh-agent-key-not-loaded).
+- It applies to the SSH terminal, to SFTP sessions and to the SFTP side panel of a session. It does not apply to gateway hops and tunnels: they still offer every agent key.
+- The choice stays on this machine. It is not written to shared session files, any import clears it, and the settings export leaves it out. An older Heimdall ignores it and offers every key.
+- With agent forwarding on, the remote host can still use every key of the agent. The dialog warns you.
+- A session that goes through Plink (agent forwarding with Pageant, or the retry after a failure of the embedded client) needs the key in Pageant, of a type Plink can be limited to (not a hardware "sk" key), and no key file configured on the session. See [Troubleshooting](TROUBLESHOOTING.md#ssh-agent-key-plink-refused).
+- External PuTTY mode cannot be limited to one key: a session that names one is refused there.
+
+### Signing in through Plink with Kerberos or a Pageant key
+
+When a session has a user name, no stored password and no key file, and the connection goes through Plink (after the embedded client failed to authenticate, or with agent forwarding and Pageant), Heimdall asks "SSH password required". Leave the answer empty to sign in with Kerberos (your Windows sign-in) or a key held by Pageant. Heimdall then starts Plink with no password file and in batch mode: no password file is written and no password is sent. If the server accepts neither, the terminal says so; connect again and type your password, or store it in the session. Cancel still cancels. A server that asks a second factor after Kerberos is not supported on this path, and the SFTP side panel cannot sign in this way (it uses the same embedded client and cannot ask anything). When the retry through Plink starts, the SFTP panel that "Auto-open SFTP panel on SSH connection" would have opened is not opened and the terminal uses the full width of the tab when the tab is displayed; the status bar tells you so once connected. An SFTP session can still be opened by hand, in its own tab or split beside the terminal; with Kerberos it cannot sign in either. A session that goes through Plink only for agent forwarding with Pageant keeps its SFTP panel. See [Troubleshooting](TROUBLESHOOTING.md#ssh-plink-kerberos-pageant).
+
 ### Web consoles
 
 Choose **Web** when you add a session, for an iLO, an iDRAC, a switch or a NAS admin page. Type
@@ -247,6 +269,14 @@ remote machine on the other.
   keeps a local copy while that editor is open and uploads each save; closing the pane while a
   file is still open there asks you first. If the server refuses an upload (permission denied,
   for example), the pane says why once and tries again the next time you save.
+- When the server refuses an action, Heimdall asks before it runs it again as root (sudo). The
+  question names the act and the path, and **Enter** declines. A transfer, a multiple delete or
+  an edit session asks once. Settings, SFTP, **retry refused operations as root** offers
+  **Ask first** (the default), **Automatic (no question)** (a delete still asks) and **Never**. Your
+  organisation may have limited this choice.
+- When Heimdall does an action as root, a **root** badge appears
+  next to the **sudo** toggle and stays until you close the pane. Click it, or press Enter on it,
+  to see the latest actions attempted as root and whether they worked.
 - In the built-in editor, **Ctrl+S** saves and **Ctrl+W** closes. A file that is not UTF-8 opens
   as Latin-1 and says so in the editor's status bar.
 

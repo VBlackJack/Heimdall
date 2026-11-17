@@ -35,6 +35,16 @@ public sealed class OpenPortsService : IOpenPortsService
     private const int AfInet6 = 23;
     private const int TcpTableOwnerPidAll = 5;
     private const int UdpTableOwnerPid = 1;
+    private const uint ErrorInsufficientBuffer = 122;
+    private const int CountHeaderSize = sizeof(int);
+
+    /// <summary>
+    /// Maximum number of sized table calls per read. Connections and sockets can be added between the size
+    /// query and the read, so the sized call may answer ERROR_INSUFFICIENT_BUFFER with a larger requirement.
+    /// Four attempts absorb several consecutive growth races on a busy machine while still bounding the work;
+    /// after that the read fails exactly as it did before the retry existed.
+    /// </summary>
+    internal const int MaxTableReadAttempts = 4;
 
     private readonly Func<IReadOnlyList<Tcp4RawRow>> _loadTcp4;
     private readonly Func<IReadOnlyList<Udp4RawRow>> _loadUdp4;
@@ -43,7 +53,12 @@ public sealed class OpenPortsService : IOpenPortsService
     private readonly Func<int, string> _resolveProcessName;
 
     public OpenPortsService()
-        : this(LoadTcp4Rows, LoadUdp4Rows, LoadTcp6Rows, LoadUdp6Rows, ResolveProcessName)
+        : this(
+            () => LoadTcp4Rows(Win32OpenPortsTableNative.Instance),
+            () => LoadUdp4Rows(Win32OpenPortsTableNative.Instance),
+            () => LoadTcp6Rows(Win32OpenPortsTableNative.Instance),
+            () => LoadUdp6Rows(Win32OpenPortsTableNative.Instance),
+            ResolveProcessName)
     {
     }
 
@@ -121,148 +136,189 @@ public sealed class OpenPortsService : IOpenPortsService
         }
     }
 
-    private static IReadOnlyList<Tcp4RawRow> LoadTcp4Rows()
-    {
-        var result = new List<Tcp4RawRow>();
-        var bufferSize = 0;
-        GetExtendedTcpTable(IntPtr.Zero, ref bufferSize, true, AfInet, TcpTableOwnerPidAll, 0);
-        if (bufferSize == 0)
-        {
-            return result;
-        }
-
-        var buffer = Marshal.AllocHGlobal(bufferSize);
-        try
-        {
-            if (GetExtendedTcpTable(buffer, ref bufferSize, true, AfInet, TcpTableOwnerPidAll, 0) != 0)
-            {
-                return result;
-            }
-
-            var rowCount = Marshal.ReadInt32(buffer);
-            var rowPtr = buffer + 4;
-            var rowSize = Marshal.SizeOf<MibTcpRowOwnerPid>();
-            for (var i = 0; i < rowCount; i++)
+    internal static IReadOnlyList<Tcp4RawRow> LoadTcp4Rows(IOpenPortsTableNative native)
+        => LoadRows(
+            native,
+            isUdp: false,
+            AfInet,
+            Marshal.SizeOf<MibTcpRowOwnerPid>(),
+            rowPtr =>
             {
                 var row = Marshal.PtrToStructure<MibTcpRowOwnerPid>(rowPtr);
-                result.Add(new Tcp4RawRow(row.dwLocalAddr, row.dwLocalPort, row.dwRemoteAddr, row.dwRemotePort, row.dwState, row.dwOwningPid));
-                rowPtr += rowSize;
-            }
-        }
-        finally
-        {
-            Marshal.FreeHGlobal(buffer);
-        }
+                return new Tcp4RawRow(row.dwLocalAddr, row.dwLocalPort, row.dwRemoteAddr, row.dwRemotePort, row.dwState, row.dwOwningPid);
+            });
 
-        return result;
-    }
-
-    private static IReadOnlyList<Udp4RawRow> LoadUdp4Rows()
-    {
-        var result = new List<Udp4RawRow>();
-        var bufferSize = 0;
-        GetExtendedUdpTable(IntPtr.Zero, ref bufferSize, true, AfInet, UdpTableOwnerPid, 0);
-        if (bufferSize == 0)
-        {
-            return result;
-        }
-
-        var buffer = Marshal.AllocHGlobal(bufferSize);
-        try
-        {
-            if (GetExtendedUdpTable(buffer, ref bufferSize, true, AfInet, UdpTableOwnerPid, 0) != 0)
-            {
-                return result;
-            }
-
-            var rowCount = Marshal.ReadInt32(buffer);
-            var rowPtr = buffer + 4;
-            var rowSize = Marshal.SizeOf<MibUdpRowOwnerPid>();
-            for (var i = 0; i < rowCount; i++)
+    internal static IReadOnlyList<Udp4RawRow> LoadUdp4Rows(IOpenPortsTableNative native)
+        => LoadRows(
+            native,
+            isUdp: true,
+            AfInet,
+            Marshal.SizeOf<MibUdpRowOwnerPid>(),
+            rowPtr =>
             {
                 var row = Marshal.PtrToStructure<MibUdpRowOwnerPid>(rowPtr);
-                result.Add(new Udp4RawRow(row.dwLocalAddr, row.dwLocalPort, row.dwOwningPid));
-                rowPtr += rowSize;
-            }
-        }
-        finally
-        {
-            Marshal.FreeHGlobal(buffer);
-        }
+                return new Udp4RawRow(row.dwLocalAddr, row.dwLocalPort, row.dwOwningPid);
+            });
 
-        return result;
-    }
-
-    private static IReadOnlyList<Tcp6RawRow> LoadTcp6Rows()
-    {
-        var result = new List<Tcp6RawRow>();
-        var bufferSize = 0;
-        GetExtendedTcpTable(IntPtr.Zero, ref bufferSize, true, AfInet6, TcpTableOwnerPidAll, 0);
-        if (bufferSize == 0)
-        {
-            return result;
-        }
-
-        var buffer = Marshal.AllocHGlobal(bufferSize);
-        try
-        {
-            if (GetExtendedTcpTable(buffer, ref bufferSize, true, AfInet6, TcpTableOwnerPidAll, 0) != 0)
-            {
-                return result;
-            }
-
-            var rowCount = Marshal.ReadInt32(buffer);
-            var rowPtr = buffer + 4;
-            var rowSize = Marshal.SizeOf<MibTcp6RowOwnerPid>();
-            for (var i = 0; i < rowCount; i++)
+    internal static IReadOnlyList<Tcp6RawRow> LoadTcp6Rows(IOpenPortsTableNative native)
+        => LoadRows(
+            native,
+            isUdp: false,
+            AfInet6,
+            Marshal.SizeOf<MibTcp6RowOwnerPid>(),
+            rowPtr =>
             {
                 var row = Marshal.PtrToStructure<MibTcp6RowOwnerPid>(rowPtr);
-                result.Add(new Tcp6RawRow((byte[])row.LocalAddr.Clone(), row.dwLocalPort, (byte[])row.RemoteAddr.Clone(), row.dwRemotePort, row.dwState, row.dwOwningPid));
-                rowPtr += rowSize;
-            }
-        }
-        finally
-        {
-            Marshal.FreeHGlobal(buffer);
-        }
+                return new Tcp6RawRow((byte[])row.LocalAddr.Clone(), row.dwLocalPort, (byte[])row.RemoteAddr.Clone(), row.dwRemotePort, row.dwState, row.dwOwningPid);
+            });
 
-        return result;
-    }
+    internal static IReadOnlyList<Udp6RawRow> LoadUdp6Rows(IOpenPortsTableNative native)
+        => LoadRows(
+            native,
+            isUdp: true,
+            AfInet6,
+            Marshal.SizeOf<MibUdp6RowOwnerPid>(),
+            rowPtr =>
+            {
+                var row = Marshal.PtrToStructure<MibUdp6RowOwnerPid>(rowPtr);
+                return new Udp6RawRow((byte[])row.LocalAddr.Clone(), row.dwLocalPort, row.dwOwningPid);
+            });
 
-    private static IReadOnlyList<Udp6RawRow> LoadUdp6Rows()
+    private static List<TRow> LoadRows<TRow>(
+        IOpenPortsTableNative native,
+        bool isUdp,
+        int addressFamily,
+        int rowSize,
+        Func<IntPtr, TRow> readRow)
     {
-        var result = new List<Udp6RawRow>();
-        var bufferSize = 0;
-        GetExtendedUdpTable(IntPtr.Zero, ref bufferSize, true, AfInet6, UdpTableOwnerPid, 0);
-        if (bufferSize == 0)
+        var result = new List<TRow>();
+        if (!TryReadTable(native, isUdp, addressFamily, out var buffer, out var capacity))
         {
             return result;
         }
 
-        var buffer = Marshal.AllocHGlobal(bufferSize);
         try
         {
-            if (GetExtendedUdpTable(buffer, ref bufferSize, true, AfInet6, UdpTableOwnerPid, 0) != 0)
+            if (capacity < CountHeaderSize)
             {
                 return result;
             }
 
             var rowCount = Marshal.ReadInt32(buffer);
-            var rowPtr = buffer + 4;
-            var rowSize = Marshal.SizeOf<MibUdp6RowOwnerPid>();
+
+            // The header count is untrusted: the rows it announces must fit in the buffer, otherwise the table
+            // is treated as failed, like a read failure.
+            if (rowCount < 0 || CountHeaderSize + ((long)rowCount * rowSize) > capacity)
+            {
+                return result;
+            }
+
+            var rowPtr = buffer + CountHeaderSize;
             for (var i = 0; i < rowCount; i++)
             {
-                var row = Marshal.PtrToStructure<MibUdp6RowOwnerPid>(rowPtr);
-                result.Add(new Udp6RawRow((byte[])row.LocalAddr.Clone(), row.dwLocalPort, row.dwOwningPid));
+                result.Add(readRow(rowPtr));
                 rowPtr += rowSize;
             }
         }
         finally
         {
-            Marshal.FreeHGlobal(buffer);
+            native.Free(buffer);
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Size-then-read protocol with a bounded retry on ERROR_INSUFFICIENT_BUFFER. On success the caller owns the
+    /// returned buffer and must free it; on any failure every buffer allocated here has already been freed.
+    /// </summary>
+    private static bool TryReadTable(
+        IOpenPortsTableNative native,
+        bool isUdp,
+        int addressFamily,
+        out IntPtr buffer,
+        out int capacity)
+    {
+        buffer = IntPtr.Zero;
+        capacity = 0;
+
+        // The result of the size query is ignored on purpose: only the reported size matters.
+        var bufferSize = 0;
+        CallTable(native, isUdp, IntPtr.Zero, ref bufferSize, addressFamily);
+        if (bufferSize <= 0)
+        {
+            return false;
+        }
+
+        for (var attempt = 1; ; attempt++)
+        {
+            var allocatedSize = bufferSize;
+            var candidate = native.Allocate(allocatedSize);
+            var handedOver = false;
+            uint status;
+            try
+            {
+                // On ERROR_INSUFFICIENT_BUFFER the API writes the size it now requires into bufferSize.
+                status = CallTable(native, isUdp, candidate, ref bufferSize, addressFamily);
+                if (status == 0)
+                {
+                    buffer = candidate;
+                    capacity = bufferSize > 0 ? Math.Min(allocatedSize, bufferSize) : allocatedSize;
+                    handedOver = true;
+                    return true;
+                }
+            }
+            finally
+            {
+                if (!handedOver)
+                {
+                    native.Free(candidate);
+                }
+            }
+
+            if (status != ErrorInsufficientBuffer || attempt >= MaxTableReadAttempts || bufferSize <= 0)
+            {
+                return false;
+            }
+        }
+    }
+
+    private static uint CallTable(IOpenPortsTableNative native, bool isUdp, IntPtr table, ref int size, int addressFamily)
+        => isUdp
+            ? native.GetExtendedUdpTable(table, ref size, addressFamily)
+            : native.GetExtendedTcpTable(table, ref size, addressFamily);
+
+    /// <summary>
+    /// Native table access and buffer ownership, so the size-then-read protocol can be tested without the network.
+    /// </summary>
+    internal interface IOpenPortsTableNative
+    {
+        /// <summary>Calls GetExtendedTcpTable for the owner-pid, all-states table; returns the Win32 status.</summary>
+        uint GetExtendedTcpTable(IntPtr table, ref int size, int addressFamily);
+
+        /// <summary>Calls GetExtendedUdpTable for the owner-pid table; returns the Win32 status.</summary>
+        uint GetExtendedUdpTable(IntPtr table, ref int size, int addressFamily);
+
+        /// <summary>Allocates an unmanaged buffer of the given size.</summary>
+        IntPtr Allocate(int size);
+
+        /// <summary>Frees a buffer returned by <see cref="Allocate"/>.</summary>
+        void Free(IntPtr buffer);
+    }
+
+    private sealed class Win32OpenPortsTableNative : IOpenPortsTableNative
+    {
+        internal static Win32OpenPortsTableNative Instance { get; } = new();
+
+        public uint GetExtendedTcpTable(IntPtr table, ref int size, int addressFamily)
+            => OpenPortsService.GetExtendedTcpTable(table, ref size, true, addressFamily, TcpTableOwnerPidAll, 0);
+
+        public uint GetExtendedUdpTable(IntPtr table, ref int size, int addressFamily)
+            => OpenPortsService.GetExtendedUdpTable(table, ref size, true, addressFamily, UdpTableOwnerPid, 0);
+
+        public IntPtr Allocate(int size) => Marshal.AllocHGlobal(size);
+
+        public void Free(IntPtr buffer) => Marshal.FreeHGlobal(buffer);
     }
 
     [DllImport("iphlpapi.dll", SetLastError = true)]

@@ -39,6 +39,7 @@ using Heimdall.Core.SessionDiagnostics;
 using Heimdall.Core.SessionHealth;
 using Heimdall.Core.Ssh;
 using Heimdall.Core.StateMachine;
+using Heimdall.Core.Utilities;
 using Microsoft.Win32;
 using KnownHostsImporter = Heimdall.App.Services.Import.KnownHostsImporter;
 
@@ -47,7 +48,7 @@ namespace Heimdall.App.ViewModels;
 /// <summary>
 /// ViewModel for the server list with filtering, sorting, and connection actions.
 /// </summary>
-public partial class ServerListViewModel : ObservableObject, IDisposable, ISessionRestoreHost
+public partial class ServerListViewModel : ObservableObject, IDisposable, ISessionRestoreHost, ISessionRestoreServerResolver
 {
     internal static readonly TimeSpan SearchFilterDebounceDelay = TimeSpan.FromMilliseconds(300);
 
@@ -105,10 +106,11 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     internal IReadOnlyList<ServerItemViewModel> AllServers => _allServers;
 
     /// <summary>
-    /// Every saved profile in the tree's display order (sort order, then name), whatever the tree
-    /// is filtered to. For lists outside the tree that want the tree's order without its filter.
+    /// Every saved profile in the order the tree lists them (folders in tree order, sub-folders
+    /// before a folder's own sessions, each folder's sessions by sort order then name), whatever
+    /// the tree is filtered to. For lists outside the tree that want the tree's order without its filter.
     /// </summary>
-    internal IReadOnlyList<ServerItemViewModel> InventoryInTreeOrder => _stableServerOrder;
+    internal IReadOnlyList<ServerItemViewModel> InventoryInTreeOrder => _treeOrderServers;
     private readonly Dictionary<string, ServerItemViewModel> _healthServerById =
         new(StringComparer.Ordinal);
     private readonly Dictionary<string, long> _lastHealthGenerationByServerId =
@@ -193,9 +195,11 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
 
     /// <summary>
     /// Raised when a connection result is ready and a session tab should be created.
-    /// Parameters: sessionId, originalServerId, displayName, connectionType, session result.
+    /// Parameters: sessionId, originalServerId, displayName, connectionType, session result,
+    /// RDP mode override, and the task that completes when the external client process Heimdall
+    /// launched has exited (null when none was launched or its end cannot be observed).
     /// </summary>
-    public event Action<string, string, string, string, Core.Models.ISessionResult?, RdpModeOverride>? SessionReady;
+    public event Action<string, string, string, string, Core.Models.ISessionResult?, RdpModeOverride, Task?>? SessionReady;
 
     /// <summary>
     /// Raised when a connect that previously fired
@@ -457,34 +461,47 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     /// <summary>
     /// Confirms and best-effort persists trust for a profile carrying local-execution payload.
     /// </summary>
-    internal async Task<bool> ConfirmAndTrustExecutionAsync(ServerProfileDto profile)
+    /// <remarks>
+    /// The one flag approves every gated value of the profile, post-connect commands included, so
+    /// the question lists all of them as the dialog notice does. Declining is the default answer.
+    /// </remarks>
+    /// <param name="profile">The profile about to connect.</param>
+    /// <param name="linkedTitles">The titles of its linked Command Library entries, by entry id.</param>
+    internal async Task<bool> ConfirmAndTrustExecutionAsync(
+        ServerProfileDto profile,
+        IReadOnlyDictionary<string, string>? linkedTitles = null)
     {
         ArgumentNullException.ThrowIfNull(profile);
 
-        // The prompt names what would run: for a web profile the program and its arguments, for
-        // a Citrix profile the ICA file the shell would open, which is not a program at all.
-        string body;
-        if (string.Equals(profile.ConnectionType, "CITRIX", StringComparison.OrdinalIgnoreCase))
+        if (IsExternalCommandTooLong(profile))
         {
-            body = _localizer.Format(
-                "ConfirmExecutionImportedIcaBody",
-                profile.DisplayName,
-                profile.CitrixIcaFilePath ?? string.Empty);
+            // A description cut short could hide the end of the arguments from the one who
+            // confirms, so nothing is asked. The error shown here is the whole report: the
+            // connect that asked reads the same predicate and adds no "you chose" status line.
+            _dialogService.ShowError(
+                _localizer["ConfirmExecutionImportedTitle"],
+                _localizer[WebExternalLaunch.CommandTooLongErrorKey]);
+            return false;
         }
-        else
-        {
-            string executable = string.Equals(profile.ConnectionType, "WEB", StringComparison.OrdinalIgnoreCase)
-                ? $"{profile.WebExternalProgram} {profile.WebExternalArguments}".Trim()
-                : DescribeLocalShellExecution(profile, _localizer);
-            body = _localizer.Format(
-                "ConfirmExecutionImportedBody",
-                profile.DisplayName,
-                executable);
-        }
+
+        // What the question describes: the profile as the next load would see it, so a legacy
+        // post-connect command is shown as the step it becomes.
+        ServerProfileDto shown = AsLoaded(profile);
+        string body = IsSingleIcaFilePayload(shown)
+            ? _localizer.Format(
+                IcaFileBodyKey,
+                VisibleProfileName(shown),
+                UntrustedText.MakeVisible(shown.CitrixIcaFilePath, UntrustedText.NoLengthLimit))
+            : _localizer.Format(
+                ExecutionTrustBodyKey,
+                VisibleProfileName(shown),
+                ExecutionTrustDescriber.Describe(shown, linkedTitles ?? EmptyLinkedTitles, _localizer));
         bool confirmed = await _dialogService.ShowConfirmAsync(
             _localizer["ConfirmExecutionImportedTitle"],
             body,
-            "warning");
+            "warning",
+            _localizer["ConfirmExecutionTrustAllow"],
+            _localizer["ConfirmExecutionTrustDecline"]);
 
         if (!confirmed)
         {
@@ -492,10 +509,90 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         }
 
         profile.ExecutionConfirmed = true;
-        await PersistExecutionTrustAsync(profile);
+        await PersistExecutionTrustAsync(profile, shown);
 
         return true;
     }
+
+    /// <summary>
+    /// Whether the external command of a WEB profile is too long to be listed whole, the one case
+    /// where the trust question is refused before it is asked.
+    /// </summary>
+    internal static bool IsExternalCommandTooLong(ServerProfileDto profile)
+        => string.Equals(profile.ConnectionType, "WEB", StringComparison.OrdinalIgnoreCase)
+            && !WebExternalLaunch.FitsDescription(profile.WebExternalProgram, profile.WebExternalArguments);
+
+    private const string ExecutionTrustBodyKey = "ConfirmExecutionTrustBody";
+
+    private const string IcaFileBodyKey = "ConfirmExecutionImportedIcaBody";
+
+    /// <summary>
+    /// Whether the only value the gate asks about is a Citrix ICA file path.
+    /// </summary>
+    /// <remarks>
+    /// The one-sentence ICA body then shows the whole payload on a single line. Any other gated
+    /// value, an enabled post-connect step above all, needs the list of rows, because the one
+    /// flag approves it too. <paramref name="profile"/> is the profile as <see cref="AsLoaded"/>
+    /// returns it, so a legacy command has already become a step and counts here.
+    /// </remarks>
+    private static bool IsSingleIcaFilePayload(ServerProfileDto profile)
+        => string.Equals(profile.ConnectionType, "CITRIX", StringComparison.OrdinalIgnoreCase)
+            && ProfileExecutionTrust.CarriesLocalExecutionPayload(profile)
+            && !ProfileExecutionTrust.CarriesPostConnectPayload(profile);
+
+    /// <summary>
+    /// The profile as the next load would see it: a legacy post-connect command turned into the
+    /// steps it becomes, the way loading does, so a command is listed and compared whether or not
+    /// the object came through loading. The profile itself when there is nothing to turn.
+    /// </summary>
+    private static ServerProfileDto AsLoaded(ServerProfileDto profile)
+    {
+        if (profile.PostConnectSteps is not { Count: 0 } || string.IsNullOrWhiteSpace(profile.PostConnectCommand))
+        {
+            return profile;
+        }
+
+        ServerProfileDto copy = profile.CloneFaithfully();
+        PostConnectMigration.Migrate(copy);
+        return copy;
+    }
+
+    /// <summary>
+    /// What the execution gate asks about for the type of <paramref name="profile"/>, as one
+    /// comparable value: the fields the gate tests for that type and the post-connect steps.
+    /// </summary>
+    private static string GatedValues(ServerProfileDto profile)
+    {
+        string type = (profile.ConnectionType ?? string.Empty).ToUpperInvariant();
+        object?[] own = type switch
+        {
+            "LOCAL" =>
+            [
+                profile.LocalShellExecutable,
+                profile.LocalShellArguments,
+                profile.LocalShellWorkingDirectory,
+                profile.EffectiveElevationMode
+            ],
+            "WEB" => [profile.WebOpenExternally, profile.WebExternalProgram, profile.WebExternalArguments],
+            "CITRIX" => [profile.CitrixIcaFilePath],
+            _ => []
+        };
+
+        return System.Text.Json.JsonSerializer.Serialize(
+            new object?[] { type, own, PostConnectFingerprint.Compute(profile.PostConnectSteps) });
+    }
+
+    /// <summary>No linked entry titles known: the rows name each linked entry by its id.</summary>
+    private static readonly IReadOnlyDictionary<string, string> EmptyLinkedTitles =
+        new Dictionary<string, string>(StringComparer.Ordinal);
+
+    /// <summary>
+    /// The display name of a profile as the header of a trust question shows it: written out
+    /// visibly and escaped as the rows are, so a name from a file can neither start a row of its
+    /// own nor close the quotes the body puts around it.
+    /// </summary>
+    private static string VisibleProfileName(ServerProfileDto profile)
+        => ExecutionTrustDescriber.Visible(profile.DisplayName);
 
     /// <summary>
     /// Describes everything a LOCAL profile would run, matching what the execution gate counts:
@@ -516,7 +613,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         parts.Add(
             string.IsNullOrWhiteSpace(profile.LocalShellExecutable)
                 ? DefaultLocalShellExecutable
-                : MakeVisible(profile.LocalShellExecutable));
+                : MakeVisible(profile.LocalShellExecutable, closedByQuote: false));
 
         if (!string.IsNullOrWhiteSpace(profile.LocalShellArguments))
         {
@@ -533,32 +630,51 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
 
     /// <summary>
     /// Makes a value shown in the trust prompt unable to break the line or imitate another
-    /// field: line breaks and tabs become visible escapes and a double quote is escaped.
+    /// field: a double quote is escaped (a backslash before it or at the end of the value is
+    /// doubled first, so it cannot cancel the escape), then line breaks and tabs become visible
+    /// escapes. <paramref name="closedByQuote"/> is false for the program, which the row shows
+    /// bare: only the arguments and the working directory sit between quotes. Any other control, bidi, zero-width, blank-looking or line-separator character is
+    /// then written out by <see cref="UntrustedText"/>, without truncation.
     /// </summary>
-    private static string MakeVisible(string value)
-        => value
-            .Replace("\r", "\\r", StringComparison.Ordinal)
-            .Replace("\n", "\\n", StringComparison.Ordinal)
-            .Replace("\t", "\\t", StringComparison.Ordinal)
-            .Replace("\"", "\\\"", StringComparison.Ordinal);
+    private static string MakeVisible(string value, bool closedByQuote = true)
+        => UntrustedText.MakeVisible(
+            UntrustedText.EscapeForDoubleQuotes(value, closedByQuote)
+                .Replace("\r", "\\r", StringComparison.Ordinal)
+                .Replace("\n", "\\n", StringComparison.Ordinal)
+                .Replace("\t", "\\t", StringComparison.Ordinal),
+            UntrustedText.NoLengthLimit);
 
     /// <summary>
     /// Confirms and best-effort persists trust for imported post-connect commands.
     /// </summary>
-    internal async Task<bool> ConfirmAndTrustPostConnectAsync(ServerProfileDto profile, int commandCount)
+    /// <remarks>
+    /// The header gives the count; the list under it holds every gated value of the profile, so
+    /// accepting approves exactly what was shown. Declining is the default answer.
+    /// </remarks>
+    /// <param name="profile">The profile whose steps are about to run.</param>
+    /// <param name="commandCount">How many steps would run.</param>
+    /// <param name="linkedTitles">The titles of its linked Command Library entries, by entry id.</param>
+    internal async Task<bool> ConfirmAndTrustPostConnectAsync(
+        ServerProfileDto profile,
+        int commandCount,
+        IReadOnlyDictionary<string, string>? linkedTitles = null)
     {
         ArgumentNullException.ThrowIfNull(profile);
 
+        ServerProfileDto shown = AsLoaded(profile);
         string body = _localizer.FormatCount(
             commandCount,
-            "ConfirmPostConnectImportedBodyOne",
-            "ConfirmPostConnectImportedBody",
-            profile.DisplayName,
-            commandCount);
+            "ConfirmPostConnectTrustBodyOne",
+            "ConfirmPostConnectTrustBody",
+            VisibleProfileName(shown),
+            commandCount,
+            ExecutionTrustDescriber.Describe(shown, linkedTitles ?? EmptyLinkedTitles, _localizer));
         bool confirmed = await _dialogService.ShowConfirmAsync(
             _localizer["ConfirmPostConnectImportedTitle"],
             body,
-            "warning");
+            "warning",
+            _localizer["ConfirmExecutionTrustAllow"],
+            _localizer["ConfirmExecutionTrustDecline"]);
 
         if (!confirmed)
         {
@@ -566,7 +682,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         }
 
         profile.ExecutionConfirmed = true;
-        await PersistExecutionTrustAsync(profile);
+        await PersistExecutionTrustAsync(profile, shown);
 
         return true;
     }
@@ -575,27 +691,48 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     /// Asks whether the post-connect commands of a shared session may run. Persists nothing: the
     /// caller records the approval against the commands it was given.
     /// </summary>
-    internal Task<bool> ConfirmSharedPostConnectAsync(ServerProfileDto profile, int commandCount)
+    /// <param name="profile">The shared profile.</param>
+    /// <param name="commandCount">How many steps would run.</param>
+    /// <param name="linkedTitles">The titles of its linked Command Library entries, by entry id.</param>
+    internal Task<bool> ConfirmSharedPostConnectAsync(
+        ServerProfileDto profile,
+        int commandCount,
+        IReadOnlyDictionary<string, string>? linkedTitles = null)
     {
         ArgumentNullException.ThrowIfNull(profile);
 
+        // Every value comes from a file other people can edit: the rows are the describer's, so a
+        // line break, bidi or zero-width character cannot forge one and linked entries are listed.
+        ServerProfileDto shown = AsLoaded(profile);
         string body = _localizer.FormatCount(
             commandCount,
             "ConfirmPostConnectSharedBodyOne",
             "ConfirmPostConnectSharedBody",
-            profile.DisplayName,
+            VisibleProfileName(shown),
             commandCount,
-            string.Join(Environment.NewLine, profile.PostConnectSteps
-                .Where(step => step.Enabled && !string.IsNullOrWhiteSpace(step.Input))
-                .Select(step => step.Input)));
+            ExecutionTrustDescriber.Describe(shown, linkedTitles ?? EmptyLinkedTitles, _localizer));
+
+        // The labeled overload: declining is the default answer and the one taken while the
+        // application closes, where the plain overload would approve and the caller record it.
         return _dialogService.ShowConfirmAsync(
             _localizer["ConfirmPostConnectSharedTitle"],
             body,
-            "warning");
+            "warning",
+            _localizer["ConfirmExecutionTrustAllow"],
+            _localizer["ConfirmExecutionTrustDecline"]);
     }
 
-    private async Task PersistExecutionTrustAsync(ServerProfileDto profile)
+    /// <summary>
+    /// Records the approval on the stored profile, only if the stored profile still carries what
+    /// <paramref name="shown"/> described.
+    /// </summary>
+    /// <remarks>
+    /// When the stored profile changed while the question was open, nothing is written: the
+    /// connection just allowed proceeds with what was shown, and the next connect asks again.
+    /// </remarks>
+    private async Task PersistExecutionTrustAsync(ServerProfileDto profile, ServerProfileDto shown)
     {
+        string shownValues = GatedValues(shown);
         try
         {
             await _configManager.MutateServersAsync(servers =>
@@ -614,12 +751,20 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
                 ServerProfileDto? stored = servers.FirstOrDefault(
                     server => string.Equals(server.Id, inventoryId, StringComparison.Ordinal));
 
-                if (stored is not null)
+                if (stored is null)
                 {
-                    stored.ExecutionConfirmed = true;
+                    return false;
                 }
 
-                return stored is not null;
+                if (!string.Equals(GatedValues(AsLoaded(stored)), shownValues, StringComparison.Ordinal))
+                {
+                    Core.Logging.FileLogger.Warn(
+                        $"Execution-trust for '{profile.DisplayName}' not saved: the stored profile changed after the question was shown.");
+                    return false;
+                }
+
+                stored.ExecutionConfirmed = true;
+                return true;
             });
         }
         catch (Exception ex)
@@ -1121,6 +1266,29 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     IEnumerable<ServerItemViewModel> ISessionRestoreHost.RestorableServers => Servers;
 
     /// <inheritdoc />
+    async Task<IReadOnlyList<ServerItemViewModel>> ISessionRestoreServerResolver.ResolveAsync(
+        IReadOnlyCollection<string> ids)
+    {
+        ArgumentNullException.ThrowIfNull(ids);
+
+        // The same lookup RestoreServerAsync uses: the full inventory, not the filtered projection,
+        // then the shared sources.
+        List<ServerItemViewModel> resolved = [];
+        foreach (string id in ids.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            ServerItemViewModel? server = _allServers.FirstOrDefault(
+                candidate => string.Equals(candidate.Id, id, StringComparison.OrdinalIgnoreCase))
+                ?? await FindSharedServerItemAsync(id);
+            if (server is not null)
+            {
+                resolved.Add(server);
+            }
+        }
+
+        return resolved;
+    }
+
+    /// <inheritdoc />
     Task<bool> ISessionRestoreHost.RestoreServerAsync(
         string originalServerId,
         CancellationToken cancellationToken)
@@ -1157,6 +1325,10 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             {
                 return false;
             }
+
+            // The inventory profile as read, before any credential resolution writes onto the
+            // connection copy: the SFTP companion is decided and built from it.
+            RememberInventoryProfile(serverDto, serverDto.CloneFaithfully());
 
             // Only a connection someone asked for may ask something back. A restore
             // reconnecting on its own must fail quietly rather than raise a modal - or
@@ -1288,6 +1460,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
                     outcome,
                     _localizer["ErrorConnectionTitle"],
                     outcome.ErrorMessage ?? _localizer["ErrorConnectionFailed"]),
+                BulkConnectOutcomeStatus.Declined => ReportDeclinedConnect(serverDto),
                 BulkConnectOutcomeStatus.Cancelled => false,
                 BulkConnectOutcomeStatus.UnsupportedType => false,
                 _ => false
@@ -1295,8 +1468,10 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
 
             // The connection that went ahead without the vault's password failed in turn, and its
             // own message ("connection refused", "authentication failed") replaced the vault's on
-            // the status line. The vault failure is the cause, so it has the last word.
-            if (!connected && quietVaultFailure is not null)
+            // the status line. The vault failure is the cause, so it has the last word. The same
+            // holds for the note that an unconfirmed session was not looked up at all.
+            if (!connected && quietVaultFailure is not null
+                && outcome.Status != BulkConnectOutcomeStatus.Declined)
             {
                 StatusMessageRequested?.Invoke(quietVaultFailure);
             }
@@ -1307,6 +1482,22 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         {
             _connectingServerIds.Remove(server.Id);
         }
+    }
+
+    /// <summary>
+    /// Says on the status line that a connection was not made because the user declined the trust
+    /// question. No modal: declining is a choice, not an error. A command too long to be listed
+    /// was refused with its own error before any question, so it adds nothing.
+    /// </summary>
+    private bool ReportDeclinedConnect(ServerProfileDto serverDto)
+    {
+        if (!IsExternalCommandTooLong(serverDto))
+        {
+            StatusMessageRequested?.Invoke(
+                _localizer.Format("StatusExecutionDeclined", VisibleProfileName(serverDto)));
+        }
+
+        return false;
     }
 
     /// <summary>
@@ -1496,13 +1687,26 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
                     server.DisplayName,
                     serverDto.ConnectionType,
                     result.Session,
-                    rdpModeOverride);
+                    rdpModeOverride,
+                    result.ExternalClientExited);
                 lifecycleHandedOff = result.Session is not null;
                 return new BulkConnectOutcome(
                     BulkConnectOutcomeStatus.Success,
                     null,
                     Authenticated: result.Session is SshSessionResult or SftpSessionBundle,
                     FallbackFrom: result.FallbackFrom);
+            }
+
+            if (result.Declined)
+            {
+                // A choice, not a failure: the row keeps the state it had (the finally block
+                // tears down the attempt's own state) and no error is raised.
+                if (sessionStartFired)
+                {
+                    SessionStartFailed?.Invoke(sessionId);
+                }
+
+                return new BulkConnectOutcome(BulkConnectOutcomeStatus.Declined, result.ErrorMessage);
             }
 
             server.ConnectionState = "Error";
@@ -1555,6 +1759,31 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             }
         }
     }
+
+    /// <summary>
+    /// The inventory profile behind each SSH connection copy, taken at the read that produced the
+    /// copy. Keyed by the copy and held weakly, so it lives exactly as long as the connection.
+    /// </summary>
+    /// <remarks>
+    /// The <see cref="SessionStarting"/> event keeps its shape: it carries the connection copy, and
+    /// this table carries what the copy no longer shows once the vault has written onto it.
+    /// </remarks>
+    private readonly System.Runtime.CompilerServices.ConditionalWeakTable<ServerProfileDto, ServerProfileDto> _inventoryProfiles = new();
+
+    /// <summary>Notes the inventory profile a connection copy was read as, for SSH profiles.</summary>
+    internal void RememberInventoryProfile(ServerProfileDto connectionCopy, ServerProfileDto inventoryProfile)
+    {
+        ArgumentNullException.ThrowIfNull(connectionCopy);
+        ArgumentNullException.ThrowIfNull(inventoryProfile);
+        if (string.Equals(connectionCopy.ConnectionType, "SSH", StringComparison.OrdinalIgnoreCase))
+        {
+            _inventoryProfiles.AddOrUpdate(connectionCopy, inventoryProfile);
+        }
+    }
+
+    /// <summary>The inventory profile a connection copy was read as, or null when none was noted.</summary>
+    internal ServerProfileDto? InventoryProfileOf(ServerProfileDto connectionCopy) =>
+        _inventoryProfiles.TryGetValue(connectionCopy, out ServerProfileDto? inventory) ? inventory : null;
 
     internal static CredentialTarget? GetCredentialTarget(ServerProfileDto dto)
     {
@@ -1721,6 +1950,37 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             return false;
         }
 
+        // An imported profile names its own host, gateway and entry: until the user has confirmed
+        // it, nothing is looked up for it, under any name. It goes on to the ordinary password
+        // handling. Only an interactive connect says so; the quiet paths (restore, reconnect,
+        // bulk connect) stay silent.
+        if (!serverDto.CredentialLookupConfirmed && !SharedSessionIds.IsSharedProfile(serverDto))
+        {
+            // A protocol with no lookup has nothing to confirm and no menu action to clear a
+            // note: stay silent. Nothing is sent to the provider either way.
+            if (!CredentialLookupConfirmation.ProtocolHasLookup(serverDto.ConnectionType))
+            {
+                return false;
+            }
+
+            if (!skipOnFailure)
+            {
+                // Through the quiet-report channel when there is one, so a connection that then
+                // fails or asks for a password does not leave the reason behind its own message.
+                string reason = _localizer.Format("StatusCredentialLookupUnconfirmed", serverDto.DisplayName);
+                if (reportQuietly is not null)
+                {
+                    reportQuietly(reason);
+                }
+                else
+                {
+                    StatusMessageRequested?.Invoke(reason);
+                }
+            }
+
+            return false;
+        }
+
         var provider = _credentialProviderFactory.Create(settings);
 
         if (!provider.IsAvailable)
@@ -1859,9 +2119,7 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             return serverDto.RemoteServer;
         }
 
-        return string.IsNullOrWhiteSpace(serverDto.VaultEntryName)
-            ? serverDto.DisplayName
-            : serverDto.VaultEntryName;
+        return CredentialLookupPolicy.NameBasedTitle(serverDto);
     }
 
     private bool ShowConnectionError(string title, string message)
@@ -1983,7 +2241,15 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             return;
         }
 
+        // Saving through the Add dialog, where the user sees the name and the host, is what
+        // confirms the new profile. A typed ad hoc template carries nothing the execution gate
+        // counts, so it is confirmed and the dialog writes that value back. A template that does
+        // carry a program, an ICA file or post-connect commands keeps its flag, and the dialog
+        // shows the notice for it.
         var dialogVm = ServerDialogViewModel.FromDto(template);
+        dialogVm.ExecutionConfirmed = template.ExecutionConfirmed
+            || !(ProfileExecutionTrust.CarriesLocalExecutionPayload(template)
+                || ProfileExecutionTrust.CarriesPostConnectPayload(template));
         dialogVm.DialogTitle = _localizer["DialogTitleAddServer"];
         dialogVm.IsEditMode = false;
         dialogVm.Origin = ProfileOrigin.Manual;
@@ -3099,7 +3365,13 @@ internal enum BulkConnectOutcomeStatus
     PreflightFailed,
     ConnectionFailed,
     Cancelled,
-    UnsupportedType
+    UnsupportedType,
+
+    /// <summary>
+    /// The user answered the trust question with "do not run": a choice, so the row keeps the
+    /// state it had and nothing reports an error.
+    /// </summary>
+    Declined
 }
 
 /// <summary>How a failed connection attempt is put in front of the user.</summary>

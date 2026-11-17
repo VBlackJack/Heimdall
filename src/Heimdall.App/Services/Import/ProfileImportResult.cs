@@ -47,6 +47,12 @@ public sealed class ProfileImportResult
 
     public int GatewayOrphanCount { get; init; }
 
+    /// <summary>
+    /// How many imported profiles will not use the external credential provider until the user
+    /// confirms them. Zero when the provider is off.
+    /// </summary>
+    public int UnconfirmedLookupCount { get; init; }
+
     public static ProfileImportResult NoChanges() => new();
 
     public static ProfileImportResult Cancelled() => new()

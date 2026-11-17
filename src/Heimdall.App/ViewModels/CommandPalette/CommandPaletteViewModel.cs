@@ -573,6 +573,7 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
             var tab = _main.Connection.AddSession(dto.Id, dto.DisplayName, connType);
             tab.MarkAsAdHoc(dto);
             tab.Status = SessionStatusTokens.LaunchedExternalClient;
+            _main.Session.FollowExternalClient(tab, result.ExternalClientExited).SafeFireAndForget();
 
             _main.StatusText = _localizer["StatusLaunchedExternalClient"];
         }

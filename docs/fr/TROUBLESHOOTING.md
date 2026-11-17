@@ -80,6 +80,9 @@ Index de tous les problèmes rencontrés pendant le développement et de leurs s
 63. [VNC - le serveur demande un nom d'utilisateur ou un mot de passe](#vnc-credentials-required)
 64. [WebView2 - le pointeur disparait à la fermeture d'un terminal](#webview2-pointer-hidden-after-close)
 65. [SSH - "Trop d'échecs d'authentification"](#ssh-too-many-authentication-failures)
+66. [SSH - "La clé d'agent choisie pour cette session ... n'est chargée"](#ssh-agent-key-not-loaded)
+67. [SSH - Une session avec une clé d'agent choisie est refusée sur le chemin Plink](#ssh-agent-key-plink-refused)
+68. [SSH - Se connecter avec Kerberos ou une clé Pageant par Plink](#ssh-plink-kerberos-pageant)
 
 ---
 
@@ -1060,7 +1063,7 @@ N'utilisez **pas** `IServiceProvider.QueryService` dans ce cas. Sur `MsTscAx.MsT
 **Solution** :
 
 1. Lire le journal. `at the reported <cols>x<rows>` suivi de `[PlinkSizeSession] Created Plink size session ... carrying <cols>x<rows>` signifie que la taille a été transmise. `at the default 80x24: the terminal page did not report its size within ... ms` signifie que la page s'est chargée trop lentement : augmenter `PlinkInitialSizeWaitMs` dans le fichier de réglages. Pour l'avertissement ci-dessus : s'il est présent, vérifier que l'utilisateur courant peut écrire sous `HKCU\Software\SimonTatham\PuTTY\Sessions` (une stratégie ou un produit de sécurité peut le bloquer).
-2. Redimensionner avant de se connecter, pas après : la taille est prise une seule fois, au lancement. Redimensionner la fenêtre après le démarrage ne peut pas atteindre le PTY distant sur ce chemin ; se reconnecter pour appliquer une nouvelle taille.
+2. Redimensionner avant de se connecter, pas après : la taille est prise une seule fois, au lancement. Redimensionner la fenêtre après le démarrage ne peut pas atteindre le PTY distant sur ce chemin ; se reconnecter pour appliquer une nouvelle taille. Le badge "Largeur fixe : N col." de l'en-tête le signale. Une session qui retente par Plink après un échec du client intégré ne le déclenche plus d'elle-même : le panneau SFTP en attente est retiré d'abord, donc le terminal démarre à toute la largeur de l'onglet quand celui-ci est affiché pendant la connexion (un onglet qui se connecte en arrière-plan ou dans une fenêtre réduite peut encore démarrer à la largeur du volet partagé et afficher le badge : reconnectez-le une fois affiché ; voir l'entrée 68).
 3. Dans le shell distant, `stty cols <n> rows <m>` fixe la taille à la main pour la session en cours.
 
 **Fichiers** : `Services/Handlers/PlinkSizeSession.cs`, `Services/PlinkSizeSessionJanitor.cs`, `Heimdall.Ssh/Plink/PlinkSizeSessionNaming.cs`, `Services/Handlers/SshHandler.cs` (`ConnectSshViaPlinkAsync`, `BuildPipeModeArguments`), `Heimdall.Terminal/PipeModeSession.cs`
@@ -1245,8 +1248,93 @@ N'utilisez **pas** `IServiceProvider.QueryService` dans ce cas. Sur `MsTscAx.MsT
 **Solution** :
 
 1. Chargez moins de clés dans l'agent : retirez celles que le serveur ne connaît pas.
-2. Donnez à la session son propre fichier de clé dans la fenêtre de la session, pour que l'agent ne soit pas nécessaire sur ce serveur.
-3. Si le serveur est le vôtre, augmentez `MaxAuthTries` dans `sshd_config` puis rechargez `sshd`.
-4. Si la session enregistre aussi un mot de passe, vérifiez qu'il est correct : un mot de passe refusé consomme au moins une tentative avant que les clés de l'agent soient essayées.
+2. Désignez la seule clé que le serveur accepte dans la fenêtre de la session (la liste "Clé d'agent" de la carte des identifiants SSH/SFTP). Seule cette clé est présentée, donc les autres ne consomment aucune tentative. Voir l'[entrée 66](#ssh-agent-key-not-loaded) si la connexion est ensuite refusée parce que la clé n'est pas chargée.
+3. Donnez à la session son propre fichier de clé dans la fenêtre de la session, pour que l'agent ne soit pas nécessaire sur ce serveur.
+4. Si le serveur est le vôtre, augmentez `MaxAuthTries` dans `sshd_config` puis rechargez `sshd`.
+5. Si la session enregistre aussi un mot de passe, vérifiez qu'il est correct : un mot de passe refusé consomme au moins une tentative avant que les clés de l'agent soient essayées.
 
 **Fichiers** : `Heimdall.Ssh/Agents/SshAgentAlgorithmSource.cs`, `Heimdall.Ssh/SshConnectionFactory.cs` (`TryCreateAgentAuth`), `Heimdall.Ssh/FailureClassifier.cs`
+
+---
+
+<a id="ssh-agent-key-not-loaded"></a>
+## 66. SSH - "La clé d'agent choisie pour cette session ... n'est chargée"
+
+**Symptôme** : la connexion d'une session SSH ou SFTP échoue aussitôt, avant toute question sur la clé d'hôte ou demande de mot de passe, avec "La clé d'agent choisie pour cette session (SHA256:...) n'est chargée dans aucun agent SSH que Heimdall est réglé pour utiliser. Chargez-la, ou choisissez une autre clé dans les paramètres de la session." Le message nomme l'empreinte de la clé que la session demande. Le même message apparaît sur le panneau latéral SFTP de la session.
+
+**Cause racine** : la session désigne une clé d'agent (la liste "Clé d'agent" de la fenêtre de la session) et Heimdall n'a trouvé aucune clé avec cette empreinte. Il ne se rabat pas sur les autres clés de l'agent, car le but du choix est de ne présenter que cette clé. Les causes habituelles :
+
+- La clé n'est pas chargée : l'agent a été redémarré, la machine a redémarré, ou la clé n'a jamais été ajoutée.
+- L'agent qui détient la clé n'est pas un de ceux que Heimdall est réglé pour utiliser. Le choix se fait dans `Settings > SSH & SFTP > Connexion > SSH agent preference`.
+- L'agent n'a pas répondu dans la courte attente que Heimdall s'accorde avant de se connecter, donc la clé a été traitée comme non chargée. Réessayez.
+- La configuration a été copiée d'une autre machine en tant que fichier entier : la clé avait été choisie dans l'agent de cette machine. Un import ne pose jamais le choix, mais un fichier de réglages copié peut le porter.
+- L'empreinte enregistrée a été modifiée à la main et n'a pas la forme `SHA256:` suivi de 43 caractères.
+
+**Solution** :
+
+1. Chargez la clé dans l'agent (Pageant : Add Key ; agent OpenSSH de Windows : `ssh-add`), puis reconnectez-vous.
+2. Vérifiez `Settings > SSH & SFTP > Connexion > SSH agent preference` et assurez-vous que l'agent qui détient la clé est autorisé.
+3. Ouvrez la session dans la fenêtre de la session et regardez la liste "Clé d'agent". Une clé enregistrée mais non chargée reste listée sous la forme "Non chargée actuellement : ...". Choisissez la clé voulue, ou "N'importe quelle clé (par défaut)" pour présenter de nouveau toutes les clés de l'agent.
+4. Si le serveur ferme les connexions après quelques tentatives, voir l'[entrée 65](#ssh-too-many-authentication-failures) : désigner la clé est le remède, et il exige que la clé soit chargée.
+
+**Fichiers** : `Services/Handlers/SshAgentKeyPreflight.cs`, `Services/Handlers/SshHandler.cs`, `Services/Handlers/SftpHandler.cs`, `Heimdall.Ssh/SshConnectionFactory.cs` (`ResolveChosenAgentKey`), `Heimdall.Ssh/Agents/SshAgentRegistry.cs` (`FindIdentity`)
+
+---
+
+<a id="ssh-agent-key-plink-refused"></a>
+## 67. SSH - Une session avec une clé d'agent choisie est refusée sur le chemin Plink
+
+**Symptôme** : une session qui désigne une clé d'agent ne s'ouvre pas et le message est l'un de ceux-ci :
+
+- "La clé d'agent choisie pour cette session (SHA256:...) n'est pas chargée dans Pageant, dont cette connexion a besoin. Chargez-la dans Pageant, ou choisissez une autre clé dans les paramètres de la session."
+- "La clé d'agent choisie pour cette session (SHA256:...) est d'un type auquel Plink ne peut pas être limité, et cette connexion passe par Plink. Désactivez le transfert d'agent, ou choisissez une autre clé."
+- "Cette session désigne une clé d'agent et aussi un fichier de clé, et cette connexion passe par Plink, qui n'accepte que l'un des deux. Retirez le fichier de clé, retirez le choix de clé d'agent, ou désactivez le transfert d'agent."
+- "Cette session désigne une clé d'agent, et le programme Plink utilisé n'est pas celui fourni avec Heimdall : rien ne garantit qu'il ne propose que cette clé. Utilisez le Plink fourni, ou retirez le choix de clé d'agent."
+- "Cette session désigne une seule clé d'agent, et le programme utilisé pour cette connexion ne peut pas être limité à cette clé. Passez la session au terminal intégré, ou retirez le choix de clé d'agent."
+
+**Cause racine** : Plink est utilisé quand le transfert d'agent est activé (il transfère Pageant) et comme nouvel essai après un échec du client intégré. Plink ne peut joindre que Pageant, et Heimdall le limite à la clé choisie en lui remettant la moitié publique de cette clé par `-i`. Il refuse de démarrer quand il ne peut pas garantir que seule cette clé est présentée, plutôt que de présenter toutes les clés de Pageant :
+
+- La clé est dans l'agent OpenSSH de Windows mais pas dans Pageant.
+- La clé est d'un type que Plink ne sait pas lire dans un fichier de clé publique, comme une clé matérielle "sk". Parmi les certificats, seul un certificat Ed25519 est accepté sur le chemin Plink.
+- La session a aussi un fichier de clé : Plink n'accepte qu'un seul `-i`.
+- Le Plink utilisé n'est pas la version fournie avec Heimdall (un autre chemin de `plink.exe` dans `Settings > SSH & SFTP`).
+- La session est réglée sur PuTTY externe, à qui l'on ne peut pas dire quelle clé d'agent utiliser.
+
+Après un échec du client intégré, le nouvel essai par Plink est simplement ignoré quand Plink ne peut pas être limité à la clé choisie, et l'erreur propre du client intégré est affichée.
+
+**Solution** :
+
+1. Chargez la clé dans Pageant, ou désactivez le transfert d'agent pour que le client intégré soit utilisé.
+2. Pour un type de clé auquel Plink ne peut pas être limité, désactivez le transfert d'agent ou choisissez une autre clé.
+3. Retirez le fichier de clé de la session, ou retirez le choix de clé d'agent.
+4. Remettez `Chemin de plink.exe` sur le Plink fourni avec Heimdall (ou remettez le champ à sa valeur par défaut), ou retirez le choix de clé d'agent.
+5. Pour PuTTY externe, passez la session au terminal intégré, ou retirez le choix de clé.
+
+**Fichiers** : `Services/Handlers/SshAgentKeyPreflight.cs` (`RefusalForPlink`), `Services/Handlers/SshHandler.cs`
+
+---
+
+<a id="ssh-plink-kerberos-pageant"></a>
+## 68. SSH - Se connecter avec Kerberos ou une clé Pageant par Plink
+
+**Symptôme** : l'un de ceux-ci :
+
+- Une session avec un nom d'utilisateur, sans mot de passe enregistré ni fichier de clé affiche "Mot de passe SSH requis" alors que votre session Windows (Kerberos) ou une clé Pageant suffirait.
+- Sur une version plus ancienne, répondre à cette demande par rien se termine par "La connexion a été annulée", sauf si Pageant détient une clé.
+- Le terminal affiche "Cette connexion a été lancée sans mot de passe, pour Kerberos ou une clé de Pageant. Si le serveur a refusé l'authentification, reconnectez-vous et saisissez votre mot de passe, ou enregistrez-le dans la session."
+
+**Cause racine** : la demande apparaît quand la connexion passe par Plink : après un échec d'authentification du client intégré, ou avec le transfert d'agent et Pageant. La demande indique toujours : "Laissez-le vide pour vous connecter avec Kerberos (votre session Windows) ou une clé chargée dans Pageant." Une réponse vide lance Plink sans fichier de mot de passe et en mode batch (`-batch`). Plink essaie alors Kerberos (GSSAPI via Windows SSPI) et les clés de Pageant (avec une clé d'agent choisie sur la session, seule cette clé est présentée). Aucun mot de passe n'est écrit sur le disque et aucun n'est envoyé au serveur. Le mode batch fait quitter Plink aussitôt ("FATAL ERROR: Cannot answer interactive prompts in batch mode") quand le serveur n'accepte ni l'un ni l'autre ; sans lui, Plink attendrait indéfiniment une question affichée nulle part et le terminal resterait vide. La ligne d'échec ci-dessus est l'explication de Heimdall pour cette sortie. Avant ce comportement, une réponse vide annulait la connexion sauf si Pageant détenait une clé : un utilisateur Kerberos devait saisir un faux mot de passe.
+
+**Solution** :
+
+1. Pour Kerberos ou une clé Pageant, laissez la demande vide et validez.
+2. Si le serveur a refusé l'authentification (la ligne d'échec ci-dessus), reconnectez-vous et saisissez votre mot de passe, ou enregistrez-le dans la session.
+3. Annuler annule toujours, et un mot de passe saisi se comporte comme avant.
+
+**Limites** :
+
+- Un serveur qui demande un second facteur (authentification interactive au clavier) après Kerberos n'est pas pris en charge avec une réponse vide : Plink tourne en mode batch et ne peut pas y répondre. Saisir le mot de passe à la place n'a pas été essayé.
+- Le client intégré et le panneau latéral SFTP ne font pas Kerberos, et le panneau ne peut pas non plus demander un mot de passe ou un code à usage unique : il utilise le même client intégré et les mêmes identifiants. Donc, quand le nouvel essai par Plink démarre, Heimdall retire le panneau latéral SFTP que "Ouvrir le panneau SFTP automatiquement lors d'une connexion SSH" avait placé dans l'onglet (il n'est pas ouvert), et, quand l'onglet est affiché, le terminal prend toute la largeur de l'onglet avant le lancement de Plink : pas de badge "Largeur fixe". Un onglet qui se connecte en arrière-plan (connexion en masse, sessions restaurées au démarrage, ou changement d'onglet avant le début du nouvel essai) ou dans une fenêtre réduite n'est pas remis en page : la session peut démarrer à la largeur du volet partagé et afficher le badge. Reconnectez-la une fois l'onglet affiché pour appliquer toute la largeur. Une fois connecté, la barre d'état indique que le panneau SFTP n'a pas été ouvert parce que le client intégré n'a pas pu s'authentifier sur ce serveur. Les sessions qui passent par Plink uniquement à cause du transfert d'agent avec Pageant gardent leur panneau SFTP, qui s'authentifie avec l'agent. Une session SFTP peut toujours être ouverte à la main, dans son propre onglet ou à côté du terminal ; avec Kerberos, elle ne peut pas non plus s'authentifier. Diviser l'onglet à la main rend le volet du terminal plus étroit que la largeur avec laquelle Plink a démarré, si bien que le badge "Largeur fixe : N col." apparaît : reconnectez-vous pour appliquer la nouvelle largeur.
+- Une session sans nom d'utilisateur est toujours refusée avant la demande : renseignez un nom d'utilisateur dans la session.
+
+**Fichiers** : `Services/Handlers/SshHandler.cs`, `Views/EmbeddedSshView.xaml.cs`, `Services/TerminalReconnectPolicy.cs`

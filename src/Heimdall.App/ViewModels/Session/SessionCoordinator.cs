@@ -74,8 +74,69 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
     /// <summary>Null only on the test-only instance built without a configuration manager.</summary>
     private readonly SharedPostConnectTrust? _sharedPostConnectTrust;
     private readonly IEmbeddedSessionManager _embeddedSessionManager;
+
+    /// <summary>
+    /// The sizes a Plink launch falls back on when its view is absent or silent. Shared with the
+    /// split service and the session manager, which feed it.
+    /// </summary>
+    private readonly TerminalSizeHints _sizeHints = new();
+
+    /// <summary>
+    /// The width share the SFTP companion takes beside its SSH terminal. The terminal's final width
+    /// is the one it has with the companion in place, so the split exists from the start.
+    /// </summary>
+    private const double CompanionSftpSplitRatio = 0.5;
+
+    /// <summary>
+    /// The companion pane standing in the tab from SessionStarting until the companion connects,
+    /// keyed by SSH session id. Present so the terminal page measures its final width before a
+    /// launch that can never resize; removed on every path where the companion does not come.
+    /// </summary>
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, SessionPaneModel> _companionPlaceholders =
+        new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// The profile the companion will connect with: the inventory profile the connect read, carried
+    /// from the start of the session. The companion deliberately uses this connect-time profile
+    /// rather than reading the inventory again, so the placeholder decision and the companion
+    /// cannot disagree, whatever is edited while the session connects.
+    /// </summary>
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, ServerProfileDto> _companionProfiles =
+        new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// The sessions whose pending companion pane was withdrawn because the embedded client failed to
+    /// authenticate and the connect moved on to Plink: the companion would share that client's
+    /// credentials and could never prompt, so it is not opened once the session is ready.
+    /// </summary>
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> _withdrawnCompanions =
+        new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// For a session whose companion pane was withdrawn, the task that completes when the terminal
+    /// page reports a wider size, so the Plink launch that follows is made at the full width. Taken
+    /// by the first size lookup that is allowed to wait.
+    /// </summary>
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, Task<TerminalSize>> _pendingRelayouts =
+        new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// The profile whose manual reconnect is running in this async flow. Lets the session that the
+    /// reconnect starts, and only that one, take the size of the terminal it replaces.
+    /// </summary>
+    private readonly AsyncLocal<string?> _manualReconnectProfileId = new();
     private readonly IPostConnectSequenceRunner _postConnectSequenceRunner;
     private readonly IPostConnectStepResolver _postConnectStepResolver;
+
+    /// <summary>The longest the lookup of linked entry titles may hold a trust question back.</summary>
+    private static readonly TimeSpan DefaultLinkedTitleLookupTimeout = TimeSpan.FromSeconds(5);
+
+    /// <summary>How long the lookup may hold a trust question back; settable for tests.</summary>
+    internal TimeSpan LinkedTitleLookupTimeout { get; set; } = DefaultLinkedTitleLookupTimeout;
+
+    /// <summary>No title known: the rows of a trust question name a linked entry by its id.</summary>
+    private static readonly IReadOnlyDictionary<string, string> EmptyLinkedTitles =
+        new Dictionary<string, string>(StringComparer.Ordinal);
     private readonly IUiDispatcher _uiDispatcher;
     private readonly Dictionary<string, ConnectingSessionCancellation> _connectingCancellations = [];
 
@@ -185,13 +246,25 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         // Wire ConnectionService status-text relay
         _main.ServerList.ConnectionService.SetStatusText = s => _main.StatusText = s;
 
+        // One hint table for the window: the views feed it, the pane reconnect and the tab
+        // reconnect leave the size of the terminal they replace in it, the size relay reads it.
+        _main.Split.SizeHints = _sizeHints;
+        _main.Split.IsSessionConnecting = tab => _connectingSshViews.ContainsKey(tab.ServerId);
+        if (_embeddedSessionManager is EmbeddedSessionManager concreteSessionManager)
+        {
+            concreteSessionManager.SizeHints = _sizeHints;
+        }
+
         // Wire the PTY-size relay: the SSH handler asks, just before it creates the PTY, what
         // size the connecting view's page has reported, waiting for it on the Plink path.
         _main.ServerList.ConnectionService.ResolveInitialTerminalSize = ResolveConnectingTerminalSizeAsync;
 
+        // The embedded client could not authenticate and Plink takes over: the pending file panel
+        // can never connect, so the terminal gets its full width back before Plink launches.
+        _main.ServerList.ConnectionService.PlinkRetryStarting = OnPlinkRetryStarting;
+
         // Wire connect-time execution-trust confirmation relay
-        _main.ServerList.ConnectionService.ConfirmExecution =
-            profile => _main.ServerList.ConfirmAndTrustExecutionAsync(profile);
+        _main.ServerList.ConnectionService.ConfirmExecution = ConfirmExecutionWithTitlesAsync;
 
         // Wire broadcast relay so terminal views can fan out input
         _embeddedSessionManager.BroadcastCallback = BroadcastToAllTerminals;
@@ -230,6 +303,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         {
             gone.PropertyChanged -= OnObservedTabPropertyChanged;
             _observedTabs.Remove(gone);
+            PurgePlinkRetryState(gone.ServerId);
         }
 
         foreach (SessionTabViewModel added in current.Where(_observedTabs.Add))
@@ -700,6 +774,8 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         }
 
         ReconnectChainState? reconnectChain = _currentReconnectChain.Value;
+        string? reconnectProfileId = reconnectChain?.ServerId ?? _manualReconnectProfileId.Value;
+        ServerProfileDto? companionProfile = ResolveCompanionProfile(connectionType, server);
         if (!_uiDispatcher.CheckAccess())
         {
             InvokeOnUi(() => OnSessionStartingCore(
@@ -710,7 +786,9 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                 server,
                 settings,
                 cancellationSource,
-                reconnectChain));
+                reconnectChain,
+                companionProfile,
+                reconnectProfileId));
             return;
         }
 
@@ -722,8 +800,49 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             server,
             settings,
             cancellationSource,
-            reconnectChain);
+            reconnectChain,
+            companionProfile,
+            reconnectProfileId);
     }
+
+    /// <summary>
+    /// The profile the SFTP companion will connect with, or null when it will not open: read the
+    /// way the auto-open reads it (the shared copy of a shared session, else the inventory), and
+    /// only when the profile has a user name.
+    /// </summary>
+    /// <remarks>
+    /// Not the connection copy: the credential vault writes the user name it found onto that copy,
+    /// while the companion is built from the inventory profile and cannot open without a user name
+    /// in it. Deciding on the copy put a placeholder where no companion would ever come. The
+    /// inventory profile is the one the connect already read, noted by the server list; nothing is
+    /// read here, and nothing here can fail the connect.
+    /// </remarks>
+    private ServerProfileDto? ResolveCompanionProfile(
+        string connectionType,
+        ServerProfileDto connectionCopy)
+    {
+        try
+        {
+            if (!WillOpenSftpCompanion(connectionType, _main.CurrentSettings))
+            {
+                return null;
+            }
+
+            ServerProfileDto? profile = SharedSessionIds.IsSharedProfile(connectionCopy)
+                ? connectionCopy
+                : (CompanionProfileSource ?? _main.ServerList.InventoryProfileOf)(connectionCopy);
+            return string.IsNullOrEmpty(profile?.SshUsername) ? null : profile;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Only the layout is at stake: the SSH connect goes ahead, without a placeholder.
+            FileLogger.Warn($"SFTP companion decision failed, opening the terminal at full width: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>Where the inventory profile of a connection copy comes from; replaced by tests.</summary>
+    internal Func<ServerProfileDto, ServerProfileDto?>? CompanionProfileSource { get; set; }
 
     private void OnSessionStartingCore(
         string sessionId,
@@ -733,7 +852,9 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         ServerProfileDto server,
         AppSettings settings,
         CancellationTokenSource cancellationSource,
-        ReconnectChainState? reconnectChain)
+        ReconnectChainState? reconnectChain,
+        ServerProfileDto? companionProfile,
+        string? reconnectProfileId)
     {
         SessionTabViewModel? existingTab = _main.Connection.ActiveSessions.FirstOrDefault(
             t => string.Equals(t.ServerId, sessionId, StringComparison.Ordinal));
@@ -751,6 +872,39 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
 
         tab.OriginalServerId = originalServerId;
         tab.FailureDetails = null;
+
+        // Decided here, not after the connect: a Plink launch fixes the remote PTY width for good,
+        // and a terminal that opens full width and is halved by the companion afterwards leaves the
+        // remote wrapping at twice the width it shows.
+        if (companionProfile is not null)
+        {
+            SessionPaneModel companionPlaceholder = new()
+            {
+                IsPendingCompanion = true,
+                ServerId = BuildCompanionSftpSessionId(sessionId),
+                OriginalServerId = originalServerId,
+                ConnectionType = "SFTP",
+                Title = tab.Title,
+                Status = SessionStatusTokens.Connecting,
+            };
+            _companionPlaceholders[sessionId] = companionPlaceholder;
+            _companionProfiles[sessionId] = companionProfile;
+            tab.RootContent = new SplitContainerModel
+            {
+                First = tab.PrimaryPane,
+                Second = companionPlaceholder,
+                Orientation = SplitOrientation.Vertical,
+                SplitRatio = CompanionSftpSplitRatio
+            };
+        }
+
+        // A reconnect left the size of the tab it replaced under the profile id; this session is
+        // the one that takes it over.
+        if (string.Equals(reconnectProfileId, originalServerId, StringComparison.Ordinal))
+        {
+            _sizeHints.MovePrevious(originalServerId, sessionId);
+        }
+
         TrackConnectingCancellation(sessionId, tab, cancellationSource);
         if (reconnectChain is not null)
         {
@@ -805,6 +959,9 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
 
         bool cancellationRequested = ReleaseConnectingCancellation(sessionId);
         _connectingSshViews.TryRemove(sessionId, out _);
+        _companionPlaceholders.TryRemove(sessionId, out SessionPaneModel? failedPlaceholder);
+        _companionProfiles.TryRemove(sessionId, out _);
+        PurgePlinkRetryState(sessionId);
         _sharedSshConnectionInputs.TryRemove(sessionId, out _);
         ReconnectChainState? reconnectChain = RemoveReconnectChainSession(sessionId);
         if (reconnectChain is not null)
@@ -827,6 +984,13 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             }
 
             return;
+        }
+
+        // The companion that was never going to come leaves before the tab is closed, so closing
+        // does not tear down a pane that never connected.
+        if (failedPlaceholder is not null)
+        {
+            RemoveCompanionPlaceholder(tab, failedPlaceholder);
         }
 
         // Silent: this is the placeholder tab of a session that never materialized. There is no
@@ -861,7 +1025,8 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         string displayName,
         string connectionType,
         ISessionResult? session,
-        RdpModeOverride rdpModeOverride)
+        RdpModeOverride rdpModeOverride,
+        Task? externalClientExited)
     {
         if (!_uiDispatcher.CheckAccess())
         {
@@ -871,7 +1036,8 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                 displayName,
                 connectionType,
                 session,
-                rdpModeOverride));
+                rdpModeOverride,
+                externalClientExited));
             return;
         }
 
@@ -889,6 +1055,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                     externalTab.FailureDetails = null;
                     ApplyRdpModeOverride(externalTab, connectionType, rdpModeOverride);
                     externalTab.Status = SessionStatusTokens.LaunchedExternalClient;
+                    FollowExternalClient(externalTab, externalClientExited).SafeFireAndForget();
                 }
 
                 _main.StatusText = _localizer["StatusLaunchedExternalClient"];
@@ -925,6 +1092,9 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                 {
                     // The view never took the session: close it here and drop the placeholder, so
                     // neither a live connection nor a tab stuck in Connecting is left behind.
+                    _companionPlaceholders.TryRemove(sessionId, out _);
+                    _companionProfiles.TryRemove(sessionId, out _);
+                    PurgePlinkRetryState(sessionId);
                     _main.Connection.CloseFailedMaterialization(existingTab);
                     SafeDisposeSessionResult(session);
                     throw;
@@ -943,6 +1113,9 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                 // user walked away from it, so the late session is closed instead of reopening a
                 // tab. A placeholder that only moved to a floating window is not cancelled.
                 FileLogger.Info($"SessionReady for SSH sessionId={sessionId} arrived after its tab was closed; discarding it.");
+                _companionPlaceholders.TryRemove(sessionId, out _);
+                _companionProfiles.TryRemove(sessionId, out _);
+                PurgePlinkRetryState(sessionId);
                 SafeDisposeSessionResult(session);
                 throw new OperationCanceledException();
             }
@@ -1016,12 +1189,30 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         _sharedSshConnectionInputs.TryRemove(sessionId, out SshConnectionInputs? sharedConnection);
 
         // Auto-open SFTP alongside SSH - use original server ID for inventory lookup
-        if (string.Equals(connectionType, "SSH", StringComparison.OrdinalIgnoreCase)
-            && _main.CurrentSettings?.SftpBrowserEnabled == true
-            && _main.CurrentSettings?.SftpAutoOpenOnSsh == true)
+        _companionPlaceholders.TryRemove(sessionId, out SessionPaneModel? companionPlaceholder);
+        _companionProfiles.TryRemove(sessionId, out ServerProfileDto? plannedProfile);
+        bool companionWithdrawn = _withdrawnCompanions.TryRemove(sessionId, out _);
+        _pendingRelayouts.TryRemove(sessionId, out _);
+        if (companionWithdrawn)
         {
-            AutoOpenSftpAsync(tab, originalServerId, sharedConnection, _main.Split.GetSessionToken(tab))
+            // The embedded client could not sign in and Plink did: a companion built on that client
+            // would fail the same way, and opening it now would split the terminal again.
+            _main.StatusText = _localizer.Format("StatusSftpCompanionNotOpenedAfterPlinkRetry", displayName);
+        }
+        else if (WillOpenSftpCompanion(connectionType, _main.CurrentSettings))
+        {
+            AutoOpenSftpAsync(
+                    tab,
+                    originalServerId,
+                    sharedConnection,
+                    companionPlaceholder,
+                    plannedProfile,
+                    _main.Split.GetSessionToken(tab))
                 .SafeFireAndForget();
+        }
+        else if (companionPlaceholder is not null)
+        {
+            RemoveCompanionPlaceholder(tab, companionPlaceholder);
         }
 
         if (string.Equals(connectionType, "SSH", StringComparison.OrdinalIgnoreCase)
@@ -1477,6 +1668,14 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                 $"Reconnect requested: serverId={serverId} connectionType={connectionType} " +
                 $"oldTabPresent={oldTabWasPresent} activeTabs={oldTabCountBefore}");
 
+            // The terminal being replaced is the best guess for the size of the one that takes its
+            // place, should the new page not report in time. Read before the close disposes it.
+            if (tab.HostControl is ITerminalSizeSource replacedView
+                && replacedView.LastKnownTerminalSize is { } replacedSize)
+            {
+                _sizeHints.RememberPrevious(serverId, replacedSize);
+            }
+
             // Close the old tab (disposes the dead session). Silent: the session being replaced is
             // already dead, there is no live work to protect and no question worth asking - and a
             // guard that withheld it here would strand the user between two tabs.
@@ -1528,10 +1727,18 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             // embedded" over a profile whose mode is External used to reconnect from the profile,
             // so the overlay's Reconnect button launched the external client and closed the
             // embedded tab whose title still carried the forced suffix.
-            await _main.ServerList.RestoreServerAsync(
-                serverId,
-                CancellationToken.None,
-                tab.RdpModeOverride);
+            _manualReconnectProfileId.Value = serverId;
+            try
+            {
+                await _main.ServerList.RestoreServerAsync(
+                    serverId,
+                    CancellationToken.None,
+                    tab.RdpModeOverride);
+            }
+            finally
+            {
+                _manualReconnectProfileId.Value = null;
+            }
         }
         catch (Exception ex)
         {
@@ -1542,6 +1749,12 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                 reconnectChain.FailureObserved = true;
                 await ContinueReconnectChainAfterFailureAsync(reconnectChain);
             }
+        }
+        finally
+        {
+            // Whatever became of the attempt, a size left under the profile id must not wait for
+            // an unrelated later connect of the same profile.
+            _sizeHints.Forget(serverId);
         }
     }
 
@@ -1750,11 +1963,46 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                 connectionType);
             tab.MarkAsAdHoc(snapshot);
             tab.Status = SessionStatusTokens.LaunchedExternalClient;
+            FollowExternalClient(tab, result.ExternalClientExited).SafeFireAndForget();
             _main.StatusText = _localizer["StatusLaunchedExternalClient"];
             return;
         }
 
         _main.StatusText = result.ErrorMessage ?? _localizer["ErrorConnectionFailed"];
+    }
+
+    /// <summary>
+    /// Moves the tab of an external client session to Disconnected when the client process ends,
+    /// so the tab stops reading "launched" and stops counting as a connected session. Does nothing
+    /// when the end cannot be observed, when the tab has been closed, or when its status has moved
+    /// on from the launched one in the meantime.
+    /// </summary>
+    /// <param name="tab">The lightweight tab created for the launched client.</param>
+    /// <param name="exited">Completes when the client has exited; null when that cannot be observed.</param>
+    internal async Task FollowExternalClient(SessionTabViewModel tab, Task? exited)
+    {
+        ArgumentNullException.ThrowIfNull(tab);
+
+        if (exited is null)
+        {
+            FileLogger.Info($"External client end is not observable for sessionId={tab.ServerId}; its tab keeps the launched status.");
+            return;
+        }
+
+        SessionPaneModel pane = tab.PrimaryPane;
+        await exited.ConfigureAwait(false);
+
+        await _uiDispatcher.InvokeAsync(() =>
+        {
+            if (_disposed
+                || tab.IsClosed
+                || !string.Equals(pane.Status, SessionStatusTokens.LaunchedExternalClient, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            EmbeddedSessionManager.WriteHostStatus(tab, pane, SessionStatusTokens.Disconnected);
+        }).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -1817,12 +2065,24 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         SessionTabViewModel tab,
         string serverId,
         SshConnectionInputs? sharedConnection,
+        SessionPaneModel? placeholder,
+        ServerProfileDto? plannedProfile,
         CancellationToken ct = default)
     {
+        var attached = false;
         try
         {
+            // The pane that was to receive the companion is gone (closed, or the tab laid out
+            // again): there is nowhere to put it, so nothing is connected for nothing.
+            if (placeholder is not null
+                && SplitTreeHelper.FindPane(tab.RootContent, placeholder.PaneId) is null)
+            {
+                FileLogger.Info($"SFTP auto-open skipped for {serverId}: its pane is gone.");
+                return;
+            }
+
             IProfileLookup lookup = _main.ServerList.ProfileLookup;
-            var server = sharedConnection?.Server ?? await lookup.FindAsync(serverId);
+            var server = sharedConnection?.Server ?? plannedProfile ?? await lookup.FindAsync(serverId);
 
             if (server is null || string.IsNullOrEmpty(server.SshUsername))
             {
@@ -1831,7 +2091,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                 return;
             }
 
-            var sftpSessionId = BuildCompanionSftpSessionId(tab.ServerId);
+            var sftpSessionId = placeholder?.ServerId ?? BuildCompanionSftpSessionId(tab.ServerId);
             var sftpProfile = CreateCompanionSftpProfile(server, sftpSessionId);
             AppSettings settings = sharedConnection?.Settings
                 ?? lookup.EffectiveSettingsFor(server, _main.CurrentSettings!);
@@ -1860,12 +2120,28 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                 return;
             }
 
-            // Create the SFTP host control on the UI thread and wrap root in a split container
-            var attached = false;
+            // Create the SFTP host control on the UI thread. The pane that was standing in for it
+            // takes the host; with no stand-in (a session that did not start through
+            // SessionStarting) the root is wrapped in a split container.
             InvokeOnUi(() =>
             {
                 if (ct.IsCancellationRequested || !_main.Connection.ActiveSessions.Contains(tab))
                 {
+                    return;
+                }
+
+                if (placeholder is not null)
+                {
+                    if (SplitTreeHelper.FindPane(tab.RootContent, placeholder.PaneId) is null)
+                    {
+                        return;
+                    }
+
+                    placeholder.HostControl = _embeddedSessionManager.CreateHostControl(
+                        tab, tab.Title, "SFTP", sftpResult.Session, _main.CurrentSettings);
+                    placeholder.Status = SessionStatusTokens.Connected;
+                    placeholder.IsPendingCompanion = false;
+                    attached = true;
                     return;
                 }
 
@@ -1889,7 +2165,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                     First = currentRoot,
                     Second = sftpPane,
                     Orientation = SplitOrientation.Vertical,
-                    SplitRatio = 0.5
+                    SplitRatio = CompanionSftpSplitRatio
                 };
                 attached = true;
             });
@@ -1907,6 +2183,42 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         {
             FileLogger.Warn($"SFTP auto-open error for {serverId}: {ex.Message}");
         }
+        finally
+        {
+            // Skipped, failed, cancelled or the tab gone: the terminal takes the full width back.
+            if (!attached && placeholder is not null)
+            {
+                RemoveCompanionPlaceholder(tab, placeholder);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Whether an SSH session opens its SFTP companion: the one decision the tab layout before the
+    /// connect and the auto-open after it must share, so they cannot disagree.
+    /// </summary>
+    internal static bool WillOpenSftpCompanion(string connectionType, AppSettings? settings) =>
+        string.Equals(connectionType, "SSH", StringComparison.OrdinalIgnoreCase)
+        && settings?.SftpBrowserEnabled == true
+        && settings.SftpAutoOpenOnSsh;
+
+    /// <summary>
+    /// Takes the stand-in companion pane out of the tab, if it is still there and still empty, so
+    /// the terminal is the whole tab again.
+    /// </summary>
+    private void RemoveCompanionPlaceholder(SessionTabViewModel tab, SessionPaneModel placeholder)
+    {
+        InvokeOnUi(() =>
+        {
+            if (placeholder.HostControl is not null
+                || SplitTreeHelper.FindPane(tab.RootContent, placeholder.PaneId) is null)
+            {
+                return;
+            }
+
+            tab.SetRootContent(
+                SplitTreeHelper.RemovePane(tab.RootContent, placeholder.PaneId) ?? tab.PrimaryPane);
+        });
     }
 
     /// <summary>The detached profile and settings one SSH connection was made with.</summary>
@@ -1918,7 +2230,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         return $"sftp-{baseId}-{Guid.NewGuid():N}";
     }
 
-    private static ServerProfileDto CreateCompanionSftpProfile(
+    internal static ServerProfileDto CreateCompanionSftpProfile(
         ServerProfileDto server,
         string sftpSessionId)
     {
@@ -1937,10 +2249,12 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             ConnectionType = "SFTP",
             SessionLoggingOverride = server.SessionLoggingOverride,
             VaultEntryName = server.VaultEntryName,
+            CredentialLookupConfirmed = server.CredentialLookupConfirmed,
             SshUsername = server.SshUsername,
             SshPort = server.SshPort,
             SshMode = server.SshMode,
             SshAgentForwarding = server.SshAgentForwarding,
+            SshAgentKeyFingerprint = server.SshAgentKeyFingerprint,
             SshKeyPath = server.SshKeyPath,
             SshPasswordEncrypted = server.SshPasswordEncrypted,
             SshCompression = server.SshCompression,
@@ -2049,6 +2363,9 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             if (!await AuthorizePostConnectAsync(server, runnableSteps).ConfigureAwait(false))
             {
                 FileLogger.Info($"Post-connect skipped for {displayName}: commands not approved.");
+                InvokeOnUi(() => _main.StatusText = _localizer.Format(
+                    "StatusPostConnectDeclined",
+                    ExecutionTrustDescriber.Visible(displayName)));
                 return;
             }
 
@@ -2101,8 +2418,15 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             return _sharedPostConnectTrust is not null
                 && await _sharedPostConnectTrust.AuthorizeAsync(
                         server,
-                        () => ConfirmOnUiThreadAsync(
-                            () => _main.ServerList.ConfirmSharedPostConnectAsync(server, runnableSteps)))
+                        async () =>
+                        {
+                            // Read only when the question is asked: an approved profile never needs them.
+                            IReadOnlyDictionary<string, string> titles =
+                                await LoadLinkedTitlesAsync(server).ConfigureAwait(false);
+                            return await ConfirmOnUiThreadAsync(
+                                    () => _main.ServerList.ConfirmSharedPostConnectAsync(server, runnableSteps, titles))
+                                .ConfigureAwait(false);
+                        })
                     .ConfigureAwait(false);
         }
 
@@ -2111,9 +2435,61 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             return true;
         }
 
+        IReadOnlyDictionary<string, string> linkedTitles = await LoadLinkedTitlesAsync(server).ConfigureAwait(false);
         return await ConfirmOnUiThreadAsync(
-                () => _main.ServerList.ConfirmAndTrustPostConnectAsync(server, runnableSteps))
+                () => _main.ServerList.ConfirmAndTrustPostConnectAsync(server, runnableSteps, linkedTitles))
             .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The connect-time question about a profile's program: the titles of its linked entries are
+    /// read first, so the list names them.
+    /// </summary>
+    /// <remarks>
+    /// No <c>ConfigureAwait(false)</c>: the caller is on the UI context and the dialog is shown
+    /// from it.
+    /// </remarks>
+    private async Task<bool> ConfirmExecutionWithTitlesAsync(ServerProfileDto profile)
+    {
+        IReadOnlyDictionary<string, string> titles = await LoadLinkedTitlesAsync(profile);
+        return await _main.ServerList.ConfirmAndTrustExecutionAsync(profile, titles);
+    }
+
+    /// <summary>
+    /// The titles of the Command Library entries the enabled steps of <paramref name="profile"/>
+    /// link to, by entry id. Never throws and never waits long: on any failure the list names an
+    /// entry by its id.
+    /// </summary>
+    private async Task<IReadOnlyDictionary<string, string>> LoadLinkedTitlesAsync(ServerProfileDto profile)
+    {
+        List<string> libraryIds = (profile.PostConnectSteps ?? [])
+            .Where(step => step is { Enabled: true } && !string.IsNullOrWhiteSpace(step.CommandLibraryId))
+            .Select(step => step.CommandLibraryId!)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        if (libraryIds.Count == 0 || _postConnectStepResolver is null)
+        {
+            return EmptyLinkedTitles;
+        }
+
+        try
+        {
+            // Off the UI thread: a library read that completes synchronously would otherwise hold
+            // the window for as long as the database takes, and the bound below could not fire.
+            // The lookup touches no UI state; the continuation returns to the caller's context.
+            string culture = _localizer.CurrentLocale;
+            IPostConnectStepResolver resolver = _postConnectStepResolver;
+            using var timeout = new CancellationTokenSource(LinkedTitleLookupTimeout);
+            return await Task
+                .Run(() => resolver.GetLinkedTitlesAsync(libraryIds, culture, timeout.Token), timeout.Token)
+                .WaitAsync(timeout.Token);
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Warn($"Could not read the titles of the linked Command Library entries: {ex.Message}");
+            return EmptyLinkedTitles;
+        }
     }
 
     internal void ClearPostConnectStateOnUiThread(SessionTabViewModel tab)
@@ -2169,15 +2545,110 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
     /// <paramref name="wait"/> for its first report. Called from the connect thread; the
     /// dictionary and the view's report are safe for it, and nothing here blocks the UI thread.
     /// </summary>
-    private Task<TerminalSizeLookup> ResolveConnectingTerminalSizeAsync(
+    private async Task<TerminalSizeLookup> ResolveConnectingTerminalSizeAsync(
         string sessionId,
         TimeSpan wait,
         CancellationToken cancellationToken)
     {
-        TerminalSizeReport? report = _connectingSshViews.TryGetValue(sessionId, out EmbeddedSshView? view)
+        // Only a lookup that may wait takes the relayout: the zero-wait lookup of the embedded dial
+        // comes first and must leave it for the Plink launch.
+        if (wait > TimeSpan.Zero && _pendingRelayouts.TryRemove(sessionId, out Task<TerminalSize>? relayout))
+        {
+            try
+            {
+                await relayout.WaitAsync(wait, cancellationToken).ConfigureAwait(false);
+            }
+            catch (TimeoutException)
+            {
+                FileLogger.Info(
+                    $"Terminal page did not report a wider size within {wait.TotalMilliseconds:0} ms after the " +
+                    $"companion pane was withdrawn for sessionId={sessionId}; launching at the size it holds.");
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                // The wait was replaced by a newer one: the report holds whatever the page sent last.
+                FileLogger.Info($"The wider-size wait for sessionId={sessionId} was replaced; using the latest size.");
+            }
+        }
+
+        return await TerminalSizeReport
+            .ResolveAsync(ConnectingReportOf(sessionId), wait, cancellationToken, _sizeHints, sessionId)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>Where the connecting view's size report comes from; replaced by tests.</summary>
+    internal Func<string, TerminalSizeReport?>? ConnectingSizeReportSource { get; set; }
+
+    private TerminalSizeReport? ConnectingReportOf(string sessionId)
+    {
+        if (ConnectingSizeReportSource is { } source)
+        {
+            return source(sessionId);
+        }
+
+        return _connectingSshViews.TryGetValue(sessionId, out EmbeddedSshView? view) && view is not null
             ? view.TerminalSizeReport
             : null;
-        return TerminalSizeReport.ResolveAsync(report, wait, cancellationToken);
+    }
+
+    /// <summary>
+    /// The embedded client failed to authenticate and Plink is about to take over. The id is the
+    /// server id the SSH handler was given, which for a connect is the session id: the same key the
+    /// size relay looks up in <c>_connectingSshViews</c> and the tab and placeholder are filed under.
+    /// Runs on a pool thread; nothing is thrown out of it.
+    /// </summary>
+    private void OnPlinkRetryStarting(string sessionId)
+    {
+        try
+        {
+            InvokeOnUi(() =>
+            {
+                if (!_companionPlaceholders.TryGetValue(sessionId, out SessionPaneModel? placeholder))
+                {
+                    return;
+                }
+
+                SessionTabViewModel? tab = _main.Connection.ActiveSessions.FirstOrDefault(
+                    t => string.Equals(t.ServerId, sessionId, StringComparison.Ordinal));
+                if (tab is null
+                    || placeholder.HostControl is not null
+                    || SplitTreeHelper.FindPane(tab.RootContent, placeholder.PaneId) is null)
+                {
+                    return;
+                }
+
+                _companionPlaceholders.TryRemove(sessionId, out _);
+                _companionProfiles.TryRemove(sessionId, out _);
+                _withdrawnCompanions[sessionId] = true;
+
+                // Armed before the tree changes, so the report that the new layout provokes is not
+                // missed. Only for the selected tab: a tab that is not on screen is not laid out
+                // again, so no wider report would come and the launch would wait for nothing. A page
+                // that never reported (bulk connect, restore) has nothing to wait for either:
+                // Plink launches at the size it already gets.
+                if (ReferenceEquals(_main.Connection.ActiveSession, tab)
+                    && ConnectingReportOf(sessionId) is { Latest: not null } report)
+                {
+                    _pendingRelayouts[sessionId] = report.ArmWiderReport();
+                }
+
+                RemoveCompanionPlaceholder(tab, placeholder);
+            });
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            FileLogger.Warn($"Withdrawing the SFTP companion pane before the Plink retry failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>How many per-session companion and Plink retry entries are held; zero when nothing leaks.</summary>
+    internal int CompanionStateCount =>
+        _companionPlaceholders.Count + _companionProfiles.Count + _withdrawnCompanions.Count + _pendingRelayouts.Count;
+
+    private void PurgePlinkRetryState(string sessionId)
+    {
+        _withdrawnCompanions.TryRemove(sessionId, out _);
+        _pendingRelayouts.TryRemove(sessionId, out _);
     }
 
     private void TrackConnectingCancellation(
@@ -2292,6 +2763,8 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         }
         _connectingCancellations.Clear();
         _sharedSshConnectionInputs.Clear();
+        _withdrawnCompanions.Clear();
+        _pendingRelayouts.Clear();
 
         lock (_reconnectChainGate)
         {

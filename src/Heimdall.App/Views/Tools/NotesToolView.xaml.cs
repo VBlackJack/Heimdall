@@ -1011,10 +1011,18 @@ public partial class NotesToolView : UserControl, IToolView
         try
         {
             FileLogger.Info($"[NotesTool][DragDrop] move source={DescribeNode(sourceNode)} target={DescribeFolderPath(targetFolderPath)}");
+            await FlushPendingChangesAsync().ConfigureAwait(true);
             var newPath = await _vm.MoveNoteToFolderAsync(sourceNode.FilePath, targetFolderPath)
                 .ConfigureAwait(true);
-            SetStatus(string.Format(L("ToolNotesStatusMoved"), Path.GetFileName(newPath)));
-            FileLogger.Info($"[NotesTool][DragDrop] move completed newPath={newPath}");
+            if (newPath is null)
+            {
+                FileLogger.Warn($"[NotesTool][DragDrop] move refused: unsaved changes kept source={DescribeNode(sourceNode)}");
+            }
+            else
+            {
+                SetStatus(string.Format(L("ToolNotesStatusMoved"), Path.GetFileName(newPath)));
+                FileLogger.Info($"[NotesTool][DragDrop] move completed newPath={newPath}");
+            }
         }
         catch (Exception ex)
         {

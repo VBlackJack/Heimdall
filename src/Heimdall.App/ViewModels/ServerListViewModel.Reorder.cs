@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+using System.Runtime.ExceptionServices;
+using Heimdall.App.Services;
 using Heimdall.Core.Configuration;
 
 namespace Heimdall.App.ViewModels;
@@ -223,6 +225,236 @@ public partial class ServerListViewModel
     }
 
     /// <summary>
+    /// Whether "Sort A to Z" has something to undo on <paramref name="folder"/>'s own level: a local
+    /// folder, or "(No Folder)", with a direct session that has a manual place or a direct
+    /// sub-folder listed in the manual folder order. Only direct children count, so a hand
+    /// arrangement deeper down never enables it, and it reads the stable tree, which is cheap.
+    /// </summary>
+    public bool CanSortFolderAlphabetically(FolderViewModel folder)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
+        if (folder.IsShared || IsSharedFolderKey(folder.FullPath))
+        {
+            return false;
+        }
+
+        string key = string.IsNullOrEmpty(folder.FullPath) ? NoGroupProjectionKey : folder.FullPath;
+        return _stableFoldersByPath.TryGetValue(key, out StableFolderNode? node)
+            && !node.IsShared
+            && HasHandArrangedLevel(node, includeFolders: !node.IsNoGroup);
+    }
+
+    /// <summary>
+    /// Whether "Sort top-level folders A to Z" has something to undo: a top-level local folder is
+    /// listed in the manual folder order.
+    /// </summary>
+    public bool CanSortTopLevelAlphabetically() =>
+        HasHandArrangedLevel(_stableTreeRoot, includeFolders: true, includeSessions: false);
+
+    /// <summary>
+    /// Puts one level back in alphabetical order: the direct sessions of <paramref name="folder"/>
+    /// lose their manual place and the folder order entries ranking its direct sub-folders are
+    /// removed. "(No Folder)" clears its sessions only. Nothing deeper changes.
+    /// </summary>
+    /// <returns><see langword="true"/> when something was cleared.</returns>
+    /// <remarks>
+    /// A shared folder is refused with the read-only status line. The change is offered to the
+    /// undo bar, which puts the session values and the removed entries back.
+    /// </remarks>
+    public async Task<bool> SortFolderAlphabeticallyAsync(
+        FolderViewModel folder,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
+        if (folder.IsShared || IsSharedFolderKey(folder.FullPath))
+        {
+            ReportSharedFolderReadOnly();
+            return false;
+        }
+
+        string key = string.IsNullOrEmpty(folder.FullPath) ? NoGroupProjectionKey : folder.FullPath;
+        if (!_stableFoldersByPath.TryGetValue(key, out StableFolderNode? node) || node.IsShared)
+        {
+            return false;
+        }
+
+        bool sorted = await SortLevelAlphabeticallyAsync(
+            folder.FullPath,
+            [.. node.Servers.Where(server => !server.IsShared)],
+            clearFolderEntries: !node.IsNoGroup,
+            cancellationToken);
+        if (sorted)
+        {
+            StatusMessageRequested?.Invoke(_localizer.Format("StatusFolderSortedAlphabetically", folder.Name));
+        }
+
+        return sorted;
+    }
+
+    /// <summary>
+    /// Puts the top-level folders back in alphabetical order by removing the folder order entries
+    /// that have no parent. Sessions and deeper levels are left as they are.
+    /// </summary>
+    /// <returns><see langword="true"/> when an entry was cleared.</returns>
+    public async Task<bool> SortTopLevelAlphabeticallyAsync(CancellationToken cancellationToken = default)
+    {
+        bool sorted = await SortLevelAlphabeticallyAsync(
+            string.Empty,
+            [],
+            clearFolderEntries: true,
+            cancellationToken);
+        if (sorted)
+        {
+            StatusMessageRequested?.Invoke(_localizer["StatusTopLevelSortedAlphabetically"]);
+        }
+
+        return sorted;
+    }
+
+    private bool HasHandArrangedLevel(StableFolderNode node, bool includeFolders, bool includeSessions = true)
+    {
+        if (includeSessions
+            && node.Servers.Any(server => !server.IsShared && server.SortOrder != SessionOrdering.Unordered))
+        {
+            return true;
+        }
+
+        if (!includeFolders || _currentSettings?.FolderOrder is not { Count: > 0 } order)
+        {
+            return false;
+        }
+
+        IReadOnlyDictionary<string, int> ranks = FolderOrdering.RanksOf(order);
+        return node.Children.Any(child =>
+            !child.IsShared && !child.IsNoGroup && ranks.ContainsKey(child.ViewModel!.FullPath));
+    }
+
+    /// <summary>
+    /// The shared write of both sort commands. The folder order entries go first, then the
+    /// sessions; if the second write fails the first is put back, and if that fails too the undo
+    /// bar still offers to put the entries back, so no failure leaves a change nobody can reverse.
+    /// </summary>
+    private async Task<bool> SortLevelAlphabeticallyAsync(
+        string levelPath,
+        IReadOnlyList<ServerItemViewModel> directSessions,
+        bool clearFolderEntries,
+        CancellationToken cancellationToken)
+    {
+        // Nothing arranged on this level: no write, no undo entry.
+        if (!(clearFolderEntries && FolderOrdering.HasChildEntry(_currentSettings?.FolderOrder, levelPath))
+            && !directSessions.Any(server => server.SortOrder != SessionOrdering.Unordered))
+        {
+            return false;
+        }
+
+        HashSet<string> directIds = new(directSessions.Select(server => server.Id), StringComparer.Ordinal);
+        Dictionary<string, ServerItemViewModel> directById = directSessions.ToDictionary(
+            server => server.Id,
+            StringComparer.Ordinal);
+        List<string> removedEntries = [];
+        bool rowsChanged = false;
+        ExceptionDispatchInfo? failure = null;
+
+        FolderOrderRestore? restore = await WithOrganizationUndoAsync(TreeOrganizationChange.FolderSort, async () =>
+        {
+            if (clearFolderEntries)
+            {
+                await _configManager.MergeSettingAsync(settings =>
+                {
+                    removedEntries = FolderOrdering.ChildEntries(settings.FolderOrder, levelPath);
+                    if (removedEntries.Count > 0)
+                    {
+                        settings.FolderOrder = FolderOrdering.WithoutChildEntries(settings.FolderOrder, levelPath);
+                    }
+                });
+            }
+
+            try
+            {
+                if (directIds.Count > 0)
+                {
+                    await ExecutePersistedBulkMutationAsync(BuildPlan, cancellationToken);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Any exception from the session write lands here, one thrown after the rows were
+                // saved (the refresh steps) included. The folder entries are then put back while the
+                // sessions are already cleared: the user is told the change failed, and the cleared
+                // rows are still recorded by the history, so Undo is offered for them.
+                failure = ExceptionDispatchInfo.Capture(ex);
+                if (removedEntries.Count > 0 && await TryPutBackEntriesAsync(removedEntries))
+                {
+                    removedEntries = [];
+                }
+            }
+
+            return removedEntries.Count > 0 ? new FolderOrderRestore(levelPath, removedEntries) : null;
+        }, serverIds: directIds, restoreFolderOrder: removed => removed);
+
+        if (!rowsChanged || failure is not null)
+        {
+            // Only the folder order changed, or nothing did: rebuild from what is now stored.
+            try
+            {
+                _currentSettings = await _configManager.LoadSettingsAsync();
+                ResortStableTreeProjection();
+                ApplyFilter();
+            }
+            catch (Exception ex) when (failure is not null)
+            {
+                Core.Logging.FileLogger.Error("Refreshing the tree after a failed sort failed", ex);
+            }
+        }
+
+        failure?.Throw();
+        return restore is not null || rowsChanged;
+
+        BulkMutationPlan? BuildPlan(List<ServerProfileDto> dtos)
+        {
+            List<(ServerItemViewModel OldVm, ServerProfileDto NewDto)> updates = [];
+            foreach (ServerProfileDto dto in dtos)
+            {
+                // A row that left the folder since the tree was built is not this level's any more.
+                if (dto.SortOrder != SessionOrdering.Unordered
+                    && directById.TryGetValue(dto.Id, out ServerItemViewModel? server)
+                    && string.Equals(FolderPath.Canonicalize(dto.Group), levelPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    dto.SortOrder = SessionOrdering.Unordered;
+                    updates.Add((server, dto));
+                }
+            }
+
+            rowsChanged = updates.Count > 0;
+            return new BulkMutationPlan(
+                Array.Empty<ServerItemViewModel>(),
+                updates,
+                Array.Empty<ServerProfileDto>(),
+                null,
+                null,
+                null,
+                null,
+                null,
+                OrderOnly: true);
+        }
+    }
+
+    private async Task<bool> TryPutBackEntriesAsync(IReadOnlyList<string> entries)
+    {
+        try
+        {
+            await _configManager.MergeSettingAsync(settings =>
+                settings.FolderOrder = FolderOrdering.WithEntriesAppended(settings.FolderOrder, entries));
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Error("Putting the folder order back after a failed sort failed", ex);
+            return false;
+        }
+    }
+
+    /// <summary>
     /// The local folders sharing a parent with <paramref name="folderPath"/>, in the order the
     /// tree shows them, when the folder can move <paramref name="delta"/> steps.
     /// </summary>
@@ -310,6 +542,7 @@ public partial class ServerListViewModel
         {
             Dictionary<string, ServerProfileDto> dtoById = dtos.ToDictionary(dto => dto.Id, StringComparer.Ordinal);
             List<(ServerItemViewModel OldVm, ServerProfileDto NewDto)> updates = [];
+            bool everyRowKeptItsFolder = true;
             for (int index = 0; index < orderedSiblings.Count; index++)
             {
                 ServerItemViewModel sibling = orderedSiblings[index];
@@ -328,6 +561,9 @@ public partial class ServerListViewModel
                     continue;
                 }
 
+                everyRowKeptItsFolder &=
+                    string.Equals(NormalizeGroupForPersistence(dto.Group), targetGroup, StringComparison.Ordinal)
+                    && string.Equals(NormalizeGroupForPersistence(sibling.Group), targetGroup, StringComparison.Ordinal);
                 dto.SortOrder = order;
                 dto.Group = targetGroup;
                 updates.Add((sibling, dto));
@@ -342,7 +578,8 @@ public partial class ServerListViewModel
                 primaryId,
                 primaryId,
                 written ? statusKey : null,
-                statusArgs);
+                statusArgs,
+                everyRowKeptItsFolder);
         }
     }
 }

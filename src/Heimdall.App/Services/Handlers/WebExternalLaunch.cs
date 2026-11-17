@@ -15,8 +15,13 @@
  */
 
 using System.Diagnostics;
+using System.Globalization;
+using System.IO;
+using System.Text.RegularExpressions;
 using Heimdall.Core.Configuration;
+using Heimdall.Core.Localization;
 using Heimdall.Core.Security;
+using Heimdall.Core.Utilities;
 
 namespace Heimdall.App.Services.Handlers;
 
@@ -28,6 +33,46 @@ internal static class WebExternalLaunch
 {
     /// <summary>The arguments a profile gets when it names a program and no arguments.</summary>
     public const string DefaultArguments = "{Url}";
+
+    /// <summary>The longest program path the confirmation shows before it is cut.</summary>
+    public const int MaxDescribedProgramLength = 260;
+
+    /// <summary>The longest argument list the confirmation shows before it is cut.</summary>
+    public const int MaxDescribedArgumentsLength = 1024;
+
+    /// <summary>The localization key of the refusal of a program or argument list too long to show whole.</summary>
+    public const string CommandTooLongErrorKey = "ErrorWebExternalCommandTooLong";
+
+    /// <summary>The localization key of the refusal of a program the shell would resolve to a share or a device.</summary>
+    public const string NetworkPathErrorKey = "ErrorWebExternalNetworkPathRefused";
+
+    /// <summary>The localization key of the body of the question asked before the external program starts.</summary>
+    private const string ConfirmationBodyKey = "ConfirmWebExternalProgramBody";
+
+    /// <summary>The localization key of the title of the question asked before the external program starts.</summary>
+    private const string ConfirmationTitleKey = "ConfirmWebExternalProgramTitle";
+
+    /// <summary>The localization key of the button that lets the external program start.</summary>
+    private const string AllowLabelKey = "ConfirmExecutionTrustAllow";
+
+    /// <summary>The localization key of the button that starts nothing, and takes Enter.</summary>
+    private const string DeclineLabelKey = "ConfirmExecutionTrustDecline";
+
+    /// <summary>The severity the question is shown with.</summary>
+    private const string ConfirmationSeverity = "warning";
+
+    /// <summary>What wraps a program that holds a space or a quote when it is shown.</summary>
+    private const char ProgramQuote = '"';
+
+    /// <summary>How many quote characters wrap a quoted program.</summary>
+    private const int ProgramQuoteCount = 2;
+
+    /// <summary>A URI scheme: two or more characters before the colon, since a single letter is a drive designator.</summary>
+    private const string SchemePattern = "^[A-Za-z][A-Za-z0-9+.-]+:";
+
+    private static readonly char[] PathSeparators = ['/', '\\'];
+
+    private static readonly Regex UriScheme = new(SchemePattern, RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
     /// <summary>The placeholder replaced with the whole address.</summary>
     public const string UrlPlaceholder = "{Url}";
@@ -53,7 +98,115 @@ internal static class WebExternalLaunch
     public static string DescribeCommand(WebSessionResult session)
     {
         ArgumentNullException.ThrowIfNull(session);
-        return $"{session.ExternalProgram} {session.ExternalArguments}".Trim();
+        return DescribeCommand(session.ExternalProgram, session.ExternalArguments);
+    }
+
+    /// <summary>
+    /// The program and arguments as a confirmation shows them. Both come from a profile that may
+    /// have been imported, so control, format, line-separator, unassigned and blank-looking
+    /// characters are written out visibly instead of starting a new line or hiding part of the
+    /// command, and a long run of one character is shown with its count. A program that holds a
+    /// space or a quote is wrapped in quotes with the quote escaped; a plain one is shown as it is.
+    /// </summary>
+    public static string DescribeCommand(string? program, string? arguments)
+    {
+        string shownProgram = ShownProgram(program, MaxDescribedProgramLength);
+        string shownArguments = UntrustedText.MakeVisible(arguments, MaxDescribedArgumentsLength);
+        return $"{shownProgram} {shownArguments}".Trim();
+    }
+
+    /// <summary>
+    /// Whether the program and arguments fit the confirmation whole. A longer value would be cut
+    /// with a marker, and the end of an argument list could then hold a flag nobody saw, so such a
+    /// launch is refused instead of shown cut.
+    /// </summary>
+    public static bool FitsDescription(string? program, string? arguments) =>
+        ShownProgram(program, UntrustedText.NoLengthLimit).Length <= MaxDescribedProgramLength
+        && UntrustedText.MakeVisible(arguments, UntrustedText.NoLengthLimit).Length <= MaxDescribedArgumentsLength;
+
+    /// <summary>
+    /// The program as the confirmation shows it. One that holds a space or a quote is wrapped in
+    /// quotes with the quote escaped, so where it ends and its arguments begin is not left to the
+    /// reader; a plain program name is shown as it is. The quotes count in <paramref name="maxLength"/>.
+    /// </summary>
+    private static string ShownProgram(string? program, int maxLength)
+    {
+        if (string.IsNullOrEmpty(program) || !program.Any(IsSpaceOrQuote))
+        {
+            return UntrustedText.MakeVisible(program, maxLength);
+        }
+
+        int innerLength = maxLength == UntrustedText.NoLengthLimit ? maxLength : Math.Max(0, maxLength - ProgramQuoteCount);
+        return ProgramQuote + UntrustedText.MakeVisible(UntrustedText.EscapeForDoubleQuotes(program), innerLength) + ProgramQuote;
+    }
+
+    private static bool IsSpaceOrQuote(char character) =>
+        character == ProgramQuote || char.GetUnicodeCategory(character) == UnicodeCategory.SpaceSeparator;
+
+    /// <summary>
+    /// The body of the question asked before a tab starts the external program of its profile.
+    /// The profile name comes from a file that may have been imported, so it is made visible and
+    /// escaped as the rows of the other trust questions are, and cannot close the quotes the body
+    /// puts around it.
+    /// </summary>
+    public static string ConfirmationBody(string? displayName, string command, LocalizationManager localizer)
+    {
+        ArgumentNullException.ThrowIfNull(localizer);
+        return localizer.Format(ConfirmationBodyKey, ExecutionTrustDescriber.Visible(displayName), command);
+    }
+
+    /// <summary>
+    /// Asks the question that gates the external program of an unconfirmed profile, with the same
+    /// labeled buttons as the connect-time trust question: declining is the default, Escape and
+    /// the close box decline, and a shutdown in progress answers no.
+    /// </summary>
+    public static Task<bool> AskAsync(
+        IDialogService dialogs,
+        string? displayName,
+        string command,
+        LocalizationManager localizer)
+    {
+        ArgumentNullException.ThrowIfNull(dialogs);
+        ArgumentNullException.ThrowIfNull(localizer);
+        return dialogs.ShowConfirmAsync(
+            localizer[ConfirmationTitleKey],
+            ConfirmationBody(displayName, command, localizer),
+            ConfirmationSeverity,
+            localizer[AllowLabelKey],
+            localizer[DeclineLabelKey]);
+    }
+
+    /// <summary>
+    /// Whether <paramref name="program"/> would be resolved by the shell to something other than a
+    /// local file: a value wrapped in quotes, a URI with a scheme (<c>file://host/share/x.exe</c>),
+    /// or a path that is, or resolves to, a share or a device path. A bare program name and a
+    /// drive path are not.
+    /// </summary>
+    public static bool IsNetworkOrIndirectProgram(string program)
+    {
+        if (program.Contains('"', StringComparison.Ordinal) || UriScheme.IsMatch(program))
+        {
+            return true;
+        }
+
+        if (ImportedPathPolicy.IsNetworkOrDevicePath(program))
+        {
+            return true;
+        }
+
+        if (program.IndexOfAny(PathSeparators) < 0)
+        {
+            return false;
+        }
+
+        try
+        {
+            return ImportedPathPolicy.IsNetworkOrDevicePath(Path.GetFullPath(program));
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return true;
+        }
     }
 
     /// <summary>
@@ -68,6 +221,11 @@ internal static class WebExternalLaunch
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(confirmAsync);
+
+        if (!FitsDescription(session.ExternalProgram, session.ExternalArguments))
+        {
+            return new SessionLaunch(null, CommandTooLongErrorKey, Declined: false);
+        }
 
         if (RequiresConfirmation(session))
         {
@@ -140,9 +298,21 @@ internal static class WebExternalLaunch
             };
         }
 
+        if (IsNetworkOrIndirectProgram(program))
+        {
+            errorKey = NetworkPathErrorKey;
+            return null;
+        }
+
         if (InputValidator.IsShellTarget(program))
         {
             errorKey = "ErrorWebExternalShellRefused";
+            return null;
+        }
+
+        if (!FitsDescription(program, profile.WebExternalArguments))
+        {
+            errorKey = CommandTooLongErrorKey;
             return null;
         }
 

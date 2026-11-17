@@ -141,6 +141,7 @@ public sealed class PlinkTunnelRunner : IDisposable
     private readonly ITcpListenerOwnershipProbe _listenerOwnershipProbe;
     private readonly Func<ProcessStartInfo, IPlinkProcess> _processFactory;
     private readonly Func<string> _passwordFileDirectory;
+    private readonly TimeProvider _timeProvider;
 
     private IPlinkProcess? _process;
     private string? _pwFilePath;
@@ -168,7 +169,7 @@ public sealed class PlinkTunnelRunner : IDisposable
     /// <see cref="DrainJoinTimeout"/>: a refused sign-in was then reported as a port nobody
     /// listened on. Bounded all the same, for a pipe another process still holds open.
     /// </summary>
-    private static readonly TimeSpan ExitedDrainTimeout = TimeSpan.FromSeconds(5);
+    internal static readonly TimeSpan ExitedDrainTimeout = TimeSpan.FromSeconds(5);
 
     public PlinkTunnelRunner(
         int portCheckIntervalMs = AppSettings.DefaultPlinkPortCheckIntervalMs,
@@ -217,16 +218,40 @@ public sealed class PlinkTunnelRunner : IDisposable
         ITcpListenerOwnershipProbe listenerOwnershipProbe,
         Func<ProcessStartInfo, IPlinkProcess> processFactory,
         Func<string> passwordFileDirectory)
+        : this(options, listenerOwnershipProbe, processFactory, passwordFileDirectory, TimeProvider.System)
+    {
+    }
+
+    /// <summary>
+    /// Initialises a runner whose wait for the stderr drain of an exited plink is measured by the given clock.
+    /// </summary>
+    /// <param name="timeProvider">
+    /// The clock that bounds the wait for the stderr drain of an exited plink. Production passes
+    /// <see cref="TimeProvider.System"/>.
+    /// </param>
+    /// <remarks>
+    /// A test that proves what the runner does while that wait is open cannot do it against the
+    /// wall clock: a loaded machine can let the bound expire before the stand-in stderr is read.
+    /// With a controlled clock the test decides when the bound passes.
+    /// </remarks>
+    internal PlinkTunnelRunner(
+        PlinkTunnelRunnerOptions options,
+        ITcpListenerOwnershipProbe listenerOwnershipProbe,
+        Func<ProcessStartInfo, IPlinkProcess> processFactory,
+        Func<string> passwordFileDirectory,
+        TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(listenerOwnershipProbe);
         ArgumentNullException.ThrowIfNull(processFactory);
         ArgumentNullException.ThrowIfNull(passwordFileDirectory);
+        ArgumentNullException.ThrowIfNull(timeProvider);
         _portCheckInterval = TimeSpan.FromMilliseconds(options.PortCheckIntervalMs);
         _processKillGracePeriod = TimeSpan.FromMilliseconds(options.KillGracePeriodMs);
         _listenerOwnershipProbe = listenerOwnershipProbe;
         _processFactory = processFactory;
         _passwordFileDirectory = passwordFileDirectory;
+        _timeProvider = timeProvider;
     }
 
     /// <summary>Whether the underlying plink process is running.</summary>
@@ -976,7 +1001,7 @@ public sealed class PlinkTunnelRunner : IDisposable
 
         try
         {
-            await drain.WaitAsync(ExitedDrainTimeout, cancellationToken).ConfigureAwait(false);
+            await drain.WaitAsync(ExitedDrainTimeout, _timeProvider, cancellationToken).ConfigureAwait(false);
         }
         catch (TimeoutException)
         {

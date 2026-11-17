@@ -42,6 +42,33 @@ public sealed class NetworkScannerService(
     private readonly IDialogService _dialogService = dialogService;
     private readonly IConfigManager _configManager = configManager;
 
+    /// <summary>The profile a scanned host is saved as.</summary>
+    internal static ServerProfileDto BuildDiscoveredProfile(NetworkScanner.ScanResult result)
+    {
+        var connectionType = result.OpenPorts.Contains(DefaultPorts.Rdp) ? "RDP"
+            : result.OpenPorts.Contains(DefaultPorts.Ssh) ? "SSH"
+            : result.OpenPorts.Contains(DefaultPorts.Vnc) ? "VNC"
+            : "SSH";
+        var port = connectionType switch
+        {
+            "RDP" => DefaultPorts.Rdp,
+            "VNC" => DefaultPorts.Vnc,
+            _ => DefaultPorts.Ssh
+        };
+
+        return new ServerProfileDto
+        {
+            Id = Guid.NewGuid().ToString(),
+            DisplayName = result.Hostname ?? result.IpAddress,
+            RemoteServer = result.IpAddress,
+            RemotePort = port,
+            ConnectionType = connectionType,
+            Group = "Discovered",
+            // The name comes from reverse DNS, which the network controls.
+            CredentialLookupConfirmed = false
+        };
+    }
+
     /// <summary>
     /// Scans a subnet for live hosts and optionally adds them to the server inventory.
     /// Progress is reported through the standard <see cref="IProgress{T}"/> pattern.
@@ -105,26 +132,7 @@ public sealed class NetworkScannerService(
                 {
                     foreach (var result in results)
                     {
-                        var connectionType = result.OpenPorts.Contains(DefaultPorts.Rdp) ? "RDP"
-                            : result.OpenPorts.Contains(DefaultPorts.Ssh) ? "SSH"
-                            : result.OpenPorts.Contains(DefaultPorts.Vnc) ? "VNC"
-                            : "SSH";
-                        var port = connectionType switch
-                        {
-                            "RDP" => DefaultPorts.Rdp,
-                            "VNC" => DefaultPorts.Vnc,
-                            _ => DefaultPorts.Ssh
-                        };
-
-                        existingServers.Add(new ServerProfileDto
-                        {
-                            Id = Guid.NewGuid().ToString(),
-                            DisplayName = result.Hostname ?? result.IpAddress,
-                            RemoteServer = result.IpAddress,
-                            RemotePort = port,
-                            ConnectionType = connectionType,
-                            Group = "Discovered"
-                        });
+                        existingServers.Add(BuildDiscoveredProfile(result));
                     }
 
                     return results.Count;

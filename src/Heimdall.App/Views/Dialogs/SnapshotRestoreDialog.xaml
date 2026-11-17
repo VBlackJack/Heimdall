@@ -107,8 +107,10 @@
                                         <ColumnDefinition Width="140"/>
                                     </Grid.ColumnDefinitions>
 
+                                    <!-- A session name is data: the template keeps its underscores. -->
                                     <CheckBox Grid.Column="0"
                                               Content="{Binding DisplayName}"
+                                              ContentTemplate="{StaticResource LiteralTextTemplate}"
                                               IsChecked="{Binding IsSelected}"
                                               Foreground="{DynamicResource TextPrimaryBrush}"
                                               AutomationProperties.Name="{Binding DisplayName}"/>

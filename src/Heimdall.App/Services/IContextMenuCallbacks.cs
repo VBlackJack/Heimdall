@@ -83,4 +83,15 @@ public interface IContextMenuCallbacks
     /// selected and in view, and reports a failure to the user.
     /// </summary>
     Task NudgeSessionAsync(ServerItemViewModel server, int delta) => Task.CompletedTask;
+
+    /// <summary>
+    /// Puts one level of a local folder (or of "(No Folder)") back in alphabetical order, keeps the
+    /// folder selected and in view, and reports a failure to the user.
+    /// </summary>
+    Task SortFolderAlphabeticallyAsync(FolderViewModel folder) => Task.CompletedTask;
+
+    /// <summary>
+    /// Puts the top-level folders back in alphabetical order and reports a failure to the user.
+    /// </summary>
+    Task SortTopLevelAlphabeticallyAsync() => Task.CompletedTask;
 }

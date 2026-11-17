@@ -241,4 +241,60 @@ public sealed partial class ServerListSelectionTests
         Assert.True(fixture.ViewModel.CanNudgeServer(fixture.ServerById("b"), -1));
         Assert.False(fixture.ViewModel.CanNudgeServer(fixture.ServerById("b"), 1));
     }
+
+    [Fact]
+    public async Task ImportedOrder_ShowsInTheTree()
+    {
+        const string sample = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <mrng:Connections xmlns:mrng="http://mremoteng.org" Name="Connections" ConfVersion="2.6">
+              <Node Name="Zeta" Type="Container">
+                <Node Name="web-b" Type="Connection" Hostname="b.example.com" Protocol="SSH2" />
+                <Node Name="Sub2" Type="Container"><Node Name="x" Type="Connection" Hostname="x.example.com" Protocol="SSH2" /></Node>
+                <Node Name="Sub1" Type="Container"><Node Name="y" Type="Connection" Hostname="y.example.com" Protocol="SSH2" /></Node>
+                <Node Name="web-a" Type="Connection" Hostname="a.example.com" Protocol="SSH2" />
+              </Node>
+              <Node Name="Alpha" Type="Container"><Node Name="db" Type="Connection" Hostname="db.example.com" Protocol="RDP" /></Node>
+              <Node Name="root-z" Type="Connection" Hostname="z.example.com" Protocol="RDP" />
+              <Node Name="root-a" Type="Connection" Hostname="r.example.com" Protocol="RDP" />
+            </mrng:Connections>
+            """;
+        List<ServerProfileDto> imported = MRemoteNgImporter.Parse(sample).Servers;
+        Heimdall.App.Services.Import.ImportSourceOrder.ArrangeSessions([], imported);
+        AppSettings settings = new()
+        {
+            FolderOrder = Heimdall.App.Services.Import.ImportSourceOrder.MergeFolderOrder(
+                [],
+                new HashSet<string>(),
+                Heimdall.App.Services.Import.ImportSourceOrder.FolderPathsInFileOrder(imported)) ?? []
+        };
+        settings.TreeExpandedNodes.Add("Zeta");
+        await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync();
+
+        await fixture.LoadServersAsync(settings, [.. imported]);
+
+        Assert.Equal(["Zeta", "Alpha", ""], TopLevelPaths(fixture.ViewModel));
+        Assert.Equal(["Zeta/Sub2", "Zeta/Sub1"], ChildPaths(fixture, "Zeta"));
+        Assert.Equal(["web-b", "web-a"], fixture.FolderByPath("Zeta").Servers.Select(server => server.DisplayName));
+        Assert.Equal(["root-z", "root-a"], fixture.FolderByPath("").Servers.Select(server => server.DisplayName));
+    }
+
+    [Fact]
+    public async Task InventoryInTreeOrder_FollowsTheTree_NotOneGlobalRankThenName()
+    {
+        await using ServerListSelectionFixture fixture = await ServerListSelectionFixture.CreateAsync();
+        await fixture.LoadServersAsync(
+            fixture.ExpandGroups("ops"),
+            CreateServer("first", "First", "ops", sortOrder: 10),
+            CreateServer("second", "Second", "ops", sortOrder: 20),
+            CreateServer("s1", "S1", "ops/sub"),
+            CreateServer("d1", "D1", "dev", sortOrder: 10),
+            CreateServer("d2", "D2", "dev", sortOrder: 20),
+            CreateServer("loose", "Loose", "", sortOrder: 10));
+
+        // One global sort would list every rank-10 session first: d1, first, loose, d2, second, s1.
+        Assert.Equal(
+            ["d1", "d2", "s1", "first", "second", "loose"],
+            fixture.ViewModel.InventoryInTreeOrder.Select(server => server.Id));
+    }
 }

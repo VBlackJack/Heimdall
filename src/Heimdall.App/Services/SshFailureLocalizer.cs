@@ -69,6 +69,14 @@ public static class SshFailureLocalizer
                     formatArgument = count;
                 }
 
+                // Handed over raw: the classifier substitutes the fingerprint in one place, with a
+                // plain replacement that a hand-edited value cannot break.
+                if (failure.Code is SshFailureCode.AgentKeyNotLoaded
+                    && failure.OriginalException is SshAgentKeyNotLoadedException)
+                {
+                    return localizer[key];
+                }
+
                 return localizer.Format(key, formatArgument);
             },
             agentKeyCountAtDial: agentKeyCountAtDial);
