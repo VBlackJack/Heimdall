@@ -576,8 +576,8 @@ directory without checking it, so an account able to write in the destination's
 folder could make a root write or read land elsewhere; earlier versions wrote and
 read through the destination's name and followed a symbolic link put there.
 
-Root reaches the folder of an entry it writes, reads, deletes or changes the
-permissions of by walking the path from `/`, one folder at a time, holding each
+Root reaches the folder of an entry it writes, reads, deletes, creates, renames or
+changes the permissions of by walking the path from `/`, one folder at a time, holding each
 folder before the next step. A symbolic link on the way is followed only when the
 link belongs to root or to the account that called sudo, and the folder holding it
 belongs to root or to that account and cannot be written by other accounts; its
@@ -589,7 +589,11 @@ folder. A folder whose mode is printed with fewer than three digits is treated a
 open; on a folder with a POSIX ACL the mode bits show the ACL mask, and NFSv4 ACLs are not seen. A root
 delete removes the entry from the folder it holds, by its last name only, refuses a file
 whose name a folder took, and, like the root permission change, needs GNU coreutils on
-the server: on BusyBox or BSD it is refused.
+the server: on BusyBox or BSD it is refused. A root folder creation and a root rename
+work the same way, from the held folder, and need GNU coreutils too: a name that is
+already taken is reported, never replaced, unless you chose to replace a file. The
+checks that look for an existing name before a rename read the path as given (a
+`!` in it is escaped); the rename itself does not.
 
 A write, read or permission change of an entry with another hard link is refused
 when its folder can be written by an account other than root, the caller and the
@@ -599,8 +603,7 @@ keep working.
 
 Limits that remain: an account that can write in the folder can remove the empty work
 directory and make the transfer fail; a new file written as root belongs to root with
-mode 0600; root creating a folder or renaming an entry still reaches it through the
-path as given, links included.
+mode 0600.
 
 The privileged connection goes through the same cancellable connect as the other
 SFTP connections, so Cancel reaches it during the handshake. Every privileged

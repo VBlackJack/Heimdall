@@ -76,7 +76,9 @@ public sealed class EmbeddedSftpSudoConsentTests
         await harness.ViewModel.RenameEntryAsync(File("old.txt", "/srv/old.txt"));
 
         Assert.Equal(expectedQuestions, harness.Dialog.Questions.Count);
-        Assert.Contains(harness.SudoRenameCommands, command => command.StartsWith("mv ", StringComparison.Ordinal));
+        Assert.Contains(
+            PrivilegedFileCommands.BuildHeldRenameBody("/srv/old.txt", "new.txt", replace: false),
+            harness.SudoRenameCommands);
         Assert.Equal(1, harness.ViewModel.RootActivity.Snapshot().OperationCount);
     }
 

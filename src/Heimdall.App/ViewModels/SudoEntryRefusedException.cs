@@ -19,7 +19,7 @@ using Heimdall.Sftp;
 namespace Heimdall.App.ViewModels;
 
 /// <summary>
-/// A privileged permission change was refused by the server-side script for this one entry: it is
+/// A privileged operation was refused by the server-side script for this one entry: it is
 /// a symbolic link or a special file, or it is no longer the entry that was listed.
 /// </summary>
 /// <remarks>
@@ -27,12 +27,16 @@ namespace Heimdall.App.ViewModels;
 /// </remarks>
 internal sealed class SudoEntryRefusedException : Exception
 {
-    public SudoEntryRefusedException(EntryRefusalReason reason, string? remoteDiagnostic)
-        : base("The privileged permission change was refused for this entry.")
+    public SudoEntryRefusedException(EntryRefusalReason reason, string? remoteDiagnostic, string? remotePath = null)
+        : base("The privileged operation was refused for this entry.")
     {
         Reason = reason;
         RemoteDiagnostic = remoteDiagnostic ?? string.Empty;
+        RemotePath = remotePath ?? string.Empty;
     }
+
+    /// <summary>The path of the entry the script was given, when the caller knew it; empty otherwise.</summary>
+    public string RemotePath { get; }
 
     /// <summary>Why the entry was refused: what the message shown to the user is chosen from.</summary>
     public EntryRefusalReason Reason { get; }
