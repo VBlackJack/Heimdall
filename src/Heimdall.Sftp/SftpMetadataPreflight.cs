@@ -118,8 +118,10 @@ public static class SftpMetadataPreflight
 
         string path = PathEscaper.EscapeForShell(remotePath);
 
-        return "LC_ALL=C sh -c "
-            + PathEscaper.EscapeForShell(
+        // env, not a leading assignment, and the login-shell escaper: this string is parsed by the
+        // account's login shell, which may be csh, tcsh or zsh, before sh sees the script.
+        return "env LC_ALL=C sh -c "
+            + PathEscaper.EscapeForLoginShell(
                 // A destination that is not there cannot lose anything.
                 $"if [ ! -e {path} ]; then exit {NoExistingTargetStatus}; fi; "
 

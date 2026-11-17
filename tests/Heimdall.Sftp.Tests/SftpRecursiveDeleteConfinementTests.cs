@@ -41,7 +41,7 @@ public sealed class SftpRecursiveDeleteConfinementTests
         await browser.DeleteDirectoryViaExecAsync("/srv/tree", CancellationToken.None);
 
         Assert.Equal(1, runner.CallCount);
-        Assert.Equal("LC_ALL=C rm -r -- '/srv/tree'", runner.LastCommand);
+        Assert.Equal("env LC_ALL=C rm -r -- '/srv/tree'", runner.LastCommand);
     }
 
     /// <remarks>

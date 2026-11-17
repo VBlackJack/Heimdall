@@ -51,4 +51,20 @@ public static class PathEscaper
         string escaped = path.Replace("'", @"'\''");
         return $"'{escaped}'";
     }
+
+    /// <summary>
+    /// Escapes a path for a command that the remote account's login shell parses before any
+    /// <c>sh -c</c> boundary: <see cref="EscapeForShell(string)"/>, plus the history-expansion
+    /// character.
+    /// </summary>
+    /// <remarks>
+    /// csh and tcsh expand <c>!</c> as a history event even inside single quotes, and a bare event
+    /// reference fails the whole command; zsh does not expand it under <c>-c</c>. Each <c>!</c>
+    /// becomes <c>'\!'</c>: POSIX sh reads it back as a literal <c>!</c>, and csh and tcsh read the
+    /// backslash-escaped form without expanding it.
+    /// </remarks>
+    /// <param name="path">The path to escape.</param>
+    /// <returns>A single-quoted path with every <c>!</c> neutralized.</returns>
+    public static string EscapeForLoginShell(string path) =>
+        EscapeForShell(path).Replace("!", "'\\!'", StringComparison.Ordinal);
 }

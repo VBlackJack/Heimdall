@@ -22,7 +22,9 @@ namespace Heimdall.Sftp;
 /// <remarks>
 /// The <c>--</c> end-of-options guard protects option-looking names, <c>LC_ALL=C</c> keeps
 /// diagnostics stable for typed permission-denied mapping, and POSIX <c>rm -r</c> removes
-/// symbolic links as entries instead of traversing their targets.
+/// symbolic links as entries instead of traversing their targets. The assignment goes through
+/// <c>env</c> because the command reaches the account's login shell, and csh and tcsh refuse a
+/// leading <c>VAR=value</c> word; <c>!</c> is neutralized for the same reason.
 /// </remarks>
 internal static class RemoteDeleteCommand
 {
@@ -32,6 +34,6 @@ internal static class RemoteDeleteCommand
     public static string Build(string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
-        return $"LC_ALL=C rm -r -- {PathEscaper.EscapeForShell(path)}";
+        return $"env LC_ALL=C rm -r -- {PathEscaper.EscapeForLoginShell(path)}";
     }
 }

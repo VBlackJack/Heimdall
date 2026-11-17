@@ -1234,6 +1234,18 @@ public static class PrivilegedFileTransfer
         return !string.IsNullOrEmpty(stderr) && ContainsAny(stderr, NotPermittedMessages);
     }
 
+    /// <summary>Whether sudo's standard error says the password was refused or never supplied.</summary>
+    public static bool IsPasswordRejectedMessage(string? stderr)
+    {
+        return !string.IsNullOrEmpty(stderr) && ContainsAny(stderr, PasswordRejectedMessages);
+    }
+
+    /// <summary>Whether sudo's standard error says no password prompt could be answered.</summary>
+    public static bool IsPasswordUnavailableMessage(string? stderr)
+    {
+        return !string.IsNullOrEmpty(stderr) && ContainsAny(stderr, PasswordUnavailableMessages);
+    }
+
     /// <summary>
     /// Whether a command ended with "command not found" for sudo itself: the status alone would
     /// also name any other missing command.
@@ -1252,6 +1264,10 @@ public static class PrivilegedFileTransfer
         "incorrect password attempt",
         "sorry, try again",
         "no password was provided",
+        // sudo-rs
+        "authentication failed, try again",
+        "incorrect authentication attempt",
+        "authentication required but not attempted",
     ];
 
     private static readonly string[] PasswordUnavailableMessages =
@@ -1261,6 +1277,9 @@ public static class PrivilegedFileTransfer
         "no askpass",
         "a password is required",
         "you must have a tty",
+        // sudo-rs
+        "interactive authentication is required",
+        "interaction is required",
     ];
 
     private static readonly string[] NotPermittedMessages =
@@ -1269,6 +1288,9 @@ public static class PrivilegedFileTransfer
         "may not run sudo",
         "is not allowed to execute",
         "is not allowed to run sudo",
+        // sudo-rs
+        "i'm afraid i can't do that",
+        "is not allowed to authenticate as",
     ];
 
     private static bool ContainsAny(string text, string[] needles)

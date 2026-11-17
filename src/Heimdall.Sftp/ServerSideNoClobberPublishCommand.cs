@@ -24,7 +24,8 @@ namespace Heimdall.Sftp;
 /// </summary>
 /// <remarks>
 /// Pure string construction with no I/O, so the shell-escaping contract is unit-testable in isolation.
-/// Every path is single-quoted through <see cref="PathEscaper.EscapeForShell(string)"/> (CWE-78) and
+/// Every path is single-quoted through <see cref="PathEscaper.EscapeForLoginShell(string)"/> (CWE-78), passed to a
+/// constant <c>sh -c</c> script as a positional parameter, and
 /// guarded by <c>--</c> so a path beginning with <c>-</c> cannot be parsed as a flag.
 /// <para>
 /// Three claims that must not be conflated. The exclusivity of <c>ln</c> and of <c>mkdir</c> without
@@ -48,6 +49,11 @@ namespace Heimdall.Sftp;
 /// </remarks>
 internal static class ServerSideNoClobberPublishCommand
 {
+    /// <summary>Constant publish script: $1 is the staging path, $2 the destination.</summary>
+    internal const string PublishScript = "ln -T -- \"$1\" \"$2\"; status=$?; rm -f -- \"$1\"; exit $status";
+
+    private const string PublishScriptLiteral = "'" + PublishScript + "'";
+
     /// <summary>
     /// Returns a command that links <paramref name="stagingPath"/> to
     /// <paramref name="destinationPath"/> and then removes the staging link.
@@ -66,12 +72,15 @@ internal static class ServerSideNoClobberPublishCommand
         ArgumentException.ThrowIfNullOrWhiteSpace(stagingPath);
         ArgumentException.ThrowIfNullOrWhiteSpace(destinationPath);
 
-        string staging = PathEscaper.EscapeForShell(stagingPath);
-        string destination = PathEscaper.EscapeForShell(destinationPath);
+        string staging = PathEscaper.EscapeForLoginShell(stagingPath);
+        string destination = PathEscaper.EscapeForLoginShell(destinationPath);
 
         // -T: a destination that became a directory after the listing must refuse the link,
         // not receive it inside and report a publication at a path that does not hold the file.
-        return $"ln -T -- {staging} {destination}; status=$?; rm -f -- {staging}; exit $status";
+        // The script is a constant run by sh with the paths as positional parameters: the login
+        // shell only sees the sh -c word and quoted arguments, so csh, tcsh and zsh (where
+        // status is read-only) cannot misread the status capture.
+        return $"sh -c {PublishScriptLiteral} sh {staging} {destination}";
     }
 
     /// <summary>
@@ -89,6 +98,6 @@ internal static class ServerSideNoClobberPublishCommand
 
         // The same escaper as the file publish and the copy: two escapers with different
         // contracts side by side is how one of them ends up handling a character the other refuses.
-        return $"mkdir -- {PathEscaper.EscapeForShell(destinationPath)}";
+        return $"mkdir -- {PathEscaper.EscapeForLoginShell(destinationPath)}";
     }
 }

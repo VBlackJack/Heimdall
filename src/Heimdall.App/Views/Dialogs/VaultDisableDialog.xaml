@@ -42,9 +42,15 @@
         <!-- Warning: credentials revert to OS-level (DPAPI) protection -->
         <Border Grid.Row="1" Background="{DynamicResource CardBrush}"
                 CornerRadius="{StaticResource CornerRadiusSm}" Padding="12,8" Margin="0,0,0,14">
-            <TextBlock Text="{loc:Translate VaultDisableWarning}"
-                       Foreground="{DynamicResource WarningTextBrush}"
-                       FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap"/>
+            <StackPanel>
+                <TextBlock Text="{loc:Translate VaultDisableWarning}"
+                           Foreground="{DynamicResource WarningTextBrush}"
+                           FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap"/>
+                <TextBlock Text="{loc:Translate VaultDisableSealedCopiesWarning}"
+                           Foreground="{DynamicResource WarningTextBrush}"
+                           FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap"
+                           Margin="0,6,0,0"/>
+            </StackPanel>
         </Border>
 
         <TextBlock Grid.Row="2" Text="{loc:Translate VaultFieldMasterPassword}"

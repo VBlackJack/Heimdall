@@ -31,11 +31,20 @@ public static class SudoDirectoryListing
     /// link to a directory lists that directory; links among the children are never followed and
     /// are reported as links.
     /// </summary>
+    /// <remarks>
+    /// The body is <c>find</c> itself, with no <c>LC_ALL=C</c> assignment in front: a sudoers rule
+    /// limited to <c>find</c> matches it, and sudo is never asked to set a variable (a
+    /// <c>VAR=value</c> argument is checked against the sudoers environment policy, which a hardened
+    /// configuration may refuse). The <c>-printf</c> fields used here are locale independent, so the
+    /// caller's locale does not change what is parsed. The operand goes through
+    /// <see cref="PathEscaper.EscapeForLoginShell(string)"/> because the command text reaches the
+    /// account's login shell.
+    /// </remarks>
     public static string Build(string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         string operand = path.StartsWith('/') ? path : "./" + path;
-        return $"LC_ALL=C find -H {PathEscaper.EscapeForShell(operand)} -mindepth 1 -maxdepth 1 -printf '{RecordFormat}'";
+        return $"find -H {PathEscaper.EscapeForLoginShell(operand)} -mindepth 1 -maxdepth 1 -printf '{RecordFormat}'";
     }
 
     /// <summary>Rejects malformed records and excludes names unsupported by remote operations.</summary>

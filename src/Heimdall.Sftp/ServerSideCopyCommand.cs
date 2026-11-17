@@ -23,7 +23,8 @@ namespace Heimdall.Sftp;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Both paths are single-quoted through <see cref="PathEscaper.EscapeForShell(string)"/> (CWE-78),
+/// Every path is single-quoted through <see cref="PathEscaper.EscapeForLoginShell(string)"/> (CWE-78) and
+/// handed to a constant <c>sh -c</c> script as a positional parameter,
 /// and a <c>--</c> end-of-options guard prevents a path that begins with <c>-</c> from being parsed as
 /// a flag. File copies use a sibling temp followed by <c>ln</c>, so the final path appears complete and
 /// link creation fails atomically on collision. Directory copies reserve the root with <c>mkdir</c> before
@@ -80,6 +81,17 @@ internal static class ServerSideCopyCommand
     /// </summary>
     private const string PrivateCreationUmask = "umask 077;";
 
+    /// <summary>Constant directory-copy script: $1 is the source, $2 the destination.</summary>
+    internal const string DirectoryScript = PrivateCreationUmask + " mkdir -- \"$2\" || exit $?; "
+        + "cp -a -- \"$1\"/. \"$2\" || { status=$?; rm -rf -- \"$2\"; exit $status; }";
+
+    /// <summary>Constant file-copy script: $1 is the source, $2 the destination, $3 the staging path.</summary>
+    internal static readonly string FileScript = PrivateCreationUmask + " set -C; : > \"$3\" || exit $?; set +C; "
+        + "cp -p -- \"$1\" \"$3\" && ln -T -- \"$3\" \"$2\"; "
+        + "status=$?; if [ $status -eq 0 ] && [ -L \"$2\" ]; then "
+        + $"rm -f -- \"$2\"; status={PublishedASymlinkStatus}; fi; "
+        + "rm -f -- \"$3\"; exit $status";
+
     /// <summary>
     /// Returns a sibling-temp and hard-link chain for a file copy, or an exclusive root reservation
     /// followed by an archive copy when <paramref name="recursive"/> is true.
@@ -92,8 +104,11 @@ internal static class ServerSideCopyCommand
         ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
         ArgumentException.ThrowIfNullOrWhiteSpace(destinationPath);
 
-        string source = PathEscaper.EscapeForShell(sourcePath);
-        string destination = PathEscaper.EscapeForShell(destinationPath);
+        // The scripts below are constants run by sh with the paths as positional parameters: the
+        // remote account's login shell (csh, tcsh, zsh, old fish) only parses the sh -c word and
+        // quoted arguments, never the umask, $?, { } or if of the script itself.
+        string source = PathEscaper.EscapeForLoginShell(sourcePath);
+        string destination = PathEscaper.EscapeForLoginShell(destinationPath);
 
         if (recursive)
         {
@@ -105,8 +120,7 @@ internal static class ServerSideCopyCommand
             // found there is not this command's to delete.
             // The umask keeps every node owner-only while it is written; cp -a restores the
             // source's modes, the root's included, once each node is complete.
-            return $"{PrivateCreationUmask} mkdir -- {destination} || exit $?; "
-                + $"cp -a -- {source}/. {destination} || {{ status=$?; rm -rf -- {destination}; exit $status; }}";
+            return $"sh -c '{DirectoryScript}' sh {source} {destination}";
         }
 
         // The staging name is drawn client-side, by the same generator the upload path
@@ -114,7 +128,7 @@ internal static class ServerSideCopyCommand
         // own PID: a few thousand possible names in a directory the attacker can write to,
         // so a local user on the server could plant a symlink at every one of them ahead of
         // time and have `cp -p` open through it. No race to win, only patience.
-        string tempDestination = PathEscaper.EscapeForShell(
+        string tempDestination = PathEscaper.EscapeForLoginShell(
             SftpAtomicUpload.CreateRemoteTempPath(destinationPath));
 
         // Three steps, each measured rather than argued (the measurements are in the type
@@ -132,10 +146,6 @@ internal static class ServerSideCopyCommand
         // mode (measured with GNU coreutils and BusyBox 1.37). -T makes ln treat the
         // destination as a name: a destination that became a directory would otherwise
         // receive the link inside it, with exit 0.
-        return $"{PrivateCreationUmask} set -C; : > {tempDestination} || exit $?; set +C; "
-            + $"cp -p -- {source} {tempDestination} && ln -T -- {tempDestination} {destination}; "
-            + $"status=$?; if [ $status -eq 0 ] && [ -L {destination} ]; then "
-            + $"rm -f -- {destination}; status={PublishedASymlinkStatus}; fi; "
-            + $"rm -f -- {tempDestination}; exit $status";
+        return $"sh -c '{FileScript}' sh {source} {destination} {tempDestination}";
     }
 }
