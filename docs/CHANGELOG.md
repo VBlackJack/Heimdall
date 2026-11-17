@@ -12,6 +12,35 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-11-17: The master password protects every stored secret, and root browsing works under stricter servers (v2026.111703)
+
+Fixes merged as #763 and #843. The user-facing summary and the upgrade notes are in the release notes.
+
+### Master password migration (#763)
+
+- `IVaultSecretStore` (forward, reverse, holds-vault-secrets) with three stores: shared-session secrets, password
+  presets, command history rows; gateways go through the settings pass. Enable seals every store; every unlock
+  seals what an older version or a late legacy write left (servers and settings written only on change);
+  disable reverses every store.
+- Disable is journaled (`VaultDisableJournal`, two-phase erase, recovery at start), checks before and after the
+  erase that nothing is still sealed, and on residue or failure puts the key back, seals everything again and
+  names the store; a journal is never applied over an enabled vault, and enable is refused while a readable
+  journal exists. Last-good copies are refreshed only while the vault is on with its key on disk, and the
+  migration is marked complete only once they are.
+- A failed unlock migration step locks again; the orphaned vault blob refusal falls back to the in-memory vault
+  flag when settings cannot be read. Vault operations are serialised and a lock during one is deferred.
+
+### Root listing, sudo-rs and login shells (#843)
+
+- `SudoDirectoryListing.Build` gives sudo `find` itself (no `LC_ALL=C` on sudo's command line).
+- sudo-rs needles added to the shared lists; `PrivilegedFileTransfer.IsPasswordRejectedMessage` /
+  `IsPasswordUnavailableMessage` back both classifiers.
+- `PathEscaper.EscapeForLoginShell` (`!` escaped for csh/tcsh); `RemoteDeleteCommand` and `SftpMetadataPreflight`
+  use `env LC_ALL=C`; server-side copy and the no-clobber publish run constant `sh -c` scripts with positional
+  parameters.
+- `VaultDisableSealedCopiesWarning` in the disable dialog.
+- Existing assertions that pinned the old command texts were changed as approved.
+
 ## 2026-11-17: Root folder creation and rename check the folders on their way (v2026.111702)
 
 Fixes merged as #840 and #841. The user-facing summary and the upgrade notes are in the release notes.
