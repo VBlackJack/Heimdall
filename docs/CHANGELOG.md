@@ -12,6 +12,34 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-11-17: Root folder creation and rename check the folders on their way (v2026.111702)
+
+Fixes merged as #840 and #841. The user-facing summary and the upgrade notes are in the release notes.
+
+### Root create-folder and rename (#840)
+
+- `PrivilegedFileCommands.BuildHeldMkdirBody(path)` and `BuildHeldRenameBody(path, newName, replace)` share
+  `HeldEntryPrologue` with the held delete: they reach the parent through `HeldParentWalk` and act from the held
+  folder (`mkdir --`, `mv -nT` / `mv -T`). An existing name exits 78 (`DestinationExistsExitStatus`), mapped to
+  `SudoDestinationExistsException` for create-folder and `SudoRenameCollisionException` for rename; `-p` is gone.
+- The rename destination is computed from the entry's own folder; the outcome probe after the move is removed;
+  the existence probes escape `!`. `SudoRenameCommands.BuildMove` and its tests are removed.
+- Refusals go through one `DescribeTransferError` branch for `SudoEntryRefusedException` (keys
+  `SftpRootRefusedEntry`, `SftpRootRefusedChanged`, `SftpErrorMkdirExists`).
+- Existing assertions that pinned the old `mv` text, the dropped probe and the sudo call count were changed as
+  approved.
+
+### New root file mode and sudo locale (#841)
+
+- The root atomic write script publishes a new file with mode 0644 (best effort), only when neither the work
+  directory nor the payload lists an ACL and the payload is still 0600; a replaced file keeps owner, mode,
+  timestamps and xattrs.
+- `PrivilegedFileCommands.SudoProgram` (`env LC_ALL=C sudo`) starts every sudo of the SFTP browser
+  (`BuildPasswordSudoInvocation`, `BuildNonInteractiveSudoInvocation`, `EmbeddedSftpViewModel.BuildSudoInvocation`);
+  the staged outer script already exported `LC_ALL=C`. Four assertions that pinned the sudo text now carry the
+  prefix, as approved.
+- SECURITY and ARCHITECTURE (EN, FR) describe both changes.
+
 ## 2026-11-17: Root actions in the SFTP browser check the folders on their way (v2026.111701)
 
 A fix merged as #838, documentation as #837, plus the root path checks merged with these notes. The
