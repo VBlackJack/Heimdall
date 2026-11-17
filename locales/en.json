@@ -3475,6 +3475,7 @@
   "VaultDisableTitle": "Heimdall - Disable master password",
   "VaultDisablePrompt": "Disable your master password",
   "VaultDisableWarning": "Your stored credentials will revert to Windows (DPAPI) protection only and will no longer require a master password at startup.",
+  "VaultDisableSealedCopiesWarning": "Passwords in copies of your Heimdall data files made while the master password was on, such as backups, stay sealed with its key and can no longer be read once it is turned off.",
   "VaultDisableBusy": "Removing master-password protection",
   "VaultDisableError": "Could not disable the master password. Please try again.",
   "VaultDisableResidueError": "The master password could not be removed from {0}. It stays on and your data is still protected.",

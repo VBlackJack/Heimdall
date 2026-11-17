@@ -25,7 +25,7 @@ public sealed class RemoteDeleteCommandTests
     {
         string command = RemoteDeleteCommand.Build("/srv/tree");
 
-        Assert.Equal("LC_ALL=C rm -r -- '/srv/tree'", command);
+        Assert.Equal("env LC_ALL=C rm -r -- '/srv/tree'", command);
     }
 
     [Fact]
@@ -33,7 +33,7 @@ public sealed class RemoteDeleteCommandTests
     {
         string command = RemoteDeleteCommand.Build("/srv/my tree");
 
-        Assert.Equal("LC_ALL=C rm -r -- '/srv/my tree'", command);
+        Assert.Equal("env LC_ALL=C rm -r -- '/srv/my tree'", command);
     }
 
     [Fact]
@@ -41,7 +41,7 @@ public sealed class RemoteDeleteCommandTests
     {
         string command = RemoteDeleteCommand.Build("/srv/it's mine");
 
-        Assert.Equal("LC_ALL=C rm -r -- '/srv/it'\\''s mine'", command);
+        Assert.Equal("env LC_ALL=C rm -r -- '/srv/it'\\''s mine'", command);
     }
 
     [Fact]
@@ -49,7 +49,7 @@ public sealed class RemoteDeleteCommandTests
     {
         string command = RemoteDeleteCommand.Build("-rf");
 
-        Assert.Equal("LC_ALL=C rm -r -- '-rf'", command);
+        Assert.Equal("env LC_ALL=C rm -r -- '-rf'", command);
     }
 
     [Theory]

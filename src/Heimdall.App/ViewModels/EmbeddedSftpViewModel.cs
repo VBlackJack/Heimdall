@@ -77,13 +77,6 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     /// <summary>Identity of the column the listing is sorted by until the user picks another.</summary>
     internal const string SortColumnName = "Name";
 
-    private const string SudoStderrTerminalRequired = "a terminal is required";
-    private const string SudoStderrNoTtyPresent = "no tty present";
-    private const string SudoStderrNoAskpass = "no askpass";
-    private const string SudoStderrPasswordRequired = "a password is required";
-    private const string SudoStderrIncorrectPasswordAttempt = "incorrect password attempt";
-    private const string SudoStderrSorryTryAgain = "sorry, try again";
-    private const string SudoStderrNoPasswordProvided = "no password was provided";
     private const int SudoStreamBufferSize = 81_920;
     private const int MaximumCapturedSudoStandardErrorBytes = 65_536;
 
@@ -3713,27 +3706,18 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             return SudoFailureKind.None;
         }
 
-        if (ContainsSudoStderr(stderr, SudoStderrTerminalRequired)
-            || ContainsSudoStderr(stderr, SudoStderrNoTtyPresent)
-            || ContainsSudoStderr(stderr, SudoStderrNoAskpass)
-            || ContainsSudoStderr(stderr, SudoStderrPasswordRequired))
+        // The needle lists live in PrivilegedFileTransfer so the two classifiers cannot drift.
+        if (PrivilegedFileTransfer.IsPasswordUnavailableMessage(stderr))
         {
             return SudoFailureKind.PasswordUnavailable;
         }
 
-        if (ContainsSudoStderr(stderr, SudoStderrIncorrectPasswordAttempt)
-            || ContainsSudoStderr(stderr, SudoStderrSorryTryAgain)
-            || ContainsSudoStderr(stderr, SudoStderrNoPasswordProvided))
+        if (PrivilegedFileTransfer.IsPasswordRejectedMessage(stderr))
         {
             return SudoFailureKind.PasswordRejected;
         }
 
         return SudoFailureKind.None;
-    }
-
-    private static bool ContainsSudoStderr(string stderr, string match)
-    {
-        return stderr.Contains(match, StringComparison.OrdinalIgnoreCase);
     }
 
     internal static string BuildSudoBase64DownloadBody(string remotePath)

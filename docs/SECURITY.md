@@ -627,7 +627,9 @@ fields; embedded newlines cannot create fictitious rows. The listing starts with
 `find -H`, so a symbolic link given as the directory to list is followed, while
 links among its children are still reported as links; owners are reported by name
 (`%u`, `%g`), or by number for an ID with no name. Unsupported child names are
-excluded before any operation can consume them.
+excluded before any operation can consume them. The command given to sudo is `find`
+itself with no variable assignment, so a sudoers rule limited to `find` matches it
+and sudo is never asked to set a variable.
 
 `RemoteFileEditor` tracks file-watcher upload tasks per edit session,
 propagates cancellation through `CloseEdit` and `Dispose`, and observes
@@ -702,7 +704,13 @@ reserved with `mkdir` without `-p`, and both fail if the destination already
 exists. If the command cannot be used, the copy is refused and the reason is
 reported; there is no second route.
 
-The command runs under `umask 077`, so the staging file is private to the account
+The SFTP browser's commands on the exec channel are read by the account's login
+shell, which may be csh, tcsh, zsh or fish. They set the C locale with `env LC_ALL=C`
+rather than a leading `LC_ALL=C`, the copy and publish scripts run through `sh -c` with
+the paths passed as parameters, and a `!` in a path is written so that csh and tcsh
+cannot expand it.
+
+The copy command runs under `umask 077`, so the staging file is private to the account
 from its creation until `cp -p` applies the source's mode at the end; a 0600 source
 used to be readable by every local user of the server for the whole copy. A
 directory root whose `mkdir` fails ends the command at once, so the cleanup of a

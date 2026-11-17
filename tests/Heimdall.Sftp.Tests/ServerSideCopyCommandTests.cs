@@ -26,19 +26,24 @@ namespace Heimdall.Sftp.Tests;
 /// </summary>
 public sealed class ServerSideCopyCommandTests
 {
+    // The constant scripts the commands hand to sh -c, spelled out here on their own rather than read
+    // from the production constants: a test that quoted the implementation would agree with a broken one.
+    private const string DirectoryScript = "umask 077; mkdir -- \"$2\" || exit $?; "
+        + "cp -a -- \"$1\"/. \"$2\" || { status=$?; rm -rf -- \"$2\"; exit $status; }";
+
+    private const string FileScript = "umask 077; set -C; : > \"$3\" || exit $?; set +C; "
+        + "cp -p -- \"$1\" \"$3\" && ln -T -- \"$3\" \"$2\"; "
+        + "status=$?; if [ $status -eq 0 ] && [ -L \"$2\" ]; then "
+        + "rm -f -- \"$2\"; status=99; fi; "
+        + "rm -f -- \"$3\"; exit $status";
+
     [Fact]
     public void Build_File_UsesPreserveFlagAndQuotesBothPaths()
     {
         string command = ServerSideCopyCommand.Build("/srv/a.txt", "/srv/b.txt", recursive: false);
 
         string temp = StagingToken(command);
-        Assert.Equal(
-            $"umask 077; set -C; : > {temp} || exit $?; set +C; "
-            + $"cp -p -- '/srv/a.txt' {temp} && ln -T -- {temp} '/srv/b.txt'; "
-            + "status=$?; if [ $status -eq 0 ] && [ -L '/srv/b.txt' ]; then "
-            + "rm -f -- '/srv/b.txt'; status=99; fi; "
-            + $"rm -f -- {temp}; exit $status",
-            command);
+        Assert.Equal($"sh -c '{FileScript}' sh '/srv/a.txt' '/srv/b.txt' {temp}", command);
     }
 
     [Fact]
@@ -46,10 +51,7 @@ public sealed class ServerSideCopyCommandTests
     {
         string command = ServerSideCopyCommand.Build("/srv/data", "/srv/copy", recursive: true);
 
-        Assert.Equal(
-            "umask 077; mkdir -- '/srv/copy' || exit $?; "
-            + "cp -a -- '/srv/data'/. '/srv/copy' || { status=$?; rm -rf -- '/srv/copy'; exit $status; }",
-            command);
+        Assert.Equal($"sh -c '{DirectoryScript}' sh '/srv/data' '/srv/copy'", command);
     }
 
     /// <remarks>
@@ -65,7 +67,7 @@ public sealed class ServerSideCopyCommandTests
 
         int copyIndex = command.IndexOf("cp -a -- ", StringComparison.Ordinal);
         int statusIndex = command.IndexOf("status=$?", StringComparison.Ordinal);
-        int cleanupIndex = command.IndexOf("rm -rf -- '/srv/copy'", StringComparison.Ordinal);
+        int cleanupIndex = command.IndexOf("rm -rf -- \"$2\"", StringComparison.Ordinal);
         int exitIndex = command.IndexOf("exit $status", StringComparison.Ordinal);
 
         Assert.True(copyIndex > 0 && statusIndex > copyIndex, "the status is captured after cp");
@@ -86,15 +88,15 @@ public sealed class ServerSideCopyCommandTests
     {
         string command = ServerSideCopyCommand.Build("/srv/data", "/srv/copy", recursive: true);
 
-        int reservation = command.IndexOf("mkdir -- '/srv/copy' || exit $?;", StringComparison.Ordinal);
-        int cleanup = command.IndexOf("rm -rf -- '/srv/copy'", StringComparison.Ordinal);
+        int reservation = command.IndexOf("mkdir -- \"$2\" || exit $?;", StringComparison.Ordinal);
+        int cleanup = command.IndexOf("rm -rf -- \"$2\"", StringComparison.Ordinal);
 
         Assert.True(reservation >= 0, "a refused reservation must end the chain with its own status");
         Assert.True(cleanup > reservation, command);
 
         // The cleanup belongs to the copy's failure branch and to nothing else.
         Assert.Contains(
-            "cp -a -- '/srv/data'/. '/srv/copy' || { status=$?; rm -rf -- '/srv/copy'; exit $status; }",
+            "cp -a -- \"$1\"/. \"$2\" || { status=$?; rm -rf -- \"$2\"; exit $status; }",
             command,
             StringComparison.Ordinal);
         Assert.Single(Regex.Matches(command, Regex.Escape("rm -rf")));
@@ -116,7 +118,7 @@ public sealed class ServerSideCopyCommandTests
     {
         string command = ServerSideCopyCommand.Build("/srv/data", "/srv/copy", recursive);
 
-        Assert.StartsWith("umask 077; ", command, StringComparison.Ordinal);
+        Assert.StartsWith("sh -c 'umask 077; ", command, StringComparison.Ordinal);
 
         int umask = command.IndexOf("umask 077;", StringComparison.Ordinal);
         int firstCreation = recursive
@@ -137,7 +139,7 @@ public sealed class ServerSideCopyCommandTests
     {
         string command = ServerSideCopyCommand.Build("/srv/a.txt", "/srv/b.txt", recursive: false);
 
-        Assert.Contains($"ln -T -- {StagingToken(command)} '/srv/b.txt'", command, StringComparison.Ordinal);
+        Assert.Contains("ln -T -- \"$3\" \"$2\"", command, StringComparison.Ordinal);
         Assert.DoesNotContain("ln -- ", command, StringComparison.Ordinal);
     }
 
@@ -155,12 +157,7 @@ public sealed class ServerSideCopyCommandTests
         // matters more than before since the token embeds the destination's own quote.
         string escapedTemp = StagingToken(command);
         Assert.Equal(
-            $"umask 077; set -C; : > {escapedTemp} || exit $?; set +C; "
-            + $"cp -p -- '/srv/my dir/it'\\''s a file.txt' {escapedTemp} "
-            + $"&& ln -T -- {escapedTemp} '/dst/o'\\''brien'; "
-            + "status=$?; if [ $status -eq 0 ] && [ -L '/dst/o'\\''brien' ]; then "
-            + "rm -f -- '/dst/o'\\''brien'; status=99; fi; "
-            + $"rm -f -- {escapedTemp}; exit $status",
+            $"sh -c '{FileScript}' sh '/srv/my dir/it'\\''s a file.txt' '/dst/o'\\''brien' {escapedTemp}",
             command);
     }
 
@@ -169,11 +166,8 @@ public sealed class ServerSideCopyCommandTests
     {
         string command = ServerSideCopyCommand.Build("/srv/my data", "/srv/my copy", recursive: true);
 
-        Assert.StartsWith(
-            "umask 077; mkdir -- '/srv/my copy' || exit $?; cp -a -- '/srv/my data'/. '/srv/my copy' || ",
-            command,
-            StringComparison.Ordinal);
-        Assert.Contains("rm -rf -- '/srv/my copy'", command, StringComparison.Ordinal);
+        Assert.EndsWith("' sh '/srv/my data' '/srv/my copy'", command, StringComparison.Ordinal);
+        Assert.Contains("rm -rf -- \"$2\"", command, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -185,12 +179,16 @@ public sealed class ServerSideCopyCommandTests
             recursive: false);
         string tempPath = StagingToken(command);
 
-        Assert.Contains($"cp -p -- '/srv/source.txt' {tempPath}", command, StringComparison.Ordinal);
+        Assert.Contains("cp -p -- \"$1\" \"$3\"", command, StringComparison.Ordinal);
         Assert.DoesNotContain(
-            "cp -p -- '/srv/source.txt' '/srv/destination.txt' ",
+            "cp -p -- \"$1\" \"$2\"",
             command,
             StringComparison.Ordinal);
-        Assert.Contains($"ln -T -- {tempPath} '/srv/destination.txt'", command, StringComparison.Ordinal);
+        Assert.Contains("ln -T -- \"$3\" \"$2\"", command, StringComparison.Ordinal);
+        Assert.EndsWith(
+            $" sh '/srv/source.txt' '/srv/destination.txt' {tempPath}",
+            command,
+            StringComparison.Ordinal);
     }
 
     [Fact]
@@ -200,10 +198,10 @@ public sealed class ServerSideCopyCommandTests
             "/srv/source.txt",
             "/srv/destination.txt",
             recursive: false);
-        string tempPath = StagingToken(command);
-        int linkIndex = command.IndexOf($"ln -T -- {tempPath}", StringComparison.Ordinal);
+        _ = StagingToken(command);
+        int linkIndex = command.IndexOf("ln -T -- \"$3\"", StringComparison.Ordinal);
         int statusIndex = command.IndexOf("; status=$?;", StringComparison.Ordinal);
-        int cleanupIndex = command.IndexOf($"rm -f -- {tempPath}", StringComparison.Ordinal);
+        int cleanupIndex = command.IndexOf("rm -f -- \"$3\"", StringComparison.Ordinal);
         int exitIndex = command.IndexOf("exit $status", StringComparison.Ordinal);
 
         Assert.True(linkIndex >= 0);
@@ -222,6 +220,10 @@ public sealed class ServerSideCopyCommandTests
         string escapedSource = "'/srv/my dir/it'\\''s.txt'";
         string escapedDestination = "'/dst/o'\\''brien.txt'";
         string escapedTemp = StagingToken(command);
+        // Inside the script the paths are the positional parameters, never the escaped text itself.
+        string sourceParameter = "\"$1\"";
+        string destinationParameter = "\"$2\"";
+        string tempParameter = "\"$3\"";
         int copyStart = command.IndexOf("cp ", StringComparison.Ordinal);
         string copyCommand = command[copyStart..command.IndexOf(" && ", copyStart, StringComparison.Ordinal)];
         int linkStart = command.IndexOf("ln ", StringComparison.Ordinal);
@@ -238,20 +240,21 @@ public sealed class ServerSideCopyCommandTests
         Assert.Contains(" -- ", copyCommand, StringComparison.Ordinal);
         Assert.Contains(" -- ", linkCommand, StringComparison.Ordinal);
         Assert.Contains(" -- ", cleanupCommand, StringComparison.Ordinal);
-        Assert.Contains(escapedSource, copyCommand, StringComparison.Ordinal);
-        Assert.Contains(escapedTemp, copyCommand, StringComparison.Ordinal);
-        Assert.Contains(escapedTemp, linkCommand, StringComparison.Ordinal);
-        Assert.Contains(escapedDestination, linkCommand, StringComparison.Ordinal);
-        Assert.Contains(escapedTemp, cleanupCommand, StringComparison.Ordinal);
+        Assert.Contains(sourceParameter, copyCommand, StringComparison.Ordinal);
+        Assert.Contains(tempParameter, copyCommand, StringComparison.Ordinal);
+        Assert.Contains(tempParameter, linkCommand, StringComparison.Ordinal);
+        Assert.Contains(destinationParameter, linkCommand, StringComparison.Ordinal);
+        Assert.Contains(tempParameter, cleanupCommand, StringComparison.Ordinal);
+        Assert.EndsWith($" sh {escapedSource} {escapedDestination} {escapedTemp}", command, StringComparison.Ordinal);
     }
 
     [Fact]
     public void Build_Directory_ReservesRootBeforeArchiveCopy()
     {
         string command = ServerSideCopyCommand.Build("/srv/source", "/srv/destination", recursive: true);
-        int reserveIndex = command.IndexOf("mkdir -- '/srv/destination'", StringComparison.Ordinal);
+        int reserveIndex = command.IndexOf("mkdir -- \"$2\"", StringComparison.Ordinal);
         int copyIndex = command.IndexOf(
-            "cp -a -- '/srv/source'/. '/srv/destination'",
+            "cp -a -- \"$1\"/. \"$2\"",
             StringComparison.Ordinal);
 
         Assert.True(reserveIndex > 0, command);
@@ -283,18 +286,19 @@ public sealed class ServerSideCopyCommandTests
     {
         string command = ServerSideCopyCommand.Build("/srv/a.txt", "/srv/b.txt", recursive: false);
 
-        // The backreference is the load-bearing part: one expression pins the sibling
-        // directory, the 32 hex digits of a GUID, the SAME token in all three commands,
-        // both `--` guards, the ordering and the exit-status capture. Drawing the name
-        // three times instead of once passes every other assertion in this file and leaves
-        // cp writing one path, ln linking a path that does not exist, and rm deleting
-        // nothing.
+        // One expression pins the constant script, the sibling directory and the 32 hex digits
+        // of a GUID in the single staging argument, the three paths in the order the script
+        // reads them as $1, $2 and $3, both `--` guards, the ordering and the exit-status
+        // capture. The script names its staging path once, as $3, and uses it for the
+        // reservation, the copy, the link and the cleanup, so the name cannot be drawn
+        // differently for each of them.
         Assert.Matches(
-            @"^umask 077; set -C; : > '(/srv/b\.txt\.[0-9a-f]{32}\.part)' \|\| exit \$\?; set \+C; "
-                + @"cp -p -- '/srv/a\.txt' '\1' && ln -T -- '\1' '/srv/b\.txt'; "
-                + @"status=\$\?; if \[ \$status -eq 0 \] && \[ -L '/srv/b\.txt' \]; then "
-                + @"rm -f -- '/srv/b\.txt'; status=99; fi; "
-                + @"rm -f -- '\1'; exit \$status$",
+            @"^sh -c 'umask 077; set -C; : > ""\$3"" \|\| exit \$\?; set \+C; "
+                + @"cp -p -- ""\$1"" ""\$3"" && ln -T -- ""\$3"" ""\$2""; "
+                + @"status=\$\?; if \[ \$status -eq 0 \] && \[ -L ""\$2"" \]; then "
+                + @"rm -f -- ""\$2""; status=99; fi; "
+                + @"rm -f -- ""\$3""; exit \$status' "
+                + @"sh '/srv/a\.txt' '/srv/b\.txt' '/srv/b\.txt\.[0-9a-f]{32}\.part'$",
             command);
     }
 
@@ -331,9 +335,9 @@ public sealed class ServerSideCopyCommandTests
     {
         string command = ServerSideCopyCommand.Build("/srv/a.txt", "/srv/b.txt", recursive: false);
 
-        Assert.Contains("[ -L '/srv/b.txt' ]", command, StringComparison.Ordinal);
+        Assert.Contains("[ -L \"$2\" ]", command, StringComparison.Ordinal);
         Assert.Contains(
-            $"rm -f -- '/srv/b.txt'; status={ServerSideCopyCommand.PublishedASymlinkStatus};",
+            $"rm -f -- \"$2\"; status={ServerSideCopyCommand.PublishedASymlinkStatus};",
             command,
             StringComparison.Ordinal);
 

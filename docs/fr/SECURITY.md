@@ -699,6 +699,8 @@ Il commence par `find -H` : un lien symbolique donné comme répertoire à liste
 suivi, tandis que les liens parmi ses enfants restent signalés comme des liens ; les
 propriétaires sont indiqués par leur nom (`%u`, `%g`), ou par leur numéro pour un
 identifiant sans nom. Les noms enfants non supportés sont exclus avant leur utilisation.
+La commande donnée à sudo est `find` lui-même, sans affectation de variable : une règle
+sudoers limitée à `find` la reconnaît et sudo n'a jamais à définir de variable.
 
 `RemoteFileEditor` suit les tâches de remontée du surveillant de fichiers par
 session d'édition, propage l'annulation via `CloseEdit` et `Dispose`, et
@@ -784,7 +786,13 @@ publié par un lien physique, une racine de répertoire est réservée par un
 commande ne peut pas être utilisée, la copie est refusée et la raison est
 rapportée ; il n'existe pas de seconde voie.
 
-La commande s'exécute sous `umask 077` : le fichier en attente est privé au compte
+Les commandes du navigateur SFTP sur le canal exec sont lues par le shell de connexion
+du compte, qui peut être csh, tcsh, zsh ou fish. Elles fixent la locale C avec
+`env LC_ALL=C` et non avec une affectation `LC_ALL=C` en tête, les scripts de copie et
+de publication passent par `sh -c` avec les chemins en paramètres, et un `!` dans un
+chemin est écrit de façon que csh et tcsh ne puissent pas le développer.
+
+La commande de copie s'exécute sous `umask 077` : le fichier en attente est privé au compte
 dès sa création, jusqu'à ce que `cp -p` applique le mode de la source à la fin ; une
 source en 0600 était auparavant lisible par tous les utilisateurs locaux du serveur
 pendant toute la copie. Une racine de répertoire dont le `mkdir` échoue termine

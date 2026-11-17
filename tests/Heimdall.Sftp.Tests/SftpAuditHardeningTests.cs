@@ -200,7 +200,7 @@ public sealed class SftpAuditHardeningTests
     {
         string command = SudoDirectoryListing.Build("/srv/link");
 
-        Assert.StartsWith("LC_ALL=C find -H '/srv/link' -mindepth 1 -maxdepth 1 ", command, StringComparison.Ordinal);
+        Assert.StartsWith("find -H '/srv/link' -mindepth 1 -maxdepth 1 ", command, StringComparison.Ordinal);
         Assert.DoesNotContain(" -L ", command, StringComparison.Ordinal);
     }
 

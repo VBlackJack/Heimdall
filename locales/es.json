@@ -3475,6 +3475,7 @@
   "VaultDisableTitle": "Heimdall - Desactivar contraseña maestra",
   "VaultDisablePrompt": "Desactiva tu contraseña maestra",
   "VaultDisableWarning": "Tus credenciales almacenadas volverán a depender solo de la protección de Windows (DPAPI) y ya no requerirán una contraseña maestra al iniciar.",
+  "VaultDisableSealedCopiesWarning": "Las contraseñas de las copias de tus archivos de datos de Heimdall hechas mientras la contraseña maestra estaba activada, como las copias de seguridad, siguen selladas con su clave y ya no se podrán leer una vez desactivada.",
   "VaultDisableBusy": "Eliminando la protección por contraseña maestra",
   "VaultDisableError": "No se pudo desactivar la contraseña maestra. Inténtalo de nuevo.",
   "VaultDisableResidueError": "No se pudo quitar la contraseña maestra de {0}. Sigue activa y tus datos siguen protegidos.",

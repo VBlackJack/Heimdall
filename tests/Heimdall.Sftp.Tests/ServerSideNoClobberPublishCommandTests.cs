@@ -33,6 +33,10 @@ namespace Heimdall.Sftp.Tests;
 /// </remarks>
 public sealed class ServerSideNoClobberPublishCommandTests
 {
+    // The constant publish script, spelled out here on its own rather than read from the
+    // production constant.
+    private const string PublishScript = "ln -T -- \"$1\" \"$2\"; status=$?; rm -f -- \"$1\"; exit $status";
+
     [Fact]
     public void BuildFilePublish_LinksTheStagingPath_AndNeverRenamesOverTheDestination()
     {
@@ -40,7 +44,11 @@ public sealed class ServerSideNoClobberPublishCommandTests
             "/srv/data/file.txt.abc.part",
             "/srv/data/file.txt");
 
-        Assert.Contains("ln -T -- '/srv/data/file.txt.abc.part' '/srv/data/file.txt'", command, StringComparison.Ordinal);
+        Assert.Contains("ln -T -- \"$1\" \"$2\"", command, StringComparison.Ordinal);
+        Assert.EndsWith(
+            " sh '/srv/data/file.txt.abc.part' '/srv/data/file.txt'",
+            command,
+            StringComparison.Ordinal);
 
         // A rename replaces the destination silently on many servers. It is the one primitive that
         // must never appear here, in any form.
@@ -58,7 +66,8 @@ public sealed class ServerSideNoClobberPublishCommandTests
     {
         string command = ServerSideNoClobberPublishCommand.BuildFilePublish("/s/t.part", "/s/t");
 
-        Assert.StartsWith("ln -T -- '/s/t.part' '/s/t';", command, StringComparison.Ordinal);
+        Assert.StartsWith("sh -c 'ln -T -- \"$1\" \"$2\";", command, StringComparison.Ordinal);
+        Assert.EndsWith(" sh '/s/t.part' '/s/t'", command, StringComparison.Ordinal);
     }
 
     // The exit status must be the link's, sampled before cleanup: a failed cleanup must not report a
@@ -78,8 +87,8 @@ public sealed class ServerSideNoClobberPublishCommandTests
         Assert.True(exitIndex > cleanupIndex, "the captured status must be what the command exits with");
 
         // Cleanup targets the staging path only. The destination is never a cleanup argument.
-        Assert.Contains("rm -f -- '/s/t.part'", command, StringComparison.Ordinal);
-        Assert.DoesNotContain("rm -f -- '/s/t'", command, StringComparison.Ordinal);
+        Assert.Contains("rm -f -- \"$1\"", command, StringComparison.Ordinal);
+        Assert.DoesNotContain("rm -f -- \"$2\"", command, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -115,17 +124,22 @@ public sealed class ServerSideNoClobberPublishCommandTests
     [InlineData("/srv/a b")]
     [InlineData("/srv/$(whoami)")]
     [InlineData("/srv/`id`")]
+    [InlineData("/srv/wow!")]
     public void BuildFilePublish_EscapesBothPaths_AndKeepsTheEndOfOptionsGuard(string destination)
     {
         string staging = destination + ".part";
-        string escapedStaging = InputValidator.EscapeShellArg(staging);
-        string escapedDestination = InputValidator.EscapeShellArg(destination);
+        // The login shell reads the command line before sh does, so history expansion is
+        // neutralized as well: each '!' travels as '\!'.
+        string escapedStaging = InputValidator.EscapeShellArg(staging).Replace("!", "'\\!'", StringComparison.Ordinal);
+        string escapedDestination = InputValidator.EscapeShellArg(destination).Replace("!", "'\\!'", StringComparison.Ordinal);
 
         string command = ServerSideNoClobberPublishCommand.BuildFilePublish(staging, destination);
 
-        Assert.Equal(
-            $"ln -T -- {escapedStaging} {escapedDestination}; status=$?; rm -f -- {escapedStaging}; exit $status",
-            command);
+        Assert.Equal($"sh -c '{PublishScript}' sh {escapedStaging} {escapedDestination}", command);
+        if (destination.Contains('!', StringComparison.Ordinal))
+        {
+            Assert.Contains("'\\!'", command, StringComparison.Ordinal);
+        }
     }
 
     [Theory]
