@@ -161,9 +161,25 @@ public sealed class VaultDisableJournal
     }
 
     /// <summary>
+    /// Whether settings that already hold an enabled vault belong to the vault this journal was
+    /// taken from: the same wrapped key, or the same non-empty vault identifier (a changed master
+    /// password wraps the same key again).
+    /// </summary>
+    private bool DescribesTheVaultOf(AppSettings settings) =>
+        string.Equals(settings.VaultWrappedDek, WrappedDek, StringComparison.Ordinal)
+        || (!string.IsNullOrEmpty(VaultId)
+            && string.Equals(settings.VaultId, VaultId, StringComparison.Ordinal));
+
+    /// <summary>
     /// Brings the vault back from a journal left by a disable that did not finish: writes the state
     /// into settings with the in-progress marker, then deletes the journal, in that order.
     /// </summary>
+    /// <remarks>
+    /// Settings that already hold the same enabled vault (the disable was undone but the journal
+    /// could not be deleted, or the vault was turned on again) are not overwritten: the wrapped key
+    /// there may be newer than the journal's. Only the marker is set and the journal is deleted.
+    /// Settings that hold a different enabled vault leave both untouched, and the conflict is logged.
+    /// </remarks>
     /// <returns>
     /// Null when there was no journal or it was restored; the journal itself when the restore could
     /// not be written and the caller must start as enabled in memory (<see cref="ApplyTo"/>).
@@ -176,9 +192,57 @@ public sealed class VaultDisableJournal
             return null;
         }
 
+        var outcome = RecoveryOutcome.Applied;
         try
         {
-            await configManager.MergeSettingAsync(journal.ApplyTo).ConfigureAwait(false);
+            // A different enabled vault is left alone without rewriting the settings at every start.
+            AppSettings current = await configManager.LoadSettingsAsync().ConfigureAwait(false);
+            if (current.VaultEnabled
+                && !string.IsNullOrEmpty(current.VaultWrappedDek)
+                && !journal.DescribesTheVaultOf(current))
+            {
+                FileLogger.Error("Vault: a disable journal exists beside a different enabled vault; it was neither applied nor deleted.");
+                return null;
+            }
+
+            await configManager.MergeSettingAsync(settings =>
+            {
+                if (!settings.VaultEnabled || string.IsNullOrEmpty(settings.VaultWrappedDek))
+                {
+                    journal.ApplyTo(settings);
+                    return;
+                }
+
+                if (journal.DescribesTheVaultOf(settings))
+                {
+                    settings.VaultMigrationState = VaultMigrationState.InProgress;
+                    outcome = RecoveryOutcome.AlreadyEnabled;
+                    return;
+                }
+
+                outcome = RecoveryOutcome.Conflict;
+            }).ConfigureAwait(false);
+
+            if (outcome == RecoveryOutcome.Conflict)
+            {
+                FileLogger.Error("Vault: a disable journal exists beside a different enabled vault; it was neither applied nor deleted.");
+                return null;
+            }
+
+            if (outcome == RecoveryOutcome.AlreadyEnabled)
+            {
+                try
+                {
+                    Delete(configManager);
+                }
+                catch (Exception ex)
+                {
+                    FileLogger.Warn($"Vault: the stale disable journal could not be deleted ({ex.GetType().Name}).");
+                }
+
+                return null;
+            }
+
             Delete(configManager);
             FileLogger.Info("Vault: an interrupted disable was undone; the master password is on.");
             return null;
@@ -186,7 +250,17 @@ public sealed class VaultDisableJournal
         catch (Exception ex)
         {
             FileLogger.Warn($"Vault: the interrupted disable could not be undone yet ({ex.GetType().Name}).");
-            return journal;
+
+            // Only a journal that was to be applied is carried in memory; over an enabled vault it
+            // would replace the real wrapped key.
+            return outcome == RecoveryOutcome.Applied ? journal : null;
         }
+    }
+
+    private enum RecoveryOutcome
+    {
+        Applied,
+        AlreadyEnabled,
+        Conflict,
     }
 }

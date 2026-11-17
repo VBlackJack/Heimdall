@@ -155,6 +155,12 @@ public partial class VaultEnableDialogViewModel : ObservableObject, IPasswordRef
                 FileLogger.Error("Vault enable failed", ex);
                 ErrorMessage = _localizer.Format("VaultStoreFailureError", _localizer.GetString(ex.StoreNameKey));
             }
+            catch (VaultDisableJournalPendingException ex)
+            {
+                // An interrupted turn-off is still waiting to be undone: nothing was changed.
+                FileLogger.Error("Vault enable refused", ex);
+                ErrorMessage = _localizer.GetString("VaultEnableJournalPendingError");
+            }
             catch (Exception ex)
             {
                 // Recoverable: the lifecycle persisted a resumable marker before migrating.

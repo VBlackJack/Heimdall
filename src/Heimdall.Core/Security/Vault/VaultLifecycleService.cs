@@ -168,6 +168,16 @@ public sealed class VaultLifecycleService : IDisposable
     {
         ThrowIfRestorePending();
         ArgumentNullException.ThrowIfNull(masterPassword);
+
+        // An interrupted disable is undone at the next start or unlock; a new vault over its journal
+        // would be overwritten by it.
+        // Only a journal that can be read counts: an unreadable one would block enable for good, and
+        // one that becomes readable later meets the conflict check of the recovery.
+        if (VaultDisableJournal.TryRead(_configManager) is not null)
+        {
+            throw new VaultDisableJournalPendingException();
+        }
+
         RequirePolicy(masterPassword);
 
         var settings = await _configManager.LoadSettingsAsync().ConfigureAwait(false);
@@ -222,16 +232,19 @@ public sealed class VaultLifecycleService : IDisposable
 
         // The last good copies still hold the pre-vault documents: a fall-back to one must not
         // bring them back. Always attempted, since a failure above does not excuse leaving them.
+        // When it fails the marker stays, so the next unlock goes through the resume path again.
+        var refreshed = true;
         try
         {
             await _configManager.RefreshLastGoodCopiesAsync().ConfigureAwait(false);
         }
         catch (Exception ex)
         {
+            refreshed = false;
             FileLogger.Warn($"Vault: the last good copies could not be refreshed ({ex.GetType().Name}).");
         }
 
-        if (unsealed.Count == 0)
+        if (unsealed.Count == 0 && refreshed)
         {
             try
             {
@@ -296,7 +309,7 @@ public sealed class VaultLifecycleService : IDisposable
             // goes ahead, and what needs a write is left to the next start.
             try
             {
-                await ResumeOrReconcileForwardMigrationAsync(settings).ConfigureAwait(false);
+                await ResumeOrReconcileForwardMigrationAsync(settings, fromJournal: true).ConfigureAwait(false);
                 await StampLastMasterUnlockAsync().ConfigureAwait(false);
             }
             catch (Exception ex)
@@ -307,9 +320,25 @@ public sealed class VaultLifecycleService : IDisposable
             return;
         }
 
-        await ResumeOrReconcileForwardMigrationAsync(settings).ConfigureAwait(false);
+        try
+        {
+            await ResumeOrReconcileForwardMigrationAsync(settings, fromJournal: false).ConfigureAwait(false);
+        }
+        catch
+        {
+            // The unlock failed: the key must not stay in memory behind a failed call.
+            LockCore();
+            throw;
+        }
 
-        await StampLastMasterUnlockAsync().ConfigureAwait(false);
+        try
+        {
+            await StampLastMasterUnlockAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Warn($"Vault: the unlock time could not be recorded ({ex.GetType().Name}).");
+        }
     }
 
     /// <summary>
@@ -487,7 +516,15 @@ public sealed class VaultLifecycleService : IDisposable
 
         SetUnlockedDek(dek);
 
-        await ResumeOrReconcileForwardMigrationAsync(settings).ConfigureAwait(false);
+        try
+        {
+            await ResumeOrReconcileForwardMigrationAsync(settings, fromJournal: false).ConfigureAwait(false);
+        }
+        catch
+        {
+            LockCore();
+            throw;
+        }
 
         return VaultHelloUnlockResult.Success;
     }
@@ -945,22 +982,70 @@ public sealed class VaultLifecycleService : IDisposable
             restored = false;
         }
 
+        // The disable refreshed the last good copies to the legacy form; a fall-back to one must not
+        // bring the legacy secrets back. Attempted whatever the outcome above, and when it fails the
+        // marker stays so the next unlock goes through the resume path again.
+        bool refreshed = await TryRefreshLastGoodCopiesAsync().ConfigureAwait(false);
+
         if (!restored)
         {
             return false;
         }
 
+        if (refreshed)
+        {
+            try
+            {
+                await _configManager.MergeSettingAsync(s => s.VaultMigrationState = VaultMigrationState.Complete)
+                    .ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                FileLogger.Warn($"Vault: the migration marker could not be cleared ({ex.GetType().Name}).");
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Brings the last good copies of the configuration documents up to date, best effort: nothing
+    /// is done unless the settings on disk hold an enabled vault with its wrapped key, so a copy is
+    /// never refreshed while a journal is the only record of the vault.
+    /// </summary>
+    /// <returns>False when the copies could not be refreshed; true otherwise, including when there was nothing to do.</returns>
+    private async Task<bool> TryRefreshLastGoodCopiesAsync()
+    {
         try
         {
-            await _configManager.MergeSettingAsync(s => s.VaultMigrationState = VaultMigrationState.Complete)
+            AppSettings current = await _configManager.LoadSettingsAsync().ConfigureAwait(false);
+            if (!current.VaultEnabled || string.IsNullOrEmpty(current.VaultWrappedDek))
+            {
+                return true;
+            }
+
+            await _configManager.RefreshLastGoodCopiesAsync().ConfigureAwait(false);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Warn($"Vault: the last good copies could not be refreshed ({ex.GetType().Name}).");
+            return false;
+        }
+    }
+
+    /// <summary>Sets the in-progress marker, best effort: the next unlock then runs the full forward pass.</summary>
+    private async Task TryMarkMigrationInProgressAsync()
+    {
+        try
+        {
+            await _configManager.MergeSettingAsync(s => s.VaultMigrationState = VaultMigrationState.InProgress)
                 .ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            FileLogger.Warn($"Vault: the migration marker could not be cleared ({ex.GetType().Name}).");
+            FileLogger.Warn($"Vault: the migration marker could not be set ({ex.GetType().Name}).");
         }
-
-        return true;
     }
 
     private static bool SettingsHoldVaultSecrets(AppSettings settings) =>
@@ -1072,17 +1157,27 @@ public sealed class VaultLifecycleService : IDisposable
     /// <see cref="VaultMigrationState.InProgress"/> covers both an interrupted enable and an
     /// interrupted disable: either way the key is intact and the answer is the same, run the
     /// forward pass again. The stores and the marker are handled after the unlock, by
-    /// <see cref="PostUnlockSealingAsync"/>.
+    /// <see cref="PostUnlockSealingAsync"/>. When the migration is complete the same pass still runs
+    /// at every unlock, since an older build or a restored file can leave a legacy secret behind;
+    /// it writes a file only when it has something to seal.
     /// </summary>
-    private async Task ResumeOrReconcileForwardMigrationAsync(AppSettings settings)
+    /// <remarks>
+    /// A failure of the servers half is thrown; the callers lock the vault again. The settings half
+    /// and the refresh of the last good copies are best effort: they never fail the unlock.
+    /// </remarks>
+    private async Task ResumeOrReconcileForwardMigrationAsync(AppSettings settings, bool fromJournal)
     {
         if (settings.VaultMigrationState == VaultMigrationState.InProgress)
         {
             await VaultMigrationEngine.MigrateForwardAsync(_configManager).ConfigureAwait(false);
 
+            // From the journal the settings on disk do not describe the vault, and the copies are
+            // left to the unlock that follows the recovery.
+            bool refreshed = fromJournal || await TryRefreshLastGoodCopiesAsync().ConfigureAwait(false);
+
             // With stores, the marker is cleared once they are sealed, after the unlock; with none
             // there is nothing left to wait for.
-            if (_secretStores.Count == 0)
+            if (_secretStores.Count == 0 && refreshed)
             {
                 await _configManager.MergeSettingAsync(
                         current => current.VaultMigrationState = VaultMigrationState.Complete)
@@ -1097,15 +1192,21 @@ public sealed class VaultLifecycleService : IDisposable
             return;
         }
 
+        bool changed = await VaultMigrationEngine.ReconcileServersAsync(_configManager).ConfigureAwait(false);
+
         try
         {
-            await VaultMigrationEngine.ReconcileCitrixLaunchTokensAsync(_configManager)
-                .ConfigureAwait(false);
+            changed |= await VaultMigrationEngine.ReconcileSettingsAsync(_configManager).ConfigureAwait(false);
         }
-        catch
+        catch (Exception ex)
         {
-            LockCore();
-            throw;
+            FileLogger.Warn($"Vault: the settings could not be sealed at unlock ({ex.GetType().Name}).");
+            await TryMarkMigrationInProgressAsync().ConfigureAwait(false);
+        }
+
+        if (changed && !await TryRefreshLastGoodCopiesAsync().ConfigureAwait(false))
+        {
+            await TryMarkMigrationInProgressAsync().ConfigureAwait(false);
         }
     }
 
@@ -1147,7 +1248,9 @@ public sealed class VaultLifecycleService : IDisposable
 
             var settings = await _configManager.LoadSettingsAsync().ConfigureAwait(false);
             bool allSealed = (await TryForwardStoresAsync(cancellationToken).ConfigureAwait(false)).Count == 0;
-            if (allSealed && settings.VaultMigrationState == VaultMigrationState.InProgress)
+            if (allSealed
+                && settings.VaultMigrationState == VaultMigrationState.InProgress
+                && await TryRefreshLastGoodCopiesAsync().ConfigureAwait(false))
             {
                 await _configManager.MergeSettingAsync(
                         current => current.VaultMigrationState = VaultMigrationState.Complete)

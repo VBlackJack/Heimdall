@@ -3491,6 +3491,7 @@
   "VaultUnreadableStoreCount": "{0} ({1})",
   "VaultDisableDropUnreadableBtn": "Supprimer {0} entr\u00e9es illisibles et d\u00e9sactiver",
   "VaultEnablePartialNotice": "Le mot de passe ma\u00eetre est actif. {0} sera chiffr\u00e9 au prochain d\u00e9verrouillage.",
+  "VaultEnableJournalPendingError": "Une d\u00e9sactivation pr\u00e9c\u00e9dente du mot de passe ma\u00eetre n'est pas all\u00e9e au bout. Red\u00e9marrez Heimdall pour la terminer ; le mot de passe ma\u00eetre reste alors actif.",
   "VaultStoreFailureError": "Le changement n'a pas pu \u00eatre men\u00e9 \u00e0 bien : {0} n'a pas pu \u00eatre lu ou mis \u00e0 jour. V\u00e9rifiez-le, puis r\u00e9essayez.",
   "VaultStoresUnsealedNotice": "Des donn\u00e9es enregistr\u00e9es ({0}) n'ont pas pu \u00eatre prot\u00e9g\u00e9es par le mot de passe ma\u00eetre. Elles restent prot\u00e9g\u00e9es par Windows uniquement.",
   "VaultDisableUnsavedGatewaysMessage": "Des passerelles ont des modifications non enregistr\u00e9es. Enregistrez ou annulez d'abord les param\u00e8tres, puis d\u00e9sactivez le mot de passe ma\u00eetre.",

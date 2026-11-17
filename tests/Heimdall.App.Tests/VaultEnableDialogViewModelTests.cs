@@ -100,6 +100,20 @@ public sealed class VaultEnableDialogViewModelTests
         Assert.Equal("VaultEnableError", viewModel.ErrorMessage);
     }
 
+    // Kills: dropping the catch of the pending journal, which would show the generic error.
+    [Fact]
+    public async Task Enable_RefusedWhileADisableJournalIsPending_ShowsItsOwnMessage()
+    {
+        var viewModel = new VaultEnableDialogViewModel(
+            _ => throw new Heimdall.Core.Security.Vault.VaultDisableJournalPendingException(), Localizer());
+        viewModel.Evaluate(C(StrongPassword), C(StrongPassword));
+
+        await viewModel.EnableCommand.ExecuteAsync(C(StrongPassword));
+
+        Assert.False(viewModel.IsCompleted);
+        Assert.Equal("VaultEnableJournalPendingError", viewModel.ErrorMessage);
+    }
+
     [Fact]
     public async Task Enable_Failure_AsksForTheFocusBackOnceTheBoxIsEnabled()
     {

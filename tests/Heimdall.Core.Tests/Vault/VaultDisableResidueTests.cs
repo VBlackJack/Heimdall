@@ -16,6 +16,7 @@
 
 using System.Runtime.Versioning;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Security;
@@ -1274,6 +1275,584 @@ public sealed class VaultDisableResidueTests : IAsyncLifetime
         Assert.Equal(good, File.ReadAllText(backupPath));
     }
 
+    // ---------------------------------------------------------------------------------------------
+    // F1: the last good copies follow the vault back on after an undone disable or a resumed unlock.
+    // ---------------------------------------------------------------------------------------------
+
+    private string ServersBackupPath => ConfigManager.BackupPathFor(_configManager.ServersPath);
+
+    private string SettingsBackupPath => ConfigManager.BackupPathFor(_configManager.SettingsPath);
+
+    private static bool HoldsSealedSecret(string json) => CountSealedSecrets(json) > 0;
+
+    private static int CountSealedSecrets(string json)
+    {
+        using JsonDocument document = JsonDocument.Parse(json);
+        return CountSealedSecrets(document.RootElement);
+    }
+
+    private static int CountSealedSecrets(JsonElement element) => element.ValueKind switch
+    {
+        JsonValueKind.Object => element.EnumerateObject().Sum(property => CountSealedSecrets(property.Value)),
+        JsonValueKind.Array => element.EnumerateArray().Sum(CountSealedSecrets),
+        JsonValueKind.String => VaultSecretBlob.IsSecretBlob(element.GetString()) ? 1 : 0,
+        _ => 0,
+    };
+
+    private Task SaveServerWithSealedSecretsAsync() =>
+        _configManager.SaveServersAsync(
+        [
+            new ServerProfileDto
+            {
+                Id = "srv1",
+                DisplayName = "Server 1",
+                ConnectionType = "RDP",
+                RdpPasswordEncrypted = CredentialProtector.Protect(ServerSecret),
+                CitrixLaunchCommandLine = CredentialProtector.Protect(CitrixToken),
+            },
+        ]);
+
+    private const string CitrixToken = "citrix-plain-token-7731";
+
+    // Kills F1: RestoreProtectionAsync without TryRefreshLastGoodCopiesAsync. The disable refreshed
+    // the copies to the legacy form before it was refused, and nothing brought them back.
+    [Fact]
+    public async Task DisableAsync_RefusedAfterTheCopiesWereRefreshed_LastGoodCopiesHoldNoLegacySecret()
+    {
+        var late = new FakeStore("StoreKeyLate") { ResidueOnHoldsCall = 2 };
+        VaultLifecycleService service = await EnabledServiceAsync(null, late);
+        await WriteGatewaysWhileUnlockedAsync();
+        await SaveServerWithSealedSecretsAsync();
+
+        VaultResidueException ex = await Assert.ThrowsAsync<VaultResidueException>(
+            () => service.DisableAsync(Pw(StrongPassword)));
+
+        Assert.True(ex.ProtectionRestored);
+        string serversBackup = File.ReadAllText(ServersBackupPath);
+        Assert.Equal(File.ReadAllText(_configManager.ServersPath), serversBackup);
+        Assert.DoesNotContain(CitrixToken, serversBackup);
+        Assert.Equal(2, CountSealedSecrets(serversBackup));
+        Assert.Equal(3, CountSealedSecrets(File.ReadAllText(SettingsBackupPath)));
+    }
+
+    // Kills F1: ResumeOrReconcileForwardMigrationAsync (InProgress branch) without the refresh. The
+    // copy taken before the forward pass wrote its result holds the legacy secret and the plaintext
+    // Citrix token.
+    [Fact]
+    public async Task UnlockAsync_ResumedAfterACrashedDisable_LastGoodCopiesHoldNoLegacySecret()
+    {
+        VaultLifecycleService service = await EnabledServiceAsync();
+        service.Lock();
+        string legacy = CredentialProtector.ProtectLegacy(ServerSecret);
+        var legacyServer = new ServerProfileDto
+        {
+            Id = "srv1",
+            DisplayName = "Server 1",
+            ConnectionType = "RDP",
+            RdpPasswordEncrypted = legacy,
+            CitrixLaunchCommandLine = CitrixToken,
+        };
+
+        // What a crash in the middle of a disable leaves: the reversed files and their copies.
+        await _configManager.SaveServersAsync([legacyServer]);
+        await _configManager.SaveServersAsync([legacyServer]);
+        await _configManager.MergeSettingAsync(s => s.VaultMigrationState = VaultMigrationState.InProgress);
+        Assert.Contains(CitrixToken, File.ReadAllText(ServersBackupPath));
+
+        await service.UnlockAsync(Pw(StrongPassword));
+
+        string serversBackup = File.ReadAllText(ServersBackupPath);
+        Assert.Equal(File.ReadAllText(_configManager.ServersPath), serversBackup);
+        Assert.DoesNotContain(CitrixToken, serversBackup);
+        Assert.Equal(2, CountSealedSecrets(serversBackup));
+        Assert.Equal(VaultMigrationState.Complete, (await _configManager.LoadSettingsAsync()).VaultMigrationState);
+    }
+
+    // Kills F1: the retry path. RetryRestoreAsync goes through RestoreProtectionAsync, so this fails
+    // when the refresh there is removed, whatever the retry itself does.
+    [Fact]
+    public async Task RetryRestoreAsync_RefreshesTheLastGoodCopiesToTheSealedForm()
+    {
+        (VaultLifecycleService service, _, _) = await PendingDisableAsync();
+        Assert.False(HoldsSealedSecret(File.ReadAllText(ServersBackupPath)), "the disable left the legacy copy");
+
+        await service.RetryRestoreAsync();
+
+        string serversBackup = File.ReadAllText(ServersBackupPath);
+        Assert.Equal(File.ReadAllText(_configManager.ServersPath), serversBackup);
+        Assert.True(HoldsSealedSecret(serversBackup));
+    }
+
+    // Kills F1 (enable half): a refresh failure used to be logged and the marker cleared anyway, so
+    // nothing ever retried it.
+    [Fact]
+    public async Task EnableAsync_LastGoodCopiesCannotBeRefreshed_KeepsTheMarkerUntilTheNextUnlockRefreshesThem()
+    {
+        var decorated = new DecoratedConfigManager(_configManager) { FailRefresh = true };
+        var service = new VaultLifecycleService(decorated);
+        _services.Add(service);
+        await SaveServerSecretAsync();
+
+        VaultEnableResult result = await service.EnableAsync(Pw(StrongPassword), FastParams);
+
+        Assert.True(result.IsComplete);
+        Assert.Equal(VaultMigrationState.InProgress, (await _configManager.LoadSettingsAsync()).VaultMigrationState);
+        Assert.False(HoldsSealedSecret(File.ReadAllText(ServersBackupPath)));
+
+        decorated.FailRefresh = false;
+        service.Lock();
+        await service.UnlockAsync(Pw(StrongPassword));
+
+        Assert.Equal(VaultMigrationState.Complete, (await _configManager.LoadSettingsAsync()).VaultMigrationState);
+        Assert.True(HoldsSealedSecret(File.ReadAllText(ServersBackupPath)));
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // F2: a legacy secret that appears after the vault was enabled is sealed at the next unlock.
+    // ---------------------------------------------------------------------------------------------
+
+    // Kills F2: the Complete branch used to seal only the Citrix tokens of the servers and never
+    // touched the settings.
+    [Fact]
+    public async Task UnlockAsync_LegacySecretsAddedWhileComplete_AreSealedAtTheNextUnlock()
+    {
+        VaultLifecycleService service = await EnabledServiceAsync();
+        service.Lock();
+        string legacyServer = CredentialProtector.ProtectLegacy(ServerSecret);
+        string legacyGateway = CredentialProtector.ProtectLegacy(GatewayPassword);
+        string legacyPassphrase = CredentialProtector.ProtectLegacy(GatewayPassphrase);
+        await _configManager.SaveServersAsync(
+        [
+            new ServerProfileDto
+            {
+                Id = "srv1",
+                DisplayName = "Server 1",
+                ConnectionType = "RDP",
+                RdpPasswordEncrypted = legacyServer,
+            },
+        ]);
+        await _configManager.MergeSettingAsync(s => s.SshGateways.Add(new SshGatewayDto
+        {
+            Id = "gw1",
+            Name = "Bastion",
+            Host = "bastion.example.test",
+            User = "ops",
+            SshPasswordEncrypted = legacyGateway,
+            SshKeyPassphraseEncrypted = legacyPassphrase,
+        }));
+        Assert.Equal(VaultMigrationState.Complete, (await _configManager.LoadSettingsAsync()).VaultMigrationState);
+
+        await service.UnlockAsync(Pw(StrongPassword));
+
+        Assert.True(VaultSecretBlob.IsSecretBlob(await ServerSecretAsync()));
+        Assert.Equal(ServerSecret, CredentialProtector.Unprotect(await ServerSecretAsync()));
+        SshGatewayDto gateway = (await _configManager.LoadSettingsAsync()).SshGateways.Single();
+        Assert.True(VaultSecretBlob.IsSecretBlob(gateway.SshPasswordEncrypted));
+        Assert.True(VaultSecretBlob.IsSecretBlob(gateway.SshKeyPassphraseEncrypted));
+        Assert.Equal(GatewayPassword, CredentialProtector.Unprotect(gateway.SshPasswordEncrypted));
+
+        // And the copies no longer hold them.
+        Assert.Equal(1, CountSealedSecrets(File.ReadAllText(ServersBackupPath)));
+        Assert.Equal(2, CountSealedSecrets(File.ReadAllText(SettingsBackupPath)));
+    }
+
+    private (string Servers, string ServersBackup, string Settings, string SettingsBackup) SnapshotFiles() =>
+        (File.ReadAllText(_configManager.ServersPath) + File.GetLastWriteTimeUtc(_configManager.ServersPath).Ticks,
+            File.ReadAllText(ServersBackupPath) + File.GetLastWriteTimeUtc(ServersBackupPath).Ticks,
+            File.ReadAllText(_configManager.SettingsPath) + File.GetLastWriteTimeUtc(_configManager.SettingsPath).Ticks,
+            File.ReadAllText(SettingsBackupPath) + File.GetLastWriteTimeUtc(SettingsBackupPath).Ticks);
+
+    private UnlockingHelloService NewUnlockingHello() =>
+        new(() =>
+        {
+            AppSettings settings = _configManager.LoadSettingsAsync().GetAwaiter().GetResult();
+            return VaultKeyManager.UnwrapDek(Encoding.UTF8.GetBytes(StrongPassword), settings.VaultWrappedDek!);
+        });
+
+    // Guards F2: the pass at every unlock must write nothing when there is nothing to seal. A Hello
+    // unlock stamps nothing, so no file of the configuration may change at all.
+    [Fact]
+    public async Task UnlockWithHello_NothingToSeal_WritesNoConfigurationFile()
+    {
+        UnlockingHelloService hello = NewUnlockingHello();
+        VaultLifecycleService service = await EnabledServiceAsync(hello);
+        await service.EnrollHelloAsync();
+        await SaveServerWithSealedSecretsAsync();
+        await WriteGatewaysWhileUnlockedAsync();
+        service.Lock();
+        var before = SnapshotFiles();
+        await Task.Delay(60);
+
+        Assert.True(await service.UnlockWithHelloAsync());
+
+        Assert.True(service.IsUnlocked);
+        Assert.Equal(before, SnapshotFiles());
+    }
+
+    // Guards F2: a master-password unlock stamps the settings, but the servers file and its copy
+    // stay untouched when nothing is left to seal.
+    [Fact]
+    public async Task UnlockAsync_NothingToSeal_LeavesTheServersFileAndItsCopyUntouched()
+    {
+        VaultLifecycleService service = await EnabledServiceAsync();
+        await SaveServerWithSealedSecretsAsync();
+        service.Lock();
+        var before = SnapshotFiles();
+        await Task.Delay(60);
+
+        await service.UnlockAsync(Pw(StrongPassword));
+
+        var after = SnapshotFiles();
+        Assert.Equal(before.Servers, after.Servers);
+        Assert.Equal(before.ServersBackup, after.ServersBackup);
+    }
+
+    // Guards the pre-check: a legacy value nothing can open is left as it is and must not make every
+    // unlock rewrite the settings.
+    [Fact]
+    public async Task UnlockWithHello_UndecryptableLegacyValue_IsLeftAloneAndWritesNothing()
+    {
+        UnlockingHelloService hello = NewUnlockingHello();
+        VaultLifecycleService service = await EnabledServiceAsync(hello);
+        await service.EnrollHelloAsync();
+        service.Lock();
+        await _configManager.MergeSettingAsync(s => s.SshGateways.Add(new SshGatewayDto
+        {
+            Id = "gw1",
+            Name = "Bastion",
+            Host = "bastion.example.test",
+            User = "ops",
+            SshPasswordEncrypted = "not-a-protected-value-from-another-user",
+        }));
+        var before = SnapshotFiles();
+        await Task.Delay(60);
+
+        Assert.True(await service.UnlockWithHelloAsync());
+
+        Assert.Equal(before, SnapshotFiles());
+        Assert.Equal(
+            "not-a-protected-value-from-another-user",
+            (await _configManager.LoadSettingsAsync()).SshGateways.Single().SshPasswordEncrypted);
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // F3: a disable journal never overwrites an enabled vault, and enable refuses while one exists.
+    // ---------------------------------------------------------------------------------------------
+
+    // Kills F3: RecoverAsync used to apply the journal over whatever settings held, so a wrapped key
+    // changed after the journal was written (a new master password) was replaced by the old one.
+    [Fact]
+    public async Task RecoverAsync_JournalBesideTheSameVaultWithANewerKey_IsDeletedAndTheKeyIsKept()
+    {
+        VaultLifecycleService service = await EnabledServiceAsync();
+        AppSettings before = await _configManager.LoadSettingsAsync();
+        await VaultDisableJournal.WriteAsync(_configManager, before);
+        await service.ChangeMasterPasswordAsync(Pw(StrongPassword), Pw("OtherStrong2!Passw0rd"), FastParams);
+        AppSettings changed = await _configManager.LoadSettingsAsync();
+        Assert.NotEqual(before.VaultWrappedDek, changed.VaultWrappedDek);
+
+        VaultDisableJournal? unrestored = await VaultDisableJournal.RecoverAsync(_configManager);
+
+        Assert.Null(unrestored);
+        AppSettings after = await _configManager.LoadSettingsAsync();
+        Assert.Equal(changed.VaultWrappedDek, after.VaultWrappedDek);
+        Assert.Equal(changed.VaultId, after.VaultId);
+        Assert.Equal(VaultMigrationState.InProgress, after.VaultMigrationState);
+        Assert.False(File.Exists(JournalPath));
+    }
+
+    // Kills F3: the same, when the journal is found by an unlock rather than by the startup recovery.
+    [Fact]
+    public async Task UnlockAsync_JournalBesideTheSameVaultWithANewerKey_UnlocksWithTheNewPassword()
+    {
+        VaultLifecycleService service = await EnabledServiceAsync();
+        await VaultDisableJournal.WriteAsync(_configManager, await _configManager.LoadSettingsAsync());
+        await service.ChangeMasterPasswordAsync(Pw(StrongPassword), Pw("OtherStrong2!Passw0rd"), FastParams);
+        service.Lock();
+
+        await service.UnlockAsync(Pw("OtherStrong2!Passw0rd"));
+
+        Assert.True(service.IsUnlocked);
+        Assert.False(File.Exists(JournalPath));
+    }
+
+    // Kills F3: a journal of another vault must neither be applied nor deleted.
+    [Fact]
+    public async Task RecoverAsync_JournalOfAnotherVault_IsNeitherAppliedNorDeleted()
+    {
+        await EnabledServiceAsync();
+        AppSettings before = await _configManager.LoadSettingsAsync();
+        await VaultDisableJournal.WriteAsync(
+            _configManager,
+            new AppSettings { VaultWrappedDek = "another-wrapped-key", VaultId = "another-vault-id" });
+
+        VaultDisableJournal? unrestored = await VaultDisableJournal.RecoverAsync(_configManager);
+
+        Assert.Null(unrestored);
+        Assert.True(File.Exists(JournalPath));
+        AppSettings after = await _configManager.LoadSettingsAsync();
+        Assert.Equal(before.VaultWrappedDek, after.VaultWrappedDek);
+        Assert.Equal(before.VaultId, after.VaultId);
+        Assert.Equal(before.VaultMigrationState, after.VaultMigrationState);
+    }
+
+    // Kills F3: a stale journal that cannot be deleted must not be reported as an unrestored disable,
+    // which would start the vault from the old journal in memory.
+    [Fact]
+    public async Task RecoverAsync_StaleJournalThatCannotBeDeleted_ReturnsNullAndKeepsTheSettings()
+    {
+        VaultLifecycleService service = await EnabledServiceAsync();
+        await VaultDisableJournal.WriteAsync(_configManager, await _configManager.LoadSettingsAsync());
+        await service.ChangeMasterPasswordAsync(Pw(StrongPassword), Pw("OtherStrong2!Passw0rd"), FastParams);
+        string newerKey = (await _configManager.LoadSettingsAsync()).VaultWrappedDek!;
+
+        VaultDisableJournal? unrestored;
+        using (new FileStream(JournalPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            unrestored = await VaultDisableJournal.RecoverAsync(_configManager);
+        }
+
+        Assert.Null(unrestored);
+        Assert.Equal(newerKey, (await _configManager.LoadSettingsAsync()).VaultWrappedDek);
+        Assert.True(File.Exists(JournalPath), "the journal could not be deleted and is left for the next start");
+    }
+
+    // Kills F3 (enable half): EnableCoreAsync without the journal guard would generate a new key
+    // that the journal then overwrites at the next start.
+    [Fact]
+    public async Task EnableAsync_WhileADisableJournalExists_IsRefusedAndChangesNothing()
+    {
+        VaultLifecycleService service = NewService(null);
+        await VaultDisableJournal.WriteAsync(
+            _configManager,
+            new AppSettings { VaultWrappedDek = "journal-wrapped-key", VaultId = "journal-vault-id" });
+
+        await Assert.ThrowsAsync<VaultDisableJournalPendingException>(
+            () => service.EnableAsync(Pw(StrongPassword), FastParams));
+
+        Assert.False((await _configManager.LoadSettingsAsync()).VaultEnabled);
+        Assert.False(service.IsUnlocked);
+        Assert.True(File.Exists(JournalPath));
+    }
+
+    // Kills the catch of RecoverAsync: a failed write after the lambda decided "same vault" used to
+    // return the journal, and the caller applied it in memory over the enabled vault.
+    [Fact]
+    public async Task RecoverAsync_WriteFailsBesideTheSameVault_DoesNotReturnTheJournal()
+    {
+        VaultLifecycleService service = await EnabledServiceAsync();
+        await VaultDisableJournal.WriteAsync(_configManager, await _configManager.LoadSettingsAsync());
+        await service.ChangeMasterPasswordAsync(Pw(StrongPassword), Pw("OtherStrong2!Passw0rd"), FastParams);
+        var decorated = new DecoratedConfigManager(_configManager) { FailAfterMutating = true };
+
+        Assert.Null(await VaultDisableJournal.RecoverAsync(decorated));
+        Assert.True(File.Exists(JournalPath));
+    }
+
+    [Fact]
+    public async Task RecoverAsync_WriteFailsBesideAnotherVault_DoesNotReturnTheJournal_AndWritesNothing()
+    {
+        await EnabledServiceAsync();
+        await VaultDisableJournal.WriteAsync(
+            _configManager,
+            new AppSettings { VaultWrappedDek = "another-wrapped-key", VaultId = "another-vault-id" });
+        var decorated = new DecoratedConfigManager(_configManager) { FailAfterMutating = true };
+        string before = File.ReadAllText(_configManager.SettingsPath);
+        DateTime stamp = File.GetLastWriteTimeUtc(_configManager.SettingsPath);
+        await Task.Delay(60);
+
+        Assert.Null(await VaultDisableJournal.RecoverAsync(decorated));
+        Assert.Null(await VaultDisableJournal.RecoverAsync(_configManager));
+
+        Assert.Equal(before, File.ReadAllText(_configManager.SettingsPath));
+        Assert.Equal(stamp, File.GetLastWriteTimeUtc(_configManager.SettingsPath));
+    }
+
+    [Fact]
+    public async Task RecoverAsync_WriteFailsWhereTheJournalIsToBeApplied_StillReturnsTheJournal()
+    {
+        VaultLifecycleService service = await EnabledServiceAsync();
+        await VaultDisableJournal.WriteAsync(_configManager, await _configManager.LoadSettingsAsync());
+        service.Lock();
+        await _configManager.MergeSettingAsync(s =>
+        {
+            s.VaultEnabled = false;
+            s.VaultWrappedDek = null;
+            s.VaultId = null;
+        });
+        var decorated = new DecoratedConfigManager(_configManager) { FailAfterMutating = true };
+
+        Assert.NotNull(await VaultDisableJournal.RecoverAsync(decorated));
+    }
+
+    // Kills the refresh condition of the post-unlock pass: Complete was written whatever the copies were.
+    [Fact]
+    public async Task PostUnlockSealing_CopiesCannotBeRefreshed_KeepsTheMarker()
+    {
+        var decorated = new DecoratedConfigManager(_configManager);
+        var store = new FakeStore("StoreKeyOne");
+        var service = new VaultLifecycleService(decorated, null, [store]);
+        _services.Add(service);
+        await service.EnableAsync(Pw(StrongPassword), FastParams);
+        service.Lock();
+        await _configManager.MergeSettingAsync(s => s.VaultMigrationState = VaultMigrationState.InProgress);
+        decorated.FailRefresh = true;
+
+        await service.UnlockAsync(Pw(StrongPassword));
+        await service.PostUnlockSealingTask;
+
+        Assert.Equal(VaultMigrationState.InProgress, (await _configManager.LoadSettingsAsync()).VaultMigrationState);
+
+        decorated.FailRefresh = false;
+        service.Lock();
+        await service.UnlockAsync(Pw(StrongPassword));
+        await service.PostUnlockSealingTask;
+
+        Assert.Equal(VaultMigrationState.Complete, (await _configManager.LoadSettingsAsync()).VaultMigrationState);
+    }
+
+    // Kills the guard of enable: an unreadable journal must not block enable for good.
+    [Fact]
+    public async Task EnableAsync_WithAnUnreadableJournal_IsNotBlocked()
+    {
+        VaultLifecycleService service = NewService(null);
+        File.WriteAllText(JournalPath, "{ not a journal");
+
+        await service.EnableAsync(Pw(StrongPassword), FastParams);
+
+        Assert.True((await _configManager.LoadSettingsAsync()).VaultEnabled);
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // F4: a failed unlock never leaves the key behind.
+    // ---------------------------------------------------------------------------------------------
+
+    private async Task<(VaultLifecycleService Service, DecoratedConfigManager Decorated)> LockedServiceOverDecoratedAsync(
+        IVaultHelloService? hello = null)
+    {
+        var decorated = new DecoratedConfigManager(_configManager);
+        var service = new VaultLifecycleService(decorated, hello);
+        _services.Add(service);
+        await service.EnableAsync(Pw(StrongPassword), FastParams);
+        if (hello is not null)
+        {
+            await service.EnrollHelloAsync();
+        }
+
+        await SaveServerSecretAsync();
+        service.Lock();
+        return (service, decorated);
+    }
+
+    // Kills F4: the InProgress branch left the key in memory when the forward pass threw.
+    [Fact]
+    public async Task UnlockAsync_ResumeFails_LocksAgain()
+    {
+        (VaultLifecycleService service, DecoratedConfigManager decorated) = await LockedServiceOverDecoratedAsync();
+        await _configManager.MergeSettingAsync(s => s.VaultMigrationState = VaultMigrationState.InProgress);
+        decorated.FailMutations = true;
+
+        await Assert.ThrowsAsync<IOException>(() => service.UnlockAsync(Pw(StrongPassword)));
+
+        Assert.False(service.IsUnlocked);
+        Assert.False(CredentialProtector.IsVaultUnlocked);
+    }
+
+    // Guards F4: the Complete branch still locks when the servers pass throws.
+    [Fact]
+    public async Task UnlockAsync_ReconcileFails_LocksAgain()
+    {
+        (VaultLifecycleService service, DecoratedConfigManager decorated) = await LockedServiceOverDecoratedAsync();
+        decorated.FailMutations = true;
+
+        await Assert.ThrowsAsync<IOException>(() => service.UnlockAsync(Pw(StrongPassword)));
+
+        Assert.False(service.IsUnlocked);
+        Assert.False(CredentialProtector.IsVaultUnlocked);
+    }
+
+    // Kills F4: the Hello unlock had no lock on failure in the InProgress branch.
+    [Fact]
+    public async Task UnlockWithHello_ResumeFails_LocksAgain()
+    {
+        (VaultLifecycleService service, DecoratedConfigManager decorated) =
+            await LockedServiceOverDecoratedAsync(NewUnlockingHello());
+        await _configManager.MergeSettingAsync(s => s.VaultMigrationState = VaultMigrationState.InProgress);
+        decorated.FailMutations = true;
+
+        await Assert.ThrowsAsync<IOException>(() => service.UnlockWithHelloAsync());
+
+        Assert.False(service.IsUnlocked);
+        Assert.False(CredentialProtector.IsVaultUnlocked);
+    }
+
+    // Kills F4: a failure to record the unlock time failed an unlock that had worked.
+    [Fact]
+    public async Task UnlockAsync_StampFails_StillUnlocks()
+    {
+        (VaultLifecycleService service, DecoratedConfigManager decorated) = await LockedServiceOverDecoratedAsync();
+        decorated.FailMerges = true;
+
+        await service.UnlockAsync(Pw(StrongPassword));
+
+        Assert.True(service.IsUnlocked);
+        Assert.True(CredentialProtector.IsVaultUnlocked);
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // F5 and F6: the writer refusal.
+    // ---------------------------------------------------------------------------------------------
+
+    // Kills F5: with unreadable settings the refusal used to be skipped, so a blob could be written
+    // while the vault was off in memory too.
+    [Fact]
+    public async Task ConfigManager_SettingsUnreadable_RefusesAVaultBlobUnlessTheVaultIsOnInMemory()
+    {
+        var servers = new List<ServerProfileDto>
+        {
+            new() { Id = "srv1", DisplayName = "Server 1", ConnectionType = "RDP", RdpPasswordEncrypted = RandomVaultBlob() },
+        };
+        File.WriteAllText(_configManager.SettingsPath, "{ this is not json");
+
+        await Assert.ThrowsAsync<VaultLockedException>(() => _configManager.SaveServersAsync(servers));
+
+        // The vault is on in this process (locked): rewriting what is sealed is ordinary.
+        CredentialProtector.SetVaultEnabled(true);
+        await _configManager.SaveServersAsync(servers);
+        Assert.True(VaultSecretBlob.IsSecretBlob(await ServerSecretAsync()));
+    }
+
+    // The settings branch of the refusal: a gateway secret sealed with a key that is gone is
+    // refused once the vault is off, and allowed while the settings say the vault is on.
+    [Fact]
+    public async Task ConfigManager_RefusesAVaultBlobInTheSettingsOnceTheVaultIsOff()
+    {
+        string blob = RandomVaultBlob();
+        void AddGateway(AppSettings s) => s.SshGateways.Add(new SshGatewayDto
+        {
+            Id = "gw1",
+            Name = "Bastion",
+            Host = "bastion.example.test",
+            User = "ops",
+            SshPasswordEncrypted = blob,
+        });
+        string before = File.ReadAllText(_configManager.SettingsPath);
+
+        await Assert.ThrowsAsync<VaultLockedException>(() => _configManager.MergeSettingAsync(AddGateway));
+
+        Assert.Equal(before, File.ReadAllText(_configManager.SettingsPath));
+
+        await _configManager.MergeSettingAsync(settings =>
+        {
+            settings.VaultEnabled = true;
+            settings.VaultWrappedDek = "placeholder-wrapped-key";
+            settings.VaultMigrationState = VaultMigrationState.Complete;
+        });
+        await _configManager.MergeSettingAsync(AddGateway);
+
+        Assert.True(VaultSecretBlob.IsSecretBlob((await _configManager.LoadSettingsAsync()).SshGateways.Single().SshPasswordEncrypted));
+    }
+
     private async Task AssertVaultStillOnAndSealedAsync()
     {
         AppSettings settings = await _configManager.LoadSettingsAsync();
@@ -1296,6 +1875,11 @@ public sealed class VaultDisableResidueTests : IAsyncLifetime
         public bool FailMerges { get; set; }
 
         public bool FailRefresh { get; set; }
+
+        public bool FailMutations { get; set; }
+
+        /// <summary>Runs the mutation on the settings as they are, then fails as a write that did not land.</summary>
+        public bool FailAfterMutating { get; set; }
 
         public Func<Task>? OnRefresh { get; set; }
 
@@ -1324,12 +1908,22 @@ public sealed class VaultDisableResidueTests : IAsyncLifetime
             _inner.MergeTrustedHostKeysAsync(entries);
 
         public Task MergeSettingAsync(Action<AppSettings> mutate) =>
-            FailMerges ? Task.FromException(new IOException("settings are locked")) : _inner.MergeSettingAsync(mutate);
+            FailAfterMutating ? MutateThenFailAsync(mutate)
+            : FailMerges ? Task.FromException(new IOException("settings are locked"))
+            : _inner.MergeSettingAsync(mutate);
+
+        private async Task MutateThenFailAsync(Action<AppSettings> mutate)
+        {
+            mutate(await _inner.LoadSettingsAsync().ConfigureAwait(false));
+            throw new IOException("settings could not be written");
+        }
 
         public Task<List<ServerProfileDto>> LoadServersAsync() => _inner.LoadServersAsync();
 
         public Task<TResult> MutateServersAsync<TResult>(Func<List<ServerProfileDto>, TResult> mutate) =>
-            _inner.MutateServersAsync(mutate);
+            FailMutations
+                ? Task.FromException<TResult>(new IOException("servers are locked"))
+                : _inner.MutateServersAsync(mutate);
 
         public Task SaveServersAsync(List<ServerProfileDto> servers) => _inner.SaveServersAsync(servers);
 
@@ -1521,5 +2115,26 @@ public sealed class VaultDisableResidueTests : IAsyncLifetime
 
             RemovedCredentialNames.Add(credentialName);
         }
+    }
+
+    /// <summary>A Hello service that enrolls like the recording one and unlocks with a supplied key.</summary>
+    private sealed class UnlockingHelloService : IVaultHelloService
+    {
+        private readonly RecordingHelloService _inner = new();
+        private readonly Func<VaultDekHolder> _unlock;
+
+        public UnlockingHelloService(Func<VaultDekHolder> unlock) => _unlock = unlock;
+
+        public Task<bool> IsEnrollmentAvailableAsync(CancellationToken ct = default) =>
+            _inner.IsEnrollmentAvailableAsync(ct);
+
+        public Task<VaultHelloEnrollment> EnrollAsync(ReadOnlyMemory<byte> dek, string vaultId, CancellationToken ct) =>
+            _inner.EnrollAsync(dek, vaultId, ct);
+
+        public Task<VaultDekHolder> UnlockAsync(VaultHelloEnrollment stored, CancellationToken ct) =>
+            Task.FromResult(_unlock());
+
+        public Task RemoveAsync(string credentialName, CancellationToken ct = default) =>
+            _inner.RemoveAsync(credentialName, ct);
     }
 }

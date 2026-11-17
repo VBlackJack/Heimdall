@@ -742,6 +742,23 @@ public sealed class SharedCredentialApplierTests : IDisposable
         Assert.Empty(harness.Prompts.Prompts);
     }
 
+    // Producer: SharedVncPassword.RememberAsync seals and stores in one scope of the seal gate.
+    // Kills: removing the gate entry of the VNC remember, which lets a password be sealed with a key
+    // that a disable is about to withdraw.
+    [Fact]
+    public async Task Vnc_Remember_WaitsForTheExclusiveSideOfTheSealGate_ThenLands()
+    {
+        Harness harness = await Harness.CreateAsync(this, content: VncContent);
+        ServerProfileDto first = VncCopy(harness);
+        SharedCredentialApplier.SharedVncPassword keeper = harness.Applier.VncPasswordFor(first.InventoryProfileId, first.RemoteServer, VncPort)!;
+
+        await VaultSealGateProbe.AssertWaitsForTheExclusiveSideAsync(
+            () => keeper.RememberAsync(VncPassword),
+            () => Task.FromResult(harness.Store.CountFor(SourceId) > 0));
+
+        Assert.NotNull(harness.Store.Find(SharedSecretKind.Vnc, SourceId, SharedSessionSecretStore.VncKey(first.Id, "vnc-a.example.test", VncPort)));
+    }
+
     // Producer: SharedVncPassword.ForgetAsync, which the view calls on a refusal after the password.
     // Kills: a forget that removes nothing (wrong kind or key).
     [Fact]

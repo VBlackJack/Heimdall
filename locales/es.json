@@ -3492,6 +3492,7 @@
   "VaultUnreadableStoreCount": "{0} ({1})",
   "VaultDisableDropUnreadableBtn": "Quitar {0} entradas ilegibles y desactivar",
   "VaultEnablePartialNotice": "La contraseña maestra está activa. {0} se sellará en el próximo desbloqueo.",
+  "VaultEnableJournalPendingError": "Un intento anterior de desactivar la contraseña maestra no terminó. Reinicia Heimdall para finalizarlo; la contraseña maestra seguirá activa.",
   "VaultStoreFailureError": "No se pudo completar el cambio: no se pudo leer o actualizar {0}. Revísalo e inténtalo de nuevo.",
   "VaultStoresUnsealedNotice": "Algunos datos guardados ({0}) no se pudieron proteger con la contraseña maestra. Siguen protegidos solo por Windows.",
   "VaultDisableUnsavedGatewaysMessage": "Algunas pasarelas tienen cambios sin guardar. Guarda o revierte primero los ajustes y luego desactiva la contraseña maestra.",

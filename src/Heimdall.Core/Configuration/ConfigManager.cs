@@ -1533,7 +1533,10 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
             return;
         }
 
-        if (VaultEnabledOnDisk(path, content) is not false)
+        // When the settings cannot be read the process-wide flag decides: a vault that is on in
+        // memory without its key is a locked vault, and rewriting what is sealed is ordinary; with
+        // the flag off, nothing could open the blob once written.
+        if (VaultEnabledOnDisk(path, content) ?? CredentialProtector.IsVaultEnabled)
         {
             return;
         }
