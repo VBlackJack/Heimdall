@@ -323,10 +323,10 @@ public sealed class PrivilegedFileCommandsTests
     public void SudoInvocations_ConsumePasswordBeforeStreamingPayload()
     {
         Assert.Equal(
-            "sudo -S -p '' -v",
+            "env LC_ALL=C sudo -S -p '' -v",
             PrivilegedFileCommands.BuildPasswordSudoInvocation("-v"));
         Assert.Equal(
-            "sudo -n sh -c 'body'",
+            "env LC_ALL=C sudo -n sh -c 'body'",
             PrivilegedFileCommands.BuildNonInteractiveSudoInvocation("sh -c 'body'"));
 
         // The password write is one simple sh -c command: the password is read first, the content
