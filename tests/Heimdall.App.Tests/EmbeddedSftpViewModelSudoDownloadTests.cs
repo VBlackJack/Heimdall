@@ -30,7 +30,7 @@ public sealed class EmbeddedSftpViewModelSudoDownloadTests
             "base64 -- '/etc/ssh/config'",
             false);
 
-        Assert.Equal("sudo base64 -- '/etc/ssh/config'", command);
+        Assert.Equal("env LC_ALL=C sudo base64 -- '/etc/ssh/config'", command);
     }
 
     [Fact]
@@ -40,7 +40,7 @@ public sealed class EmbeddedSftpViewModelSudoDownloadTests
             "base64 -- '/etc/ssh/config'",
             true);
 
-        Assert.Equal("sudo -S -p '' base64 -- '/etc/ssh/config'", command);
+        Assert.Equal("env LC_ALL=C sudo -S -p '' base64 -- '/etc/ssh/config'", command);
     }
 
     [Fact]

@@ -3702,8 +3702,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     internal static string BuildSudoInvocation(string privilegedBody, bool authenticateViaStdin)
     {
         return authenticateViaStdin
-            ? $"sudo -S -p '' {privilegedBody}"
-            : $"sudo {privilegedBody}";
+            ? $"{PrivilegedFileCommands.SudoProgram} -S -p '' {privilegedBody}"
+            : $"{PrivilegedFileCommands.SudoProgram} {privilegedBody}";
     }
 
     internal static SudoFailureKind ClassifySudoStderr(string? stderr)

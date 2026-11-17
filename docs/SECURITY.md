@@ -534,9 +534,10 @@ later entry can change (password refused or unavailable, account not allowed to
 use sudo, sudo or a required tool missing, SSH authentication or host key
 refused) stops escalation for the rest of that operation: the remaining entries
 are still tried with the session's own rights, and the summary says how many
-were not tried as root. The detection reads sudo's English messages, so on a
-server whose sudo answers in another language a refused password is still tried
-once per entry.
+were not tried as root. The detection reads sudo's English messages. Every sudo
+the browser runs is started as `env LC_ALL=C sudo` (the upload exports
+`LC_ALL=C` before its sudo calls), so sudo answers in English whatever the
+server's language, and a refused password stops the batch there too.
 
 Privileged uploads are staged first: the content goes into a private 0700 directory of the
 connecting user under `$TMPDIR` (default `/tmp`), in a 0600 file, and stays there until the
@@ -602,8 +603,15 @@ links in folders closed to other accounts, such as package files under `/usr`,
 keep working.
 
 Limits that remain: an account that can write in the folder can remove the empty work
-directory and make the transfer fail; a new file written as root belongs to root with
-mode 0600.
+directory and make the transfer fail.
+
+A file that replaces another keeps its owner, mode, timestamps and extended
+attributes. A new file written as root belongs to root, with the folder's gid when
+the folder is setgid, and gets mode 0644, as `sudo cp` gave it, where the file system
+allows it. In a folder with a default ACL, the new file keeps what that ACL gives it
+instead. A secret uploaded as a new file is therefore readable by every account until
+you change its permissions; the root permission change does that without following a
+link.
 
 The privileged connection goes through the same cancellable connect as the other
 SFTP connections, so Cancel reaches it during the handshake. Every privileged

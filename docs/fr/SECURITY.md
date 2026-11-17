@@ -596,9 +596,11 @@ passe refusé ou indisponible, compte non autorisé à utiliser sudo, sudo ou un
 outil nécessaire absent, authentification SSH ou clé d'hôte refusée) arrête
 l'escalade pour le reste de l'opération : les éléments restants sont quand même
 tentés avec les droits de la session, et le résumé indique combien n'ont pas été
-tentés en root. La détection lit les messages anglais de sudo : sur un serveur
-dont sudo répond dans une autre langue, un mot de passe refusé est encore tenté
-une fois par élément.
+tentés en root. La détection lit les messages anglais de sudo. Chaque sudo lancé
+par le navigateur l'est sous la forme `env LC_ALL=C sudo` (le téléversement
+exporte `LC_ALL=C` avant ses appels sudo) : sudo répond donc en anglais quelle que
+soit la langue du serveur, et un mot de passe refusé arrête aussi le lot sur ces
+serveurs.
 
 Les téléversements privilégiés passent d'abord par une zone de transit : le contenu est déposé
 dans un répertoire privé (0700) de l'utilisateur connecté, sous `$TMPDIR` (`/tmp` par défaut),
@@ -671,8 +673,16 @@ root, l'appelant et le propriétaire de l'entrée ; le message le dit. Les liens
 les fichiers de paquets sous `/usr`, continuent de fonctionner.
 
 Limites qui restent : un compte qui peut écrire dans le dossier peut supprimer le
-répertoire de travail vide et faire échouer le transfert ; un nouveau fichier écrit en
-root appartient à root avec le mode 0600.
+répertoire de travail vide et faire échouer le transfert.
+
+Un fichier qui en remplace un autre garde son propriétaire, son mode, ses horodatages
+et ses attributs étendus. Un nouveau fichier écrit en root appartient à root, avec le
+gid du dossier quand le dossier est setgid, et prend le mode 0644, comme avec
+`sudo cp`, là où le système de fichiers le permet. Dans un dossier qui a une ACL par
+défaut, le nouveau fichier garde plutôt ce que cette ACL lui donne. Un secret téléversé
+comme nouveau fichier est donc lisible par tous les comptes tant que vous n'avez pas
+changé ses permissions ; le changement de permissions en root le fait sans suivre de
+lien.
 
 La connexion privilégiée passe par la même connexion annulable que les autres
 connexions SFTP : Annuler l'atteint pendant la négociation. Chaque commande

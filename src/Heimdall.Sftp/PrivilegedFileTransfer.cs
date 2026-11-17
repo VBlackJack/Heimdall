@@ -357,7 +357,20 @@ public static class PrivilegedFileCommands
         // file. Measured across the copy, and refused if it moved.
         + "if [ \"$(stat -c %s -- payload)\" != \"$payload_size\" ]; then "
         + "printf '%s\\n' 'Refusing: the attribute copy altered the payload.' >&2; "
-        + "exit 76; fi; fi; "
+        + "exit 76; fi; else "
+        // A new file: umask 077 kept it private while it was written in the private work directory,
+        // but it is published like "sudo cp" would, readable by others. The chmod runs only when all
+        // of these hold: the work directory carries no ACL (GNU ls marks a directory with any default
+        // ACL, base-only included, with a plus, and the work directory inherits the folder's), the
+        // payload carries none, and its mode is still the 600 that "cat >" gives under umask 077. In
+        // every other case the folder's default ACL decided and must not be widened. An ls that fails
+        // counts as an ACL (leave alone). Best effort: some filesystems (vfat, CIFS) refuse the mode
+        // change, and that must not fail the write.
+        + "work_acl=$(ls -ld -- . 2>/dev/null) || work_acl=----------+; "
+        + "payload_acl=$(ls -ld -- payload 2>/dev/null) || payload_acl=----------+; "
+        + "case \"$work_acl\" in ??????????+*) ;; *) case \"$payload_acl\" in ??????????+*) ;; *) "
+        + "if [ \"$(stat -c %a -- payload)\" = 600 ]; then chmod -- 0644 payload 2>/dev/null || :; fi "
+        + ";; esac ;; esac; fi; "
         // After the metadata, so what reaches the disk is the file as it will be published.
         + "sync -f payload; "
         + "rm -f -- original; "
@@ -523,6 +536,14 @@ public static class PrivilegedFileCommands
     /// <summary>
     /// Builds a root-side streamed write that commits with a same-directory atomic rename.
     /// </summary>
+    /// <remarks>
+    /// A replaced file takes the old file's owner, mode, timestamps and extended attributes. A new
+    /// file is published with mode 0644 where the filesystem allows it, or keeps the folder's
+    /// default ACL when it has one (named or base-only); its group is the folder's when the folder is setgid, else
+    /// root's. The chmod runs only when neither the work directory nor the payload carries an ACL and the
+    /// payload is still mode 600; a failing ls counts as an ACL. The umask 077 at the start is unchanged and
+    /// the work directory stays private.
+    /// </remarks>
     public static string BuildAtomicWriteBody(string targetRemotePath, bool overwrite = true)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(targetRemotePath);
@@ -811,16 +832,31 @@ public static class PrivilegedFileCommands
         return -1;
     }
 
+    /// <summary>
+    /// The program every sudo started by the SFTP browser begins with, so sudo's own messages
+    /// ("a password is required", "sorry, try again", "not in the sudoers") are English whatever
+    /// the login locale of the server, and the classifiers that read them keep working.
+    /// </summary>
+    /// <remarks>
+    /// <c>env</c> and not <c>LC_ALL=C sudo</c>: a csh or tcsh login shell does not parse a
+    /// leading assignment. Before <c>sudo</c> and not after: <c>sudo LC_ALL=C</c> needs the
+    /// SETENV tag. <c>LC_ALL=C</c> also makes gettext ignore <c>LANGUAGE</c>. The staged outer
+    /// script already exports <c>LC_ALL=C</c> before its own sudo calls and does not use this.
+    /// A missing sudo then reports <c>env: 'sudo': No such file or directory</c> with status 127,
+    /// which <see cref="PrivilegedFileTransfer.IsSudoMissing"/> still recognizes.
+    /// </remarks>
+    public const string SudoProgram = "env LC_ALL=C sudo";
+
     internal static string BuildPasswordSudoInvocation(string privilegedBody)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(privilegedBody);
-        return $"sudo -S -p '' {privilegedBody}";
+        return $"{SudoProgram} -S -p '' {privilegedBody}";
     }
 
     internal static string BuildNonInteractiveSudoInvocation(string privilegedBody)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(privilegedBody);
-        return $"sudo -n {privilegedBody}";
+        return $"{SudoProgram} -n {privilegedBody}";
     }
 
     /// <summary>
