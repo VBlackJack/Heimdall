@@ -12,6 +12,38 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-11-17: Root actions in the SFTP browser check the folders on their way (v2026.111701)
+
+A fix merged as #838, documentation as #837, plus the root path checks merged with these notes. The
+user-facing summary and the upgrade notes are in the release notes.
+
+### Root path checks
+
+- The root scripts of `PrivilegedFileCommands` (write, read, permission change, and the new
+  `BuildHeldDeleteBody(remotePath, recursive)`) reach the entry's folder through `HeldParentWalk`: one folder
+  at a time from `/`, a symbolic link followed only when the link and the folder holding it belong to root or
+  the caller (`SUDO_UID`), the folder having no group or other write bit, at most 40 links.
+- A write, read or permission change refuses an entry with more than one link when its folder is open to
+  accounts other than root, the caller and the entry's owner.
+- Refusals print `HEIMDALL-TRANSFER-REFUSED <reason>` (write 73, read 74) or `HEIMDALL-ENTRY-REFUSED
+  <reason>` (permission change and delete, 73), read at the start of a line only
+  (`ParseTransferRefusal`, `HasEntryRefusalMarker`); `PrivilegedTransferRefusedException` and
+  `EntryRefusalReason.PathLink` / `HardLink` map to localized messages (`SftpRootRefusedPathLink`,
+  `SftpRootRefusedHardLink`, `SftpDeleteRootRefusedEntry`). They are never batch-fatal and the editors do not
+  retry them.
+- Root delete runs the held delete script: `rm -f` for a file (refused, untouched, when the name is a folder),
+  `rm -rf` for a folder, by the entry's last name from the held folder. Three assertions that pinned the old delete
+  command text now check that this builder is used. SECURITY and ARCHITECTURE (EN, FR) describe the rules.
+
+### Selection after a new folder (#838)
+
+- `EmbeddedSftpViewModel.ApplyFilterAndSort`: the entry requested by `RequestSelectAfterRefresh` replaces the
+  selection instead of being added to the kept one.
+
+### Documentation (#837)
+
+- SECURITY (EN, FR) describes the verified work directory of the root transfers, earlier versions, and limits.
+
 ## 2026-11-16: Heimdall asks before it acts as root, and four questions decline by default (v2026.111601)
 
 Features merged as #825, #833 and #835, fixes as #829, #830, #831, #832 and #834, plus the hardening of

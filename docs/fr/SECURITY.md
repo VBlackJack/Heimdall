@@ -659,9 +659,9 @@ suppression en root retire l'entrée du dossier qu'elle tient, par son seul dern
 refuse un fichier dont un dossier a pris le nom et, comme le changement de permissions
 en root, demande GNU coreutils sur le serveur : sur BusyBox ou BSD elle est refusée.
 
-Une entrée qui a un autre lien physique est refusée quand son dossier peut être
-modifié par un compte autre que root, l'appelant et le propriétaire de l'entrée ; le
-message le dit. Les liens physiques dans des dossiers fermés aux autres comptes, comme
+L'écriture, la lecture ou le changement de permissions d'une entrée qui a un autre
+lien physique est refusé quand son dossier peut être modifié par un compte autre que
+root, l'appelant et le propriétaire de l'entrée ; le message le dit. Les liens physiques dans des dossiers fermés aux autres comptes, comme
 les fichiers de paquets sous `/usr`, continuent de fonctionner.
 
 Limites qui restent : un compte qui peut écrire dans le dossier peut supprimer le

@@ -591,8 +591,9 @@ delete removes the entry from the folder it holds, by its last name only, refuse
 whose name a folder took, and, like the root permission change, needs GNU coreutils on
 the server: on BusyBox or BSD it is refused.
 
-An entry with another hard link is refused when its folder can be written by an
-account other than root, the caller and the entry's owner; the message says so. Hard
+A write, read or permission change of an entry with another hard link is refused
+when its folder can be written by an account other than root, the caller and the
+entry's owner; the message says so. Hard
 links in folders closed to other accounts, such as package files under `/usr`,
 keep working.
 
