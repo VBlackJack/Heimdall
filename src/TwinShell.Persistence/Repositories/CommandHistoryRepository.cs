@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using Heimdall.Core.Security.Vault;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using TwinShell.Core.Enums;
@@ -46,6 +47,8 @@ public sealed class CommandHistoryRepository : ICommandHistoryRepository
     {
         try
         {
+            // Sealing and saving are one scope for the vault: disabling it waits for the row to land.
+            using IDisposable sealScope = await VaultSealGate.Shared.EnterAsync().ConfigureAwait(false);
             var entity = CommandHistoryMapper.ToEntity(history, _protector);
             _context.CommandHistories.Add(entity);
             await _context.SaveChangesAsync();
@@ -64,6 +67,7 @@ public sealed class CommandHistoryRepository : ICommandHistoryRepository
     {
         try
         {
+            using IDisposable sealScope = await VaultSealGate.Shared.EnterAsync().ConfigureAwait(false);
             var entities = histories.Select(history => CommandHistoryMapper.ToEntity(history, _protector));
             _context.CommandHistories.AddRange(entities);
             await _context.SaveChangesAsync();
@@ -79,6 +83,7 @@ public sealed class CommandHistoryRepository : ICommandHistoryRepository
     {
         try
         {
+            using IDisposable sealScope = await VaultSealGate.Shared.EnterAsync().ConfigureAwait(false);
             var entity = CommandHistoryMapper.ToEntity(history, _protector);
             _context.CommandHistories.Update(entity);
             await _context.SaveChangesAsync();

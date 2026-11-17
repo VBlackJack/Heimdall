@@ -64,6 +64,26 @@ public partial class VaultDisableDialog : Window
 
     private void OnDisableClick(object sender, RoutedEventArgs e) => Submit();
 
+    private void OnRetryClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is VaultDisableDialogViewModel vm)
+        {
+            vm.RetryRestoreCommand.Execute(null);
+        }
+    }
+
+    private void OnDropUnreadableClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not VaultDisableDialogViewModel vm)
+        {
+            return;
+        }
+
+        using var secure = PasswordBox.SecurePassword;
+        var password = SecurePasswordHelper.ToChars(secure);
+        vm.DropUnreadableCommand.Execute(password); // ViewModel owns and zeroes the buffer.
+    }
+
     private void OnPasswordKeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key == Key.Enter)
@@ -85,9 +105,39 @@ public partial class VaultDisableDialog : Window
         vm.DisableCommand.Execute(password); // ViewModel owns and zeroes the buffer.
     }
 
+    private bool IsRetryPending => DataContext is VaultDisableDialogViewModel { IsRetryPending: true };
+
     private void OnCancelClick(object sender, RoutedEventArgs e)
     {
+        // Cancel and Escape do not dismiss the dialog while a retry is pending: the way out is the
+        // explicit action below.
+        if (IsRetryPending)
+        {
+            return;
+        }
+
         PasswordBox.Clear();
         DialogResult = false;
+    }
+
+    private bool _closeAllowed;
+
+    private void OnCloseRestoreLaterClick(object sender, RoutedEventArgs e)
+    {
+        _closeAllowed = true;
+        PasswordBox.Clear();
+        DialogResult = false;
+    }
+
+    /// <inheritdoc />
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        if (IsRetryPending && !_closeAllowed)
+        {
+            e.Cancel = true;
+            return;
+        }
+
+        base.OnClosing(e);
     }
 }

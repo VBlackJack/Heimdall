@@ -78,6 +78,21 @@ public sealed class CommandLibrarySettingsServiceTokenTests : IDisposable
         Assert.Equal("ghp_under_vault", GitTokenReader.Decrypt(settings.CmdLibGitSyncToken));
     }
 
+    // Kills: removing the seal gate entry of TrySaveTokenAsync, which lets a token be sealed with a
+    // key that a disable is about to withdraw.
+    [Fact]
+    public async Task TrySaveToken_WaitsForTheExclusiveSideOfTheSealGate_ThenLands()
+    {
+        bool saved = false;
+
+        await VaultSealGateProbe.AssertWaitsForTheExclusiveSideAsync(
+            async () => saved = await _service.TrySaveTokenAsync("ghp_gate"),
+            async () => await _service.HasSavedTokenAsync());
+
+        Assert.True(saved);
+        Assert.Equal("ghp_gate", GitTokenReader.Decrypt((await _configManager.LoadSettingsAsync()).CmdLibGitSyncToken));
+    }
+
     [Fact]
     public async Task TrySaveToken_NoVault_WritesLegacy_RoundTrips()
     {

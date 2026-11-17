@@ -41,6 +41,14 @@ public sealed class VaultSecretBlob
     public const byte CurrentFormatVersion = 1;
 
     /// <summary>
+    /// The Base64 text every secret blob starts with: the magic, the format version and the cipher
+    /// id are six bytes, which encode to eight characters with no padding, so the text is the same
+    /// for every blob and a store can filter on it without decoding.
+    /// </summary>
+    public static readonly string EncodedPrefix =
+        Convert.ToBase64String([.. Magic, CurrentFormatVersion, (byte)VaultCipherId.Aes256Gcm]);
+
+    /// <summary>
     /// Fixed domain-separation tag bound into the AES-GCM AAD for every secret.
     /// Separates secret encryption from DEK wrapping and from any other AEAD use.
     /// </summary>

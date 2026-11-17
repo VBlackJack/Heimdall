@@ -19,6 +19,7 @@ using System.Text.Json;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Logging;
 using Heimdall.Core.Security;
+using Heimdall.Core.Security.Vault;
 
 namespace Heimdall.App.Services.SharedSessions;
 
@@ -111,6 +112,151 @@ public sealed class SharedSessionSecretStore
         lock (_gate)
         {
             return Entries().Count(entry => string.Equals(entry.SourceId, sourceId, StringComparison.Ordinal));
+        }
+    }
+
+    /// <summary>Whether the document holds a secret sealed with the vault key.</summary>
+    /// <remarks>
+    /// Reads the document itself, not the entries cached in memory: the cache answers an empty list
+    /// for a document it could not read, and that answer must never reach a caller who is about to
+    /// erase the vault key. An unreadable document throws. Taken under the write gate, so a write in
+    /// flight has landed, or not started, when the document is read.
+    /// </remarks>
+    internal async Task<bool> HoldsVaultSecretsAsync(CancellationToken cancellationToken)
+    {
+        await _writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return await VaultConfigurationScan.HoldsVaultSecretsAsync(_path, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            _writeGate.Release();
+        }
+    }
+
+    /// <summary>Removes every remembered secret for which <paramref name="isUnreadable"/> is true.</summary>
+    /// <remarks>Reads the document strictly, like <see cref="TransformSecretsAsync"/>.</remarks>
+    internal async Task DropSecretsAsync(Func<string?, bool> isUnreadable, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(isUnreadable);
+        await _writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (!File.Exists(_path))
+            {
+                return;
+            }
+
+            string json = await File.ReadAllTextAsync(_path, cancellationToken).ConfigureAwait(false);
+            SecretDocument document = JsonSerializer.Deserialize<SecretDocument>(json)
+                ?? throw new InvalidDataException("The remembered passwords document is empty.");
+            if (document.FormatVersion != FormatVersion || document.Entries is null)
+            {
+                throw new InvalidDataException("The remembered passwords document has an unknown format.");
+            }
+
+            if (document.Entries.RemoveAll(entry => isUnreadable(entry.Secret)) == 0)
+            {
+                return;
+            }
+
+            await SecureFileWriter.WriteAllTextAtomicAsync(
+                _path,
+                JsonSerializer.Serialize(document, JsonOptions),
+                cancellationToken).ConfigureAwait(false);
+
+            lock (_gate)
+            {
+                _entries = [.. document.Entries.Where(entry => entry.IsComplete)];
+            }
+        }
+        finally
+        {
+            _writeGate.Release();
+        }
+    }
+
+    /// <summary>Whether a remembered secret is still in the legacy form. An unreadable document throws.</summary>
+    internal async Task<bool> HasUnsealedSecretsAsync(CancellationToken cancellationToken)
+    {
+        await _writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (!File.Exists(_path))
+            {
+                return false;
+            }
+
+            string json = await File.ReadAllTextAsync(_path, cancellationToken).ConfigureAwait(false);
+            SecretDocument document = JsonSerializer.Deserialize<SecretDocument>(json)
+                ?? throw new InvalidDataException("The remembered passwords document is empty.");
+            return (document.Entries ?? [])
+                .Any(entry => entry.Secret.Length > 0 && !VaultConfigurationScan.IsVaultSecret(entry.Secret));
+        }
+        finally
+        {
+            _writeGate.Release();
+        }
+    }
+
+    /// <summary>
+    /// Maps every remembered secret through <paramref name="transform"/> and writes the document back
+    /// atomically when any of them changed.
+    /// </summary>
+    /// <remarks>
+    /// Reads the document itself, strictly: one that cannot be read or is of another format throws and
+    /// is left as it is, since writing back what a failed read produced would erase the passwords.
+    /// </remarks>
+    internal async Task TransformSecretsAsync(Func<string?, string?> transform, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(transform);
+        await _writeGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (!File.Exists(_path))
+            {
+                return;
+            }
+
+            string json = await File.ReadAllTextAsync(_path, cancellationToken).ConfigureAwait(false);
+            SecretDocument document = JsonSerializer.Deserialize<SecretDocument>(json)
+                ?? throw new InvalidDataException("The remembered passwords document is empty.");
+            if (document.FormatVersion != FormatVersion || document.Entries is null)
+            {
+                throw new InvalidDataException("The remembered passwords document has an unknown format.");
+            }
+
+            var changed = false;
+            foreach (SecretEntry entry in document.Entries)
+            {
+                string? next = transform(entry.Secret);
+                if (!string.IsNullOrEmpty(next) && !string.Equals(next, entry.Secret, StringComparison.Ordinal))
+                {
+                    entry.Secret = next;
+                    changed = true;
+                }
+            }
+
+            if (!changed)
+            {
+                return;
+            }
+
+            await SecureFileWriter.WriteAllTextAtomicAsync(
+                _path,
+                JsonSerializer.Serialize(document, JsonOptions),
+                cancellationToken).ConfigureAwait(false);
+
+            lock (_gate)
+            {
+                _entries = [.. document.Entries.Where(entry => entry.IsComplete)];
+            }
+        }
+        finally
+        {
+            _writeGate.Release();
         }
     }
 

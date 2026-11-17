@@ -3525,7 +3525,15 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
     /// change: a file written on every slider movement would be a file written on every pixel of a
     /// drag, and the whole of this setting is a convenience.
     /// </remarks>
-    internal void PersistSettingsIfRemembering()
+    internal void PersistSettingsIfRemembering() => PersistSettings(inBackground: false);
+
+    /// <summary>
+    /// The same, for the moment the tool is put away: the save is started and not waited for, so
+    /// closing a tab never blocks on the vault.
+    /// </summary>
+    internal void PersistSettingsInBackground() => PersistSettings(inBackground: true);
+
+    private void PersistSettings(bool inBackground)
     {
         // Nothing is written while the tool is still being set up. Turning the switch on during a
         // restore would otherwise save the defaults over the very snapshot being restored, which
@@ -3538,7 +3546,14 @@ public sealed partial class PasswordGeneratorViewModel : ObservableObject
         var store = LoadStore();
         store.RememberSettings = RememberSettings;
         store.Settings = RememberSettings ? SnapshotCurrentPreset(string.Empty) : null;
-        _presetStorage.Save(store);
+        if (inBackground)
+        {
+            _ = _presetStorage.SaveAsync(store);
+        }
+        else
+        {
+            _presetStorage.Save(store);
+        }
     }
 
     partial void OnRememberSettingsChanged(bool value) => PersistSettingsIfRemembering();

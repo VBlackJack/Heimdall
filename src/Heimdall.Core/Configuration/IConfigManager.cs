@@ -100,6 +100,14 @@ public interface IConfigManager
     /// Serializes and saves the server inventory to servers.json (UTF-8 without BOM).
     /// </summary>
     Task SaveServersAsync(List<ServerProfileDto> servers);
+
+    /// <summary>
+    /// Replaces the last good copy kept beside the settings and the server inventory with the
+    /// documents as they are now, so that a later fall-back to a copy cannot bring back what a
+    /// migration has just rewritten. The default does nothing, for implementations that keep no
+    /// such copies.
+    /// </summary>
+    Task RefreshLastGoodCopiesAsync() => Task.CompletedTask;
 }
 /// <summary>
 /// Commits a settings change and a server-inventory change as one logical unit.

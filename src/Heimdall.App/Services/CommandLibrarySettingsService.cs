@@ -19,6 +19,7 @@ using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Logging;
 using Heimdall.Core.Security;
+using Heimdall.Core.Security.Vault;
 
 namespace Heimdall.App.Services;
 
@@ -63,6 +64,9 @@ public sealed class CommandLibrarySettingsService
             // vault is active, legacy DPAPI when no vault. Matches the vault-aware
             // reader (GitTokenReader). Protect throws if the vault is enabled but
             // locked; that is caught below and reported as a failed save.
+            // The seal and the write are one scope for the vault: disabling it waits for this save
+            // to land before it withdraws the key.
+            using IDisposable sealScope = await VaultSealGate.Shared.EnterAsync().ConfigureAwait(false);
             string encrypted = CredentialProtector.Protect(plaintext);
             await _configManager.MergeSettingAsync(
                     (AppSettings settings) => settings.CmdLibGitSyncToken = encrypted)
