@@ -1243,6 +1243,11 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             return L10n("SftpErrorSudoToolingUnavailable");
         }
 
+        if (ex is PrivilegedTransferRefusedException transferRefusal)
+        {
+            return DescribeTransferRefusal(transferRefusal.Reason, transferRefusal.RemotePath);
+        }
+
         if (ex is SudoEditFileTooLargeException tooLargeException)
         {
             string fileSize = FormatSize(tooLargeException.FileSizeBytes);
@@ -2310,7 +2315,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                     commandCancellation,
                     localPath,
                     ct,
-                    overwrite);
+                    overwrite,
+                    remotePath);
 
                 if (authenticateViaStdin)
                 {
@@ -2376,7 +2382,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         CancellationTokenSource commandCancellation,
         string localPath,
         CancellationToken ct,
-        bool overwrite = true)
+        bool overwrite = true,
+        string? remotePath = null)
     {
         ArgumentNullException.ThrowIfNull(standardOutput);
         ArgumentNullException.ThrowIfNull(standardError);
@@ -2408,7 +2415,7 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 await destination.FlushAsync(commandCancellation.Token).ConfigureAwait(false);
             }
 
-            EnsureSudoSucceeded(exitStatusProvider(), standardErrorText, "base64");
+            EnsureSudoSucceeded(exitStatusProvider(), standardErrorText, "base64", remotePath);
             ct.ThrowIfCancellationRequested();
             AtomicLocalFile.Commit(tempPath, localPath, overwrite);
         }
@@ -2592,7 +2599,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                     EnsureSudoSucceeded(
                         result.ExitStatus,
                         PrivilegedFileTransfer.CleanWriteError(result.Error),
-                        "atomic write");
+                        "atomic write",
+                        remotePath);
                 },
                 () => new FileInfo(localPath).Length).ConfigureAwait(false);
         }
@@ -2631,7 +2639,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     internal static void EnsureSudoSucceeded(
         int exitStatus,
         string? stderr,
-        string operationLabel)
+        string operationLabel,
+        string? remotePath = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(operationLabel);
 
@@ -2643,13 +2652,22 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         string error = stderr ?? string.Empty;
         // First: the marker proves sudo already let the script run, so a file name echoed in the
         // script's own stderr ("sorry, try again", "not in the sudoers") cannot be read as a sudo
-        // refusal. The status alone is shared with other refusals, so the marker must be there too:
-        // only the permission change prints it, and an upload never does.
+        // refusal. The status alone is shared with other refusals, so the marker must be there too,
+        // at the start of a line.
         if (exitStatus == PrivilegedFileCommands.NonRegularTargetExitStatus
-            && error.Contains(PrivilegedFileCommands.EntryRefusedMarker, StringComparison.Ordinal))
+            && PrivilegedFileCommands.HasEntryRefusalMarker(error))
         {
             Core.Logging.FileLogger.Warn($"EmbeddedSFTP sudo {operationLabel} refused the entry: {error}");
             throw new SudoEntryRefusedException(PrivilegedFileCommands.ParseEntryRefusalReason(error), error);
+        }
+
+        // Before the sudo wording is read: a path or a hard link refusal belongs to the entry, and a
+        // folder name in its message can look like a sudo message.
+        EntryRefusalReason? transferRefusal = PrivilegedFileCommands.ParseTransferRefusal(error, exitStatus);
+        if (transferRefusal is not null)
+        {
+            Core.Logging.FileLogger.Warn($"EmbeddedSFTP sudo {operationLabel} refused the path: {error}");
+            throw new PrivilegedTransferRefusedException(transferRefusal.Value, remotePath ?? string.Empty);
         }
 
         SudoFailureKind failureKind = ClassifySudoStderr(error);
@@ -3184,11 +3202,10 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                 SftpPathGuard.ThrowIfProtectedRoot(file.FullPath, "sudo delete");
                 Core.Logging.FileLogger.Info(
                     $"EmbeddedSFTP delete permission denied, falling back to sudo for {file.Name}");
-                string flag = file.IsDirectory ? "-rf" : "-f";
                 await _privilegedActs.RunDeleteAsync(
                     file.FullPath,
                     () => RunSudoDeleteCommandAsync(
-                        $"rm {flag} {PathEscaper.EscapeForShell(file.FullPath)}",
+                        PrivilegedFileCommands.BuildHeldDeleteBody(file.FullPath, file.IsDirectory),
                         CancellationToken.None)).ConfigureAwait(false);
                 return null;
             }
@@ -3202,7 +3219,13 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
                     $"EmbeddedSFTP sudo deletion failed for '{file.FullPath}' "
                     + $"[{sudoException.GetType().Name}]: {sudoException.Message}");
                 sudoGuard.Record(sudoException);
-                return new DeleteEntryFailure(file.Name, null);
+                EntryRefusalReason? refusal = sudoException switch
+                {
+                    SudoEntryRefusedException entryRefused => entryRefused.Reason,
+                    PrivilegedTransferRefusedException transferRefused => transferRefused.Reason,
+                    _ => null,
+                };
+                return new DeleteEntryFailure(file.Name, null, Refusal: refusal);
             }
         }
         catch (RemoteRecursiveDeleteException ex)
@@ -3233,12 +3256,28 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
     /// </summary>
     private string DescribeEntryRefusal(SudoEntryRefusedException refusal, string entryName)
     {
+        if (refusal.Reason is EntryRefusalReason.PathLink or EntryRefusalReason.HardLink)
+        {
+            return DescribeTransferRefusal(refusal.Reason, entryName);
+        }
+
         string key = refusal.Reason is EntryRefusalReason.Link
             or EntryRefusalReason.Special
             or EntryRefusalReason.Changed
             ? "SftpChmodRootRefusedEntry"
             : "SftpChmodRootRefusedUnverifiable";
         return LF(key, ExecutionTrustDescriber.Visible(entryName));
+    }
+
+    /// <summary>
+    /// The sentence for a path or a hard link refusal, naming the entry as it can be shown.
+    /// </summary>
+    internal string DescribeTransferRefusal(EntryRefusalReason reason, string path)
+    {
+        string key = reason == EntryRefusalReason.HardLink
+            ? "SftpRootRefusedHardLink"
+            : "SftpRootRefusedPathLink";
+        return LF(key, ExecutionTrustDescriber.Visible(path));
     }
 
     /// <summary>
@@ -3288,6 +3327,13 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
             if (totalCount == 1 && firstFailure.IsProtectedRoot)
             {
                 return L10n("SftpErrorProtectedRoot");
+            }
+
+            if (firstFailure.Refusal is EntryRefusalReason refusal)
+            {
+                return refusal is EntryRefusalReason.PathLink or EntryRefusalReason.HardLink
+                    ? DescribeTransferRefusal(refusal, firstFailure.Name)
+                    : LF("SftpDeleteRootRefusedEntry", ExecutionTrustDescriber.Visible(firstFailure.Name));
             }
 
             return firstFailure.Reason switch
@@ -3994,7 +4040,8 @@ public sealed partial class EmbeddedSftpViewModel : ObservableObject
         string Name,
         RemoteRecursiveDeleteFailureReason? Reason,
         bool IsProtectedRoot = false,
-        bool SudoNotAttempted = false);
+        bool SudoNotAttempted = false,
+        EntryRefusalReason? Refusal = null);
 
     private string L10n(string key) => _localizer?.GetString(key) ?? key;
 

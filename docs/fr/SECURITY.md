@@ -587,10 +587,8 @@ pendant la vérification est refusé ; pour modifier la cible d'un lien, ouvrez 
 cible. Il faut GNU coreutils sur le serveur, comme pour les transferts
 privilégiés, et un dossier où root peut créer ce dossier et un lien physique ;
 sinon la modification est refusée plutôt que faite par un chemin qui pourrait
-suivre un lien. Deux limites demeurent : les liens symboliques des dossiers qui
-mènent à l'élément sont suivis, comme avant ; et un lien physique vers un autre
-fichier, placé sous le nom de l'élément par quelqu'un qui peut écrire dans son
-dossier, est le même fichier, et il est modifié.
+suivre un lien. Les dossiers qui mènent à l'élément et un lien physique à son nom
+sont traités comme décrit plus bas pour les transferts privilégiés.
 
 Dans une suppression ou un changement de permissions portant sur plusieurs
 éléments, un échec de sudo qu'aucun élément suivant ne peut changer (mot de
@@ -645,16 +643,31 @@ aboutir ailleurs une écriture ou une lecture en root ; les versions antérieure
 écrivaient et lisaient par le nom de la destination et suivaient un lien symbolique
 placé là.
 
-Limites qui restent : les liens symboliques dans les dossiers au-dessus de la
-destination sont suivis ; un lien physique placé sous le nom de la destination par un
-compte qui peut écrire dans son dossier est remplacé comme un autre fichier : le
-fichier lié n'est pas modifié, mais le nouveau fichier reprend son propriétaire, son
-mode et ses attributs étendus, donc là où le noyau ne protège pas les liens physiques
-(`fs.protected_hardlinks=0`) un lien vers un programme setuid, ou doté de capacités,
-fait du contenu envoyé un tel programme ; dans le même cas, un lien physique sous le
-nom d'un fichier lu en root renvoie le fichier lié ; un compte qui peut écrire dans le
-dossier peut supprimer le répertoire de travail vide et faire échouer le transfert ;
-un nouveau fichier écrit en root appartient à root avec le mode 0600.
+Root atteint le dossier d'une entrée qu'il écrit, lit, supprime ou dont il change les
+permissions en parcourant le chemin depuis `/`, un dossier à la fois, en tenant chaque
+dossier avant l'étape suivante. Un lien symbolique rencontré n'est suivi que si le
+lien appartient à root ou au compte qui a appelé sudo, et si le dossier qui le contient
+appartient à root ou à ce compte et ne peut pas être modifié par les autres comptes ;
+sa cible est parcourue de la même façon, et plus de 40 liens arrêtent le parcours. Tout
+autre lien est refusé, et le message dit qu'un dossier au-dessus de l'entrée est
+atteint par un lien qu'un autre compte contrôle : ouvrez plutôt le dossier par son
+chemin réel. Un lien qui appartient à un autre compte, comme un lien extrait d'une
+archive, est refusé même dans un dossier fermé. Un dossier dont le mode s'affiche avec
+moins de trois chiffres est traité comme ouvert ; sur un dossier doté d'une ACL POSIX, les
+bits du mode montrent le masque de l'ACL, et les ACL NFSv4 ne sont pas vues. Une
+suppression en root retire l'entrée du dossier qu'elle tient, par son seul dernier nom,
+refuse un fichier dont un dossier a pris le nom et, comme le changement de permissions
+en root, demande GNU coreutils sur le serveur : sur BusyBox ou BSD elle est refusée.
+
+L'écriture, la lecture ou le changement de permissions d'une entrée qui a un autre
+lien physique est refusé quand son dossier peut être modifié par un compte autre que
+root, l'appelant et le propriétaire de l'entrée ; le message le dit. Les liens physiques dans des dossiers fermés aux autres comptes, comme
+les fichiers de paquets sous `/usr`, continuent de fonctionner.
+
+Limites qui restent : un compte qui peut écrire dans le dossier peut supprimer le
+répertoire de travail vide et faire échouer le transfert ; un nouveau fichier écrit en
+root appartient à root avec le mode 0600 ; quand root crée un dossier ou renomme une
+entrée, il l'atteint encore par le chemin tel qu'il est donné, liens compris.
 
 La connexion privilégiée passe par la même connexion annulable que les autres
 connexions SFTP : Annuler l'atteint pendant la négociation. Chaque commande

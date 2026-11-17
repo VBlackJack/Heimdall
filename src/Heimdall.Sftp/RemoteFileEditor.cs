@@ -215,6 +215,14 @@ public sealed class RemoteFileEditor : IDisposable
 
                 if (downloadResult.ExitStatus != 0)
                 {
+                    EntryRefusalReason? refusal = PrivilegedFileCommands.ParseTransferRefusal(
+                        downloadResult.Error,
+                        downloadResult.ExitStatus);
+                    if (refusal is not null)
+                    {
+                        throw new PrivilegedTransferRefusedException(refusal.Value, remotePath);
+                    }
+
                     throw new InvalidOperationException(
                         $"sudo base64 failed (exit {downloadResult.ExitStatus}): {downloadResult.Error}");
                 }
@@ -654,6 +662,7 @@ public sealed class RemoteFileEditor : IDisposable
         => ex is SftpMetadataPreservationException
             or PrivilegedWriteFailedException { Kind: not PrivilegedWriteFailureKind.StagingFailed }
             or RemoteUploadTargetUnsupportedException
+            or PrivilegedTransferRefusedException
             or Renci.SshNet.Common.SftpPermissionDeniedException;
 
     private static void ArmDebounceTimer(EditSession session)
@@ -766,7 +775,7 @@ public sealed class RemoteFileEditor : IDisposable
                 .ConfigureAwait(false);
 
             ct.ThrowIfCancellationRequested();
-            EnsureSudoWriteSucceeded(result);
+            EnsureSudoWriteSucceeded(result, session.RemotePath);
         }
         finally
         {
@@ -779,11 +788,19 @@ public sealed class RemoteFileEditor : IDisposable
     /// installer (staging, a refused or missing sudo) is named by its kind so the caller can say
     /// what happened; a failure of the installer itself stays a generic failed write.
     /// </summary>
-    internal static void EnsureSudoWriteSucceeded(PrivilegedCommandResult result)
+    internal static void EnsureSudoWriteSucceeded(PrivilegedCommandResult result, string remotePath = "")
     {
         if (result.ExitStatus == 0)
         {
             return;
+        }
+
+        // Before any reading of sudo's own messages: a refusal of the path or of the file is the
+        // script's own answer, and it holds until the server changes.
+        EntryRefusalReason? refusal = PrivilegedFileCommands.ParseTransferRefusal(result.Error, result.ExitStatus);
+        if (refusal is not null)
+        {
+            throw new PrivilegedTransferRefusedException(refusal.Value, remotePath);
         }
 
         PrivilegedFileTransfer.EnsureStageSucceeded(result);

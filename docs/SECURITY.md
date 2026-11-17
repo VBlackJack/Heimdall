@@ -526,10 +526,8 @@ pipe, a socket, a device, or an entry that changed during the check is refused;
 to change a link's target, browse to the target. This needs GNU coreutils on the
 server, like the privileged transfers, and a folder where root can create that
 directory and a hard link; otherwise the change is refused rather than made by a
-path that could follow a link. Two limits remain: symbolic links in the folders
-that lead to the entry are followed, as before; and a hard link to another file,
-put under the entry's name by someone who can write in its folder, is the same
-file and is changed.
+path that could follow a link. The folders that lead to the entry and a hard link
+at its name are handled as described below for the privileged transfers.
 
 In a deletion or a permission change of several entries, a sudo failure that no
 later entry can change (password refused or unavailable, account not allowed to
@@ -578,15 +576,31 @@ directory without checking it, so an account able to write in the destination's
 folder could make a root write or read land elsewhere; earlier versions wrote and
 read through the destination's name and followed a symbolic link put there.
 
-Limits that remain: symbolic links in the folders above the destination are followed;
-a hard link put at the destination's name by an account that can write in its folder
-is replaced like any file: the linked file is not changed, but the new file takes its
-owner, mode and extended attributes, so where the kernel does not protect hard links
-(`fs.protected_hardlinks=0`) a link to a setuid program, or to one with file
-capabilities, makes the uploaded content such a program; in the same case, a hard link
-at the name of a file read as root returns the linked file; an account that can write
-in the folder can remove the empty work directory and make the transfer fail; a new
-file written as root belongs to root with mode 0600.
+Root reaches the folder of an entry it writes, reads, deletes or changes the
+permissions of by walking the path from `/`, one folder at a time, holding each
+folder before the next step. A symbolic link on the way is followed only when the
+link belongs to root or to the account that called sudo, and the folder holding it
+belongs to root or to that account and cannot be written by other accounts; its
+target is walked the same way, and more than 40 links end the walk. Any other link is
+refused, and the message says that a folder above the entry is reached through a link
+another account controls: open the folder by its real path instead. A link owned by
+another account, such as one unpacked from an archive, is refused even in a closed
+folder. A folder whose mode is printed with fewer than three digits is treated as
+open; on a folder with a POSIX ACL the mode bits show the ACL mask, and NFSv4 ACLs are not seen. A root
+delete removes the entry from the folder it holds, by its last name only, refuses a file
+whose name a folder took, and, like the root permission change, needs GNU coreutils on
+the server: on BusyBox or BSD it is refused.
+
+A write, read or permission change of an entry with another hard link is refused
+when its folder can be written by an account other than root, the caller and the
+entry's owner; the message says so. Hard
+links in folders closed to other accounts, such as package files under `/usr`,
+keep working.
+
+Limits that remain: an account that can write in the folder can remove the empty work
+directory and make the transfer fail; a new file written as root belongs to root with
+mode 0600; root creating a folder or renaming an entry still reaches it through the
+path as given, links included.
 
 The privileged connection goes through the same cancellable connect as the other
 SFTP connections, so Cancel reaches it during the handshake. Every privileged

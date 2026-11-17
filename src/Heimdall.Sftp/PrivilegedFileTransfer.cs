@@ -16,6 +16,7 @@
 
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using Renci.SshNet;
 
 namespace Heimdall.Sftp;
@@ -79,11 +80,30 @@ public static class PrivilegedFileCommands
     public const int NonRegularTargetExitStatus = 73;
 
     /// <summary>
+    /// Exit status of a privileged read that refused its source. Kept in step with the literal the
+    /// read script exits with; a test pins the two.
+    /// </summary>
+    public const int NonRegularSourceExitStatus = 74;
+
+    private static readonly Regex TransferRefusalLine = new(
+        "^" + TransferRefusedMarker + " (" + RefusalReasonPathLink + "|" + RefusalReasonHardLink + ")\\r?$",
+        RegexOptions.Multiline | RegexOptions.CultureInvariant,
+        TimeSpan.FromSeconds(1));
+
+    /// <summary>
     /// The first line the root-side chmod writes to standard error when it refuses an entry. With
     /// <see cref="NonRegularTargetExitStatus"/> it tells a refusal of the entry from every other
     /// failure that happens to end with the same status: both must be present.
     /// </summary>
     public const string EntryRefusedMarker = "HEIMDALL-ENTRY-REFUSED";
+
+    /// <summary>
+    /// The first line the root-side write or read prints on standard error when it refuses a path
+    /// (<see cref="RefusalReasonPathLink"/>) or a file (<see cref="RefusalReasonHardLink"/>). It is
+    /// read together with the exit status (73 for a write, 74 for a read), and only when it starts
+    /// a line.
+    /// </summary>
+    public const string TransferRefusedMarker = "HEIMDALL-TRANSFER-REFUSED";
 
     // The same status as text: a constant string cannot be built from the integer. A test pins the two.
     private const string NonRegularTargetExitStatusText = "73";
@@ -122,6 +142,22 @@ public static class PrivilegedFileCommands
     private const string ReadRefuseFunction =
         "refuse() { printf '%s\\n' \"Refusing: $2\" >&2; exit " + NonRegularSourceExitStatusText + "; }; ";
 
+    // The refusal of a path that goes through a link that is not trusted, and of a file that has
+    // other hard links in a folder others can write to. It prints the reason on a line of its own,
+    // so the application can name it, then ends the script: the exit trap runs the cleanup.
+    private const string WriteDenyFunction =
+        "deny() { printf '%s %s\\n' '" + TransferRefusedMarker + "' \"$1\" >&2; "
+        + "printf '%s\\n' \"Refusing: $2\" >&2; exit " + NonRegularTargetExitStatusText + "; }; ";
+
+    private const string ReadDenyFunction =
+        "deny() { printf '%s %s\\n' '" + TransferRefusedMarker + "' \"$1\" >&2; "
+        + "printf '%s\\n' \"Refusing: $2\" >&2; exit " + NonRegularSourceExitStatusText + "; }; ";
+
+    // The permission change and the delete report their refusals with the entry marker.
+    private const string EntryDenyFunction =
+        "deny() { printf '%s %s\\n' '" + EntryRefusedMarker + "' \"$1\" >&2; "
+        + "printf '%s\\n' \"Refusing: $2\" >&2; exit " + NonRegularTargetExitStatusText + "; }; ";
+
     // The command search path of the two scripts, reduced to its absolute entries before any
     // command is looked up. An empty or relative entry would resolve a command name in the
     // current directory, which the scripts change. No directory is added: a server keeps its
@@ -151,6 +187,83 @@ public static class PrivilegedFileCommands
     // What the cleanup removes from the work directory, in addition to the files of the script.
     private const string RemoveClaim = "rmdir -- " + ClaimName + " 2>/dev/null || :; ";
 
+    // Whether a folder is open to a change by an account the script does not trust: the folder is
+    // owned by neither root, the account that called sudo, nor the owner given as the third
+    // argument, or its mode (read from stat, three or four octal digits) grants write to group or
+    // others. A mode printed with fewer digits is read as open. Arguments: owner, mode, file owner.
+    // The function returns 0 when the folder is open.
+    private const string OpenFolderFunction =
+        "open_folder() { case \"$1\" in 0|\"$caller\"|\"$3\") ;; *) return 0;; esac; "
+        + "case \"$2\" in [0-7][0-7][0-7]|[0-7][0-7][0-7][0-7]) ;; *) return 0;; esac; "
+        + "return $(( (0$2 & 022) == 0 )); }; ";
+
+    // The texts the walk below prints.
+    private const string PathLinkMessage = "a symbolic link in the path is not trusted.";
+
+    private const string WalkChangedMessage = "the parent directory changed during the check.";
+
+    /// <summary>
+    /// The component walk of the parent folder shared by the privileged write, read, permission
+    /// change and delete. It needs the <c>refuse</c> and <c>deny</c> functions, the <c>dir</c>
+    /// variable (an absolute path) and the <c>me</c> variable (the running account), and leaves the
+    /// shell inside the folder, held, as the plain <c>cd -P</c> of the whole path used to.
+    /// </summary>
+    /// <remarks>
+    /// The path is walked from the root one component at a time, each step by <c>cd -P</c> into a
+    /// folder named relative to the folder held (<c>./name</c> or <c>..</c>), so the command search
+    /// path and the working directory of the caller play no part. A component that is a symbolic
+    /// link is followed only when the link is owned by root or by the account that called sudo
+    /// (<c>SUDO_UID</c>, else the running account) and the folder that holds the link is owned by
+    /// one of them and grants no write to group or others (<see cref="OpenFolderFunction"/>); the
+    /// link target is walked the same way, with a limit of forty links. Any other link is denied
+    /// with the reason <see cref="RefusalReasonPathLink"/>. After each step the folder entered is
+    /// checked against the one named: for a link-free name by the identity read before the entry,
+    /// and, only when the device differs (a mount appeared on entry), by its parent; for <c>..</c>
+    /// by its identity. A <c>stat</c> or <c>readlink</c>
+    /// message never reaches standard error.
+    /// </remarks>
+    internal const string HeldParentWalk =
+        OpenFolderFunction
+        + "command -v readlink >/dev/null 2>&1 || { printf '%s\\n' "
+        + "'Refusing: readlink is not available on the server.' >&2; exit " + ToolingUnavailableExitStatusText + "; }; "
+        + "caller=${SUDO_UID:-$me}; hops=0; "
+        + "case \"$dir\" in /*) ;; *) refuse " + RefusalReasonInvalid + " 'the path is not absolute.';; esac; "
+        + "rest=${dir#/}; cd /; set -f; IFS=/; set -- $rest; unset IFS; set +f; "
+        + "while [ $# -gt 0 ]; do c=$1; shift; "
+        + "case \"$c\" in ''|.) continue;; ..) dir=..;; *) dir=./$c;; esac; "
+        + "before=$(stat -c %d:%i . 2>/dev/null) || refuse " + RefusalReasonChanged + " '" + WalkChangedMessage + "'; "
+        + "want=$(stat -c %d:%i:%u -- \"$dir\" 2>/dev/null) || refuse " + RefusalReasonChanged + " '" + WalkChangedMessage + "'; "
+        + "if [ -L \"$dir\" ]; then : $((hops += 1)); "
+        + "if [ \"$hops\" -gt 40 ]; then deny " + RefusalReasonPathLink + " '" + PathLinkMessage + "'; fi; "
+        + "hold=$(stat -c %u:%a . 2>/dev/null) || refuse " + RefusalReasonChanged + " '" + WalkChangedMessage + "'; "
+        + "if open_folder \"${hold%%:*}\" \"${hold#*:}\" \"\"; then deny " + RefusalReasonPathLink + " '" + PathLinkMessage + "'; fi; "
+        + "case \"${want##*:}\" in 0|\"$caller\") ;; *) deny " + RefusalReasonPathLink + " '" + PathLinkMessage + "';; esac; "
+        + "t=$(readlink -- \"$dir\" 2>/dev/null) || refuse " + RefusalReasonChanged + " '" + WalkChangedMessage + "'; "
+        + "case \"$t\" in /*) cd /;; esac; "
+        + "set -f; IFS=/; set -- $t \"$@\"; unset IFS; set +f; continue; fi; "
+        + "[ -d \"$dir\" ] || refuse " + RefusalReasonSpecial + " 'a folder of the path is not a directory.'; "
+        + "cd -P -- \"$dir\" || refuse " + RefusalReasonChanged + " '" + WalkChangedMessage + "'; "
+        + "if [ \"$c\" = .. ]; then [ \"$(stat -c %d:%i:%u . 2>/dev/null)\" = \"$want\" ] "
+        + "|| refuse " + RefusalReasonChanged + " '" + WalkChangedMessage + "'; "
+        + "else now=$(stat -c %d:%i . 2>/dev/null) || refuse " + RefusalReasonChanged + " '" + WalkChangedMessage + "'; "
+        + "if [ \"$now\" = \"${want%:*}\" ]; then :; "
+        + "elif [ \"${now%%:*}\" = \"${want%%:*}\" ]; then refuse " + RefusalReasonChanged + " '" + WalkChangedMessage + "'; "
+        + "else [ \"$(stat -c %d:%i .. 2>/dev/null)\" = \"$before\" ] "
+        + "|| refuse " + RefusalReasonChanged + " '" + WalkChangedMessage + "'; fi; fi; "
+        + "done; ";
+
+    // The check of a pinned file: it is refused when another name reaches it (the link count, which
+    // includes the pin) and the folder holding it is open to an account the script does not trust.
+    // The file is named between the two halves. It needs the pin to be in the working directory,
+    // whose parent is the held folder.
+    private const string HardLinkCheckStart = "links=$(stat -c %h:%u -- ";
+
+    private const string HardLinkCheckEnd =
+        " 2>/dev/null) || refuse " + RefusalReasonUnverifiable + " 'the file could not be checked.'; "
+        + "pinfo=$(stat -c %u:%a .. 2>/dev/null) || refuse " + RefusalReasonUnverifiable + " 'the file could not be checked.'; "
+        + "if [ \"${links%%:*}\" -gt 2 ] && open_folder \"${pinfo%%:*}\" \"${pinfo#*:}\" \"${links#*:}\"; then "
+        + "deny " + RefusalReasonHardLink + " 'the file has other hard links in a folder that others can write to.'; fi; ";
+
     /// <summary>
     /// The first half of the entry procedure shared by the privileged write and read: it finds the
     /// entry name, holds the parent directory and arms the exit and signal handlers. It needs the
@@ -160,7 +273,7 @@ public static class PrivilegedFileCommands
     internal const string VerifiedEntryOpening =
         "name=${target##*/}; case \"$name\" in ''|.|..) refuse " + RefusalReasonInvalid + " 'no entry name.';; esac; "
         + "me=$(id -u) || refuse " + RefusalReasonUnverifiable + " 'the account could not be identified.'; "
-        + "cd -P -- \"$dir\" || refuse " + RefusalReasonChanged + " 'the parent directory changed during the check.'; "
+        + HeldParentWalk
         + "parent=$(stat -c %d:%i .) || refuse " + RefusalReasonChanged + " 'the parent directory changed during the check.'; "
         + "pdev=$(stat -c %d .) || refuse " + RefusalReasonChanged + " 'the parent directory changed during the check.'; "
         + "trap cleanup EXIT; trap 'exit 129' HUP INT TERM; ";
@@ -202,6 +315,7 @@ public static class PrivilegedFileCommands
         + AbsolutePathOnly
         + ToolingProbe
         + WriteRefuseFunction
+        + WriteDenyFunction
         + "cleanup() { if [ \"$entered\" = 1 ]; then rm -f -- original payload || :; " + RemoveClaim + "entered=0; fi; "
         + RemoveWorkDirectory
         + "case \"$target\" in /*) ;; *) target=$PWD/$target ;; esac; "
@@ -216,6 +330,7 @@ public static class PrivilegedFileCommands
         + "|| refuse " + RefusalReasonUnverifiable + " 'the file could not be pinned.'; "
         + "if [ -L original ] || [ ! -f original ]; then "
         + "printf '%s\\n' 'Refusing non-regular or symbolic-link target.' >&2; exit 73; fi; "
+        + HardLinkCheckStart + "original" + HardLinkCheckEnd
         + "original_owner=$(stat -c %u:%g -- original); "
         + "original_mode=$(stat -c %a -- original); preserve_metadata=1; fi; "
         + "cat > payload; "
@@ -260,6 +375,7 @@ public static class PrivilegedFileCommands
         + AbsolutePathOnly
         + ToolingProbe
         + ReadRefuseFunction
+        + ReadDenyFunction
         + "cleanup() { if [ \"$entered\" = 1 ]; then rm -f -- source || :; " + RemoveClaim + "entered=0; fi; "
         + RemoveWorkDirectory
         + "case \"$target\" in /*) ;; *) target=$PWD/$target ;; esac; "
@@ -271,6 +387,7 @@ public static class PrivilegedFileCommands
         + "ln -- \"$target\" source || refuse " + RefusalReasonUnverifiable + " 'the file could not be pinned.'; fi; "
         + "if [ -L source ] || [ ! -f source ]; then "
         + "printf '%s\\n' 'Refusing non-regular or symbolic-link source.' >&2; exit " + NonRegularSourceExitStatusText + "; fi; "
+        + HardLinkCheckStart + "source" + HardLinkCheckEnd
         + "exec 3< source; rm -f -- source; ";
 
     private const string NoFollowReadSuffix =
@@ -290,6 +407,43 @@ public static class PrivilegedFileCommands
 
     /// <summary>The request itself is not valid (mode, entry name).</summary>
     public const string RefusalReasonInvalid = "invalid";
+
+    /// <summary>The path goes through a symbolic link that is not trusted.</summary>
+    public const string RefusalReasonPathLink = "pathlink";
+
+    /// <summary>The file has other hard links and sits in a folder that others can write to.</summary>
+    public const string RefusalReasonHardLink = "hardlink";
+
+    /// <summary>
+    /// The script root runs to delete one entry (a file, a link or a folder with its content) by its
+    /// name in a parent folder it holds. Positional parameter: the absolute path (<c>$1</c>).
+    /// </summary>
+    /// <remarks>
+    /// The parent is reached by <see cref="HeldParentWalk"/>, so a link in the path is followed only
+    /// when it is trusted; the entry is then removed as <c>./name</c> from the held parent, and a
+    /// link in that last position is removed itself, never followed. A refusal exits with 73 and
+    /// prints <see cref="EntryRefusedMarker"/> and one of <c>pathlink</c>, <c>invalid</c>,
+    /// <c>changed</c>, <c>special</c> or <c>unverifiable</c>.
+    /// </remarks>
+    private const string HeldDeleteScript =
+        "set -eu; umask 077; target=$1; "
+        + AbsolutePathOnly
+        + ToolingProbe
+        + "refuse() { printf '%s %s\\n' '" + EntryRefusedMarker + "' \"$1\" >&2; "
+        + "printf '%s\\n' \"Refusing: $2\" >&2; exit " + NonRegularTargetExitStatusText + "; }; "
+        + EntryDenyFunction
+        + "case \"$target\" in /*) ;; *) target=$PWD/$target ;; esac; "
+        + "case \"$target\" in */*) dir=${target%/*}; [ -n \"$dir\" ] || dir=/ ;; *) dir=. ;; esac; "
+        + "name=${target##*/}; case \"$name\" in ''|.|..|*/*) refuse " + RefusalReasonInvalid + " 'no entry name.';; esac; "
+        + "me=$(id -u) || refuse " + RefusalReasonUnverifiable + " 'the account could not be identified.'; "
+        + HeldParentWalk;
+
+    // The tail of the delete of a file or a link: a folder at that name is refused, untouched.
+    private const string HeldDeleteFileTail =
+        "if [ -L \"./$name\" ]; then :; elif [ -d \"./$name\" ]; then refuse "
+        + RefusalReasonChanged + " 'the entry is a folder now.'; fi; rm -f -- \"./$name\"";
+
+    private const string HeldDeleteFolderTail = "rm -rf -- \"./$name\"";
 
     /// <summary>
     /// The script root runs to change the permissions of one entry without following a link.
@@ -319,6 +473,7 @@ public static class PrivilegedFileCommands
         + ToolingProbe
         + "refuse() { printf '%s %s\\n' '" + EntryRefusedMarker + "' \"$1\" >&2; "
         + "printf '%s\\n' \"Refusing: $2\" >&2; exit " + NonRegularTargetExitStatusText + "; }; "
+        + EntryDenyFunction
         + "cleanup() { if [ \"$entered\" = 1 ]; then rm -f -- source || :; entered=0; fi; cd /; "
         + "if [ -n \"$work\" ]; then rmdir -- \"$work\" 2>/dev/null || :; work=; fi; }; "
         + "case \"$mode\" in [0-7]|[0-7][0-7]|[0-7][0-7][0-7]|[0-7][0-7][0-7][0-7]) ;; "
@@ -326,7 +481,8 @@ public static class PrivilegedFileCommands
         + "case \"$target\" in /*) ;; *) target=$PWD/$target ;; esac; "
         + "case \"$target\" in */*) dir=${target%/*}; [ -n \"$dir\" ] || dir=/ ;; *) dir=. ;; esac; "
         + "name=${target##*/}; case \"$name\" in ''|.|..) refuse " + RefusalReasonInvalid + " 'no entry name.';; esac; "
-        + "cd -P -- \"$dir\" || refuse " + RefusalReasonChanged + " 'the parent directory changed during the check.'; "
+        + "me=$(id -u) || refuse " + RefusalReasonUnverifiable + " 'the account could not be identified.'; "
+        + HeldParentWalk
         + "parent=$(stat -c %d:%i .) || refuse " + RefusalReasonChanged + " 'the parent directory changed during the check.'; "
         + "pdev=$(stat -c %d .) || refuse " + RefusalReasonChanged + " 'the parent directory changed during the check.'; "
         + "if [ -L \"./$name\" ]; then refuse " + RefusalReasonLink + " 'symbolic link.'; fi; "
@@ -351,6 +507,7 @@ public static class PrivilegedFileCommands
         + "ln -P -T -- \"../$name\" source || refuse " + RefusalReasonUnverifiable + " 'the file could not be pinned.'; "
         + "if [ -L source ]; then refuse " + RefusalReasonLink + " 'symbolic link.'; fi; "
         + "[ -f source ] || refuse " + RefusalReasonSpecial + " 'not a regular file.'; "
+        + HardLinkCheckStart + "source" + HardLinkCheckEnd
         + "chmod -- \"$mode\" source; cleanup; trap - EXIT HUP INT TERM";
 
     /// <summary>
@@ -421,6 +578,74 @@ public static class PrivilegedFileCommands
     }
 
     /// <summary>
+    /// Builds a root-side delete that reaches the parent folder through <see cref="HeldParentWalk"/>
+    /// and removes the entry by its name from that held folder: <c>rm -rf</c> of <c>./name</c>.
+    /// </summary>
+    /// <param name="remotePath">The absolute path of the entry to delete.</param>
+    /// <param name="recursive">
+    /// <see langword="true"/> for a folder (<c>rm -rf</c>); <see langword="false"/> for a file or a
+    /// link, which is removed with <c>rm -f</c> and refuses, untouched, a folder found at that name.
+    /// </param>
+    /// <remarks>
+    /// The entry name is the last component of the path; a name that is empty, <c>.</c> or
+    /// <c>..</c> is refused. The path is data, passed as a quoted positional parameter, so spaces,
+    /// a leading dash or a quote in a name change nothing. A refusal exits with
+    /// <see cref="NonRegularTargetExitStatus"/> and writes <see cref="EntryRefusedMarker"/> and a
+    /// reason (read it with <see cref="ParseEntryRefusalReason"/>); any other failure keeps the
+    /// status of the tool that failed.
+    /// </remarks>
+    /// <exception cref="ArgumentException">The path is blank.</exception>
+    public static string BuildHeldDeleteBody(string remotePath, bool recursive = true)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(remotePath);
+
+        // A "!" in a file name is escaped the way every history-expanding login shell reads it:
+        // outside the quotes. The script itself holds none.
+        string target = PathEscaper.EscapeForShell(remotePath)
+            .Replace("!", "'\\!'", StringComparison.Ordinal);
+
+        return string.Join(
+            ' ',
+            "sh",
+            "-c",
+            PathEscaper.EscapeForShell(HeldDeleteScript + (recursive ? HeldDeleteFolderTail : HeldDeleteFileTail)),
+            "sh",
+            target);
+    }
+
+    /// <summary>
+    /// Reads why a write or a read was refused for its path or its file, when the script said so.
+    /// </summary>
+    /// <param name="stderr">What the script wrote on standard error.</param>
+    /// <param name="exitStatus">The script's exit status: 73 for a write, 74 for a read.</param>
+    /// <returns>
+    /// <see cref="EntryRefusalReason.PathLink"/> or <see cref="EntryRefusalReason.HardLink"/> when
+    /// the status is 73 or 74 and a line of <paramref name="stderr"/> is the marker followed by one
+    /// of the two reasons; otherwise <see langword="null"/>.
+    /// </returns>
+    public static EntryRefusalReason? ParseTransferRefusal(string? stderr, int exitStatus)
+    {
+        if (string.IsNullOrEmpty(stderr)
+            || (exitStatus != NonRegularTargetExitStatus && exitStatus != NonRegularSourceExitStatus))
+        {
+            return null;
+        }
+
+        Match match = TransferRefusalLine.Match(stderr);
+        if (!match.Success)
+        {
+            return null;
+        }
+
+        return match.Groups[1].Value switch
+        {
+            RefusalReasonPathLink => EntryRefusalReason.PathLink,
+            RefusalReasonHardLink => EntryRefusalReason.HardLink,
+            _ => null,
+        };
+    }
+
+    /// <summary>
     /// Reads why the permission change script refused an entry, from the token after the marker.
     /// A missing or unknown token is read as the cautious answer: the safe method was not possible.
     /// </summary>
@@ -431,7 +656,7 @@ public static class PrivilegedFileCommands
             return EntryRefusalReason.Unverifiable;
         }
 
-        int marker = stderr.IndexOf(EntryRefusedMarker, StringComparison.Ordinal);
+        int marker = IndexOfLineStart(stderr, EntryRefusedMarker);
         if (marker < 0)
         {
             return EntryRefusalReason.Unverifiable;
@@ -446,8 +671,34 @@ public static class PrivilegedFileCommands
             RefusalReasonSpecial => EntryRefusalReason.Special,
             RefusalReasonChanged => EntryRefusalReason.Changed,
             RefusalReasonInvalid => EntryRefusalReason.Invalid,
+            RefusalReasonPathLink => EntryRefusalReason.PathLink,
+            RefusalReasonHardLink => EntryRefusalReason.HardLink,
             _ => EntryRefusalReason.Unverifiable,
         };
+    }
+
+    /// <summary>
+    /// Whether <paramref name="stderr"/> holds <see cref="EntryRefusedMarker"/> at the start of a
+    /// line; the same text in the middle of a line (an echoed file name) does not count.
+    /// </summary>
+    public static bool HasEntryRefusalMarker(string? stderr)
+        => !string.IsNullOrEmpty(stderr) && IndexOfLineStart(stderr, EntryRefusedMarker) >= 0;
+
+    // The marker counts only at the start of a line: a file name that holds the same text, echoed
+    // in the middle of a line of a message, is not a refusal.
+    private static int IndexOfLineStart(string text, string value)
+    {
+        for (int index = text.IndexOf(value, StringComparison.Ordinal);
+            index >= 0;
+            index = text.IndexOf(value, index + 1, StringComparison.Ordinal))
+        {
+            if (index == 0 || text[index - 1] == '\n')
+            {
+                return index;
+            }
+        }
+
+        return -1;
     }
 
     internal static string BuildPasswordSudoInvocation(string privilegedBody)
@@ -1109,6 +1360,12 @@ public enum EntryRefusalReason
 
     /// <summary>The request was not valid: the mode, or no entry name.</summary>
     Invalid,
+
+    /// <summary>The path goes through a symbolic link that is not trusted.</summary>
+    PathLink,
+
+    /// <summary>The file has other hard links and sits in a folder that others can write to.</summary>
+    HardLink,
 }
 
 /// <summary>
