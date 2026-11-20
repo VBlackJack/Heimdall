@@ -71,7 +71,7 @@ Direct references from the shipped projects under `src/`.
 | Microsoft.Extensions.DependencyInjection.Abstractions | 10.0.14 | MIT |
 | Microsoft.Extensions.Logging.Abstractions | 10.0.14 | MIT |
 | SQLitePCLRaw.bundle_e_sqlite3 | 3.0.5 | Apache-2.0 |
-| SSH.NET | 2026.0.0 | MIT |
+| SSH.NET | 2026.0.1 | MIT |
 | System.Management | 10.0.14 | MIT |
 | System.Security.Cryptography.ProtectedData | 10.0.14 | MIT |
 | ThemeForge.Theme | 2.1.0 | Apache-2.0 |

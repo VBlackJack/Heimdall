@@ -610,7 +610,7 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
 | Runtime | .NET 10 (C# 14) |
 | Framework UI | WPF (MVVM via CommunityToolkit.Mvvm) |
 | Injection de dépendances | Microsoft.Extensions.DependencyInjection |
-| SSH/SFTP | SSH.NET 2026.0.0 |
+| SSH/SFTP | SSH.NET 2026.0.1 |
 | Rendu du terminal | WebView2 + xterm.js |
 | VNC | noVNC (client VNC HTML5 dans WebView2) |
 | Éditeur de code | AvalonEdit |
