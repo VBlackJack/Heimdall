@@ -61,7 +61,19 @@ public sealed class FileLogger : IDisposable
     private const string LogFileDateFormat = "yyyyMMdd";
     private const string LogFileExtension = ".log";
 
+    /// <summary>
+    /// How many entries the queue keeps while the file cannot be written. Past it the oldest are
+    /// dropped and counted, so a full disk or a held file cannot grow memory without bound.
+    /// </summary>
+    internal const int DefaultMaxQueuedEntries = 10_000;
+
+    /// <summary>The line written ahead of the next successful batch to say entries were lost.</summary>
+    private const string DroppedSummaryFormat = "[{0:yyyy-MM-dd HH:mm:ss}] [WARN] [FileLogger] {1} entries dropped while the log could not be written";
+
     private static FileLogger? _instance;
+    private readonly int _maxQueued;
+    private int _queuedCount;
+    private long _dropped;
     private readonly string _logPath;
     private readonly long _maxFileBytes;
     private int _overflowIndex;
@@ -72,10 +84,11 @@ public sealed class FileLogger : IDisposable
     private static volatile bool _enabled = true;
     private bool _disposed;
 
-    private FileLogger(string logDirectory, int flushIntervalMs, long maxFileBytes, int retentionDays)
+    private FileLogger(string logDirectory, int flushIntervalMs, long maxFileBytes, int retentionDays, int maxQueuedEntries)
     {
         Directory.CreateDirectory(logDirectory);
         _maxFileBytes = maxFileBytes;
+        _maxQueued = maxQueuedEntries;
         _logPath = Path.Combine(logDirectory, $"{LogFilePrefix}{DateTime.Now.ToString(LogFileDateFormat, System.Globalization.CultureInfo.InvariantCulture)}{LogFileExtension}");
         PurgeExpiredLogs(logDirectory, retentionDays, DateTime.UtcNow, _logPath);
         var interval = TimeSpan.FromMilliseconds(flushIntervalMs);
@@ -91,10 +104,15 @@ public sealed class FileLogger : IDisposable
     /// <summary>
     /// Initialize with explicit bounds, so a test can use a size cap of a few bytes.
     /// </summary>
-    internal static void Initialize(string logDirectory, int flushIntervalMs, long maxFileBytes, int retentionDays)
+    internal static void Initialize(
+        string logDirectory,
+        int flushIntervalMs,
+        long maxFileBytes,
+        int retentionDays,
+        int maxQueuedEntries = DefaultMaxQueuedEntries)
     {
         _instance?.Dispose();
-        _instance = new FileLogger(logDirectory, flushIntervalMs, maxFileBytes, retentionDays);
+        _instance = new FileLogger(logDirectory, flushIntervalMs, maxFileBytes, retentionDays, maxQueuedEntries);
     }
 
     /// <summary>
@@ -172,10 +190,25 @@ public sealed class FileLogger : IDisposable
         if (!_enabled) return;
 
         var entry = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [{level}] {message}";
-        _instance?._queue.Enqueue(entry);
+        _instance?.EnqueueBounded(entry);
 
         // Also write to debug output for development
         System.Diagnostics.Debug.WriteLine(entry);
+    }
+
+    /// <summary>
+    /// Adds an entry without taking a lock, then drops the oldest ones while the queue is over
+    /// its cap. The count is kept by hand because ConcurrentQueue.Count is not cheap.
+    /// </summary>
+    private void EnqueueBounded(string entry)
+    {
+        _queue.Enqueue(entry);
+        Interlocked.Increment(ref _queuedCount);
+        while (Volatile.Read(ref _queuedCount) > _maxQueued && _queue.TryDequeue(out _))
+        {
+            Interlocked.Decrement(ref _queuedCount);
+            Interlocked.Increment(ref _dropped);
+        }
     }
 
     public static void Debug(string message) => Log("DEBUG", message);
@@ -226,11 +259,22 @@ public sealed class FileLogger : IDisposable
             var sb = new StringBuilder();
             while (_queue.TryDequeue(out var entry))
             {
+                Interlocked.Decrement(ref _queuedCount);
                 entries.Add(entry);
                 sb.AppendLine(entry);
             }
 
             if (sb.Length == 0) return;
+
+            var dropped = Interlocked.Exchange(ref _dropped, 0);
+            if (dropped > 0)
+            {
+                sb.Insert(0, string.Format(
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    DroppedSummaryFormat,
+                    DateTime.Now,
+                    dropped) + Environment.NewLine);
+            }
 
             var text = sb.ToString();
             int[] retryDelaysMs = [10, 50, 200];
@@ -255,18 +299,32 @@ public sealed class FileLogger : IDisposable
                 }
                 catch (IOException)
                 {
-                    foreach (var originalEntry in entries)
-                    {
-                        _queue.Enqueue(originalEntry);
-                    }
-
+                    RequeueNewest(entries, dropped);
                     return;
                 }
                 catch
                 {
+                    Interlocked.Add(ref _dropped, dropped);
                     return;
                 }
             }
+        }
+    }
+
+    /// <summary>
+    /// Puts back the newest entries of a failed batch that fit under the cap and counts the rest
+    /// as dropped, together with the count the failed write was carrying. Re-enqueued entries
+    /// land after any entry logged meanwhile, so the order is not strictly chronological.
+    /// </summary>
+    private void RequeueNewest(List<string> entries, long carriedDropped)
+    {
+        var room = Math.Max(0, _maxQueued - Volatile.Read(ref _queuedCount));
+        var keep = Math.Min(entries.Count, room);
+        Interlocked.Add(ref _dropped, carriedDropped + (entries.Count - keep));
+        for (var i = entries.Count - keep; i < entries.Count; i++)
+        {
+            _queue.Enqueue(entries[i]);
+            Interlocked.Increment(ref _queuedCount);
         }
     }
 

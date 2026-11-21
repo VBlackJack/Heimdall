@@ -352,6 +352,112 @@ public class FileLoggerTests : IDisposable
         Assert.Null(exception);
     }
 
+    // ── Bounded queue ──────────────────────────────────────────────────
+
+    private const string DroppedSummaryMarker = "entries dropped while the log could not be written";
+    private const int TestQueueCap = 100;
+    private const int TestBurstSize = 250;
+    private const int TestIdleFlushIntervalMs = 3_600_000;
+    private const int TestConcurrentEntries = 50;
+    private const int FailingFlushHeadStartMs = 50;
+
+    private void InitializeCapped()
+        => FileLogger.Initialize(_tempDir, TestIdleFlushIntervalMs, FileLogger.MaxLogFileBytes, FileLogger.LogRetentionDays, TestQueueCap);
+
+    private string[] SummaryLines()
+        => ReadLogContent().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries)
+            .Where(l => l.Contains(DroppedSummaryMarker, StringComparison.Ordinal)).ToArray();
+
+    [Fact]
+    public void Flush_WhenTheFileIsHeld_KeepsTheQueueUnderTheCapAndReportsTheDrops()
+    {
+        InitializeCapped();
+        FileLogger.Info("warmup");
+        FileLogger.Flush();
+        var logFile = Directory.GetFiles(_tempDir, "heimdall_*.log").Single();
+
+        using (new FileStream(logFile, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+            for (var i = 0; i < TestBurstSize; i++)
+            {
+                FileLogger.Info($"e{i:D3}");
+            }
+
+            FileLogger.Flush();
+        }
+
+        FileLogger.Info("after");
+        FileLogger.Flush();
+
+        var content = ReadLogContent();
+        Assert.Contains("e249", content);
+        Assert.Contains("after", content);
+        Assert.DoesNotContain("e000", content);
+        var lines = content.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        Assert.True(lines.Count(l => !l.Contains(DroppedSummaryMarker, StringComparison.Ordinal)) <= TestQueueCap + 1);
+
+        // 150 were dropped by the burst; "after" pushed one more out of the full queue.
+        var summary = Assert.Single(SummaryLines());
+        Assert.Contains(" 151 entries", summary);
+
+        FileLogger.Info("one more");
+        FileLogger.Flush();
+        Assert.Single(SummaryLines());
+    }
+
+    [Fact]
+    public async Task Flush_WhenEntriesArriveDuringAFailedWrite_RequeuesOnlyWhatFitsUnderTheCap()
+    {
+        InitializeCapped();
+        FileLogger.Info("warmup");
+        FileLogger.Flush();
+        var logFile = Directory.GetFiles(_tempDir, "heimdall_*.log").Single();
+
+        using (new FileStream(logFile, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+            for (var i = 0; i < TestBurstSize; i++)
+            {
+                FileLogger.Info($"e{i:D3}");
+            }
+
+            // The failing flush drains the queue, then retries for a while: entries logged in
+            // that window are newer and take room that the failed batch can no longer claim.
+            var failingFlush = Task.Run(FileLogger.Flush);
+            Thread.Sleep(FailingFlushHeadStartMs);
+            for (var i = 0; i < TestConcurrentEntries; i++)
+            {
+                FileLogger.Info($"m{i:D2}");
+            }
+
+            await failingFlush;
+        }
+
+        FileLogger.Info("after");
+        FileLogger.Flush();
+
+        var content = ReadLogContent();
+        Assert.Contains("e249", content);
+        Assert.Contains("m49", content);
+        Assert.DoesNotContain("e150", content);
+        var lines = content.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        Assert.True(lines.Count(l => !l.Contains(DroppedSummaryMarker, StringComparison.Ordinal)) <= TestQueueCap + 1);
+        Assert.Single(SummaryLines());
+    }
+
+    [Fact]
+    public void Flush_WhenNothingWasDropped_WritesNoSummary()
+    {
+        InitializeCapped();
+        for (var i = 0; i < TestQueueCap; i++)
+        {
+            FileLogger.Info($"e{i:D3}");
+        }
+
+        FileLogger.Flush();
+
+        Assert.Empty(SummaryLines());
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────
 
     private string ReadLogContent()
