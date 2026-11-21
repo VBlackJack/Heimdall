@@ -398,4 +398,29 @@ public class HostKeyStoreTests
         Assert.False(HostKeyStore.ConstantTimeEquals("x", null!));
         Assert.False(HostKeyStore.ConstantTimeEquals(null!, null!));
     }
+
+    [Fact]
+    public void RemoveKey_OfATrustedKey_RaisesKeyRemovedOnceWithThatKey()
+    {
+        _store.Trust("host.example.com", 22, "SHA256:abc");
+        var removed = new List<string>();
+        _store.KeyRemoved += removed.Add;
+
+        bool result = _store.RemoveKey("host.example.com:22");
+
+        Assert.True(result);
+        Assert.Equal(["host.example.com:22"], removed);
+    }
+
+    [Fact]
+    public void RemoveKey_OfAnAbsentKey_DoesNotRaiseKeyRemoved()
+    {
+        var removed = new List<string>();
+        _store.KeyRemoved += removed.Add;
+
+        bool result = _store.RemoveKey("absent.example.com:22");
+
+        Assert.False(result);
+        Assert.Empty(removed);
+    }
 }

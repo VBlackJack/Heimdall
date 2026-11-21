@@ -410,6 +410,11 @@ public partial class App : System.Windows.Application
             hostKeyTrustService.EntryReplaced += (key, oldEntry, entry) => hostKeyPersistence.Upsert(key, entry);
             hostKeyTrustService.EntryRemoved += key => hostKeyPersistence.Remove(key);
 
+            // Removal of a hashed entry by a detached trust service (connection factory) reaches
+            // persistence only through the store. A second Remove of the same key is a no-op: the
+            // coalescer keeps one pending change per key.
+            hostKeyStore.KeyRemoved += key => hostKeyPersistence.Remove(key);
+
             hostKeyStore.HostKeyEvent += (key, fingerprint, trusted) =>
             {
                 if (!trusted)

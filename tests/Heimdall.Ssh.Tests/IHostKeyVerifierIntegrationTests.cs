@@ -137,6 +137,32 @@ public sealed class IHostKeyVerifierIntegrationTests
     }
 
     [Fact]
+    public async Task MismatchAcceptAgainstHashedEntry_RaisesKeyRemovedOnTheSharedStore()
+    {
+        var store = new HostKeyStore();
+        byte[] salt = [0x01, 0x02, 0x03, 0x04];
+        using var hmac = new System.Security.Cryptography.HMACSHA1(salt);
+        string hashedHost = $"|1|{Convert.ToBase64String(salt)}|"
+            + Convert.ToBase64String(hmac.ComputeHash(System.Text.Encoding.UTF8.GetBytes(Host)));
+        store.TrustEntry(
+            hashedHost,
+            Port,
+            new HostKeyEntry(
+                HostKeyStore.ComputeFingerprint(FirstKey),
+                DateTimeOffset.UtcNow.AddDays(-2),
+                DateTimeOffset.UtcNow.AddDays(-1),
+                Algorithm,
+                HostKeySource.ImportedKnownHosts));
+        var removed = new List<string>();
+        store.KeyRemoved += removed.Add;
+        var verifier = new FixedDecisionVerifier(HostKeyDecision.Accept);
+
+        await ResolvePresentationAsync(store, verifier, DifferentKey);
+
+        Assert.Equal([$"{hashedHost}:{Port}"], removed);
+    }
+
+    [Fact]
     public async Task MismatchTrustOnce_PreservesStoredFingerprint_AndReturnsNewPin()
     {
         var store = new HostKeyStore();

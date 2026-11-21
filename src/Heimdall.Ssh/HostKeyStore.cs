@@ -39,6 +39,14 @@ public sealed class HostKeyStore
     public event Action<string, string, bool>? HostKeyEvent;
 
     /// <summary>
+    /// Raised when a trusted entry is removed by its stored key (the replacement of a
+    /// hashed known_hosts entry). Parameter: the stored host:port key. It is raised on
+    /// the store because the trust service that triggers it can be a detached instance
+    /// whose own removal event reaches nobody.
+    /// </summary>
+    public event Action<string>? KeyRemoved;
+
+    /// <summary>
     /// Compare two fingerprint strings without leaking the position of any
     /// differing byte through timing variations. Inputs are OpenSSH-style
     /// fingerprints (<c>SHA256:&lt;base64&gt;</c>) and so are ASCII in practice;
@@ -231,7 +239,13 @@ public sealed class HostKeyStore
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(hostPortKey);
         _sessionTrustedKeys.TryRemove(hostPortKey, out _);
-        return _trustedKeys.TryRemove(hostPortKey, out _);
+        bool removed = _trustedKeys.TryRemove(hostPortKey, out _);
+        if (removed)
+        {
+            KeyRemoved?.Invoke(hostPortKey);
+        }
+
+        return removed;
     }
 
     /// <summary>
