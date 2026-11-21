@@ -78,6 +78,12 @@ public sealed class PingService : IPingService
     {
         var timestamp = DateTime.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
 
+        // Checked before branching: a gateway session must never run an unvalidated host remotely.
+        if (_gateway is not null)
+        {
+            EnsureValidTunnelHost(host);
+        }
+
         if (_sshClient is not null && _sshClient.IsConnected)
         {
             return await PingViaTunnelAsync(host, seq, timestamp, timeoutMs, ct).ConfigureAwait(false);
@@ -168,6 +174,17 @@ public sealed class PingService : IPingService
         }
     }
 
+    /// <summary>
+    /// Refuses a host the remote shell command would read as an option, before anything is sent.
+    /// </summary>
+    internal static void EnsureValidTunnelHost(string host)
+    {
+        if (!InputValidator.IsValidDiagnosticHost(host))
+        {
+            throw new ArgumentException($"Invalid ping host: {host}", nameof(host));
+        }
+    }
+
     private async Task<PingProbeResult> PingViaTunnelAsync(
         string host,
         int seq,
@@ -175,8 +192,10 @@ public sealed class PingService : IPingService
         int timeoutMs,
         CancellationToken ct)
     {
+        EnsureValidTunnelHost(host);
+
         var timeoutSec = Math.Max(1, timeoutMs / 1000);
-        var escapedHost = InputValidator.EscapeShellArg(host);
+        var escapedHost = InputValidator.EscapeShellArg(host.Trim());
         var command = $"ping -c 1 -W {timeoutSec} {escapedHost}";
 
         try

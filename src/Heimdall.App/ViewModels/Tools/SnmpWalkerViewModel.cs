@@ -20,6 +20,7 @@ using Heimdall.App.Services;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Network;
+using Heimdall.Core.Security;
 
 namespace Heimdall.App.ViewModels.Tools;
 
@@ -71,14 +72,34 @@ public sealed partial class SnmpWalkerViewModel : ObservableObject, IDisposable
             return;
         }
 
+        host = host.Trim();
+
         if (string.IsNullOrWhiteSpace(community))
         {
             community = NetworkToolPresets.SnmpDefaultCommunity;
         }
 
-        if (string.IsNullOrWhiteSpace(startOid))
+        startOid = string.IsNullOrWhiteSpace(startOid)
+            ? NetworkToolPresets.SnmpDefaultOid
+            : startOid.Trim();
+
+        // A value starting with "-" would be read as an option by the remote snmpwalk command.
+        // The direct walk only understands numeric OIDs, so a symbolic one needs a gateway.
+        var invalidKey = !InputValidator.IsValidDiagnosticHost(host)
+            ? "ErrorInvalidHost"
+            : !InputValidator.Validate(startOid, InputValidator.SnmpOidPatternName)
+                || (!_hasGateway && !InputValidator.Validate(startOid, InputValidator.SnmpNumericOidPatternName))
+                ? "ErrorInvalidSnmpOid"
+                : null;
+        if (invalidKey is not null)
         {
-            startOid = NetworkToolPresets.SnmpDefaultOid;
+            lock (_lock)
+            {
+                _entries.Clear();
+            }
+
+            SetError(Lk(invalidKey));
+            return;
         }
 
         _cts?.Cancel();
