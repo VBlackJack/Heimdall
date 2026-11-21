@@ -45,6 +45,8 @@ public class FileLoggerTests : IDisposable
     public void Dispose()
     {
         FileLogger.SetEnabled(true);
+        FileLogger.WriteFailedForTest = null;
+        FileLogger.AclApplier = FileLogger.RestrictToOwner;
         try
         {
             if (Directory.Exists(_tempDir))
@@ -359,10 +361,11 @@ public class FileLoggerTests : IDisposable
     private const int TestBurstSize = 250;
     private const int TestIdleFlushIntervalMs = 3_600_000;
     private const int TestConcurrentEntries = 50;
-    private const int FailingFlushHeadStartMs = 50;
+    private const int EarlyFlushWaitSeconds = 10;
+    private const int EarlyFlushPollMs = 20;
 
     private void InitializeCapped()
-        => FileLogger.Initialize(_tempDir, TestIdleFlushIntervalMs, FileLogger.MaxLogFileBytes, FileLogger.LogRetentionDays, TestQueueCap);
+        => FileLogger.Initialize(_tempDir, TestIdleFlushIntervalMs, FileLogger.MaxLogFileBytes, FileLogger.LogRetentionDays, TestQueueCap, TestIdleFlushIntervalMs, earlyFlush: false);
 
     private string[] SummaryLines()
         => ReadLogContent().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries)
@@ -406,12 +409,22 @@ public class FileLoggerTests : IDisposable
     }
 
     [Fact]
-    public async Task Flush_WhenEntriesArriveDuringAFailedWrite_RequeuesOnlyWhatFitsUnderTheCap()
+    public void Flush_WhenEntriesArriveDuringAFailedWrite_RequeuesOnlyWhatFitsUnderTheCap()
     {
         InitializeCapped();
         FileLogger.Info("warmup");
         FileLogger.Flush();
         var logFile = Directory.GetFiles(_tempDir, "heimdall_*.log").Single();
+
+        // The failed batch has been drained by then; entries logged at that moment are newer
+        // and take room that the batch can no longer claim.
+        FileLogger.WriteFailedForTest = () =>
+        {
+            for (var i = 0; i < TestConcurrentEntries; i++)
+            {
+                FileLogger.Info($"m{i:D2}");
+            }
+        };
 
         using (new FileStream(logFile, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
         {
@@ -420,28 +433,73 @@ public class FileLoggerTests : IDisposable
                 FileLogger.Info($"e{i:D3}");
             }
 
-            // The failing flush drains the queue, then retries for a while: entries logged in
-            // that window are newer and take room that the failed batch can no longer claim.
-            var failingFlush = Task.Run(FileLogger.Flush);
-            Thread.Sleep(FailingFlushHeadStartMs);
-            for (var i = 0; i < TestConcurrentEntries; i++)
-            {
-                FileLogger.Info($"m{i:D2}");
-            }
-
-            await failingFlush;
+            FileLogger.Flush();
         }
 
+        FileLogger.WriteFailedForTest = null;
         FileLogger.Info("after");
         FileLogger.Flush();
 
+        // 150 dropped by the burst, 50 of the failed batch that did not fit, and "m00"
+        // pushed out by "after".
         var content = ReadLogContent();
+        var summary = Assert.Single(SummaryLines());
+        Assert.Contains(" 201 entries", summary);
         Assert.Contains("e249", content);
+        Assert.Contains("e200", content);
+        Assert.DoesNotContain("e199", content);
+        Assert.DoesNotContain("m00", content);
+        Assert.Contains("m01", content);
         Assert.Contains("m49", content);
-        Assert.DoesNotContain("e150", content);
         var lines = content.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
         Assert.True(lines.Count(l => !l.Contains(DroppedSummaryMarker, StringComparison.Ordinal)) <= TestQueueCap + 1);
+    }
+
+    [Fact]
+    public void Flush_WhenTheAclStepFailsAfterTheWrite_DoesNotRepeatTheBatchOrTheSummary()
+    {
+        InitializeCapped();
+        for (var i = 0; i < TestBurstSize; i++)
+        {
+            FileLogger.Info($"e{i:D3}");
+        }
+
+        FileLogger.AclApplier = _ => throw new IOException("acl failed");
+        FileLogger.Flush();
+        FileLogger.Info("later");
+        FileLogger.Flush();
+
+        var content = ReadLogContent();
         Assert.Single(SummaryLines());
+        Assert.Equal(1, CountOccurrences(content, "e249"));
+        Assert.Equal(1, CountOccurrences(content, "e150"));
+        Assert.Equal(1, CountOccurrences(content, "later"));
+    }
+
+    [Fact]
+    public void Log_WhenTheQueueReachesHalfTheCap_FlushesWithoutWaitingForTheTimer()
+    {
+        FileLogger.Initialize(
+            _tempDir,
+            TestIdleFlushIntervalMs,
+            FileLogger.MaxLogFileBytes,
+            FileLogger.LogRetentionDays,
+            TestQueueCap,
+            TestIdleFlushIntervalMs,
+            earlyFlush: true);
+
+        for (var i = 0; i < TestQueueCap / 2; i++)
+        {
+            FileLogger.Info($"e{i:D3}");
+        }
+
+        var deadline = DateTime.UtcNow.AddSeconds(EarlyFlushWaitSeconds);
+        while (!ReadLogContent().Contains("e049", StringComparison.Ordinal) && DateTime.UtcNow < deadline)
+        {
+            Thread.Sleep(EarlyFlushPollMs);
+        }
+
+        Assert.Contains("e049", ReadLogContent());
     }
 
     [Fact]

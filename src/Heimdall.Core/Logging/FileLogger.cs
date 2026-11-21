@@ -70,7 +70,30 @@ public sealed class FileLogger : IDisposable
     /// <summary>The line written ahead of the next successful batch to say entries were lost.</summary>
     private const string DroppedSummaryFormat = "[{0:yyyy-MM-dd HH:mm:ss}] [WARN] [FileLogger] {1} entries dropped while the log could not be written";
 
+    /// <summary>Milliseconds before the first timed flush.</summary>
+    internal const int DefaultInitialFlushDelayMs = 1000;
+
+    /// <summary>The queue triggers an early flush when it reaches the cap divided by this.</summary>
+    private const int EarlyFlushDivisor = 2;
+
+    /// <summary>Test seam: runs when a batch could not be written, just before it is re-queued.</summary>
+    internal static Action? WriteFailedForTest;
+
+    /// <summary>Test seam: restricts a new log file to its owner. Replaced only by tests.</summary>
+    internal static Action<string> AclApplier = RestrictToOwner;
+
+    /// <summary>The production restriction of a log file to its owner (Windows only).</summary>
+    internal static void RestrictToOwner(string path)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            AclEnforcer.SetFileAcl(path);
+        }
+    }
+
     private static FileLogger? _instance;
+    private readonly int _flushIntervalMs;
+    private readonly bool _earlyFlush;
     private readonly int _maxQueued;
     private int _queuedCount;
     private long _dropped;
@@ -84,15 +107,24 @@ public sealed class FileLogger : IDisposable
     private static volatile bool _enabled = true;
     private bool _disposed;
 
-    private FileLogger(string logDirectory, int flushIntervalMs, long maxFileBytes, int retentionDays, int maxQueuedEntries)
+    private FileLogger(
+        string logDirectory,
+        int flushIntervalMs,
+        long maxFileBytes,
+        int retentionDays,
+        int maxQueuedEntries,
+        int initialFlushDelayMs,
+        bool earlyFlush)
     {
         Directory.CreateDirectory(logDirectory);
         _maxFileBytes = maxFileBytes;
         _maxQueued = maxQueuedEntries;
+        _flushIntervalMs = flushIntervalMs;
+        _earlyFlush = earlyFlush;
         _logPath = Path.Combine(logDirectory, $"{LogFilePrefix}{DateTime.Now.ToString(LogFileDateFormat, System.Globalization.CultureInfo.InvariantCulture)}{LogFileExtension}");
         PurgeExpiredLogs(logDirectory, retentionDays, DateTime.UtcNow, _logPath);
         var interval = TimeSpan.FromMilliseconds(flushIntervalMs);
-        _flushTimer = new Timer(_ => FlushInternal(), null, TimeSpan.FromSeconds(1), interval);
+        _flushTimer = new Timer(_ => FlushInternal(), null, TimeSpan.FromMilliseconds(initialFlushDelayMs), interval);
     }
 
     /// <summary>
@@ -109,10 +141,12 @@ public sealed class FileLogger : IDisposable
         int flushIntervalMs,
         long maxFileBytes,
         int retentionDays,
-        int maxQueuedEntries = DefaultMaxQueuedEntries)
+        int maxQueuedEntries = DefaultMaxQueuedEntries,
+        int initialFlushDelayMs = DefaultInitialFlushDelayMs,
+        bool earlyFlush = true)
     {
         _instance?.Dispose();
-        _instance = new FileLogger(logDirectory, flushIntervalMs, maxFileBytes, retentionDays, maxQueuedEntries);
+        _instance = new FileLogger(logDirectory, flushIntervalMs, maxFileBytes, retentionDays, maxQueuedEntries, initialFlushDelayMs, earlyFlush);
     }
 
     /// <summary>
@@ -203,11 +237,32 @@ public sealed class FileLogger : IDisposable
     private void EnqueueBounded(string entry)
     {
         _queue.Enqueue(entry);
-        Interlocked.Increment(ref _queuedCount);
+        var queued = Interlocked.Increment(ref _queuedCount);
+        if (_earlyFlush && queued == _maxQueued / EarlyFlushDivisor)
+        {
+            RequestEarlyFlush();
+        }
+
         while (Volatile.Read(ref _queuedCount) > _maxQueued && _queue.TryDequeue(out _))
         {
             Interlocked.Decrement(ref _queuedCount);
             Interlocked.Increment(ref _dropped);
+        }
+    }
+
+    /// <summary>
+    /// Asks the timer for a flush right now, on its own thread, so Log never waits for the file.
+    /// The cap keeps a burst from losing entries a prompt write would have kept.
+    /// </summary>
+    private void RequestEarlyFlush()
+    {
+        try
+        {
+            _flushTimer.Change(0, _flushIntervalMs);
+        }
+        catch (ObjectDisposedException)
+        {
+            // The logger is shutting down; the final flush takes what is queued.
         }
     }
 
@@ -278,20 +333,14 @@ public sealed class FileLogger : IDisposable
 
             var text = sb.ToString();
             int[] retryDelaysMs = [10, 50, 200];
-            for (var attempt = 0; attempt <= retryDelaysMs.Length; attempt++)
+            string? writtenPath = null;
+            for (var attempt = 0; attempt <= retryDelaysMs.Length && writtenPath is null; attempt++)
             {
                 try
                 {
                     var path = ResolveWritablePath(Encoding.UTF8.GetByteCount(text));
                     File.AppendAllText(path, text, Encoding.UTF8);
-
-                    if (!string.Equals(_aclAppliedPath, path, StringComparison.Ordinal) && OperatingSystem.IsWindows())
-                    {
-                        AclEnforcer.SetFileAcl(path);
-                        _aclAppliedPath = path;
-                    }
-
-                    return;
+                    writtenPath = path;
                 }
                 catch (IOException) when (attempt < retryDelaysMs.Length)
                 {
@@ -299,15 +348,44 @@ public sealed class FileLogger : IDisposable
                 }
                 catch (IOException)
                 {
+                    WriteFailedForTest?.Invoke();
                     RequeueNewest(entries, dropped);
                     return;
                 }
                 catch
                 {
-                    Interlocked.Add(ref _dropped, dropped);
+                    Interlocked.Add(ref _dropped, dropped + entries.Count);
                     return;
                 }
             }
+
+            if (writtenPath is not null)
+            {
+                ApplyAclOnce(writtenPath);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Restricts a newly written file to its owner. Runs after the batch is on disk and touches
+    /// neither the queue nor the dropped count: a failure here must never make the batch be
+    /// written twice. A path whose restriction failed is tried again on the next flush.
+    /// </summary>
+    private void ApplyAclOnce(string path)
+    {
+        if (string.Equals(_aclAppliedPath, path, StringComparison.Ordinal) || !OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        try
+        {
+            AclApplier(path);
+            _aclAppliedPath = path;
+        }
+        catch
+        {
+            // Best effort, as before: the log itself must keep working.
         }
     }
 
