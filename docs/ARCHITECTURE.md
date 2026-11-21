@@ -77,7 +77,7 @@ Heimdall.slnx (14 projects)
 
 ### 1. SSH.NET + Plink Dual Strategy
 
-**Problem**: SSH.NET 2026.0.0 has no built-in Pageant agent support. Many enterprise environments use PPK keys loaded exclusively in Pageant.
+**Problem**: SSH.NET 2026.0.1 has no built-in Pageant agent support. Many enterprise environments use PPK keys loaded exclusively in Pageant.
 
 **Solution**: Two-pronged approach:
 

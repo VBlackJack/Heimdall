@@ -202,7 +202,7 @@ Lorsque le remplissage automatique échoue silencieusement, activez la journalis
 
 **Symptôme** : `Server rejected the SSH key` ou `No suitable authentication method found` alors même que Pageant tourne avec des clés chargées.
 
-**Cause racine** : SSH.NET 2026.0.0 n'intègre pas de prise en charge de l'agent Pageant. Le repli `NoneAuthenticationMethod` ne déclenche pas la négociation Pageant.
+**Cause racine** : SSH.NET 2026.0.1 n'intègre pas de prise en charge de l'agent Pageant. Le repli `NoneAuthenticationMethod` ne déclenche pas la négociation Pageant.
 
 **Solution** : approche en deux volets :
 1. **Client IPC Pageant** : le `PageantClient` maison dialogue avec Pageant via la mémoire partagée Win32 (`CreateFileMapping` + `WM_COPYDATA`). Chaque clé devient une `PageantAgentKey`, que `SshAgentKeyWrapper` encapsule en `IPrivateKeySource` pour SSH.NET (la signature passe par `SshAgentHostAlgorithm`).

@@ -77,7 +77,7 @@ Heimdall.slnx (14 projects)
 
 ### 1. Double stratégie SSH.NET + Plink
 
-**Problème** : SSH.NET 2026.0.0 ne prend pas en charge l'agent Pageant nativement. De nombreux environnements d'entreprise utilisent des clés PPK chargées exclusivement dans Pageant.
+**Problème** : SSH.NET 2026.0.1 ne prend pas en charge l'agent Pageant nativement. De nombreux environnements d'entreprise utilisent des clés PPK chargées exclusivement dans Pageant.
 
 **Solution** : une approche à deux volets.
 

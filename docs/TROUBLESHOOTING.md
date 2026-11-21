@@ -202,7 +202,7 @@ When autofill silently fails, enable Debug-level logging for `CredentialAutofill
 
 **Symptom**: `Server rejected the SSH key` or `No suitable authentication method found` even with Pageant running and keys loaded.
 
-**Root Cause**: SSH.NET 2026.0.0 does not have built-in Pageant agent support. The `NoneAuthenticationMethod` fallback doesn't trigger Pageant negotiation.
+**Root Cause**: SSH.NET 2026.0.1 does not have built-in Pageant agent support. The `NoneAuthenticationMethod` fallback doesn't trigger Pageant negotiation.
 
 **Solution**: Two-pronged approach:
 1. **Pageant IPC client**: Custom `PageantClient` communicates with Pageant via Win32 shared memory (`CreateFileMapping` + `WM_COPYDATA`). Each key becomes a `PageantAgentKey`, which `SshAgentKeyWrapper` wraps as an `IPrivateKeySource` for SSH.NET (signing goes through `SshAgentHostAlgorithm`).

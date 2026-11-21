@@ -102,8 +102,8 @@
       },
       "SSH.NET": {
         "type": "Transitive",
-        "resolved": "2026.0.0",
-        "contentHash": "Yu9dirPq8l3oaat0+OQ7K0nUf5MmYltpia5UGqsApTG4zTPvBC1cxbNnC3NERij26dUST0A3Ef1QdHSn5ArbWQ==",
+        "resolved": "2026.0.1",
+        "contentHash": "74/nnq/n7EZLGLsUTt4aEE+/iet3B6ahi2iFfXgRXb6rNAvxsxLwbhLZ6lzITfAEB1vkmuAI3gXxOp2HcUMa2g==",
         "dependencies": {
           "BouncyCastle.Cryptography": "2.7.0",
           "Microsoft.Extensions.Logging.Abstractions": "8.0.3"
@@ -169,14 +169,14 @@
           "FluentFTP": "[55.1.0, )",
           "Heimdall.Core": "[1.0.0, )",
           "Heimdall.Ssh": "[1.0.0, )",
-          "SSH.NET": "[2026.0.0, )"
+          "SSH.NET": "[2026.0.1, )"
         }
       },
       "heimdall.ssh": {
         "type": "Project",
         "dependencies": {
           "Heimdall.Core": "[1.0.0, )",
-          "SSH.NET": "[2026.0.0, )"
+          "SSH.NET": "[2026.0.1, )"
         }
       }
     },
