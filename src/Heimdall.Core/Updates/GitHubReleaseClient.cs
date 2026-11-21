@@ -44,6 +44,16 @@ public sealed class GitHubReleaseClient : IGitHubReleaseClient
         "github.com",
         "githubusercontent.com",
     ];
+
+    /// <summary>The only host the release-lookup API call may be redirected to (a renamed repository answers 301 there).</summary>
+    private const string ApiHost = "api.github.com";
+
+    /// <summary>
+    /// The most redirect hops one request may follow. Releases need one or two (github.com
+    /// to the asset CDN); five leaves headroom and still ends a redirect loop quickly.
+    /// </summary>
+    private const int MaxRedirectHops = 5;
+
     private const string GitHubAcceptHeader = "application/vnd.github+json";
 
     /// <summary>Header GitHub uses to say how much of the caller's quota is left.</summary>
@@ -94,9 +104,8 @@ public sealed class GitHubReleaseClient : IGitHubReleaseClient
         var url = $"{ApiBaseUrl}/repos/{owner}/{repo}/releases/latest";
         try
         {
-            using var request = CreateRequest(url, acceptGitHubJson: true);
-            using var response = await _httpClient
-                .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+            using var response = await SendFollowingAllowedRedirectsAsync(
+                    url, acceptGitHubJson: true, IsAllowedApiUri, cancellationToken)
                 .ConfigureAwait(false);
 
             if (!response.IsSuccessStatusCode)
@@ -125,6 +134,11 @@ public sealed class GitHubReleaseClient : IGitHubReleaseClient
 
             return GitHubReleaseResult.Succeeded(
                 new GitHubRelease(dto.TagName, dto.HtmlUrl ?? string.Empty, dto.Body ?? string.Empty, assets));
+        }
+        catch (RedirectRefusedException ex)
+        {
+            FileLogger.Warn($"GitHub release check refused a redirect for {owner}/{repo}: {ex.Message}");
+            return GitHubReleaseResult.Failed(UpdateCheckFailure.SourceUnavailable);
         }
         catch (JsonException ex)
         {
@@ -323,12 +337,10 @@ public sealed class GitHubReleaseClient : IGitHubReleaseClient
 
         try
         {
-            using var request = CreateRequest(url, acceptGitHubJson: false);
-
             // Headers first: a body past the bound must be refused before it is read,
             // not after it has already been buffered.
-            using var response = await _httpClient
-                .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+            using var response = await SendFollowingAllowedRedirectsAsync(
+                    url, acceptGitHubJson: false, IsAllowedAssetUri, cancellationToken)
                 .ConfigureAwait(false);
 
             if (!response.IsSuccessStatusCode)
@@ -338,6 +350,11 @@ public sealed class GitHubReleaseClient : IGitHubReleaseClient
             }
 
             return await ReadBoundedTextAsync(response.Content, url, cancellationToken).ConfigureAwait(false);
+        }
+        catch (RedirectRefusedException ex)
+        {
+            FileLogger.Warn($"Fetching update asset text refused a redirect for {url}: {ex.Message}");
+            return null;
         }
         catch (HttpRequestException ex)
         {
@@ -408,13 +425,18 @@ public sealed class GitHubReleaseClient : IGitHubReleaseClient
             throw new InvalidOperationException($"Refusing to download an update asset from an unexpected origin: {url}");
         }
 
-        using var request = CreateRequest(url, acceptGitHubJson: false);
-        var response = await _httpClient
-            .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+        var response = await SendFollowingAllowedRedirectsAsync(
+                url, acceptGitHubJson: false, IsAllowedAssetUri, cancellationToken)
             .ConfigureAwait(false);
         try
         {
             response.EnsureSuccessStatusCode();
+            var inner = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+
+            // The caller owns the returned stream; disposing it releases the response and
+            // with it the connection. It also carries the declared length so the caller can
+            // refuse an oversized body before reading any of it.
+            return new DeclaredLengthStream(inner, response, response.Content.Headers.ContentLength);
         }
         catch
         {
@@ -422,11 +444,91 @@ public sealed class GitHubReleaseClient : IGitHubReleaseClient
             response.Dispose();
             throw;
         }
-
-        // The caller owns the returned stream; disposing it releases the
-        // underlying connection, and the response wrapper is collected with it.
-        return await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
     }
+
+    /// <summary>
+    /// Sends a GET and follows redirects by hand, up to <see cref="MaxRedirectHops"/>, so
+    /// that every hop, not only the first URL, is checked against the allowed origins.
+    /// </summary>
+    /// <remarks>
+    /// The handler no longer follows redirects itself: an automatic follow would let an
+    /// allowed host send the download anywhere. A hop to a non-https or disallowed URL, or
+    /// one past the hop limit, throws <see cref="RedirectRefusedException"/>. The final
+    /// request URI is checked once more in case a handler still redirected on its own.
+    /// </remarks>
+    private async Task<HttpResponseMessage> SendFollowingAllowedRedirectsAsync(
+        string url,
+        bool acceptGitHubJson,
+        Func<Uri, bool> isAllowed,
+        CancellationToken cancellationToken)
+    {
+        string currentUrl = url;
+        for (int hop = 0; ; hop++)
+        {
+            using var request = CreateRequest(currentUrl, acceptGitHubJson);
+            var response = await _httpClient
+                .SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+                .ConfigureAwait(false);
+            try
+            {
+                var finalUri = response.RequestMessage?.RequestUri;
+                if (finalUri is not null && !IsHttps(finalUri))
+                {
+                    throw new RedirectRefusedException($"the request ended on a non-https URL: {finalUri}");
+                }
+
+                if (finalUri is not null && !isAllowed(finalUri))
+                {
+                    throw new RedirectRefusedException($"the request ended on an unexpected origin: {finalUri.Host}");
+                }
+
+                int status = (int)response.StatusCode;
+                var location = response.Headers.Location;
+                if (status < 300 || status >= 400 || location is null)
+                {
+                    return response;
+                }
+
+                if (hop >= MaxRedirectHops)
+                {
+                    throw new RedirectRefusedException($"more than {MaxRedirectHops} redirects");
+                }
+
+                var current = response.RequestMessage?.RequestUri ?? new Uri(currentUrl);
+                var next = location.IsAbsoluteUri ? location : new Uri(current, location);
+                if (!IsHttps(next))
+                {
+                    throw new RedirectRefusedException($"redirect to a non-https URL: {next}");
+                }
+
+                if (!isAllowed(next))
+                {
+                    throw new RedirectRefusedException($"redirect to an unexpected origin: {next.Host}");
+                }
+
+                currentUrl = next.AbsoluteUri;
+            }
+            catch
+            {
+                response.Dispose();
+                throw;
+            }
+
+            // Intermediate response: release it before the next hop.
+            response.Dispose();
+        }
+    }
+
+    private static bool IsHttps(Uri uri) =>
+        string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsAllowedAssetUri(Uri uri) => IsAllowedAssetUrl(uri.AbsoluteUri);
+
+    private static bool IsAllowedApiUri(Uri uri) =>
+        string.Equals(uri.Host, ApiHost, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>A redirect the client refused: disallowed origin, plain http, or too many hops.</summary>
+    private sealed class RedirectRefusedException(string message) : InvalidOperationException(message);
 
     /// <summary>
     /// Whether an asset URL names an origin releases are actually served from: an
@@ -475,4 +577,68 @@ public sealed class GitHubReleaseClient : IGitHubReleaseClient
         [property: JsonPropertyName("name")] string? Name,
         [property: JsonPropertyName("browser_download_url")] string? DownloadUrl,
         [property: JsonPropertyName("size")] long Size);
+}
+
+/// <summary>
+/// A response body stream that owns its response and remembers the length the server
+/// declared, so a caller can refuse an oversized download before reading a byte.
+/// </summary>
+internal sealed class DeclaredLengthStream : Stream
+{
+    private readonly Stream _inner;
+    private readonly IDisposable? _owner;
+
+    internal DeclaredLengthStream(Stream inner, IDisposable? owner, long? declaredLength)
+    {
+        ArgumentNullException.ThrowIfNull(inner);
+        _inner = inner;
+        _owner = owner;
+        DeclaredLength = declaredLength;
+    }
+
+    /// <summary>The Content-Length the server declared, or null when it declared none.</summary>
+    internal long? DeclaredLength { get; }
+
+    public override bool CanRead => _inner.CanRead;
+
+    public override bool CanSeek => false;
+
+    public override bool CanWrite => false;
+
+    public override long Length => throw new NotSupportedException();
+
+    public override long Position
+    {
+        get => throw new NotSupportedException();
+        set => throw new NotSupportedException();
+    }
+
+    public override int Read(byte[] buffer, int offset, int count) => _inner.Read(buffer, offset, count);
+
+    public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        => _inner.ReadAsync(buffer, cancellationToken);
+
+    public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        => _inner.ReadAsync(buffer, offset, count, cancellationToken);
+
+    public override void Flush()
+    {
+    }
+
+    public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+    public override void SetLength(long value) => throw new NotSupportedException();
+
+    public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _inner.Dispose();
+            _owner?.Dispose();
+        }
+
+        base.Dispose(disposing);
+    }
 }

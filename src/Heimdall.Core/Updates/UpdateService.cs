@@ -35,6 +35,14 @@ public sealed class UpdateService : IUpdateService
     private const int DownloadBufferSize = 81920;
 
     /// <summary>
+    /// Absolute ceiling on an installer download, used when the release JSON gives no
+    /// usable size and as an upper bound on one that does. The installer is about a
+    /// hundred megabytes; one gibibyte is an order of magnitude above it, so no real
+    /// release trips it, while a hostile or broken host can no longer fill the disk.
+    /// </summary>
+    internal const long MaxInstallerBytes = 1024L * 1024 * 1024;
+
+    /// <summary>
     /// How long a download may go without delivering a single byte before it is
     /// treated as stalled.
     /// </summary>
@@ -194,7 +202,10 @@ public sealed class UpdateService : IUpdateService
             await using (var source = await _client.OpenAssetStreamAsync(update.Asset.DownloadUrl, cancellationToken).ConfigureAwait(false))
             await using (var destination = CreateInstallerWriteStream(installerPath))
             {
-                await CopyWithProgressAsync(source, destination, update.Asset.SizeBytes, progress, _downloadIdleTimeout, cancellationToken).ConfigureAwait(false);
+                long maxBytes = update.Asset.SizeBytes > 0
+                    ? Math.Min(update.Asset.SizeBytes, MaxInstallerBytes)
+                    : MaxInstallerBytes;
+                await CopyWithProgressAsync(source, destination, update.Asset.SizeBytes, maxBytes, progress, _downloadIdleTimeout, cancellationToken).ConfigureAwait(false);
                 await destination.FlushAsync(cancellationToken).ConfigureAwait(false);
                 destination.Flush(flushToDisk: true);
             }
@@ -464,17 +475,35 @@ public sealed class UpdateService : IUpdateService
         Stream source,
         Stream destination,
         long totalBytes,
+        long maxBytes,
         IProgress<double>? progress,
         TimeSpan idleTimeout,
         CancellationToken cancellationToken)
     {
+        // Refuse on the declared length before a byte is read; the running count below
+        // covers a response that declares nothing or lies about it.
+        long? declared = source is DeclaredLengthStream declaredStream
+            ? declaredStream.DeclaredLength
+            : source.CanSeek ? source.Length : null;
+        if (declared > maxBytes)
+        {
+            throw new InvalidOperationException(
+                $"The update download declares {declared} bytes, over the {maxBytes} byte limit.");
+        }
+
         var buffer = new byte[DownloadBufferSize];
         long copied = 0;
         int read;
         while ((read = await ReadWithIdleTimeoutAsync(source, buffer, idleTimeout, cancellationToken).ConfigureAwait(false)) > 0)
         {
-            await destination.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
             copied += read;
+            if (copied > maxBytes)
+            {
+                throw new InvalidOperationException(
+                    $"The update download exceeded the {maxBytes} byte limit.");
+            }
+
+            await destination.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
             if (progress is not null && totalBytes > 0)
             {
                 progress.Report(Math.Min(1.0, (double)copied / totalBytes));

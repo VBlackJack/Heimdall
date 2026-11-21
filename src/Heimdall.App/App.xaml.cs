@@ -1090,7 +1090,7 @@ public partial class App : System.Windows.Application
     {
         // The handler is the whole point: a singleton client keeps its pooled sockets, and
         // with them the DNS answer they were opened against, for the life of the process.
-        var handler = new SocketsHttpHandler { PooledConnectionLifetime = UpdateConnectionLifetime };
+        var handler = new SocketsHttpHandler { PooledConnectionLifetime = UpdateConnectionLifetime, AllowAutoRedirect = false };
 
         return new HttpClient(handler) { Timeout = UpdateHttpTimeout };
     }

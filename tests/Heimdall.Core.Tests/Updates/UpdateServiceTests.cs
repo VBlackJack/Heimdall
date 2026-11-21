@@ -497,6 +497,106 @@ public sealed class UpdateServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task DownloadVerifiedAsync_StreamLongerThanTheDeclaredSize_FailsAndDeletesStagingDirectory()
+    {
+        // The release JSON said 8 bytes; the host keeps sending. The copy must stop at the
+        // cap, not at the disk. A non-seekable body declares no length, so only the running
+        // count can catch it.
+        var payload = new byte[64];
+        var client = new StubReleaseClient
+        {
+            StreamFactory = () => new DeclaredLengthStream(new MemoryStream(payload), null, null),
+        };
+        var service = CreateService(client, BuildVariant.Standard);
+        const string tag = "v2026.061597";
+        var update = UpdateWithSha(Sha256Verifier.ComputeHex(new MemoryStream(payload)), 8, tag);
+
+        var before = StagingSnapshot(tag);
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.DownloadVerifiedAsync(update, null, CancellationToken.None));
+
+        Assert.Empty(StagingSnapshot(tag).Except(before));
+    }
+
+    [Fact]
+    public async Task DownloadVerifiedAsync_DeclaredLengthAboveTheCap_IsRefusedBeforeReading()
+    {
+        var body = new ReadCountingStream(new byte[64]);
+        var client = new StubReleaseClient
+        {
+            StreamFactory = () => new DeclaredLengthStream(body, null, 64),
+        };
+        var service = CreateService(client, BuildVariant.Standard);
+        const string tag = "v2026.061596";
+        var update = UpdateWithSha(Sha256Verifier.ComputeHex(new MemoryStream(new byte[64])), 8, tag);
+
+        var before = StagingSnapshot(tag);
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.DownloadVerifiedAsync(update, null, CancellationToken.None));
+
+        Assert.Equal(0, body.Reads);
+        Assert.Empty(StagingSnapshot(tag).Except(before));
+    }
+
+    [Fact]
+    public async Task DownloadVerifiedAsync_UnknownSizeDeclaredAboveTheCeiling_IsRefused()
+    {
+        var client = new StubReleaseClient
+        {
+            StreamFactory = () => new DeclaredLengthStream(
+                new ReadCountingStream(new byte[8]), null, UpdateService.MaxInstallerBytes + 1),
+        };
+        var service = CreateService(client, BuildVariant.Standard);
+        var update = UpdateWithSha(new string('a', 64), 0, "v2026.061595");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.DownloadVerifiedAsync(update, null, CancellationToken.None));
+    }
+
+    private sealed class ReadCountingStream(byte[] data) : Stream
+    {
+        private readonly MemoryStream _inner = new(data);
+
+        public int Reads { get; private set; }
+
+        public override bool CanRead => true;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => false;
+
+        public override long Length => throw new NotSupportedException();
+
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            Reads++;
+            return _inner.Read(buffer, offset, count);
+        }
+
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            Reads++;
+            return _inner.ReadAsync(buffer, cancellationToken);
+        }
+
+        public override void Flush()
+        {
+        }
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
+    [Fact]
     public async Task DownloadVerifiedAsync_CancelledDownload_DeletesStagingDirectory()
     {
         var payload = Encoding.ASCII.GetBytes("payload");

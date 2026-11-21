@@ -53,7 +53,7 @@ public sealed class UpdaterHttpClientWiringTests
     private const string RegistrationStatement = "services.AddSingleton(_ => CreateUpdateHttpClient());";
 
     private const string HandlerStatement =
-        "var handler = new SocketsHttpHandler { PooledConnectionLifetime = UpdateConnectionLifetime };";
+        "var handler = new SocketsHttpHandler { PooledConnectionLifetime = UpdateConnectionLifetime, AllowAutoRedirect = false };";
 
     private const string ClientStatement = "return new HttpClient(handler) { Timeout = UpdateHttpTimeout };";
 
