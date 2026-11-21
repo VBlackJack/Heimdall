@@ -956,9 +956,10 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             return;
         }
 
-        var settings = await _configManager.LoadSettingsAsync();
-        var servers = await _configManager.LoadServersAsync();
-        LoadServers(servers, settings);
+        if (!await TryReloadServersAfterImportAsync(_localizer["DialogImportRdpTitle"]))
+        {
+            return;
+        }
 
         if (!string.IsNullOrWhiteSpace(result.UserMessage))
         {
@@ -1005,9 +1006,10 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             return;
         }
 
-        var settings = await _configManager.LoadSettingsAsync();
-        var servers = await _configManager.LoadServersAsync();
-        LoadServers(servers, settings);
+        if (!await TryReloadServersAfterImportAsync(_localizer["DialogTitleImportOpenSshConfig"]))
+        {
+            return;
+        }
 
         var summary = ImportSummaryText.OpenSsh(
             _localizer,
@@ -1024,6 +1026,30 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         else
         {
             _dialogService.ShowWarning(_localizer["DialogTitleImportOpenSshConfig"], details);
+        }
+    }
+
+    /// <summary>
+    /// Reloads settings and servers after an import wrote them. A damaged or unreadable store
+    /// is reported to the user instead of escaping the <c>async void</c> import handlers.
+    /// </summary>
+    private async Task<bool> TryReloadServersAfterImportAsync(string dialogTitle)
+    {
+        try
+        {
+            var settings = await _configManager.LoadSettingsAsync();
+            var servers = await _configManager.LoadServersAsync();
+            LoadServers(servers, settings);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException
+            or System.Text.Json.JsonException
+            or UnauthorizedAccessException
+            or InvalidOperationException)
+        {
+            Core.Logging.FileLogger.Warn($"Reloading the server list after an import failed: {ex.Message}");
+            _dialogService.ShowError(dialogTitle, _localizer.Format("StatusImportFailed", ex.Message));
+            return false;
         }
     }
 
@@ -1054,9 +1080,10 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             return;
         }
 
-        var settings = await _configManager.LoadSettingsAsync();
-        var servers = await _configManager.LoadServersAsync();
-        LoadServers(servers, settings);
+        if (!await TryReloadServersAfterImportAsync(_localizer["DialogTitleImportPuttySessions"]))
+        {
+            return;
+        }
 
         var summary = ImportSummaryText.Putty(
             _localizer,

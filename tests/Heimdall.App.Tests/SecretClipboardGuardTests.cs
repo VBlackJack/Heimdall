@@ -171,6 +171,44 @@ public sealed class SecretClipboardGuardTests
             "Dispose does not finish a pending clipboard clear");
     }
 
+    [Fact]
+    public void TheTotpGeneratorView_CopiesTheCodeThroughTheSensitivePath()
+    {
+        string source = File.ReadAllText(Path.Combine(
+            FindRepoRoot(), "src", "Heimdall.App", "Views", "Tools", "TotpGeneratorView.xaml.cs"));
+
+        Assert.DoesNotContain("Clipboard.SetText(", source, StringComparison.Ordinal);
+
+        string copy = ViewSource.HandlerBody(
+            ViewSource.WithoutCommentsAndLiterals(source), "private static void CopySensitive(");
+        Assert.True(
+            ViewSource.IsStatementOfTheMethodBody(copy, "new WpfClipboardService().SetSensitiveText(text);"),
+            "CopySensitive does not use the sensitive clipboard path");
+    }
+
+    [Fact]
+    public void TheMainWindow_CopiesTheShareUrlThroughTheSensitivePath()
+    {
+        string source = File.ReadAllText(Path.Combine(
+            FindRepoRoot(), "src", "Heimdall.App", "MainWindow.xaml.cs"));
+        string logic = ViewSource.WithoutCommentsAndLiterals(source);
+
+        string copy = ViewSource.HandlerBody(logic, "private static void CopyShareUrlToClipboard(");
+        Assert.True(
+            ViewSource.IsStatementOfTheMethodBody(copy, "new WpfClipboardService().SetSensitiveText(url);"),
+            "CopyShareUrlToClipboard does not use the sensitive clipboard path");
+
+        // The two sites that used to write the URL as plain text.
+        Assert.DoesNotContain(
+            "Clipboard.SetText(e.BaseUrl)",
+            ViewSource.HandlerBody(logic, "private void OnFileShareSharingStarted("),
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            "Clipboard.SetText(_fileShareService.BaseUrl)",
+            ViewSource.HandlerBody(logic, "private void OnCopyShareUrlClick("),
+            StringComparison.Ordinal);
+    }
+
     private static string FindRepoRoot()
     {
         string? directory = AppContext.BaseDirectory;

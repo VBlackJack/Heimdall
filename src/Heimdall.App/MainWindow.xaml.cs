@@ -4447,7 +4447,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
 
         if (!_suppressFileShareStartDialog)
         {
-            try { Clipboard.SetText(e.BaseUrl); }
+            try { CopyShareUrlToClipboard(e.BaseUrl); }
             catch { /* clipboard may fail in some RDP sessions */ }
         }
 
@@ -4497,6 +4497,15 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         });
     }
 
+    /// <summary>
+    /// The share URL goes through the sensitive clipboard path (no history, no cloud sync). It is
+    /// not auto-cleared, because the user pastes it to the person receiving the share.
+    /// </summary>
+    private static void CopyShareUrlToClipboard(string url)
+    {
+        new WpfClipboardService().SetSensitiveText(url);
+    }
+
     private void OnCopyShareUrlClick(object sender, RoutedEventArgs e)
     {
         if (string.IsNullOrWhiteSpace(_fileShareService.BaseUrl))
@@ -4506,7 +4515,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
 
         try
         {
-            Clipboard.SetText(_fileShareService.BaseUrl);
+            CopyShareUrlToClipboard(_fileShareService.BaseUrl);
 
             if (DataContext is MainViewModel vm)
             {
