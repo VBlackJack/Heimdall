@@ -373,6 +373,8 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
                 extendedMessageShown = true;
                 await Dispatcher.InvokeAsync(() =>
                 {
+                    if (_disposed) return;
+
                     CaptureLoadingText.Text = L10n("CitrixCaptureSearchingExtended");
                     Behaviors.LiveRegionBehavior.Announce(CaptureLoadingText);
                 });
@@ -390,6 +392,8 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
                 // bare window existence this lot exists to stop trusting.
                 bool adopted = await Dispatcher.InvokeAsync(() =>
                 {
+                    if (_disposed) return false;
+
                     if (!AdoptSessionWindow(bestWindow))
                     {
                         return false;
@@ -428,6 +432,8 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
                 $"Citrix: Workspace sign-in window is foreground; embedding it inline hwnd=0x{authHwnd.ToInt64():X}");
             await Dispatcher.InvokeAsync(() =>
             {
+                if (_disposed) return;
+
                 CaptureLoadingText.Text = L10n("CitrixAuthSignInHint");
                 Behaviors.LiveRegionBehavior.Announce(CaptureLoadingText);
 
@@ -440,15 +446,13 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
 
             // After the user signs in, Citrix launches the published app. Swap the embedded
             // auth window for the real session window when it appears.
+            if (_disposed) return;
             StartAuthWatch(preLaunchWindows, authHwnd);
             return;
         }
 
         Core.Logging.FileLogger.Info("Citrix: window capture timed out after 30s, using external mode");
-        await Dispatcher.InvokeAsync(() =>
-        {
-            ShowExternalFallback();
-        });
+        await Dispatcher.InvokeAsync(ShowExternalFallbackUnlessDisposed);
     }
 
     private void StartAuthWatch(HashSet<IntPtr> preLaunchWindows, IntPtr authHwnd)
@@ -674,6 +678,8 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
             // could neither drive nor report would leave the pane with nothing at all.
             bool swapped = await Dispatcher.InvokeAsync(() =>
             {
+                if (_disposed) return false;
+
                 if (!AdoptSessionWindow(sessionWindow))
                 {
                     return false;
@@ -1138,6 +1144,27 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
         _embedded = false;
     }
 
+    /// <summary>Runs one teardown step so a failure is logged and never skips the steps after it.</summary>
+    private static void RunDisposeStep(string step, Action action, bool isSessionTermination = false)
+    {
+        try
+        {
+            action();
+        }
+        catch (Exception ex)
+        {
+            string message = $"[EmbeddedCitrixView] Dispose step '{step}' failed";
+            if (isSessionTermination)
+            {
+                Core.Logging.FileLogger.ErrorDetailed(message, ex);
+            }
+            else
+            {
+                Core.Logging.FileLogger.WarnDetailed(message, ex);
+            }
+        }
+    }
+
     public void Dispose()
     {
         if (_disposed) return;
@@ -1156,27 +1183,28 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
             _localeChangeSubscribed = false;
         }
 
-        StopAuthWatch();
+        RunDisposeStep("StopAuthWatch", StopAuthWatch);
 
-        if (_healthTimer is not null)
+        RunDisposeStep("health timer", () =>
         {
-            _healthTimer.Stop();
-            _healthTimer.Tick -= OnHealthTimerTick;
-            _healthTimer = null;
-        }
+            if (_healthTimer is not null)
+            {
+                _healthTimer.Stop();
+                _healthTimer.Tick -= OnHealthTimerTick;
+                _healthTimer = null;
+            }
+        });
 
-        ReleaseEmbeddedWindow();
-
-        try { FormsHost.Child = null; }
-        catch (Exception ex) { Core.Logging.FileLogger.Warn($"[EmbeddedCitrixView] FormsHost cleanup: {ex.Message}"); }
-        _hostPanel?.Dispose();
+        RunDisposeStep("ReleaseEmbeddedWindow", ReleaseEmbeddedWindow);
+        RunDisposeStep("FormsHost cleanup", () => FormsHost.Child = null);
+        RunDisposeStep("host panel", () => _hostPanel?.Dispose());
 
         // End the ICA session, then release its process object. The launcher is only released:
         // terminating it would not end the session, and it is routinely already gone.
-        _sessionHandle?.Terminate();
-        _sessionHandle?.Dispose();
+        RunDisposeStep("session terminate", () => _sessionHandle?.Terminate(), isSessionTermination: true);
+        RunDisposeStep("session handle", () => _sessionHandle?.Dispose());
         _sessionHandle = null;
 
-        _session?.Process?.Dispose();
+        RunDisposeStep("launcher process", () => { _session?.Process?.Dispose(); });
     }
 }
