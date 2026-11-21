@@ -41,6 +41,11 @@ public static class InputValidator
     private const int MaxDnsLabelLength = 63;
 
     /// <summary>
+    /// Name of the SNMP OID validation pattern.
+    /// </summary>
+    public const string SnmpOidPatternName = "SnmpOid";
+
+    /// <summary>
     /// Validation patterns indexed by name, all built on the non-backtracking engine.
     /// </summary>
     private static readonly FrozenDictionary<string, Regex> ValidationPatterns =
@@ -71,6 +76,11 @@ public static class InputValidator
             ["Address"] = BuildPattern(
                 @"^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$|^[a-zA-Z][a-zA-Z0-9\-]*(\.[a-zA-Z0-9][a-zA-Z0-9\-]*)*$"),
 
+            // SNMP OID: numeric (1.3.6.1, .1.3.6.1) or symbolic (sysDescr.0, SNMPv2-MIB::sysDescr.0).
+            // Must not start with "-": the value reaches snmpwalk as an argument.
+            [SnmpOidPatternName] = BuildPattern(
+                @"^\.?\d+(\.\d+)*$|^[A-Za-z][A-Za-z0-9\-]*(::[A-Za-z][A-Za-z0-9\-]*)?(\.\d+)*$"),
+
             // Port numbers (used for LocalPort, RemotePort, etc.)
             ["LocalPort"] = BuildPattern(@"^\d{1,5}$"),
             ["RemotePort"] = BuildPattern(@"^\d{1,5}$"),
@@ -100,7 +110,7 @@ public static class InputValidator
     /// <param name="value">The value to validate.</param>
     /// <param name="patternName">
     /// Name of the pattern: SshGateway, SshUser, Username, Hostname, IPv4, Address,
-    /// TunnelTarget, LocalPort, RemotePort, Port.
+    /// TunnelTarget, SnmpOid, LocalPort, RemotePort, Port.
     /// </param>
     /// <returns>True if the value passes validation; false otherwise.</returns>
     public static bool Validate(string? value, string patternName)

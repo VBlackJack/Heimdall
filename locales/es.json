@@ -4529,6 +4529,7 @@
   "ToolSnmpA11yLoading": "Cargando exploración SNMP",
   "ToolSnmpProgress": "{0} OID obtenidos",
   "ToolSnmpErrorConnection": "Falló la consulta SNMP: {0}",
+  "ErrorInvalidSnmpOid": "OID SNMP no válido. Use un OID numérico (1.3.6.1.2.1) o un nombre MIB (SNMPv2-MIB::sysDescr.0).",
 
   "PaletteExternalToolsHeader": "Herramientas externas",
 

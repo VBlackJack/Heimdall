@@ -38,6 +38,53 @@ public class SnmpWalkerViewModelTests
         Assert.Equal(0, service.WalkCallCount);
     }
 
+    [Theory]
+    [InlineData("-Lf/tmp/x", "1.3.6.1")]
+    [InlineData("10.0.0.1", "-Ln")]
+    public async Task Walk_OptionLikeHostOrOid_SetsErrorAndSkipsService(string host, string oid)
+    {
+        var service = new FakeWalkerService();
+        var vm = new SnmpWalkerViewModel(service);
+        vm.Initialize(null);
+        vm.SetGateway(new SshGatewayDto { Name = "gw", Host = "jump", Port = 22, User = "me" });
+
+        await vm.WalkAsync(host, "public", oid);
+
+        Assert.True(vm.ShowError);
+        Assert.False(vm.IsWalking);
+        Assert.Equal(0, service.WalkCallCount);
+        Assert.Equal(0, service.TunnelWalkCallCount);
+    }
+
+    [Theory]
+    [InlineData("SNMPv2-MIB::sysDescr.0")]
+    [InlineData("1.3.6.1")]
+    public async Task Walk_SymbolicOrNumericOid_IsAccepted(string oid)
+    {
+        var service = new FakeWalkerService();
+        var vm = new SnmpWalkerViewModel(service);
+        vm.Initialize(null);
+
+        await vm.WalkAsync("10.0.0.1", "public", oid);
+
+        Assert.False(vm.ShowError);
+        Assert.Equal(1, service.WalkCallCount);
+    }
+
+    [Theory]
+    [InlineData("-Lf/tmp/x", "1.3.6.1", "host")]
+    [InlineData("10.0.0.1", "-Ln", "oid")]
+    public async Task WalkViaTunnel_OptionLikeHostOrOid_ThrowsBeforeConnecting(string host, string oid, string param)
+    {
+        var gateway = new SshGatewayDto { Name = "gw", Host = "unreachable.invalid", Port = 22, User = "me" };
+        var service = new SnmpWalkerService(gateway);
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(
+            () => service.WalkViaTunnelAsync(host, "public", oid, null, CancellationToken.None));
+
+        Assert.Equal(param, ex.ParamName);
+    }
+
     [Fact]
     public async Task Walk_ValidHost_DelegatesToDirectService()
     {

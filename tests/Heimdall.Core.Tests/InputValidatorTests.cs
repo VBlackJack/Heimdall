@@ -21,6 +21,25 @@ namespace Heimdall.Core.Tests;
 
 public class InputValidatorTests
 {
+    [Theory]
+    [InlineData("1.3.6.1", true)]
+    [InlineData(".1.3.6.1.2.1", true)]
+    [InlineData("sysDescr.0", true)]
+    [InlineData("SNMPv2-MIB::sysDescr.0", true)]
+    [InlineData("ifTable", true)]
+    [InlineData("-Ln", false)]
+    [InlineData("-Lf/tmp/x", false)]
+    [InlineData("--help", false)]
+    [InlineData("1.3.6.1;id", false)]
+    [InlineData("sysDescr 0", false)]
+    [InlineData("1..3", false)]
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    public void Validate_SnmpOid_ReturnsExpected(string? value, bool expected)
+    {
+        Assert.Equal(expected, InputValidator.Validate(value, InputValidator.SnmpOidPatternName));
+    }
+
     // ── Hostname validation ─────────────────────────────────────────────
 
     [Theory]

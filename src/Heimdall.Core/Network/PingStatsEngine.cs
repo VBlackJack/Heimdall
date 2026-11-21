@@ -82,6 +82,12 @@ public static class PingStatsEngine
             return (null, "ToolValidationHostRequired");
         }
 
+        // A leading "-" would be read as an option by the remote ping command. IPv6 is accepted.
+        if (!InputValidator.IsValidSshHost(host))
+        {
+            return (null, "ErrorInvalidHost");
+        }
+
         var timeoutRaw = (timeoutText ?? string.Empty).Trim();
         if (!int.TryParse(timeoutRaw, out var timeoutMs) ||
             timeoutMs < MinTimeoutMs ||

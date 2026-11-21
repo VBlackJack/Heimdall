@@ -20,6 +20,7 @@ using Heimdall.App.Services;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Network;
+using Heimdall.Core.Security;
 
 namespace Heimdall.App.ViewModels.Tools;
 
@@ -79,6 +80,23 @@ public sealed partial class SnmpWalkerViewModel : ObservableObject, IDisposable
         if (string.IsNullOrWhiteSpace(startOid))
         {
             startOid = NetworkToolPresets.SnmpDefaultOid;
+        }
+
+        // A value starting with "-" would be read as an option by the remote snmpwalk command.
+        var invalidKey = !InputValidator.IsValidSshHost(host.Trim())
+            ? "ErrorInvalidHost"
+            : !InputValidator.Validate(startOid, InputValidator.SnmpOidPatternName)
+                ? "ErrorInvalidSnmpOid"
+                : null;
+        if (invalidKey is not null)
+        {
+            lock (_lock)
+            {
+                _entries.Clear();
+            }
+
+            SetError(Lk(invalidKey));
+            return;
         }
 
         _cts?.Cancel();
