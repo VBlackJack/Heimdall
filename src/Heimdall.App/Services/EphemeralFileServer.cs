@@ -347,6 +347,7 @@ public sealed class EphemeralFileServer : IDisposable, IAsyncDisposable
             Core.Logging.FileLogger.Error($"HTTP request error: {ex.Message}");
             try
             {
+                AddProtectiveHeaders(context.Response, activeContent: false);
                 context.Response.StatusCode = 500;
                 context.Response.Close();
             }
@@ -362,6 +363,7 @@ public sealed class EphemeralFileServer : IDisposable, IAsyncDisposable
     {
         var request = context.Request;
         var response = context.Response;
+        AddProtectiveHeaders(response, activeContent: false);
 
         if (!IsAuthorized(request))
         {
@@ -478,7 +480,6 @@ public sealed class EphemeralFileServer : IDisposable, IAsyncDisposable
         var html = Encoding.UTF8.GetBytes(sb.ToString());
         response.ContentType = "text/html; charset=utf-8";
         response.AddHeader("Cache-Control", "no-store");
-        AddProtectiveHeaders(response, activeContent: false);
         response.ContentLength64 = html.Length;
         await response.OutputStream.WriteAsync(html);
         response.Close();
@@ -514,7 +515,8 @@ public sealed class EphemeralFileServer : IDisposable, IAsyncDisposable
     {
         response.ContentType = GetMimeType(filePath);
         response.AddHeader("Cache-Control", "no-store");
-        AddProtectiveHeaders(response, IsActiveContentExtension(Path.GetExtension(filePath)));
+        if (IsActiveContentExtension(Path.GetExtension(filePath)))
+            response.AddHeader(ContentSecurityPolicyHeader, ActiveContentSecurityPolicyValue);
         FileInfo fileInfo = new(filePath);
         response.ContentLength64 = fileInfo.Length;
         string sanitizedFileName = (Path.GetFileName(filePath) ?? string.Empty)

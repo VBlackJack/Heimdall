@@ -896,4 +896,49 @@ public class EphemeralFileServerTests : IDisposable
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         AssertBaseProtectiveHeaders(response);
     }
+
+    [Fact]
+    public async Task Http_NotFound_Response_Has_Protective_Headers()
+    {
+        using var response = await GetWithHeaderTokenAsync("/missing.txt");
+        if (response is null) return;
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        AssertBaseProtectiveHeaders(response);
+    }
+
+    [Fact]
+    public async Task Http_Unauthorized_Response_Has_Protective_Headers()
+    {
+        var httpPort = GetFreeTcpPort();
+        try
+        {
+            await _server.StartHttpServerAsync(_testDir, httpPort);
+        }
+        catch (Exception ex) when (IsPortException(ex))
+        {
+            return; // skip: port unavailable in this environment
+        }
+
+        await Task.Delay(50);
+        using var client = new HttpClient();
+        using var response = await client.GetAsync($"http://localhost:{httpPort}/");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        AssertBaseProtectiveHeaders(response);
+    }
+
+    [Theory]
+    [InlineData("PAGE.HTM", true)]
+    [InlineData("x.SVG", true)]
+    [InlineData("doc.pdf", false)]
+    public async Task Http_Content_Security_Policy_Follows_Extension_Case_Insensitively(
+        string fileName, bool sandboxed)
+    {
+        await File.WriteAllTextAsync(Path.Combine(_testDir, fileName), "<x/>");
+        using var response = await GetWithHeaderTokenAsync("/" + fileName);
+        if (response is null) return;
+
+        Assert.Equal(sandboxed, response.Headers.Contains(EphemeralFileServer.ContentSecurityPolicyHeader));
+    }
 }

@@ -15,9 +15,11 @@
  */
 
 using Heimdall.Core.Configuration;
+using Heimdall.Core.Security;
 
 namespace Heimdall.Core.Tests;
 
+[System.Runtime.Versioning.SupportedOSPlatform("windows")]
 public sealed class ConfigManagerSharedReadTests : IDisposable
 {
     private readonly string _dir = Path.Combine(Path.GetTempPath(), "heimdall-sharedread-" + Guid.NewGuid().ToString("N"));
@@ -46,5 +48,39 @@ public sealed class ConfigManagerSharedReadTests : IDisposable
         }
 
         Assert.True(File.Exists(moved));
+    }
+
+    [Fact]
+    public async Task AtomicWrite_SucceedsWhileSharedReadHandleIsOpen()
+    {
+        string path = Path.Combine(_dir, "servers.json");
+        await File.WriteAllTextAsync(path, "{\"old\":true}");
+        if (!string.Equals(new DriveInfo(Path.GetFullPath(path)).DriveFormat, "NTFS", StringComparison.OrdinalIgnoreCase))
+        {
+            return; // skip: the POSIX-semantics replace needs an NTFS test volume
+        }
+
+        using (FileStream reader = ConfigManager.OpenSharedRead(path))
+        {
+            await SecureFileWriter.WriteAllTextAtomicAsync(path, "{\"new\":true}");
+        }
+
+        Assert.Equal("{\"new\":true}", await File.ReadAllTextAsync(path));
+    }
+
+    [Fact]
+    public async Task LoadServersAsync_SucceedsWhileAnotherHandleAllowsWriteAndDelete()
+    {
+        Directory.CreateDirectory(Path.Combine(_dir, "config"));
+        ConfigManager manager = new(_dir);
+        await File.WriteAllTextAsync(
+            manager.ServersPath,
+            """[ { "id": "s1", "displayName": "Held", "connectionType": "SSH" } ]""");
+
+        using FileStream held = new(
+            manager.ServersPath, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite | FileShare.Delete);
+        var servers = await manager.LoadServersAsync();
+
+        Assert.Equal("Held", Assert.Single(servers).DisplayName);
     }
 }

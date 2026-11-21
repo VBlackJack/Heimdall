@@ -1381,7 +1381,7 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
                     continue;
                 }
 
-                string current = await File.ReadAllTextAsync(path, Utf8NoBom).ConfigureAwait(false);
+                string current = await ReadSharedTextAsync(path).ConfigureAwait(false);
                 if (IsReadableJson(current))
                 {
                     await WriteFileAsync(BackupPathFor(path), current).ConfigureAwait(false);
@@ -1593,7 +1593,7 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
 
         try
         {
-            string current = await File.ReadAllTextAsync(path, Utf8NoBom).ConfigureAwait(false);
+            string current = await ReadSharedTextAsync(path).ConfigureAwait(false);
             if (IsReadableJson(current))
             {
                 await WriteFileAsync(BackupPathFor(path), current).ConfigureAwait(false);
