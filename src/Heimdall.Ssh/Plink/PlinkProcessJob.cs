@@ -39,6 +39,8 @@ internal static class PlinkProcessJob
 
     private static readonly Lazy<SafeFileHandle?> Job = new(CreateKillOnCloseJob);
 
+    internal static SafeFileHandle? JobHandleForTests => Job.Value;
+
     /// <summary>
     /// Places <paramref name="process"/> in the kill-on-close job; false when it could not be.
     /// </summary>
