@@ -39,4 +39,45 @@ internal static class WindowNative
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+    /// <summary>Index of the extended window style for <see cref="GetWindowLong"/> and <see cref="SetWindowLong"/>.</summary>
+    public const int GwlExStyle = -20;
+
+    /// <summary>Extended style: the window lets mouse input fall through to the windows below it.</summary>
+    public const int WsExTransparent = 0x00000020;
+
+    /// <summary>Extended style: the window never becomes the foreground window when clicked.</summary>
+    public const int WsExNoActivate = 0x08000000;
+
+    /// <summary>Z-order marker: place the window above all non-topmost windows only.</summary>
+    public static readonly IntPtr HwndNoTopmost = new(-2);
+
+    /// <summary>Keeps the current size.</summary>
+    public const uint SwpNoSize = 0x0001;
+
+    /// <summary>Keeps the current position.</summary>
+    public const uint SwpNoMove = 0x0002;
+
+    /// <summary>Does not activate the window.</summary>
+    public const uint SwpNoActivate = 0x0010;
+
+    /// <summary>Relationship for <see cref="GetWindow"/>: the window directly above in the z-order.</summary>
+    public const uint GwHwndPrev = 3;
+
+    /// <summary>Retrieves the window that has the given z-order relationship to a window.</summary>
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern IntPtr GetWindow(IntPtr hWnd, uint uCmd);
+
+    /// <summary>Changes the z-order and position of a window.</summary>
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint flags);
+
+    /// <summary>Reads a 32-bit value from the window information.</summary>
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongW")]
+    public static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+
+    /// <summary>Writes a 32-bit value into the window information.</summary>
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongW")]
+    public static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
 }

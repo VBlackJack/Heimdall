@@ -22,6 +22,7 @@ using System.Text;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
@@ -69,6 +70,10 @@ public partial class EmbeddedRdpView
     private static readonly TimeSpan ResizeDebounceInterval = TimeSpan.FromMilliseconds(1000);
     private static readonly TimeSpan AutofillFilledDisplayDuration = TimeSpan.FromSeconds(3);
     private static readonly TimeSpan TransientToastDuration = TimeSpan.FromSeconds(3);
+    /// <summary>Gap, in device-independent pixels, between the top of the surface and the toast.</summary>
+    private const double TransientToastTopOffset = 16;
+    /// <summary>Offset toggled on the toast popup to make it re-run its placement callback.</summary>
+    private const double TransientToastRepositionNudge = 0.01;
     private static readonly TimeSpan LetterboxHintDisplayDuration = TimeSpan.FromSeconds(4);
     private static readonly TimeSpan LetterboxHintFadeDuration = TimeSpan.FromMilliseconds(600);
     /// <summary>Size change, in pixels, below which a resize is churn rather than a user action.</summary>
@@ -209,6 +214,7 @@ public partial class EmbeddedRdpView
     private bool _autofillAttemptInFlight;
     private bool _dpiChangeDroppedDuringLockout;
     private Window? _dpiWindow;
+    private Window? _toastOwnerWindow;
 
     // Session-event latches: at most one Disconnected per connected segment, paired with one
     // Connected per (re)connect. Reset across the auto-reconnect bounce so each bounce is truthful.
@@ -324,9 +330,12 @@ public partial class EmbeddedRdpView
         _trustPrompt = new RdpTrustPromptSession(PostTrustPromptWithdrawal);
         _trustPrompt.QuestionChanged += OnTrustPromptQuestionChanged;
 
+        TransientToastPopup.CustomPopupPlacementCallback = PlaceTransientToast;
+
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
         SurfaceContainer.SizeChanged += OnSurfaceContainerSizeChanged;
+        SurfaceContainer.IsVisibleChanged += OnSurfaceContainerIsVisibleChanged;
     }
 
     public void SetFullscreen(bool isFullscreen)
@@ -433,11 +442,16 @@ public partial class EmbeddedRdpView
         {
             TransientToastText.Text = string.Empty;
             TransientToast.Visibility = System.Windows.Visibility.Collapsed;
+            CloseTransientToastPopup();
             return;
         }
 
         TransientToastText.Text = message;
         TransientToast.Visibility = System.Windows.Visibility.Visible;
+
+        // The toast sits in a Popup so it is not painted under the RDP child window. The popup is
+        // opened first so the live region is announced from a toast that has a presentation source.
+        OpenTransientToastPopupIfShown();
         _ = RdpLiveRegion.Announce(TransientToast);
         _transientToastTimer = new DispatcherTimer(
             TransientToastDuration,
@@ -452,6 +466,141 @@ public partial class EmbeddedRdpView
         StopTransientToastTimer();
         TransientToastText.Text = string.Empty;
         TransientToast.Visibility = System.Windows.Visibility.Collapsed;
+        CloseTransientToastPopup();
+    }
+
+    /// <summary>
+    /// Opens the toast popup only when the surface is actually on screen: a popup is its own
+    /// window and would otherwise float over a collapsed tab or a minimized window.
+    /// </summary>
+    private void OpenTransientToastPopupIfShown()
+    {
+        if (!IsLoaded
+            || !SurfaceContainer.IsVisible
+            || Window.GetWindow(this)?.WindowState == WindowState.Minimized)
+        {
+            return;
+        }
+
+        TransientToastPopup.IsOpen = true;
+    }
+
+    private void CloseTransientToastPopup()
+    {
+        TransientToastPopup.IsOpen = false;
+    }
+
+    private static CustomPopupPlacement[] PlaceTransientToast(
+        System.Windows.Size popupSize,
+        System.Windows.Size targetSize,
+        System.Windows.Point offset)
+    {
+        var location = new System.Windows.Point((targetSize.Width - popupSize.Width) / 2, TransientToastTopOffset);
+        return [new CustomPopupPlacement(location, PopupPrimaryAxis.None)];
+    }
+
+    private void OnTransientToastPopupOpened(object? sender, EventArgs e)
+    {
+        if (PresentationSource.FromVisual(TransientToast) is not System.Windows.Interop.HwndSource source)
+        {
+            return;
+        }
+
+        var handle = source.Handle;
+
+        // Popup windows are topmost by default, which would draw the toast over other applications.
+        // While Heimdall is the active window, the top of the non-topmost band is the right place.
+        // While it is not, that band's top is above whatever the user is working in, so the toast
+        // is slotted directly above its owner instead.
+        _ = WindowNative.SetWindowPos(
+            handle,
+            ResolveToastInsertAfter(),
+            0,
+            0,
+            0,
+            0,
+            WindowNative.SwpNoMove | WindowNative.SwpNoSize | WindowNative.SwpNoActivate);
+
+        // Click-through and never activated: the toast must not take focus from the remote session.
+        var style = WindowNative.GetWindowLong(handle, WindowNative.GwlExStyle);
+        _ = WindowNative.SetWindowLong(
+            handle,
+            WindowNative.GwlExStyle,
+            style | WindowNative.WsExTransparent | WindowNative.WsExNoActivate);
+    }
+
+    private IntPtr ResolveToastInsertAfter()
+    {
+        var owner = Window.GetWindow(this);
+        if (owner is null || owner.IsActive)
+        {
+            return WindowNative.HwndNoTopmost;
+        }
+
+        var ownerHandle = new System.Windows.Interop.WindowInteropHelper(owner).Handle;
+        if (ownerHandle == IntPtr.Zero)
+        {
+            return WindowNative.HwndNoTopmost;
+        }
+
+        var above = WindowNative.GetWindow(ownerHandle, WindowNative.GwHwndPrev);
+        return above == IntPtr.Zero ? WindowNative.HwndNoTopmost : above;
+    }
+
+    /// <summary>
+    /// Closes the toast when its surface is hidden without being unloaded (workspace lock,
+    /// onboarding, drag overlay, tab switch): the popup is its own window and would stay up.
+    /// </summary>
+    private void OnSurfaceContainerIsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (e.NewValue is false)
+        {
+            CloseTransientToastPopup();
+        }
+    }
+
+    private void RegisterToastOwnerWindowHandlers()
+    {
+        var window = Window.GetWindow(this);
+        if (ReferenceEquals(_toastOwnerWindow, window))
+        {
+            return;
+        }
+
+        UnregisterToastOwnerWindowHandlers();
+        _toastOwnerWindow = window;
+        if (window is not null)
+        {
+            window.Deactivated += OnToastOwnerWindowChanged;
+            window.LocationChanged += OnToastOwnerWindowChanged;
+            window.StateChanged += OnToastOwnerWindowChanged;
+        }
+    }
+
+    private void UnregisterToastOwnerWindowHandlers()
+    {
+        if (_toastOwnerWindow is null)
+        {
+            return;
+        }
+
+        _toastOwnerWindow.Deactivated -= OnToastOwnerWindowChanged;
+        _toastOwnerWindow.LocationChanged -= OnToastOwnerWindowChanged;
+        _toastOwnerWindow.StateChanged -= OnToastOwnerWindowChanged;
+        _toastOwnerWindow = null;
+    }
+
+    private void OnToastOwnerWindowChanged(object? sender, EventArgs e) => CloseTransientToastPopup();
+
+    private void NudgeTransientToastPopup()
+    {
+        if (TransientToastPopup.IsOpen)
+        {
+            // A Popup only re-runs its placement when one of its placement properties changes, so
+            // the offset is toggled by a negligible amount to force it to follow the new size.
+            TransientToastPopup.HorizontalOffset =
+                TransientToastPopup.HorizontalOffset == 0 ? TransientToastRepositionNudge : 0;
+        }
     }
 
     private void StopTransientToastTimer()
@@ -713,6 +862,7 @@ public partial class EmbeddedRdpView
         Loaded -= OnLoaded;
         Unloaded -= OnUnloaded;
         SurfaceContainer.SizeChanged -= OnSurfaceContainerSizeChanged;
+        SurfaceContainer.IsVisibleChanged -= OnSurfaceContainerIsVisibleChanged;
         _resizeTimer.Stop();
         _resizeTimer.Tick -= OnResizeTimerTick;
     }
@@ -729,7 +879,18 @@ public partial class EmbeddedRdpView
         _autofillRetryContext = null;
     }
 
-    void IRdpViewDisposeTarget.StopTransientToastTimer() => StopTransientToastTimer();
+    void IRdpViewDisposeTarget.StopTransientToastTimer()
+    {
+        StopTransientToastTimer();
+        ReleaseTransientToastPopup();
+    }
+
+    /// <summary>Detaches the owner-window handlers and closes the toast popup.</summary>
+    private void ReleaseTransientToastPopup()
+    {
+        UnregisterToastOwnerWindowHandlers();
+        CloseTransientToastPopup();
+    }
 
     void IRdpViewDisposeTarget.HideLetterboxHint() => HideLetterboxHint();
 
@@ -901,6 +1062,11 @@ public partial class EmbeddedRdpView
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
+        if (!_disposed)
+        {
+            RegisterToastOwnerWindowHandlers();
+        }
+
         if (_disposed || !_initialized)
         {
             return;
@@ -923,6 +1089,8 @@ public partial class EmbeddedRdpView
 
     private void OnUnloaded(object sender, RoutedEventArgs e)
     {
+        UnregisterToastOwnerWindowHandlers();
+        CloseTransientToastPopup();
         UnregisterEscapeHook();
         UnregisterDpiChangedHandler();
         _autofillRetryContext = null;
@@ -1407,6 +1575,8 @@ public partial class EmbeddedRdpView
 
     private void OnSurfaceContainerSizeChanged(object sender, SizeChangedEventArgs e)
     {
+        NudgeTransientToastPopup();
+
         if (_disposed || _server is null)
         {
             return;

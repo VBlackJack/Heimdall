@@ -172,6 +172,8 @@ UpdateLayout() -> DoEvents() -> Dispatcher.Invoke(Render) -> EnsureHandle -> Con
 
 **Airspace overlay rule**: Any WPF UI that must render above a `WindowsFormsHost` surface (RDP, VNC) MUST use a WPF `Popup`. A Popup creates its own top-level HWND that the OS composites above the embedded ActiveX surface. The Command Palette uses this pattern - it was originally a `Grid` overlay with `Panel.ZIndex="9999"` which was invisible over RDP sessions.
 
+A Popup used over a session surface has three caveats. It is topmost by default, so it must be demoted (`SetWindowPos` with `HWND_NOTOPMOST`) or it floats over other applications. It must be click-through and non-activating (`WS_EX_TRANSPARENT | WS_EX_NOACTIVATE`) when it is only informative, or it takes focus and clicks from the remote session. And it must be gated on visibility: open it only while the owner is loaded, visible and not minimized, and close it when the owner window deactivates, moves or changes state, because a popup does not follow a collapsed tab or a minimized window. The RDP transient toast follows these rules. Where a popup is overkill, move the visual out of the row that holds the surface (the VNC and web loading bars sit on the header row) or collapse the session host while the overlay is up (`MainViewModel.IsSessionHostVisible`, used by the onboarding and the .rdp drop overlays).
+
 Additional guards:
 - Resolution updates blocked after `OnConnected` (prevents disconnect code 4360). The delay is `AppSettings.RdpResizeEnableDelayMs`, default 10000 ms, and a per-profile value overrides it
 - COM dispose follows strict order: collapse visibility, detach from tree, disconnect, detach event sink, dispose - do NOT call `Marshal.ReleaseComObject` (let AxHost handle RCW cleanup)

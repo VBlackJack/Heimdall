@@ -590,7 +590,23 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     /// Win32 (RDP ActiveX) and WebView2 (terminal/VNC) child HWNDs are masked - a
     /// WPF overlay alone cannot cover those, so the host must be collapsed.
     /// </summary>
-    public bool IsSessionHostVisible => !IsWorkspaceLocked;
+    public bool IsSessionHostVisible => !IsWorkspaceLocked && !IsOnboardingActive && !IsRdpImportDragActive;
+
+    /// <summary>
+    /// Whether the onboarding overlay is up. The session host is collapsed meanwhile: the overlay
+    /// is a WPF visual and the RDP / WebView2 child windows would paint over it.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsSessionHostVisible))]
+    private bool _isOnboardingActive;
+
+    /// <summary>
+    /// Whether an .rdp file is being dragged over the window. The session host is collapsed
+    /// meanwhile so the drop overlay is not painted under the child windows.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsSessionHostVisible))]
+    private bool _isRdpImportDragActive;
 
     /// <summary>The re-unlock ViewModel bound by the lock overlay (null while unlocked).</summary>
     [ObservableProperty]

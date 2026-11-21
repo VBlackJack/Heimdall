@@ -865,26 +865,32 @@
                          BorderThickness="0"
                          IsHitTestVisible="False"/>
 
-            <rdp:AutomationBorder x:Name="TransientToast"
-                    HorizontalAlignment="Center"
-                    VerticalAlignment="Top"
-                    Margin="0,16,0,0"
-                    CornerRadius="{StaticResource CornerRadiusMd}"
-                    Padding="12,6"
-                    Background="{DynamicResource OverlayBackground}"
-                    BorderBrush="{DynamicResource BorderBrush}"
-                    BorderThickness="1"
-                    Visibility="Collapsed"
-                    IsHitTestVisible="False"
-                    Focusable="False"
-                    KeyboardNavigation.IsTabStop="False"
-                    Panel.ZIndex="50"
-                    AutomationProperties.LiveSetting="Polite"
-                    AutomationProperties.Name="{loc:Translate A11yRdpTransientToast}">
-                <TextBlock x:Name="TransientToastText"
-                           Foreground="{DynamicResource TextPrimaryBrush}"
-                           FontSize="{StaticResource FontSizeBody}"/>
-            </rdp:AutomationBorder>
+            <!-- The toast lives in a Popup: the RDP surface is a Win32 child window that paints
+                 over any WPF visual in the same window (airspace), a Popup is its own window. -->
+            <Popup x:Name="TransientToastPopup"
+                   PlacementTarget="{Binding ElementName=SurfaceContainer}"
+                   Placement="Custom"
+                   AllowsTransparency="True"
+                   StaysOpen="True"
+                   Focusable="False"
+                   Opened="OnTransientToastPopupOpened">
+                <rdp:AutomationBorder x:Name="TransientToast"
+                        CornerRadius="{StaticResource CornerRadiusMd}"
+                        Padding="12,6"
+                        Background="{DynamicResource OverlayBackground}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="1"
+                        Visibility="Collapsed"
+                        IsHitTestVisible="False"
+                        Focusable="False"
+                        KeyboardNavigation.IsTabStop="False"
+                        AutomationProperties.LiveSetting="Polite"
+                        AutomationProperties.Name="{loc:Translate A11yRdpTransientToast}">
+                    <TextBlock x:Name="TransientToastText"
+                               Foreground="{DynamicResource TextPrimaryBrush}"
+                               FontSize="{StaticResource FontSizeBody}"/>
+                </rdp:AutomationBorder>
+            </Popup>
         </Grid>
     </Grid>
 </UserControl>

@@ -146,11 +146,11 @@
             </Grid>
         </Border>
 
-        <!-- Connection progress indicator -->
+        <!-- Connection progress indicator. It sits on the bottom edge of the header row: a WPF
+             visual over the surface row would be painted under the Win32 child window (airspace). -->
         <ProgressBar x:Name="VncLoadingBar"
-                     Grid.Row="1"
-                     VerticalAlignment="Top"
-                     Panel.ZIndex="1"
+                     Grid.Row="0"
+                     VerticalAlignment="Bottom"
                      Height="2"
                      IsIndeterminate="True"
                      Foreground="{DynamicResource AccentTextBrush}"
