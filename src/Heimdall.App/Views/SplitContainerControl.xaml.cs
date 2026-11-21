@@ -150,10 +150,12 @@ public partial class SplitContainerControl : UserControl
         // Re-sync content on every layout pass (critical for TabControl tab switching)
         SyncContent();
 
-        RootGrid.RowDefinitions.Clear();
-        RootGrid.ColumnDefinitions.Clear();
-
-        if (_model is null) return;
+        if (_model is null)
+        {
+            RootGrid.RowDefinitions.Clear();
+            RootGrid.ColumnDefinitions.Clear();
+            return;
+        }
 
         // Model clamps SplitRatio to [MinRatio, MaxRatio] in its setter
         var ratio = _model.SplitRatio;
@@ -161,10 +163,11 @@ public partial class SplitContainerControl : UserControl
         if (_model.Orientation == SplitOrientation.Horizontal)
         {
             // Stacked: top/bottom
-            RootGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            RootGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(ratio, GridUnitType.Star) });
-            RootGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            RootGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1 - ratio, GridUnitType.Star) });
+            EnsureDefinitions(rows: 3, columns: 1);
+            RootGrid.ColumnDefinitions[0].Width = new GridLength(1, GridUnitType.Star);
+            RootGrid.RowDefinitions[0].Height = new GridLength(ratio, GridUnitType.Star);
+            RootGrid.RowDefinitions[1].Height = GridLength.Auto;
+            RootGrid.RowDefinitions[2].Height = new GridLength(1 - ratio, GridUnitType.Star);
 
             Grid.SetRow(FirstPresenter, 0);
             Grid.SetColumn(FirstPresenter, 0);
@@ -184,10 +187,11 @@ public partial class SplitContainerControl : UserControl
         else
         {
             // Side-by-side: left/right
-            RootGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-            RootGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(ratio, GridUnitType.Star) });
-            RootGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            RootGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1 - ratio, GridUnitType.Star) });
+            EnsureDefinitions(rows: 1, columns: 3);
+            RootGrid.RowDefinitions[0].Height = new GridLength(1, GridUnitType.Star);
+            RootGrid.ColumnDefinitions[0].Width = new GridLength(ratio, GridUnitType.Star);
+            RootGrid.ColumnDefinitions[1].Width = GridLength.Auto;
+            RootGrid.ColumnDefinitions[2].Width = new GridLength(1 - ratio, GridUnitType.Star);
 
             Grid.SetRow(FirstPresenter, 0);
             Grid.SetColumn(FirstPresenter, 0);
@@ -207,6 +211,31 @@ public partial class SplitContainerControl : UserControl
     }
 
     /// <summary>
+    /// Keeps the existing row and column definitions when their shape already matches, so a
+    /// ratio change only updates their lengths. The splitter holds the definitions it saw when a
+    /// drag started (the second press of a double-click starts one) and, on release, writes
+    /// lengths by index into the grid's current ones: replacing them under it would write the
+    /// lengths from before the reset over the new definitions, or fault when it measures the
+    /// detached ones.
+    /// </summary>
+    private void EnsureDefinitions(int rows, int columns)
+    {
+        if (RootGrid.RowDefinitions.Count != rows)
+        {
+            RootGrid.RowDefinitions.Clear();
+            for (var i = 0; i < rows; i++)
+                RootGrid.RowDefinitions.Add(new RowDefinition());
+        }
+
+        if (RootGrid.ColumnDefinitions.Count != columns)
+        {
+            RootGrid.ColumnDefinitions.Clear();
+            for (var i = 0; i < columns; i++)
+                RootGrid.ColumnDefinitions.Add(new ColumnDefinition());
+        }
+    }
+
+    /// <summary>
     /// Restores the split ratio the container opened with when the splitter is double-clicked.
     /// </summary>
     private void OnSplitterDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
@@ -218,7 +247,7 @@ public partial class SplitContainerControl : UserControl
     }
 
     /// <summary>
-    /// Captures the actual splitter position after user drag and writes it back
+    /// Captures the splitter position after user drag and writes it back
     /// to the model (preserved across tab switches).
     /// </summary>
     private void OnSplitterDragCompleted(
@@ -226,25 +255,21 @@ public partial class SplitContainerControl : UserControl
     {
         if (!IsLoaded || _model is null) return;
 
-        // A click, or the second click of a double-click, raises DragCompleted with no movement. It
-        // is not a drag: reading the columns now would see the layout from before the double-click
-        // handler's reset was applied and write the old ratio back over it.
+        // A click, or the second press of a double-click, completes a drag with no movement: it
+        // is not a drag and must not overwrite the ratio (the double-click handler sets it).
         if (e.Canceled || (e.HorizontalChange == 0 && e.VerticalChange == 0)) return;
 
+        // The splitter shows a preview while dragging and applies the move on release, just
+        // before this handler, as star lengths. No layout pass has run since, so ActualWidth and
+        // ActualHeight still describe the split from before the drag: read the lengths instead.
         double ratio;
         if (_model.Orientation == SplitOrientation.Horizontal && RootGrid.RowDefinitions.Count >= 3)
         {
-            var first = RootGrid.RowDefinitions[0].ActualHeight;
-            var second = RootGrid.RowDefinitions[2].ActualHeight;
-            var total = first + second;
-            ratio = total > 0 ? first / total : SplitContainerModel.DefaultRatio;
+            ratio = FirstShare(RootGrid.RowDefinitions[0].Height, RootGrid.RowDefinitions[2].Height);
         }
         else if (_model.Orientation == SplitOrientation.Vertical && RootGrid.ColumnDefinitions.Count >= 3)
         {
-            var first = RootGrid.ColumnDefinitions[0].ActualWidth;
-            var second = RootGrid.ColumnDefinitions[2].ActualWidth;
-            var total = first + second;
-            ratio = total > 0 ? first / total : SplitContainerModel.DefaultRatio;
+            ratio = FirstShare(RootGrid.ColumnDefinitions[0].Width, RootGrid.ColumnDefinitions[2].Width);
         }
         else
         {
@@ -258,5 +283,12 @@ public partial class SplitContainerControl : UserControl
         // Model setter clamps to [MinRatio, MaxRatio]
         _model.SplitRatio = ratio;
         MainViewModelLocator.FindCurrent()?.Split.RememberSplitRatio(_model);
+    }
+
+    private static double FirstShare(GridLength first, GridLength second)
+    {
+        if (!first.IsStar || !second.IsStar) return SplitContainerModel.DefaultRatio;
+        var total = first.Value + second.Value;
+        return total > 0 ? first.Value / total : SplitContainerModel.DefaultRatio;
     }
 }
