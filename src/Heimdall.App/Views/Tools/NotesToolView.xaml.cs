@@ -403,7 +403,31 @@ public partial class NotesToolView : UserControl, IToolView
     private async Task FlushPendingChangesAsync()
     {
         _saveTimer.Stop();
-        _vm.CurrentMarkdown = _useMilkdown ? await GetMilkdownContentAsync().ConfigureAwait(true) : Editor.Text;
+
+        // The editor content is read asynchronously: if another note was opened meanwhile, the
+        // text belongs to the previous note and must not land in the new one (the switch already
+        // saved what the previous note held).
+        string? notePath = _vm.CurrentNotePath;
+        if (notePath is null)
+        {
+            return;
+        }
+
+        string markdown = _useMilkdown
+            ? await GetMilkdownContentAsync().ConfigureAwait(true)
+            : Editor.Text ?? string.Empty;
+        if (!string.Equals(_vm.CurrentNotePath, notePath, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        // Only a note with pending edits takes the editor text: for a clean note the editor may
+        // report a normalized form of what it loaded, which is not an edit and must not be saved.
+        if (_vm.IsDirty)
+        {
+            _vm.TryApplyEditorMarkdown(markdown);
+        }
+
         await _vm.SaveCommand.ExecuteAsync(null);
     }
 
@@ -1121,8 +1145,13 @@ public partial class NotesToolView : UserControl, IToolView
             return;
         }
 
-        _vm.CurrentMarkdown = Editor.Text ?? string.Empty;
-        _vm.IsDirty = true;
+        // Same entry point as the rich editor: a text equal to what the clean note holds is not an
+        // edit, and the revision the save compares is bumped by the markdown change itself.
+        if (!_vm.TryApplyEditorMarkdown(Editor.Text ?? string.Empty))
+        {
+            return;
+        }
+
         _vm.SetStatus(L("ToolNotesStatusModified"));
 
         _saveTimer.Stop();

@@ -171,9 +171,17 @@ public sealed class NotesStorageService : INotesStorageService
     /// <summary>How long the synchronous save waits for a write already in progress.</summary>
     private static readonly TimeSpan SyncSaveLockWait = TimeSpan.FromSeconds(2);
 
+    /// <summary>
+    /// A staged note file older than this is the leftover of a crash: a write takes milliseconds,
+    /// so nothing alive still needs it.
+    /// </summary>
+    private static readonly TimeSpan OrphanedTempAge = TimeSpan.FromDays(1);
+
     private readonly string _notesRootPath;
     private readonly SemaphoreSlim _writeLock;
     private readonly TimeSpan _syncSaveLockWait;
+    private readonly NoteFileWriter _fileWriter;
+    private int _orphanSweepDone;
 
     public NotesStorageService(string notesRootPath)
         : this(notesRootPath, new SemaphoreSlim(1, 1), SyncSaveLockWait)
@@ -185,12 +193,24 @@ public sealed class NotesStorageService : INotesStorageService
     /// the lock the way a slow asynchronous save does.
     /// </summary>
     internal NotesStorageService(string notesRootPath, SemaphoreSlim writeLock, TimeSpan syncSaveLockWait)
+        : this(notesRootPath, writeLock, syncSaveLockWait, new NoteFileWriter())
+    {
+    }
+
+    /// <summary>Also takes the file writer, so a test can fail a write while it is staged.</summary>
+    internal NotesStorageService(
+        string notesRootPath,
+        SemaphoreSlim writeLock,
+        TimeSpan syncSaveLockWait,
+        NoteFileWriter fileWriter)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(notesRootPath);
         ArgumentNullException.ThrowIfNull(writeLock);
+        ArgumentNullException.ThrowIfNull(fileWriter);
         _notesRootPath = notesRootPath;
         _writeLock = writeLock;
         _syncSaveLockWait = syncSaveLockWait;
+        _fileWriter = fileWriter;
     }
 
     public string NotesRootPath => _notesRootPath;
@@ -205,6 +225,7 @@ public sealed class NotesStorageService : INotesStorageService
         return Task.Run<IReadOnlyList<NoteListItem>>(() =>
         {
             EnsureInitialized();
+            SweepOrphanedTempFilesOnce();
 
             var normalizedSearch = searchText?.Trim();
             var results = new List<NoteListItem>();
@@ -253,6 +274,42 @@ public sealed class NotesStorageService : INotesStorageService
 
             return sorted.ToList();
         }, cancellationToken);
+    }
+
+    /// <summary>
+    /// Deletes staged note files that a crash left behind, once per service instance, on the
+    /// first listing. Best effort: a file that cannot be removed is left for the next start.
+    /// </summary>
+    private void SweepOrphanedTempFilesOnce()
+    {
+        if (Interlocked.Exchange(ref _orphanSweepDone, 1) != 0)
+        {
+            return;
+        }
+
+        try
+        {
+            var threshold = DateTime.UtcNow - OrphanedTempAge;
+            foreach (var tempPath in Directory.EnumerateFiles(
+                         _notesRootPath, NoteFileWriter.OrphanSearchPattern, SearchOption.AllDirectories))
+            {
+                try
+                {
+                    if (File.GetLastWriteTimeUtc(tempPath) < threshold)
+                    {
+                        File.Delete(tempPath);
+                    }
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    FileLogger.Warn($"Could not remove the orphaned staged note '{tempPath}': {ex.Message}");
+                }
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            FileLogger.Warn($"Orphaned staged note sweep failed: {ex.Message}");
+        }
     }
 
     public Task<string?> FindNotePathAsync(string noteReference, CancellationToken cancellationToken = default)
@@ -311,15 +368,15 @@ public sealed class NotesStorageService : INotesStorageService
         var nowLocal = DateTime.Now;
         var draft = NotesTemplateFactory.Create(templateKind, context, nowLocal, localizer);
         var desiredPath = Path.Combine(_notesRootPath, draft.RelativePath);
-        if (templateKind == NoteTemplateKind.Daily && File.Exists(desiredPath))
-        {
-            return desiredPath;
-        }
 
-        var targetPath = GetUniquePath(desiredPath);
-
-        await SaveNoteAsync(targetPath, draft.Content, cancellationToken).ConfigureAwait(false);
-        return targetPath;
+        // The daily note of a day is opened, not duplicated: that check and the unique-path
+        // pick are made under the write lock, so two creations cannot choose the same path.
+        return await WriteNewNoteLockedAsync(
+                desiredPath,
+                draft.Content,
+                reuseExisting: templateKind == NoteTemplateKind.Daily,
+                cancellationToken)
+            .ConfigureAwait(false);
     }
 
     public string CreateFolder(string folderName, string? parentFolder = null)
@@ -345,12 +402,12 @@ public sealed class NotesStorageService : INotesStorageService
         ValidatePathWithinRoot(Path.Combine(targetFolder, "x"));
 
         var fileName = Path.GetFileName(filePath);
-        var newPath = Path.Combine(targetFolder, fileName);
-        newPath = GetUniquePath(newPath);
+        string newPath;
 
         await _writeLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            newPath = GetUniquePath(Path.Combine(targetFolder, fileName));
             Directory.CreateDirectory(targetFolder);
             File.Move(filePath, newPath);
         }
@@ -393,7 +450,7 @@ public sealed class NotesStorageService : INotesStorageService
                 Directory.CreateDirectory(directory);
             }
 
-            await File.WriteAllTextAsync(filePath, content ?? string.Empty, Utf8NoBom, cancellationToken)
+            await _fileWriter.WriteAsync(filePath, content ?? string.Empty, cancellationToken)
                 .ConfigureAwait(false);
         }
         finally
@@ -429,7 +486,7 @@ public sealed class NotesStorageService : INotesStorageService
                 Directory.CreateDirectory(directory);
             }
 
-            File.WriteAllText(filePath, content ?? string.Empty, Utf8NoBom);
+            _fileWriter.Write(filePath, content ?? string.Empty);
             return true;
         }
         finally
@@ -486,18 +543,17 @@ public sealed class NotesStorageService : INotesStorageService
             return filePath;
         }
 
-        newPath = GetUniquePath(newPath);
-
         await _writeLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
+            newPath = GetUniquePath(newPath);
             var content = File.ReadAllText(filePath, Utf8NoBom);
             File.Move(filePath, newPath);
 
             var updatedContent = UpdatePrimaryHeading(content, desiredTitle);
             if (!string.Equals(updatedContent, content, StringComparison.Ordinal))
             {
-                File.WriteAllText(newPath, updatedContent, Utf8NoBom);
+                _fileWriter.Write(newPath, updatedContent);
             }
         }
         finally
@@ -525,12 +581,12 @@ public sealed class NotesStorageService : INotesStorageService
             fileSuffix = "copy";
         }
 
-        var copyPath = GetUniquePath(Path.Combine(directory, $"{baseName}-{fileSuffix}.md"));
+        var desiredPath = Path.Combine(directory, $"{baseName}-{fileSuffix}.md");
         var desiredTitle = BuildDuplicatedTitle(ExtractTitle(filePath, content), duplicateLabel);
         var duplicatedContent = UpdatePrimaryHeading(content, desiredTitle);
 
-        await SaveNoteAsync(copyPath, duplicatedContent, cancellationToken).ConfigureAwait(false);
-        return copyPath;
+        return await WriteNewNoteLockedAsync(desiredPath, duplicatedContent, reuseExisting: false, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     public string GetRelativePath(string filePath)
@@ -554,6 +610,46 @@ public sealed class NotesStorageService : INotesStorageService
         }
     }
 
+    /// <summary>
+    /// Creates a note at <paramref name="desiredPath"/> or, when that name is taken, at the next
+    /// free one, picking the path and writing under one write lock: two creations racing for
+    /// the same name get distinct files instead of one overwriting the other.
+    /// </summary>
+    /// <param name="reuseExisting">True returns an existing file at the desired path untouched.</param>
+    private async Task<string> WriteNewNoteLockedAsync(
+        string desiredPath,
+        string content,
+        bool reuseExisting,
+        CancellationToken cancellationToken)
+    {
+        ValidatePathWithinRoot(desiredPath);
+
+        await _writeLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (reuseExisting && File.Exists(desiredPath))
+            {
+                return desiredPath;
+            }
+
+            var targetPath = GetUniquePath(desiredPath);
+            var directory = Path.GetDirectoryName(targetPath);
+            if (!string.IsNullOrEmpty(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            await _fileWriter.WriteAsync(targetPath, content ?? string.Empty, cancellationToken)
+                .ConfigureAwait(false);
+            return targetPath;
+        }
+        finally
+        {
+            _writeLock.Release();
+        }
+    }
+
+    /// <remarks>Callers hold the write lock: the pick and the write that follows must not be split.</remarks>
     private string GetUniquePath(string targetPath)
     {
         if (!File.Exists(targetPath))
@@ -715,14 +811,14 @@ public sealed class NotesStorageService : INotesStorageService
             throw new ArgumentException("Invalid note reference.", nameof(noteReference));
         }
 
-        var targetPath = GetUniquePath(Path.Combine(_notesRootPath, $"{fileName}.md"));
+        var desiredPath = Path.Combine(_notesRootPath, $"{fileName}.md");
         var content = new StringBuilder()
             .AppendLine($"# {title}")
             .AppendLine()
             .ToString();
 
-        await SaveNoteAsync(targetPath, content, cancellationToken).ConfigureAwait(false);
-        return targetPath;
+        return await WriteNewNoteLockedAsync(desiredPath, content, reuseExisting: false, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     private IEnumerable<NoteLookupCandidate> EnumerateLookupCandidates(CancellationToken cancellationToken)
