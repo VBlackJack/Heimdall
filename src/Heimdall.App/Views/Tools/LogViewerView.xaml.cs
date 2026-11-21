@@ -24,6 +24,9 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Heimdall.Core.Localization;
+using Heimdall.Core.LogFiles;
+using Heimdall.Core.Logging;
+using Heimdall.Core.Matching;
 using Heimdall.Core.Models;
 
 namespace Heimdall.App.Views.Tools;
@@ -35,7 +38,11 @@ namespace Heimdall.App.Views.Tools;
 /// </summary>
 public partial class LogViewerView : UserControl, IToolView
 {
-    private const int MaxDisplayLines = 10000;
+    private const int MaxDisplayLines = LogFileScanner.MaxLines;
+    private const string HighlightBrushKey = "AccentBrush";
+    private const string HighlightForegroundBrushKey = "TextOnAccentBrush";
+    private const string MutedBrushKey = "TextSecondaryBrush";
+    private const double BytesPerKilobyte = 1024.0;
     private const int TailIntervalMs = 500;
     private const int EncodingIndexUtf8 = 0;
     private const int EncodingIndexAscii = 1;
@@ -45,15 +52,19 @@ public partial class LogViewerView : UserControl, IToolView
 
     private LocalizationManager? _localizer;
     private string? _filePath;
-    private FileStream? _fileStream;
-    private long _lastPosition;
+    private CancellationTokenSource? _scanCts;
+    private int _generation;
+    private LogCursor? _cursor;
+    private bool _tailBusy;
+    private bool _loading;
+    private bool _disposed;
+    private Paragraph? _provisional;
     private DispatcherTimer? _tailTimer;
     private Encoding _encoding = Encoding.UTF8;
     private Regex? _filterRegex;
     private bool _autoScroll = true;
-    private int _totalLineCount;
-    private int _displayedLineCount;
-    private Brush? _highlightBrush;
+
+    private readonly record struct RenderStyle(Brush Highlight, Brush? HighlightForeground, Brush? Muted, string TruncatedMarker);
 
     public LogViewerView()
     {
@@ -75,7 +86,7 @@ public partial class LogViewerView : UserControl, IToolView
         if (!string.IsNullOrWhiteSpace(context?.Argument))
         {
             FilePathInput.Text = context.Argument;
-            LoadFile(context.Argument);
+            _ = LoadAsync(context.Argument);
         }
 
         Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () => FilePathInput.Focus());
@@ -130,7 +141,7 @@ public partial class LogViewerView : UserControl, IToolView
         if (dialog.ShowDialog() == true)
         {
             FilePathInput.Text = dialog.FileName;
-            LoadFile(dialog.FileName);
+            _ = LoadAsync(dialog.FileName);
         }
     }
 
@@ -141,54 +152,104 @@ public partial class LogViewerView : UserControl, IToolView
             var path = FilePathInput.Text.Trim();
             if (!string.IsNullOrEmpty(path))
             {
-                LoadFile(path);
+                _ = LoadAsync(path);
             }
         }
     }
 
-    private void LoadFile(string filePath)
+    private bool IsCurrent(int generation) => !_disposed && generation == _generation;
+
+    private void CancelScan()
     {
+        var cts = _scanCts;
+        _scanCts = null;
+        if (cts is null) return;
+
+        cts.Cancel();
+        cts.Dispose();
+    }
+
+    /// <summary>
+    /// Scans the file off the UI thread and renders the last lines once. Never throws: failures
+    /// are shown in the error banner and a superseded load is dropped silently.
+    /// </summary>
+    private async Task LoadAsync(string filePath)
+    {
+        CancelScan();
+        var cts = new CancellationTokenSource();
+        _scanCts = cts;
+        var generation = ++_generation;
+
         StopTail();
         ClearErrorState();
-        DisposeCurrentFile();
-        ResetDisplay();
-
-        if (!File.Exists(filePath))
-        {
-            ShowErrorState(L("ToolLogViewErrorFileNotFound"));
-            return;
-        }
-
+        _cursor = null;
         _filePath = filePath;
+        _loading = true;
+        ResetDisplay();
+        StatsText.Text = L("ToolLogViewLoading");
+
+        var encoding = _encoding;
+        var filter = new LogFilter(_filterRegex);
+        LogScanResult result;
 
         try
         {
-            _fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            result = await Task.Run(() => LogFileScanner.ReadInitial(filePath, encoding, filter, cts.Token), cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            if (IsCurrent(generation)) FailLoad(ex);
+            return;
+        }
 
-            using var reader = new StreamReader(_fileStream, _encoding, leaveOpen: true);
-            var content = reader.ReadToEnd();
-            _lastPosition = _fileStream.Position;
+        if (!IsCurrent(generation)) return;
 
-            AppendLines(content);
-            UpdateStats();
+        try
+        {
+            _loading = false;
+            if (result.Status == LogScanStatus.FilterTimeout)
+            {
+                ResetDisplay();
+                ShowErrorState(L("ToolLogViewErrorRegexTimeout"));
+                return;
+            }
 
-            // Start tail if toggle is checked
+            _cursor = result.Cursor;
+            _autoScroll = true;
+            RenderAll(result);
+
             if (BtnTail.IsChecked == true)
             {
                 StartTail();
             }
         }
-        catch (IOException ex)
+        catch (Exception ex)
         {
-            DisposeCurrentFile();
-            ResetDisplay();
-            ShowErrorState(string.Format(L("ToolLogViewErrorOpen"), ex.Message));
+            FailLoad(ex);
         }
+    }
+
+    private void FailLoad(Exception ex)
+    {
+        _loading = false;
+        _filePath = null;
+        _cursor = null;
+        ResetDisplay();
+
+        var notFound = ex is FileNotFoundException or DirectoryNotFoundException
+            or ArgumentException or NotSupportedException;
+        ShowErrorState(notFound
+            ? L("ToolLogViewErrorFileNotFound")
+            : string.Format(L("ToolLogViewErrorOpen"), ex.Message));
     }
 
     private void OnTailChecked(object sender, RoutedEventArgs e)
     {
-        if (_fileStream is not null && _filePath is not null)
+        if (_cursor is not null && _filePath is not null)
         {
             StartTail();
         }
@@ -205,7 +266,7 @@ public partial class LogViewerView : UserControl, IToolView
 
         _autoScroll = true;
         _tailTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(TailIntervalMs) };
-        _tailTimer.Tick += (_, _) => ReadNewContent();
+        _tailTimer.Tick += OnTailTick;
         _tailTimer.Start();
 
         TailStatusText.Text = L("ToolLogViewTailActive");
@@ -220,74 +281,132 @@ public partial class LogViewerView : UserControl, IToolView
         TailStatusText.Visibility = Visibility.Collapsed;
     }
 
-    private void ReadNewContent()
+    private async void OnTailTick(object? sender, EventArgs e)
     {
-        if (_fileStream is null || _filePath is null) return;
+        var path = _filePath;
+        var cursor = _cursor;
+        if (_tailBusy || _loading || _disposed || path is null || cursor is null) return;
+
+        _tailBusy = true;
+        var generation = _generation;
+        var filter = new LogFilter(_filterRegex);
+        var token = _scanCts?.Token ?? CancellationToken.None;
 
         try
         {
-            var fileInfo = new FileInfo(_filePath);
-            var currentLength = fileInfo.Length;
+            var result = await Task.Run(() => LogFileScanner.ReadAppended(path, cursor, filter, token), token);
+            if (!IsCurrent(generation)) return;
 
-            if (currentLength == _lastPosition) return;
-
-            if (currentLength < _lastPosition)
+            if (_tailTimer is null)
             {
-                // File was truncated; re-read from start
-                _lastPosition = 0;
-                _totalLineCount = 0;
-                _displayedLineCount = 0;
-                LogDocument.Blocks.Clear();
-                UpdateViewerState();
+                // Tail was switched off while this scan ran: its cursor is spent, so resync by rescanning.
+                ReloadCurrentFile();
+                return;
             }
 
-            _fileStream.Position = _lastPosition;
-            using var reader = new StreamReader(_fileStream, _encoding, leaveOpen: true);
-            var newContent = reader.ReadToEnd();
-            _lastPosition = _fileStream.Position;
-
-            if (!string.IsNullOrEmpty(newContent))
-            {
-                AppendLines(newContent);
-                UpdateStats();
-            }
+            ApplyTailResult(result, cursor);
         }
-        catch (IOException)
+        catch (OperationCanceledException)
         {
-            // File may be temporarily locked; skip this tick
+            // A newer load superseded this tick.
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // The file may be locked or mid-rotation; the next tick retries.
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Warn($"Log viewer tail tick failed: {ex.Message}");
+        }
+        finally
+        {
+            _tailBusy = false;
         }
     }
 
-    private void AppendLines(string content)
+    private void ApplyTailResult(LogScanResult result, LogCursor previous)
     {
-        var lines = content.Split('\n');
-        _highlightBrush = TryFindResource("AccentBrush") as Brush ?? Brushes.Yellow;
-
-        foreach (var rawLine in lines)
+        if (result.Status == LogScanStatus.FilterTimeout)
         {
-            var line = rawLine.TrimEnd('\r');
-            _totalLineCount++;
-
-            if (_filterRegex is not null && !_filterRegex.IsMatch(line))
-                continue;
-
-            var para = new Paragraph { Margin = new Thickness(0), LineHeight = 1 };
-
-            if (_filterRegex is not null)
-            {
-                HighlightMatches(para, line, _filterRegex);
-            }
-            else
-            {
-                para.Inlines.Add(new Run(line));
-            }
-
-            LogDocument.Blocks.Add(para);
-            _displayedLineCount++;
+            _cursor = null;
+            StopTail();
+            ShowErrorState(L("ToolLogViewErrorRegexTimeout"));
+            return;
         }
 
-        TrimToMaxLines();
+        _cursor = result.Cursor;
+        if (result.Status == LogScanStatus.Ok && !result.Overflowed && result.Cursor!.Position == previous.Position)
+        {
+            return;
+        }
+
+        if (result.Status == LogScanStatus.Reset || result.Overflowed)
+        {
+            RenderAll(result);
+            return;
+        }
+
+        var style = ResolveStyle();
+        LogViewer.BeginChange();
+        try
+        {
+            RemoveProvisional();
+            AppendLines(result, style);
+            TrimToMaxLines();
+        }
+        finally
+        {
+            LogViewer.EndChange();
+        }
+
+        FinishRender(result);
+    }
+
+    private void RenderAll(LogScanResult result)
+    {
+        var style = ResolveStyle();
+        LogViewer.BeginChange();
+        try
+        {
+            LogDocument.Blocks.Clear();
+            _provisional = null;
+            AppendLines(result, style);
+            TrimToMaxLines();
+        }
+        finally
+        {
+            LogViewer.EndChange();
+        }
+
+        FinishRender(result);
+    }
+
+    private void AppendLines(LogScanResult result, RenderStyle style)
+    {
+        foreach (var line in result.Lines)
+        {
+            LogDocument.Blocks.Add(BuildParagraph(line, style));
+        }
+
+        if (result.PendingLine is not null)
+        {
+            _provisional = BuildParagraph(result.PendingLine, style);
+            LogDocument.Blocks.Add(_provisional);
+        }
+    }
+
+    private void RemoveProvisional()
+    {
+        if (_provisional is null) return;
+
+        LogDocument.Blocks.Remove(_provisional);
+        _provisional = null;
+    }
+
+    private void FinishRender(LogScanResult result)
+    {
         UpdateViewerState();
+        UpdateStats(result);
 
         if (_autoScroll)
         {
@@ -295,33 +414,54 @@ public partial class LogViewerView : UserControl, IToolView
         }
     }
 
-    private void HighlightMatches(Paragraph para, string line, Regex regex)
+    private RenderStyle ResolveStyle() => new(
+        TryFindResource(HighlightBrushKey) as Brush ?? Brushes.Yellow,
+        TryFindResource(HighlightForegroundBrushKey) as Brush,
+        TryFindResource(MutedBrushKey) as Brush,
+        L("ToolLogViewLineTruncated"));
+
+    private static Paragraph BuildParagraph(LogLine line, RenderStyle style)
     {
+        var para = new Paragraph { Margin = new Thickness(0), LineHeight = 1 };
         var lastIndex = 0;
-        var highlightForeground = TryFindResource("TextOnAccentBrush") as Brush;
-        foreach (Match match in regex.Matches(line))
+
+        foreach (var highlight in line.Highlights)
         {
-            if (match.Index > lastIndex)
+            if (highlight.Start > lastIndex)
             {
-                para.Inlines.Add(new Run(line[lastIndex..match.Index]));
+                para.Inlines.Add(new Run(line.Text[lastIndex..highlight.Start]));
             }
 
-            var highlighted = new Run(match.Value)
+            var run = new Run(line.Text.Substring(highlight.Start, highlight.Length))
             {
-                Background = _highlightBrush
+                Background = style.Highlight
             };
-            if (highlightForeground is not null)
+            if (style.HighlightForeground is not null)
             {
-                highlighted.Foreground = highlightForeground;
+                run.Foreground = style.HighlightForeground;
             }
-            para.Inlines.Add(highlighted);
-            lastIndex = match.Index + match.Length;
+
+            para.Inlines.Add(run);
+            lastIndex = highlight.Start + highlight.Length;
         }
 
-        if (lastIndex < line.Length)
+        if (lastIndex < line.Text.Length || para.Inlines.Count == 0)
         {
-            para.Inlines.Add(new Run(line[lastIndex..]));
+            para.Inlines.Add(new Run(line.Text[lastIndex..]));
         }
+
+        if (line.Truncated)
+        {
+            var marker = new Run(style.TruncatedMarker);
+            if (style.Muted is not null)
+            {
+                marker.Foreground = style.Muted;
+            }
+
+            para.Inlines.Add(marker);
+        }
+
+        return para;
     }
 
     private void TrimToMaxLines()
@@ -341,7 +481,15 @@ public partial class LogViewerView : UserControl, IToolView
     {
         FilterInput.Text = string.Empty;
         _filterRegex = null;
-        ReloadWithFilter();
+        ReloadCurrentFile();
+    }
+
+    private void OnCaseSensitiveChanged(object sender, RoutedEventArgs e)
+    {
+        if (_filterRegex is not null)
+        {
+            ApplyFilter();
+        }
     }
 
     private void OnFilterKeyDown(object sender, KeyEventArgs e)
@@ -364,11 +512,11 @@ public partial class LogViewerView : UserControl, IToolView
         {
             try
             {
-                var options = RegexOptions.Compiled;
+                var options = RegexOptions.Compiled | RegexOptions.CultureInvariant;
                 if (ChkCaseSensitive.IsChecked != true)
                     options |= RegexOptions.IgnoreCase;
 
-                _filterRegex = new Regex(pattern, options, TimeSpan.FromSeconds(1));
+                _filterRegex = new Regex(pattern, options, RegexEngine.DefaultTimeout);
             }
             catch (RegexParseException)
             {
@@ -379,35 +527,17 @@ public partial class LogViewerView : UserControl, IToolView
             }
         }
 
-        ReloadWithFilter();
+        ReloadCurrentFile();
     }
 
     /// <summary>
-    /// Reloads the file content with the current filter applied.
+    /// Rescans the open file with the current filter.
     /// </summary>
-    private void ReloadWithFilter()
+    private void ReloadCurrentFile()
     {
-        if (_filePath is null || _fileStream is null) return;
-
-        ClearErrorState();
-        _displayedLineCount = 0;
-        _totalLineCount = 0;
-        LogDocument.Blocks.Clear();
-
-        try
+        if (_filePath is not null)
         {
-            _fileStream.Position = 0;
-            using var reader = new StreamReader(_fileStream, _encoding, leaveOpen: true);
-            var content = reader.ReadToEnd();
-            _lastPosition = _fileStream.Position;
-
-            AppendLines(content);
-            UpdateStats();
-        }
-        catch (IOException ex)
-        {
-            ShowErrorState(string.Format(L("ToolLogViewErrorOpen"), ex.Message));
-            UpdateViewerState();
+            _ = LoadAsync(_filePath);
         }
     }
 
@@ -424,31 +554,21 @@ public partial class LogViewerView : UserControl, IToolView
         // Reload with new encoding if a file is open
         if (_filePath is not null)
         {
-            LoadFile(_filePath);
+            _ = LoadAsync(_filePath);
         }
     }
 
-    private void UpdateStats()
+    private void UpdateStats(LogScanResult result)
     {
-        if (_filePath is null) return;
+        var sizeKb = result.FileLength / BytesPerKilobyte;
+        var lastWrite = result.LastWriteUtc.ToLocalTime();
 
-        try
-        {
-            var fileInfo = new FileInfo(_filePath);
-            var sizeKb = fileInfo.Length / 1024.0;
-            var lastWrite = fileInfo.LastWriteTime;
-
-            StatsText.Text = string.Format(
-                L("ToolLogViewStats"),
-                _displayedLineCount,
-                _totalLineCount,
-                sizeKb.ToString("F1"),
-                lastWrite.ToString("yyyy-MM-dd HH:mm:ss"));
-        }
-        catch (IOException)
-        {
-            // File info may be temporarily unavailable
-        }
+        StatsText.Text = string.Format(
+            L("ToolLogViewStats"),
+            LogDocument.Blocks.Count - (_provisional is null ? 0 : 1),
+            result.TotalLines,
+            sizeKb.ToString("F1"),
+            lastWrite.ToString("yyyy-MM-dd HH:mm:ss"));
     }
 
     private void OnCopyLogClick(object sender, RoutedEventArgs e)
@@ -497,19 +617,10 @@ public partial class LogViewerView : UserControl, IToolView
 
     private void ResetDisplay()
     {
-        _totalLineCount = 0;
-        _displayedLineCount = 0;
-        _lastPosition = 0;
         LogDocument.Blocks.Clear();
+        _provisional = null;
         StatsText.Text = string.Empty;
         UpdateViewerState();
-    }
-
-    private void DisposeCurrentFile()
-    {
-        _fileStream?.Dispose();
-        _fileStream = null;
-        _filePath = null;
     }
 
     private void UpdateViewerState()
@@ -517,9 +628,11 @@ public partial class LogViewerView : UserControl, IToolView
         var hasContent = LogDocument.Blocks.Count > 0;
         ResultsPanel.Visibility = hasContent ? Visibility.Visible : Visibility.Collapsed;
         EmptyStatePanel.Visibility = hasContent ? Visibility.Collapsed : Visibility.Visible;
-        TxtEmptyState.Text = _filterRegex is not null && !hasContent && _filePath is not null
-            ? L("ToolLogViewNoMatches")
-            : L("ToolLogViewEmptyState");
+        TxtEmptyState.Text = _loading
+            ? L("ToolLogViewLoading")
+            : _filterRegex is not null && !hasContent && _filePath is not null
+                ? L("ToolLogViewNoMatches")
+                : L("ToolLogViewEmptyState");
     }
 
     private string L(string key) => _localizer?[key] ?? key;
@@ -537,9 +650,10 @@ public partial class LogViewerView : UserControl, IToolView
     public void Dispose()
     {
         if (_localizer is not null) _localizer.LocaleChanged -= OnLocaleChanged;
+        _disposed = true;
+        _generation++;
+        CancelScan();
         StopTail();
-        _fileStream?.Dispose();
-        _fileStream = null;
         GC.SuppressFinalize(this);
     }
 }

@@ -4584,6 +4584,9 @@
   "ToolLogViewErrorOpen": "Impossible d'ouvrir le fichier : {0}",
   "ToolLogViewErrorInvalidRegex": "Expression r\u00e9guli\u00e8re invalide.",
   "ToolLogViewNoMatches": "Aucune ligne de log ne correspond au filtre actuel",
+  "ToolLogViewLoading": "Chargement...",
+  "ToolLogViewErrorRegexTimeout": "Le filtre a pris trop de temps et a \u00e9t\u00e9 arr\u00eat\u00e9. Simplifiez l'expression.",
+  "ToolLogViewLineTruncated": " [ligne tronqu\u00e9e]",
 
   "PaletteToolHosts": "\u00c9diteur du fichier hosts",
   "PaletteToolSshConfig": "G\u00e9n\u00e9rateur de config SSH",
