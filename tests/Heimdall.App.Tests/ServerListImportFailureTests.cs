@@ -40,6 +40,7 @@ namespace Heimdall.App.Tests;
 public sealed class ServerListImportFailureTests
 {
     private const string ImportFailedKey = "StatusImportFailed";
+    private const string ReloadFailedKey = "ErrorImportReloadFailed";
     private const string FailureReason = "the store is unreadable";
 
     public static TheoryData<string, string> Failures()
@@ -47,7 +48,21 @@ public sealed class ServerListImportFailureTests
         TheoryData<string, string> data = [];
         foreach (string import in new[] { "rdp", "openssh", "putty" })
         {
-            foreach (string exception in new[] { "io", "json", "unauthorized", "invalid" })
+            foreach (string exception in new[] { "io", "json", "unauthorized" })
+            {
+                data.Add(import, exception);
+            }
+        }
+
+        return data;
+    }
+
+    public static TheoryData<string, string> StageFailures()
+    {
+        TheoryData<string, string> data = [];
+        foreach (string import in new[] { "rdp", "openssh", "putty" })
+        {
+            foreach (string exception in new[] { "io", "json", "unauthorized", "security", "validation", "schema" })
             {
                 data.Add(import, exception);
             }
@@ -58,7 +73,35 @@ public sealed class ServerListImportFailureTests
 
     [Theory]
     [MemberData(nameof(Failures))]
-    public async Task Import_WhenTheStoreCannotBeReloaded_ShowsTheErrorAndDoesNotThrow(string import, string exception)
+    public async Task Import_WhenTheStoreCannotBeReloaded_ReportsTheReloadFailureAndDoesNotThrow(string import, string exception)
+    {
+        (RecordingDialogProxy dialog, LocalizationManager localizer) =
+            await RunAsync(import, reloadFailure: CreateException(exception), stageFailure: null);
+
+        string message = Assert.Single(dialog.Errors);
+        Assert.Equal(string.Format(localizer[ReloadFailedKey], FailureReason), message);
+        Assert.Empty(dialog.Infos);
+        Assert.Empty(dialog.Warnings);
+    }
+
+    [Theory]
+    [MemberData(nameof(StageFailures))]
+    public async Task Import_WhenTheFlowFailsBeforeTheReload_ReportsAnImportFailureAndDoesNotThrow(string import, string exception)
+    {
+        Exception failure = CreateException(exception);
+        (RecordingDialogProxy dialog, LocalizationManager localizer) =
+            await RunAsync(import, reloadFailure: null, stageFailure: failure);
+
+        string message = Assert.Single(dialog.Errors);
+        Assert.Equal(string.Format(localizer[ImportFailedKey], failure.Message), message);
+        Assert.Empty(dialog.Infos);
+        Assert.Empty(dialog.Warnings);
+    }
+
+    private static async Task<(RecordingDialogProxy Dialog, LocalizationManager Localizer)> RunAsync(
+        string import,
+        Exception? reloadFailure,
+        Exception? stageFailure)
     {
         string root = Path.Combine(Path.GetTempPath(), "heimdall-import-failure", Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
@@ -67,9 +110,10 @@ public sealed class ServerListImportFailureTests
             LocalizationManager localizer = new();
             await localizer.LoadAsync(Path.Combine(AppContext.BaseDirectory, "locales"), "en");
 
-            IConfigManager configManager = ThrowingConfigProxy.Create(CreateException(exception));
+            IConfigManager configManager = ThrowingConfigProxy.Create(reloadFailure);
             IDialogService dialogService = DispatchProxy.Create<IDialogService, RecordingDialogProxy>();
             RecordingDialogProxy dialog = (RecordingDialogProxy)(object)dialogService;
+            dialog.ImportDialogFailure = stageFailure;
 
             using ConnectionService connectionService = new(
                 configManager,
@@ -89,7 +133,7 @@ public sealed class ServerListImportFailureTests
                 null!,
                 new PuttySessionImporter(new FixedPuttyRegistrySource(puttySessions), configManager),
                 new KnownHostsImporter(configManager, new HostKeyStore()),
-                profileImportService: new ChangedProfileImportService());
+                profileImportService: new ChangedProfileImportService(stageFailure));
 
             string sshConfig = Path.Combine(root, "config");
             await File.WriteAllTextAsync(sshConfig, "Host alpha\n  HostName alpha.example\n");
@@ -102,8 +146,7 @@ public sealed class ServerListImportFailureTests
             };
             await task;
 
-            string message = Assert.Single(dialog.Errors);
-            Assert.Equal(string.Format(localizer[ImportFailedKey], FailureReason), message);
+            return (dialog, localizer);
         }
         finally
         {
@@ -116,14 +159,17 @@ public sealed class ServerListImportFailureTests
         "io" => new IOException(FailureReason),
         "json" => new JsonException(FailureReason),
         "unauthorized" => new UnauthorizedAccessException(FailureReason),
-        _ => new InvalidOperationException(FailureReason),
+        "security" => new System.Security.SecurityException(FailureReason),
+        "validation" => new ConfigurationValidationException("servers.json", [FailureReason]),
+        "schema" => new ConfigurationSchemaVersionException("servers.json", "servers.json", 9, 1),
+        _ => throw new ArgumentOutOfRangeException(nameof(kind)),
     };
 
     public class ThrowingConfigProxy : DispatchProxy
     {
-        private Exception _failure = new InvalidOperationException();
+        private Exception? _failure;
 
-        public static IConfigManager Create(Exception failure)
+        public static IConfigManager Create(Exception? failure)
         {
             IConfigManager proxy = Create<IConfigManager, ThrowingConfigProxy>();
             ((ThrowingConfigProxy)(object)proxy)._failure = failure;
@@ -133,7 +179,7 @@ public sealed class ServerListImportFailureTests
         protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
         {
             ArgumentNullException.ThrowIfNull(targetMethod);
-            if (targetMethod.Name is "LoadSettingsAsync" or "LoadServersAsync")
+            if (_failure is not null && targetMethod.Name is "LoadSettingsAsync" or "LoadServersAsync")
             {
                 Type result = targetMethod.ReturnType.GetGenericArguments()[0];
                 return typeof(ServerListImportFailureTests)
@@ -150,6 +196,12 @@ public sealed class ServerListImportFailureTests
     {
         public List<string> Errors { get; } = [];
 
+        public List<string> Infos { get; } = [];
+
+        public List<string> Warnings { get; } = [];
+
+        public Exception? ImportDialogFailure { get; set; }
+
         protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
         {
             ArgumentNullException.ThrowIfNull(targetMethod);
@@ -158,8 +210,19 @@ public sealed class ServerListImportFailureTests
                 case "ShowError":
                     Errors.Add((string)args![1]!);
                     return null;
+                case "ShowInfo":
+                    Infos.Add((string)args![1]!);
+                    return null;
+                case "ShowWarning":
+                    Warnings.Add((string)args![1]!);
+                    return null;
                 case "ShowImportOpenSshConfigAsync":
                 case "ShowImportPuttySessionsAsync":
+                    if (ImportDialogFailure is not null)
+                    {
+                        return Task.FromException<ImportOutcome?>(ImportDialogFailure);
+                    }
+
                     return Task.FromResult<ImportOutcome?>(new ImportOutcome(1, 0));
                 default:
                     return DefaultFor(targetMethod.ReturnType);
@@ -199,13 +262,15 @@ public sealed class ServerListImportFailureTests
         return returnType.IsValueType ? Activator.CreateInstance(returnType) : null;
     }
 
-    private sealed class ChangedProfileImportService : IProfileImportService
+    private sealed class ChangedProfileImportService(Exception? failure) : IProfileImportService
     {
         public Task<ProfileImportResult> ImportFromPathAsync(string path, CancellationToken ct = default) =>
             ImportFromPathsAsync([path], ct);
 
         public Task<ProfileImportResult> ImportFromPathsAsync(IEnumerable<string> paths, CancellationToken ct = default) =>
-            Task.FromResult(new ProfileImportResult { HasChanges = true });
+            failure is null
+                ? Task.FromResult(new ProfileImportResult { HasChanges = true })
+                : Task.FromException<ProfileImportResult>(failure);
     }
 
     private sealed class FixedPuttyRegistrySource(RawPuttySession[] sessions) : IPuttySessionRegistrySource
