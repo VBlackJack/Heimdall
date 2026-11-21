@@ -63,7 +63,7 @@ public class PingStatsEngineTests
     [InlineData("--help")]
     [InlineData("-c 1")]
     [InlineData("a b")]
-    public void ValidateInputs_HostStartingWithDash_ReturnsInvalidHost(string host)
+    public void ValidateInputs_OptionLikeOrSpacedHost_IsRefused(string host)
     {
         var (inputs, errorKey) = PingStatsEngine.ValidateInputs(host, "1000", "");
         Assert.Null(inputs);

@@ -15,6 +15,7 @@
  */
 
 using System.Collections.Frozen;
+using System.Globalization;
 using System.Net;
 using System.Text.RegularExpressions;
 
@@ -128,7 +129,7 @@ public static class InputValidator
     /// <param name="value">The value to validate.</param>
     /// <param name="patternName">
     /// Name of the pattern: SshGateway, SshUser, Username, Hostname, IPv4, Address,
-    /// TunnelTarget, SnmpOid, LocalPort, RemotePort, Port.
+    /// TunnelTarget, SnmpOid, SnmpNumericOid, DiagnosticHost, LocalPort, RemotePort, Port.
     /// </param>
     /// <returns>True if the value passes validation; false otherwise.</returns>
     public static bool Validate(string? value, string patternName)
@@ -291,7 +292,23 @@ public static class InputValidator
             return false;
 
         string trimmed = host.Trim();
-        return IPAddress.TryParse(trimmed, out _) || Validate(trimmed, DiagnosticHostPatternName);
+        if (IPAddress.TryParse(trimmed, out _) || Validate(trimmed, DiagnosticHostPatternName))
+            return true;
+
+        // Internationalized names (bücher.de) are valid once converted to ASCII. The raw value is
+        // what reaches the command, so it must not start with "-" itself: the conversion could
+        // otherwise turn a leading hyphen into an "xn--" prefix that passes.
+        if (trimmed[0] == '-')
+            return false;
+
+        try
+        {
+            return Validate(new IdnMapping().GetAscii(trimmed), DiagnosticHostPatternName);
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
     }
 
     /// <summary>

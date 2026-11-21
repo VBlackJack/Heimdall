@@ -195,7 +195,7 @@ public sealed class PingService : IPingService
         EnsureValidTunnelHost(host);
 
         var timeoutSec = Math.Max(1, timeoutMs / 1000);
-        var escapedHost = InputValidator.EscapeShellArg(host);
+        var escapedHost = InputValidator.EscapeShellArg(host.Trim());
         var command = $"ping -c 1 -W {timeoutSec} {escapedHost}";
 
         try

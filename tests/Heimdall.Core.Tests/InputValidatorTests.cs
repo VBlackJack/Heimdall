@@ -53,6 +53,8 @@ public class InputValidatorTests
     [InlineData("fe80::1%12", true)]
     [InlineData("::1", true)]
     [InlineData("10.0.0.1", true)]
+    [InlineData("bücher.de", true)]
+    [InlineData("-bücher.de", false)]
     [InlineData("-f", false)]
     [InlineData("--help", false)]
     [InlineData("a b", false)]
