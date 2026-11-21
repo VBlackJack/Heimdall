@@ -52,6 +52,9 @@ public partial class EmbeddedWebView : UserControl, IDisposable, ISessionPaneOwn
     private bool _localeChangeSubscribed;
     private bool _connectedRaised;
     private bool _disposed;
+    private IDisposable? _lockdown;
+    private Task? _initTask;
+    private bool _certificateRemovedSubscribed;
 
     /// <summary>Raised when the console's first page has loaded. Parameter: ServerId.</summary>
     public event Action<string>? SessionConnected;
@@ -138,7 +141,7 @@ public partial class EmbeddedWebView : UserControl, IDisposable, ISessionPaneOwn
 
         ApplyLocalization();
 
-        await InitializeWebViewAsync();
+        await StartInitializationAsync();
     }
 
     private void ApplyLocalization()
@@ -179,6 +182,22 @@ public partial class EmbeddedWebView : UserControl, IDisposable, ISessionPaneOwn
         }
     }
 
+    /// <summary>
+    /// Starts the browser initialisation unless one is already running. Reload is the way back
+    /// from a failed start, so a finished attempt never blocks the next one; only an attempt still
+    /// in flight does, because two overlapping starts would subscribe every handler twice.
+    /// </summary>
+    private Task StartInitializationAsync()
+    {
+        if (_initTask is { IsCompleted: false })
+        {
+            return _initTask;
+        }
+
+        _initTask = InitializeWebViewAsync();
+        return _initTask;
+    }
+
     private async Task InitializeWebViewAsync()
     {
         try
@@ -202,22 +221,20 @@ public partial class EmbeddedWebView : UserControl, IDisposable, ISessionPaneOwn
             CoreWebView2 core = ConsoleWebView.CoreWebView2;
 
             // A console is a web application the user operates: copy and paste, find and zoom
-            // stay. Developer tools stay off, as in every embedded view.
-            core.Settings.AreDevToolsEnabled = false;
-            core.Settings.IsPasswordAutosaveEnabled = false;
-            core.Settings.IsGeneralAutofillEnabled = false;
+            // stay. Developer tools, autofill and external protocol launches are shut by the
+            // shared lockdown, as in every embedded view; a popup opens in this tab.
+            _lockdown = WebView2Lockdown.Apply(core, OnNewWindow);
 
             core.NavigationStarting += OnNavigationStarting;
             core.FrameNavigationStarting += OnFrameNavigationStarting;
-            core.NewWindowRequested += OnNewWindowRequested;
-            core.LaunchingExternalUriScheme += OnLaunchingExternalUriScheme;
             core.NavigationCompleted += OnNavigationCompleted;
             core.HistoryChanged += OnHistoryChanged;
             core.ServerCertificateErrorDetected += OnServerCertificateErrorDetected;
             core.BasicAuthenticationRequested += OnBasicAuthenticationRequested;
-            if (CertificateTrust is not null)
+            if (CertificateTrust is not null && !_certificateRemovedSubscribed)
             {
                 CertificateTrust.CertificateRemoved += OnCertificateRemoved;
+                _certificateRemovedSubscribed = true;
             }
 
             // The zoom the console was last left at, then every change the user makes to it.
@@ -258,9 +275,8 @@ public partial class EmbeddedWebView : UserControl, IDisposable, ISessionPaneOwn
     /// none of this view's rules (navigation filter, certificate pins, developer tools off) while
     /// writing into the shared profile.
     /// </summary>
-    private void OnNewWindowRequested(object? sender, CoreWebView2NewWindowRequestedEventArgs e)
+    private void OnNewWindow(CoreWebView2NewWindowRequestedEventArgs e)
     {
-        e.Handled = true;
         if (WebConsolePolicy.IsNavigable(e.Uri) && ConsoleWebView.CoreWebView2 is { } core)
         {
             core.Navigate(e.Uri);
@@ -268,13 +284,6 @@ public partial class EmbeddedWebView : UserControl, IDisposable, ISessionPaneOwn
         }
 
         FileLogger.Warn("Web console blocked a popup to a non-web address.");
-    }
-
-    /// <summary>A page must not hand the machine a custom protocol (ms-settings:, search-ms:...).</summary>
-    private void OnLaunchingExternalUriScheme(object? sender, CoreWebView2LaunchingExternalUriSchemeEventArgs e)
-    {
-        e.Cancel = true;
-        FileLogger.Warn("Web console blocked an external protocol launch.");
     }
 
     private void OnNavigationStarting(object? sender, CoreWebView2NavigationStartingEventArgs e)
@@ -557,7 +566,7 @@ public partial class EmbeddedWebView : UserControl, IDisposable, ISessionPaneOwn
 
         if (ConsoleWebView.CoreWebView2 is not { } core)
         {
-            _ = InitializeWebViewAsync();
+            _ = StartInitializationAsync();
             return;
         }
 
@@ -701,7 +710,11 @@ public partial class EmbeddedWebView : UserControl, IDisposable, ISessionPaneOwn
         if (CertificateTrust is not null)
         {
             CertificateTrust.CertificateRemoved -= OnCertificateRemoved;
+            _certificateRemovedSubscribed = false;
         }
+
+        _lockdown?.Dispose();
+        _lockdown = null;
 
         ConsoleWebView.PreviewKeyDown -= OnConsoleWebViewPreviewKeyDown;
         ConsoleWebView.ZoomFactorChanged -= OnZoomFactorChanged;
@@ -710,8 +723,6 @@ public partial class EmbeddedWebView : UserControl, IDisposable, ISessionPaneOwn
         {
             core.NavigationStarting -= OnNavigationStarting;
             core.FrameNavigationStarting -= OnFrameNavigationStarting;
-            core.NewWindowRequested -= OnNewWindowRequested;
-            core.LaunchingExternalUriScheme -= OnLaunchingExternalUriScheme;
             core.NavigationCompleted -= OnNavigationCompleted;
             core.HistoryChanged -= OnHistoryChanged;
             core.ServerCertificateErrorDetected -= OnServerCertificateErrorDetected;

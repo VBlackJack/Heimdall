@@ -316,6 +316,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     private readonly TerminalBufferReadCoordinator _bufferReads = new();
     private bool _healthPanelVisible;
     private bool _disposed;
+    private IDisposable? _lockdown;
     private bool _webViewInitializationStarted;
     private bool _webViewInitialized;
     private bool _terminalPageNavigationPending;
@@ -745,6 +746,9 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             _localizer.LocaleChanged -= OnLocaleChanged;
             _localeChangeSubscribed = false;
         }
+
+        _lockdown?.Dispose();
+        _lockdown = null;
 
         if (_webViewInitialized && TryGetCoreWebView2(out CoreWebView2? core, allowDuringDispose: true))
         {
@@ -1512,6 +1516,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
                 return;
             }
 
+            _lockdown = Services.WebView2Lockdown.Apply(core, onNewWindow: null);
             core.Settings.AreDefaultContextMenusEnabled = false;
             core.Settings.AreDevToolsEnabled = false;
             core.Settings.AreBrowserAcceleratorKeysEnabled = false;

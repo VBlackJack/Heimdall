@@ -42,6 +42,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
     private bool _localeChangeSubscribed;
     private bool _webViewReady;
     private bool _disposed;
+    private IDisposable? _lockdown;
 
     // Server-supplied desktop name, captured from the "desktop-name:" web message; used as the
     // event-log title when present, falling back to the host otherwise.
@@ -354,10 +355,13 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
             }
 
             var env = await Services.WebView2Helper.CreateEnvironmentAsync("VNC");
+            if (_disposed) return;
 
             await VncWebView.EnsureCoreWebView2Async(env);
+            if (_disposed) return;
 
             var core = VncWebView.CoreWebView2;
+            _lockdown = Services.WebView2Lockdown.Apply(core, onNewWindow: null);
             core.Settings.AreDefaultContextMenusEnabled = false;
             core.Settings.AreDevToolsEnabled = false;
             core.Settings.AreBrowserAcceleratorKeysEnabled = false;
@@ -383,6 +387,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
             // The page's words must exist before its first script runs: it shows the loading
             // label at once and reports a failure of its own library before any connect message.
             await core.AddScriptToExecuteOnDocumentCreatedAsync(VncPageText.BuildBootstrapScript(PageTextOf));
+            if (_disposed) return;
 
             // Load the VNC HTML page via virtual host mapping
             var htmlPath = Path.Combine(AppContext.BaseDirectory, "Assets", "vnc.html");
@@ -402,6 +407,8 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
         }
         catch (Exception ex)
         {
+            if (_disposed) return;
+
             ShowFallback(ex.Message);
             if (_session?.ServerId is not null)
             {
@@ -412,6 +419,8 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
 
     private void OnWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
     {
+        if (_disposed) return;
+
         var activeDocument = VncWebView.CoreWebView2?.Source;
         if (!ShouldAcceptWebMessage(e.Source, activeDocument))
         {
@@ -634,6 +643,8 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
     /// <summary>Shows why the attempt ended, on the header and over the pane.</summary>
     private void EndAttempt(string text, bool offerEntry)
     {
+        if (_disposed) return;
+
         Dispatcher.Invoke(() =>
         {
             _offerPasswordEntry = offerEntry;
@@ -1088,6 +1099,20 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
             // render. Mirrors ShowFallback().
             VncWebView.Visibility = Visibility.Collapsed;
         });
+
+        // The overlay itself takes the focus, not a button: a Space or Enter typed out of habit
+        // as the session drops must not trigger Reconnect.
+        Dispatcher.BeginInvoke(
+            () =>
+            {
+                if (_disposed || ReconnectOverlay.Visibility != Visibility.Visible)
+                {
+                    return;
+                }
+
+                ReconnectOverlay.Focus();
+            },
+            System.Windows.Threading.DispatcherPriority.Input);
     }
 
     /// <summary>Raised to request a reconnect. Parameter: ServerId.</summary>
@@ -1139,6 +1164,9 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
             _localizer.LocaleChanged -= OnLocaleChanged;
             _localeChangeSubscribed = false;
         }
+
+        _lockdown?.Dispose();
+        _lockdown = null;
 
         if (VncWebView.CoreWebView2 is not null)
         {

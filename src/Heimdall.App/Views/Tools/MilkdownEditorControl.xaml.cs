@@ -44,6 +44,7 @@ public partial class MilkdownEditorControl : UserControl, IDisposable
     private bool _initialized;
     private bool _editorReady;
     private bool _disposed;
+    private IDisposable? _lockdown;
     private string? _pendingContent;
     private bool? _pendingReadOnly;
 
@@ -124,6 +125,7 @@ public partial class MilkdownEditorControl : UserControl, IDisposable
             Core.Logging.FileLogger.Info("Milkdown WebView2 host initialized");
 
             var core = EditorWebView.CoreWebView2;
+            _lockdown = WebView2Lockdown.Apply(core, OnNewWindow);
             core.Settings.AreDefaultContextMenusEnabled = false;
             core.Settings.AreDevToolsEnabled = false;
             core.Settings.IsStatusBarEnabled = false;
@@ -132,8 +134,6 @@ public partial class MilkdownEditorControl : UserControl, IDisposable
             // Block external navigation
             core.NavigationStarting -= OnNavigationStarting;
             core.NavigationStarting += OnNavigationStarting;
-            core.NewWindowRequested -= OnNewWindowRequested;
-            core.NewWindowRequested += OnNewWindowRequested;
             core.WebMessageReceived -= OnWebMessageReceived;
             core.WebMessageReceived += OnWebMessageReceived;
 
@@ -248,10 +248,8 @@ public partial class MilkdownEditorControl : UserControl, IDisposable
         }
     }
 
-    private void OnNewWindowRequested(object? sender, CoreWebView2NewWindowRequestedEventArgs args)
+    private void OnNewWindow(CoreWebView2NewWindowRequestedEventArgs args)
     {
-        args.Handled = true;
-
         if (args.IsUserInitiated)
         {
             _ = TryOpenExternalLink(args.Uri, _browserLauncher);
@@ -422,10 +420,12 @@ public partial class MilkdownEditorControl : UserControl, IDisposable
             _themeService = null;
         }
 
+        _lockdown?.Dispose();
+        _lockdown = null;
+
         if (EditorWebView.CoreWebView2 is { } core)
         {
             core.NavigationStarting -= OnNavigationStarting;
-            core.NewWindowRequested -= OnNewWindowRequested;
             core.WebMessageReceived -= OnWebMessageReceived;
         }
 

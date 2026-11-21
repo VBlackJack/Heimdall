@@ -63,6 +63,7 @@ public partial class DiagramEditorView : UserControl, IToolView, IRecoverableUns
     private Action<SessionLaunchRequest>? _openSession;
     private WebViewDocumentPolicy? _hostPolicy;
     private bool _disposed;
+    private IDisposable? _lockdown;
     private bool _editorReady;
 
     /// <summary>Set while a save is waiting for the editor to report its content.</summary>
@@ -132,6 +133,7 @@ public partial class DiagramEditorView : UserControl, IToolView, IRecoverableUns
 
             var core = DiagramWebView.CoreWebView2;
             ConfigureWebViewSettings(core);
+            _lockdown = WebView2Lockdown.Apply(core, OnNewWindow);
 
             // Virtual host mapping for local draw.io files
             core.SetVirtualHostNameToFolderMapping(
@@ -144,8 +146,6 @@ public partial class DiagramEditorView : UserControl, IToolView, IRecoverableUns
             core.NavigationStarting += OnNavigationStarting;
             core.FrameNavigationStarting -= OnFrameNavigationStarting;
             core.FrameNavigationStarting += OnFrameNavigationStarting;
-            core.NewWindowRequested -= OnNewWindowRequested;
-            core.NewWindowRequested += OnNewWindowRequested;
 
             core.Navigate(hostUri);
         }
@@ -206,10 +206,8 @@ public partial class DiagramEditorView : UserControl, IToolView, IRecoverableUns
         }
     }
 
-    private void OnNewWindowRequested(object? sender, CoreWebView2NewWindowRequestedEventArgs args)
+    private void OnNewWindow(CoreWebView2NewWindowRequestedEventArgs args)
     {
-        args.Handled = true;
-
         if (args.IsUserInitiated)
         {
             OpenExternalLink(args.Uri);
@@ -982,6 +980,9 @@ public partial class DiagramEditorView : UserControl, IToolView, IRecoverableUns
 
         if (_localizer is not null) _localizer.LocaleChanged -= OnLocaleChanged;
 
+        _lockdown?.Dispose();
+        _lockdown = null;
+
         try
         {
             if (DiagramWebView.CoreWebView2 is not null)
@@ -989,7 +990,6 @@ public partial class DiagramEditorView : UserControl, IToolView, IRecoverableUns
                 DiagramWebView.CoreWebView2.WebMessageReceived -= OnWebMessageReceived;
                 DiagramWebView.CoreWebView2.NavigationStarting -= OnNavigationStarting;
                 DiagramWebView.CoreWebView2.FrameNavigationStarting -= OnFrameNavigationStarting;
-                DiagramWebView.CoreWebView2.NewWindowRequested -= OnNewWindowRequested;
             }
             DiagramWebView.Dispose();
         }
