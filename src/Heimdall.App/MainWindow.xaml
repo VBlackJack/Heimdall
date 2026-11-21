@@ -4133,6 +4133,17 @@
                                         <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[SftpBrowserEnabled]}"/>
                                         <CheckBox x:Name="Mw_SettingsAutoOpenSftp" Content="{loc:Translate SettingsLabelAutoOpenSftp}" IsChecked="{Binding Settings.SftpAutoOpenOnSsh}" IsEnabled="{Binding Settings.SftpBrowserEnabled}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,8,0,0"/>
                                         <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[SftpAutoOpenOnSsh]}"/>
+                                        <StackPanel Style="{StaticResource SettingsDependentPanelStyle}"
+                                                    IsEnabled="{Binding Settings.IsSftpCompanionWidthEditable}"
+                                                    Margin="{StaticResource SettingsFieldGap}">
+                                            <TextBlock x:Name="Mw_SettingsSftpCompanionWidthLabel" Text="{loc:Translate SettingsLabelSftpCompanionWidth}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBox Text="{Binding Settings.SftpCompanionWidthPercentText, UpdateSourceTrigger=PropertyChanged}" Width="{StaticResource SettingsNumericFieldWidth}" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsSftpCompanionWidthLabel}"/>
+                                                <TextBlock Text="{loc:Translate SettingsUnitPercent}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
+                                            </StackPanel>
+                                            <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[SftpCompanionWidthPercent]}"/>
+                                            <TextBlock x:Name="Mw_SettingsSftpCompanionWidthHint" Text="{loc:Translate SettingsSftpCompanionWidthHint}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                        </StackPanel>
                                         <CheckBox x:Name="Mw_SettingsSftpFollowSshDirectory" Content="{loc:Translate SettingsLabelSftpFollowSshDirectory}" IsChecked="{Binding Settings.SftpFollowSshDirectory}" IsEnabled="{Binding Settings.SftpBrowserEnabled}" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,8,0,0" AutomationProperties.Name="{loc:Translate SettingsLabelSftpFollowSshDirectory}"/>
                                         <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[SftpFollowSshDirectory]}"/>
                                         <TextBlock x:Name="Mw_SettingsSftpSudoFallbackLabel" Text="{loc:Translate SettingsLabelSftpSudoFallback}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,12,0,4"/>

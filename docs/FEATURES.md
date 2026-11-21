@@ -102,7 +102,7 @@ The complete catalogue of what Heimdall does, protocol by protocol. If you are l
 
 ### SFTP Browser
 - Embedded file browser panel with directory tree and file list
-- **Auto-open companion**: opens automatically alongside an SSH session as a vertical split (gated by a setting). Reconnecting the SFTP pane is pane-scoped, so the sibling SSH terminal and its scrollback are preserved; an SSH keepalive keeps idle SFTP sessions alive
+- **Auto-open companion**: opens automatically alongside an SSH session as a vertical split (gated by a setting) whose SFTP pane takes a configurable share of the width (1/3 by default, so the terminal keeps 2/3; range 25 to 80 percent; applies to new sessions). Reconnecting the SFTP pane is pane-scoped, so the sibling SSH terminal and its scrollback are preserved; an SSH keepalive keeps idle SFTP sessions alive
 - **Follow the SSH directory** (opt-in): the companion can track the SSH terminal's current working directory via the OSC 7 escape sequence, with a per-pane toggle (best-effort; inert on shells that do not emit OSC 7)
 - Dual edit modes: integrated AvalonEdit editor OR external editor with auto-upload on save (transient upload failures are retried; a refusal no retry can change is reported once and tried again at the next save). The external editor set in Settings is used for remote files too, and a shell interpreter is refused as an editor. Closing a pane while a file is open in an external editor asks first, and the staged copy is kept as long as that editor runs
 - The inline editor opens a file that is not valid UTF-8 as Latin-1 and says so; Ctrl+S saves, Ctrl+W closes; the local editor pane asks before closing on unsaved text
@@ -320,7 +320,7 @@ All tools open as session tabs (split with any session or tool, detach, reorder)
 - Pane-scoped failure disclosure for SSH and RDP with structured stage/code/detail diagnostics
 - Loading overlay with spinner during pane connection
 - **Minimum pane size enforcement**: 120×80px prevents splitter from collapsing panes to unusable size
-- **Double-click splitter** resets ratio to 50/50; hover border on panes for better active pane feedback
+- **Double-click splitter** resets the ratio to the split the container opened with (50/50 for a user split, the configured share for the SFTP companion); hover border on panes for better active pane feedback
 - **Dynamic splitter cursor**: SizeNS for horizontal splits, SizeWE for vertical (updates on orientation toggle)
 - Splitter ratio remembered per pane across tab switches; restored on merge from split layout history
 - Split layout persistence (versioned JSON schema): previously paired servers suggested in Command Palette (all servers visible in split mode)

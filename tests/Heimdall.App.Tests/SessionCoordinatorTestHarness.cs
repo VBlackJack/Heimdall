@@ -472,12 +472,13 @@ public sealed partial class SessionCoordinatorPreMountTests : IDisposable
         public Task<BulkConnectOutcome> RunPipelineAsync(
             ServerProfileDto server,
             string sessionId,
-            RdpModeOverride rdpModeOverride = RdpModeOverride.UseProfile)
+            RdpModeOverride rdpModeOverride = RdpModeOverride.UseProfile,
+            AppSettings? pipelineSettings = null)
         {
             ServerItemViewModel item = ServerItemViewModel.FromDto(server, localizer: Main.GetLocalizer());
             return Main.ServerList.RunConnectionPipelineAsync(
                 server,
-                new AppSettings { SftpAutoOpenOnSsh = false },
+                pipelineSettings ?? new AppSettings { SftpAutoOpenOnSsh = false },
                 sessionId,
                 server.Id,
                 item,

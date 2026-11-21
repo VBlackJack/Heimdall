@@ -56,4 +56,10 @@ public partial class SplitContainerModel : ObservableObject, ISplitContent
             SetProperty(ref _splitRatio, clamped);
         }
     }
+
+    /// <summary>
+    /// The ratio a splitter double-click restores: the split the container opened with. A user
+    /// split keeps <see cref="DefaultRatio"/>; the SFTP companion split carries its configured share.
+    /// </summary>
+    public double ResetRatio { get; init; } = DefaultRatio;
 }

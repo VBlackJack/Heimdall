@@ -81,11 +81,8 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
     /// </summary>
     private readonly TerminalSizeHints _sizeHints = new();
 
-    /// <summary>
-    /// The width share the SFTP companion takes beside its SSH terminal. The terminal's final width
-    /// is the one it has with the companion in place, so the split exists from the start.
-    /// </summary>
-    private const double CompanionSftpSplitRatio = 0.5;
+    /// <summary>The whole width, in percent, the terminal and SFTP companion shares add up to.</summary>
+    private const int CompanionWidthTotalPercent = 100;
 
     /// <summary>
     /// The companion pane standing in the tab from SessionStarting until the companion connects,
@@ -894,7 +891,8 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                 First = tab.PrimaryPane,
                 Second = companionPlaceholder,
                 Orientation = SplitOrientation.Vertical,
-                SplitRatio = CompanionSftpSplitRatio
+                SplitRatio = CompanionTerminalShare(settings),
+                ResetRatio = CompanionTerminalShare(settings)
             };
         }
 
@@ -2165,7 +2163,8 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                     First = currentRoot,
                     Second = sftpPane,
                     Orientation = SplitOrientation.Vertical,
-                    SplitRatio = CompanionSftpSplitRatio
+                    SplitRatio = CompanionTerminalShare(settings),
+                    ResetRatio = CompanionTerminalShare(settings)
                 };
                 attached = true;
             });
@@ -2201,6 +2200,18 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         string.Equals(connectionType, "SSH", StringComparison.OrdinalIgnoreCase)
         && settings?.SftpBrowserEnabled == true
         && settings.SftpAutoOpenOnSsh;
+
+    /// <summary>
+    /// The share of the width the terminal (the first pane) keeps beside the SFTP companion: the
+    /// complement of the configured companion share, which is clamped into its declared range so a
+    /// hand-edited value cannot squeeze either pane out. Null settings fall back to the default.
+    /// </summary>
+    internal static double CompanionTerminalShare(AppSettings? settings)
+    {
+        int stored = settings?.SftpCompanionWidthPercent ?? AppSettings.DefaultSftpCompanionWidthPercent;
+        int companionPercent = SettingRanges.Of(nameof(AppSettings.SftpCompanionWidthPercent)).Clamp(stored);
+        return (CompanionWidthTotalPercent - companionPercent) / (double)CompanionWidthTotalPercent;
+    }
 
     /// <summary>
     /// Takes the stand-in companion pane out of the tab, if it is still there and still empty, so

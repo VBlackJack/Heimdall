@@ -65,6 +65,7 @@ internal static class SettingsLabelCatalog
         [nameof(AppSettings.SshKeepAliveIntervalSeconds)] = new("SettingsLabelSshKeepAliveInterval", "SettingsTabSshSftp", "SettingsSshSubTabSession"),
         [nameof(AppSettings.SshTmoutResetIntervalSeconds)] = new("SettingsLabelSshTmoutReset", "SettingsTabSshSftp", "SettingsSshSubTabSession"),
         [nameof(AppSettings.SftpAutoOpenOnSsh)] = new("SettingsLabelAutoOpenSftp", "SettingsTabSshSftp", "SettingsSshSubTabSftpX11"),
+        [nameof(AppSettings.SftpCompanionWidthPercent)] = new("SettingsLabelSftpCompanionWidth", "SettingsTabSshSftp", "SettingsSshSubTabSftpX11"),
         [nameof(AppSettings.SftpBrowserEnabled)] = new("SettingsLabelSftpBrowserEnabled", "SettingsTabSshSftp", "SettingsSshSubTabSftpX11"),
         [nameof(AppSettings.SftpFollowSshDirectory)] = new("SettingsLabelSftpFollowSshDirectory", "SettingsTabSshSftp", "SettingsSshSubTabSftpX11"),
         [nameof(AppSettings.SftpSudoFallback)] = new("SettingsLabelSftpSudoFallback", "SettingsTabSshSftp", "SettingsSshSubTabSftpX11"),
