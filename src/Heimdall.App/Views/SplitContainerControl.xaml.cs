@@ -226,6 +226,11 @@ public partial class SplitContainerControl : UserControl
     {
         if (!IsLoaded || _model is null) return;
 
+        // A click, or the second click of a double-click, raises DragCompleted with no movement. It
+        // is not a drag: reading the columns now would see the layout from before the double-click
+        // handler's reset was applied and write the old ratio back over it.
+        if (e.Canceled || (e.HorizontalChange == 0 && e.VerticalChange == 0)) return;
+
         double ratio;
         if (_model.Orientation == SplitOrientation.Horizontal && RootGrid.RowDefinitions.Count >= 3)
         {
