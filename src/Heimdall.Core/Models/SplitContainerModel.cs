@@ -57,9 +57,28 @@ public partial class SplitContainerModel : ObservableObject, ISplitContent
         }
     }
 
+    private double _resetRatio = DefaultRatio;
+
     /// <summary>
     /// The ratio a splitter double-click restores: the split the container opened with. A user
     /// split keeps <see cref="DefaultRatio"/>; the SFTP companion split carries its configured share.
+    /// Init-only for callers; <see cref="SwapChildren"/> mirrors it when the panes change sides.
     /// </summary>
-    public double ResetRatio { get; init; } = DefaultRatio;
+    public double ResetRatio
+    {
+        get => _resetRatio;
+        init => _resetRatio = value;
+    }
+
+    /// <summary>
+    /// Exchanges the first and second child. Each pane keeps its size and only changes side:
+    /// <see cref="SplitRatio"/> and the reset ratio are mirrored (1 - ratio) and clamped, so a splitter
+    /// double-click restores the swapped share instead of handing the other pane the old one.
+    /// </summary>
+    public void SwapChildren()
+    {
+        (First, Second) = (Second, First);
+        SplitRatio = 1 - SplitRatio;
+        _resetRatio = Math.Clamp(1 - _resetRatio, MinRatio, MaxRatio);
+    }
 }

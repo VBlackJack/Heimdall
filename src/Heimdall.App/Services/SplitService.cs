@@ -907,7 +907,8 @@ public sealed class SplitService : ISplitService
     // ── Swap panes ───────────────────────────────────────────────────
 
     /// <summary>
-    /// Swaps the First and Second children of a pane's parent container.
+    /// Swaps the First and Second children of a pane's parent container. Each pane keeps its
+    /// size and only changes side (see <see cref="SplitContainerModel.SwapChildren"/>).
     /// </summary>
     public async Task SwapSplitPanesAsync(SessionTabViewModel session, string? paneId = null)
     {
@@ -941,7 +942,7 @@ public sealed class SplitService : ISplitService
             // reparenting because WPF has not stabilized the intermediate state yet.
             await AwaitVisualTreeAsync(dispatcher);
 
-            (container.First, container.Second) = (container.Second, container.First);
+            container.SwapChildren();
             session.NotifyShimPropertiesChanged();
 
             // Let ContentPresenters finish rebinding / recreating their template

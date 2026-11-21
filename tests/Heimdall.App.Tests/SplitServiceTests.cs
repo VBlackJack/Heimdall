@@ -624,6 +624,28 @@ public sealed class SplitServiceTests : IDisposable
     }
 
     [Fact]
+    public void SwapChildren_RememberedRatioStillMatchesForTheReversedPair()
+    {
+        var left = MakePane(paneId: "left");
+        left.OriginalServerId = "profile-left";
+        var right = MakePane(paneId: "right");
+        right.OriginalServerId = "profile-right";
+        var container = new SplitContainerModel
+        {
+            First = left,
+            Second = right,
+            Orientation = SplitOrientation.Vertical,
+            SplitRatio = 0.25
+        };
+        _sut.RememberSplitRatio(container);
+
+        container.SwapChildren();
+
+        Assert.Equal(0.75, container.SplitRatio, 6);
+        Assert.Equal(container.SplitRatio, _sut.LayoutMemory.FindRatio("profile-right", "profile-left")!.Value, 6);
+    }
+
+    [Fact]
     public void ClosePane_NestedPrimaryPane_RefreshesTheTabHeader()
     {
         var a = MakePane(paneId: "a", connectionType: "TOOL:NOTES");

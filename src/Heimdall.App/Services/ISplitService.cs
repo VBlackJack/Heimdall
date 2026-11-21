@@ -91,7 +91,8 @@ public interface ISplitService
     Task ReconnectPaneAsync(SessionTabViewModel session, string paneId);
 
     /// <summary>
-    /// Swaps the children of the targeted split container.
+    /// Swaps the children of the targeted split container. Each pane keeps its size and only
+    /// changes side (see <see cref="SplitContainerModel.SwapChildren"/>).
     /// </summary>
     Task SwapSplitPanesAsync(SessionTabViewModel session, string? paneId = null);
 
