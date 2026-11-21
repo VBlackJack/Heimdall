@@ -1618,7 +1618,7 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
     /// </remarks>
     private async Task<string> ReadDocumentTextAsync(string path, string documentName)
     {
-        string text = await File.ReadAllTextAsync(path, Utf8NoBom).ConfigureAwait(false);
+        string text = await ReadSharedTextAsync(path).ConfigureAwait(false);
         if (IsReadableJson(text))
         {
             return text;
@@ -1626,6 +1626,23 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
 
         return await ReadLastGoodCopyAsync(path, documentName, UnreadableDocumentState).ConfigureAwait(false)
             ?? text;
+    }
+
+    /// <summary>
+    /// Opens a document for reading without blocking a concurrent atomic save (temporary file
+    /// then replace or move over it), which needs the reader to share Write and Delete.
+    /// </summary>
+    internal static FileStream OpenSharedRead(string path) =>
+        new(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete,
+            SharedReadBufferBytes, FileOptions.Asynchronous | FileOptions.SequentialScan);
+
+    private const int SharedReadBufferBytes = 4096;
+
+    private static async Task<string> ReadSharedTextAsync(string path)
+    {
+        await using FileStream stream = OpenSharedRead(path);
+        using StreamReader reader = new(stream, Utf8NoBom);
+        return await reader.ReadToEndAsync().ConfigureAwait(false);
     }
 
     /// <summary>How the log names a document that is there but is not readable JSON.</summary>
@@ -1651,7 +1668,7 @@ public sealed class ConfigManager : IConfigManager, IConfigTransactionalWriter
             return null;
         }
 
-        string backup = await File.ReadAllTextAsync(backupPath, Utf8NoBom).ConfigureAwait(false);
+        string backup = await ReadSharedTextAsync(backupPath).ConfigureAwait(false);
         if (!IsReadableJson(backup))
         {
             return null;

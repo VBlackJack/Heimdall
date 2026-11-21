@@ -478,15 +478,43 @@ public sealed class EphemeralFileServer : IDisposable, IAsyncDisposable
         var html = Encoding.UTF8.GetBytes(sb.ToString());
         response.ContentType = "text/html; charset=utf-8";
         response.AddHeader("Cache-Control", "no-store");
+        AddProtectiveHeaders(response, activeContent: false);
         response.ContentLength64 = html.Length;
         await response.OutputStream.WriteAsync(html);
         response.Close();
+    }
+
+    internal const string ContentTypeOptionsHeader = "X-Content-Type-Options";
+    internal const string ContentTypeOptionsValue = "nosniff";
+    internal const string ReferrerPolicyHeader = "Referrer-Policy";
+    internal const string ReferrerPolicyValue = "no-referrer";
+    internal const string ContentSecurityPolicyHeader = "Content-Security-Policy";
+    internal const string ActiveContentSecurityPolicyValue = "sandbox; default-src 'none'";
+
+    private static readonly HashSet<string> ActiveContentExtensions =
+        new(StringComparer.OrdinalIgnoreCase) { ".html", ".htm", ".svg", ".xml", ".xhtml" };
+
+    private static bool IsActiveContentExtension(string extension) =>
+        ActiveContentExtensions.Contains(extension);
+
+    /// <summary>
+    /// Protective headers for every response. Markup types that can run script are also sandboxed
+    /// so they cannot reach the token-bearing listing on the same origin; other types stay
+    /// unsandboxed so the inline PDF viewer keeps working.
+    /// </summary>
+    private static void AddProtectiveHeaders(HttpListenerResponse response, bool activeContent)
+    {
+        response.AddHeader(ContentTypeOptionsHeader, ContentTypeOptionsValue);
+        response.AddHeader(ReferrerPolicyHeader, ReferrerPolicyValue);
+        if (activeContent)
+            response.AddHeader(ContentSecurityPolicyHeader, ActiveContentSecurityPolicyValue);
     }
 
     private static async Task ServeFile(HttpListenerResponse response, string filePath)
     {
         response.ContentType = GetMimeType(filePath);
         response.AddHeader("Cache-Control", "no-store");
+        AddProtectiveHeaders(response, IsActiveContentExtension(Path.GetExtension(filePath)));
         FileInfo fileInfo = new(filePath);
         response.ContentLength64 = fileInfo.Length;
         string sanitizedFileName = (Path.GetFileName(filePath) ?? string.Empty)
