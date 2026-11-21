@@ -436,6 +436,8 @@ public sealed class SshShellSession : IDisposable
     /// </summary>
     private async Task ReadLoopAsync(CancellationToken cancellationToken)
     {
+        // Must stay a private, non-pooled array: an abandoned read (see below) may still
+        // write into it after this loop has exited.
         var buffer = new byte[ReadBufferSize];
         SshSessionDisconnectInfo? disconnectInfo = null;
         Exception? disconnectException = null;
@@ -451,11 +453,37 @@ public sealed class SshShellSession : IDisposable
                 }
 
                 int bytesRead;
+                Task<int>? readTask = null;
 
                 try
                 {
-                    bytesRead = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken)
-                        .ConfigureAwait(false);
+                    // SSH.NET's ShellStream inherits Stream's default ReadAsync, which ignores the
+                    // token once the blocking read is parked, so WaitAsync is what lets a cancel
+                    // wake this loop. The abandoned read ends when teardown disposes the stream.
+                    // The cancellation continuation normally runs inline on the thread that calls Cancel
+                    // (StopReadLoop), so keep the cancel path of this loop cheap.
+                    ValueTask<int> pendingRead = stream.ReadAsync(buffer.AsMemory(0, buffer.Length), cancellationToken);
+                    if (pendingRead.IsCompletedSuccessfully)
+                    {
+                        bytesRead = pendingRead.Result;
+                    }
+                    else
+                    {
+                        readTask = pendingRead.AsTask();
+                        bytesRead = await readTask.WaitAsync(cancellationToken).ConfigureAwait(false);
+                    }
+                }
+                catch (OperationCanceledException) when (readTask is not null)
+                {
+                    // Observe a later failure (typically ObjectDisposedException once teardown
+                    // disposes the stream) of the abandoned read, so it never reaches the
+                    // unobserved task exception hook.
+                    _ = readTask.ContinueWith(
+                        static t => _ = t.Exception,
+                        CancellationToken.None,
+                        TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+                        TaskScheduler.Default);
+                    throw;
                 }
                 catch (ObjectDisposedException)
                 {

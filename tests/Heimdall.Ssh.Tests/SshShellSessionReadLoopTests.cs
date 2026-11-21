@@ -28,6 +28,8 @@ namespace Heimdall.Ssh.Tests;
 /// is the code the disposed-client and read-token fixes of the SSH audit depended on,
 /// and it had never been executed by a test. The last test pins that a Dispose issued
 /// while the connect is still resolving the host key leaves no connected client behind.
+/// Two further tests pin that a Disconnect or Dispose tears down inline when the stream,
+/// like SSH.NET's ShellStream, ignores the read cancellation token while idle.
 /// </summary>
 public sealed class SshShellSessionReadLoopTests
 {
@@ -220,6 +222,55 @@ public sealed class SshShellSessionReadLoopTests
         Assert.Equal(0, stream.ReadCount);
     }
 
+    [Fact]
+    public async Task Disconnect_IdleReadThatIgnoresCancellation_TearsDownInline()
+    {
+        using TokenIgnoringShellStream stream = new();
+        using SshShellSession session = new(null, TransportFor(stream));
+        List<SshSessionDisconnectInfo> disconnects = [];
+        session.Disconnected += info =>
+        {
+            lock (disconnects)
+            {
+                disconnects.Add(info);
+            }
+        };
+
+        await session.ConnectAsync(ConnectionParams(), new HostKeyStore(), NeverAskedVerifier.Instance);
+        await stream.FirstReadStarted.WaitAsync(Backstop);
+
+        session.Disconnect();
+
+        // The stream is closed inside Disconnect itself, not by a deferred background wait.
+        Assert.True(stream.CloseCount >= 1, "Disconnect did not close the stream inline");
+        SshSessionDisconnectInfo info = Assert.Single(disconnects);
+        Assert.True(info.IsClean);
+        Assert.False(session.IsConnected);
+
+        // Closing the stream is what ends the abandoned read.
+        await stream.ReadEnded.WaitAsync(Backstop);
+    }
+
+    [Fact]
+    public async Task Dispose_IdleReadThatIgnoresCancellation_TearsDownInline()
+    {
+        using TokenIgnoringShellStream stream = new();
+        SshShellSession session = new(null, TransportFor(stream));
+        int disconnectedCount = 0;
+        session.Disconnected += _ => Interlocked.Increment(ref disconnectedCount);
+
+        await session.ConnectAsync(ConnectionParams(), new HostKeyStore(), NeverAskedVerifier.Instance);
+        await stream.FirstReadStarted.WaitAsync(Backstop);
+
+        session.Dispose();
+
+        Assert.True(stream.CloseCount >= 1, "Dispose did not close the stream inline");
+        Assert.Equal(0, Volatile.Read(ref disconnectedCount));
+        Assert.False(session.IsConnected);
+
+        await stream.ReadEnded.WaitAsync(Backstop);
+    }
+
     private static SshShellSession.Transport TransportFor(ISshShellStream stream) =>
         SshShellSession.Transport.Default with
         {
@@ -338,6 +389,109 @@ public sealed class SshShellSessionReadLoopTests
 
         public void Dispose()
         {
+        }
+    }
+
+    /// <summary>
+    /// A shell stream that mirrors SSH.NET's ShellStream: its inner stream implements only the
+    /// synchronous Read and inherits <see cref="Stream"/>'s default ReadAsync, which checks the
+    /// token once at entry and then parks a pool thread in the blocking read. Proven against
+    /// SSH.NET 2026.0.1: cancelling the token never wakes an idle read, only closing or
+    /// disposing the stream does.
+    /// </summary>
+    private sealed class TokenIgnoringShellStream : ISshShellStream
+    {
+        private readonly BlockingReadStream _inner = new();
+
+        public Task FirstReadStarted => _inner.FirstReadStarted;
+
+        public Task ReadEnded => _inner.ReadEnded;
+
+        public int CloseCount => Volatile.Read(ref _closeCount);
+
+        private int _closeCount;
+
+        public ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken) =>
+            _inner.ReadAsync(buffer, cancellationToken);
+
+        public void Write(byte[] data, int offset, int count)
+        {
+        }
+
+        public void Flush()
+        {
+        }
+
+        public void ChangeWindowSize(uint columns, uint rows, uint width, uint height)
+        {
+        }
+
+        public void Close()
+        {
+            Interlocked.Increment(ref _closeCount);
+            _inner.CloseStream();
+        }
+
+        public void Dispose() => Close();
+
+        private sealed class BlockingReadStream : Stream
+        {
+            private readonly object _sync = new();
+            private readonly TaskCompletionSource _firstReadStarted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            private readonly TaskCompletionSource _readEnded = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            private bool _closed;
+
+            public Task FirstReadStarted => _firstReadStarted.Task;
+
+            public Task ReadEnded => _readEnded.Task;
+
+            public override bool CanRead => true;
+
+            public override bool CanSeek => false;
+
+            public override bool CanWrite => false;
+
+            public override long Length => throw new NotSupportedException();
+
+            public override long Position
+            {
+                get => throw new NotSupportedException();
+                set => throw new NotSupportedException();
+            }
+
+            public void CloseStream()
+            {
+                lock (_sync)
+                {
+                    _closed = true;
+                    Monitor.PulseAll(_sync);
+                }
+            }
+
+            public override int Read(byte[] buffer, int offset, int count)
+            {
+                _firstReadStarted.TrySetResult();
+                lock (_sync)
+                {
+                    while (!_closed)
+                    {
+                        Monitor.Wait(_sync);
+                    }
+                }
+
+                _readEnded.TrySetResult();
+                return 0;
+            }
+
+            public override void Flush()
+            {
+            }
+
+            public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+            public override void SetLength(long value) => throw new NotSupportedException();
+
+            public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
         }
     }
 
