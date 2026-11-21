@@ -95,6 +95,9 @@ public sealed class SettingRangesTests
         (nameof(AppSettings.WindowsHelloGraceMinutes), 0, 1440, false),
         (nameof(AppSettings.AutoLockIdleMinutes), 0, 1440, false),
         (nameof(AppSettings.VaultHelloMaxDaysBeforeMasterPassword), 0, 3650, false),
+        (nameof(AppSettings.CitrixWindowDiagnosticsDurationSeconds), 10, 1800, false),
+        (nameof(AppSettings.CitrixWindowDiagnosticsIntervalMs), 250, 10000, false),
+        (nameof(AppSettings.CitrixSessionWindowWaitSeconds), 10, 1800, false),
     ];
 
     private static readonly (string Name, int Min, int Max, bool ZeroMeansOff)[] ExpectedServerRanges =
