@@ -207,12 +207,12 @@ public partial class SplitContainerControl : UserControl
     }
 
     /// <summary>
-    /// Resets the split ratio to 50/50 when the splitter is double-clicked.
+    /// Restores the split ratio the container opened with when the splitter is double-clicked.
     /// </summary>
     private void OnSplitterDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
         if (!IsLoaded || _model is null) return;
-        _model.SplitRatio = SplitContainerModel.DefaultRatio;
+        _model.SplitRatio = _model.ResetRatio;
         MainViewModelLocator.FindCurrent()?.Split.RememberSplitRatio(_model);
         e.Handled = true;
     }
@@ -225,6 +225,11 @@ public partial class SplitContainerControl : UserControl
         object sender, System.Windows.Controls.Primitives.DragCompletedEventArgs e)
     {
         if (!IsLoaded || _model is null) return;
+
+        // A click, or the second click of a double-click, raises DragCompleted with no movement. It
+        // is not a drag: reading the columns now would see the layout from before the double-click
+        // handler's reset was applied and write the old ratio back over it.
+        if (e.Canceled || (e.HorizontalChange == 0 && e.VerticalChange == 0)) return;
 
         double ratio;
         if (_model.Orientation == SplitOrientation.Horizontal && RootGrid.RowDefinitions.Count >= 3)

@@ -102,7 +102,7 @@ Le catalogue complet de ce que fait Heimdall, protocole par protocole. Si vous c
 
 ### Navigateur SFTP
 - Panneau de navigation de fichiers embarqué avec arborescence de répertoires et liste de fichiers
-- **Ouverture automatique en compagnon** : s'ouvre automatiquement à côté d'une session SSH sous forme de split vertical (conditionné par un réglage). La reconnexion du volet SFTP reste circonscrite au volet, si bien que le terminal SSH voisin et son historique sont préservés ; un keepalive SSH maintient en vie les sessions SFTP inactives
+- **Ouverture automatique en compagnon** : s'ouvre automatiquement à côté d'une session SSH sous forme de split vertical (conditionné par un réglage) dont le volet SFTP prend une part configurable de la largeur (1/3 par défaut, le terminal garde donc 2/3 ; de 25 à 80 pour cent ; s'applique aux nouvelles sessions). La reconnexion du volet SFTP reste circonscrite au volet, si bien que le terminal SSH voisin et son historique sont préservés ; un keepalive SSH maintient en vie les sessions SFTP inactives
 - **Suivre le répertoire SSH** (optionnel) : le compagnon peut suivre le répertoire courant du terminal SSH via la séquence d'échappement OSC 7, avec une bascule par volet (au mieux ; inerte sur les shells qui n'émettent pas OSC 7)
 - Deux modes d'édition : éditeur AvalonEdit intégré OU éditeur externe avec téléversement automatique à l'enregistrement (les échecs de téléversement transitoires sont réessayés ; un refus qu'aucune nouvelle tentative ne peut changer est signalé une fois et retenté au prochain enregistrement). L'éditeur externe choisi dans les réglages sert aussi aux fichiers distants, et un interpréteur de commandes est refusé comme éditeur. Fermer un volet pendant qu'un fichier est ouvert dans un éditeur externe demande d'abord, et la copie locale est conservée tant que cet éditeur tourne
 - L'éditeur intégré ouvre un fichier qui n'est pas de l'UTF-8 valide en Latin-1 et le dit ; Ctrl+S enregistre, Ctrl+W ferme ; le volet d'éditeur local demande avant de se fermer sur du texte non enregistré
@@ -320,7 +320,7 @@ Tous les outils s'ouvrent comme des onglets de session (split avec n'importe que
 - Divulgation d'échec circonscrite au volet pour SSH et RDP, avec diagnostics structurés étape/code/détail
 - Surcouche de chargement avec indicateur pendant la connexion d'un volet
 - **Taille minimale de volet imposée** : 120x80 px empêche le séparateur de réduire les volets à une taille inutilisable
-- **Double-clic sur le séparateur** : remise du ratio à 50/50 ; bordure au survol des volets pour mieux identifier le volet actif
+- **Double-clic sur le séparateur** : remise du ratio sur la répartition d'ouverture du conteneur (50/50 pour un split utilisateur, la part configurée pour le compagnon SFTP) ; bordure au survol des volets pour mieux identifier le volet actif
 - **Curseur de séparateur dynamique** : SizeNS pour les splits horizontaux, SizeWE pour les verticaux (mis à jour lors de la bascule d'orientation)
 - Ratio du séparateur mémorisé par volet d'un changement d'onglet à l'autre ; restauré lors d'une fusion à partir de l'historique de disposition
 - Persistance de la disposition des splits (schéma JSON versionné) : les serveurs précédemment appairés sont suggérés dans la palette de commandes (tous les serveurs sont visibles en mode split)

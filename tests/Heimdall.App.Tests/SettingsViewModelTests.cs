@@ -2531,6 +2531,54 @@ public sealed partial class SettingsViewModelTests : IDisposable
         Assert.True(viewModel.SshTabErrorCount > 0);
     }
 
+    [Fact]
+    public async Task SftpCompanionWidth_LoadsSavesAndRefusesOutOfRange()
+    {
+        FakeConfigManager config = new();
+        config.Settings.SftpCompanionWidthPercent = 40;
+        SettingsViewModel viewModel = CreateViewModel(config);
+        viewModel.LoadFromSettings(config.Settings);
+
+        Assert.Equal("40", viewModel.SftpCompanionWidthPercentText);
+
+        viewModel.SftpCompanionWidthPercentText = "50";
+        Assert.True(viewModel.IsDirty);
+        Assert.True(await viewModel.TrySaveAsync());
+        Assert.Equal(50, config.Settings.SftpCompanionWidthPercent);
+
+        viewModel.SftpCompanionWidthPercentText = "1";
+        Assert.False(await viewModel.TrySaveAsync());
+        Assert.True(viewModel.SshTabErrorCount > 0);
+        Assert.Equal(50, config.Settings.SftpCompanionWidthPercent);
+
+        viewModel.SftpCompanionWidthPercentText = "81";
+        Assert.False(await viewModel.TrySaveAsync());
+    }
+
+    [Theory]
+    [InlineData(true, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(false, false, false)]
+    public void SftpCompanionWidth_IsEditableOnlyWhenTheCompanionCanOpen(
+        bool browserEnabled, bool autoOpen, bool expected)
+    {
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config);
+        viewModel.LoadFromSettings(config.Settings);
+        List<string?> raised = [];
+        viewModel.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        viewModel.SftpBrowserEnabled = !browserEnabled;
+        viewModel.SftpAutoOpenOnSsh = !autoOpen;
+        raised.Clear();
+        viewModel.SftpBrowserEnabled = browserEnabled;
+        viewModel.SftpAutoOpenOnSsh = autoOpen;
+
+        Assert.Equal(expected, viewModel.IsSftpCompanionWidthEditable);
+        Assert.Contains(nameof(SettingsViewModel.IsSftpCompanionWidthEditable), raised);
+    }
+
     // The tool paths were accepted as typed and failed only at use. A typed path with nothing
     // behind it now says so beside the field, on load and after each edit; an empty one says
     // nothing, since empty means "not used" or "look for it".

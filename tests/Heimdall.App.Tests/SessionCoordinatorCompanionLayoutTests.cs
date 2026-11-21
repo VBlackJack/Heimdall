@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 
+using System.IO;
 using Heimdall.App.Services;
 using Heimdall.App.Services.SessionSnapshot;
 using Heimdall.App.ViewModels;
+using Heimdall.App.ViewModels.Session;
 using Heimdall.App.ViewModels.Shell;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Models;
@@ -37,19 +39,95 @@ public sealed partial class SessionCoordinatorPreMountTests
     private static readonly TimeSpan HintWait = TimeSpan.FromMilliseconds(100);
     private static readonly TimeSpan NoConnectGrace = TimeSpan.FromMilliseconds(300);
 
-    private static AppSettings CompanionSettings(bool autoOpen = true) =>
-        new() { SftpBrowserEnabled = true, SftpAutoOpenOnSsh = autoOpen };
+    // The default companion share is a third of the width, so the terminal keeps two thirds.
+    private const double DefaultTerminalShare = 0.67;
+
+    private static AppSettings CompanionSettings(bool autoOpen = true, int? companionWidthPercent = null)
+    {
+        AppSettings settings = new() { SftpBrowserEnabled = true, SftpAutoOpenOnSsh = autoOpen };
+        if (companionWidthPercent.HasValue)
+        {
+            settings.SftpCompanionWidthPercent = companionWidthPercent.Value;
+        }
+
+        return settings;
+    }
+
+    [Fact]
+    public void CompanionTerminalShare_NullSettings_UsesTheDefault()
+    {
+        Assert.Equal(DefaultTerminalShare, SessionCoordinator.CompanionTerminalShare(null));
+        Assert.Equal(DefaultTerminalShare, SessionCoordinator.CompanionTerminalShare(new AppSettings()));
+    }
+
+    [Theory]
+    [InlineData(40, 0.6)]
+    [InlineData(25, 0.75)]
+    [InlineData(80, 0.2)]
+    [InlineData(95, 0.2)]
+    [InlineData(10, 0.75)]
+    [InlineData(-5, 0.75)]
+    public void CompanionTerminalShare_IsTheClampedComplement(int companionPercent, double expectedTerminalShare)
+    {
+        double share = SessionCoordinator.CompanionTerminalShare(
+            new AppSettings { SftpCompanionWidthPercent = companionPercent });
+
+        Assert.Equal(expectedTerminalShare, share);
+    }
+
+    // The current settings keep the default width while the pipeline snapshot carries another one:
+    // the placeholder split must follow the snapshot of the connection being opened.
+    [Theory]
+    [InlineData(40, 0.6)]
+    [InlineData(95, 0.2)]
+    [InlineData(10, 0.75)]
+    public async Task SshWithCompanion_SplitFollowsTheConfiguredWidth(int companionPercent, double expectedRatio)
+    {
+        using TestHarness harness = TestHarness.Create();
+        ServerProfileDto server = harness.CreateServer("SSH");
+
+        (Task<BulkConnectOutcome> pipeline, ControlledProtocolHandler ssh, SessionTabViewModel tab) =
+            await StartSshWithCompanionSettingsAsync(
+                harness, server, CompanionSettings(), pipelineWidthPercent: companionPercent);
+
+        SplitContainerModel container = Assert.IsType<SplitContainerModel>(tab.RootContent);
+        Assert.Equal(expectedRatio, container.SplitRatio);
+        Assert.Equal(container.SplitRatio, container.ResetRatio);
+
+        ssh.Result.SetResult(new ConnectionResult(false, "stop here", null));
+        await pipeline.WaitAsync(TestTimeout);
+    }
+
+    [Fact]
+    public void ShippedDefaultSettings_CarryTheCompanionWidth()
+    {
+        string path = Path.Combine(AppContext.BaseDirectory, "config", "settings.default.json");
+        Assert.True(File.Exists(path), $"settings.default.json not found at {path}");
+
+        using System.Text.Json.JsonDocument document = System.Text.Json.JsonDocument.Parse(File.ReadAllText(path));
+
+        Assert.True(document.RootElement.TryGetProperty("sftpCompanionWidthPercent", out System.Text.Json.JsonElement width));
+        Assert.Equal(AppSettings.DefaultSftpCompanionWidthPercent, width.GetInt32());
+    }
 
     private static async Task<(Task<BulkConnectOutcome> Pipeline, ControlledProtocolHandler Ssh, SessionTabViewModel Tab)>
         StartSshWithCompanionSettingsAsync(
             TestHarness harness,
             ServerProfileDto server,
-            AppSettings settings)
+            AppSettings settings,
+            int? pipelineWidthPercent = null)
     {
         await harness.PersistServerAsync(server);
         await harness.Main.ReloadConfigurationAsync(settings);
         harness.Main.ServerList.RememberInventoryProfile(server, server.CloneFaithfully());
-        Task<BulkConnectOutcome> pipeline = harness.RunPipelineAsync(server, CompanionSessionId);
+        Task<BulkConnectOutcome> pipeline = harness.RunPipelineAsync(
+            server,
+            CompanionSessionId,
+            pipelineSettings: new AppSettings
+            {
+                SftpAutoOpenOnSsh = false,
+                SftpCompanionWidthPercent = pipelineWidthPercent ?? settings.SftpCompanionWidthPercent
+            });
         ControlledProtocolHandler ssh = harness.GetHandler("SSH");
         await ssh.Started.Task.WaitAsync(TestTimeout);
         await WaitUntilAsync(() => harness.Main.Connection.ActiveSessions
@@ -79,7 +157,8 @@ public sealed partial class SessionCoordinatorPreMountTests
         // The connect has not completed: the layout is already the final one.
         SplitContainerModel container = Assert.IsType<SplitContainerModel>(tab.RootContent);
         SessionPaneModel companion = CompanionOf(tab);
-        Assert.Equal(0.5, container.SplitRatio);
+        Assert.Equal(DefaultTerminalShare, container.SplitRatio);
+        Assert.Equal(container.SplitRatio, container.ResetRatio);
         Assert.Equal("SFTP", companion.ConnectionType);
         Assert.Equal(profileId, companion.OriginalServerId);
         Assert.Null(companion.HostControl);
@@ -87,6 +166,33 @@ public sealed partial class SessionCoordinatorPreMountTests
 
         ssh.Result.SetResult(new ConnectionResult(false, "stop here", null));
         await pipeline.WaitAsync(TestTimeout);
+    }
+
+    [Fact]
+    public async Task CompanionOpenedWithoutPlaceholder_SplitFollowsTheConfiguredWidth()
+    {
+        const int ConfiguredWidthPercent = 40;
+        const double ExpectedTerminalShare = 0.6;
+        using TestHarness harness = TestHarness.Create();
+        ServerProfileDto server = harness.CreateServer("SSH");
+        (Task<BulkConnectOutcome> pipeline, ControlledProtocolHandler ssh, SessionTabViewModel tab) =
+            await StartSshWithCompanionSettingsAsync(harness, server, CompanionSettings(autoOpen: false));
+        Assert.Same(tab.PrimaryPane, tab.RootContent);
+        ControlledProtocolHandler sftp = harness.GetHandler("SFTP");
+
+        // The setting is turned on after the tab was laid out: no placeholder exists, so the split
+        // is built when the companion has connected.
+        await harness.Main.ReloadConfigurationAsync(
+            CompanionSettings(companionWidthPercent: ConfiguredWidthPercent));
+        ssh.Result.SetResult(SuccessWithTerminalSession());
+        await sftp.Started.Task.WaitAsync(TestTimeout);
+        sftp.Result.SetResult(new ConnectionResult(true, null, new CompanionTestSession()));
+        await WaitUntilAsync(() => tab.RootContent is SplitContainerModel);
+        await pipeline.WaitAsync(TestTimeout);
+
+        SplitContainerModel container = Assert.IsType<SplitContainerModel>(tab.RootContent);
+        Assert.Equal(ExpectedTerminalShare, container.SplitRatio);
+        Assert.Equal(container.SplitRatio, container.ResetRatio);
     }
 
     [Fact]

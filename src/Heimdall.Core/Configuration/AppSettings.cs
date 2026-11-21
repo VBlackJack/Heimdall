@@ -319,6 +319,14 @@ public sealed class AppSettings
     public int MaxEmbeddedSessions { get; set; } = DefaultMaxEmbeddedSessions;
     public bool SftpBrowserEnabled { get; set; } = true;
     public bool SftpAutoOpenOnSsh { get; set; } = true;
+    public const int DefaultSftpCompanionWidthPercent = 33;
+
+    /// <summary>
+    /// Width share, in percent, the SFTP companion pane takes beside its SSH terminal when an SSH
+    /// session auto-opens it. The terminal takes the rest. Applies to new sessions only.
+    /// </summary>
+    [SettingRange(25, 80)]
+    public int SftpCompanionWidthPercent { get; set; } = DefaultSftpCompanionWidthPercent;
     public bool SftpFollowSshDirectory { get; set; }
 
     /// <summary>

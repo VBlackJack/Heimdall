@@ -59,6 +59,7 @@ public sealed class SettingRangesTests
         (nameof(AppSettings.RdpHostPoolCapacity), 0, 8, false),
         (nameof(AppSettings.RdpHostPoolIdleExpiryMinutes), 0, 1440, false),
         (nameof(AppSettings.SshKeepAliveIntervalSeconds), 5, 600, false),
+        (nameof(AppSettings.SftpCompanionWidthPercent), 25, 80, false),
         (nameof(AppSettings.PlinkPortCheckIntervalMs), 500, 30000, false),
         (nameof(AppSettings.PlinkKillGracePeriodMs), 500, 30000, false),
         (nameof(AppSettings.SftpUploadDebounceMs), 500, 30000, false),

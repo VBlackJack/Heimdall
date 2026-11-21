@@ -444,10 +444,29 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         => CommitNumericText(value, parsed => SshAutoReconnectAttempts = parsed);
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsSftpCompanionWidthEditable))]
     private bool _sftpBrowserEnabled = true;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsSftpCompanionWidthEditable))]
     private bool _sftpAutoOpenOnSsh = true;
+
+    /// <summary>Whether the SFTP companion width field applies: the companion must be able to open.</summary>
+    public bool IsSftpCompanionWidthEditable => SftpBrowserEnabled && SftpAutoOpenOnSsh;
+
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [SettingRangeOf(nameof(AppSettings.SftpCompanionWidthPercent))]
+    private int _sftpCompanionWidthPercent = AppSettings.DefaultSftpCompanionWidthPercent;
+
+    /// <summary>Text of the field that edits <see cref="SftpCompanionWidthPercent"/>.</summary>
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [CustomValidation(typeof(SettingsViewModel), nameof(ValidateWholeNumberText))]
+    private string _sftpCompanionWidthPercentText = string.Empty;
+
+    partial void OnSftpCompanionWidthPercentTextChanged(string value)
+        => CommitNumericText(value, parsed => SftpCompanionWidthPercent = parsed);
 
     [ObservableProperty]
     private bool _sftpFollowSshDirectory;
@@ -1864,6 +1883,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             SshAutoReconnectAttempts = settings.SshAutoReconnectAttempts;
             SftpBrowserEnabled = settings.SftpBrowserEnabled;
             SftpAutoOpenOnSsh = settings.SftpAutoOpenOnSsh;
+            SftpCompanionWidthPercent = settings.SftpCompanionWidthPercent;
             SftpFollowSshDirectory = settings.SftpFollowSshDirectory;
             SftpSudoFallback = settings.SftpSudoFallback.ToString();
             X11ServerPath = settings.X11ServerPath ?? "";
@@ -2121,6 +2141,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         SshTmoutResetIntervalText = SshTmoutResetInterval.ToString(CultureInfo.InvariantCulture);
         SshAutoReconnectAttemptsText = SshAutoReconnectAttempts.ToString(CultureInfo.InvariantCulture);
         SshKeepAliveIntervalSecondsText = SshKeepAliveIntervalSeconds.ToString(CultureInfo.InvariantCulture);
+        SftpCompanionWidthPercentText = SftpCompanionWidthPercent.ToString(CultureInfo.InvariantCulture);
         CredentialProviderTimeoutMsText = CredentialProviderTimeoutMs.ToString(CultureInfo.InvariantCulture);
         VaultHelloMaxDaysBeforeMasterPasswordText = VaultHelloMaxDaysBeforeMasterPassword.ToString(CultureInfo.InvariantCulture);
         TunnelEstablishmentDelayMsText = TunnelEstablishmentDelayMs.ToString(CultureInfo.InvariantCulture);
@@ -2345,6 +2366,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         settings.SshAutoReconnectAttempts = SshAutoReconnectAttempts;
         settings.SftpBrowserEnabled = SftpBrowserEnabled;
         settings.SftpAutoOpenOnSsh = SftpAutoOpenOnSsh;
+        settings.SftpCompanionWidthPercent = SftpCompanionWidthPercent;
         settings.SftpFollowSshDirectory = SftpFollowSshDirectory;
         settings.SftpSudoFallback = ParseSftpSudoFallback(SftpSudoFallback);
         settings.X11ServerPath = string.IsNullOrWhiteSpace(X11ServerPath) ? null : X11ServerPath;
@@ -4954,6 +4976,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         [nameof(AppSettings.SessionHealthProbeTimeoutMs)] = "ValidationSettingsHealthProbeTimeout",
         [nameof(AppSettings.SessionHealthMaxConcurrent)] = "ValidationSettingsHealthMaxConcurrent",
         [nameof(AppSettings.SshKeepAliveIntervalSeconds)] = "ValidationSettingsSshKeepAlive",
+        [nameof(AppSettings.SftpCompanionWidthPercent)] = "ValidationSettingsSftpCompanionWidth",
         [nameof(AppSettings.CredentialProviderTimeoutMs)] = "ValidationSettingsCredProviderTimeout",
         [nameof(AppSettings.VaultHelloMaxDaysBeforeMasterPassword)] = "ValidationSettingsVaultHelloMaxDays",
     };
@@ -4989,6 +5012,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         [nameof(WindowsHelloGraceMinutes)] = "SettingsLabelWindowsHelloGrace",
         [nameof(AutoLockIdleMinutes)] = "SettingsAutoLockLabel",
         [nameof(SshKeepAliveIntervalSeconds)] = "SettingsLabelSshKeepAliveInterval",
+        [nameof(SftpCompanionWidthPercent)] = "SettingsLabelSftpCompanionWidth",
         [nameof(CredentialProviderTimeoutMs)] = "SettingsLabelCredProviderTimeout",
         [nameof(VaultHelloMaxDaysBeforeMasterPassword)] = "SettingsLabelVaultHelloMaxDays",
     };
@@ -5017,6 +5041,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         nameof(SshAutoReconnectAttemptsText),
         nameof(SshKeepAliveIntervalSeconds),
         nameof(SshKeepAliveIntervalSecondsText),
+        nameof(SftpCompanionWidthPercent),
+        nameof(SftpCompanionWidthPercentText),
     ];
 
     private static readonly string[] AdvancedValidatedSettingPropertyNames =

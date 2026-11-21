@@ -93,6 +93,7 @@
     "embeddedIdleTimeoutMs": 0,
     "sftpBrowserEnabled": true,
     "sftpAutoOpenOnSsh": true,
+    "sftpCompanionWidthPercent": 33,
     "externalEditorPath": "%windir%\\system32\\notepad.exe",
     "preventSleepDuringSession": true,
     "sessionLoggingEnabled": false,
