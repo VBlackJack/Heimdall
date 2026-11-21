@@ -214,6 +214,9 @@
             }
 
             function base64ToBytes(base64) {
+                if (typeof Uint8Array.fromBase64 === 'function') {
+                    return Uint8Array.fromBase64(base64);
+                }
                 var binary = atob(base64);
                 var bytes = new Uint8Array(binary.length);
                 for (var index = 0; index < binary.length; index++) {

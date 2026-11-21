@@ -285,6 +285,12 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         new(MaxPendingTerminalMessageBytes, static () =>
             Core.Logging.FileLogger.Debug(
                 "EmbeddedSSH pending terminal output exceeded the pre-ready buffer limit; oldest buffered output was dropped."));
+    private readonly TerminalOutputCoalescer _outputCoalescer;
+    private bool _holdOutputForReadyFlush;
+    private int _outputCountersLogged;
+    private long _dataChunksIn;
+    private long _dataPostsOut;
+    private long _dataBytes;
     private readonly ResizeFailureLogThrottle _resizeLogThrottle = new ResizeFailureLogThrottle();
     private readonly object _macroExpectSync = new();
 
@@ -465,6 +471,10 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
     public EmbeddedSshView()
     {
+        _outputCoalescer = new TerminalOutputCoalescer(
+            action => BeginInvokeIfAvailable(action),
+            PostDataMessage);
+
         InitializeComponent();
 
         // Set WebView2 background from theme to avoid flash of wrong color
@@ -804,7 +814,9 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             try { disposableWebView.Dispose(); } catch (Exception ex) { Core.Logging.FileLogger.Warn($"[EmbeddedSshView] WebView dispose: {ex.Message}"); }
         }
 
+        _outputCoalescer.Close();
         _pendingTerminalMessages.Clear();
+        LogOutputCounters();
 
         Core.Logging.FileLogger.Info("EmbeddedSSH Dispose completed");
     }
@@ -1623,6 +1635,9 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
         if (message.StartsWith(MsgReady, StringComparison.Ordinal))
         {
+            // Output queued before the page was ready stays behind the surface and viewport
+            // messages below: it is held in the pending queue until that queue has been flushed.
+            _holdOutputForReadyFlush = true;
             _terminalReady = true;
             Core.Logging.FileLogger.Info($"EmbeddedSSH terminal ready: {message}");
 
@@ -1644,7 +1659,9 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
                 SendViewportIfHidden();
             }
 
+            DrainOutputCoalescer();
             FlushPendingTerminalMessages();
+            _holdOutputForReadyFlush = false;
             ApplyInitialTerminalFocus();
             HideConnectingOverlayWhenEstablished();
             return;
@@ -2052,8 +2069,66 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
         ObserveWinRmEarlyOutput(data);
 
-        var message = "data:" + Convert.ToBase64String(data);
-        PostTerminalMessage(message);
+        Interlocked.Increment(ref _dataChunksIn);
+        Interlocked.Add(ref _dataBytes, data.Length);
+        _outputCoalescer.Append(data);
+    }
+
+    /// <summary>
+    /// Posts one coalesced output message (UI thread). Output goes straight to the page only when
+    /// the page is ready and nothing older is waiting; otherwise it queues behind what is pending.
+    /// </summary>
+    private void PostDataMessage(string message)
+    {
+        if (_disposed || _webViewUnavailable || IsDispatcherShuttingDown())
+        {
+            return;
+        }
+
+        Interlocked.Increment(ref _dataPostsOut);
+
+        if (_terminalReady && !_holdOutputForReadyFlush && _pendingTerminalMessages.Count == 0
+            && TryGetCoreWebView2(out var core))
+        {
+            try
+            {
+                core.PostWebMessageAsString(message);
+            }
+            catch (ObjectDisposedException)
+            {
+                DisableWebViewPosts();
+            }
+            catch (InvalidOperationException)
+            {
+                DisableWebViewPosts();
+            }
+
+            return;
+        }
+
+        _pendingTerminalMessages.Enqueue(message);
+    }
+
+    private void DrainOutputCoalescer()
+    {
+        if (_disposed || _webViewUnavailable)
+        {
+            return;
+        }
+
+        _outputCoalescer.Drain();
+    }
+
+    private void LogOutputCounters()
+    {
+        if (Interlocked.Exchange(ref _outputCountersLogged, 1) != 0)
+        {
+            return;
+        }
+
+        Core.Logging.FileLogger.Debug(
+            $"EmbeddedSSH output chunks={Interlocked.Read(ref _dataChunksIn)} "
+            + $"posts={Interlocked.Read(ref _dataPostsOut)} bytes={Interlocked.Read(ref _dataBytes)}");
     }
 
     private void ObserveWinRmEarlyOutput(ReadOnlySpan<byte> data)
@@ -2119,6 +2194,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             // a new view, which acquires its own.
             ReleaseSleepPrevention();
             StopKeepAliveTimer();
+            LogOutputCounters();
 
             string? errorMessage = SshDisconnectMessageResolver.Resolve(
                 disconnectInfo,
@@ -3123,6 +3199,9 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             return;
         }
 
+        // Output already queued by producers precedes this control message.
+        DrainOutputCoalescer();
+
         if (_terminalReady && TryGetCoreWebView2(out var core))
         {
             try
@@ -3240,6 +3319,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         _webViewUnavailable = true;
         _bufferReads.FailPending();
 
+        _outputCoalescer.Close();
         _pendingTerminalMessages.Clear();
     }
 
@@ -3282,6 +3362,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         SetOverlayVisibility(AutoReconnectOverlay, Visibility.Collapsed);
         _terminalReady = false;
 
+        _outputCoalescer.Close();
         _pendingTerminalMessages.Clear();
         FallbackPanel.Visibility = System.Windows.Visibility.Visible;
         FallbackMessageText.Text = message;
@@ -3469,15 +3550,11 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             ? configuredThemeJson
             : ColorSchemes["Dracula"];
 
-        // Sanitize font family to prevent injection (allow alphanumeric, spaces, commas, quotes, hyphens)
-        string safeFontFamily = System.Text.RegularExpressions.Regex.Replace(
-            fontFamily, @"[^a-zA-Z0-9\s,'""\-]", "");
-
         int safeFontSize = Math.Clamp(fontSize, TerminalFontSizeMin, TerminalFontSizeMax);
 
         // The offline NavigateToString page requires inline script/style. Keep
         // placeholder values constrained to known constants or sanitized data.
-        html = html.Replace("/*{{TERMINAL_FONT_FAMILY}}*/", safeFontFamily, StringComparison.Ordinal);
+        html = TerminalFontFamilyFormatter.Apply(html, fontFamily);
         html = html.Replace("/*{{TERMINAL_FONT_SIZE}}*/", safeFontSize.ToString(), StringComparison.Ordinal);
         html = html.Replace(
             "/*{{TERMINAL_FONT_MIN}}*/",
