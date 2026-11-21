@@ -323,6 +323,165 @@ public sealed class GitHubReleaseClientTests
         Assert.True(content.Disposed, "the response content must be disposed when it is not returned");
     }
 
+    // Redirects are followed by hand, hop by hop, so every hop is checked and not only the
+    // first URL. The handler no longer follows them on its own.
+
+    private static HttpResponseMessage Redirect(string location, HttpStatusCode status = HttpStatusCode.Found)
+    {
+        var response = new HttpResponseMessage(status);
+        response.Headers.Location = new Uri(location, UriKind.RelativeOrAbsolute);
+        return response;
+    }
+
+    private static HttpResponseMessage Bytes(string text) =>
+        new(HttpStatusCode.OK) { Content = new ByteArrayContent(Encoding.ASCII.GetBytes(text)) };
+
+    [Fact]
+    public async Task OpenAssetStreamAsync_RedirectToAnotherHost_IsRefused()
+    {
+        var requested = new List<string>();
+        var client = CreateClient((request, _) =>
+        {
+            requested.Add(request.RequestUri!.AbsoluteUri);
+            return request.RequestUri.Host == "github.com" ? Redirect("https://evil.example/x") : Bytes("owned");
+        });
+
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(
+            () => client.OpenAssetStreamAsync(InstallerUrl, CancellationToken.None));
+
+        Assert.Equal([InstallerUrl], requested);
+    }
+
+    [Fact]
+    public async Task GetAssetTextAsync_RedirectToAnotherHost_ReturnsNull()
+    {
+        var client = CreateClient((request, _) =>
+            request.RequestUri!.Host == "github.com" ? Redirect("https://evil.example/x") : Bytes("owned"));
+
+        Assert.Null(await client.GetAssetTextAsync(ChecksumUrl, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task OpenAssetStreamAsync_RedirectToAllowedAssetHost_IsFollowed()
+    {
+        var client = CreateClient((request, _) =>
+            request.RequestUri!.Host == "github.com"
+                ? Redirect("https://objects.githubusercontent.com/blob/1")
+                : Bytes("installer"));
+
+        await using var stream = await client.OpenAssetStreamAsync(InstallerUrl, CancellationToken.None);
+        using var reader = new StreamReader(stream);
+
+        Assert.Equal("installer", await reader.ReadToEndAsync());
+    }
+
+    [Fact]
+    public async Task OpenAssetStreamAsync_RelativeLocation_IsResolvedAgainstTheCurrentUri()
+    {
+        var requested = new List<string>();
+        var client = CreateClient((request, _) =>
+        {
+            requested.Add(request.RequestUri!.AbsoluteUri);
+            return requested.Count == 1 ? Redirect("/VBlackJack/Heimdall/moved/standard.exe") : Bytes("installer");
+        });
+
+        await using var stream = await client.OpenAssetStreamAsync(InstallerUrl, CancellationToken.None);
+
+        Assert.Equal("https://github.com/VBlackJack/Heimdall/moved/standard.exe", requested[1]);
+    }
+
+    [Fact]
+    public async Task OpenAssetStreamAsync_SixthHop_IsRefused()
+    {
+        int sent = 0;
+        var client = CreateClient((_, _) =>
+        {
+            sent++;
+            return sent <= 6 ? Redirect($"https://github.com/loop/{sent}") : Bytes("installer");
+        });
+
+        var refusal = await Assert.ThrowsAnyAsync<InvalidOperationException>(
+            () => client.OpenAssetStreamAsync(InstallerUrl, CancellationToken.None));
+
+        Assert.Contains("redirects", refusal.Message, StringComparison.Ordinal);
+
+        // The first request plus five followed hops; the sixth redirect is not followed.
+        Assert.Equal(6, sent);
+    }
+
+    [Fact]
+    public async Task OpenAssetStreamAsync_FifthHop_IsStillFollowed()
+    {
+        int sent = 0;
+        var client = CreateClient((_, _) =>
+        {
+            sent++;
+            return sent <= 5 ? Redirect($"https://github.com/hop/{sent}") : Bytes("installer");
+        });
+
+        await using var stream = await client.OpenAssetStreamAsync(InstallerUrl, CancellationToken.None);
+
+        Assert.Equal(6, sent);
+    }
+
+    [Fact]
+    public async Task OpenAssetStreamAsync_RedirectToPlainHttp_IsRefused()
+    {
+        var client = CreateClient((request, _) =>
+            request.RequestUri!.Scheme == "https"
+                ? Redirect("http://github.com/VBlackJack/Heimdall/standard.exe")
+                : Bytes("owned"));
+
+        await Assert.ThrowsAnyAsync<InvalidOperationException>(
+            () => client.OpenAssetStreamAsync(InstallerUrl, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task GetLatestReleaseAsync_MovedPermanentlyToTheApiHost_IsFollowed()
+    {
+        var client = CreateClient((request, _) =>
+            request.RequestUri!.AbsolutePath.StartsWith("/repos/", StringComparison.Ordinal)
+                ? Redirect("https://api.github.com/repositories/42/releases/latest", HttpStatusCode.MovedPermanently)
+                : JsonResponse(HttpStatusCode.OK, LatestReleaseJson));
+
+        var result = await client.GetLatestReleaseAsync("VBlackJack", "Heimdall", CancellationToken.None);
+
+        Assert.NotNull(result.Release);
+    }
+
+    [Fact]
+    public async Task GetLatestReleaseAsync_RedirectToPlainHttpOnTheApiHost_FailsWithoutFollowing()
+    {
+        int sent = 0;
+        var client = CreateClient((_, _) =>
+        {
+            sent++;
+            return Redirect("http://api.github.com/repositories/42/releases/latest", HttpStatusCode.MovedPermanently);
+        });
+
+        var result = await client.GetLatestReleaseAsync("VBlackJack", "Heimdall", CancellationToken.None);
+
+        Assert.Null(result.Release);
+        Assert.Equal(UpdateCheckFailure.SourceUnavailable, result.Failure);
+        Assert.Equal(1, sent);
+    }
+
+    [Fact]
+    public async Task GetLatestReleaseAsync_RedirectToAnotherHost_FailsWithoutFollowing()
+    {
+        int sent = 0;
+        var client = CreateClient((_, _) =>
+        {
+            sent++;
+            return Redirect("https://evil.example/releases/latest", HttpStatusCode.MovedPermanently);
+        });
+
+        var result = await client.GetLatestReleaseAsync("VBlackJack", "Heimdall", CancellationToken.None);
+
+        Assert.Null(result.Release);
+        Assert.Equal(1, sent);
+    }
+
     // The asset text path is the checksum list: a few hundred bytes from the
     // application's own release. It used to be buffered whole with no ceiling, so an
     // allowed host serving an unbounded body would have been read into memory until

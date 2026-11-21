@@ -35,6 +35,17 @@ public sealed class UpdateService : IUpdateService
     private const int DownloadBufferSize = 81920;
 
     /// <summary>
+    /// Absolute ceiling on an installer download, used when the release JSON gives no
+    /// usable size and as an upper bound on one that does. The installer is about a
+    /// hundred megabytes; one gibibyte is an order of magnitude above it, so no real
+    /// release trips it, while a hostile or broken host can no longer fill the disk.
+    /// </summary>
+    internal const long DefaultMaxInstallerBytes = 1024L * 1024 * 1024;
+
+    /// <summary>The ceiling in force; only a test sets it, to reach the ceiling without a gibibyte of data.</summary>
+    internal long MaxInstallerBytes { get; init; } = DefaultMaxInstallerBytes;
+
+    /// <summary>
     /// How long a download may go without delivering a single byte before it is
     /// treated as stalled.
     /// </summary>
@@ -191,12 +202,26 @@ public sealed class UpdateService : IUpdateService
 
         try
         {
-            await using (var source = await _client.OpenAssetStreamAsync(update.Asset.DownloadUrl, cancellationToken).ConfigureAwait(false))
-            await using (var destination = CreateInstallerWriteStream(installerPath))
+            try
             {
-                await CopyWithProgressAsync(source, destination, update.Asset.SizeBytes, progress, _downloadIdleTimeout, cancellationToken).ConfigureAwait(false);
-                await destination.FlushAsync(cancellationToken).ConfigureAwait(false);
-                destination.Flush(flushToDisk: true);
+                await using (var source = await _client.OpenAssetStreamAsync(update.Asset.DownloadUrl, cancellationToken).ConfigureAwait(false))
+                await using (var destination = CreateInstallerWriteStream(installerPath))
+                {
+                    bool capIsAssetSize = update.Asset.SizeBytes > 0 && update.Asset.SizeBytes <= MaxInstallerBytes;
+                    long maxBytes = capIsAssetSize ? update.Asset.SizeBytes : MaxInstallerBytes;
+                    await CopyWithProgressAsync(source, destination, update.Asset.SizeBytes, maxBytes, capIsAssetSize, progress, _downloadIdleTimeout, cancellationToken).ConfigureAwait(false);
+                    await destination.FlushAsync(cancellationToken).ConfigureAwait(false);
+                    destination.Flush(flushToDisk: true);
+                }
+            }
+            catch (AssetSizeExceededException exceeded)
+            {
+                // More bytes than the release JSON promised is the signature of a release
+                // republished with a larger installer while it downloaded. Ask the source
+                // before reporting a generic failure: this throws UpdateSupersededException
+                // when the published checksum changed. Otherwise the refusal stands.
+                await RefuseIfRepublishedAsync(update, cancellationToken).ConfigureAwait(false);
+                throw new InvalidOperationException(exceeded.Message, exceeded);
             }
 
             if (update.Sha256 is null)
@@ -464,17 +489,38 @@ public sealed class UpdateService : IUpdateService
         Stream source,
         Stream destination,
         long totalBytes,
+        long maxBytes,
+        bool capIsAssetSize,
         IProgress<double>? progress,
         TimeSpan idleTimeout,
         CancellationToken cancellationToken)
     {
+        // Refuse on the declared length before a byte is read; the running count below
+        // covers a response that declares nothing or lies about it.
+        long? declared = source is DeclaredLengthStream declaredStream
+            ? declaredStream.DeclaredLength
+            : source.CanSeek ? source.Length : null;
+        if (declared > maxBytes)
+        {
+            throw CapExceeded(
+                $"The update download declares {declared} bytes, over the {maxBytes} byte limit.",
+                capIsAssetSize);
+        }
+
         var buffer = new byte[DownloadBufferSize];
         long copied = 0;
         int read;
         while ((read = await ReadWithIdleTimeoutAsync(source, buffer, idleTimeout, cancellationToken).ConfigureAwait(false)) > 0)
         {
-            await destination.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
             copied += read;
+            if (copied > maxBytes)
+            {
+                throw CapExceeded(
+                    $"The update download exceeded the {maxBytes} byte limit.",
+                    capIsAssetSize);
+            }
+
+            await destination.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
             if (progress is not null && totalBytes > 0)
             {
                 progress.Report(Math.Min(1.0, (double)copied / totalBytes));
@@ -483,6 +529,16 @@ public sealed class UpdateService : IUpdateService
 
         progress?.Report(1.0);
     }
+
+    /// <summary>
+    /// A breach of the asset's own size starts the republication diagnosis; a breach of the
+    /// absolute ceiling fails directly.
+    /// </summary>
+    private static InvalidOperationException CapExceeded(string message, bool capIsAssetSize)
+        => capIsAssetSize ? new AssetSizeExceededException(message) : new InvalidOperationException(message);
+
+    /// <summary>A download passed the size the release JSON gave for its asset.</summary>
+    private sealed class AssetSizeExceededException(string message) : InvalidOperationException(message);
 
     /// <summary>
     /// One read, bounded by the inactivity budget. A read that produces nothing within
