@@ -62,6 +62,7 @@ public class PingStatsEngineTests
     [InlineData("-f")]
     [InlineData("--help")]
     [InlineData("-c 1")]
+    [InlineData("a b")]
     public void ValidateInputs_HostStartingWithDash_ReturnsInvalidHost(string host)
     {
         var (inputs, errorKey) = PingStatsEngine.ValidateInputs(host, "1000", "");
@@ -72,6 +73,11 @@ public class PingStatsEngineTests
     [Theory]
     [InlineData("::1")]
     [InlineData("fe80::1")]
+    [InlineData("fe80::1%12")]
+    [InlineData("my_host")]
+    [InlineData("host.example.com.")]
+    [InlineData("1e100.net")]
+    [InlineData("3com.com")]
     [InlineData("10.0.0.1")]
     [InlineData("example.com")]
     public void ValidateInputs_ValidHost_IsAccepted(string host)

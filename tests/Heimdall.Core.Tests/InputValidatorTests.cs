@@ -27,8 +27,13 @@ public class InputValidatorTests
     [InlineData("sysDescr.0", true)]
     [InlineData("SNMPv2-MIB::sysDescr.0", true)]
     [InlineData("ifTable", true)]
+    [InlineData("iso.org.dod.internet", true)]
+    [InlineData("IF-MIB::ifTable.ifEntry.ifDescr", true)]
+    [InlineData("IF-MIB::ifDescr.1", true)]
     [InlineData("-Ln", false)]
     [InlineData("-Lf/tmp/x", false)]
+    [InlineData("iso..org", false)]
+    [InlineData("iso.-org", false)]
     [InlineData("--help", false)]
     [InlineData("1.3.6.1;id", false)]
     [InlineData("sysDescr 0", false)]
@@ -38,6 +43,25 @@ public class InputValidatorTests
     public void Validate_SnmpOid_ReturnsExpected(string? value, bool expected)
     {
         Assert.Equal(expected, InputValidator.Validate(value, InputValidator.SnmpOidPatternName));
+    }
+
+    [Theory]
+    [InlineData("my_host", true)]
+    [InlineData("host.example.com.", true)]
+    [InlineData("1e100.net", true)]
+    [InlineData("123.lab", true)]
+    [InlineData("fe80::1%12", true)]
+    [InlineData("::1", true)]
+    [InlineData("10.0.0.1", true)]
+    [InlineData("-f", false)]
+    [InlineData("--help", false)]
+    [InlineData("a b", false)]
+    [InlineData("host;id", false)]
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    public void IsValidDiagnosticHost_ReturnsExpected(string? value, bool expected)
+    {
+        Assert.Equal(expected, InputValidator.IsValidDiagnosticHost(value));
     }
 
     // ── Hostname validation ─────────────────────────────────────────────

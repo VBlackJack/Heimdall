@@ -4528,7 +4528,7 @@
   "ToolSnmpA11yLoading": "Chargement du parcours SNMP",
   "ToolSnmpProgress": "{0} OID r\u00e9cup\u00e9r\u00e9s",
   "ToolSnmpErrorConnection": "Requ\u00eate SNMP \u00e9chou\u00e9e : {0}",
-  "ErrorInvalidSnmpOid": "OID SNMP invalide. Utilisez un OID numérique (1.3.6.1.2.1) ou un nom MIB (SNMPv2-MIB::sysDescr.0).",
+  "ErrorInvalidSnmpOid": "OID SNMP invalide. Utilisez un OID num\u00e9rique (1.3.6.1.2.1). Les noms MIB symboliques (SNMPv2-MIB::sysDescr.0) ne fonctionnent que via une passerelle SSH.",
 
   "PaletteExternalToolsHeader": "Outils externes",
 

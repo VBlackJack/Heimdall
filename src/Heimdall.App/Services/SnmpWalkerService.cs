@@ -159,7 +159,7 @@ public sealed class SnmpWalkerService : ISnmpWalkerService
             throw new InvalidOperationException("Tunnel walk requested without a configured gateway.");
         }
 
-        if (!InputValidator.IsValidSshHost(host))
+        if (!InputValidator.IsValidDiagnosticHost(host))
         {
             throw new ArgumentException($"Invalid SNMP host: {host}", nameof(host));
         }

@@ -78,6 +78,12 @@ public sealed class PingService : IPingService
     {
         var timestamp = DateTime.Now.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
 
+        // Checked before branching: a gateway session must never run an unvalidated host remotely.
+        if (_gateway is not null)
+        {
+            EnsureValidTunnelHost(host);
+        }
+
         if (_sshClient is not null && _sshClient.IsConnected)
         {
             return await PingViaTunnelAsync(host, seq, timestamp, timeoutMs, ct).ConfigureAwait(false);
@@ -173,7 +179,7 @@ public sealed class PingService : IPingService
     /// </summary>
     internal static void EnsureValidTunnelHost(string host)
     {
-        if (!InputValidator.IsValidSshHost(host))
+        if (!InputValidator.IsValidDiagnosticHost(host))
         {
             throw new ArgumentException($"Invalid ping host: {host}", nameof(host));
         }

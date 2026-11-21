@@ -72,20 +72,23 @@ public sealed partial class SnmpWalkerViewModel : ObservableObject, IDisposable
             return;
         }
 
+        host = host.Trim();
+
         if (string.IsNullOrWhiteSpace(community))
         {
             community = NetworkToolPresets.SnmpDefaultCommunity;
         }
 
-        if (string.IsNullOrWhiteSpace(startOid))
-        {
-            startOid = NetworkToolPresets.SnmpDefaultOid;
-        }
+        startOid = string.IsNullOrWhiteSpace(startOid)
+            ? NetworkToolPresets.SnmpDefaultOid
+            : startOid.Trim();
 
         // A value starting with "-" would be read as an option by the remote snmpwalk command.
-        var invalidKey = !InputValidator.IsValidSshHost(host.Trim())
+        // The direct walk only understands numeric OIDs, so a symbolic one needs a gateway.
+        var invalidKey = !InputValidator.IsValidDiagnosticHost(host)
             ? "ErrorInvalidHost"
             : !InputValidator.Validate(startOid, InputValidator.SnmpOidPatternName)
+                || (!_hasGateway && !InputValidator.Validate(startOid, InputValidator.SnmpNumericOidPatternName))
                 ? "ErrorInvalidSnmpOid"
                 : null;
         if (invalidKey is not null)

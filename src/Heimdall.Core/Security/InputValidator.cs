@@ -46,6 +46,16 @@ public static class InputValidator
     public const string SnmpOidPatternName = "SnmpOid";
 
     /// <summary>
+    /// Name of the numeric-only SNMP OID validation pattern.
+    /// </summary>
+    public const string SnmpNumericOidPatternName = "SnmpNumericOid";
+
+    /// <summary>
+    /// Name of the diagnostic host name validation pattern.
+    /// </summary>
+    public const string DiagnosticHostPatternName = "DiagnosticHost";
+
+    /// <summary>
     /// Validation patterns indexed by name, all built on the non-backtracking engine.
     /// </summary>
     private static readonly FrozenDictionary<string, Regex> ValidationPatterns =
@@ -78,8 +88,16 @@ public static class InputValidator
 
             // SNMP OID: numeric (1.3.6.1, .1.3.6.1) or symbolic (sysDescr.0, SNMPv2-MIB::sysDescr.0).
             // Must not start with "-": the value reaches snmpwalk as an argument.
+            // Symbolic names may be dotted paths (iso.org.dod, IF-MIB::ifTable.ifEntry.ifDescr).
             [SnmpOidPatternName] = BuildPattern(
-                @"^\.?\d+(\.\d+)*$|^[A-Za-z][A-Za-z0-9\-]*(::[A-Za-z][A-Za-z0-9\-]*)?(\.\d+)*$"),
+                @"^\.?[0-9]+(\.[0-9]+)*$|^[A-Za-z][A-Za-z0-9\-]*(::[A-Za-z][A-Za-z0-9\-]*)?(\.([0-9]+|[A-Za-z][A-Za-z0-9\-]*))*$"),
+
+            // Numeric-only SNMP OID, the only form the direct (non-tunnel) walk understands.
+            [SnmpNumericOidPatternName] = BuildPattern(@"^\.?[0-9]+(\.[0-9]+)*$"),
+
+            // Diagnostic host name (ping, SNMP): permissive on purpose (underscores, trailing dot,
+            // digit-leading labels) but never a leading "-", which a remote command reads as an option.
+            [DiagnosticHostPatternName] = BuildPattern(@"^[A-Za-z0-9_][A-Za-z0-9_.\-]*$"),
 
             // Port numbers (used for LocalPort, RemotePort, etc.)
             ["LocalPort"] = BuildPattern(@"^\d{1,5}$"),
@@ -259,6 +277,21 @@ public static class InputValidator
     {
         return !string.IsNullOrWhiteSpace(host)
             && (ValidateDomain(host) || IPAddress.TryParse(host, out _));
+    }
+
+    /// <summary>
+    /// Validate a host for a diagnostic command (ping, SNMP walk): any IP address, or a name made
+    /// of letters, digits, underscores, dots and hyphens that does not start with a hyphen.
+    /// </summary>
+    /// <param name="host">The host value to validate.</param>
+    /// <returns>True if the host cannot be read as an option by a remote command.</returns>
+    public static bool IsValidDiagnosticHost(string? host)
+    {
+        if (string.IsNullOrWhiteSpace(host))
+            return false;
+
+        string trimmed = host.Trim();
+        return IPAddress.TryParse(trimmed, out _) || Validate(trimmed, DiagnosticHostPatternName);
     }
 
     /// <summary>

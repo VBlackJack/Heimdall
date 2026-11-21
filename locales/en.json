@@ -4529,7 +4529,7 @@
   "ToolSnmpA11yLoading": "Loading SNMP walk",
   "ToolSnmpProgress": "{0} OIDs retrieved",
   "ToolSnmpErrorConnection": "SNMP query failed: {0}",
-  "ErrorInvalidSnmpOid": "Invalid SNMP OID. Use a numeric OID (1.3.6.1.2.1) or a MIB name (SNMPv2-MIB::sysDescr.0).",
+  "ErrorInvalidSnmpOid": "Invalid SNMP OID. Use a numeric OID (1.3.6.1.2.1). Symbolic MIB names (SNMPv2-MIB::sysDescr.0) work only through an SSH gateway.",
 
   "PaletteExternalToolsHeader": "External Tools",
 

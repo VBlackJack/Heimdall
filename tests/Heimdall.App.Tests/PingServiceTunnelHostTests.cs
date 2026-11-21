@@ -15,6 +15,7 @@
  */
 
 using Heimdall.App.Services;
+using Heimdall.Core.Configuration;
 
 namespace Heimdall.App.Tests;
 
@@ -30,6 +31,22 @@ public class PingServiceTunnelHostTests
     }
 
     [Theory]
+    [InlineData("-f")]
+    [InlineData("--help")]
+    public async Task PingAsync_WithGateway_OptionLikeHost_ThrowsBeforeConnecting(string host)
+    {
+        using var service = new PingService();
+        service.SetGateway(new SshGatewayDto { Name = "gw", Host = "unreachable.invalid", Port = 22, User = "me" });
+
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => service.PingAsync(host, 1, 1000, CancellationToken.None));
+    }
+
+    [Theory]
+    [InlineData("my_host")]
+    [InlineData("host.example.com.")]
+    [InlineData("1e100.net")]
+    [InlineData("fe80::1%12")]
     [InlineData("::1")]
     [InlineData("fe80::1")]
     [InlineData("10.0.0.1")]

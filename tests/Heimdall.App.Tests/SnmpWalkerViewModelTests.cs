@@ -56,19 +56,57 @@ public class SnmpWalkerViewModelTests
         Assert.Equal(0, service.TunnelWalkCallCount);
     }
 
-    [Theory]
-    [InlineData("SNMPv2-MIB::sysDescr.0")]
-    [InlineData("1.3.6.1")]
-    public async Task Walk_SymbolicOrNumericOid_IsAccepted(string oid)
+    [Fact]
+    public async Task Walk_NumericOidWithoutGateway_IsAccepted()
     {
         var service = new FakeWalkerService();
         var vm = new SnmpWalkerViewModel(service);
         vm.Initialize(null);
 
-        await vm.WalkAsync("10.0.0.1", "public", oid);
+        await vm.WalkAsync("my_host", "public", "1.3.6.1");
 
         Assert.False(vm.ShowError);
         Assert.Equal(1, service.WalkCallCount);
+    }
+
+    [Fact]
+    public async Task Walk_SymbolicOidWithGateway_IsAccepted()
+    {
+        var service = new FakeWalkerService();
+        var vm = new SnmpWalkerViewModel(service);
+        vm.Initialize(null);
+        vm.SetGateway(new SshGatewayDto { Name = "gw", Host = "jump", Port = 22, User = "me" });
+
+        await vm.WalkAsync("10.0.0.1", "public", "SNMPv2-MIB::sysDescr.0");
+
+        Assert.False(vm.ShowError);
+        Assert.Equal(1, service.TunnelWalkCallCount);
+    }
+
+    [Fact]
+    public async Task Walk_SymbolicOidWithoutGateway_IsRefused()
+    {
+        var service = new FakeWalkerService();
+        var vm = new SnmpWalkerViewModel(service);
+        vm.Initialize(null);
+
+        await vm.WalkAsync("10.0.0.1", "public", "SNMPv2-MIB::sysDescr.0");
+
+        Assert.True(vm.ShowError);
+        Assert.Equal(0, service.WalkCallCount);
+    }
+
+    [Fact]
+    public async Task Walk_PaddedValues_AreTrimmedBeforeTheService()
+    {
+        var service = new FakeWalkerService();
+        var vm = new SnmpWalkerViewModel(service);
+        vm.Initialize(null);
+
+        await vm.WalkAsync("  10.0.0.1 ", "public", " 1.3.6.1 ");
+
+        Assert.Equal("1.3.6.1", service.LastOid);
+        Assert.Equal("10.0.0.1", service.LastHost);
     }
 
     [Theory]
@@ -237,6 +275,7 @@ public class SnmpWalkerViewModelTests
         public SshGatewayDto? LastGateway { get; private set; }
         public string LastCommunity { get; private set; } = string.Empty;
         public string LastOid { get; private set; } = string.Empty;
+        public string LastHost { get; private set; } = string.Empty;
 
         public Task<IReadOnlyList<SnmpEntry>> WalkDirectAsync(
             string host,
@@ -247,6 +286,7 @@ public class SnmpWalkerViewModelTests
             CancellationToken ct)
         {
             WalkCallCount++;
+            LastHost = host;
             LastCommunity = community;
             LastOid = startOid;
 
