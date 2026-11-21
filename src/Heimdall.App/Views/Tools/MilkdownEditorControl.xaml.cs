@@ -122,9 +122,11 @@ public partial class MilkdownEditorControl : UserControl, IDisposable
                 .ConfigureAwait(true);
 
             await EditorWebView.EnsureCoreWebView2Async(env).ConfigureAwait(true);
+            if (_disposed) return;
             Core.Logging.FileLogger.Info("Milkdown WebView2 host initialized");
 
             var core = EditorWebView.CoreWebView2;
+            _lockdown?.Dispose();
             _lockdown = WebView2Lockdown.Apply(core, OnNewWindow);
             core.Settings.AreDefaultContextMenusEnabled = false;
             core.Settings.AreDevToolsEnabled = false;

@@ -1516,6 +1516,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
                 return;
             }
 
+            _lockdown?.Dispose();
             _lockdown = Services.WebView2Lockdown.Apply(core, onNewWindow: null);
             core.Settings.AreDefaultContextMenusEnabled = false;
             core.Settings.AreDevToolsEnabled = false;

@@ -41,7 +41,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
     private LocalizationManager? _localizer;
     private bool _localeChangeSubscribed;
     private bool _webViewReady;
-    private bool _disposed;
+    private volatile bool _disposed;
     private IDisposable? _lockdown;
 
     // Server-supplied desktop name, captured from the "desktop-name:" web message; used as the
@@ -361,6 +361,7 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
             if (_disposed) return;
 
             var core = VncWebView.CoreWebView2;
+            _lockdown?.Dispose();
             _lockdown = Services.WebView2Lockdown.Apply(core, onNewWindow: null);
             core.Settings.AreDefaultContextMenusEnabled = false;
             core.Settings.AreDevToolsEnabled = false;
@@ -647,11 +648,15 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
 
         Dispatcher.Invoke(() =>
         {
+            if (_disposed) return;
+
             _offerPasswordEntry = offerEntry;
             StatusTextBlock.Text = text;
             Behaviors.LiveRegionBehavior.Announce(StatusTextBlock);
             ShowReconnectOverlay(text);
         });
+
+        if (_disposed) return;
 
         if (_session?.ServerId is not null)
         {
@@ -1081,6 +1086,8 @@ public partial class EmbeddedVncView : UserControl, IDisposable, ISessionPaneOwn
     /// <summary>Shows the reconnect overlay and header button after an unexpected disconnect.</summary>
     public void ShowReconnectOverlay(string? message = null)
     {
+        if (_disposed) return;
+
         Dispatcher.Invoke(() =>
         {
             if (!string.IsNullOrEmpty(message))

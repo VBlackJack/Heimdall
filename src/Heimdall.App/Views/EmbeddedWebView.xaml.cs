@@ -223,6 +223,7 @@ public partial class EmbeddedWebView : UserControl, IDisposable, ISessionPaneOwn
             // A console is a web application the user operates: copy and paste, find and zoom
             // stay. Developer tools, autofill and external protocol launches are shut by the
             // shared lockdown, as in every embedded view; a popup opens in this tab.
+            _lockdown?.Dispose();
             _lockdown = WebView2Lockdown.Apply(core, OnNewWindow);
 
             core.NavigationStarting += OnNavigationStarting;

@@ -130,9 +130,11 @@ public partial class DiagramEditorView : UserControl, IToolView, IRecoverableUns
 
             var env = await WebView2Helper.CreateEnvironmentAsync("DrawIO");
             await DiagramWebView.EnsureCoreWebView2Async(env);
+            if (_disposed) return;
 
             var core = DiagramWebView.CoreWebView2;
             ConfigureWebViewSettings(core);
+            _lockdown?.Dispose();
             _lockdown = WebView2Lockdown.Apply(core, OnNewWindow);
 
             // Virtual host mapping for local draw.io files

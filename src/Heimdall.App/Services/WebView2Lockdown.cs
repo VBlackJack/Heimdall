@@ -61,6 +61,7 @@ public static class WebView2Lockdown
         void OnLaunchingExternalUriScheme(object? sender, CoreWebView2LaunchingExternalUriSchemeEventArgs e)
         {
             e.Cancel = true;
+            Core.Logging.FileLogger.Warn("WebView2 blocked an external protocol launch.");
         }
 
         core.NewWindowRequested += OnNewWindowRequested;

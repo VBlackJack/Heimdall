@@ -115,6 +115,18 @@ public sealed class WebView2LockdownGuardTests
         Assert.False(LockdownIsAStepOfTheStartUp(ViewSource.WithoutCommentsAndLiterals(mutated)));
     }
 
+    [Theory]
+    [MemberData(nameof(HostFiles))]
+    public void AHostThatDoesNotDisposeThePreviousHandleFirst_IsRefused(string relativePath)
+    {
+        string source = File.ReadAllText(Path.Combine(AppRoot(), relativePath));
+        string mutated = source.Replace("            " + DisposeStatement + "\r\n            _lockdown = ", "            _lockdown = ", StringComparison.Ordinal);
+        mutated = mutated.Replace("            " + DisposeStatement + "\n            _lockdown = ", "            _lockdown = ", StringComparison.Ordinal);
+
+        Assert.NotEqual(source, mutated);
+        Assert.False(LockdownIsAStepOfTheStartUp(ViewSource.WithoutCommentsAndLiterals(mutated)));
+    }
+
     [Fact]
     public void AHostWithTheLockdownInsideABranch_IsRefused()
     {
@@ -247,11 +259,17 @@ public sealed class WebView2LockdownGuardTests
 
         // The overlay itself takes the focus, as a step of the deferred lambda, below the guard.
         Assert.True(
-            ViewSource.IsStatementOfTheMethodBody(lambda, "ReconnectOverlay.Focus();"),
-            "The reconnect overlay does not take the focus in its deferred lambda.");
-        Assert.True(
             ViewSource.IsStatementOfTheMethodBody(lambda, DisposedOrHiddenGuard),
             "The deferred focus does not check disposal and visibility first.");
+
+        // The focus is a step that follows the guard, and the guard's block leaves the lambda.
+        string fromGuard = ViewSource.HandlerBody(lambda, DisposedOrHiddenGuard);
+        Assert.True(
+            ViewSource.IsStatementOfTheMethodBody("{" + fromGuard, "ReconnectOverlay.Focus();"),
+            "The reconnect overlay does not take the focus below the guard of its deferred lambda.");
+        Assert.True(
+            ViewSource.IsStatementOfTheMethodBody(BlockAfter(fromGuard, DisposedOrHiddenGuard), "return;"),
+            "The guard of the deferred focus does not return.");
         Assert.StartsWith(
             "System.Windows.Threading.DispatcherPriority.Input);",
             afterLambda.TrimStart(',', ' ', '\r', '\n'),
@@ -277,6 +295,11 @@ public sealed class WebView2LockdownGuardTests
                 "{" + ViewSource.HandlerBody(start, Guard),
                 "_initTask = InitializeWebViewAsync();"),
             "The web console does not start initialisation below the in-flight check.");
+        Assert.True(
+            ViewSource.IsStatementOfTheMethodBody(
+                BlockAfter(ViewSource.HandlerBody(start, Guard), Guard),
+                "return _initTask;"),
+            "The in-flight check does not hand back the running attempt.");
 
         // The only caller of the real initialisation is the guarded starter (plus its declaration).
         Assert.Equal(2, logic.Split("InitializeWebViewAsync(").Length - 1);
@@ -371,6 +394,11 @@ public sealed class WebView2LockdownGuardTests
             scope = catchStart > tryStart ? method[tryStart..catchStart] : method[tryStart..];
         }
 
+        if (!ViewSource.IsStatementOfTheMethodBody(scope, DisposeStatement))
+        {
+            return false;
+        }
+
         bool plain = ViewSource.IsStatementOfTheMethodBody(scope, LockdownStatement);
         bool qualified = ViewSource.IsStatementOfTheMethodBody(scope, LockdownStatementQualified);
         if (!plain && !qualified)
@@ -381,7 +409,11 @@ public sealed class WebView2LockdownGuardTests
         int apply = Math.Max(
             scope.IndexOf(LockdownStatement, StringComparison.Ordinal),
             scope.IndexOf(LockdownStatementQualified, StringComparison.Ordinal));
-        return apply > scope.IndexOf(CoreCall, StringComparison.Ordinal);
+        // The previous handle goes first, so a second start never leaves the first one subscribed.
+        int dispose = scope.LastIndexOf(DisposeStatement, apply, StringComparison.Ordinal);
+        return apply > scope.IndexOf(CoreCall, StringComparison.Ordinal)
+            && dispose >= 0
+            && scope[(dispose + DisposeStatement.Length)..apply].Trim().Length == 0;
     }
 
     private static List<string> FindHosts()
