@@ -424,4 +424,35 @@ public sealed class PrivilegeLauncherTests
 
         Assert.Equal(original, PrivilegeLauncher.ParseArguments(argumentsOnly));
     }
+
+    private static readonly System.Security.Principal.SecurityIdentifier LocalSystem =
+        new(System.Security.Principal.WellKnownSidType.LocalSystemSid, null);
+
+    private static readonly System.Security.Principal.SecurityIdentifier TrustedInstallerSid =
+        new(PrivilegeLauncher.TrustedInstallerServiceSid);
+
+    private static readonly System.Security.Principal.SecurityIdentifier AdminUser =
+        new("S-1-5-21-1-2-3-1001");
+
+    [Fact]
+    public void IsAcceptableToken_SystemUserAtSystemLevel_IsAccepted() =>
+        Assert.True(PrivilegeLauncher.IsAcceptableToken(LocalSystem, [], PrivilegeLevel.System));
+
+    [Fact]
+    public void IsAcceptableToken_AdminUserAtSystemLevel_IsRefused() =>
+        Assert.False(PrivilegeLauncher.IsAcceptableToken(AdminUser, [], PrivilegeLevel.System));
+
+    [Fact]
+    public void IsAcceptableToken_TrustedInstallerWithServiceGroup_IsAccepted() =>
+        Assert.True(PrivilegeLauncher.IsAcceptableToken(
+            LocalSystem, [AdminUser, TrustedInstallerSid], PrivilegeLevel.TrustedInstaller));
+
+    [Fact]
+    public void IsAcceptableToken_TrustedInstallerWithoutServiceGroup_IsRefused() =>
+        Assert.False(PrivilegeLauncher.IsAcceptableToken(
+            LocalSystem, [AdminUser], PrivilegeLevel.TrustedInstaller));
+
+    [Fact]
+    public void IsAcceptableToken_PlainSystemTokenAtTrustedInstallerLevel_IsRefused() =>
+        Assert.False(PrivilegeLauncher.IsAcceptableToken(LocalSystem, [], PrivilegeLevel.TrustedInstaller));
 }
