@@ -33,6 +33,31 @@ internal sealed partial class NotesToolViewModel : ObservableObject, IDisposable
     private readonly IDialogService? _dialogService;
     private readonly Stack<string> _backStack = new();
     private readonly Stack<string> _forwardStack = new();
+
+    /// <summary>
+    /// Serializes every write of the open note (autosave, explicit save, pre-switch save) with
+    /// the operations that change which file the open note is (delete, rename, move), so an
+    /// autosave can never recreate a file that is being deleted or moved.
+    /// </summary>
+    private readonly SemaphoreSlim _noteMutationGate = new(1, 1);
+
+    /// <summary>How many times one save call writes again because edits landed during the write.</summary>
+    private const int MaxSavePasses = 3;
+
+    /// <summary>
+    /// Bumped whenever the open document changes (its text or which note it is), so a save can
+    /// tell that edits arrived while it was writing.
+    /// </summary>
+    private long _documentRevision;
+
+    /// <summary>
+    /// The note whose file a delete, rename or move is changing right now, set and cleared under
+    /// the gate. The synchronous save (close paths) cannot take the gate, so it reads this instead:
+    /// writing the old path then would recreate a deleted note or leave a stale copy.
+    /// </summary>
+    private volatile InFlightMutation? _mutationInFlight;
+
+    private sealed record InFlightMutation(string Path, bool IsDelete);
     private IReadOnlyList<NoteListItem> _allNotes = Array.Empty<NoteListItem>();
     private CancellationTokenSource? _refreshCts;
     private ToolContext? _context;
@@ -114,11 +139,40 @@ internal sealed partial class NotesToolViewModel : ObservableObject, IDisposable
 
         try
         {
+            string path = CurrentNotePath;
+
+            if (_mutationInFlight is { } mutation
+                && string.Equals(mutation.Path, path, StringComparison.Ordinal))
+            {
+                if (mutation.IsDelete)
+                {
+                    // The note is on its way out: there is nothing to keep, and writing it
+                    // would bring the deleted file back.
+                    IsDirty = false;
+                    return true;
+                }
+
+                // The file is being moved: refused, so the caller asks about discarding instead
+                // of writing a stale copy at the old path.
+                return false;
+            }
+
+            string content = CurrentMarkdown;
+            long revision = Interlocked.Read(ref _documentRevision);
+
             // A save that could not take the write lock wrote nothing: the note stays
             // dirty and the close is refused, rather than closing over the lost edits.
-            if (!_storage.SaveNote(CurrentNotePath, CurrentMarkdown))
+            if (!_storage.SaveNote(path, content))
             {
                 return false;
+            }
+
+            // Only what was written is marked clean: a document that moved on meanwhile stays
+            // dirty and the close is refused.
+            if (!string.Equals(CurrentNotePath, path, StringComparison.Ordinal)
+                || Interlocked.Read(ref _documentRevision) != revision)
+            {
+                return !IsDirty;
             }
 
             IsDirty = false;
@@ -224,21 +278,59 @@ internal sealed partial class NotesToolViewModel : ObservableObject, IDisposable
     {
         ThrowIfDisposed();
         bool movesCurrentNote = string.Equals(CurrentNotePath, filePath, StringComparison.OrdinalIgnoreCase);
-        if (movesCurrentNote && !await TrySaveOrConfirmDiscardAsync().ConfigureAwait(true))
-        {
-            return null;
-        }
+        string newPath;
 
-        var newPath = await _storage.MoveNoteToFolderAsync(filePath, targetFolder).ConfigureAwait(true);
+        // The gate is held for the file operation only: the reload below opens a note, which
+        // saves under the gate itself.
         if (movesCurrentNote)
         {
-            CurrentNotePath = newPath;
-            RewriteHistoryPath(filePath, newPath);
+            await _noteMutationGate.WaitAsync().ConfigureAwait(true);
+        }
 
-            // What the editor shows is what the file holds now: after a declined save and a
-            // discard the screen would otherwise keep the discarded text as if it were clean.
-            CurrentMarkdown = await _storage.LoadNoteAsync(newPath).ConfigureAwait(true);
-            IsDirty = false;
+        try
+        {
+            if (movesCurrentNote && !await TrySaveOrConfirmDiscardAsync(gateHeld: true).ConfigureAwait(true))
+            {
+                return null;
+            }
+
+            if (movesCurrentNote)
+            {
+                _mutationInFlight = new InFlightMutation(filePath, IsDelete: false);
+            }
+
+            try
+            {
+                newPath = await _storage.MoveNoteToFolderAsync(filePath, targetFolder).ConfigureAwait(true);
+            }
+            finally
+            {
+                _mutationInFlight = null;
+            }
+
+            if (movesCurrentNote)
+            {
+                CurrentNotePath = newPath;
+                long revision = Interlocked.Read(ref _documentRevision);
+                RewriteHistoryPath(filePath, newPath);
+
+                // What the editor shows is what the file holds now: after a declined save and a
+                // discard the screen would otherwise keep the discarded text as if it were clean.
+                // Edits typed during the move are newer than the file and are kept, dirty.
+                string content = await _storage.LoadNoteAsync(newPath).ConfigureAwait(true);
+                if (Interlocked.Read(ref _documentRevision) == revision)
+                {
+                    CurrentMarkdown = content;
+                    IsDirty = false;
+                }
+            }
+        }
+        finally
+        {
+            if (movesCurrentNote)
+            {
+                _noteMutationGate.Release();
+            }
         }
 
         await ReloadAsync(movesCurrentNote ? newPath : CurrentNotePath).ConfigureAwait(true);
@@ -354,9 +446,9 @@ internal sealed partial class NotesToolViewModel : ObservableObject, IDisposable
     /// the note is still dirty then, the status line says why, and a caller about to replace the
     /// editor content must stop, or the edits are lost.
     /// </returns>
-    private async Task<bool> TrySaveOrConfirmDiscardAsync()
+    private async Task<bool> TrySaveOrConfirmDiscardAsync(bool gateHeld = false)
     {
-        if (await TrySaveCurrentNoteAsync().ConfigureAwait(true))
+        if (await TrySaveCurrentNoteAsync(gateHeld).ConfigureAwait(true))
         {
             return true;
         }
@@ -398,7 +490,13 @@ internal sealed partial class NotesToolViewModel : ObservableObject, IDisposable
         return discard;
     }
 
-    private async Task<bool> TrySaveCurrentNoteAsync()
+    /// <summary>
+    /// Writes the open note until it is clean. Edits that land while a write is in flight are
+    /// written by the next pass (at most <see cref="MaxSavePasses"/>); the note is marked clean
+    /// only when the document is exactly what was written.
+    /// </summary>
+    /// <param name="gateHeld">True when the caller already holds the mutation gate.</param>
+    private async Task<bool> TrySaveCurrentNoteAsync(bool gateHeld = false)
     {
         ThrowIfDisposed();
 
@@ -407,24 +505,78 @@ internal sealed partial class NotesToolViewModel : ObservableObject, IDisposable
             return true;
         }
 
+        if (!gateHeld)
+        {
+            await _noteMutationGate.WaitAsync().ConfigureAwait(true);
+        }
+
         try
         {
-            IsBusy = true;
-            SetStatus(L("ToolNotesStatusSaving"));
-            await _storage.SaveNoteAsync(CurrentNotePath, CurrentMarkdown).ConfigureAwait(true);
-            IsDirty = false;
-            SetStatus(string.Format(L("ToolNotesStatusSaved"), DateTime.Now.ToString("HH:mm:ss")));
-            return true;
-        }
-        catch (Exception ex)
-        {
-            SetStatus(string.Format(L("ToolNotesStatusSaveFailed"), ex.Message), isError: true);
-            return false;
+            return await SaveUnderGateAsync().ConfigureAwait(true);
         }
         finally
         {
-            IsBusy = false;
+            if (!gateHeld)
+            {
+                _noteMutationGate.Release();
+            }
         }
+    }
+
+    private async Task<bool> SaveUnderGateAsync()
+    {
+        for (int pass = 0; pass < MaxSavePasses; pass++)
+        {
+            if (!IsDirty || CurrentNotePath is null)
+            {
+                return true;
+            }
+
+            string path = CurrentNotePath;
+            string content = CurrentMarkdown;
+            long revision = Interlocked.Read(ref _documentRevision);
+
+            try
+            {
+                IsBusy = true;
+                SetStatus(L("ToolNotesStatusSaving"));
+                await _storage.SaveNoteAsync(path, content).ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                SetStatus(string.Format(L("ToolNotesStatusSaveFailed"), ex.Message), isError: true);
+                return false;
+            }
+            finally
+            {
+                IsBusy = false;
+            }
+
+            if (!string.Equals(CurrentNotePath, path, StringComparison.Ordinal))
+            {
+                // Another note is open now: what was written belongs to the old one, and the
+                // dirty flag is the new note's.
+                return true;
+            }
+
+            if (Interlocked.Read(ref _documentRevision) == revision)
+            {
+                IsDirty = false;
+                SetStatus(string.Format(L("ToolNotesStatusSaved"), DateTime.Now.ToString("HH:mm:ss")));
+                return true;
+            }
+
+            // Edits landed during the write: they are not on disk, so the note stays dirty and
+            // the next pass writes them.
+        }
+
+        if (!IsDirty || CurrentNotePath is null)
+        {
+            return true;
+        }
+
+        SetStatus(L("ToolNotesStatusModified"));
+        return false;
     }
 
     [RelayCommand]
@@ -440,9 +592,51 @@ internal sealed partial class NotesToolViewModel : ObservableObject, IDisposable
         try
         {
             IsBusy = true;
-            var deletedPath = CurrentNotePath;
-            await _storage.DeleteNoteAsync(deletedPath).ConfigureAwait(true);
-            CurrentNotePath = null;
+            string deletedPath;
+            await _noteMutationGate.WaitAsync().ConfigureAwait(true);
+            try
+            {
+                if (CurrentNotePath is null)
+                {
+                    return;
+                }
+
+                deletedPath = CurrentNotePath;
+
+                // A note on its way out has nothing left to save: clean before the delete, so no
+                // autosave queued behind the gate writes the file back, and the in-flight marker
+                // makes the synchronous save of the close paths treat it as clean too (it cannot
+                // take the gate, and edits typed during the delete set the flag again).
+                bool wasDirty = IsDirty;
+                IsDirty = false;
+                _mutationInFlight = new InFlightMutation(deletedPath, IsDelete: true);
+                try
+                {
+                    await _storage.DeleteNoteAsync(deletedPath).ConfigureAwait(true);
+                }
+                catch
+                {
+                    if (wasDirty && string.Equals(CurrentNotePath, deletedPath, StringComparison.Ordinal))
+                    {
+                        IsDirty = true;
+                    }
+
+                    throw;
+                }
+                finally
+                {
+                    _mutationInFlight = null;
+                }
+
+                // Edits typed during the delete would otherwise recreate the file.
+                CurrentNotePath = null;
+                IsDirty = false;
+            }
+            finally
+            {
+                _noteMutationGate.Release();
+            }
+
             await ReloadAsync().ConfigureAwait(true);
             SetStatus(string.Format(L("ToolNotesStatusDeleted"), Path.GetFileNameWithoutExtension(deletedPath)));
         }
@@ -469,15 +663,47 @@ internal sealed partial class NotesToolViewModel : ObservableObject, IDisposable
         try
         {
             IsBusy = true;
-            if (!await TrySaveOrConfirmDiscardAsync().ConfigureAwait(true))
+            string newPath;
+            await _noteMutationGate.WaitAsync().ConfigureAwait(true);
+            try
             {
-                return;
+                if (!await TrySaveOrConfirmDiscardAsync(gateHeld: true).ConfigureAwait(true)
+                    || CurrentNotePath is null)
+                {
+                    return;
+                }
+
+                var oldPath = CurrentNotePath;
+                _mutationInFlight = new InFlightMutation(oldPath, IsDelete: false);
+                try
+                {
+                    newPath = await _storage.RenameNoteAsync(oldPath, newName).ConfigureAwait(true);
+                }
+                finally
+                {
+                    _mutationInFlight = null;
+                }
+
+                CurrentNotePath = newPath;
+                long revision = Interlocked.Read(ref _documentRevision);
+                RewriteHistoryPath(oldPath, newPath);
+
+                // The rename rewrote the heading on disk: the open document takes that text now,
+                // because the reload below sees an already open path and would keep the old
+                // heading, which the next autosave would write back. Edits typed during the
+                // rename are newer than the file and are kept, dirty.
+                string content = await _storage.LoadNoteAsync(newPath).ConfigureAwait(true);
+                if (Interlocked.Read(ref _documentRevision) == revision)
+                {
+                    CurrentMarkdown = content;
+                    IsDirty = false;
+                }
+            }
+            finally
+            {
+                _noteMutationGate.Release();
             }
 
-            var oldPath = CurrentNotePath;
-            var newPath = await _storage.RenameNoteAsync(oldPath, newName).ConfigureAwait(true);
-            CurrentNotePath = newPath;
-            RewriteHistoryPath(oldPath, newPath);
             await ReloadAsync(newPath).ConfigureAwait(true);
             SetStatus(string.Format(L("ToolNotesStatusRenamed"), _storage.GetRelativePath(newPath)));
         }
@@ -631,6 +857,10 @@ internal sealed partial class NotesToolViewModel : ObservableObject, IDisposable
         UpdateNavigationState();
         await OpenNoteCoreAsync(target, pushCurrentToBackStack: false).ConfigureAwait(true);
     }
+
+    partial void OnCurrentMarkdownChanged(string value) => Interlocked.Increment(ref _documentRevision);
+
+    partial void OnCurrentNotePathChanged(string? value) => Interlocked.Increment(ref _documentRevision);
 
     partial void OnSearchTextChanged(string value)
     {

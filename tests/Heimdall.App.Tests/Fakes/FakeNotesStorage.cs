@@ -25,6 +25,7 @@ namespace Heimdall.App.Tests.Fakes;
 internal sealed class FakeNotesStorage : INotesStorageService
 {
     private readonly Dictionary<string, StoredNote> _notes = new(StringComparer.OrdinalIgnoreCase);
+    private readonly SemaphoreSlim _saveOrder = new(1, 1);
     private int _createSequence;
 
     public FakeNotesStorage(string notesRootPath, params FakeNoteSeed[] notes)
@@ -49,6 +50,27 @@ internal sealed class FakeNotesStorage : INotesStorageService
     public bool SyncSaveLockTimesOut { get; set; }
 
     public Exception? ListFailure { get; set; }
+
+    /// <summary>
+    /// When set, an asynchronous save stores its content only once this source completes. Create
+    /// it without RunContinuationsAsynchronously, so releasing it runs the save inline.
+    /// </summary>
+    public TaskCompletionSource? SaveGate { get; set; }
+
+    /// <summary>When set, a delete removes the note only once this source completes.</summary>
+    public TaskCompletionSource? DeleteGate { get; set; }
+
+    /// <summary>When set, a rename or a move changes the note only once this source completes.</summary>
+    public TaskCompletionSource? MutationGate { get; set; }
+
+    /// <summary>How long the synchronous save waits for a write in progress before reporting failure.</summary>
+    public TimeSpan SyncSaveWait { get; set; } = TimeSpan.FromSeconds(2);
+
+    /// <summary>Runs inside every save with the content the caller handed over, before it is stored.</summary>
+    public Action<string>? OnSaveStarted { get; set; }
+
+    /// <summary>Every content stored by a save, in the order the writes landed.</summary>
+    public List<string> SavedContents { get; } = [];
 
     public IReadOnlyCollection<string> Paths => _notes.Keys.ToList();
 
@@ -158,22 +180,35 @@ internal sealed class FakeNotesStorage : INotesStorageService
         return Path.Combine(parent, folderName);
     }
 
-    public Task<string> MoveNoteToFolderAsync(string filePath, string targetFolder, CancellationToken cancellationToken = default)
+    public async Task<string> MoveNoteToFolderAsync(string filePath, string targetFolder, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (!_notes.Remove(filePath, out var note))
+        await _saveOrder.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
         {
-            throw new FileNotFoundException(filePath);
-        }
+            if (MutationGate is { } gate)
+            {
+                await gate.Task.ConfigureAwait(false);
+            }
 
-        var newPath = GetUniquePath(Path.Combine(targetFolder, Path.GetFileName(filePath)));
-        _notes[newPath] = note with
+            if (!_notes.Remove(filePath, out var note))
+            {
+                throw new FileNotFoundException(filePath);
+            }
+
+            var newPath = GetUniquePath(Path.Combine(targetFolder, Path.GetFileName(filePath)));
+            _notes[newPath] = note with
+            {
+                FilePath = newPath,
+                RelativePath = NormalizeRelativePath(Path.GetRelativePath(NotesRootPath, newPath)),
+                LastModifiedUtc = DateTime.UtcNow
+            };
+            return newPath;
+        }
+        finally
         {
-            FilePath = newPath,
-            RelativePath = NormalizeRelativePath(Path.GetRelativePath(NotesRootPath, newPath)),
-            LastModifiedUtc = DateTime.UtcNow
-        };
-        return Task.FromResult(newPath);
+            _saveOrder.Release();
+        }
     }
 
     public Task<string> LoadNoteAsync(string filePath, CancellationToken cancellationToken = default)
@@ -182,11 +217,28 @@ internal sealed class FakeNotesStorage : INotesStorageService
         return Task.FromResult(_notes.TryGetValue(filePath, out var note) ? note.Content : string.Empty);
     }
 
-    public Task SaveNoteAsync(string filePath, string content, CancellationToken cancellationToken = default)
+    public async Task SaveNoteAsync(string filePath, string content, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        SaveInternal(filePath, content);
-        return Task.CompletedTask;
+
+        // The content is what the caller handed over at call time, like a real write that has
+        // already been given its bytes when the edits that follow arrive.
+        string captured = content;
+        await _saveOrder.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            OnSaveStarted?.Invoke(captured);
+            if (SaveGate is { } gate)
+            {
+                await gate.Task.ConfigureAwait(false);
+            }
+
+            SaveInternal(filePath, captured);
+        }
+        finally
+        {
+            _saveOrder.Release();
+        }
     }
 
     public bool SaveNote(string filePath, string content)
@@ -196,41 +248,79 @@ internal sealed class FakeNotesStorage : INotesStorageService
             return false;
         }
 
-        SaveInternal(filePath, content);
-        return true;
-    }
-
-    public Task DeleteNoteAsync(string filePath, CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        _notes.Remove(filePath);
-        return Task.CompletedTask;
-    }
-
-    public Task<string> RenameNoteAsync(string filePath, string newName, CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        if (!_notes.Remove(filePath, out var note))
+        if (!_saveOrder.Wait(SyncSaveWait))
         {
-            throw new FileNotFoundException(filePath);
+            return false;
         }
 
-        var sanitized = StripMarkdownExtension(newName).Trim();
-        if (string.IsNullOrWhiteSpace(sanitized))
+        try
         {
-            throw new ArgumentException("Invalid file name.", nameof(newName));
+            OnSaveStarted?.Invoke(content);
+            SaveInternal(filePath, content);
+            return true;
         }
-
-        var directory = Path.GetDirectoryName(filePath) ?? NotesRootPath;
-        var newPath = GetUniquePath(Path.Combine(directory, $"{Slugify(sanitized)}.md"));
-        _notes[newPath] = note with
+        finally
         {
-            FilePath = newPath,
-            RelativePath = NormalizeRelativePath(Path.GetRelativePath(NotesRootPath, newPath)),
-            Content = UpdatePrimaryHeading(note.Content, sanitized),
-            LastModifiedUtc = DateTime.UtcNow
-        };
-        return Task.FromResult(newPath);
+            _saveOrder.Release();
+        }
+    }
+
+    public async Task DeleteNoteAsync(string filePath, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        await _saveOrder.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (DeleteGate is { } gate)
+            {
+                await gate.Task.ConfigureAwait(false);
+            }
+
+            _notes.Remove(filePath);
+        }
+        finally
+        {
+            _saveOrder.Release();
+        }
+    }
+
+    public async Task<string> RenameNoteAsync(string filePath, string newName, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        await _saveOrder.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            if (MutationGate is { } gate)
+            {
+                await gate.Task.ConfigureAwait(false);
+            }
+
+            if (!_notes.Remove(filePath, out var note))
+            {
+                throw new FileNotFoundException(filePath);
+            }
+
+            var sanitized = StripMarkdownExtension(newName).Trim();
+            if (string.IsNullOrWhiteSpace(sanitized))
+            {
+                throw new ArgumentException("Invalid file name.", nameof(newName));
+            }
+
+            var directory = Path.GetDirectoryName(filePath) ?? NotesRootPath;
+            var newPath = GetUniquePath(Path.Combine(directory, $"{Slugify(sanitized)}.md"));
+            _notes[newPath] = note with
+            {
+                FilePath = newPath,
+                RelativePath = NormalizeRelativePath(Path.GetRelativePath(NotesRootPath, newPath)),
+                Content = UpdatePrimaryHeading(note.Content, sanitized),
+                LastModifiedUtc = DateTime.UtcNow
+            };
+            return newPath;
+        }
+        finally
+        {
+            _saveOrder.Release();
+        }
     }
 
     public Task<string> DuplicateNoteAsync(string filePath, string duplicateLabel, CancellationToken cancellationToken = default)
@@ -275,6 +365,7 @@ internal sealed class FakeNotesStorage : INotesStorageService
 
         var relativePath = NormalizeRelativePath(Path.GetRelativePath(NotesRootPath, filePath));
         _notes[filePath] = new StoredNote(filePath, relativePath, content ?? string.Empty, DateTime.UtcNow);
+        SavedContents.Add(content ?? string.Empty);
     }
 
     private string BuildAbsolutePath(string relativePath)
