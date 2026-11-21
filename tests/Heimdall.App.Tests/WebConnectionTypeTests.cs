@@ -308,6 +308,9 @@ public sealed class WebConnectionTypeTests
             WebOpenExternally = true,
             WebExternalProgram = @"C:\Legacy\firefox.exe",
             WebExternalArguments = "{Url}",
+            WebSignInUsernameSelector = "#username",
+            WebSignInPasswordSelector = "#password",
+            WebSignInSubmitSelector = "#submit",
         };
 
         ServerDialogViewModel vm = ServerDialogViewModel.FromDto(dto);
@@ -322,6 +325,9 @@ public sealed class WebConnectionTypeTests
         Assert.True(saved.WebOpenExternally);
         Assert.Equal(@"C:\Legacy\firefox.exe", saved.WebExternalProgram);
         Assert.Equal("{Url}", saved.WebExternalArguments);
+        Assert.Equal("#username", saved.WebSignInUsernameSelector);
+        Assert.Equal("#password", saved.WebSignInPasswordSelector);
+        Assert.Equal("#submit", saved.WebSignInSubmitSelector);
         Assert.Equal("https://ilo.example.test:8443/index.html", vm.WebAddressPreview);
 
         // The header named the protocol by its internal token, WEB, beside a card that says Web.
@@ -501,5 +507,34 @@ public sealed class WebHandlerCredentialTests : IDisposable
         Assert.Equal("s3cret", session.Password);
         Assert.Equal(ConnectionState.LaunchingWeb, stateMachine.GetState(profile.Id));
         Assert.DoesNotContain("s3cret", session.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AnEmbeddedProfile_CarriesTheFormItsAccountSignsInThrough()
+    {
+        var stateMachine = new ConnectionStateMachine();
+        Assert.True(stateMachine.TryTransition("web-test", ConnectionState.Initializing));
+        WebHandler handler = new(stateMachine, new LocalizationManager(), _ => throw new InvalidOperationException("no launch expected"));
+        ServerProfileDto profile = new()
+        {
+            Id = "web-test",
+            DisplayName = "iLO",
+            ConnectionType = "WEB",
+            RemoteServer = "ilo.example.test",
+            UseDirectConnection = true,
+            WebUsername = "admin",
+            WebPasswordEncrypted = CredentialProtector.Protect("s3cret"),
+            WebSignInUsernameSelector = "#user",
+            WebSignInPasswordSelector = "#pass",
+            WebSignInSubmitSelector = "#go",
+        };
+
+        ConnectionResult result = await handler.ConnectAsync(profile, new AppSettings(), CancellationToken.None);
+
+        WebSessionResult session = Assert.IsType<WebSessionResult>(result.Session);
+        Assert.Equal("#user", session.SignInUsernameSelector);
+        Assert.Equal("#pass", session.SignInPasswordSelector);
+        Assert.Equal("#go", session.SignInSubmitSelector);
+        Assert.NotNull(WebSignInFormPolicy.BuildScript(session));
     }
 }

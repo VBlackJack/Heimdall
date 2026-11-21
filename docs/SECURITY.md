@@ -202,6 +202,16 @@ only and closes the connection rather than drain a body. A forged server can the
 nothing else. Trust in a console's certificate is decided in its web tab, by
 the pin the user accepts there.
 
+The account stored for a web console is written into the console's own sign-in
+form only when the profile names the fields, and only on the scheme, host and
+port that profile addresses: a console which redirects to another host is left
+to the user rather than handed the password. The password reaches the page as a
+JavaScript string literal, is never logged, and the form is filled once per tab,
+recorded in the page's session storage, so a refused account is not retried into
+a lockout; Reload gives that attempt back. The fields are set through the
+input's own value setter and the input and change events, which is what the
+page's framework reads, and a selector matching nothing leaves that field alone.
+
 `~/.ssh/known_hosts` import and export are explicit user actions surfaced in
 `Settings > SSH & SFTP > Trusted host keys`. Import preserves conflicting
 existing entries unless the user explicitly opts into replacement in a

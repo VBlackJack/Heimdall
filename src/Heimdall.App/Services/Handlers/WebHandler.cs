@@ -133,6 +133,9 @@ internal sealed class WebHandler : IProtocolHandler
             ExternalArguments = server.WebExternalArguments,
             ExternalExecutionConfirmed = server.ExecutionConfirmed,
             DisplayName = server.DisplayName,
+            SignInUsernameSelector = server.WebSignInUsernameSelector,
+            SignInPasswordSelector = server.WebSignInPasswordSelector,
+            SignInSubmitSelector = server.WebSignInSubmitSelector,
         };
         return new ConnectionResult(true, null, session);
     }
