@@ -211,6 +211,10 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                     code: tunnelOutcome.FailureCode));
         }
 
+        // From here every exit gives the reference back, a throw included. Only the success path
+        // hands it to the session (Transfer).
+        using TunnelLease lease = new(_tunnelService, usesTunnel, targetPort, tunnelLeaseId);
+
         _connectionSm.TryTransition(server.Id, ConnectionState.LaunchingSsh);
 
         var sshMode = server.SshMode ?? "Embedded";
@@ -218,7 +222,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
 
         if (string.Equals(sshMode, "External", StringComparison.OrdinalIgnoreCase))
         {
-            return await ConnectSshExternal(server, settings, targetHost, targetPort, usesTunnel, tunnelLeaseId, ct)
+            return await ConnectSshExternal(server, settings, targetHost, targetPort, usesTunnel, lease, ct)
                 .ConfigureAwait(false);
         }
 
@@ -229,7 +233,6 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         {
             string keyPathMessage = LocalizeKeyPathError(sshNetKeyPathError, server.SshKeyPath);
             _connectionSm.SetError(server.Id, keyPathMessage);
-            ReleaseTunnelIfNeeded(usesTunnel, targetPort, tunnelLeaseId);
             return new ConnectionResult(
                 false,
                 keyPathMessage,
@@ -283,7 +286,6 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         {
             var message = _localizer[SshLocalizationKeys.ErrorPlinkOpenSshAgentUnsupported];
             _connectionSm.SetError(server.Id, message);
-            ReleaseTunnelIfNeeded(usesTunnel, targetPort, tunnelLeaseId);
             return new ConnectionResult(
                 false,
                 message,
@@ -306,7 +308,8 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                     usesTunnel,
                     originalFailure: null,
                     ct,
-                    tunnelLeaseId: tunnelLeaseId)
+                    tunnelLeaseId: tunnelLeaseId,
+                    lease: lease)
                 .ConfigureAwait(false);
         }
 
@@ -320,7 +323,6 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         {
             string usernameMsg = _localizer[SshLocalizationKeys.ErrorSshUsernameRequired];
             _connectionSm.SetError(server.Id, usernameMsg);
-            ReleaseTunnelIfNeeded(usesTunnel, targetPort, tunnelLeaseId);
             return new ConnectionResult(
                 false,
                 usernameMsg,
@@ -384,7 +386,6 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         catch (HostKeyRejectedException ex)
         {
             session.Dispose();
-            ReleaseTunnelIfNeeded(usesTunnel, targetPort, tunnelLeaseId);
 
             if (ex.IsMismatch && !string.IsNullOrWhiteSpace(ex.StoredFingerprint))
             {
@@ -416,7 +417,6 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             session.Dispose();
-            ReleaseTunnelIfNeeded(usesTunnel, targetPort, tunnelLeaseId);
             throw;
         }
         catch (Exception ex)
@@ -439,9 +439,8 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                 }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested)
                 {
-                    // Same ending as a cancelled dial above: the tunnel reference is given back
-                    // and the cancellation travels on.
-                    ReleaseTunnelIfNeeded(usesTunnel, targetPort, tunnelLeaseId);
+                    // Same ending as a cancelled dial above: the cancellation travels on and the
+                    // lease gives the tunnel reference back.
                     throw;
                 }
             }
@@ -464,7 +463,6 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                         SshLocalizationKeys.ErrorPlinkOpenSshAgentUnsupported)
                         ?? localizedFailure.Message;
                     _connectionSm.SetError(server.Id, message);
-                    ReleaseTunnelIfNeeded(usesTunnel, targetPort, tunnelLeaseId);
                     return new ConnectionResult(
                         false,
                         message,
@@ -499,13 +497,13 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                         failure.Code,
                         ct,
                         localizedFailure.Message,
-                        tunnelLeaseId: tunnelLeaseId)
+                        tunnelLeaseId: tunnelLeaseId,
+                        lease: lease)
                     .ConfigureAwait(false);
                 return fallback with { FallbackFrom = failure.Code };
             }
 
             _connectionSm.SetError(server.Id, localizedFailure.Message);
-            ReleaseTunnelIfNeeded(usesTunnel, targetPort, tunnelLeaseId);
             return new ConnectionResult(
                 false,
                 localizedFailure.Message,
@@ -514,6 +512,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         }
 
         _connectionSm.TryTransition(server.Id, ConnectionState.Connected);
+        lease.Transfer();
         return new ConnectionResult(true, null, new SshSessionResult(session, server.SessionLoggingOverride));
     }
 
@@ -681,18 +680,6 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         return false;
     }
 
-    // The lease names the one reference this connect took, so giving it back here and again
-    // from the pane close that follows a failed connect releases it only once.
-    private void ReleaseTunnelIfNeeded(bool usesTunnel, int tunnelLocalPort, long tunnelLeaseId)
-    {
-        if (!usesTunnel || tunnelLocalPort <= 0)
-        {
-            return;
-        }
-
-        _tunnelService.ReleaseTunnelReference(tunnelLocalPort, tunnelLeaseId);
-    }
-
     /// <summary>
     /// Launches putty.exe as an external (non-embedded) SSH session.
     /// Used when <see cref="ServerProfileDto.SshMode"/> is "External".
@@ -703,10 +690,9 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         string targetHost,
         int targetPort,
         bool usesTunnel,
-        long tunnelLeaseId,
+        TunnelLease lease,
         CancellationToken ct)
     {
-        bool releaseTunnel = usesTunnel;
         try
         {
             string? puttyPath = ConnectionHelpers.ResolvePuttyPath(settings.PuttyPath, settings.PlinkPath);
@@ -815,7 +801,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                 {
                     try
                     {
-                        ReleaseTunnelIfNeeded(usesTunnel, targetPort, tunnelLeaseId);
+                        lease.Release();
                     }
                     catch (Exception ex)
                     {
@@ -833,8 +819,8 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                             $"putty.exe Process.Dispose failed: {ex.Message}");
                     }
                 };
-                releaseTunnel = false;
                 startedProcess.EnableRaisingEvents = true;
+                lease.Transfer();
             }
 
             return new ConnectionResult(true, null, null);
@@ -851,7 +837,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         }
         finally
         {
-            ReleaseTunnelIfNeeded(releaseTunnel, targetPort, tunnelLeaseId);
+            lease.Dispose();
         }
     }
 
@@ -868,9 +854,12 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         SshFailureCode? originalFailure,
         CancellationToken ct,
         string? originalFailureMessage = null,
-        long tunnelLeaseId = 0)
+        long tunnelLeaseId = 0,
+        TunnelLease? lease = null)
     {
-        bool releaseTunnel = usesTunnel;
+        // A caller that already took the lease passes it; a direct caller gets one built from the
+        // triple it holds. Either way this method owns the release on every failure exit.
+        TunnelLease tunnelLease = lease ?? new TunnelLease(_tunnelService, usesTunnel, targetPort, tunnelLeaseId);
         try
         {
             string? plinkPath = ConnectionHelpers.ResolvePlinkPath(settings.PlinkPath);
@@ -1187,7 +1176,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
             }
 
             _connectionSm.TryTransition(server.Id, ConnectionState.Connected);
-            releaseTunnel = false;
+            tunnelLease.Transfer();
             return new ConnectionResult(true, null, new TerminalSessionResult(
                 terminalSession,
                 BuildDisplayEndpoint(server),
@@ -1198,7 +1187,7 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
         }
         finally
         {
-            ReleaseTunnelIfNeeded(releaseTunnel, targetPort, tunnelLeaseId);
+            tunnelLease.Dispose();
         }
     }
 

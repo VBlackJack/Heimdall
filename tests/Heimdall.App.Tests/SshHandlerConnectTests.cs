@@ -31,8 +31,11 @@ using Heimdall.Core.SessionDiagnostics;
 using Heimdall.Core.Ssh;
 using Heimdall.Core.StateMachine;
 using Heimdall.Ssh;
+using Heimdall.Ssh.Agents;
+using Heimdall.Ssh.Pageant;
 using Heimdall.Ssh.Plink;
 using Heimdall.TestSupport;
+using Renci.SshNet.Common;
 
 namespace Heimdall.App.Tests;
 
@@ -1017,6 +1020,198 @@ public sealed class SshHandlerConnectTests : IDisposable
         Assert.Equal(targetPort, tunnelService.ReleasedLocalPort);
     }
 
+    private const long LeasedTunnelId = 42;
+    private const int LeasedTunnelPort = 49170;
+
+    private static FakeTunnelService CreateLeasedTunnel() => new()
+    {
+        UsesTunnel = true,
+        TargetHost = "127.0.0.1",
+        TargetPort = LeasedTunnelPort,
+        TunnelLeaseId = LeasedTunnelId,
+    };
+
+    private static void AssertReleasedOnce(FakeTunnelService tunnelService)
+    {
+        Assert.Equal(1, tunnelService.ReleaseCount);
+        Assert.Equal((LeasedTunnelPort, LeasedTunnelId), Assert.Single(tunnelService.LeasedReleases));
+    }
+
+    // F-29: a throw between the tunnel setup and the old first try skipped the release, so the
+    // gateway lease leaked until the process ended.
+    [Fact]
+    public async Task ConnectAsync_AgentRegistryFactoryThrows_PropagatesAndReleasesTheLeaseOnce()
+    {
+        FakeTunnelService tunnelService = CreateLeasedTunnel();
+        using SshHandler handler = CreateHandler(
+            tunnelService,
+            agentRegistryFactory: _ => throw new InvalidOperationException("registry unavailable"));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => handler.ConnectAsync(
+            CreateGatewayServer(),
+            new AppSettings(),
+            CancellationToken.None));
+
+        AssertReleasedOnce(tunnelService);
+    }
+
+    [Fact]
+    public async Task ConnectAsync_ChosenKeyPlinkCheckThrows_PropagatesAndReleasesTheLeaseOnce()
+    {
+        byte[] blob = SshHandlerAgentKeyTests.Blob("ssh-ed25519", 1);
+        string plinkPath = Path.GetTempFileName();
+        try
+        {
+            int registryCalls = 0;
+            FakeTunnelService tunnelService = CreateLeasedTunnel();
+            using SshHandler handler = CreateHandler(
+                tunnelService,
+                agentRegistryFactory: _ =>
+                {
+                    // The preflight and the post-tunnel check read the agents; the third read is
+                    // the one CanPlinkHonourChosenKeyAsync makes after the dial failed.
+                    if (++registryCalls > 2)
+                    {
+                        throw new InvalidOperationException("registry unavailable");
+                    }
+
+                    return new SshAgentRegistry(
+                    [
+                        new SshHandlerAgentKeyTests.FakeAgent(
+                            PageantAgent.AgentName,
+                            [new SshHandlerAgentKeyTests.FakeKey("a", blob)]),
+                    ]);
+                },
+                connectShellSession: (_, _, _, _, _, _, _) =>
+                    throw new SshAuthenticationException("Permission denied (publickey)."));
+            ServerProfileDto server = CreateGatewayServer();
+            server.SshAgentKeyFingerprint = SshAgentKeyFingerprints.Compute(blob);
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() => handler.ConnectAsync(
+                server,
+                new AppSettings { PlinkPath = plinkPath },
+                CancellationToken.None));
+
+            Assert.Equal(3, registryCalls);
+            AssertReleasedOnce(tunnelService);
+        }
+        finally
+        {
+            TemporaryFileCleanup.Delete(plinkPath);
+        }
+    }
+
+    [Fact]
+    public async Task ConnectAsync_Success_HandsTheLeaseToTheSession()
+    {
+        FakeTunnelService tunnelService = CreateLeasedTunnel();
+        using SshHandler handler = CreateHandler(
+            tunnelService,
+            agentRegistryFactory: _ => new SshAgentRegistry([]),
+            connectShellSession: (_, _, _, _, _, _, _) => Task.CompletedTask);
+
+        ConnectionResult result = await handler.ConnectAsync(
+            CreateGatewayServer(),
+            new AppSettings(),
+            CancellationToken.None);
+
+        try
+        {
+            Assert.True(result.Success, result.ErrorMessage);
+            Assert.Equal(0, tunnelService.ReleaseCount);
+        }
+        finally
+        {
+            if (result.Session is SshSessionResult shell)
+            {
+                shell.Session.Dispose();
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ConnectSshViaPlinkAsync_EarlyFailureWithLeasedTunnel_ReleasesTheLeaseOnce()
+    {
+        FakeTunnelService tunnelService = CreateLeasedTunnel();
+        using SshHandler handler = CreateHandler(tunnelService);
+
+        ConnectionResult result = await handler.ConnectSshViaPlinkAsync(
+            CreatePlinkServer(),
+            new AppSettings { PlinkPath = @"C:\nonexistent\plink.exe" },
+            "127.0.0.1",
+            LeasedTunnelPort,
+            usesTunnel: true,
+            originalFailure: null,
+            CancellationToken.None,
+            tunnelLeaseId: LeasedTunnelId);
+
+        Assert.False(result.Success);
+        AssertReleasedOnce(tunnelService);
+    }
+
+    [Fact]
+    public async Task ConnectSshViaPlinkAsync_SuccessWithLeasedTunnel_DoesNotReleaseTheLease()
+    {
+        string configured = Path.Combine(Path.GetTempPath(), $"heimdall-unrunnable-{Guid.NewGuid():N}.exe");
+        File.WriteAllBytes(configured, []);
+        string runnable = Path.Combine(Path.GetTempPath(), $"heimdall-runnable-{Guid.NewGuid():N}.exe");
+        File.Copy(ShippedLauncherPath(), runnable);
+        string? deletedPasswordPath = null;
+        ConnectionResult? result = null;
+
+        try
+        {
+            FakeTunnelService tunnelService = CreateLeasedTunnel();
+            HostKeyStore hostKeyStore = new HostKeyStore();
+            hostKeyStore.Trust("server01.contoso.local", DefaultPorts.Ssh, "SHA256:stored-test-fingerprint");
+            using SshHandler handler = CreateHandler(
+                tunnelService,
+                new HostKeyTrustService(hostKeyStore),
+                new FakePlinkHostKeyProbe(null),
+                deletePlinkPasswordFile: path =>
+                {
+                    deletedPasswordPath = path;
+                    if (!string.IsNullOrWhiteSpace(path))
+                    {
+                        File.Delete(path);
+                    }
+                },
+                plinkAttestation: _ => new PlinkAttestationLease(
+                    new FileStream(runnable, FileMode.Open, FileAccess.Read, FileShare.Read),
+                    runnable));
+            ServerProfileDto server = CreateGatewayServer();
+            server.SshPasswordEncrypted = CredentialProtector.Protect("temporary-password");
+
+            result = await handler.ConnectSshViaPlinkAsync(
+                server,
+                new AppSettings { PlinkPath = configured },
+                "127.0.0.1",
+                LeasedTunnelPort,
+                usesTunnel: true,
+                originalFailure: null,
+                CancellationToken.None,
+                tunnelLeaseId: LeasedTunnelId);
+
+            Assert.True(result.Success, result.ErrorMessage);
+            Assert.Equal(0, tunnelService.ReleaseCount);
+        }
+        finally
+        {
+            if (result?.Session is TerminalSessionResult terminal)
+            {
+                terminal.Session.Dispose();
+            }
+
+            if (!string.IsNullOrWhiteSpace(deletedPasswordPath))
+            {
+                TemporaryFileCleanup.Delete(deletedPasswordPath);
+            }
+
+            TemporaryFileCleanup.Delete(configured);
+            TemporaryFileCleanup.Delete(runnable);
+        }
+    }
+
     private static SshHandler CreateHandler(
         FakeTunnelService tunnelService,
         IHostKeyTrustService? hostKeyTrustService = null,
@@ -1025,7 +1220,9 @@ public sealed class SshHandlerConnectTests : IDisposable
         Action<string?>? deletePlinkPasswordFile = null,
         LocalizationManager? localizer = null,
         Func<string?, PlinkAttestationLease>? plinkAttestation = null,
-        IDialogService? dialogService = null)
+        IDialogService? dialogService = null,
+        Func<SshAgentPreference, SshAgentRegistry>? agentRegistryFactory = null,
+        SshHandler.ConnectShellSession? connectShellSession = null)
     {
         LocalizationManager effectiveLocalizer = localizer ?? new LocalizationManager();
         IHostKeyTrustService effectiveHostKeyTrustService =
@@ -1044,6 +1241,8 @@ public sealed class SshHandlerConnectTests : IDisposable
                 plinkPasswordFileJanitor ?? CreateNoOpPlinkPasswordFileJanitor(),
             deletePlinkPasswordFile: deletePlinkPasswordFile,
             plinkAttestation: plinkAttestation,
+            agentRegistryFactory: agentRegistryFactory,
+            connectShellSession: connectShellSession,
             puttySessionRegistry: new InMemoryPuttySessionRegistry());
     }
 
@@ -1135,6 +1334,8 @@ public sealed class SshHandlerConnectTests : IDisposable
         public int TargetPort { get; init; }
         public int ReleaseCount { get; private set; }
         public int ReleasedLocalPort { get; private set; }
+        public long TunnelLeaseId { get; init; }
+        public List<(int Port, long LeaseId)> LeasedReleases { get; } = [];
         public bool SetupSucceeds { get; init; } = true;
         public SshFailureCode? SetupFailureCode { get; init; }
         public string? SetupErrorMessage { get; init; }
@@ -1154,7 +1355,11 @@ public sealed class SshHandlerConnectTests : IDisposable
 
             string host = UsesTunnel ? TargetHost : server.RemoteServer;
             int port = UsesTunnel ? TargetPort : remotePort;
-            return Task.FromResult(new TunnelSetupOutcome(true, UsesTunnel, host, port, (string?)null, null));
+            return Task.FromResult(
+                new TunnelSetupOutcome(true, UsesTunnel, host, port, (string?)null, null)
+                {
+                    TunnelLeaseId = UsesTunnel ? TunnelLeaseId : 0,
+                });
         }
 
         public void UpdateSettings(AppSettings settings)
@@ -1167,6 +1372,12 @@ public sealed class SshHandlerConnectTests : IDisposable
         {
             ReleaseCount++;
             ReleasedLocalPort = localPort;
+        }
+
+        public void ReleaseTunnelReference(int localPort, long leaseId)
+        {
+            ReleaseTunnelReference(localPort);
+            LeasedReleases.Add((localPort, leaseId));
         }
     }
 
