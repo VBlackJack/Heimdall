@@ -145,6 +145,7 @@
 
                 <WrapPanel Grid.Row="1" Margin="{StaticResource MarginSubsectionTop}" VerticalAlignment="Center">
                     <CheckBox x:Name="ChkCaseSensitive"
+                              Checked="OnCaseSensitiveChanged" Unchecked="OnCaseSensitiveChanged"
                               Foreground="{DynamicResource TextPrimaryBrush}"
                               VerticalAlignment="Center"
                               TabIndex="6"/>
@@ -189,6 +190,7 @@
                 Padding="0">
             <RichTextBox x:Name="LogViewer"
                          IsReadOnly="True"
+                         IsUndoEnabled="False"
                          FontFamily="{StaticResource FontFamilyMonospace}" FontSize="{StaticResource FontSizeBody}"
                          Background="{DynamicResource CardBrush}"
                          Foreground="{DynamicResource TextPrimaryBrush}"

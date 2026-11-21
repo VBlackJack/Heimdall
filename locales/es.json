@@ -4585,6 +4585,9 @@
   "ToolLogViewErrorOpen": "No se puede abrir el archivo: {0}",
   "ToolLogViewErrorInvalidRegex": "Expresión regular no válida.",
   "ToolLogViewNoMatches": "Ninguna línea de registro coincide con el filtro actual",
+  "ToolLogViewLoading": "Cargando...",
+  "ToolLogViewErrorRegexTimeout": "El filtro tardó demasiado y se detuvo. Simplifica la expresión.",
+  "ToolLogViewLineTruncated": " [línea truncada]",
 
   "PaletteToolHosts": "Editor del archivo hosts",
   "PaletteToolSshConfig": "Generador de configuración SSH",

@@ -4585,6 +4585,9 @@
   "ToolLogViewErrorOpen": "Cannot open file: {0}",
   "ToolLogViewErrorInvalidRegex": "Invalid regular expression.",
   "ToolLogViewNoMatches": "No log lines match the current filter",
+  "ToolLogViewLoading": "Loading...",
+  "ToolLogViewErrorRegexTimeout": "The filter took too long and was stopped. Simplify the expression.",
+  "ToolLogViewLineTruncated": " [line truncated]",
 
   "PaletteToolHosts": "Hosts File Editor",
   "PaletteToolSshConfig": "SSH Config Generator",
