@@ -100,7 +100,7 @@ public sealed class CitrixDisposalGuardTests
     {
         string logic = Logic(DisposeMember);
 
-        Assert.Equal(DisposeStepCount, logic.Split(StepRunner).Length - 1);
+        Assert.Equal(DisposeStepCount, CountBodyStatements(logic, StepRunner));
 
         string[] bareSteps =
         [
@@ -197,6 +197,55 @@ public sealed class CitrixDisposalGuardTests
         }
 
         throw new InvalidOperationException("The dispatcher lambda never closes.");
+    }
+
+    /// <summary>
+    /// How many statements of the method body itself (its own brace depth, starting a statement)
+    /// begin with the anchor. A call nested in a lambda or a branch is not counted.
+    /// </summary>
+    private static int CountBodyStatements(string logic, string anchor)
+    {
+        int count = 0;
+        int depth = 0;
+        for (int index = logic.IndexOf('{'); index < logic.Length; index++)
+        {
+            char current = logic[index];
+            if (current == '{')
+            {
+                depth++;
+            }
+            else if (current == '}')
+            {
+                depth--;
+            }
+            else if (depth == 1
+                && string.CompareOrdinal(logic, index, anchor, 0, anchor.Length) == 0
+                && StartsAStatement(logic, index))
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private static bool StartsAStatement(string logic, int index)
+    {
+        for (int back = index - 1; back >= 0; back--)
+        {
+            char previous = logic[back];
+            if (previous is '{' or '}' or ';')
+            {
+                return true;
+            }
+
+            if (!char.IsWhiteSpace(previous))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static bool StartsWithStatement(string body, string statement) =>

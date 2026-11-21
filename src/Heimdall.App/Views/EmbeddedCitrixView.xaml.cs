@@ -1145,7 +1145,7 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
     }
 
     /// <summary>Runs one teardown step so a failure is logged and never skips the steps after it.</summary>
-    private static void RunDisposeStep(string step, Action action)
+    private static void RunDisposeStep(string step, Action action, bool isSessionTermination = false)
     {
         try
         {
@@ -1153,7 +1153,15 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
         }
         catch (Exception ex)
         {
-            Core.Logging.FileLogger.Warn($"[EmbeddedCitrixView] Dispose step '{step}' failed: {ex.Message}");
+            string message = $"[EmbeddedCitrixView] Dispose step '{step}' failed";
+            if (isSessionTermination)
+            {
+                Core.Logging.FileLogger.ErrorDetailed(message, ex);
+            }
+            else
+            {
+                Core.Logging.FileLogger.WarnDetailed(message, ex);
+            }
         }
     }
 
@@ -1193,7 +1201,7 @@ public partial class EmbeddedCitrixView : UserControl, IDisposable, ISessionPane
 
         // End the ICA session, then release its process object. The launcher is only released:
         // terminating it would not end the session, and it is routinely already gone.
-        RunDisposeStep("session terminate", () => _sessionHandle?.Terminate());
+        RunDisposeStep("session terminate", () => _sessionHandle?.Terminate(), isSessionTermination: true);
         RunDisposeStep("session handle", () => _sessionHandle?.Dispose());
         _sessionHandle = null;
 
