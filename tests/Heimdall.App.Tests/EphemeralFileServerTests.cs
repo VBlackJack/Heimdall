@@ -836,4 +836,109 @@ public class EphemeralFileServerTests : IDisposable
         // Either a routable IPv4 or the documented loopback fallback.
         Assert.True(IPAddress.TryParse(ip, out _));
     }
+
+    private async Task<HttpResponseMessage?> GetWithHeaderTokenAsync(string path)
+    {
+        var httpPort = GetFreeTcpPort();
+        try
+        {
+            await _server.StartHttpServerAsync(_testDir, httpPort);
+        }
+        catch (Exception ex) when (IsPortException(ex))
+        {
+            return null; // skip: port unavailable in this environment
+        }
+
+        await Task.Delay(50);
+        using var client = new HttpClient();
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"http://localhost:{httpPort}{path}");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _server.AccessToken);
+        return await client.SendAsync(request);
+    }
+
+    private static void AssertBaseProtectiveHeaders(HttpResponseMessage response)
+    {
+        Assert.Equal(EphemeralFileServer.ContentTypeOptionsValue,
+            Assert.Single(response.Headers.GetValues(EphemeralFileServer.ContentTypeOptionsHeader)));
+        Assert.Equal(EphemeralFileServer.ReferrerPolicyValue,
+            Assert.Single(response.Headers.GetValues(EphemeralFileServer.ReferrerPolicyHeader)));
+    }
+
+    [Fact]
+    public async Task Http_Html_File_Is_Served_Sandboxed_With_Protective_Headers()
+    {
+        await File.WriteAllTextAsync(Path.Combine(_testDir, "page.html"), "<html></html>");
+        using var response = await GetWithHeaderTokenAsync("/page.html");
+        if (response is null) return;
+
+        AssertBaseProtectiveHeaders(response);
+        Assert.Equal(EphemeralFileServer.ActiveContentSecurityPolicyValue,
+            Assert.Single(response.Headers.GetValues(EphemeralFileServer.ContentSecurityPolicyHeader)));
+    }
+
+    [Fact]
+    public async Task Http_Text_File_Has_Protective_Headers_Without_Sandbox()
+    {
+        await File.WriteAllTextAsync(Path.Combine(_testDir, "note.txt"), "hello");
+        using var response = await GetWithHeaderTokenAsync("/note.txt");
+        if (response is null) return;
+
+        AssertBaseProtectiveHeaders(response);
+        Assert.False(response.Headers.Contains(EphemeralFileServer.ContentSecurityPolicyHeader));
+    }
+
+    [Fact]
+    public async Task Http_Listing_Has_Protective_Headers()
+    {
+        using var response = await GetWithHeaderTokenAsync("/");
+        if (response is null) return;
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        AssertBaseProtectiveHeaders(response);
+    }
+
+    [Fact]
+    public async Task Http_NotFound_Response_Has_Protective_Headers()
+    {
+        using var response = await GetWithHeaderTokenAsync("/missing.txt");
+        if (response is null) return;
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        AssertBaseProtectiveHeaders(response);
+    }
+
+    [Fact]
+    public async Task Http_Unauthorized_Response_Has_Protective_Headers()
+    {
+        var httpPort = GetFreeTcpPort();
+        try
+        {
+            await _server.StartHttpServerAsync(_testDir, httpPort);
+        }
+        catch (Exception ex) when (IsPortException(ex))
+        {
+            return; // skip: port unavailable in this environment
+        }
+
+        await Task.Delay(50);
+        using var client = new HttpClient();
+        using var response = await client.GetAsync($"http://localhost:{httpPort}/");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        AssertBaseProtectiveHeaders(response);
+    }
+
+    [Theory]
+    [InlineData("PAGE.HTM", true)]
+    [InlineData("x.SVG", true)]
+    [InlineData("doc.pdf", false)]
+    public async Task Http_Content_Security_Policy_Follows_Extension_Case_Insensitively(
+        string fileName, bool sandboxed)
+    {
+        await File.WriteAllTextAsync(Path.Combine(_testDir, fileName), "<x/>");
+        using var response = await GetWithHeaderTokenAsync("/" + fileName);
+        if (response is null) return;
+
+        Assert.Equal(sandboxed, response.Headers.Contains(EphemeralFileServer.ContentSecurityPolicyHeader));
+    }
 }
