@@ -93,7 +93,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     private bool _shutdownStatePersistenceStarted;
     private bool _closeInProgress;
     private bool _suppressSidebarLaunch;
-    private bool _isRdpImportDragActive;
+    private DispatcherTimer? _rdpImportDragLeaveTimer;
     private bool _suppressFileShareStartDialog;
     private bool _settingsRuntimeBridgeInitialized;
     private OnboardingFlowViewModel? _onboardingVm;
@@ -1201,6 +1201,8 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             return;
         }
 
+        CancelRdpImportDragLeaveTimer();
+
         var files = TryGetRdpFiles(e.Data);
         if (files.Length == 0)
         {
@@ -1220,7 +1222,36 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             return;
         }
 
+        // The leave event also fires when the pointer crosses from one child element to the next,
+        // so the overlay is only cleared if no drag-over follows within the grace period.
+        CancelRdpImportDragLeaveTimer();
+        var timer = new DispatcherTimer { Interval = RdpImportDragLeaveGracePeriod };
+        timer.Tick += OnRdpImportDragLeaveTimerTick;
+        _rdpImportDragLeaveTimer = timer;
+        timer.Start();
+    }
+
+    /// <summary>Time without a drag-over after which a drag leave really means the drag left.</summary>
+    private static readonly TimeSpan RdpImportDragLeaveGracePeriod = TimeSpan.FromMilliseconds(RdpImportDragLeaveGraceMilliseconds);
+
+    private const int RdpImportDragLeaveGraceMilliseconds = 150;
+
+    private void OnRdpImportDragLeaveTimerTick(object? sender, EventArgs e)
+    {
+        CancelRdpImportDragLeaveTimer();
         SetRdpImportOverlayVisible(false);
+    }
+
+    private void CancelRdpImportDragLeaveTimer()
+    {
+        if (_rdpImportDragLeaveTimer is null)
+        {
+            return;
+        }
+
+        _rdpImportDragLeaveTimer.Stop();
+        _rdpImportDragLeaveTimer.Tick -= OnRdpImportDragLeaveTimerTick;
+        _rdpImportDragLeaveTimer = null;
     }
 
     private async void OnWindowPreviewDrop(object sender, System.Windows.DragEventArgs e)
@@ -1231,6 +1262,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         }
 
         var files = TryGetRdpFiles(e.Data);
+        CancelRdpImportDragLeaveTimer();
         SetRdpImportOverlayVisible(false);
 
         if (files.Length == 0 || DataContext is not MainViewModel vm)
@@ -1258,12 +1290,11 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
 
     private void SetRdpImportOverlayVisible(bool isVisible)
     {
-        if (_isRdpImportDragActive == isVisible)
+        if (DataContext is MainViewModel vm)
         {
-            return;
+            vm.IsRdpImportDragActive = isVisible;
         }
 
-        _isRdpImportDragActive = isVisible;
         RdpImportDropOverlay.Visibility = isVisible ? Visibility.Visible : Visibility.Collapsed;
     }
 
@@ -2743,6 +2774,12 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         {
             ApplyOnboardingStep();
         }
+        else if (e.PropertyName == nameof(OnboardingFlowViewModel.IsVisible)
+            && sender is OnboardingFlowViewModel { } onboarding
+            && DataContext is MainViewModel vm)
+        {
+            vm.IsOnboardingActive = onboarding.IsVisible;
+        }
     }
 
     private void OnOnboardingOverlaySizeChanged(object sender, SizeChangedEventArgs e)
@@ -2979,6 +3016,11 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         // read, so without this the tour finishes on whichever tab the last step
         // left behind and the empty-state panel that invites the first session is
         // never seen at all.
+        if (DataContext is MainViewModel mainVm)
+        {
+            mainVm.IsOnboardingActive = false;
+        }
+
         TabSessions.IsChecked = true;
         SwitchToTab(ShellTab.Sessions);
 
@@ -4741,6 +4783,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         _startupUpdateCts.Cancel();
         _startupUpdateCts.Dispose();
 
+        CancelRdpImportDragLeaveTimer();
         StopFullscreenChrome();
         DisposeLowLevelKeyboardHook();
         if (_threadPreprocessMessageHooked)
