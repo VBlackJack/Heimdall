@@ -161,6 +161,8 @@ public partial class PrivilegeLauncherView : UserControl, IToolView
         return null;
     }
 
+    private const int FallbackSearchMaxDepth = 1;
+
     private static string? FindInProgramFiles(string subDir, string fileName)
     {
         string?[] roots =
@@ -171,18 +173,35 @@ public partial class PrivilegeLauncherView : UserControl, IToolView
 
         foreach (var root in roots)
         {
-            if (string.IsNullOrEmpty(root)) continue;
-            var dir = Path.Combine(root, subDir);
-            if (!Directory.Exists(dir)) continue;
-
-            // Search up to one level deep (e.g. PowerShell/7/pwsh.exe)
-            try
-            {
-                foreach (var match in Directory.EnumerateFiles(dir, fileName, SearchOption.AllDirectories))
-                    return match;
-            }
-            catch (UnauthorizedAccessException) { }
+            var match = FindUnder(root, subDir, fileName);
+            if (match is not null) return match;
         }
+        return null;
+    }
+
+    /// <summary>
+    /// Looks for <paramref name="fileName"/> in <c>root/subDir</c> and one folder below it
+    /// (e.g. PowerShell/7/pwsh.exe). Inaccessible folders are skipped instead of abandoning the root.
+    /// </summary>
+    internal static string? FindUnder(string? root, string subDir, string fileName)
+    {
+        if (string.IsNullOrEmpty(root)) return null;
+        var dir = Path.Combine(root, subDir);
+        if (!Directory.Exists(dir)) return null;
+
+        var options = new EnumerationOptions
+        {
+            RecurseSubdirectories = true,
+            MaxRecursionDepth = FallbackSearchMaxDepth,
+            IgnoreInaccessible = true
+        };
+
+        try
+        {
+            foreach (var match in Directory.EnumerateFiles(dir, fileName, options))
+                return match;
+        }
+        catch (IOException) { }
         return null;
     }
 
