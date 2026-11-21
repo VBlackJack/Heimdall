@@ -963,7 +963,10 @@ public static class PrivilegedFileCommands
     private static string BuildShellBody(string script, string remotePath)
     {
         string escapedScript = PathEscaper.EscapeForShell(script);
-        string escapedPath = PathEscaper.EscapeForShell(remotePath);
+
+        // A "!" in a file name is escaped the way csh and tcsh read it: outside the quotes. The
+        // scripts hold only "! " and "!=", which those shells leave alone.
+        string escapedPath = PathEscaper.EscapeForLoginShell(remotePath);
         return $"sh -c {escapedScript} sh {escapedPath}";
     }
 }
