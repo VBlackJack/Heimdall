@@ -539,18 +539,93 @@ public sealed class UpdateServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task DownloadVerifiedAsync_UnknownSizeDeclaredAboveTheCeiling_IsRefused()
+    public async Task DownloadVerifiedAsync_UnknownSizeDeclaredAboveTheCeiling_IsRefusedBeforeReading()
     {
+        // The payload hashes to the published checksum, so the only thing that can refuse
+        // this download is the declared length; Reads == 0 proves it came before any read.
+        var payload = new byte[8];
+        var body = new ReadCountingStream(payload);
         var client = new StubReleaseClient
         {
-            StreamFactory = () => new DeclaredLengthStream(
-                new ReadCountingStream(new byte[8]), null, UpdateService.MaxInstallerBytes + 1),
+            StreamFactory = () => new DeclaredLengthStream(body, null, 17),
         };
-        var service = CreateService(client, BuildVariant.Standard);
-        var update = UpdateWithSha(new string('a', 64), 0, "v2026.061595");
+        var service = new UpdateService(client, new StubVariantDetector(BuildVariant.Standard), _dataRoot)
+        {
+            MaxInstallerBytes = 16,
+        };
+        var update = UpdateWithSha(Sha256Verifier.ComputeHex(new MemoryStream(payload)), 0, "v2026.061595");
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => service.DownloadVerifiedAsync(update, null, CancellationToken.None));
+
+        Assert.Equal(0, body.Reads);
+    }
+
+    [Fact]
+    public async Task DownloadVerifiedAsync_UnknownSizeStreamPastTheCeiling_IsRefusedWhileCopying()
+    {
+        // No declared length and no size from the release JSON: only the running count
+        // against the ceiling can stop this. The payload is valid for its checksum, so the
+        // hash check cannot be what refuses it.
+        var payload = new byte[64];
+        var client = new StubReleaseClient
+        {
+            StreamFactory = () => new DeclaredLengthStream(new MemoryStream(payload), null, null),
+        };
+        var service = new UpdateService(client, new StubVariantDetector(BuildVariant.Standard), _dataRoot)
+        {
+            MaxInstallerBytes = 16,
+        };
+        const string tag = "v2026.061594";
+        var update = UpdateWithSha(Sha256Verifier.ComputeHex(new MemoryStream(payload)), 0, tag);
+
+        var before = StagingSnapshot(tag);
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.DownloadVerifiedAsync(update, null, CancellationToken.None));
+
+        Assert.Empty(StagingSnapshot(tag).Except(before));
+    }
+
+    [Fact]
+    public async Task DownloadVerifiedAsync_UnknownSizeStreamUnderTheCeiling_Succeeds()
+    {
+        // The control for the two refusals above: a ceiling that refused everything would
+        // satisfy both of them.
+        var payload = new byte[64];
+        var client = new StubReleaseClient
+        {
+            StreamFactory = () => new DeclaredLengthStream(new MemoryStream(payload), null, null),
+        };
+        var service = new UpdateService(client, new StubVariantDetector(BuildVariant.Standard), _dataRoot);
+        var update = UpdateWithSha(Sha256Verifier.ComputeHex(new MemoryStream(payload)), 0, "v2026.061593");
+
+        using var package = await service.DownloadVerifiedAsync(update, null, CancellationToken.None);
+
+        Assert.NotNull(package);
+    }
+
+    [Fact]
+    public async Task DownloadVerifiedAsync_StreamPastTheDeclaredSizeOfARepublishedRelease_IsReportedAsSuperseded()
+    {
+        // The check read the old checksum; by the time the copy overruns the size the JSON
+        // promised, the source publishes a different one. That is a republication, not a
+        // generic failure.
+        var payload = new byte[64];
+        var frozen = new string('a', 64);
+        var publishedNow = new string('b', 64);
+        const string tag = "v2026.061592";
+        var update = UpdateWithSha(frozen, 8, tag) with { ChecksumUrl = "https://example.test/SHA256SUMS.txt" };
+        var client = new ChecksumChangingClient(
+            () => new DeclaredLengthStream(new MemoryStream(payload), null, null),
+            [$"{frozen}  {update.Asset.Name}", $"{publishedNow}  {update.Asset.Name}"]);
+        var service = CreateService(client, BuildVariant.Standard);
+
+        var before = StagingSnapshot(tag);
+        var refusal = await Assert.ThrowsAsync<UpdateSupersededException>(
+            () => service.DownloadVerifiedAsync(update, null, CancellationToken.None));
+
+        Assert.Equal(publishedNow, refusal.PublishedSha256);
+        Assert.Empty(StagingSnapshot(tag).Except(before));
     }
 
     private sealed class ReadCountingStream(byte[] data) : Stream

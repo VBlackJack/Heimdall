@@ -397,11 +397,13 @@ public sealed class GitHubReleaseClientTests
         var client = CreateClient((_, _) =>
         {
             sent++;
-            return Redirect($"https://github.com/loop/{sent}");
+            return sent <= 6 ? Redirect($"https://github.com/loop/{sent}") : Bytes("installer");
         });
 
-        await Assert.ThrowsAnyAsync<InvalidOperationException>(
+        var refusal = await Assert.ThrowsAnyAsync<InvalidOperationException>(
             () => client.OpenAssetStreamAsync(InstallerUrl, CancellationToken.None));
+
+        Assert.Contains("redirects", refusal.Message, StringComparison.Ordinal);
 
         // The first request plus five followed hops; the sixth redirect is not followed.
         Assert.Equal(6, sent);
@@ -445,6 +447,23 @@ public sealed class GitHubReleaseClientTests
         var result = await client.GetLatestReleaseAsync("VBlackJack", "Heimdall", CancellationToken.None);
 
         Assert.NotNull(result.Release);
+    }
+
+    [Fact]
+    public async Task GetLatestReleaseAsync_RedirectToPlainHttpOnTheApiHost_FailsWithoutFollowing()
+    {
+        int sent = 0;
+        var client = CreateClient((_, _) =>
+        {
+            sent++;
+            return Redirect("http://api.github.com/repositories/42/releases/latest", HttpStatusCode.MovedPermanently);
+        });
+
+        var result = await client.GetLatestReleaseAsync("VBlackJack", "Heimdall", CancellationToken.None);
+
+        Assert.Null(result.Release);
+        Assert.Equal(UpdateCheckFailure.SourceUnavailable, result.Failure);
+        Assert.Equal(1, sent);
     }
 
     [Fact]
