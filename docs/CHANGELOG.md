@@ -12,6 +12,38 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-11-21: The SFTP pane beside an SSH session takes the share you choose, and the splitter keeps where you drag it (v2026.112101)
+
+Merged as #858, #859 and #860, with the dependency updates #845, #847 and #849 to #857. The user-facing summary and the
+upgrade notes are in the release notes.
+
+### SFTP companion width (#858)
+
+- `AppSettings.SftpCompanionWidthPercent`, `[SettingRange(25, 80)]`, default 33 (also in
+  `config/settings.default.json`), edited under Settings > SSH & SFTP > SFTP & X11 and editable only when the SFTP
+  browser and its auto-open on SSH are both on.
+- `SplitRatio` is the terminal's share: both companion sites in `SessionCoordinator` store the complement of the
+  clamped setting, read from the connect's own settings snapshot.
+- `SplitContainerModel.ResetRatio`: the split a double-click restores, the configured share for the SFTP
+  companion and 50/50 for a user split.
+
+### Splitter drag, double-click and swap (#858, #859, #860)
+
+- `OnSplitterDragCompleted` reads the star lengths the splitter has just written instead of `ActualWidth` /
+  `ActualHeight`, which still held the split from before the drag, and ignores a cancelled or motionless
+  completion (the second press of a double-click).
+- `ApplyLayout` keeps the row and column definitions when their shape matches and only updates their lengths
+  (`EnsureDefinitions`): rebuilding them under a drag started by a double-click left the splitter measuring
+  detached definitions and threw in `GridSplitter.RemovePreviewAdorner`.
+- `SplitContainerModel.SwapChildren` exchanges the children and mirrors `SplitRatio` and `ResetRatio` (clamped);
+  `SwapSplitPanesAsync` calls it. The layout memory needs no new record, since `FindRatio` returns the
+  complement for the reversed pair.
+
+### Dependencies
+
+- SSH.NET 2026.0.1 (#847), YamlDotNet 18.1.0 (#849), Microsoft.Extensions.TimeProvider.Testing 10.11.1 (#845),
+  coverlet.collector 10.1.1 (#850 to #857); lock files refreshed where the transitive graph changed.
+
 ## 2026-11-17: The master password protects every stored secret, and root browsing works under stricter servers (v2026.111703)
 
 Fixes merged as #763 and #843. The user-facing summary and the upgrade notes are in the release notes.
