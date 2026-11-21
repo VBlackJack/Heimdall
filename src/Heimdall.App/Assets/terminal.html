@@ -39,7 +39,7 @@
             overflow: hidden;
             background: var(--terminal-bg);
             color: var(--terminal-fg);
-            font-family: /*{{TERMINAL_FONT_FAMILY}}*/, 'Courier New', monospace;
+            font-family: /*{{TERMINAL_FONT_FAMILY_CSS}}*/;
         }
 
         body {
@@ -256,6 +256,9 @@
             }
 
             function base64ToBytes(base64) {
+                if (typeof Uint8Array.fromBase64 === 'function') {
+                    return Uint8Array.fromBase64(base64);
+                }
                 var binary = atob(base64);
                 var bytes = new Uint8Array(binary.length);
                 for (var index = 0; index < binary.length; index++) {
@@ -750,7 +753,7 @@
                     cursorStyle: 'block',
                     // Each cell's foreground is raised to this contrast on its background at render time.
                     minimumContrastRatio: /*{{TERMINAL_MIN_CONTRAST}}*/,
-                    fontFamily: '/*{{TERMINAL_FONT_FAMILY}}*/, "Courier New", monospace',
+                    fontFamily: /*{{TERMINAL_FONT_FAMILY_JSON}}*/,
                     fontSize: baseFontSize,
                     scrollback: scrollbackLines,
                     linkHandler: {
