@@ -61,7 +61,42 @@ public sealed class FileLogger : IDisposable
     private const string LogFileDateFormat = "yyyyMMdd";
     private const string LogFileExtension = ".log";
 
+    /// <summary>
+    /// How many entries the queue keeps while the file cannot be written. Past it the oldest are
+    /// dropped and counted, so a full disk or a held file cannot grow memory without bound.
+    /// </summary>
+    internal const int DefaultMaxQueuedEntries = 10_000;
+
+    /// <summary>The line written ahead of the next successful batch to say entries were lost.</summary>
+    private const string DroppedSummaryFormat = "[{0:yyyy-MM-dd HH:mm:ss}] [WARN] [FileLogger] {1} entries dropped while the log could not be written";
+
+    /// <summary>Milliseconds before the first timed flush.</summary>
+    internal const int DefaultInitialFlushDelayMs = 1000;
+
+    /// <summary>The queue triggers an early flush when it reaches the cap divided by this.</summary>
+    private const int EarlyFlushDivisor = 2;
+
+    /// <summary>Test seam: runs when a batch could not be written, just before it is re-queued.</summary>
+    internal static Action? WriteFailedForTest;
+
+    /// <summary>Test seam: restricts a new log file to its owner. Replaced only by tests.</summary>
+    internal static Action<string> AclApplier = RestrictToOwner;
+
+    /// <summary>The production restriction of a log file to its owner (Windows only).</summary>
+    internal static void RestrictToOwner(string path)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            AclEnforcer.SetFileAcl(path);
+        }
+    }
+
     private static FileLogger? _instance;
+    private readonly int _flushIntervalMs;
+    private readonly bool _earlyFlush;
+    private readonly int _maxQueued;
+    private int _queuedCount;
+    private long _dropped;
     private readonly string _logPath;
     private readonly long _maxFileBytes;
     private int _overflowIndex;
@@ -72,14 +107,24 @@ public sealed class FileLogger : IDisposable
     private static volatile bool _enabled = true;
     private bool _disposed;
 
-    private FileLogger(string logDirectory, int flushIntervalMs, long maxFileBytes, int retentionDays)
+    private FileLogger(
+        string logDirectory,
+        int flushIntervalMs,
+        long maxFileBytes,
+        int retentionDays,
+        int maxQueuedEntries,
+        int initialFlushDelayMs,
+        bool earlyFlush)
     {
         Directory.CreateDirectory(logDirectory);
         _maxFileBytes = maxFileBytes;
+        _maxQueued = maxQueuedEntries;
+        _flushIntervalMs = flushIntervalMs;
+        _earlyFlush = earlyFlush;
         _logPath = Path.Combine(logDirectory, $"{LogFilePrefix}{DateTime.Now.ToString(LogFileDateFormat, System.Globalization.CultureInfo.InvariantCulture)}{LogFileExtension}");
         PurgeExpiredLogs(logDirectory, retentionDays, DateTime.UtcNow, _logPath);
         var interval = TimeSpan.FromMilliseconds(flushIntervalMs);
-        _flushTimer = new Timer(_ => FlushInternal(), null, TimeSpan.FromSeconds(1), interval);
+        _flushTimer = new Timer(_ => FlushInternal(), null, TimeSpan.FromMilliseconds(initialFlushDelayMs), interval);
     }
 
     /// <summary>
@@ -91,10 +136,17 @@ public sealed class FileLogger : IDisposable
     /// <summary>
     /// Initialize with explicit bounds, so a test can use a size cap of a few bytes.
     /// </summary>
-    internal static void Initialize(string logDirectory, int flushIntervalMs, long maxFileBytes, int retentionDays)
+    internal static void Initialize(
+        string logDirectory,
+        int flushIntervalMs,
+        long maxFileBytes,
+        int retentionDays,
+        int maxQueuedEntries = DefaultMaxQueuedEntries,
+        int initialFlushDelayMs = DefaultInitialFlushDelayMs,
+        bool earlyFlush = true)
     {
         _instance?.Dispose();
-        _instance = new FileLogger(logDirectory, flushIntervalMs, maxFileBytes, retentionDays);
+        _instance = new FileLogger(logDirectory, flushIntervalMs, maxFileBytes, retentionDays, maxQueuedEntries, initialFlushDelayMs, earlyFlush);
     }
 
     /// <summary>
@@ -172,10 +224,46 @@ public sealed class FileLogger : IDisposable
         if (!_enabled) return;
 
         var entry = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [{level}] {message}";
-        _instance?._queue.Enqueue(entry);
+        _instance?.EnqueueBounded(entry);
 
         // Also write to debug output for development
         System.Diagnostics.Debug.WriteLine(entry);
+    }
+
+    /// <summary>
+    /// Adds an entry without taking a lock, then drops the oldest ones while the queue is over
+    /// its cap. The count is kept by hand because ConcurrentQueue.Count is not cheap.
+    /// </summary>
+    private void EnqueueBounded(string entry)
+    {
+        _queue.Enqueue(entry);
+        var queued = Interlocked.Increment(ref _queuedCount);
+        if (_earlyFlush && queued == _maxQueued / EarlyFlushDivisor)
+        {
+            RequestEarlyFlush();
+        }
+
+        while (Volatile.Read(ref _queuedCount) > _maxQueued && _queue.TryDequeue(out _))
+        {
+            Interlocked.Decrement(ref _queuedCount);
+            Interlocked.Increment(ref _dropped);
+        }
+    }
+
+    /// <summary>
+    /// Asks the timer for a flush right now, on its own thread, so Log never waits for the file.
+    /// The cap keeps a burst from losing entries a prompt write would have kept.
+    /// </summary>
+    private void RequestEarlyFlush()
+    {
+        try
+        {
+            _flushTimer.Change(0, _flushIntervalMs);
+        }
+        catch (ObjectDisposedException)
+        {
+            // The logger is shutting down; the final flush takes what is queued.
+        }
     }
 
     public static void Debug(string message) => Log("DEBUG", message);
@@ -226,28 +314,33 @@ public sealed class FileLogger : IDisposable
             var sb = new StringBuilder();
             while (_queue.TryDequeue(out var entry))
             {
+                Interlocked.Decrement(ref _queuedCount);
                 entries.Add(entry);
                 sb.AppendLine(entry);
             }
 
             if (sb.Length == 0) return;
 
+            var dropped = Interlocked.Exchange(ref _dropped, 0);
+            if (dropped > 0)
+            {
+                sb.Insert(0, string.Format(
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    DroppedSummaryFormat,
+                    DateTime.Now,
+                    dropped) + Environment.NewLine);
+            }
+
             var text = sb.ToString();
             int[] retryDelaysMs = [10, 50, 200];
-            for (var attempt = 0; attempt <= retryDelaysMs.Length; attempt++)
+            string? writtenPath = null;
+            for (var attempt = 0; attempt <= retryDelaysMs.Length && writtenPath is null; attempt++)
             {
                 try
                 {
                     var path = ResolveWritablePath(Encoding.UTF8.GetByteCount(text));
                     File.AppendAllText(path, text, Encoding.UTF8);
-
-                    if (!string.Equals(_aclAppliedPath, path, StringComparison.Ordinal) && OperatingSystem.IsWindows())
-                    {
-                        AclEnforcer.SetFileAcl(path);
-                        _aclAppliedPath = path;
-                    }
-
-                    return;
+                    writtenPath = path;
                 }
                 catch (IOException) when (attempt < retryDelaysMs.Length)
                 {
@@ -255,18 +348,61 @@ public sealed class FileLogger : IDisposable
                 }
                 catch (IOException)
                 {
-                    foreach (var originalEntry in entries)
-                    {
-                        _queue.Enqueue(originalEntry);
-                    }
-
+                    WriteFailedForTest?.Invoke();
+                    RequeueNewest(entries, dropped);
                     return;
                 }
                 catch
                 {
+                    Interlocked.Add(ref _dropped, dropped + entries.Count);
                     return;
                 }
             }
+
+            if (writtenPath is not null)
+            {
+                ApplyAclOnce(writtenPath);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Restricts a newly written file to its owner. Runs after the batch is on disk and touches
+    /// neither the queue nor the dropped count: a failure here must never make the batch be
+    /// written twice. A path whose restriction failed is tried again on the next flush.
+    /// </summary>
+    private void ApplyAclOnce(string path)
+    {
+        if (string.Equals(_aclAppliedPath, path, StringComparison.Ordinal) || !OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        try
+        {
+            AclApplier(path);
+            _aclAppliedPath = path;
+        }
+        catch
+        {
+            // Best effort, as before: the log itself must keep working.
+        }
+    }
+
+    /// <summary>
+    /// Puts back the newest entries of a failed batch that fit under the cap and counts the rest
+    /// as dropped, together with the count the failed write was carrying. Re-enqueued entries
+    /// land after any entry logged meanwhile, so the order is not strictly chronological.
+    /// </summary>
+    private void RequeueNewest(List<string> entries, long carriedDropped)
+    {
+        var room = Math.Max(0, _maxQueued - Volatile.Read(ref _queuedCount));
+        var keep = Math.Min(entries.Count, room);
+        Interlocked.Add(ref _dropped, carriedDropped + (entries.Count - keep));
+        for (var i = entries.Count - keep; i < entries.Count; i++)
+        {
+            _queue.Enqueue(entries[i]);
+            Interlocked.Increment(ref _queuedCount);
         }
     }
 

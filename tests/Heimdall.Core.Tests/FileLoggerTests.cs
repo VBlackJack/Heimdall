@@ -45,6 +45,8 @@ public class FileLoggerTests : IDisposable
     public void Dispose()
     {
         FileLogger.SetEnabled(true);
+        FileLogger.WriteFailedForTest = null;
+        FileLogger.AclApplier = FileLogger.RestrictToOwner;
         try
         {
             if (Directory.Exists(_tempDir))
@@ -350,6 +352,168 @@ public class FileLoggerTests : IDisposable
         var exception = Record.Exception(() => FileLogger.Flush());
 
         Assert.Null(exception);
+    }
+
+    // ── Bounded queue ──────────────────────────────────────────────────
+
+    private const string DroppedSummaryMarker = "entries dropped while the log could not be written";
+    private const int TestQueueCap = 100;
+    private const int TestBurstSize = 250;
+    private const int TestIdleFlushIntervalMs = 3_600_000;
+    private const int TestConcurrentEntries = 50;
+    private const int EarlyFlushWaitSeconds = 10;
+    private const int EarlyFlushPollMs = 20;
+
+    private void InitializeCapped()
+        => FileLogger.Initialize(_tempDir, TestIdleFlushIntervalMs, FileLogger.MaxLogFileBytes, FileLogger.LogRetentionDays, TestQueueCap, TestIdleFlushIntervalMs, earlyFlush: false);
+
+    private string[] SummaryLines()
+        => ReadLogContent().Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries)
+            .Where(l => l.Contains(DroppedSummaryMarker, StringComparison.Ordinal)).ToArray();
+
+    [Fact]
+    public void Flush_WhenTheFileIsHeld_KeepsTheQueueUnderTheCapAndReportsTheDrops()
+    {
+        InitializeCapped();
+        FileLogger.Info("warmup");
+        FileLogger.Flush();
+        var logFile = Directory.GetFiles(_tempDir, "heimdall_*.log").Single();
+
+        using (new FileStream(logFile, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+            for (var i = 0; i < TestBurstSize; i++)
+            {
+                FileLogger.Info($"e{i:D3}");
+            }
+
+            FileLogger.Flush();
+        }
+
+        FileLogger.Info("after");
+        FileLogger.Flush();
+
+        var content = ReadLogContent();
+        Assert.Contains("e249", content);
+        Assert.Contains("after", content);
+        Assert.DoesNotContain("e000", content);
+        var lines = content.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        Assert.True(lines.Count(l => !l.Contains(DroppedSummaryMarker, StringComparison.Ordinal)) <= TestQueueCap + 1);
+
+        // 150 were dropped by the burst; "after" pushed one more out of the full queue.
+        var summary = Assert.Single(SummaryLines());
+        Assert.Contains(" 151 entries", summary);
+
+        FileLogger.Info("one more");
+        FileLogger.Flush();
+        Assert.Single(SummaryLines());
+    }
+
+    [Fact]
+    public void Flush_WhenEntriesArriveDuringAFailedWrite_RequeuesOnlyWhatFitsUnderTheCap()
+    {
+        InitializeCapped();
+        FileLogger.Info("warmup");
+        FileLogger.Flush();
+        var logFile = Directory.GetFiles(_tempDir, "heimdall_*.log").Single();
+
+        // The failed batch has been drained by then; entries logged at that moment are newer
+        // and take room that the batch can no longer claim.
+        FileLogger.WriteFailedForTest = () =>
+        {
+            for (var i = 0; i < TestConcurrentEntries; i++)
+            {
+                FileLogger.Info($"m{i:D2}");
+            }
+        };
+
+        using (new FileStream(logFile, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+            for (var i = 0; i < TestBurstSize; i++)
+            {
+                FileLogger.Info($"e{i:D3}");
+            }
+
+            FileLogger.Flush();
+        }
+
+        FileLogger.WriteFailedForTest = null;
+        FileLogger.Info("after");
+        FileLogger.Flush();
+
+        // 150 dropped by the burst, 50 of the failed batch that did not fit, and "m00"
+        // pushed out by "after".
+        var content = ReadLogContent();
+        var summary = Assert.Single(SummaryLines());
+        Assert.Contains(" 201 entries", summary);
+        Assert.Contains("e249", content);
+        Assert.Contains("e200", content);
+        Assert.DoesNotContain("e199", content);
+        Assert.DoesNotContain("m00", content);
+        Assert.Contains("m01", content);
+        Assert.Contains("m49", content);
+        var lines = content.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        Assert.True(lines.Count(l => !l.Contains(DroppedSummaryMarker, StringComparison.Ordinal)) <= TestQueueCap + 1);
+    }
+
+    [Fact]
+    public void Flush_WhenTheAclStepFailsAfterTheWrite_DoesNotRepeatTheBatchOrTheSummary()
+    {
+        InitializeCapped();
+        for (var i = 0; i < TestBurstSize; i++)
+        {
+            FileLogger.Info($"e{i:D3}");
+        }
+
+        FileLogger.AclApplier = _ => throw new IOException("acl failed");
+        FileLogger.Flush();
+        FileLogger.Info("later");
+        FileLogger.Flush();
+
+        var content = ReadLogContent();
+        Assert.Single(SummaryLines());
+        Assert.Equal(1, CountOccurrences(content, "e249"));
+        Assert.Equal(1, CountOccurrences(content, "e150"));
+        Assert.Equal(1, CountOccurrences(content, "later"));
+    }
+
+    [Fact]
+    public void Log_WhenTheQueueReachesHalfTheCap_FlushesWithoutWaitingForTheTimer()
+    {
+        FileLogger.Initialize(
+            _tempDir,
+            TestIdleFlushIntervalMs,
+            FileLogger.MaxLogFileBytes,
+            FileLogger.LogRetentionDays,
+            TestQueueCap,
+            TestIdleFlushIntervalMs,
+            earlyFlush: true);
+
+        for (var i = 0; i < TestQueueCap / 2; i++)
+        {
+            FileLogger.Info($"e{i:D3}");
+        }
+
+        var deadline = DateTime.UtcNow.AddSeconds(EarlyFlushWaitSeconds);
+        while (!ReadLogContent().Contains("e049", StringComparison.Ordinal) && DateTime.UtcNow < deadline)
+        {
+            Thread.Sleep(EarlyFlushPollMs);
+        }
+
+        Assert.Contains("e049", ReadLogContent());
+    }
+
+    [Fact]
+    public void Flush_WhenNothingWasDropped_WritesNoSummary()
+    {
+        InitializeCapped();
+        for (var i = 0; i < TestQueueCap; i++)
+        {
+            FileLogger.Info($"e{i:D3}");
+        }
+
+        FileLogger.Flush();
+
+        Assert.Empty(SummaryLines());
     }
 
     // ── Helpers ────────────────────────────────────────────────────────
