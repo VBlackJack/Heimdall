@@ -89,8 +89,14 @@ public partial class TotpGeneratorView : UserControl, IToolView
     private void OnCopyClick(object sender, RoutedEventArgs e)
     {
         if (!_vm.CanCopy()) return;
-        try { Clipboard.SetText(_vm.CurrentCode); CopyFeedbackHelper.ShowCopyFeedback(sender as Button); }
+        try { CopySensitive(_vm.CurrentCode); CopyFeedbackHelper.ShowCopyFeedback(sender as Button); }
         catch (Exception ex) { FileLogger.Warn($"TotpGenerator clipboard copy failed: {ex.Message}"); }
+    }
+
+    /// <summary>A one-time code must stay out of the clipboard history and the cloud clipboard.</summary>
+    private static void CopySensitive(string text)
+    {
+        new WpfClipboardService().SetSensitiveText(text);
     }
 
     private void OnHelpClick(object sender, RoutedEventArgs e)

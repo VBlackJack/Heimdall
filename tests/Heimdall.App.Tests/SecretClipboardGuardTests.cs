@@ -171,6 +171,55 @@ public sealed class SecretClipboardGuardTests
             "Dispose does not finish a pending clipboard clear");
     }
 
+    [Fact]
+    public void TheTotpGeneratorView_CopiesTheCodeThroughTheSensitivePath()
+    {
+        string source = File.ReadAllText(Path.Combine(
+            FindRepoRoot(), "src", "Heimdall.App", "Views", "Tools", "TotpGeneratorView.xaml.cs"));
+
+        Assert.DoesNotContain("Clipboard.SetText(", source, StringComparison.Ordinal);
+
+        string copy = ViewSource.HandlerBody(
+            ViewSource.WithoutCommentsAndLiterals(source), "private static void CopySensitive(");
+        Assert.True(
+            ViewSource.IsStatementOfTheMethodBody(copy, "new WpfClipboardService().SetSensitiveText(text);"),
+            "CopySensitive does not use the sensitive clipboard path");
+
+        string handler = ViewSource.HandlerBody(
+            ViewSource.WithoutCommentsAndLiterals(source), "private void OnCopyClick(");
+        Assert.DoesNotContain("Clipboard.SetText(", handler, StringComparison.Ordinal);
+        SourceStatements.AssertStatementChain(handler, "try", "CopySensitive(_vm.CurrentCode);");
+    }
+
+    [Fact]
+    public void TheMainWindow_CopiesTheShareUrlThroughTheSensitivePath()
+    {
+        string source = File.ReadAllText(Path.Combine(
+            FindRepoRoot(), "src", "Heimdall.App", "MainWindow.xaml.cs"));
+        string logic = ViewSource.WithoutCommentsAndLiterals(source);
+
+        string copy = ViewSource.HandlerBody(logic, "private static void CopyShareUrlToClipboard(");
+        Assert.True(
+            ViewSource.IsStatementOfTheMethodBody(copy, "new WpfClipboardService().SetSensitiveText(url);"),
+            "CopyShareUrlToClipboard does not use the sensitive clipboard path");
+
+        // The two sites that used to write the URL as plain text now call the helper.
+        string started = ViewSource.HandlerBody(logic, "private void OnFileShareSharingStarted(");
+        Assert.DoesNotContain("Clipboard.SetText(", started, StringComparison.Ordinal);
+        SourceStatements.AssertStatementChain(
+            started,
+            "if (!_suppressFileShareStartDialog)",
+            "try",
+            "CopyShareUrlToClipboard(e.BaseUrl);");
+
+        string clicked = ViewSource.HandlerBody(logic, "private void OnCopyShareUrlClick(");
+        Assert.DoesNotContain("Clipboard.SetText(", clicked, StringComparison.Ordinal);
+        SourceStatements.AssertStatementChain(
+            clicked,
+            "try",
+            "CopyShareUrlToClipboard(_fileShareService.BaseUrl);");
+    }
+
     private static string FindRepoRoot()
     {
         string? directory = AppContext.BaseDirectory;

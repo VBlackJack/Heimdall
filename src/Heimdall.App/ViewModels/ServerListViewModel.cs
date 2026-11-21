@@ -929,10 +929,17 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         return targets;
     }
 
-    public async Task ImportRdpFilesAsync(IEnumerable<string> filePaths, CancellationToken cancellationToken = default)
+    public Task ImportRdpFilesAsync(IEnumerable<string> filePaths, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(filePaths);
 
+        return RunImportGuardedAsync(
+            _localizer["DialogImportRdpTitle"],
+            () => ImportRdpFilesCoreAsync(filePaths, cancellationToken));
+    }
+
+    private async Task ImportRdpFilesCoreAsync(IEnumerable<string> filePaths, CancellationToken cancellationToken)
+    {
         var paths = filePaths
             .Where(path => !string.IsNullOrWhiteSpace(path))
             .ToArray();
@@ -956,9 +963,10 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             return;
         }
 
-        var settings = await _configManager.LoadSettingsAsync();
-        var servers = await _configManager.LoadServersAsync();
-        LoadServers(servers, settings);
+        if (!await TryReloadServersAfterImportAsync(_localizer["DialogImportRdpTitle"]))
+        {
+            return;
+        }
 
         if (!string.IsNullOrWhiteSpace(result.UserMessage))
         {
@@ -966,10 +974,17 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         }
     }
 
-    public async Task ImportOpenSshConfigAsync(string filePath, CancellationToken cancellationToken = default)
+    public Task ImportOpenSshConfigAsync(string filePath, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
 
+        return RunImportGuardedAsync(
+            _localizer["DialogTitleImportOpenSshConfig"],
+            () => ImportOpenSshConfigCoreAsync(filePath, cancellationToken));
+    }
+
+    private async Task ImportOpenSshConfigCoreAsync(string filePath, CancellationToken cancellationToken)
+    {
         string contents;
         try
         {
@@ -1005,9 +1020,10 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             return;
         }
 
-        var settings = await _configManager.LoadSettingsAsync();
-        var servers = await _configManager.LoadServersAsync();
-        LoadServers(servers, settings);
+        if (!await TryReloadServersAfterImportAsync(_localizer["DialogTitleImportOpenSshConfig"]))
+        {
+            return;
+        }
 
         var summary = ImportSummaryText.OpenSsh(
             _localizer,
@@ -1028,6 +1044,57 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
     }
 
     /// <summary>
+    /// Runs one whole import flow (preview, dialogs, write, reload). The callers are
+    /// <c>async void</c> handlers, where an escaping exception would surface as the generic
+    /// unhandled-error dialog, so the failures a damaged or unreadable store produces are shown
+    /// as an import failure instead.
+    /// </summary>
+    private async Task RunImportGuardedAsync(string dialogTitle, Func<Task> import)
+    {
+        try
+        {
+            await import();
+        }
+        catch (Exception ex) when (ex is IOException
+            or UnauthorizedAccessException
+            or System.Text.Json.JsonException
+            or System.Security.SecurityException
+            or ConfigurationValidationException
+            or ConfigurationSchemaVersionException)
+        {
+            Core.Logging.FileLogger.ErrorDetailed("Importing sessions failed", ex);
+            _dialogService.ShowError(dialogTitle, _localizer.Format("StatusImportFailed", ex.Message));
+        }
+    }
+
+    /// <summary>
+    /// Reloads settings and servers after an import wrote them. The import is already on disk
+    /// here, so a failed reload is reported as such rather than as a failed import. The list is
+    /// only touched once both files loaded.
+    /// </summary>
+    private async Task<bool> TryReloadServersAfterImportAsync(string dialogTitle)
+    {
+        AppSettings settings;
+        List<ServerProfileDto> servers;
+        try
+        {
+            settings = await _configManager.LoadSettingsAsync();
+            servers = await _configManager.LoadServersAsync();
+        }
+        catch (Exception ex) when (ex is IOException
+            or UnauthorizedAccessException
+            or System.Text.Json.JsonException)
+        {
+            Core.Logging.FileLogger.ErrorDetailed("Reloading the server list after an import failed", ex);
+            _dialogService.ShowError(dialogTitle, _localizer.Format("ErrorImportReloadFailed", ex.Message));
+            return false;
+        }
+
+        LoadServers(servers, settings);
+        return true;
+    }
+
+    /// <summary>
     /// The import summary followed by what the import boundary took away, profile by profile,
     /// so a dropped key path can be re-entered by a user who trusts it.
     /// </summary>
@@ -1037,7 +1104,14 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         return lines.Count == 0 ? summary : string.Join(Environment.NewLine, [summary, .. lines]);
     }
 
-    public async Task ImportPuttySessionsAsync(CancellationToken cancellationToken = default)
+    public Task ImportPuttySessionsAsync(CancellationToken cancellationToken = default)
+    {
+        return RunImportGuardedAsync(
+            _localizer["DialogTitleImportPuttySessions"],
+            () => ImportPuttySessionsCoreAsync(cancellationToken));
+    }
+
+    private async Task ImportPuttySessionsCoreAsync(CancellationToken cancellationToken)
     {
         var parseResult = await _puttySessionImporter.ReadAndParseAsync(cancellationToken);
         if (parseResult.Candidates.Count == 0)
@@ -1054,9 +1128,10 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             return;
         }
 
-        var settings = await _configManager.LoadSettingsAsync();
-        var servers = await _configManager.LoadServersAsync();
-        LoadServers(servers, settings);
+        if (!await TryReloadServersAfterImportAsync(_localizer["DialogTitleImportPuttySessions"]))
+        {
+            return;
+        }
 
         var summary = ImportSummaryText.Putty(
             _localizer,

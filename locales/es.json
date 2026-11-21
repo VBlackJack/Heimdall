@@ -334,6 +334,7 @@
   "ImportNoSessionsFound": "No se encontraron sesiones en el archivo seleccionado.",
   "ImportErrorFileTooLarge": "El archivo de importación es demasiado grande (límite {0}).",
   "StatusImportFailed": "Falló la importación: {0}",
+  "ErrorImportReloadFailed": "Las sesiones se importaron, pero no se pudo actualizar la lista: {0}",
   "StatusExportFailed": "Falló la exportación: {0}",
   "StatusClipboardCopyFailed": "No se pudo copiar al portapapeles: {0}",
   "ConfirmImportTitle": "Importar sesiones",
