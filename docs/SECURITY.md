@@ -667,7 +667,7 @@ same key as the SFTP cap, `HKLM\Software\Policies\Heimdall`:
   no restriction today. The Core pack has no value: it can never be forbidden.
 - A forbidden pack beats the user's choice. Its tools are hidden and refused, and its switch in
   `Settings > Advanced > Tools & integrations > Tool packs` shows off and disabled, with a line
-  saying the pack is set by the organization's policy. The user's own choice stays in the
+  saying the pack is set by the organisation's policy. The user's own choice stays in the
   settings file, so lifting the policy gives it back.
 - Only the per-machine hive is read, because the per-user hive is writable by the user the
   policy constrains. Two readers exist, the tool availability service and the privilege

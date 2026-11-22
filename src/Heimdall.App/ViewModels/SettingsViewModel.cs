@@ -2879,6 +2879,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         bool savedTranscripts = _savedSessionLoggingEnabled;
         merged.SshGateways = keptGateways;
 
+        // A pack the organisation policy forbids is not the user's to change, so the file leaves
+        // the user's own choice for it alone, the way the resets do.
+        merged.DisabledToolPacks = [.. WithPolicyPacksKept(merged.DisabledToolPacks)];
+
         LoadFromSettings(merged);
         _originalLocale = localeToReturnTo;
         _originalTheme = themeToReturnTo;

@@ -17,8 +17,10 @@
 using System.Globalization;
 using System.IO;
 using System.Reflection;
+using Heimdall.App.Services;
 using Heimdall.App.ViewModels.Settings;
 using Heimdall.Core.Configuration;
+using Heimdall.Core.Models;
 
 namespace Heimdall.App.ViewModels;
 
@@ -217,11 +219,35 @@ public partial class SettingsViewModel
 
     private void UpdateDefaultMarker(SettingDefaultState state)
     {
-        string defaultText = FormatDefaultValue(DefaultPanelValueOf(state.Setting));
+        object? defaultValue = DefaultPanelValueOf(state.Setting);
+        string defaultText = state.Setting == nameof(DisabledToolPacks) && defaultValue is string[] disabledPacks
+            ? FormatDisabledToolPacksDefault(disabledPacks)
+            : FormatDefaultValue(defaultValue);
         state.DefaultText = defaultText;
         state.BadgeAccessibleName = _localizer.Format("SettingsModifiedFromDefault", defaultText);
         state.ResetAccessibleName = _localizer.Format("SettingsResetToDefaultAccessible", defaultText);
         state.IsModified = IsModifiedFromDefault(state.Setting);
+    }
+
+    /// <summary>
+    /// Words the default of the list of switched-off packs as the setting's label followed by the
+    /// pack names, so the marker cannot read as the packs being on by default.
+    /// </summary>
+    /// <remarks>An entry that names no pack of this build stays as written.</remarks>
+    internal string FormatDisabledToolPacksDefault(string[] list)
+    {
+        ArgumentNullException.ThrowIfNull(list);
+
+        string[] names =
+        [
+            .. list.Select(entry => ToolAvailability.TryParseOptionalPack(entry, out ToolPack pack)
+                ? _localizer[ToolPackLabelKey(pack)]
+                : entry),
+        ];
+        return _localizer.Format(
+            "SettingsDefaultValueLabeled",
+            _localizer["SettingsLabelToolPacksDisabled"],
+            FormatDefaultValue(names));
     }
 
     private string FormatDefaultValue(object? value) => value switch

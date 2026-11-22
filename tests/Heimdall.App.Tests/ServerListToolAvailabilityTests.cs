@@ -38,7 +38,7 @@ public sealed partial class ServerListSelectionTests
 
     [Theory]
     [InlineData(ToolAvailabilityState.DisabledByUser, "belongs to a tool pack that is turned off")]
-    [InlineData(ToolAvailabilityState.ForbiddenByPolicy, "not allowed by your organization")]
+    [InlineData(ToolAvailabilityState.ForbiddenByPolicy, "not allowed by your organisation")]
     public async Task ASavedToolEntry_OfAnUnavailableTool_ReportsTheStateAndTheReason(
         ToolAvailabilityState state,
         string expectedReasonFragment)

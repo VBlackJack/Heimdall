@@ -1299,6 +1299,7 @@
   "SettingsResetToDefault": "R\u00e9tablir",
   "SettingsResetToDefaultAccessible": "R\u00e9tablir la valeur par d\u00e9faut : {0}",
   "SettingsDefaultValueEmpty": "vide",
+  "SettingsDefaultValueLabeled": "{0} : {1}",
   "SettingsValueOn": "Activ\u00e9",
   "SettingsValueOff": "D\u00e9sactiv\u00e9",
   "SettingsFindModified": "Trouver les param\u00e8tres modifi\u00e9s",

@@ -1299,6 +1299,7 @@
   "SettingsResetToDefault": "Restablecer",
   "SettingsResetToDefaultAccessible": "Restablecer el valor predeterminado: {0}",
   "SettingsDefaultValueEmpty": "vacío",
+  "SettingsDefaultValueLabeled": "{0}: {1}",
   "SettingsValueOn": "Activado",
   "SettingsValueOff": "Desactivado",
   "SettingsFindModified": "Buscar ajustes modificados",

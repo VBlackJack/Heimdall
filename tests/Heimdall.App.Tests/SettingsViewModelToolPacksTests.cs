@@ -399,6 +399,112 @@ public sealed partial class SettingsViewModelTests
         Assert.True(viewModel.Defaults[nameof(SettingsViewModel.DisabledToolPacks)].IsModified);
     }
 
+    [Theory]
+    [InlineData("en", "Tool packs turned off: Audit and reconnaissance", "Modified from default: Tool packs turned off: Audit and reconnaissance", "Reset to the default value: Tool packs turned off: Audit and reconnaissance")]
+    [InlineData("fr", "Packs d'outils désactivés : Audit et reconnaissance", "Modifié, valeur par défaut : Packs d'outils désactivés : Audit et reconnaissance", "Rétablir la valeur par défaut : Packs d'outils désactivés : Audit et reconnaissance")]
+    public async Task TheDefaultMarker_NamesTheSettingAndThePacks_NotTheRawEnumName(
+        string locale,
+        string expectedDefault,
+        string expectedBadge,
+        string expectedReset)
+    {
+        SettingsViewModel viewModel = CreateViewModel(
+            new FakeConfigManager(),
+            localizer: await LoadLocalizerForToolPacksAsync(locale));
+        viewModel.LoadFromSettings(SettingsViewModel.ParseFactoryDefaults(ReadFactoryDefaultsFileForToolPacks()));
+
+        SettingDefaultState state = viewModel.Defaults[nameof(SettingsViewModel.DisabledToolPacks)];
+
+        Assert.Equal(expectedDefault, state.DefaultText);
+        Assert.Equal(expectedBadge, state.BadgeAccessibleName);
+        Assert.Equal(expectedReset, state.ResetAccessibleName);
+    }
+
+    [Fact]
+    public async Task TheDefaultMarkerOfThePackList_ReadsEmptyAnUnknownNameAndSeveralPacks()
+    {
+        LocalizationManager localizer = await LoadLocalizerForToolPacksAsync("en");
+        SettingsViewModel viewModel = CreateViewModel(new FakeConfigManager(), localizer: localizer);
+
+        Assert.Equal("Tool packs turned off: empty", viewModel.FormatDisabledToolPacksDefault([]));
+        Assert.Equal(
+            "Tool packs turned off: Administration, FuturePack",
+            viewModel.FormatDisabledToolPacksDefault([nameof(ToolPack.Administration), "FuturePack"]));
+    }
+
+    [Fact]
+    public async Task TheDefaultMarkerOfAnotherSetting_KeepsItsRawValueWording()
+    {
+        SettingsViewModel viewModel = CreateViewModel(
+            new FakeConfigManager(),
+            localizer: await LoadLocalizerForToolPacksAsync("en"));
+        viewModel.LoadFromSettings(SettingsViewModel.ParseFactoryDefaults(ReadFactoryDefaultsFileForToolPacks()));
+
+        foreach (SettingDefaultState state in viewModel.Defaults.All.Where(state => state.Setting != nameof(SettingsViewModel.DisabledToolPacks)))
+        {
+            Assert.DoesNotContain("Tool packs turned off", state.DefaultText, StringComparison.Ordinal);
+        }
+    }
+
+    [Theory]
+    [InlineData(new[] { "Audit" }, "[]", new[] { "Audit" })]
+    [InlineData(new[] { "Audit", "Essentials" }, "[\"Administration\"]", new[] { "Administration", "Audit" })]
+    public async Task AnImport_KeepsAForbiddenPacksOwnChoice_AndLetsTheOthersFollowTheFile(
+        string[] stored,
+        string importedList,
+        string[] expected)
+    {
+        string file = Path.Combine(Path.GetTempPath(), "heimdall-settings-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            File.WriteAllText(
+                file,
+                "{\"format\":\"heimdall-settings\",\"version\":1,\"settings\":{\"DisabledToolPacks\":" + importedList + "}}");
+            FakeConfigManager config = new() { Settings = new AppSettings { DisabledToolPacks = [.. stored] } };
+            FakeDialogService dialog = new() { ConfirmResult = true };
+            SettingsViewModel viewModel = CreateViewModel(
+                config,
+                dialog,
+                localizer: await LoadLocalizerForToolPacksAsync("en"),
+                toolAvailability: AvailabilityForbidding(ToolPack.Audit));
+            viewModel.LoadFromSettings(config.Settings);
+            viewModel.SettingsImportPathProvider = () => file;
+
+            await viewModel.ImportSettingsCommand.ExecuteAsync(null);
+
+            Assert.Equal(expected, viewModel.DisabledToolPacks);
+        }
+        finally
+        {
+            File.Delete(file);
+        }
+    }
+
+    [Fact]
+    public async Task AnImport_WithNoPolicy_ReplacesTheListWithTheFilesList()
+    {
+        string file = Path.Combine(Path.GetTempPath(), "heimdall-settings-" + Guid.NewGuid().ToString("N") + ".json");
+        try
+        {
+            File.WriteAllText(
+                file,
+                "{\"format\":\"heimdall-settings\",\"version\":1,\"settings\":{\"DisabledToolPacks\":[]}}");
+            FakeConfigManager config = new() { Settings = new AppSettings { DisabledToolPacks = [nameof(ToolPack.Audit)] } };
+            FakeDialogService dialog = new() { ConfirmResult = true };
+            SettingsViewModel viewModel = CreateViewModel(config, dialog, localizer: await LoadLocalizerForToolPacksAsync("en"));
+            viewModel.LoadFromSettings(config.Settings);
+            viewModel.SettingsImportPathProvider = () => file;
+
+            await viewModel.ImportSettingsCommand.ExecuteAsync(null);
+
+            Assert.Empty(viewModel.DisabledToolPacks);
+        }
+        finally
+        {
+            File.Delete(file);
+        }
+    }
+
     private static string ReadFactoryDefaultsFileForToolPacks()
     {
         string path = Path.Combine(AppContext.BaseDirectory, "config", "settings.default.json");
