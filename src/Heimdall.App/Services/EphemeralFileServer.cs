@@ -41,6 +41,7 @@ public sealed class EphemeralFileServer : IDisposable, IAsyncDisposable
     private const string OutboundProbeAddress = "8.8.8.8";
     private const int OutboundProbePort = 80;
     private const int TftpBlockSize = 512;
+    private const int EphemeralPort = 0;
     private const int TftpTimeout = 5000;
     private const int TftpMaxRetries = 3;
     private const int MaxConcurrentTftpTransfers = 8;
@@ -97,6 +98,16 @@ public sealed class EphemeralFileServer : IDisposable, IAsyncDisposable
     /// cannot create a file symbolic link without the SeCreateSymbolicLink privilege.
     /// </summary>
     internal Func<string, bool> IsLink { get; init; } = IsSymbolicLinkOrJunction;
+
+    /// <summary>
+    /// Local address the TFTP listener and its per-transfer reply sockets bind to. Defaults to
+    /// every interface so the share stays reachable on the LAN; tests set the loopback address
+    /// so the test host does not listen on the network (and trigger a firewall prompt).
+    /// </summary>
+    internal IPAddress TftpBindAddress { get; init; } = IPAddress.Any;
+
+    /// <summary>Local endpoint of the running TFTP listener, or <c>null</c> when stopped.</summary>
+    internal IPEndPoint? TftpLocalEndPoint => _tftpListener?.Client.LocalEndPoint as IPEndPoint;
 
     /// <summary>
     /// Resolves a catalogue key to the interface language for the pages and messages that the
@@ -212,10 +223,10 @@ public sealed class EphemeralFileServer : IDisposable, IAsyncDisposable
 
         _servingDirectory = Path.GetFullPath(directory);
         _tftpCts = new CancellationTokenSource();
-        _tftpListener = new UdpClient(port);
+        _tftpListener = new UdpClient(new IPEndPoint(TftpBindAddress, port));
 
         IsTftpRunning = true;
-        Core.Logging.FileLogger.Info($"TFTP file server started on port {port}, serving: {_servingDirectory}");
+        Core.Logging.FileLogger.Info($"TFTP file server started on {TftpBindAddress}:{port}, serving: {_servingDirectory}");
 
         var token = _tftpCts.Token;
         _tftpTask = Task.Run(() => TftpListenLoop(token), token);
@@ -589,7 +600,7 @@ public sealed class EphemeralFileServer : IDisposable, IAsyncDisposable
             if (!string.Equals(mode, "octet", StringComparison.OrdinalIgnoreCase))
             {
                 // Only octet (binary) mode is supported
-                using UdpClient errorClient = new();
+                using UdpClient errorClient = CreateTftpReplyClient();
                 await SendTftpError(errorClient, clientEndpoint, 0, "Only octet mode is supported");
                 return;
             }
@@ -608,7 +619,7 @@ public sealed class EphemeralFileServer : IDisposable, IAsyncDisposable
                 || !File.Exists(filePath)
                 || CrossesLink(_servingDirectory, filePath, IsLink))
             {
-                using UdpClient errorClient = new();
+                using UdpClient errorClient = CreateTftpReplyClient();
                 await SendTftpError(errorClient, clientEndpoint, 1, "File not found");
                 return;
             }
@@ -616,7 +627,7 @@ public sealed class EphemeralFileServer : IDisposable, IAsyncDisposable
             Core.Logging.FileLogger.Info($"TFTP RRQ from {clientEndpoint}: {safeName}");
 
             // Transfer the file using a new UDP socket (unique transfer ID per RFC 1350)
-            using UdpClient transferClient = new();
+            using UdpClient transferClient = CreateTftpReplyClient();
             try
             {
                 await using FileStream fileStream = new(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
@@ -706,6 +717,10 @@ public sealed class EphemeralFileServer : IDisposable, IAsyncDisposable
                 "[EphemeralFileServer] TFTP read request handling failed: " + ex.Message);
         }
     }
+
+    // Reply sockets follow TftpBindAddress so tests stay on loopback.
+    /// <summary>Creates an ephemeral-port reply socket on the same local address as the listener.</summary>
+    private UdpClient CreateTftpReplyClient() => new(new IPEndPoint(TftpBindAddress, EphemeralPort));
 
     private static async Task SendTftpError(UdpClient client, IPEndPoint endpoint, ushort errorCode, string message)
     {

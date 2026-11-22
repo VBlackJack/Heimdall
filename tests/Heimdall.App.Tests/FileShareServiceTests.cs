@@ -129,7 +129,7 @@ public sealed class FileShareServiceTests : IDisposable
     [Fact]
     public async Task StartAsync_With_Tftp_Enabled_Publishes_Tftp_Template()
     {
-        await using var service = new FileShareService();
+        await using var service = new FileShareService { TftpBindAddress = IPAddress.Loopback };
         FileShareStartedEventArgs? startedArgs = null;
         service.SharingStarted += (_, args) => startedArgs = args;
 
@@ -224,7 +224,7 @@ public sealed class FileShareServiceTests : IDisposable
 
     private static int GetFreeUdpPort()
     {
-        using var client = new UdpClient(0);
+        using var client = new UdpClient(new IPEndPoint(IPAddress.Loopback, 0));
         return ((IPEndPoint)client.Client.LocalEndPoint!).Port;
     }
 }

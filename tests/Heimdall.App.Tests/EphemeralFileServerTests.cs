@@ -57,6 +57,7 @@ public class EphemeralFileServerTests : IDisposable
         _server = new EphemeralFileServer
         {
             ShutdownTimeoutMs = 500,
+            TftpBindAddress = IPAddress.Loopback,
         };
     }
 
@@ -566,6 +567,7 @@ public class EphemeralFileServerTests : IDisposable
         var server = new EphemeralFileServer
         {
             ShutdownTimeoutMs = 500,
+            TftpBindAddress = IPAddress.Loopback,
             IsLink = path => string.Equals(Path.GetFileName(path), "linked.bin", StringComparison.OrdinalIgnoreCase),
         };
 
@@ -740,6 +742,30 @@ public class EphemeralFileServerTests : IDisposable
     }
 
     [Fact]
+    public async Task StartTftpServerAsync_Binds_The_Configured_Address()
+    {
+        int port = GetFreeUdpPort();
+        try
+        {
+            await _server.StartTftpServerAsync(_testDir, port);
+        }
+        catch (Exception ex) when (IsPortException(ex))
+        {
+            return; // skip: port unavailable
+        }
+
+        Assert.Equal(IPAddress.Loopback, _server.TftpLocalEndPoint?.Address);
+        Assert.Equal(port, _server.TftpLocalEndPoint?.Port);
+    }
+
+    [Fact]
+    public void TftpBindAddress_Defaults_To_Every_Interface()
+    {
+        Assert.Equal(IPAddress.Any, new EphemeralFileServer().TftpBindAddress);
+        Assert.Equal(IPAddress.Any, new FileShareService().TftpBindAddress);
+    }
+
+    [Fact]
     public async Task StopTftpServerAsync_Sets_IsTftpRunning_False()
     {
         try
@@ -768,7 +794,7 @@ public class EphemeralFileServerTests : IDisposable
     [Fact]
     public async Task Dispose_Stops_All_Running_Servers()
     {
-        var local = new EphemeralFileServer { ShutdownTimeoutMs = 500 };
+        var local = new EphemeralFileServer { ShutdownTimeoutMs = 500, TftpBindAddress = IPAddress.Loopback };
         bool httpStarted = false;
         bool tftpStarted = false;
 
@@ -804,7 +830,7 @@ public class EphemeralFileServerTests : IDisposable
     [Fact]
     public async Task DisposeAsync_Stops_All_Running_Servers()
     {
-        var local = new EphemeralFileServer { ShutdownTimeoutMs = 500 };
+        var local = new EphemeralFileServer { ShutdownTimeoutMs = 500, TftpBindAddress = IPAddress.Loopback };
         bool any = false;
 
         try
