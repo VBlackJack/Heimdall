@@ -4135,8 +4135,7 @@ internal static class SudoRenameCommands
     internal static string BuildExistenceProbe(string targetPath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(targetPath);
-        string escapedPath = PathEscaper.EscapeForShell(targetPath)
-            .Replace("!", "'\\!'", StringComparison.Ordinal);
+        string escapedPath = PathEscaper.EscapeForLoginShell(targetPath);
         return $"test -e {escapedPath} -o -L {escapedPath}";
     }
 
@@ -4144,8 +4143,7 @@ internal static class SudoRenameCommands
     internal static string BuildDirectoryProbe(string targetPath)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(targetPath);
-        string escapedPath = PathEscaper.EscapeForShell(targetPath)
-            .Replace("!", "'\\!'", StringComparison.Ordinal);
+        string escapedPath = PathEscaper.EscapeForLoginShell(targetPath);
         return $"test -d {escapedPath}";
     }
 }
