@@ -582,10 +582,13 @@ public static class PrivilegeLauncher
         };
     }
 
-    private static bool TokenMatchesLevel(SafeAccessTokenHandle tokenHandle, PrivilegeLevel level, int pid)
+    internal static bool TokenMatchesLevel(SafeAccessTokenHandle tokenHandle, PrivilegeLevel level, int pid)
     {
+        bool handleReferenced = false;
         try
         {
+            // Keep the handle alive while the raw value is in use by WindowsIdentity.
+            tokenHandle.DangerousAddRef(ref handleReferenced);
             using System.Security.Principal.WindowsIdentity identity =
                 new(tokenHandle.DangerousGetHandle());
             var groups = (identity.Groups ?? [])
@@ -601,6 +604,11 @@ public static class PrivilegeLauncher
         {
             FileLogger.Debug($"[PrivilegeLauncher] Skipped process {pid}: token not readable ({ex.GetType().Name}).");
             return false;
+        }
+        finally
+        {
+            if (handleReferenced)
+                tokenHandle.DangerousRelease();
         }
     }
 

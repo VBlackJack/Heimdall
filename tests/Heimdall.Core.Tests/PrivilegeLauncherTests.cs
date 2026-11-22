@@ -455,4 +455,61 @@ public sealed class PrivilegeLauncherTests
     [Fact]
     public void IsAcceptableToken_PlainSystemTokenAtTrustedInstallerLevel_IsRefused() =>
         Assert.False(PrivilegeLauncher.IsAcceptableToken(LocalSystem, [], PrivilegeLevel.TrustedInstaller));
+
+    [Fact]
+    public void IsAcceptableToken_NullUser_IsRefusedAtEveryLevel()
+    {
+        foreach (PrivilegeLevel level in Enum.GetValues<PrivilegeLevel>())
+        {
+            Assert.False(PrivilegeLauncher.IsAcceptableToken(null, [TrustedInstallerSid], level));
+        }
+    }
+
+    [Fact]
+    public void IsAcceptableToken_NonSystemUserCarryingTheServiceGroup_IsRefusedAtTrustedInstallerLevel() =>
+        Assert.False(PrivilegeLauncher.IsAcceptableToken(
+            AdminUser, [TrustedInstallerSid], PrivilegeLevel.TrustedInstaller));
+
+    [Fact]
+    public void IsAcceptableToken_SystemTokenAtCurrentUserElevatedLevel_IsRefused()
+    {
+        Assert.False(PrivilegeLauncher.IsAcceptableToken(
+            LocalSystem, [TrustedInstallerSid], PrivilegeLevel.CurrentUserElevated));
+        Assert.False(PrivilegeLauncher.IsAcceptableToken(LocalSystem, [], PrivilegeLevel.CurrentUserElevated));
+    }
+
+    // -- TokenMatchesLevel: reads the real token of the test process (never SYSTEM) ----------
+
+    private const int AnyProcessId = 0;
+
+    [Theory]
+    [InlineData(PrivilegeLevel.System)]
+    [InlineData(PrivilegeLevel.TrustedInstaller)]
+    [InlineData(PrivilegeLevel.CurrentUserElevated)]
+    public void TokenMatchesLevel_OwnProcessToken_IsRefusedAndTheHandleStaysOpen(PrivilegeLevel level)
+    {
+        using System.Security.Principal.WindowsIdentity current =
+            System.Security.Principal.WindowsIdentity.GetCurrent();
+        Assert.False(current.User!.IsWellKnown(System.Security.Principal.WellKnownSidType.LocalSystemSid));
+
+        Microsoft.Win32.SafeHandles.SafeAccessTokenHandle token = current.AccessToken;
+
+        Assert.False(PrivilegeLauncher.TokenMatchesLevel(token, level, AnyProcessId));
+
+        Assert.False(token.IsClosed);
+        Assert.False(token.IsInvalid);
+
+        // The handle is still usable: it can be read again and the reference count is balanced.
+        Assert.False(PrivilegeLauncher.TokenMatchesLevel(token, level, AnyProcessId));
+        using System.Security.Principal.WindowsIdentity again = new(token.DangerousGetHandle());
+        Assert.Equal(current.User, again.User);
+    }
+
+    [Fact]
+    public void TokenMatchesLevel_InvalidHandle_IsRefusedWithoutThrowing()
+    {
+        using Microsoft.Win32.SafeHandles.SafeAccessTokenHandle invalid = new(IntPtr.Zero);
+
+        Assert.False(PrivilegeLauncher.TokenMatchesLevel(invalid, PrivilegeLevel.System, AnyProcessId));
+    }
 }
