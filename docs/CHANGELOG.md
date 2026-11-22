@@ -12,6 +12,167 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-11-22: Notes no longer lose text typed during a save, updates check every redirect, and closing sessions is safer (v2026.112201)
+
+Merged as #862 to #885. The user-facing summary and the upgrade notes are in the release notes.
+
+### Notes (#863)
+
+- `NotesToolViewModel.TrySaveCurrentNoteAsync` no longer sets `IsDirty = false` unconditionally. A document
+  revision (`_documentRevision`) is bumped on every content or path change; a save marks the note clean only when
+  the path and the revision are unchanged, and repeats (up to 3 passes) while edits keep arriving. Pre-switch flows
+  carry the edits.
+- A mutation gate (`_noteMutationGate`) serialises saves with delete, rename and move of the open note. The
+  synchronous close path skips a note being deleted (clean) and refuses one being renamed or moved (existing
+  discard dialog). Rename and move load the rewritten file when no edit arrived meanwhile, so the next autosave no
+  longer reverts the rewritten heading.
+- `NotesToolView`: editor content read after an await is dropped when another note was opened; the plain editor
+  goes through `TryApplyEditorMarkdown`.
+- `NoteFileWriter` writes through a hidden temporary file in the same folder (`*.md.<8hex>.tmp`, UTF-8 without BOM,
+  flushed) swapped in with `File.Replace`; after retries it falls back to `File.Move(overwrite)`, then to an
+  in-place write. No ACL change, so notes in shared or synced folders keep their permissions. Orphaned temporary
+  files older than a day are swept on the first listing.
+- `NotesStorageService` picks the unique names for new, duplicated and linked notes, and for move and rename,
+  inside the storage write lock.
+
+### Log viewer and terminal (#862, #864, #865)
+
+- `LogFileScanner` (Heimdall.Core/LogFiles) streams the log file on a background task. `LogCursor` keeps a
+  persistent decoder, detects and skips the BOM, keeps the unterminated last line provisional, and returns
+  `LogScanStatus.Reset` when the file shrinks or its first 1 KB changes. Lines are capped at `MaxLineChars` (4096),
+  only the last `MaxLines` (10000) matching lines are kept with their highlight ranges, and a filter timeout stops
+  the scan (`LogScanStatus.FilterTimeout`).
+- `LogViewerView` loads, filters and tails through the scanner with a generation counter and cancellation, drops
+  stale results, keeps no file handle, re-filters when the case option changes and turns undo off on the read-only
+  view. Locale keys `ToolLogViewLoading`, `ToolLogViewErrorRegexTimeout` and `ToolLogViewLineTruncated` (en/fr/es).
+- `TerminalOutputCoalescer`: terminal output bytes are appended under a lock and one flush is scheduled when the
+  buffer becomes non-empty; the flush posts the concatenated bytes in slices of at most
+  `DefaultMaxRawBytesPerMessage` (256 KB). No timer, so echo latency is unchanged. `PostTerminalMessage` drains
+  pending output before any control message, and the coalescer is closed on dispose and when the WebView becomes
+  unavailable. `base64ToBytes` in `terminal.html` and `vnc.html` uses `Uint8Array.fromBase64` when available.
+- `TerminalFontFamilyFormatter` quotes each family, leaves CSS generic keywords bare, drops names that could break
+  out, and fills `TERMINAL_FONT_FAMILY_JSON` (script) and `TERMINAL_FONT_FAMILY_CSS` (style) in `terminal.html`: a
+  quoted font list such as `'Cascadia Code', Consolas` no longer breaks every terminal tab.
+- Airspace: the RDP `TransientToast` now lives in a `Popup` (`TransientToastPopup`) anchored on `SurfaceContainer`,
+  made click-through and non-activating through `WindowNative`, and closed when the surface hides, on tick, and
+  when the window is deactivated, moved or minimized. The VNC and web loading bars moved into the header row.
+  `MainViewModel.IsSessionHostVisible` is also false while onboarding is visible or an .rdp file is dragged over
+  the window. The airspace rule in `docs/ARCHITECTURE.md` (and `docs/fr/ARCHITECTURE.md`) records the popup
+  caveats.
+
+### Sessions (SSH, VNC, Citrix) (#866, #867, #868, #873, #879)
+
+- `SshShellSession.ReadLoopAsync` awaits the read through `WaitAsync(cancellationToken)`: SSH.NET's `ShellStream`
+  inherits `Stream.ReadAsync`, which ignores the token once the blocking read is parked, so closing an idle session
+  logged "read loop is still running". Teardown now runs inline in `Disconnect` and `Dispose`.
+- `HostKeyStore.RemoveKey` raises the new `KeyRemoved` event when a durable key is actually removed, and `App`
+  forwards it to the host key persistence next to the existing wiring, so a replaced hashed known_hosts entry no
+  longer comes back at the next start.
+- `TunnelLease` (IDisposable): `Dispose()` releases the gateway tunnel reference once unless `Transfer()` handed
+  ownership away; `Release()` is idempotent and thread-safe. `SshHandler.ConnectAsync` takes it with `using` and
+  transfers it only after the `Connected` transition, so a throw between the tunnel setup and the try block no
+  longer leaks the reference; `ConnectSshExternal` and `ConnectSshViaPlinkAsync` take the lease too.
+- `EmbeddedVncView`: `_disposed` (volatile) is checked after each start-up await, first in the catch, in and after
+  the `EndAttempt` dispatcher call, in `ShowReconnectOverlay` and in `OnWebMessageReceived`; the reconnect overlay
+  takes keyboard focus. `vnc.html` gets a meta Content-Security-Policy (`default-src 'none'`, loopback websocket
+  only). The web console starts its initialisation only when none is in flight (`_initTask`), so Reload can retry a
+  failed one and `CertificateRemoved` is subscribed once.
+- `EmbeddedCitrixView`: `if (_disposed) return;` is the first statement of the four window-capture lambdas and
+  precedes `StartAuthWatch`; the timeout fallback goes through `ShowExternalFallbackUnlessDisposed`. `Dispose` runs
+  its 8 teardown steps through `RunDisposeStep`, each in its own try/catch, order unchanged; failures are logged
+  with the full exception (session terminate as an error).
+
+### SFTP (#869, #881, #882)
+
+- `PrivilegedFileTransfer.BuildShellBody` (atomic write and no-follow read) escapes the path with
+  `PathEscaper.EscapeForLoginShell`, so a `!` in the path no longer triggers history expansion under csh and tcsh.
+- Refactors, byte-identical output: the five inline `EscapeForShell(x).Replace("!", ...)` copies in
+  `PrivilegedFileTransfer` and the sudo rename probes (`SudoRenameCommands.BuildExistenceProbe` /
+  `BuildDirectoryProbe`, in `EmbeddedSftpViewModel`) call `EscapeForLoginShell`; the private `EscapeHeldArgument`
+  is removed.
+
+### Security hardening: updater (#872)
+
+- The updater `SocketsHttpHandler` sets `AllowAutoRedirect = false`.
+  `GitHubReleaseClient.SendFollowingAllowedRedirectsAsync` (release lookup, asset text, asset stream) follows at
+  most `MaxRedirectHops` (5) hops by hand: relative `Location` resolved, each hop https and allowed (GitHub asset
+  hosts for assets, exactly `api.github.com` for the lookup), the final URI re-checked, refusals raised as
+  `RedirectRefusedException`.
+- `UpdateService` caps the download at the asset size from the release JSON (declared length and bytes copied),
+  with a 1 GiB ceiling when the size is unknown. When the cap is hit because the release was republished during the
+  download, the existing "release superseded" diagnosis still runs and reports it.
+
+### Security hardening: file share (#874)
+
+- `EphemeralFileServer` sends `X-Content-Type-Options: nosniff` and `Referrer-Policy: no-referrer` on every
+  response (listing, files, 401/403/404/405/500). `.html`, `.htm`, `.svg`, `.xml` and `.xhtml` (any case) also get
+  `Content-Security-Policy: sandbox; default-src 'none'`; PDF is not sandboxed, so the inline viewer keeps working.
+- `ConfigManager` reads the live document through `OpenSharedRead` (`FileShare.ReadWrite | FileShare.Delete`), so
+  an atomic save of `servers.json` succeeds while a read is in progress.
+
+### Security hardening: WebView2 (#873)
+
+- New `WebView2Lockdown.Apply`, used by the SSH, VNC, web console, Diagram and Milkdown hosts: DevTools, autofill
+  and password autosave off, host objects off, external protocol launches cancelled (logged), popups handled and
+  delegated to the host's own policy. Re-applying disposes the previous subscription. See also the VNC items under
+  Sessions.
+
+### Security hardening: privilege launcher (#870, #876, #885)
+
+- `PrivilegeLauncher` no longer trusts a process by name alone: the candidate token is opened with `TOKEN_DUPLICATE
+  | TOKEN_QUERY` and checked by `IsAcceptableToken` (via `TokenMatchesLevel`): the user must be LocalSystem, and
+  for the TrustedInstaller level the TrustedInstaller service SID must be among the groups. A failed candidate is
+  skipped (debug log: pid and level only).
+- `LaunchAsTrustedInstaller` acquires a SYSTEM impersonation token (`SystemImpersonationCandidates`), impersonates
+  it on the current thread, and opens and duplicates the TrustedInstaller token inside that context
+  (`AcquireTokenWhileImpersonating`), because the TrustedInstaller token's DACL refuses `TOKEN_DUPLICATE` to an
+  elevated administrator on Windows 11 build 26300. `RevertToSelf` always runs in `finally`; if it fails the launch
+  fails closed and the probed token is disposed.
+- `PrivilegeLauncherView.FindUnder` enumerates with `MaxRecursionDepth = 1` (named constant
+  `FallbackSearchMaxDepth`) and `IgnoreInaccessible = true`, so the pwsh fallback search is one folder deep as
+  documented.
+
+### Network diagnostics (#871)
+
+- `InputValidator.IsValidDiagnosticHost`: any `IPAddress.TryParse` value, or a trimmed name matching the
+  `DiagnosticHost` pattern (`^[A-Za-z0-9_][A-Za-z0-9_.\-]*$`), IDN names through their ASCII form (`IdnMapping`); a
+  leading `-` is refused. New `SnmpOid` pattern: numeric OIDs or symbolic names with an optional `MODULE::` prefix.
+- Validation in `PingStatsEngine` and `SnmpWalkerViewModel`, and again at the sinks (`PingService.PingAsync` with a
+  gateway, `PingViaTunnelAsync`, `SnmpWalkerService.WalkViaTunnelAsync`), which throw `ArgumentException` before
+  connecting. A symbolic OID without a gateway is refused with the new `ErrorInvalidSnmpOid` (en/fr/es).
+
+### Reliability (#878)
+
+- `FileLogger` caps its queue (`DefaultMaxQueuedEntries`, 10,000): the oldest entries are evicted and counted. On a
+  final write failure only the newest entries that fit are re-queued. The next successful write is preceded once by
+  `[WARN] [FileLogger] N entries dropped while the log could not be written`. The ACL is applied after the write in
+  its own try/catch, so an ACL failure cannot re-queue a batch already on disk. An early flush is requested at half
+  the cap.
+
+### Import and clipboard (#877, #883)
+
+- The TOTP code (`TotpGeneratorView`) and the file-share URL (`MainWindow`) are copied through `SetSensitiveText`.
+- Each session import flow in `ServerListViewModel` runs inside one guard (IOException,
+  UnauthorizedAccessException, JsonException, SecurityException, ConfigurationValidationException,
+  ConfigurationSchemaVersionException): the full exception is logged and `StatusImportFailed` is shown. The list
+  reload after an import loads both files first and applies them only if both succeeded; a failure shows the new
+  `ErrorImportReloadFailed` (en/fr/es).
+- `DialogSnapshotRestoreWarning` (en/fr/es) now says that top-level session tabs are restored and tool tabs are
+  not.
+
+### Tests and guards (#875, #880, #884)
+
+- `PlinkProcessJob.JobHandleForTests` and `PlinkProcessJobTests`: a child process is assigned to the job, and the
+  job carries `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`.
+- `EphemeralFileServer.TftpBindAddress` (internal, init-only, default `IPAddress.Any`) and `FileShareService`'s own
+  `TftpBindAddress`: the TFTP tests bind 127.0.0.1, so test runs no longer raise a Windows Firewall prompt for
+  `testhost.exe`. Production behaviour is unchanged.
+- `SourceReadingScan` treats `File.ReadAllText`, `File.ReadAllLines` and `File.ReadLines` as source reads and
+  tracks `string[]`, `IEnumerable<string>`, `IReadOnlyList<string>` and `List<string>` locals. Three guards that
+  looped over `File.ReadAllLines` (`CloneFidelityConvention`, `DiagramEditor`, `MainWindowDetailPaneBinding`) now
+  read through `ViewSource.WithoutCommentsAndLiterals` and assert absence; `WebView2LockdownGuardTests` compares
+  the host file names as one set. No exemption or baseline entry was added.
+
 ## 2026-11-21: The SFTP pane beside an SSH session takes the share you choose, and the splitter keeps where you drag it (v2026.112101)
 
 Merged as #858, #859 and #860, with the dependency updates #845, #847 and #849 to #857. The user-facing summary and the
