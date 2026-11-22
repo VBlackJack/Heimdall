@@ -136,6 +136,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     private Action<string>? _settingNavigationHandler;
     private System.ComponentModel.PropertyChangedEventHandler? _selectedExternalToolPropertyChangedHandler;
     private Action? _externalToolsChangedHandler;
+    private Action? _toolAvailabilityChangedHandler;
     private Action<string>? _localeChangedHandler;
     private ExternalToolItemViewModel? _trackedExternalToolForPreview;
 
@@ -300,6 +301,20 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             });
         };
         viewModel.ToolRegistry.ExternalToolsChanged += _externalToolsChangedHandler;
+
+        // A pack turned on or off, or a policy change, alters which tools are listed. The service
+        // raises this on a pool thread: marshal, then invalidate the two cached listings the same
+        // way a change of detected external tools does. The palette and the picker are rebuilt on
+        // each use and need nothing here.
+        _toolAvailabilityChangedHandler = () =>
+        {
+            Dispatcher.BeginInvoke(() =>
+            {
+                viewModel.ToolsTab.OnExternalToolsChanged();
+                viewModel.Sidebar.OnExternalToolsChanged();
+            });
+        };
+        viewModel.ToolAvailability.Changed += _toolAvailabilityChangedHandler;
 
         // Wire split button callback from embedded views
         viewModel.EmbeddedSessionManager.SplitRequestedCallback = OnEmbeddedSplitRequested;
@@ -975,7 +990,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         {
             var dialog = new Views.Dialogs.ToolPickerDialog(
                 vm.GetLocalizer(),
-                ToolRegistry.All,
+                vm.ToolAvailability.ListedTools(ToolRegistry.All),
                 group,
                 vm.ServerList.SelectedServer?.RemoteServer)
             {
@@ -4834,6 +4849,8 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             }
             if (_externalToolsChangedHandler is not null)
                 vm.ToolRegistry.ExternalToolsChanged -= _externalToolsChangedHandler;
+            if (_toolAvailabilityChangedHandler is not null)
+                vm.ToolAvailability.Changed -= _toolAvailabilityChangedHandler;
             if (_localeChangedHandler is not null)
                 vm.GetLocalizer().LocaleChanged -= _localeChangedHandler;
             vm.ToolsTab.SectionsInvalidated -= OnToolsTabSectionsInvalidated;

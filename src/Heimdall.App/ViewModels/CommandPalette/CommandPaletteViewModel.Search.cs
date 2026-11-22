@@ -15,6 +15,7 @@
  */
 
 using System.Collections.ObjectModel;
+using Heimdall.App.Services;
 using Heimdall.App.ViewModels.CommandLibrary;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Models;
@@ -131,7 +132,7 @@ public sealed partial class CommandPaletteViewModel
             foreach (var toolId in _main.RecentToolIds)
             {
                 var desc = _toolRegistry.GetById(toolId);
-                if (desc is not null)
+                if (desc is not null && _main.ToolAvailability.IsListed(desc))
                 {
                     initialResults.Add(new ServerItemViewModel
                     {
@@ -162,7 +163,7 @@ public sealed partial class CommandPaletteViewModel
         if (string.Equals(query, "tool", StringComparison.OrdinalIgnoreCase)
             || string.Equals(query, "tools", StringComparison.OrdinalIgnoreCase))
         {
-            var allTools = _toolRegistry.All.Select(BuildToolPaletteItem).ToList();
+            var allTools = _main.ToolAvailability.ListedTools(_toolRegistry.All).Select(BuildToolPaletteItem).ToList();
             Results = new ObservableCollection<ServerItemViewModel>(allTools);
             SelectedItem = Results.FirstOrDefault();
             return;
@@ -173,7 +174,7 @@ public sealed partial class CommandPaletteViewModel
         // surface tool matches that the prefix-only path used to miss.
         var scored = new List<(ServerItemViewModel Item, int Score)>();
 
-        foreach (var desc in _toolRegistry.All)
+        foreach (var desc in _main.ToolAvailability.ListedTools(_toolRegistry.All))
         {
             var score = ScoreToolDescriptor(desc, query);
             if (score > 0)
@@ -341,7 +342,7 @@ public sealed partial class CommandPaletteViewModel
     private ServerItemViewModel? TryParseExplicitToolInvocation(string query)
     {
         var lower = query.ToLowerInvariant();
-        foreach (var descriptor in _toolRegistry.All)
+        foreach (var descriptor in _main.ToolAvailability.ListedTools(_toolRegistry.All))
         {
             if (descriptor.LabelWithArgKey is null) continue;
 
