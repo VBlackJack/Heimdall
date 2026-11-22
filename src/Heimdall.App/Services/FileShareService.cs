@@ -16,6 +16,7 @@
 
 using System.ComponentModel;
 using System.IO;
+using System.Net;
 using System.Runtime.CompilerServices;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Logging;
@@ -39,6 +40,12 @@ public sealed class FileShareService : IAsyncDisposable, INotifyPropertyChanged
     private readonly object _startGate = new();
     private bool _disposed;
     private bool _startInProgress;
+
+    /// <summary>
+    /// Local address handed to the TFTP listener. Defaults to every interface; tests set the
+    /// loopback address so the test host does not listen on the network.
+    /// </summary>
+    internal IPAddress TftpBindAddress { get; init; } = IPAddress.Any;
 
     /// <summary>True while either the HTTP or TFTP listener is running.</summary>
     public bool IsSharing => _server is { IsHttpRunning: true } or { IsTftpRunning: true };
@@ -98,7 +105,7 @@ public sealed class FileShareService : IAsyncDisposable, INotifyPropertyChanged
 
         try
         {
-            EphemeralFileServer server = new();
+            EphemeralFileServer server = new() { TftpBindAddress = TftpBindAddress };
             if (settings is not null)
             {
                 server.ShutdownTimeoutMs = settings.ServerShutdownTimeoutMs;
