@@ -294,7 +294,7 @@ public static class PrivilegeLauncher
         {
             return level switch
             {
-                PrivilegeLevel.System => LaunchWithTokenProbe(payload.Exe, payload.Args, SystemProcessCandidates),
+                PrivilegeLevel.System => LaunchWithTokenProbe(payload.Exe, payload.Args, SystemProcessCandidates, PrivilegeLevel.System),
                 PrivilegeLevel.TrustedInstaller => LaunchAsTrustedInstaller(payload.Exe, payload.Args),
                 _ => PrivilegeLaunchResult.Failed($"Unknown privilege level: {level}")
             };
@@ -393,7 +393,7 @@ public static class PrivilegeLauncher
         {
             result = level switch
             {
-                PrivilegeLevel.System => LaunchWithTokenProbe(payload.Exe, payload.Args, SystemProcessCandidates),
+                PrivilegeLevel.System => LaunchWithTokenProbe(payload.Exe, payload.Args, SystemProcessCandidates, PrivilegeLevel.System),
                 PrivilegeLevel.TrustedInstaller => LaunchAsTrustedInstaller(payload.Exe, payload.Args),
                 _ => PrivilegeLaunchResult.Failed($"Unsupported level for self-elevation: {level}")
             };
@@ -534,7 +534,7 @@ public static class PrivilegeLauncher
     private static readonly string[] SystemProcessCandidates =
         ["spoolsv", "svchost", "services", "lsass", "winlogon"];
 
-    private static SafeAccessTokenHandle? TryAcquireTokenFromProcesses(string[] processNames)
+    private static SafeAccessTokenHandle? TryAcquireTokenFromProcesses(string[] processNames, PrivilegeLevel level)
     {
         foreach (string name in processNames)
         {
@@ -543,7 +543,7 @@ public static class PrivilegeLauncher
             {
                 foreach (Process proc in procs)
                 {
-                    SafeAccessTokenHandle? token = TryOpenAndDuplicateToken(proc.Id);
+                    SafeAccessTokenHandle? token = TryOpenAndDuplicateToken(proc.Id, level);
                     if (token is not null) return token;
                 }
             }
@@ -556,16 +556,75 @@ public static class PrivilegeLauncher
         return null;
     }
 
-    private static SafeAccessTokenHandle? TryOpenAndDuplicateToken(int pid)
+    /// <summary>Well-known service SID of NT SERVICE\TrustedInstaller.</summary>
+    internal const string TrustedInstallerServiceSid =
+        "S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464";
+
+    /// <summary>
+    /// Whether a process token really carries the requested context. A process name alone is not
+    /// proof: both levels need the token user to be LocalSystem, and TrustedInstaller also needs
+    /// the TrustedInstaller service SID among the token groups.
+    /// </summary>
+    internal static bool IsAcceptableToken(
+        System.Security.Principal.SecurityIdentifier? user,
+        IEnumerable<System.Security.Principal.SecurityIdentifier> groups,
+        PrivilegeLevel level)
+    {
+        if (user is null || !user.IsWellKnown(System.Security.Principal.WellKnownSidType.LocalSystemSid))
+            return false;
+
+        return level switch
+        {
+            PrivilegeLevel.System => true,
+            PrivilegeLevel.TrustedInstaller => groups.Any(g =>
+                string.Equals(g.Value, TrustedInstallerServiceSid, StringComparison.OrdinalIgnoreCase)),
+            _ => false
+        };
+    }
+
+    internal static bool TokenMatchesLevel(SafeAccessTokenHandle tokenHandle, PrivilegeLevel level, int pid)
+    {
+        bool handleReferenced = false;
+        try
+        {
+            // Keep the handle alive while the raw value is in use by WindowsIdentity.
+            tokenHandle.DangerousAddRef(ref handleReferenced);
+            using System.Security.Principal.WindowsIdentity identity =
+                new(tokenHandle.DangerousGetHandle());
+            var groups = (identity.Groups ?? [])
+                .OfType<System.Security.Principal.SecurityIdentifier>()
+                .ToList();
+            if (IsAcceptableToken(identity.User, groups, level))
+                return true;
+
+            FileLogger.Debug($"[PrivilegeLauncher] Skipped process {pid}: token does not match level {level}.");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Debug($"[PrivilegeLauncher] Skipped process {pid}: token not readable ({ex.GetType().Name}).");
+            return false;
+        }
+        finally
+        {
+            if (handleReferenced)
+                tokenHandle.DangerousRelease();
+        }
+    }
+
+    private static SafeAccessTokenHandle? TryOpenAndDuplicateToken(int pid, PrivilegeLevel level)
     {
         using SafeProcessHandle processHandle = OpenProcess(PROCESS_QUERY_INFORMATION, false, pid);
         if (processHandle.IsInvalid) return null;
 
-        if (!OpenProcessToken(processHandle, TOKEN_DUPLICATE, out SafeAccessTokenHandle tokenHandle))
+        if (!OpenProcessToken(processHandle, TOKEN_DUPLICATE | TOKEN_QUERY, out SafeAccessTokenHandle tokenHandle))
             return null;
 
         using (tokenHandle)
         {
+            if (!TokenMatchesLevel(tokenHandle, level, pid))
+                return null;
+
             if (DuplicateTokenEx(
                     tokenHandle, MAXIMUM_ALLOWED, IntPtr.Zero,
                     SECURITY_IMPERSONATION, TOKEN_PRIMARY,
@@ -586,7 +645,7 @@ public static class PrivilegeLauncher
             return serviceResult;
 
         // Step 2: Launch with TrustedInstaller's token
-        return LaunchWithTokenProbe(exe, args, ["TrustedInstaller"]);
+        return LaunchWithTokenProbe(exe, args, ["TrustedInstaller"], PrivilegeLevel.TrustedInstaller);
     }
 
     private static PrivilegeLaunchResult EnsureTrustedInstallerServiceRunning()
@@ -648,13 +707,13 @@ public static class PrivilegeLauncher
     /// duplicates it, and creates the target process under that token.
     /// </summary>
     private static PrivilegeLaunchResult LaunchWithTokenProbe(
-        string exe, IReadOnlyList<string> args, string[] processCandidates)
+        string exe, IReadOnlyList<string> args, string[] processCandidates, PrivilegeLevel level)
     {
         try
         {
             EnableDebugPrivilege();
 
-            using SafeAccessTokenHandle? token = TryAcquireTokenFromProcesses(processCandidates);
+            using SafeAccessTokenHandle? token = TryAcquireTokenFromProcesses(processCandidates, level);
             if (token is null || token.IsInvalid)
                 return PrivilegeLaunchResult.Failed(
                     $"No accessible token found. Probed: {string.Join(", ", processCandidates)}. " +
