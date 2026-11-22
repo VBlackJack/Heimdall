@@ -73,6 +73,20 @@ public sealed class SessionSnapshotProjectionTests
     }
 
     [Fact]
+    public void AVncSessionIsKept_WhileAToolTabBesideItIsDropped()
+    {
+        // The restore dialog tells the operator which tabs come back. Every top-level session tab
+        // is kept whatever its protocol; only tool tabs are not, and the dialog text says so.
+        IReadOnlyList<SessionSnapshotEntry> entries = SessionSnapshotProjection.FromSessions(
+            [Session("srv-1", "TOOL:HASH"), Session("srv-2", "VNC")]);
+
+        SessionSnapshotEntry entry = Assert.Single(entries);
+        Assert.Equal("srv-2", entry.ServerId);
+        Assert.Equal("VNC", entry.ConnectionType);
+        Assert.Equal(0, entry.Order);
+    }
+
+    [Fact]
     public void ATabTypedAsAToolWithNoToolBehindIt_IsAlsoExcluded()
     {
         // Documenting the existing semantics rather than changing them: the shell's own predicate

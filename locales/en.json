@@ -1462,7 +1462,7 @@
 
   "DialogSnapshotRestoreTitle": "Restore previous sessions",
   "DialogSnapshotRestoreMessage": "Heimdall found a saved session snapshot from the previous run. Select the sessions to restore.",
-  "DialogSnapshotRestoreWarning": "Only top-level SSH, RDP, and SFTP tabs are restored in this version.",
+  "DialogSnapshotRestoreWarning": "Only top-level session tabs are restored in this version; tool tabs are not.",
   "DialogSnapshotRestoreSavedAt": "Saved at {0}",
   "DialogSnapshotRestoreColumnSession": "Session",
   "DialogSnapshotRestoreColumnProtocol": "Protocol",

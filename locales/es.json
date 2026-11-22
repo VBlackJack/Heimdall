@@ -1462,7 +1462,7 @@
 
   "DialogSnapshotRestoreTitle": "Restaurar sesiones anteriores",
   "DialogSnapshotRestoreMessage": "Heimdall encontró una instantánea de sesión guardada de la ejecución anterior. Selecciona las sesiones a restaurar.",
-  "DialogSnapshotRestoreWarning": "En esta versión solo se restauran las pestañas SSH, RDP y SFTP de nivel superior.",
+  "DialogSnapshotRestoreWarning": "En esta versión solo se restauran las pestañas de sesión de nivel superior; las pestañas de herramientas no.",
   "DialogSnapshotRestoreSavedAt": "Guardado a las {0}",
   "DialogSnapshotRestoreColumnSession": "Sesión",
   "DialogSnapshotRestoreColumnProtocol": "Protocolo",

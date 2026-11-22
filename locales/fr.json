@@ -1462,7 +1462,7 @@
 
   "DialogSnapshotRestoreTitle": "Restaurer les sessions pr\u00e9c\u00e9dentes",
   "DialogSnapshotRestoreMessage": "Heimdall a trouv\u00e9 un instantan\u00e9 de session sauvegard\u00e9 lors de l'ex\u00e9cution pr\u00e9c\u00e9dente. S\u00e9lectionnez les sessions \u00e0 restaurer.",
-  "DialogSnapshotRestoreWarning": "Seuls les onglets SSH, RDP et SFTP de premier niveau sont restaur\u00e9s dans cette version.",
+  "DialogSnapshotRestoreWarning": "Seuls les onglets de session de premier niveau sont restaur\u00e9s dans cette version ; les onglets d'outils ne le sont pas.",
   "DialogSnapshotRestoreSavedAt": "Sauvegard\u00e9 le {0}",
   "DialogSnapshotRestoreColumnSession": "Session",
   "DialogSnapshotRestoreColumnProtocol": "Protocole",
