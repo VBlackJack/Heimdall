@@ -103,7 +103,7 @@ internal static class SourceReadingScan
         @"\bViewSource\.(?:Code|HandlerBody|HandlerLogic)\s*\(", RegexOptions.Compiled);
 
     private static readonly Regex s_fileRead = new(
-        @"\bFile\.ReadAllText(?:Async)?\s*\(", RegexOptions.Compiled);
+        @"\bFile\.Read(?:AllText|AllLines|Lines)(?:Async)?\s*\(", RegexOptions.Compiled);
 
     private static readonly Regex s_productionDirectory = new(
         "\"" + ProductionDirectory + "\"|@?\"" + ProductionDirectory + "[/\\\\]",
@@ -113,7 +113,7 @@ internal static class SourceReadingScan
         "\\.cs\"|\\*\\.cs", RegexOptions.Compiled);
 
     private static readonly Regex s_localDeclaration = new(
-        @"\b(?:string|var)\s+(\w+)\s*=\s*([^;]*);",
+        @"\b(?:string(?:\[\])?|var|IEnumerable<string>|IReadOnlyList<string>|List<string>)\s+(\w+)\s*=\s*([^;]*);",
         RegexOptions.Compiled | RegexOptions.Singleline);
 
     private static readonly Regex s_assertCall = new(

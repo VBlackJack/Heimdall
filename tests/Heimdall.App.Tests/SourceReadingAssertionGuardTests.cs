@@ -214,6 +214,29 @@ public sealed class SourceReadingAssertionGuardTests
         Assert.Equal("\"TryReset();\"", finding.Needle);
     }
 
+    /// <summary>
+    /// A bare presence assertion over lines read with ReadAllLines or ReadLines is reported, whatever
+    /// the declared type of the local that holds them.
+    /// </summary>
+    /// <remarks>
+    /// Every existing line-reading site declares <c>string[]</c>, a type the local-declaration rule
+    /// once ignored, so a scan that widened the reader pattern alone looked at nothing new.
+    /// </remarks>
+    [Theory]
+    [InlineData("var lines = File.ReadAllLines(Path);")]
+    [InlineData("string[] lines = File.ReadAllLines(Path);")]
+    [InlineData("IEnumerable<string> lines = File.ReadLines(Path);")]
+    public void ABareContainsOverLinesReadFromSourceIsReported(string declaration)
+    {
+        SourceReadingScanResult scan = ScanFixture(
+            "        " + declaration
+            + "\n        Assert.Contains(\"TryReset();\", lines);");
+
+        BareSourceAssertion finding = Assert.Single(scan.Findings);
+        Assert.Equal(SourceReadingScan.PresenceRule, finding.Rule);
+        Assert.Equal("\"TryReset();\"", finding.Needle);
+    }
+
     /// <summary>The absence exemption, exercised rather than assumed.</summary>
     [Fact]
     public void AnAbsenceAssertionIsExemptAndCounted()

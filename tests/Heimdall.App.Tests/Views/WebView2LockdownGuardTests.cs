@@ -40,7 +40,6 @@ public sealed class WebView2LockdownGuardTests
     private const string LockdownStatementQualified = "_lockdown = Services.WebView2Lockdown.Apply(";
     private const string DisposeStatement = "_lockdown?.Dispose();";
     private const string DisposeSignature = "public void Dispose()";
-    private const int KnownHostCount = 5;
 
     private const string VncView = "EmbeddedVncView.xaml.cs";
     private const string WebConsoleView = "EmbeddedWebView.xaml.cs";
@@ -63,17 +62,18 @@ public sealed class WebView2LockdownGuardTests
     [Fact]
     public void EveryKnownHost_IsFoundByTheScan()
     {
-        List<string> hosts = FindHosts().Select(Path.GetFileName).OfType<string>().ToList();
-
-        Assert.Equal(KnownHostCount, hosts.Count);
-        foreach (string expected in new[]
+        string[] found = FindHosts()
+            .Select(Path.GetFileName)
+            .OfType<string>()
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        string[] expected = new[]
         {
             "EmbeddedVncView.xaml.cs", "EmbeddedSshView.xaml.cs", "EmbeddedWebView.xaml.cs",
             "DiagramEditorView.xaml.cs", "MilkdownEditorControl.xaml.cs",
-        })
-        {
-            Assert.Contains(expected, hosts);
-        }
+        }.Order(StringComparer.Ordinal).ToArray();
+
+        Assert.Equal(expected, found);
     }
 
     [Theory]
