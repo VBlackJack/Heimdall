@@ -512,4 +512,128 @@ public sealed class PrivilegeLauncherTests
 
         Assert.False(PrivilegeLauncher.TokenMatchesLevel(invalid, PrivilegeLevel.System, AnyProcessId));
     }
+
+    // -- AcquireTokenWhileImpersonating: orchestration and RevertToSelf guarantees ----------
+
+    private static Microsoft.Win32.SafeHandles.SafeAccessTokenHandle OpenOwnTokenForTest() =>
+        System.Security.Principal.WindowsIdentity.GetCurrent().AccessToken;
+
+    [Fact]
+    public void AcquireTokenWhileImpersonating_NoSystemToken_FailsWithoutImpersonating()
+    {
+        bool impersonated = false;
+        bool probed = false;
+        bool reverted = false;
+
+        (Microsoft.Win32.SafeHandles.SafeAccessTokenHandle? token, string? failure) =
+            PrivilegeLauncher.AcquireTokenWhileImpersonating(
+                () => null,
+                _ => { impersonated = true; return (true, 0); },
+                () => { probed = true; return null; },
+                () => { reverted = true; return (true, 0); });
+
+        Assert.Null(token);
+        Assert.NotNull(failure);
+        Assert.Contains("SYSTEM", failure, StringComparison.Ordinal);
+        Assert.False(impersonated);
+        Assert.False(probed);
+        Assert.False(reverted);
+    }
+
+    [Fact]
+    public void AcquireTokenWhileImpersonating_ImpersonateFails_ReportsErrorWithoutProbingOrReverting()
+    {
+        bool probed = false;
+        bool reverted = false;
+
+        (Microsoft.Win32.SafeHandles.SafeAccessTokenHandle? token, string? failure) =
+            PrivilegeLauncher.AcquireTokenWhileImpersonating(
+                OpenOwnTokenForTest,
+                _ => (false, 1346),
+                () => { probed = true; return null; },
+                () => { reverted = true; return (true, 0); });
+
+        Assert.Null(token);
+        Assert.Equal("ImpersonateLoggedOnUser failed: 1346", failure);
+        Assert.False(probed);
+        Assert.False(reverted);
+    }
+
+    [Fact]
+    public void AcquireTokenWhileImpersonating_TargetProbeReturnsNull_RevertsAndNamesTrustedInstaller()
+    {
+        int revertCalls = 0;
+
+        (Microsoft.Win32.SafeHandles.SafeAccessTokenHandle? token, string? failure) =
+            PrivilegeLauncher.AcquireTokenWhileImpersonating(
+                OpenOwnTokenForTest,
+                _ => (true, 0),
+                () => null,
+                () => { revertCalls++; return (true, 0); });
+
+        Assert.Null(token);
+        Assert.NotNull(failure);
+        Assert.Contains("TrustedInstaller", failure, StringComparison.Ordinal);
+        Assert.Equal(1, revertCalls);
+    }
+
+    [Fact]
+    public void AcquireTokenWhileImpersonating_TargetProbeThrows_StillRevertsInFinally()
+    {
+        int revertCalls = 0;
+
+        InvalidOperationException ex = Assert.Throws<InvalidOperationException>(() =>
+            PrivilegeLauncher.AcquireTokenWhileImpersonating(
+                OpenOwnTokenForTest,
+                _ => (true, 0),
+                () => throw new InvalidOperationException("probe boom"),
+                () => { revertCalls++; return (true, 0); }));
+
+        Assert.Equal("probe boom", ex.Message);
+        Assert.Equal(1, revertCalls);
+    }
+
+    [Fact]
+    public void AcquireTokenWhileImpersonating_TargetProbeSucceeds_RevertsBeforeReturningToken()
+    {
+        List<string> steps = [];
+
+        (Microsoft.Win32.SafeHandles.SafeAccessTokenHandle? token, string? failure) =
+            PrivilegeLauncher.AcquireTokenWhileImpersonating(
+                () => { steps.Add("acquire"); return OpenOwnTokenForTest(); },
+                _ => { steps.Add("impersonate"); return (true, 0); },
+                () => { steps.Add("probe"); return OpenOwnTokenForTest(); },
+                () => { steps.Add("revert"); return (true, 0); });
+
+        using (token)
+        {
+            Assert.NotNull(token);
+            Assert.False(token!.IsInvalid);
+            Assert.False(token.IsClosed);
+            Assert.Null(failure);
+            Assert.Equal(["acquire", "impersonate", "probe", "revert"], steps);
+        }
+    }
+
+    [Fact]
+    public void AcquireTokenWhileImpersonating_RevertToSelfFails_DisposesProbedTokenAndFailsClosed()
+    {
+        Microsoft.Win32.SafeHandles.SafeAccessTokenHandle? probedToken = null;
+
+        (Microsoft.Win32.SafeHandles.SafeAccessTokenHandle? token, string? failure) =
+            PrivilegeLauncher.AcquireTokenWhileImpersonating(
+                OpenOwnTokenForTest,
+                _ => (true, 0),
+                () =>
+                {
+                    probedToken = OpenOwnTokenForTest();
+                    return probedToken;
+                },
+                () => (false, 5));
+
+        Assert.Null(token);
+        Assert.Equal("RevertToSelf failed: 5", failure);
+        Assert.NotNull(probedToken);
+        Assert.True(probedToken!.IsClosed);
+    }
 }
