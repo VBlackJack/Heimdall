@@ -280,7 +280,8 @@ public sealed partial class SessionCoordinatorPreMountTests : IDisposable
             Func<string, LocalizationManager, SharedCredentialApplier>? sharedCredentialsFactory = null,
             ISessionWindowService? sessionWindows = null,
             Heimdall.App.Services.WorkspaceLockService? workspaceLock = null,
-            IPostConnectStepResolver? postConnectStepResolver = null)
+            IPostConnectStepResolver? postConnectStepResolver = null,
+            IToolAvailability? toolAvailability = null)
         {
             string rootPath = Path.Combine(
                 Path.GetTempPath(),
@@ -324,7 +325,7 @@ public sealed partial class SessionCoordinatorPreMountTests : IDisposable
                 connectionService,
                 toolRegistry,
                 dialogService, closeArbiter,
-                AlwaysAvailableToolAvailability.Instance,
+                toolAvailability ?? AlwaysAvailableToolAvailability.Instance,
                 profileLookup);
             FakeUiDispatcher dispatcher = new(checkAccess);
             ConnectionViewModel connection = new ConnectionViewModel(
@@ -415,7 +416,7 @@ public sealed partial class SessionCoordinatorPreMountTests : IDisposable
                     Heimdall.Core.Ssh.RejectingHostKeyVerifier.Instance,
                     configManager),
                 new MaskedCopyTestSupport.RecordingClipboard(),
-                AlwaysAvailableToolAvailability.Instance);
+                toolAvailability ?? AlwaysAvailableToolAvailability.Instance);
 
             return new TestHarness(
                 rootPath,

@@ -1719,6 +1719,14 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
             };
         }
 
+        // Backstop: the entry points refuse a switched-off or forbidden tool before they get here,
+        // so this builds no view and touches no application resource.
+        ToolAvailabilityState availability = _toolAvailability.GetState(toolId);
+        if (ToolUnavailableException.IsRefusal(availability))
+        {
+            throw new ToolUnavailableException(toolId, availability);
+        }
+
         var view = _toolRegistry.CreateView(toolId);
 
         // The gateways a tool lists and dials follow the settings from here on, through one

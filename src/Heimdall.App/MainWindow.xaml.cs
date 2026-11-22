@@ -3056,8 +3056,6 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
                 descriptor.Id,
                 ToolsTabPopulationService.ResolveToolTabTitle(descriptor, context, vm),
                 context);
-
-            vm.TrackRecentTool(descriptor.Id);
         }
         catch (Exception ex)
         {

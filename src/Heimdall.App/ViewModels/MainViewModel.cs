@@ -541,7 +541,6 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         // (SessionReady is handled by SessionCoordinator, not here)
         _onToolSessionRequested = (toolId, title, ctx) =>
         {
-            TrackRecentTool(toolId.ToUpperInvariant());
             OpenToolTabAsync(toolId, title, ctx).SafeFireAndForget();
         };
         ServerList.ToolSessionRequested += _onToolSessionRequested;
@@ -1400,9 +1399,20 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     /// Opens a non-connection tool as a session tab, bypassing
     /// ConnectionService and ConnectionStateMachine entirely.
     /// </summary>
-    internal async Task OpenToolTabAsync(string toolId, string title, ToolContext? context)
+    /// <remarks>
+    /// A tool whose pack is switched off, or forbidden by policy, is refused before anything else:
+    /// no session is added, no existing tab is focused, and the status bar names the reason. A
+    /// successful open or focus records the tool as recently used, so no caller does.
+    /// </remarks>
+    /// <returns>What happened to the request; <see cref="ToolOpenOutcome.Refused"/> is not an error.</returns>
+    internal async Task<ToolOpenOutcome> OpenToolTabAsync(string toolId, string title, ToolContext? context)
     {
         await Task.CompletedTask;
+
+        if (TryRefuseTool(toolId))
+        {
+            return ToolOpenOutcome.Refused;
+        }
 
         var connectionType = $"TOOL:{toolId.ToUpperInvariant()}";
 
@@ -1418,7 +1428,8 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
             {
                 Connection.ActiveSession = openLibrary;
                 target.PrefillNewAction(capture);
-                return;
+                TrackRecentTool(toolId.ToUpperInvariant());
+                return ToolOpenOutcome.FocusedExisting;
             }
         }
 
@@ -1445,7 +1456,8 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
                     commandLibraryView.PreselectAction(context.InitialActionId!);
                 }
 
-                return;
+                TrackRecentTool(toolId.ToUpperInvariant());
+                return ToolOpenOutcome.FocusedExisting;
             }
         }
 
@@ -1467,5 +1479,27 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
             Connection.HasActiveSessions = Connection.ActiveSessions.Count > 0;
             throw;
         }
+
+        TrackRecentTool(toolId.ToUpperInvariant());
+        return ToolOpenOutcome.Opened;
+    }
+
+    /// <summary>
+    /// Refuses a tool whose pack is switched off or forbidden by policy, telling the user why
+    /// through the status bar. An unknown id is not refused: it keeps its placeholder tab.
+    /// </summary>
+    /// <returns>True when the tool was refused.</returns>
+    private bool TryRefuseTool(string toolId)
+    {
+        ToolAvailabilityState state = ToolAvailability.GetState(toolId);
+        if (!ToolUnavailableException.IsRefusal(state))
+        {
+            return false;
+        }
+
+        string label = ToolRegistry.GetById(toolId)?.ResolveLabel(_localizer.GetString) ?? toolId;
+        StatusText = _localizer.Format(ToolUnavailableException.MessageKeyFor(state), label);
+        Core.Logging.FileLogger.Info($"Tool '{toolId}' refused: {state}.");
+        return true;
     }
 }

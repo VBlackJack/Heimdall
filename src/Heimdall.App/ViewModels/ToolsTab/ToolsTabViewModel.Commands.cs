@@ -32,8 +32,8 @@ public sealed partial class ToolsTabViewModel
     /// <summary>
     /// Resolves the inherited <see cref="ToolContext"/> for
     /// <paramref name="descriptor"/>, opens the tool tab via
-    /// <see cref="MainViewModel.OpenToolTabAsync"/> and tracks it as
-    /// recently used. Tab-strip navigation
+    /// <see cref="MainViewModel.OpenToolTabAsync"/>, which tracks it as
+    /// recently used when the open succeeds. Tab-strip navigation
     /// (<c>TabSessions.IsChecked = true</c>) is the host window's
     /// responsibility - this command focuses on the tool-launch logic only.
     /// </summary>
@@ -50,7 +50,6 @@ public sealed partial class ToolsTabViewModel
             var context = ToolsTabPopulationService.CreateInheritedToolContext(descriptor, _main);
             var title = ToolsTabPopulationService.ResolveToolTabTitle(descriptor, context, _main);
             await _main.OpenToolTabAsync(descriptor.Id, title, context).ConfigureAwait(true);
-            _main.TrackRecentTool(descriptor.Id);
         }
         catch (Exception ex)
         {

@@ -242,6 +242,10 @@ public partial class PrivilegeLauncherView : UserControl, IToolView
                 isError: false,
                 string.Format(L("ToolPrivLaunchStatusSuccess"), result.ProcessId));
         }
+        else if (result.RefusedByPolicy)
+        {
+            ShowStatus(isError: true, L("ToolPrivLaunchStatusForbiddenByPolicy"));
+        }
         else
         {
             ShowStatus(isError: true, result.ErrorMessage ?? L("ToolPrivLaunchStatusFailed"));
