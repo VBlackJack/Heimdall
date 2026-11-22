@@ -1915,6 +1915,7 @@
   "SessionAuthCredentialProvider": "Credential provider",
   "SessionTreeServerAccessibleName": "{0}, protocol {1}, state {2}",
   "SessionTreeServerAccessibleNameFavorite": "{0}, favorite, protocol {1}, state {2}",
+  "SessionTreeServerAccessibleNameToolUnavailable": "{0}, unavailable. {1}",
   "SessionTreeFavoriteMark": "Favorite",
   "SessionTreeAccessibleName": "Sessions",
   "SessionTreeFolderAccessibleName": "{0}, folder",

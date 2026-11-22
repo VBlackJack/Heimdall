@@ -931,7 +931,7 @@
                                             Background="Transparent"
                                             ToolTip="{Binding RowTooltipText}"
                                             ToolTipService.InitialShowDelay="{StaticResource SessionTreeRowToolTipDelay}">
-                                        <Grid>
+                                        <Grid x:Name="ServerRowContent">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto"/>
                                                 <ColumnDefinition Width="Auto"/>
@@ -1119,6 +1119,12 @@
                                         <DataTrigger Binding="{Binding IsSelected, FallbackValue=False}" Value="True">
                                             <Setter TargetName="ServerSelectionChrome" Property="Background" Value="{DynamicResource TreeRowSelectedBrush}"/>
                                             <Setter TargetName="ServerSelectionChrome" Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
+                                        </DataTrigger>
+                                        <!-- A saved tool entry whose pack is off or forbidden: the content is dimmed, not the
+                                             chrome, so the selection edge stays. The row tooltip and the spoken name carry
+                                             the reason; the dimming is for the eye only. -->
+                                        <DataTrigger Binding="{Binding IsToolUnavailable}" Value="True">
+                                            <Setter TargetName="ServerRowContent" Property="Opacity" Value="{StaticResource OpacityDisabled}"/>
                                         </DataTrigger>
                                     </DataTemplate.Triggers>
                                 </DataTemplate>
@@ -2288,6 +2294,13 @@
                                 <TextBlock x:Name="Mw_ToolDetailDescription"
                                            Text="{Binding ServerList.ToolDetailDescription}"
                                            Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,12,0,0"
+                                           FontSize="{StaticResource FontSizeBodyLarge}" TextWrapping="Wrap"/>
+
+                                <!-- Why the selected tool cannot be opened: its pack is turned off or forbidden. -->
+                                <TextBlock x:Name="Mw_ToolDetailUnavailable"
+                                           Text="{Binding ServerList.ToolDetailUnavailableReason}"
+                                           Visibility="{Binding ServerList.ToolDetailIsUnavailable, Converter={StaticResource BoolToVisibilityConverter}}"
+                                           Foreground="{DynamicResource WarningTextBrush}" Margin="0,12,0,0"
                                            FontSize="{StaticResource FontSizeBodyLarge}" TextWrapping="Wrap"/>
 
                                 <Button x:Name="Mw_ToolDetailOpenBtn" Content="{loc:Translate DetailBtnOpenInTab}"

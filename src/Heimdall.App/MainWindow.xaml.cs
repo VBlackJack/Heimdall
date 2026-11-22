@@ -312,9 +312,13 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             {
                 viewModel.ToolsTab.OnExternalToolsChanged();
                 viewModel.Sidebar.OnExternalToolsChanged();
+
+                // Saved tool entries in the server tree and the tool detail pane re-read their state.
+                viewModel.ServerList.RefreshToolAvailability();
             });
         };
         viewModel.ToolAvailability.Changed += _toolAvailabilityChangedHandler;
+        viewModel.ServerList.ToolStateResolver = viewModel.ToolAvailability.GetState;
 
         // Wire split button callback from embedded views
         viewModel.EmbeddedSessionManager.SplitRequestedCallback = OnEmbeddedSplitRequested;

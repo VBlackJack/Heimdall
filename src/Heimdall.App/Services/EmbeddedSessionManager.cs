@@ -1733,9 +1733,12 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
         // inventory shared by every tool tab. The snapshot list below is kept as the seed for a
         // context built without the inventory.
         _gatewayInventory ??= new ConfigGatewayInventory(_configManager, () => _configManager.CurrentSettings);
+        // Views ask the availability service, through this predicate, before offering an action
+        // that opens another tool.
         context = (context ?? new ToolContext()) with
         {
-            GatewayInventory = _gatewayInventory
+            GatewayInventory = _gatewayInventory,
+            IsToolAvailable = relatedToolId => _toolAvailability.IsListed(relatedToolId)
         };
 
         // Enrich context with SSH gateways so tools can offer "Route via" tunnel support

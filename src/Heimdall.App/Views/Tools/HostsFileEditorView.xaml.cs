@@ -44,6 +44,7 @@ public partial class HostsFileEditorView : UserControl, IToolView
         ApplicationDataPathResolver.GetHostsBackupsDirectory(ApplicationDataPathResolver.Resolve()));
     private LocalizationManager? _localizer;
     private Action<string, string, ToolContext?>? _openToolAction;
+    private Func<string, bool>? _isToolAvailable;
     private HostsFileDocument? _document;
 
     public HostsFileEditorView()
@@ -57,6 +58,7 @@ public partial class HostsFileEditorView : UserControl, IToolView
     {
         _localizer = localizer;
         _openToolAction = ToolContextMenuHelper.GetOpenToolAction(context);
+        _isToolAvailable = context?.IsToolAvailable;
         ApplyLocalization();
         ClearErrorState();
         LoadHostsFile();
@@ -408,30 +410,47 @@ public partial class HostsFileEditorView : UserControl, IToolView
             menu.Items.Add(copyHost);
         }
 
-        // Cross-tool navigation
-        if (_openToolAction is not null && !string.IsNullOrWhiteSpace(entry.IpAddress))
+        // Cross-tool navigation: only the tools that may be used, and no separator when none may.
+        bool offerPing = ToolContextMenuHelper.IsToolOffered(_isToolAvailable, "PING");
+        bool offerPortScan = ToolContextMenuHelper.IsToolOffered(_isToolAvailable, "PORTSCAN");
+        bool offerDns = ToolContextMenuHelper.IsToolOffered(_isToolAvailable, "DNS");
+        bool offerWhois = ToolContextMenuHelper.IsToolOffered(_isToolAvailable, "WHOIS");
+        if (_openToolAction is not null && !string.IsNullOrWhiteSpace(entry.IpAddress)
+            && (offerPing || offerPortScan || offerDns || offerWhois))
         {
             menu.Items.Add(new System.Windows.Controls.Separator());
 
-            var ping = new System.Windows.Controls.MenuItem { Header = L("ToolCtxOpenPing") };
-            ping.Click += (_, _) => _openToolAction("PING", L("PaletteToolPing"),
-                new ToolContext(TargetHost: entry.IpAddress));
-            menu.Items.Add(ping);
+            if (offerPing)
+            {
+                var ping = new System.Windows.Controls.MenuItem { Header = L("ToolCtxOpenPing") };
+                ping.Click += (_, _) => _openToolAction("PING", L("PaletteToolPing"),
+                    new ToolContext(TargetHost: entry.IpAddress));
+                menu.Items.Add(ping);
+            }
 
-            var portScan = new System.Windows.Controls.MenuItem { Header = L("ToolCtxOpenPortScan") };
-            portScan.Click += (_, _) => _openToolAction("PORTSCAN", L("PaletteToolPortScan"),
-                new ToolContext(TargetHost: entry.IpAddress));
-            menu.Items.Add(portScan);
+            if (offerPortScan)
+            {
+                var portScan = new System.Windows.Controls.MenuItem { Header = L("ToolCtxOpenPortScan") };
+                portScan.Click += (_, _) => _openToolAction("PORTSCAN", L("PaletteToolPortScan"),
+                    new ToolContext(TargetHost: entry.IpAddress));
+                menu.Items.Add(portScan);
+            }
 
-            var dns = new System.Windows.Controls.MenuItem { Header = L("ToolCtxOpenDns") };
-            dns.Click += (_, _) => _openToolAction("DNS", L("PaletteToolDns"),
-                new ToolContext(TargetHost: entry.IpAddress));
-            menu.Items.Add(dns);
+            if (offerDns)
+            {
+                var dns = new System.Windows.Controls.MenuItem { Header = L("ToolCtxOpenDns") };
+                dns.Click += (_, _) => _openToolAction("DNS", L("PaletteToolDns"),
+                    new ToolContext(TargetHost: entry.IpAddress));
+                menu.Items.Add(dns);
+            }
 
-            var whois = new System.Windows.Controls.MenuItem { Header = L("ToolCtxOpenWhois") };
-            whois.Click += (_, _) => _openToolAction("WHOIS", L("PaletteToolWhois"),
-                new ToolContext(TargetHost: entry.IpAddress));
-            menu.Items.Add(whois);
+            if (offerWhois)
+            {
+                var whois = new System.Windows.Controls.MenuItem { Header = L("ToolCtxOpenWhois") };
+                whois.Click += (_, _) => _openToolAction("WHOIS", L("PaletteToolWhois"),
+                    new ToolContext(TargetHost: entry.IpAddress));
+                menu.Items.Add(whois);
+            }
         }
 
         HostsGrid.ContextMenu = menu;
