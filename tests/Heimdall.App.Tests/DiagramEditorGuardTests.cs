@@ -57,6 +57,15 @@ public sealed class DiagramEditorGuardTests
     private const string DraftRecoveryStatement = "OfferDraftRecovery();";
 
     /// <summary>
+    /// A string literal assigned to <c>Filter</c>. The view source reader blanks every literal,
+    /// quotes included, so the literal is the run of blanks that follows the equals sign and is
+    /// itself followed by something that cannot start an operand. A real operand (an identifier, a
+    /// call, a bracket) starts right after the blanks and does not match.
+    /// </summary>
+    private static readonly Regex LiteralFilterAssignment = new(
+        @"\bFilter\s*=(?>\s+)(?![\w@$!(\[{<~-])", RegexOptions.CultureInvariant);
+
+    /// <summary>
     /// F5 and Ctrl+R reload the host page and drop whatever the editor holds.
     /// </summary>
     [Fact]
@@ -132,23 +141,12 @@ public sealed class DiagramEditorGuardTests
         Assert.True(Directory.Exists(toolsDirectory),
             $"Tool views directory not found: {toolsDirectory}");
 
-        var offenders = new List<string>();
-
         foreach (string file in Directory.EnumerateFiles(toolsDirectory, "*.cs", SearchOption.TopDirectoryOnly))
         {
-            string[] lines = File.ReadAllLines(file);
-            for (int index = 0; index < lines.Length; index++)
-            {
-                if (Regex.IsMatch(lines[index], @"\bFilter\s*=\s*""", RegexOptions.CultureInvariant))
-                {
-                    offenders.Add($"{Path.GetFileName(file)}:{index + 1}: {lines[index].Trim()}");
-                }
-            }
+            // File dialog filters must come from the locale catalogue.
+            string code = ViewSource.WithoutCommentsAndLiterals(File.ReadAllText(file));
+            Assert.DoesNotMatch(LiteralFilterAssignment, code);
         }
-
-        Assert.True(offenders.Count == 0,
-            "File dialog filters must come from the locale catalogue:"
-                + Environment.NewLine + string.Join(Environment.NewLine, offenders));
     }
 
     private static string Logic(string relativePath, string signature)

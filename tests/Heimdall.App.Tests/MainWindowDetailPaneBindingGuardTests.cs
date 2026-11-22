@@ -16,6 +16,7 @@
 
 using System.IO;
 using System.Xml.Linq;
+using Heimdall.App.Tests.Views.EmbeddedRdp;
 
 namespace Heimdall.App.Tests;
 
@@ -50,29 +51,14 @@ public sealed class MainWindowDetailPaneBindingGuardTests
     public void NoCodeBehindWritesADetailPaneProperty()
     {
         string appRoot = Path.Combine(FindRepoRoot(), "src", "Heimdall.App");
-        List<string> violations = [];
         foreach (string file in Directory.EnumerateFiles(appRoot, "MainWindow*.cs", SearchOption.TopDirectoryOnly))
         {
-            string[] lines = File.ReadAllLines(file);
-            for (int index = 0; index < lines.Length; index++)
+            string code = ViewSource.WithoutCommentsAndLiterals(File.ReadAllText(file));
+            foreach (string forbidden in ForbiddenAssignments)
             {
-                string line = lines[index];
-                if (line.TrimStart().StartsWith("//", StringComparison.Ordinal))
-                {
-                    continue;
-                }
-
-                foreach (string forbidden in ForbiddenAssignments)
-                {
-                    if (line.Contains(forbidden, StringComparison.Ordinal))
-                    {
-                        violations.Add($"{Path.GetFileName(file)}:{index + 1}: {line.Trim()}");
-                    }
-                }
+                Assert.DoesNotContain(forbidden, code, StringComparison.Ordinal);
             }
         }
-
-        Assert.Empty(violations);
     }
 
     [Theory]

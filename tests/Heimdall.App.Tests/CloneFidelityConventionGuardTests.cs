@@ -15,6 +15,7 @@
  */
 
 using System.IO;
+using Heimdall.App.Tests.Views.EmbeddedRdp;
 
 namespace Heimdall.App.Tests;
 
@@ -99,22 +100,13 @@ public sealed class CloneFidelityConventionGuardTests
     public void NoGatewayCopyAssignsThePassphraseProperty()
     {
         string sourceRoot = Path.Combine(FindRepoRoot(), "src");
-        List<string> violations = [];
 
         foreach ((string relativePath, _) in GatewayCompleteCopyCallSites)
         {
-            string[] lines = File.ReadAllLines(Path.Combine(sourceRoot, relativePath));
-            for (int index = 0; index < lines.Length; index++)
-            {
-                string line = lines[index];
-                if (line.Contains("SshKeyPassphraseEncrypted =", StringComparison.Ordinal))
-                {
-                    violations.Add($"{relativePath}:{index + 1}: {line.Trim()}");
-                }
-            }
+            string code = ViewSource.WithoutCommentsAndLiterals(
+                File.ReadAllText(Path.Combine(sourceRoot, relativePath)));
+            Assert.DoesNotContain("SshKeyPassphraseEncrypted =", code, StringComparison.Ordinal);
         }
-
-        Assert.Empty(violations);
     }
 
     [Fact]
