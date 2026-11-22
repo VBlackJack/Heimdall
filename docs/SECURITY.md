@@ -670,8 +670,11 @@ same key as the SFTP cap, `HKLM\Software\Policies\Heimdall`:
   saying the pack is set by the organization's policy. The user's own choice stays in the
   settings file, so lifting the policy gives it back.
 - Only the per-machine hive is read, because the per-user hive is writable by the user the
-  policy constrains. The values are read once per process, the first time a tool pack is
-  consulted: a change needs a restart.
+  policy constrains. Two readers exist, the tool availability service and the privilege
+  launcher's own; each reads the values once, the first time it needs them, so a change needs a
+  restart.
+- Only a `REG_DWORD` equal to `0` forbids a pack. Any other type or value, and a key that cannot
+  be read, means no policy.
 - The privilege launcher also refuses to launch while the Audit pack is forbidden, whether it
   was reached from the tool or started with a hand-built command line.
 

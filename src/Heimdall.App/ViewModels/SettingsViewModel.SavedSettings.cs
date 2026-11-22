@@ -133,7 +133,7 @@ public partial class SettingsViewModel
 
         foreach ((string name, (PropertyInfo panel, PropertyInfo setting)) in MarkerProperties)
         {
-            if (!PanelValuesEqual(panel.GetValue(this), ToPanelValue(setting.GetValue(_savedSettings), panel.PropertyType)))
+            if (!PanelValuesEqual(name, panel.GetValue(this), ToPanelValue(setting.GetValue(_savedSettings), panel.PropertyType)))
             {
                 return true;
             }

@@ -61,22 +61,79 @@ public partial class SettingsViewModel
     {
         ArgumentNullException.ThrowIfNull(disabled);
 
-        string name = pack.ToString();
         if (enabled)
         {
-            return [.. disabled.Where(entry => !IsPackName(entry, name))];
+            return [.. disabled.Where(entry => !IsPackName(entry, pack))];
         }
 
         // Already listed: nothing to add, so turning a pack off twice is a no-op.
-        return ListsPack(disabled, pack) ? [.. disabled] : [.. disabled, name];
+        return ListsPack(disabled, pack) ? [.. disabled] : [.. disabled, pack.ToString()];
     }
 
-    /// <summary>Whether the list names the pack. Case is ignored, like the availability service does.</summary>
+    /// <summary>Whether the list names the pack. Case and padding are ignored, like the availability service does.</summary>
     internal static bool ListsPack(IEnumerable<string>? disabled, ToolPack pack)
-        => disabled is not null && disabled.Any(entry => IsPackName(entry, pack.ToString()));
+        => disabled is not null && disabled.Any(entry => IsPackName(entry, pack));
 
-    private static bool IsPackName(string? entry, string packName)
-        => string.Equals(entry, packName, StringComparison.OrdinalIgnoreCase);
+    private static bool IsPackName(string? entry, ToolPack pack)
+        => ToolAvailability.TryParseOptionalPack(entry, out ToolPack parsed) && parsed == pack;
+
+    /// <summary>
+    /// Whether two lists of switched-off packs mean the same thing: the same optional packs, whatever
+    /// their order, case or padding, and the same other entries in the same order. Entries that name
+    /// a pack for which <paramref name="ignored"/> answers true are left out of both sides.
+    /// </summary>
+    internal static bool ToolPackListsEqual(
+        IEnumerable<string> left,
+        IEnumerable<string> right,
+        Func<ToolPack, bool>? ignored = null)
+    {
+        ArgumentNullException.ThrowIfNull(left);
+        ArgumentNullException.ThrowIfNull(right);
+
+        (HashSet<ToolPack> knownLeft, List<string> otherLeft) = SplitPackList(left, ignored);
+        (HashSet<ToolPack> knownRight, List<string> otherRight) = SplitPackList(right, ignored);
+        return knownLeft.SetEquals(knownRight) && otherLeft.SequenceEqual(otherRight, StringComparer.Ordinal);
+    }
+
+    private static (HashSet<ToolPack> Known, List<string> Other) SplitPackList(
+        IEnumerable<string> list,
+        Func<ToolPack, bool>? ignored)
+    {
+        HashSet<ToolPack> known = [];
+        List<string> other = [];
+        foreach (string entry in list)
+        {
+            if (!ToolAvailability.TryParseOptionalPack(entry, out ToolPack pack))
+            {
+                other.Add(entry);
+            }
+            else if (ignored is null || !ignored(pack))
+            {
+                known.Add(pack);
+            }
+        }
+
+        return (known, other);
+    }
+
+    /// <summary>Whether the pending list differs from <paramref name="other"/>, leaving policy-forbidden packs out.</summary>
+    private bool ToolPackListsDifferOutsidePolicy(IEnumerable<string> other)
+        => !ToolPackListsEqual(DisabledToolPacks, other, IsToolPackForbiddenByPolicy);
+
+    private bool IsToolPackForbiddenByPolicy(ToolPack pack)
+        => _toolAvailability?.IsPackForbiddenByPolicy(pack) ?? false;
+
+    /// <summary>
+    /// <paramref name="wanted"/> with each policy-forbidden pack put back as the pending list has it:
+    /// the user cannot change such a pack, so a reset must not either.
+    /// </summary>
+    private string[] WithPolicyPacksKept(IEnumerable<string> wanted)
+    {
+        bool IsForbiddenEntry(string entry)
+            => ToolAvailability.TryParseOptionalPack(entry, out ToolPack pack) && IsToolPackForbiddenByPolicy(pack);
+
+        return [.. wanted.Where(entry => !IsForbiddenEntry(entry)), .. DisabledToolPacks.Where(IsForbiddenEntry)];
+    }
 
     partial void OnDisabledToolPacksChanged(string[] value)
     {

@@ -178,6 +178,13 @@ public static class ToolContextMenuHelper
             items.Add(addServer);
         }
 
+        // Every tool entry may have been left out with no browser entry and no add-server entry
+        // after the separator that precedes them: the menu never ends with one.
+        while (items.Count > 0 && items[^1] is Separator)
+        {
+            items.RemoveAt(items.Count - 1);
+        }
+
         return items;
     }
 

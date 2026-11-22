@@ -141,6 +141,31 @@ public sealed partial class SessionCoordinatorPreMountTests
     }
 
     [Fact]
+    public async Task OpenToolTabAsync_AskedNotToRecord_OpensTheToolWithoutRecordingIt()
+    {
+        using TestHarness harness = TestHarness.Create(toolAvailability: new ScriptedToolAvailability());
+
+        ToolOpenOutcome outcome = await harness.Main.OpenToolTabAsync(AvailableToolId, "Hash", null, recordRecent: false);
+
+        Assert.Equal(ToolOpenOutcome.Opened, outcome);
+        Assert.Single(harness.Main.Connection.ActiveSessions);
+        Assert.Empty(harness.Main.RecentToolIds);
+    }
+
+    [Fact]
+    public async Task TheCrossToolCallbackOfTheSessionManager_OpensTheToolWithoutRecordingIt()
+    {
+        using TestHarness harness = TestHarness.Create(toolAvailability: new ScriptedToolAvailability());
+        Func<string, string, ToolContext?, Task> callback = Assert.IsType<Func<string, string, ToolContext?, Task>>(
+            harness.EmbeddedSessionManager.OpenToolCallback);
+
+        await callback(AvailableToolId, "Hash", null);
+
+        Assert.Single(harness.Main.Connection.ActiveSessions);
+        Assert.Empty(harness.Main.RecentToolIds);
+    }
+
+    [Fact]
     public async Task OpenToolTabAsync_AvailableToolAlreadyOpen_FocusesItAndMovesItToTheFrontOfTheRecents()
     {
         using TestHarness harness = TestHarness.Create(toolAvailability: new ScriptedToolAvailability());

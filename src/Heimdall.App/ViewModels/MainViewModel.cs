@@ -519,8 +519,10 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
                 cancellationToken);
 
         // Wire cross-tool navigation so tools can open other tool tabs
+        // These opens never recorded a recent tool (a tool opening another tool, a command captured
+        // from a terminal), and still do not.
         _embeddedSessionManager.OpenToolCallback = (toolId, title, ctx) =>
-            OpenToolTabAsync(toolId, title, ctx);
+            OpenToolTabAsync(toolId, title, ctx, recordRecent: false);
 
         // Wire the session opener so a tool can connect to a host it discovered.
         _embeddedSessionManager.OpenSessionCallback = ConnectAdHocSessionAsync;
@@ -1402,10 +1404,12 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     /// <remarks>
     /// A tool whose pack is switched off, or forbidden by policy, is refused before anything else:
     /// no session is added, no existing tab is focused, and the status bar names the reason. A
-    /// successful open or focus records the tool as recently used, so no caller does.
+    /// successful open or focus records the tool as recently used unless <paramref name="recordRecent"/>
+    /// is false, so no caller records it itself. A tool whose open fails is never recorded.
     /// </remarks>
+    /// <param name="recordRecent">Whether a successful open or focus counts as a recent use; the routes that never recorded pass false.</param>
     /// <returns>What happened to the request; <see cref="ToolOpenOutcome.Refused"/> is not an error.</returns>
-    internal async Task<ToolOpenOutcome> OpenToolTabAsync(string toolId, string title, ToolContext? context)
+    internal async Task<ToolOpenOutcome> OpenToolTabAsync(string toolId, string title, ToolContext? context, bool recordRecent = true)
     {
         await Task.CompletedTask;
 
@@ -1428,7 +1432,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
             {
                 Connection.ActiveSession = openLibrary;
                 target.PrefillNewAction(capture);
-                TrackRecentTool(toolId.ToUpperInvariant());
+                TrackRecentToolWhen(recordRecent, toolId);
                 return ToolOpenOutcome.FocusedExisting;
             }
         }
@@ -1456,7 +1460,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
                     commandLibraryView.PreselectAction(context.InitialActionId!);
                 }
 
-                TrackRecentTool(toolId.ToUpperInvariant());
+                TrackRecentToolWhen(recordRecent, toolId);
                 return ToolOpenOutcome.FocusedExisting;
             }
         }
@@ -1480,8 +1484,16 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
             throw;
         }
 
-        TrackRecentTool(toolId.ToUpperInvariant());
+        TrackRecentToolWhen(recordRecent, toolId);
         return ToolOpenOutcome.Opened;
+    }
+
+    private void TrackRecentToolWhen(bool recordRecent, string toolId)
+    {
+        if (recordRecent)
+        {
+            TrackRecentTool(toolId.ToUpperInvariant());
+        }
     }
 
     /// <summary>

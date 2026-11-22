@@ -264,6 +264,37 @@ public sealed class ToolAvailabilityTests
     }
 
     [Fact]
+    public void AnOlderEventArrivingLate_DoesNotOverwriteTheNewerSnapshot()
+    {
+        (ToolAvailability availability, SettingsSource source) = Create(settings: new AppSettings());
+        Assert.Equal(ToolAvailabilityState.Available, availability.GetState(AuditTool));
+        int raised = 0;
+        availability.Changed += () => raised++;
+
+        // The settings source already holds the newer write (Audit off) when the event of the
+        // older write (nothing off) is delivered.
+        source.Current = Disabling(nameof(ToolPack.Audit));
+        source.Handler!(new AppSettings());
+
+        Assert.Equal(ToolAvailabilityState.DisabledByUser, availability.GetState(AuditTool));
+        Assert.Equal(1, raised);
+
+        // The newer event then arrives: nothing differs any more.
+        source.Handler!(Disabling(nameof(ToolPack.Audit)));
+        Assert.Equal(1, raised);
+    }
+
+    [Fact]
+    public void AnEventBeforeAnySnapshotExists_IsTakenFromItsArgument()
+    {
+        (ToolAvailability availability, SettingsSource source) = Create(settings: null);
+
+        source.Handler!(Disabling(nameof(ToolPack.Audit)));
+
+        Assert.Equal(ToolAvailabilityState.DisabledByUser, availability.GetState(AuditTool));
+    }
+
+    [Fact]
     public void ChangedIsNotRaisedByAnUnrelatedSettingsWrite()
     {
         (ToolAvailability availability, SettingsSource source) = Create(settings: Disabling(nameof(ToolPack.Audit)));

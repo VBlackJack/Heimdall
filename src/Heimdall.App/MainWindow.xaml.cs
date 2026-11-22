@@ -4254,7 +4254,8 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             GroupName: server.Group,
             ConnectionType: server.ConnectionType);
 
-        _ = vm.OpenToolTabAsync("NOTES", server.DisplayName, context);
+        // A notes template opened from a tree entry never counted as a recent tool.
+        _ = vm.OpenToolTabAsync("NOTES", server.DisplayName, context, recordRecent: false);
     }
 
     /// <inheritdoc />

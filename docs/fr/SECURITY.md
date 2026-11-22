@@ -739,7 +739,7 @@ sous la même clé que le plafond SFTP, `HKLM\Software\Policies\Heimdall` :
 
 - `0` interdit le pack. `1` signifie aucune restriction. Tout autre nombre, et une valeur
   absente, signifient aucune politique pour ce pack ; `2` est réservé à un futur "forcé
-  activé" et est traité aujourd'hui comme aucune restriction. Le pack Core n'a pas de valeur :
+  activé" et est traité aujourd'hui comme aucune restriction. Le pack Noyau n'a pas de valeur :
   il ne peut jamais être interdit.
 - Un pack interdit l'emporte sur le choix de l'utilisateur. Ses outils sont masqués et refusés,
   et son interrupteur dans `Paramètres > Avancé > Outils et intégrations > Packs d'outils`
@@ -747,8 +747,11 @@ sous la même clé que le plafond SFTP, `HKLM\Software\Policies\Heimdall` :
   l'organisation. Le choix de l'utilisateur reste dans le fichier de paramètres : lever la
   politique le lui rend.
 - Seule la ruche par machine est lue, parce que la ruche par utilisateur est modifiable par
-  l'utilisateur que la politique contraint. Les valeurs sont lues une fois par processus, la
-  première fois qu'un pack d'outils est consulté : une modification demande un redémarrage.
+  l'utilisateur que la politique contraint. Deux lecteurs existent, le service de disponibilité
+  des outils et celui du lanceur de privilèges ; chacun lit les valeurs une seule fois, la
+  première fois qu'il en a besoin : une modification demande un redémarrage.
+- Seule une valeur `REG_DWORD` égale à `0` interdit un pack. Tout autre type ou valeur, et une
+  clé illisible, signifient aucune politique.
 - Le lanceur de privilèges refuse aussi de lancer tant que le pack Audit est interdit, qu'il
   ait été atteint depuis l'outil ou démarré avec une ligne de commande construite à la main.
 

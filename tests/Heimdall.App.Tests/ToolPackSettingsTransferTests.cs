@@ -134,6 +134,51 @@ public sealed class ToolPackSettingsTransferTests
         }
     }
 
+    [Fact]
+    public async Task ThePreviewLabel_SaysTheListHoldsThePacksTurnedOff_InEveryLanguage()
+    {
+        Assert.True(SettingsLabelCatalog.TryGetPlace(nameof(AppSettings.DisabledToolPacks), out SettingsPanelPlace? place));
+        Assert.Equal("SettingsLabelToolPacksDisabled", place!.LabelKey);
+
+        string[] expected = ["Tool packs turned off", "Packs d'outils d\u00e9sactiv\u00e9s", "Paquetes de herramientas desactivados"];
+        for (int index = 0; index < Locales.Length; index++)
+        {
+            LocalizationManager localizer = await LoadLocalizerAsync(Locales[index]);
+            Assert.Equal(expected[index], localizer[place.LabelKey]);
+        }
+    }
+
+    [Fact]
+    public async Task AnImportThatTurnsAPackOn_IsLabelledAsTheListOfPacksTurnedOff()
+    {
+        LocalizationManager localizer = await LoadLocalizerAsync("en");
+        SettingsTransferChange change = new(
+            nameof(AppSettings.DisabledToolPacks),
+            new JsonArray(nameof(ToolPack.Audit)),
+            new JsonArray());
+
+        string preview = SettingsImportPreview.Compose(localizer, [change]);
+
+        Assert.Contains("Tool packs turned off", preview, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ASensitiveListOfNames_IsShownInFull_WhateverItsLength()
+    {
+        LocalizationManager localizer = await LoadLocalizerAsync("en");
+        JsonArray longList = new(
+            Enumerable.Range(0, 12).Select(index => (JsonNode?)JsonValue.Create("FuturePack" + index))
+                .Append(JsonValue.Create(nameof(ToolPack.Audit)))
+                .ToArray());
+
+        string text = SettingsImportPreview.DescribeFullValue(localizer, longList, nameof(AppSettings.DisabledToolPacks));
+        Assert.EndsWith(nameof(ToolPack.Audit), text, StringComparison.Ordinal);
+        Assert.True(text.Length > 60);
+
+        SettingsTransferChange change = new(nameof(AppSettings.DisabledToolPacks), new JsonArray(), longList);
+        Assert.Contains(text, SettingsImportPreview.Compose(localizer, [change]), StringComparison.Ordinal);
+    }
+
     private static async Task<LocalizationManager> LoadLocalizerAsync(string locale)
     {
         LocalizationManager localizer = new();

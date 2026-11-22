@@ -155,6 +155,8 @@ internal static class SettingsImportPreview
                     ? source => DescribeSharedSource(localizer, source)
                     : tool => DescribeTool(localizer, tool);
                 return string.Join(ListSeparator, array.Select(item => describe((JsonObject)item!)));
+            case JsonArray names when names.Count > 0 && names.All(IsString):
+                return string.Join(ListSeparator, names.Select(item => item!.GetValue<string>()));
             case JsonValue scalar when scalar.GetValueKind() == JsonValueKind.String
                 && !string.IsNullOrEmpty(scalar.GetValue<string>()):
                 return scalar.GetValue<string>();

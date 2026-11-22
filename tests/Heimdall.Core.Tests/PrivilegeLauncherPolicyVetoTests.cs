@@ -110,8 +110,10 @@ public sealed class PrivilegeLauncherPolicyVetoTests
             args,
             () =>
             {
+                // Records the call and answers "not elevated": were the veto ever removed, the
+                // request would stop at the elevation check and no token work or process would follow.
                 elevationChecked = true;
-                return true;
+                return false;
             },
             Forbidding(ToolPack.Audit),
             out PrivilegeLauncher.PrivilegeLaunchRefusal refusal);

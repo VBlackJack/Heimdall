@@ -161,7 +161,9 @@ public partial class SettingsViewModel
 
     /// <summary>Whether the pending value of a marked setting differs from its factory default.</summary>
     internal bool IsModifiedFromDefault(string setting)
-        => !PanelValuesEqual(MarkerProperties[setting].Panel.GetValue(this), DefaultPanelValueOf(setting));
+        => setting == nameof(DisabledToolPacks)
+            ? ToolPackListsDifferOutsidePolicy((string[])DefaultPanelValueOf(setting)!)
+            : !PanelValuesEqual(setting, MarkerProperties[setting].Panel.GetValue(this), DefaultPanelValueOf(setting));
 
     /// <summary>
     /// Puts the factory default back into one setting as a pending edit.
@@ -176,6 +178,11 @@ public partial class SettingsViewModel
     {
         PropertyInfo panel = MarkerProperties[setting].Panel;
         object? value = DefaultPanelValueOf(setting);
+        if (setting == nameof(DisabledToolPacks))
+        {
+            value = WithPolicyPacksKept((string[])value!);
+        }
+
         panel.SetValue(this, value);
 
         if (value is int number
@@ -251,10 +258,12 @@ public partial class SettingsViewModel
     /// <summary>Whether two panel values mean the same setting.</summary>
     /// <remarks>
     /// Blank text equals blank text, because Save writes a blank optional path as null: a field
-    /// holding only spaces is the default, not a modification.
+    /// holding only spaces is the default, not a modification. The list of switched-off packs is
+    /// compared as a set of packs, so its order, case and padding do not count.
     /// </remarks>
-    private static bool PanelValuesEqual(object? current, object? fallback) => (current, fallback) switch
+    private static bool PanelValuesEqual(string setting, object? current, object? fallback) => (current, fallback) switch
     {
+        (string[] left, string[] right) when setting == nameof(DisabledToolPacks) => ToolPackListsEqual(left, right),
         (string[] left, string[] right) => left.SequenceEqual(right, StringComparer.Ordinal),
         (string left, string right) => (string.IsNullOrWhiteSpace(left) && string.IsNullOrWhiteSpace(right))
             || string.Equals(left, right, StringComparison.Ordinal),

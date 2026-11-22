@@ -136,7 +136,11 @@ public sealed class ToolAvailability : IToolAvailability
             .ToFrozenSet();
     }
 
-    private static bool TryParseOptionalPack(string? name, out ToolPack pack)
+    /// <summary>
+    /// Reads a settings entry as an optional pack: padding and case are ignored, and Core, numbers and
+    /// unknown names are not packs. The Settings panel reads the list through this same rule.
+    /// </summary>
+    internal static bool TryParseOptionalPack(string? name, out ToolPack pack)
     {
         string? trimmed = name?.Trim();
         foreach (ToolPack candidate in Enum.GetValues<ToolPack>())
@@ -177,10 +181,15 @@ public sealed class ToolAvailability : IToolAvailability
 
     private void OnSettingsChanged(AppSettings settings)
     {
-        FrozenSet<ToolPack> next = ComputeEnabled(settings.DisabledToolPacks);
+        // The event can arrive after a newer write was already applied, because the settings source
+        // raises it once its own lock is released: the current snapshot, not the argument, is the
+        // truth. The argument stands in only while no snapshot exists yet.
         FrozenSet<ToolPack> previous;
+        FrozenSet<ToolPack> next;
         lock (_gate)
         {
+            AppSettings current = _currentSettings() ?? settings;
+            next = ComputeEnabled(current.DisabledToolPacks);
             previous = _enabled ?? ComputeEnabled(null);
             _enabled = next;
         }

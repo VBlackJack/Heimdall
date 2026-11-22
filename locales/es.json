@@ -2072,6 +2072,7 @@
   "SettingsSftpSudoFallbackAutomatic": "Automático (sin preguntar)",
   "SettingsSftpSudoFallbackCapped": "Definido por su organización: como máximo {0}. Aplicado ahora: {1}.",
   "SettingsSectionToolPacks": "Paquetes de herramientas",
+  "SettingsLabelToolPacksDisabled": "Paquetes de herramientas desactivados",
   "SettingsToolPacksIntro": "Elija qu\u00e9 conjuntos de herramientas muestra y abre Heimdall. Una herramienta de un paquete desactivado queda oculta y no se puede abrir; sus entradas guardadas y sus favoritos vuelven al activar de nuevo el paquete. Los cambios se aplican al guardar.",
   "SettingsToolPackEssentialsLabel": "Esenciales",
   "SettingsToolPackEssentialsDescription": "Convertidores, generadores y verificadores sin conexi\u00f3n: codificaci\u00f3n, hashes, contrase\u00f1as, claves, certificados, subredes. No realizan ninguna solicitud de red.",

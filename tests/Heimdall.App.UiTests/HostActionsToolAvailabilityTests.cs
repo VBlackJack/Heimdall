@@ -115,6 +115,26 @@ public sealed class HostActionsToolAvailabilityTests
     }
 
     [Fact]
+    public async Task WithEveryToolRefused_NoBrowserPortAndNoAddServerCallback_TheMenuDoesNotEndWithASeparator()
+    {
+        await WpfTestHost.Dispatcher.InvokeAsync(() =>
+        {
+            List<object> items = ToolContextMenuHelper.BuildHostActions(
+                Host,
+                "host-01",
+                [22],
+                WpfTestHost.Localizer,
+                (_, _, _) => { },
+                openSessionCallback: null,
+                addServerCallback: null,
+                isToolAvailable: id => !TheFiveTools.Contains(id));
+
+            Assert.True(Has(items, "ToolCtxCopyIp"));
+            AssertNoDanglingSeparator(items);
+        }).Task;
+    }
+
+    [Fact]
     public async Task AnEntryThatIsOffered_StillOpensItsTool()
     {
         await WpfTestHost.Dispatcher.InvokeAsync(() =>

@@ -2654,6 +2654,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         var defaults = await LoadFactoryDefaultsAsync(cancellationToken);
         defaults.SshGateways = keptGateways;
 
+        // A pack the organization policy forbids is not the user's to change, so the reset leaves its
+        // entry as it stands and lifting the policy gives the user's own choice back.
+        defaults.DisabledToolPacks = [.. WithPolicyPacksKept(defaults.DisabledToolPacks)];
+
         // The language and the theme are kept. A reset that switches the interface into English
         // under a user who reads French leaves them in front of a panel they cannot read, the one
         // place from which they would have to find their way back; the confirmation says so.

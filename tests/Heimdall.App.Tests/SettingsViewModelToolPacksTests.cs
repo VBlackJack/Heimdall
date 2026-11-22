@@ -294,6 +294,111 @@ public sealed partial class SettingsViewModelTests
         Assert.True(SwitchOf(viewModel, ToolPack.Audit).IsEnabled);
     }
 
+    [Fact]
+    public void APaddedName_ReadsAsOff_AndTurningThePackOnRemovesEveryVariant()
+    {
+        FakeConfigManager config = new() { Settings = new AppSettings { DisabledToolPacks = ["Audit "] } };
+        SettingsViewModel viewModel = LoadedToolPackPanel(config);
+        Assert.False(SwitchOf(viewModel, ToolPack.Audit).IsEnabled);
+
+        SwitchOf(viewModel, ToolPack.Audit).IsEnabled = true;
+        Assert.Empty(viewModel.DisabledToolPacks);
+
+        string[] result = SettingsViewModel.WithPackState([" audit", "Keep", "AUDIT  "], ToolPack.Audit, enabled: true);
+        Assert.Equal(["Keep"], result);
+        Assert.Equal(["Audit "], SettingsViewModel.WithPackState(["Audit "], ToolPack.Audit, enabled: false));
+    }
+
+    [Fact]
+    public void ARoundTripOnAnotherPack_LeavesThePanelClean_WhateverTheOrder()
+    {
+        FakeConfigManager config = new()
+        {
+            Settings = new AppSettings { DisabledToolPacks = [nameof(ToolPack.Audit), nameof(ToolPack.Administration)] },
+        };
+        SettingsViewModel viewModel = LoadedToolPackPanel(config);
+        viewModel.IsDirty = false;
+
+        SwitchOf(viewModel, ToolPack.Audit).IsEnabled = true;
+        Assert.True(viewModel.IsDirty);
+        SwitchOf(viewModel, ToolPack.Audit).IsEnabled = false;
+
+        Assert.Equal([nameof(ToolPack.Administration), nameof(ToolPack.Audit)], viewModel.DisabledToolPacks);
+        Assert.False(viewModel.IsDirty);
+    }
+
+    [Fact]
+    public void ADifferenceOfCaseOrPadding_IsNotAModificationFromTheDefault()
+    {
+        FakeConfigManager config = new();
+        SettingsViewModel viewModel = CreateViewModel(config);
+        viewModel.LoadFromSettings(SettingsViewModel.ParseFactoryDefaults(ReadFactoryDefaultsFileForToolPacks()));
+
+        viewModel.LoadFromSettings(new AppSettings { DisabledToolPacks = ["audit"] });
+        Assert.False(viewModel.Defaults[nameof(SettingsViewModel.DisabledToolPacks)].IsModified);
+
+        viewModel.LoadFromSettings(new AppSettings { DisabledToolPacks = [" AUDIT "] });
+        Assert.False(viewModel.Defaults[nameof(SettingsViewModel.DisabledToolPacks)].IsModified);
+    }
+
+    [Fact]
+    public void ANameTheBuildDoesNotKnow_StillCountsAsADifference()
+    {
+        FakeConfigManager config = new() { Settings = new AppSettings { DisabledToolPacks = [nameof(ToolPack.Audit)] } };
+        SettingsViewModel viewModel = LoadedToolPackPanel(config);
+        viewModel.IsDirty = false;
+
+        viewModel.DisabledToolPacks = [nameof(ToolPack.Audit), "FuturePack"];
+
+        Assert.True(viewModel.IsDirty);
+    }
+
+    [Fact]
+    public void ThePerSettingReset_KeepsAForbiddenPacksOwnChoice()
+    {
+        FakeConfigManager config = new() { Settings = new AppSettings { DisabledToolPacks = [] } };
+        SettingsViewModel viewModel = LoadedToolPackPanel(config, AvailabilityForbidding(ToolPack.Audit));
+
+        viewModel.ResetSettingToDefault(nameof(SettingsViewModel.DisabledToolPacks));
+
+        Assert.Empty(viewModel.DisabledToolPacks);
+
+        FakeConfigManager listed = new()
+        {
+            Settings = new AppSettings { DisabledToolPacks = [nameof(ToolPack.Audit), nameof(ToolPack.Essentials)] },
+        };
+        SettingsViewModel other = LoadedToolPackPanel(listed, AvailabilityForbidding(ToolPack.Audit));
+
+        other.ResetSettingToDefault(nameof(SettingsViewModel.DisabledToolPacks));
+
+        Assert.Equal([nameof(ToolPack.Audit)], other.DisabledToolPacks);
+    }
+
+    [Fact]
+    public async Task RestoreDefaults_KeepsAForbiddenPacksOwnChoice()
+    {
+        FakeConfigManager config = new() { Settings = new AppSettings { DisabledToolPacks = [] } };
+        var dialog = new FakeDialogService { ConfirmResult = true };
+        SettingsViewModel viewModel = CreateViewModel(config, dialog, toolAvailability: AvailabilityForbidding(ToolPack.Audit));
+        viewModel.LoadFromSettings(config.Settings);
+
+        await viewModel.ResetToDefaultsCommand.ExecuteAsync(null);
+
+        Assert.DoesNotContain(viewModel.DisabledToolPacks, name => name == nameof(ToolPack.Audit));
+    }
+
+    [Fact]
+    public void TheDefaultMarker_IgnoresAForbiddenPack()
+    {
+        FakeConfigManager config = new() { Settings = new AppSettings { DisabledToolPacks = [] } };
+        SettingsViewModel viewModel = CreateViewModel(config, toolAvailability: AvailabilityForbidding(ToolPack.Audit));
+        viewModel.LoadFromSettings(config.Settings);
+        Assert.False(viewModel.Defaults[nameof(SettingsViewModel.DisabledToolPacks)].IsModified);
+
+        SwitchOf(viewModel, ToolPack.Essentials).IsEnabled = false;
+        Assert.True(viewModel.Defaults[nameof(SettingsViewModel.DisabledToolPacks)].IsModified);
+    }
+
     private static string ReadFactoryDefaultsFileForToolPacks()
     {
         string path = Path.Combine(AppContext.BaseDirectory, "config", "settings.default.json");
