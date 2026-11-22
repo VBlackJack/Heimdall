@@ -53,11 +53,13 @@ public sealed class SensitiveLoggingGuardTests
     private const string FatalNativePasswordReset =
         "TryResetNativePassword(nameof(OnRdpFatalError));";
 
-    // Regime B classification: CredentialAutofill.cs performs CredUI broker enumeration under the
-    // second credential-logging clause in CLAUDE.md:361. It is excluded by regime, not allowlisted.
+    // Regime B: CredentialAutofill.cs enumerates the CredUI broker windows. Its diagnostics may carry
+    // window titles, handles, PIDs and process names, never edit-field content, so the file is
+    // excluded by regime, not allowlisted.
     private const string CredentialAutofillRegimeBPath = @"src\Heimdall.Rdp\CredentialAutofill.cs";
 
-    // Regime A is the credential connect path defined by the first clause in CLAUDE.md:361.
+    // Regime A, the credential connect path: these files log host and protocol only, never a user
+    // name, a domain, the presence or length of a password, or any other credential field.
     private static readonly string[] CredentialRegimeAPaths =
     {
         ActiveXHostPath,
