@@ -70,6 +70,7 @@ public static class PrivilegeLauncher
 
     private const int SECURITY_IMPERSONATION = 2; // SecurityImpersonation
     private const int TOKEN_PRIMARY = 1;          // TokenPrimary
+    private const int TOKEN_IMPERSONATION = 2;    // TokenImpersonation
 
     private const uint SE_PRIVILEGE_ENABLED = 0x00000002;
     private const uint LOGON_WITH_PROFILE = 0x00000001;
@@ -193,6 +194,14 @@ public static class PrivilegeLauncher
         int impersonationLevel,
         int tokenType,
         out SafeAccessTokenHandle phNewToken);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool ImpersonateLoggedOnUser(SafeAccessTokenHandle hToken);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool RevertToSelf();
 
     [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -534,7 +543,18 @@ public static class PrivilegeLauncher
     private static readonly string[] SystemProcessCandidates =
         ["spoolsv", "svchost", "services", "lsass", "winlogon"];
 
-    private static SafeAccessTokenHandle? TryAcquireTokenFromProcesses(string[] processNames, PrivilegeLevel level)
+    /// <summary>
+    /// SYSTEM process candidates for impersonation when opening TrustedInstaller's token.
+    /// Prefers winlogon (unrestricted SYSTEM token) over service hosts whose tokens may carry
+    /// a reduced privilege set, and skips lsass (typically PPL-protected).
+    /// </summary>
+    private static readonly string[] SystemImpersonationCandidates =
+        ["winlogon", "spoolsv", "svchost", "services"];
+
+    private static SafeAccessTokenHandle? TryAcquireTokenFromProcesses(
+        string[] processNames,
+        PrivilegeLevel level,
+        int tokenType = TOKEN_PRIMARY)
     {
         foreach (string name in processNames)
         {
@@ -543,7 +563,7 @@ public static class PrivilegeLauncher
             {
                 foreach (Process proc in procs)
                 {
-                    SafeAccessTokenHandle? token = TryOpenAndDuplicateToken(proc.Id, level);
+                    SafeAccessTokenHandle? token = TryOpenAndDuplicateToken(proc.Id, level, tokenType);
                     if (token is not null) return token;
                 }
             }
@@ -612,13 +632,22 @@ public static class PrivilegeLauncher
         }
     }
 
-    private static SafeAccessTokenHandle? TryOpenAndDuplicateToken(int pid, PrivilegeLevel level)
+    private static SafeAccessTokenHandle? TryOpenAndDuplicateToken(int pid, PrivilegeLevel level, int tokenType)
     {
         using SafeProcessHandle processHandle = OpenProcess(PROCESS_QUERY_INFORMATION, false, pid);
-        if (processHandle.IsInvalid) return null;
+        if (processHandle.IsInvalid)
+        {
+            FileLogger.Debug(
+                $"[PrivilegeLauncher] OpenProcess failed for pid {pid} (level {level}): error {Marshal.GetLastPInvokeError()}.");
+            return null;
+        }
 
         if (!OpenProcessToken(processHandle, TOKEN_DUPLICATE | TOKEN_QUERY, out SafeAccessTokenHandle tokenHandle))
+        {
+            FileLogger.Debug(
+                $"[PrivilegeLauncher] OpenProcessToken failed for pid {pid} (level {level}): error {Marshal.GetLastPInvokeError()}.");
             return null;
+        }
 
         using (tokenHandle)
         {
@@ -627,10 +656,12 @@ public static class PrivilegeLauncher
 
             if (DuplicateTokenEx(
                     tokenHandle, MAXIMUM_ALLOWED, IntPtr.Zero,
-                    SECURITY_IMPERSONATION, TOKEN_PRIMARY,
+                    SECURITY_IMPERSONATION, tokenType,
                     out SafeAccessTokenHandle duplicated))
                 return duplicated;
 
+            FileLogger.Debug(
+                $"[PrivilegeLauncher] DuplicateTokenEx failed for pid {pid} (level {level}): error {Marshal.GetLastPInvokeError()}.");
             return null;
         }
     }
@@ -644,8 +675,95 @@ public static class PrivilegeLauncher
         if (!serviceResult.Success)
             return serviceResult;
 
-        // Step 2: Launch with TrustedInstaller's token
-        return LaunchWithTokenProbe(exe, args, ["TrustedInstaller"], PrivilegeLevel.TrustedInstaller);
+        // Step 2: Acquire TrustedInstaller's primary token while impersonating SYSTEM
+        // (the TrustedInstaller token DACL refuses TOKEN_DUPLICATE to administrators,
+        // even with SeDebugPrivilege, but grants it to SYSTEM), then revert before spawning.
+        try
+        {
+            EnableDebugPrivilege();
+
+            (SafeAccessTokenHandle? tiToken, string? failureMessage) = AcquireTokenWhileImpersonating(
+                () => TryAcquireTokenFromProcesses(SystemImpersonationCandidates, PrivilegeLevel.System, TOKEN_IMPERSONATION),
+                static token => ImpersonateLoggedOnUser(token) ? (true, 0) : (false, Marshal.GetLastPInvokeError()),
+                () => TryAcquireTokenFromProcesses(["TrustedInstaller"], PrivilegeLevel.TrustedInstaller, TOKEN_PRIMARY),
+                static () => RevertToSelf() ? (true, 0) : (false, Marshal.GetLastPInvokeError()));
+
+            using (tiToken)
+            {
+                if (tiToken is null || tiToken.IsInvalid)
+                    return PrivilegeLaunchResult.Failed(
+                        failureMessage ?? "No accessible TrustedInstaller token found.");
+
+                return CreateProcessWithPrimaryToken(tiToken, exe, args);
+            }
+        }
+        catch (Exception ex)
+        {
+            return PrivilegeLaunchResult.Failed(ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Acquires an impersonation token, impersonates it on the current thread for the duration
+    /// of <paramref name="probeTargetToken"/>, and always reverts in <c>finally</c>.
+    /// </summary>
+    internal static (SafeAccessTokenHandle? Token, string? FailureMessage) AcquireTokenWhileImpersonating(
+        Func<SafeAccessTokenHandle?> acquireImpersonationToken,
+        Func<SafeAccessTokenHandle, (bool Succeeded, int Win32Error)> impersonate,
+        Func<SafeAccessTokenHandle?> probeTargetToken,
+        Func<(bool Succeeded, int Win32Error)> revertToSelf)
+    {
+        using SafeAccessTokenHandle? systemToken = acquireImpersonationToken();
+        if (systemToken is null || systemToken.IsInvalid)
+        {
+            return (
+                null,
+                $"No accessible SYSTEM token found for impersonation. Probed: {string.Join(", ", SystemImpersonationCandidates)}. " +
+                "Ensure Heimdall is running as administrator.");
+        }
+
+        (bool impersonated, int impersonateError) = impersonate(systemToken);
+        if (!impersonated)
+        {
+            FileLogger.Debug(
+                $"[PrivilegeLauncher] ImpersonateLoggedOnUser failed while acquiring TrustedInstaller token: error {impersonateError}.");
+            return (null, $"ImpersonateLoggedOnUser failed: {impersonateError}");
+        }
+
+        SafeAccessTokenHandle? targetToken = null;
+        bool reverted = false;
+        int revertError = 0;
+
+        try
+        {
+            targetToken = probeTargetToken();
+        }
+        finally
+        {
+            (reverted, revertError) = revertToSelf();
+            if (!reverted)
+            {
+                FileLogger.Error(
+                    $"[PrivilegeLauncher] RevertToSelf failed after TrustedInstaller token probe: error {revertError}.");
+            }
+        }
+
+        if (!reverted)
+        {
+            targetToken?.Dispose();
+            return (null, $"RevertToSelf failed: {revertError}");
+        }
+
+        if (targetToken is null || targetToken.IsInvalid)
+        {
+            targetToken?.Dispose();
+            return (
+                null,
+                "No accessible TrustedInstaller token found while impersonating SYSTEM. " +
+                "Probed: TrustedInstaller.");
+        }
+
+        return (targetToken, null);
     }
 
     private static PrivilegeLaunchResult EnsureTrustedInstallerServiceRunning()
@@ -719,26 +837,34 @@ public static class PrivilegeLauncher
                     $"No accessible token found. Probed: {string.Join(", ", processCandidates)}. " +
                     "Ensure Heimdall is running as administrator.");
 
-            string commandLine = BuildCommandLine(exe, args);
-
-            STARTUPINFO si = new() { cb = Marshal.SizeOf<STARTUPINFO>() };
-
-            if (!CreateProcessWithTokenW(
-                    token, LOGON_WITH_PROFILE, null, commandLine,
-                    CREATE_UNICODE_ENVIRONMENT, IntPtr.Zero, null,
-                    ref si, out PROCESS_INFORMATION pi))
-                return PrivilegeLaunchResult.Failed(
-                    $"CreateProcessWithTokenW failed: {Marshal.GetLastPInvokeError()}");
-
-            CloseHandle(pi.hProcess);
-            CloseHandle(pi.hThread);
-
-            return PrivilegeLaunchResult.Ok(pi.dwProcessId);
+            return CreateProcessWithPrimaryToken(token, exe, args);
         }
         catch (Exception ex)
         {
             return PrivilegeLaunchResult.Failed(ex.Message);
         }
+    }
+
+    private static PrivilegeLaunchResult CreateProcessWithPrimaryToken(
+        SafeAccessTokenHandle token,
+        string exe,
+        IReadOnlyList<string> args)
+    {
+        string commandLine = BuildCommandLine(exe, args);
+
+        STARTUPINFO si = new() { cb = Marshal.SizeOf<STARTUPINFO>() };
+
+        if (!CreateProcessWithTokenW(
+                token, LOGON_WITH_PROFILE, null, commandLine,
+                CREATE_UNICODE_ENVIRONMENT, IntPtr.Zero, null,
+                ref si, out PROCESS_INFORMATION pi))
+            return PrivilegeLaunchResult.Failed(
+                $"CreateProcessWithTokenW failed: {Marshal.GetLastPInvokeError()}");
+
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
+
+        return PrivilegeLaunchResult.Ok(pi.dwProcessId);
     }
 
     internal static string EncodeLaunchPayload(string executablePath, IReadOnlyList<string>? arguments)
