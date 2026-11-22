@@ -593,10 +593,8 @@ public static class PrivilegedFileCommands
                 nameof(octalMode));
         }
 
-        // A "!" in a file name is escaped the way every history-expanding login shell reads it:
-        // outside the quotes. The script itself holds none.
-        string target = PathEscaper.EscapeForShell(targetRemotePath)
-            .Replace("!", "'\\!'", StringComparison.Ordinal);
+        // The path leaves the quotes for a "!" (see PathEscaper.EscapeForLoginShell); the script holds none.
+        string target = PathEscaper.EscapeForLoginShell(targetRemotePath);
 
         return string.Join(
             ' ',
@@ -630,10 +628,8 @@ public static class PrivilegedFileCommands
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(remotePath);
 
-        // A "!" in a file name is escaped the way every history-expanding login shell reads it:
-        // outside the quotes. The script itself holds none.
-        string target = PathEscaper.EscapeForShell(remotePath)
-            .Replace("!", "'\\!'", StringComparison.Ordinal);
+        // The path leaves the quotes for a "!" (see PathEscaper.EscapeForLoginShell); the script holds none.
+        string target = PathEscaper.EscapeForLoginShell(remotePath);
 
         return string.Join(
             ' ',
@@ -696,7 +692,7 @@ public static class PrivilegedFileCommands
             "-c",
             PathEscaper.EscapeForShell(HeldMkdirScript),
             "sh",
-            EscapeHeldArgument(remotePath));
+            PathEscaper.EscapeForLoginShell(remotePath));
     }
 
     /// <summary>
@@ -735,14 +731,9 @@ public static class PrivilegedFileCommands
             "-c",
             PathEscaper.EscapeForShell(HeldRenameScript + (replace ? HeldRenameReplaceTail : HeldRenameKeepTail)),
             "sh",
-            EscapeHeldArgument(remotePath),
-            EscapeHeldArgument(newName));
+            PathEscaper.EscapeForLoginShell(remotePath),
+            PathEscaper.EscapeForLoginShell(newName));
     }
-
-    // A "!" in a file name is escaped the way every history-expanding login shell reads it:
-    // outside the quotes. The scripts themselves hold none.
-    private static string EscapeHeldArgument(string value) =>
-        PathEscaper.EscapeForShell(value).Replace("!", "'\\!'", StringComparison.Ordinal);
 
     /// <summary>
     /// Reads why a write or a read was refused for its path or its file, when the script said so.
@@ -943,9 +934,8 @@ public static class PrivilegedFileCommands
         // would act on even inside quotes. It travels as a placeholder the outer script restores.
         string installer = StagedInstallScript.Replace("!", BangPlaceholder, StringComparison.Ordinal);
 
-        // A "!" in a file name is escaped the way every such shell reads it: outside the quotes.
-        string target = PathEscaper.EscapeForShell(targetRemotePath)
-            .Replace("!", "'\\!'", StringComparison.Ordinal);
+        // The path leaves the quotes for a "!" (see PathEscaper.EscapeForLoginShell).
+        string target = PathEscaper.EscapeForLoginShell(targetRemotePath);
 
         return string.Join(
             ' ',
