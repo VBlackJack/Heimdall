@@ -67,7 +67,7 @@ public sealed class ToolRouteSelectorSplitTests
                 toolRegistry.RegisterToolForTests(ProbeDescriptor(), () => new RouteProbeToolView());
                 using TunnelManager tunnelManager = new();
                 EmbeddedSessionManager sessionManager = new(
-                    localizer, null!, null!, null!, toolRegistry, null!, null!, null!, null!, configManager);
+                    localizer, null!, null!, null!, toolRegistry, null!, null!, null!, null!, configManager, AlwaysAvailableToolAvailability.Instance);
                 SplitService splitService = new(
                     configManager,
                     localizer,
@@ -77,7 +77,8 @@ public sealed class ToolRouteSelectorSplitTests
                     connectionService: null!,
                     toolRegistry,
                     dialogService: null!,
-                    new PaneCloseArbiter());
+                    new PaneCloseArbiter(),
+                    AlwaysAvailableToolAvailability.Instance);
 
                 SessionTabViewModel session = new();
                 session.RootContent = new SessionPaneModel { ConnectionType = "SSH" };

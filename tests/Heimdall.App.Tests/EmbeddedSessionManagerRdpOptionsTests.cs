@@ -127,7 +127,8 @@ public sealed class EmbeddedSessionManagerRdpOptionsTests
             null!,
             null!,
             null!,
-            null!);
+            null!,
+            AlwaysAvailableToolAvailability.Instance);
 
     private static App CreateApplication()
     {

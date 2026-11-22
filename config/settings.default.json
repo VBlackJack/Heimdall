@@ -153,5 +153,6 @@
     "cmdLibGitSyncAuthorName": "Heimdall User",
     "cmdLibGitSyncAuthorEmail": "heimdall@local",
     "cmdLibGitSyncOnStartup": false,
-    "cmdLibGitSyncAutoPush": true
+    "cmdLibGitSyncAutoPush": true,
+    "disabledToolPacks": ["Audit"]
 }

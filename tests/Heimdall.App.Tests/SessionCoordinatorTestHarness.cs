@@ -324,6 +324,7 @@ public sealed partial class SessionCoordinatorPreMountTests : IDisposable
                 connectionService,
                 toolRegistry,
                 dialogService, closeArbiter,
+                AlwaysAvailableToolAvailability.Instance,
                 profileLookup);
             FakeUiDispatcher dispatcher = new(checkAccess);
             ConnectionViewModel connection = new ConnectionViewModel(
@@ -413,7 +414,8 @@ public sealed partial class SessionCoordinatorPreMountTests : IDisposable
                     hostKeyStore,
                     Heimdall.Core.Ssh.RejectingHostKeyVerifier.Instance,
                     configManager),
-                new MaskedCopyTestSupport.RecordingClipboard());
+                new MaskedCopyTestSupport.RecordingClipboard(),
+                AlwaysAvailableToolAvailability.Instance);
 
             return new TestHarness(
                 rootPath,

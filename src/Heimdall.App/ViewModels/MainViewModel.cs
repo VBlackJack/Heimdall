@@ -356,6 +356,9 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     /// <summary>Centralized tool registry shared with MainWindow for menus.</summary>
     public ToolRegistry ToolRegistry { get; }
 
+    /// <summary>Decides whether each tool may be listed and opened, from its pack, the user's settings and the machine policy.</summary>
+    public IToolAvailability ToolAvailability { get; }
+
     /// <summary>Sidebar (Sessions / Tools tabs) state and commands.</summary>
     public SidebarViewModel Sidebar { get; }
 
@@ -435,7 +438,8 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         IPaneCloseArbiter closeArbiter,
         ICommandPaletteViewModelFactory commandPaletteFactory,
         ITunnelsViewModelFactory tunnelsFactory,
-        IClipboardService clipboard)
+        IClipboardService clipboard,
+        IToolAvailability toolAvailability)
     {
         _closeArbiter = closeArbiter ?? throw new ArgumentNullException(nameof(closeArbiter));
         _configManager = configManager;
@@ -454,6 +458,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         _sessionRestore = sessionRestore;
         _uiDispatcher = uiDispatcher;
         ToolRegistry = toolRegistry;
+        ToolAvailability = toolAvailability ?? throw new ArgumentNullException(nameof(toolAvailability));
         Split = splitService;
 
         // Built from the SAME arbiter instance every other close path uses: a clearance obtained in

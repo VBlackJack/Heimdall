@@ -832,6 +832,11 @@ public partial class App : System.Windows.Application
         services.AddSingleton<ExternalToolProviderService>();
         services.AddSingleton<ToolRegistry>();
 
+        // The organisation veto on optional tool packs, read once from the machine policy key, and
+        // the single decision on whether a tool may be used (registry pack, user setting, policy).
+        services.AddSingleton<ToolPackPolicy>(_ => new ToolPackPolicy());
+        services.AddSingleton<IToolAvailability, ToolAvailability>();
+
         // The single place the real preset location is resolved. Neither the storage nor the
         // view model can reach it any more: their parameterless constructors are gone.
         services.AddSingleton<IPasswordPresetStorage>(

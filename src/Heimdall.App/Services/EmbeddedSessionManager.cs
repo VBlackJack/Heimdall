@@ -48,6 +48,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
     private readonly HostKeyStore _hostKeyStore;
     private readonly ConnectionStateMachine _connectionSm;
     private readonly ToolRegistry _toolRegistry;
+    private readonly IToolAvailability _toolAvailability;
     private readonly ITunnelService _tunnelService;
     private readonly ISessionLogService _sessionLogService;
     private readonly ISessionEventLog _sessionEventLog;
@@ -191,6 +192,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
         ISessionEventLog sessionEventLog,
         ISessionOperationLog sessionOperationLog,
         ConfigManager configManager,
+        IToolAvailability toolAvailability,
         WebCertificateTrust? webCertificateTrust = null,
         WebZoomMemory? webZoomMemory = null,
         SharedCredentialApplier? sharedCredentials = null,
@@ -205,6 +207,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
         _hostKeyStore = hostKeyStore;
         _connectionSm = connectionSm;
         _toolRegistry = toolRegistry;
+        _toolAvailability = toolAvailability;
         _tunnelService = tunnelService;
         _sessionLogService = sessionLogService;
         _sessionEventLog = sessionEventLog;

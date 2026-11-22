@@ -45,6 +45,7 @@ public sealed class SplitService : ISplitService
     private readonly IEmbeddedSessionManager _sessionManager;
     private readonly IConnectionService _connectionService;
     private readonly ToolRegistry _toolRegistry;
+    private readonly IToolAvailability _toolAvailability;
     private readonly IDialogService _dialogService;
     private readonly IPaneCloseArbiter _closeArbiter;
 
@@ -94,6 +95,7 @@ public sealed class SplitService : ISplitService
         ToolRegistry toolRegistry,
         IDialogService dialogService,
         IPaneCloseArbiter closeArbiter,
+        IToolAvailability toolAvailability,
         IProfileLookup? profileLookup = null)
     {
         _configManager = configManager;
@@ -104,6 +106,7 @@ public sealed class SplitService : ISplitService
         _sessionManager = sessionManager;
         _connectionService = connectionService;
         _toolRegistry = toolRegistry;
+        _toolAvailability = toolAvailability;
         _dialogService = dialogService;
         _closeArbiter = closeArbiter ?? throw new ArgumentNullException(nameof(closeArbiter));
 
