@@ -135,6 +135,7 @@ internal static class SettingsLabelCatalog
         [nameof(AppSettings.CmdLibGitSyncOnStartup)] = new("SettingsCmdLibSyncOnStartup", "SettingsTabAdvanced", "SettingsAdvancedSubTabCmdLibSync"),
         [nameof(AppSettings.CmdLibGitSyncUrl)] = new("SettingsCmdLibSyncUrl", "SettingsTabAdvanced", "SettingsAdvancedSubTabCmdLibSync"),
         [nameof(AppSettings.ExternalEditorPath)] = new("SettingsLabelEditorPath", "SettingsTabAdvanced", "SettingsAdvancedSubTabTools"),
+        [nameof(AppSettings.DisabledToolPacks)] = new("SettingsSectionToolPacks", "SettingsTabAdvanced", "SettingsAdvancedSubTabTools"),
         [nameof(AppSettings.ExternalTools)] = new("SettingsSectionExternalToolsList", "SettingsTabAdvanced", "SettingsAdvancedSubTabTools"),
         [nameof(AppSettings.MobaXtermUserVariables)] = new("SettingsSectionMobaXtermVariables", "SettingsTabGeneral", "SettingsGeneralSubTabFiles"),
         [nameof(AppSettings.SharedSessionSources)] = new("SettingsSectionSharedSessionSources", "SettingsTabGeneral", "SettingsGeneralSubTabSharedSources"),

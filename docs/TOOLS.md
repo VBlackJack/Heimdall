@@ -39,86 +39,86 @@ keys used by command palette, tabs, split panes, and tool lookup.
 
 ### Network
 
-| ID | Name |
-|---|---|
-| `PING` | Ping Monitor |
-| `DNS` | DNS Lookup |
-| `CERT` | Certificate Inspector |
-| `PORTSCAN` | Port Scanner |
-| `SUBNET` | Subnet Calculator |
-| `IPCONV` | IP Address Converter |
-| `HTTP` | HTTP Status Codes |
-| `WHOIS` | WHOIS Lookup |
-| `HTTPHEADERS` | HTTP Header Analyzer |
-| `BANNER` | Banner Grabber |
-| `TCPTRACE` | Traceroute |
-| `SNMPWALK` | SNMP Walker |
-| `ARPMON` | ARP Monitor |
-| `FWTEST` | Firewall Tester |
-| `NETMAP` | Network Cartography |
-| `NETCALC` | Network Calculator |
-| `TCPPING` | TCP Ping |
+| ID | Name | Pack |
+|---|---|---|
+| `PING` | Ping Monitor | Network diagnostics |
+| `DNS` | DNS Lookup | Network diagnostics |
+| `CERT` | Certificate Inspector | Network diagnostics |
+| `PORTSCAN` | Port Scanner | Audit and reconnaissance |
+| `SUBNET` | Subnet Calculator | Essentials |
+| `IPCONV` | IP Address Converter | Essentials |
+| `HTTP` | HTTP Status Codes | Essentials |
+| `WHOIS` | WHOIS Lookup | Network diagnostics |
+| `HTTPHEADERS` | HTTP Header Analyzer | Network diagnostics |
+| `BANNER` | Banner Grabber | Audit and reconnaissance |
+| `TCPTRACE` | Traceroute | Network diagnostics |
+| `SNMPWALK` | SNMP Walker | Audit and reconnaissance |
+| `ARPMON` | ARP Monitor | Network diagnostics |
+| `FWTEST` | Firewall Tester | Audit and reconnaissance |
+| `NETMAP` | Network Cartography | Audit and reconnaissance |
+| `NETCALC` | Network Calculator | Essentials |
+| `TCPPING` | TCP Ping | Network diagnostics |
 
 ### Security
 
-| ID | Name |
-|---|---|
-| `HASH` | Hash Generator |
-| `HMAC` | HMAC Generator |
-| `PASSWORD` | Password Generator |
-| `SSHKEY` | SSH Key Generator |
-| `CERTGEN` | Certificate Generator |
-| `JWT` | JWT Parser |
-| `TOTP` | TOTP Generator |
-| `PWDAUDIT` | Password Auditor |
-| `SSHAUDIT` | SSH Key Auditor |
-| `TLSAUDIT` | TLS Auditor |
-| `DNSSEC` | DNS Security Checker |
-| `SMBENUM` | SMB Enumerator |
-| `DEFAULTCREDS` | Default Credential Scanner |
-| `CVELOOKUP` | CVE Lookup |
-| `SECNUMCLOUD` | SecNumCloud Audit |
+| ID | Name | Pack |
+|---|---|---|
+| `HASH` | Hash Generator | Essentials |
+| `HMAC` | HMAC Generator | Essentials |
+| `PASSWORD` | Password Generator | Essentials |
+| `SSHKEY` | SSH Key Generator | Essentials |
+| `CERTGEN` | Certificate Generator | Essentials |
+| `JWT` | JWT Parser | Essentials |
+| `TOTP` | TOTP Generator | Essentials |
+| `PWDAUDIT` | Password Auditor | Essentials |
+| `SSHAUDIT` | SSH Key Auditor | Essentials |
+| `TLSAUDIT` | TLS Auditor | Audit and reconnaissance |
+| `DNSSEC` | DNS Security Checker | Network diagnostics |
+| `SMBENUM` | SMB Enumerator | Audit and reconnaissance |
+| `DEFAULTCREDS` | Default Credential Scanner | Audit and reconnaissance |
+| `CVELOOKUP` | CVE Lookup | Essentials |
+| `SECNUMCLOUD` | SecNumCloud Audit | Audit and reconnaissance |
 
 ### Encoding
 
-| ID | Name |
-|---|---|
-| `BASE64` | Base64 Encoder / Decoder |
-| `URLENC` | URL Encoder / Decoder |
-| `JSON` | JSON Formatter |
-| `REGEX` | Regex Tester |
-| `DIFF` | Text Diff |
-| `TEXTCASE` | Text Case Converter |
+| ID | Name | Pack |
+|---|---|---|
+| `BASE64` | Base64 Encoder / Decoder | Essentials |
+| `URLENC` | URL Encoder / Decoder | Essentials |
+| `JSON` | JSON Formatter | Essentials |
+| `REGEX` | Regex Tester | Essentials |
+| `DIFF` | Text Diff | Essentials |
+| `TEXTCASE` | Text Case Converter | Essentials |
 
 ### System
 
-| ID | Name |
-|---|---|
-| `CHMOD` | Chmod Calculator |
-| `DATETIME` | DateTime Converter |
-| `UUID` | UUID Generator |
-| `ULID` | ULID Generator |
-| `CRONTAB` | Crontab Builder |
-| `LOGVIEW` | Log Viewer |
-| `HOSTS` | Hosts File Editor |
-| `SSHCONFIG` | SSH Config Generator |
-| `CRONJOB` | Cron Job Manager |
-| `SERVICES` | Service Status Dashboard |
-| `NOTES` | Notes |
-| `DIAGRAM` | Diagram Editor |
-| `CMDLIB` | Command Library |
-| `PRIVLAUNCH` | Privilege Launcher |
+| ID | Name | Pack |
+|---|---|---|
+| `CHMOD` | Chmod Calculator | Essentials |
+| `DATETIME` | DateTime Converter | Essentials |
+| `UUID` | UUID Generator | Essentials |
+| `ULID` | ULID Generator | Essentials |
+| `CRONTAB` | Crontab Builder | Essentials |
+| `LOGVIEW` | Log Viewer | Administration |
+| `HOSTS` | Hosts File Editor | Administration |
+| `SSHCONFIG` | SSH Config Generator | Essentials |
+| `CRONJOB` | Cron Job Manager | Administration |
+| `SERVICES` | Service Status Dashboard | Administration |
+| `NOTES` | Notes | Core (permanent) |
+| `DIAGRAM` | Diagram Editor | Administration |
+| `CMDLIB` | Command Library | Core (permanent) |
+| `PRIVLAUNCH` | Privilege Launcher | Audit and reconnaissance |
 
 ### External Native
 
-| ID | Name |
-|---|---|
-| `WOL` | Wake-on-LAN |
-| `OPENPORTS` | Open Ports |
-| `NETIF` | Network Interfaces |
-| `ROUTES` | Route Table |
-| `DNSBATCH` | DNS Batch Resolver |
-| `WIFI` | WiFi Networks |
+| ID | Name | Pack |
+|---|---|---|
+| `WOL` | Wake-on-LAN | Network diagnostics |
+| `OPENPORTS` | Open Ports | Network diagnostics |
+| `NETIF` | Network Interfaces | Network diagnostics |
+| `ROUTES` | Route Table | Network diagnostics |
+| `DNSBATCH` | DNS Batch Resolver | Network diagnostics |
+| `WIFI` | WiFi Networks | Network diagnostics |
 
 ## Tool Infrastructure
 
@@ -139,6 +139,17 @@ the corresponding `IToolView` implementation.
 - `IconResourceKey`: XAML geometry resource key
 - `DescriptionKey`: optional explicit description key; when null, the UI uses
   the `ToolDesc{Id}` convention
+- `Pack`: the `ToolPack` the tool belongs to (`Core`, `Essentials`,
+  `NetworkDiagnostics`, `Administration` or `Audit`); null for detected
+  external tools, which belong to no pack
+
+The Pack column of the catalog tables above shows the pack of each built-in
+tool. A tool whose pack is turned off in Settings, or forbidden by the machine
+policy, is hidden from every listing and refused when something tries to open
+it; the registry itself keeps the full catalogue. See
+[Tool packs](FEATURES.md#tool-packs) for the user side,
+[Tool Architecture](ARCHITECTURE.md#tool-architecture) for the mechanism and
+[SECURITY.md](SECURITY.md) for the machine policy and its limits.
 
 `IToolView` is the runtime contract for tool views. It exposes:
 

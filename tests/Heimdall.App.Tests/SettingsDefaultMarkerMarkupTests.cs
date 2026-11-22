@@ -39,9 +39,14 @@ public sealed class SettingsDefaultMarkerMarkupTests
 
     private const string SettingsBindingPrefix = "{Binding Settings.";
 
-    /// <summary>The bindings that edit the credential provider type: it is two radio buttons.</summary>
+    /// <summary>
+    /// The bindings that stand for a setting the panel does not edit through one control: the
+    /// credential provider type is two radio buttons, and the disabled tool packs are one switch
+    /// per pack.
+    /// </summary>
     private static readonly Dictionary<string, string[]> EditedThrough = new(StringComparer.Ordinal)
     {
+        [nameof(SettingsViewModel.DisabledToolPacks)] = [nameof(SettingsViewModel.ToolPackSwitches)],
         [nameof(SettingsViewModel.CredentialProviderType)] =
         [
             nameof(SettingsViewModel.IsCommandProvider),

@@ -5749,6 +5749,31 @@
                                         </Grid.ColumnDefinitions>
                                     <StackPanel>
 
+                                <!-- Tool packs -->
+                                <Border x:Name="Mw_SettingsToolPacksCard" Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
+                                    <StackPanel>
+                                        <TextBlock x:Name="Mw_SettingsToolPacksTitle" Text="{loc:Translate SettingsSectionToolPacks}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,4"/>
+                                        <TextBlock x:Name="Mw_SettingsToolPacksDesc" Text="{loc:Translate SettingsToolPacksIntro}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap" Margin="0,0,0,12"/>
+                                        <ItemsControl x:Name="Mw_SettingsToolPackList" ItemsSource="{Binding Settings.ToolPackSwitches}" IsTabStop="False">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel Margin="0,0,0,12">
+                                                        <CheckBox IsChecked="{Binding IsEnabled}" IsEnabled="{Binding IsEditable}" Content="{Binding Label}" Foreground="{DynamicResource TextPrimaryBrush}"
+                                                                  AutomationProperties.HelpText="{Binding Description}"/>
+                                                        <StackPanel Margin="24,2,0,0">
+                                                            <TextBlock Text="{Binding Description}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap"/>
+                                                            <TextBlock Text="{Binding CountText}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,2,0,0"/>
+                                                            <TextBlock Text="{Binding WarningText}" Visibility="{Binding HasWarning, Converter={StaticResource BoolToVisibilityConverter}}" Foreground="{DynamicResource WarningTextBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                                            <TextBlock Text="{Binding PolicyText}" Visibility="{Binding HasPolicyText, Converter={StaticResource BoolToVisibilityConverter}}" Foreground="{DynamicResource WarningTextBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[DisabledToolPacks]}"/>
+                                    </StackPanel>
+                                </Border>
+
                                 <!-- External Editor -->
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>

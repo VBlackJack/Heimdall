@@ -834,6 +834,23 @@ The registry eliminates three formerly-duplicated lists (menu definitions, palet
 2. One `Entry()` line in `ToolRegistry`
 3. i18n keys in both locale files
 
+### Tool Packs and Availability
+
+Every built-in descriptor names a `ToolPack` (`Core`, `Essentials`, `NetworkDiagnostics`, `Administration`, `Audit`) in its trailing `Pack` member. Detected external tools and test probes leave it null and are always available. The pack is data on the descriptor: the registry still holds the full catalogue (`All`, `GetById`), so a saved entry of a hidden tool keeps its name and icon.
+
+`IToolAvailability` (`Heimdall.App.Services`, a singleton) is the one decision on whether a tool may be used. `GetState(toolId)` returns `Available`, `DisabledByUser`, `ForbiddenByPolicy` or `Unknown`:
+- an id that is not in the registry is `Unknown`; a tool with no pack, or in `Core`, is `Available`
+- the machine policy (`ToolPackPolicy`) beats the user's `AppSettings.DisabledToolPacks`
+- `Core` and pack names this build does not know are ignored when a hand-edited settings file lists them
+- the set of enabled packs is computed once and again on each settings change; `Changed` is raised only when that set differs, on the thread that published the change (a pool thread), so a subscriber that touches the UI marshals itself
+
+The decision is enforced at three points, each before any side effect:
+1. `MainViewModel.OpenToolTabAsync` refuses first, before it reuses an open tab, names the reason in the status bar and returns a `ToolOpenOutcome`. It records the recent tool itself, on a successful open or focus.
+2. `SplitService.SplitSessionWithTool` refuses right after the descriptor lookup, before any pane is built.
+3. `EmbeddedSessionManager.CreateToolControl` throws `ToolUnavailableException` and builds no UI. It is a backstop that is not expected to fire.
+
+The listing surfaces (the Tools tab, the sidebar tree, the command palette and the tool picker) share one projection, `ToolAvailabilityExtensions.ListedTools` and `IsListed`, which keeps the tools whose state is `Available`. Cross-tool menu items ask the same service through `ToolContext` and are offered only when their target is available. The cached Tools tab and sidebar tree are invalidated when `Changed` fires. The Settings panel edits the stored list as `DisabledToolPacks` and applies it on Save like any other setting.
+
 ### IToolView Interface
 
 ```csharp

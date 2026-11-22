@@ -839,6 +839,23 @@ Le registre fusionne en une unique collection ordonnée trois listes auparavant 
 2. Une ligne `Entry()` dans `ToolRegistry`
 3. Des clés i18n dans les deux fichiers de locale
 
+### Packs d'outils et disponibilité
+
+Chaque descripteur intégré nomme un `ToolPack` (`Core`, `Essentials`, `NetworkDiagnostics`, `Administration`, `Audit`) dans son dernier membre, `Pack`. Les outils externes détectés et les sondes de test le laissent nul et sont toujours disponibles. Le pack est une donnée du descripteur : le registre garde le catalogue complet (`All`, `GetById`), si bien qu'une entrée enregistrée d'un outil masqué garde son nom et son icône.
+
+`IToolAvailability` (`Heimdall.App.Services`, singleton) est la décision unique sur la possibilité d'utiliser un outil. `GetState(toolId)` renvoie `Available`, `DisabledByUser`, `ForbiddenByPolicy` ou `Unknown` :
+- un identifiant absent du registre est `Unknown` ; un outil sans pack, ou dans `Core`, est `Available`
+- la politique de la machine (`ToolPackPolicy`) l'emporte sur la liste `AppSettings.DisabledToolPacks` de l'utilisateur
+- `Core` et les noms de pack que cette version ne connaît pas sont ignorés quand un fichier de paramètres modifié à la main les liste
+- l'ensemble des packs activés est calculé une fois, puis à chaque changement de paramètres ; `Changed` n'est levé que si cet ensemble diffère, sur le thread qui a publié le changement (un thread du pool), si bien qu'un abonné qui touche l'interface se charge lui-même du marshaling
+
+La décision est appliquée en trois points, chacun avant tout effet de bord :
+1. `MainViewModel.OpenToolTabAsync` refuse en premier, avant de réutiliser un onglet ouvert, donne la raison dans la barre d'état et renvoie un `ToolOpenOutcome`. Il enregistre lui-même l'outil récent, à l'ouverture ou au focus réussis.
+2. `SplitService.SplitSessionWithTool` refuse juste après la recherche du descripteur, avant la création de tout volet.
+3. `EmbeddedSessionManager.CreateToolControl` lève `ToolUnavailableException` et ne construit aucune interface. C'est un filet de sécurité qui ne devrait pas se déclencher.
+
+Les surfaces de liste (l'onglet Outils, l'arborescence de la barre latérale, la palette de commandes et le sélecteur d'outils) partagent une même projection, `ToolAvailabilityExtensions.ListedTools` et `IsListed`, qui garde les outils dont l'état est `Available`. Les éléments de menu entre outils interrogent le même service via `ToolContext` et ne sont proposés que si leur cible est disponible. L'onglet Outils et l'arborescence de la barre latérale, mis en cache, sont invalidés quand `Changed` est levé. Le panneau Paramètres édite la liste stockée sous le nom `DisabledToolPacks` et l'applique à l'enregistrement comme tout autre paramètre.
+
 ### Interface IToolView
 
 ```csharp

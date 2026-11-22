@@ -38,8 +38,9 @@ internal static class SettingsImportPreview
     /// Settings that decide what runs on this computer: commands, executables, where code is
     /// fetched from, and the shared session files read at every start (a session file names hosts
     /// and the commands typed into them, and a network path is opened with the user's Windows
-    /// sign-in). A settings file is shared between people, and these are the lines an author with
-    /// bad intent would hide among harmless ones.
+    /// sign-in), and the list of switched-off tool packs, which is how the scanning and enumeration
+    /// tools are turned on. A settings file is shared between people, and these are the lines an
+    /// author with bad intent would hide among harmless ones.
     /// </summary>
     internal static readonly IReadOnlySet<string> SensitiveKeys = new HashSet<string>(StringComparer.Ordinal)
     {
@@ -63,6 +64,7 @@ internal static class SettingsImportPreview
         "NanaRunPath",
         "CmdLibGitSyncUrl",
         "SharedSessionSources",
+        "DisabledToolPacks",
     };
 
     private const string ListSeparator = ", ";

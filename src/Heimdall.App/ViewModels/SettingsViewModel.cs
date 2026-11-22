@@ -1454,9 +1454,13 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         Services.SharedSessions.ISharedSessionProvider? sharedSessions = null,
         Services.SharedSessions.SharedSessionSecretStore? sharedSecrets = null,
         IGitIdentityReader? gitIdentityReader = null,
-        SftpSudoFallbackPolicy? sftpSudoFallbackPolicy = null)
+        SftpSudoFallbackPolicy? sftpSudoFallbackPolicy = null,
+        IToolAvailability? toolAvailability = null,
+        ToolRegistry? toolRegistry = null)
     {
         _sftpSudoFallbackPolicy = sftpSudoFallbackPolicy ?? new SftpSudoFallbackPolicy();
+        _toolAvailability = toolAvailability;
+        _toolRegistry = toolRegistry ?? new ToolRegistry();
         _configManager = configManager;
         _gitIdentityReader = gitIdentityReader;
         _sharedSessions = sharedSessions;
@@ -1493,6 +1497,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     {
         RefreshAllDefaultMarkers();
         RefreshSecurityPosture();
+        RefreshToolPackTexts();
 
         // Worded from the localizer and otherwise raised only when their own state moves.
         OnPropertyChanged(nameof(SkippedVersionText));
@@ -1849,6 +1854,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             PreventSleepDuringSession = settings.PreventSleepDuringSession;
             CollapseTunnelsPanelByDefault = settings.CollapseTunnelsPanelByDefault;
             ExternalEditorPath = settings.ExternalEditorPath;
+            DisabledToolPacks = settings.DisabledToolPacks?.ToArray() ?? [];
 
             // Updates
             UpdateCheckEnabled = settings.UpdateCheckEnabled;
@@ -2344,6 +2350,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         settings.PreventSleepDuringSession = PreventSleepDuringSession;
         settings.CollapseTunnelsPanelByDefault = CollapseTunnelsPanelByDefault;
         settings.ExternalEditorPath = ExternalEditorPath;
+        settings.DisabledToolPacks = [.. DisabledToolPacks];
         settings.UpdateCheckEnabled = UpdateCheckEnabled;
         settings.UpdateCheckIntervalHours = UpdateCheckIntervalHours;
 
