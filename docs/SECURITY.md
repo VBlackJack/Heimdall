@@ -661,6 +661,7 @@ same key as the SFTP cap, `HKLM\Software\Policies\Heimdall`:
 | `ToolPackNetworkDiagnostics` | Network diagnostics |
 | `ToolPackAdministration` | Administration |
 | `ToolPackAudit` | Audit and reconnaissance |
+| `ToolPackRecipes` | Recipes |
 
 - `0` forbids the pack. `1` means no restriction. Any other number, and an absent value,
   means no policy for that pack; `2` is reserved for a later "forced on" and is treated as
@@ -691,6 +692,86 @@ everything that resembles a pack's tools. Known limits:
 - Several network diagnostics tools (ping, DNS lookup, WHOIS, HTTP headers, traceroute and the
   certificate inspector) can run their probe on an SSH gateway the user picks, which runs
   commands on a remote host. This is not specific to the Audit pack.
+
+### Recipes
+
+A recipe (see [TOOLS.md](TOOLS.md#recipes)) is a text file, written by someone
+else, that tells Heimdall to run a program already on the computer with a given
+list of arguments. Importing one is a trust decision: from then on, running the
+tool starts that program with those arguments, with your rights. The Recipes
+pack is off by default.
+
+**What protects you.**
+
+- **The import preview is the real barrier.** Before anything is written,
+  Heimdall shows the program as the full path it resolved, then every argument
+  exactly as written in the file, one per line. Control and invisible
+  characters, and every character outside printable ASCII in the program, the
+  arguments and the defaults, are shown as `\uXXXX`. This model assumes the
+  preview is read: the other rules below are limits on what a file can ask for,
+  not a judgment on what it is for.
+- **Structural rules.** The program must be a real `.exe` that Heimdall resolves
+  itself (the operating system search order is never used), and its final
+  location, once links are followed, must lie under the Windows folder, Program
+  Files, Program Files (x86) or a folder you added. It is never started through a
+  shell: the argument list is passed as is, one token being one argument, with
+  no quoting, splitting or joining. No environment variable is expanded. Fixed
+  text that holds a network path, a URL, a `%` or a leading `@` is refused at
+  import, and so is a choice or a default that would always be refused at run
+  time. A typed value is held to a common rule (no control character, no
+  leading `-`, `/` or `@` where it starts an argument, no network or device
+  path in a `path` field) and to the validation of its type.
+- **A seat belt, as a second line only.** A list of names of shells,
+  interpreters and proxy executables (`cmd`, `powershell`, `python`, `rundll32`
+  and the others listed in [TOOLS.md](TOOLS.md#recipes)) is checked on the file
+  name and on the original file name in the version resource. It stops the
+  obvious mistake. It is not a boundary (see below).
+- **The bytes you accepted.** The SHA-256 of the imported file is recorded. A
+  recipe file that was changed afterwards, or dropped into the folder by hand,
+  is not loaded.
+- **The program you accepted.** The path the program resolved to at import is
+  recorded and compared before each run. If the name now leads to another file,
+  or to nothing, the run does not start and the recipe has to be imported again.
+- **A fresh working folder.** Each run gets a new, empty working folder, removed
+  afterwards.
+- **Bounded runs.** At most 1 MiB of output is kept, and a run is stopped at the
+  timeout of the recipe (60 seconds by default, 600 at most).
+- **The policy.** An organisation can forbid the pack (see below).
+
+**What does not protect you.**
+
+- These rules do not make a recipe safe. A legitimate program can do harm through
+  its own arguments: one that deletes, writes, reads or sends what it is told
+  to, does so. A program started by a recipe has the rights and the environment
+  of Heimdall, and an empty working folder does not keep it from using any other
+  folder. Nothing here is a sandbox.
+- The seat belt is a list of names. A copy of an interpreter under another name,
+  with a neutral original file name in its version resource, passes it, and so
+  does a program that is harmless by name but runs other programs or loads
+  plug-ins.
+- There is a window between the check of the program and its start: a file
+  replaced in that interval is not detected. The comparison made before each run
+  is a comparison of paths, so a program replaced in place, at the same path, is
+  not detected either. A folder you add to the list is trusted as a whole: any
+  `.exe` under it can be named by a recipe.
+- The folder rule reads the text of the path. A drive letter that is mapped to a
+  network share is not detected as a network location.
+- Behavior with some unusual path forms (short 8.3 names, substituted drives) and
+  whether ending a run also ends the processes the program started have not been
+  verified by a real test, and nothing is promised about them.
+- A recipe is not signed and not reviewed by the project. The author is a text
+  the file claims, and Heimdall shows it as unverified. A community catalogue is
+  not part of this version: a recipe comes from whoever gives you the file.
+
+**Machine policy.** The value `ToolPackRecipes`, a `REG_DWORD` under
+`HKLM\Software\Policies\Heimdall` (the key of the other pack values, see
+[Tool packs machine policy](#tool-packs-machine-policy)), set to `0`, forbids
+the pack. The pack's switch then shows off and disabled with a line saying it is
+set by the organisation's policy; recipe tools are not listed and are refused
+when something tries to run them; the **Import a recipe...** button is disabled
+and an import is refused. The recipe files already on disk stay where they are.
+As for the other packs, this is a convenience for administrators, not a security
+boundary.
 
 ### Remote upload commit guarantees
 

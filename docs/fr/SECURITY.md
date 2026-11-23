@@ -736,6 +736,7 @@ sous la même clé que le plafond SFTP, `HKLM\Software\Policies\Heimdall` :
 | `ToolPackNetworkDiagnostics` | Diagnostic réseau |
 | `ToolPackAdministration` | Administration |
 | `ToolPackAudit` | Audit et reconnaissance |
+| `ToolPackRecipes` | Recettes |
 
 - `0` interdit le pack. `1` signifie aucune restriction. Tout autre nombre, et une valeur
   absente, signifient aucune politique pour ce pack ; `2` est réservé à un futur "forcé
@@ -769,6 +770,97 @@ Elle n'atteint pas non plus tout ce qui ressemble aux outils d'un pack. Limites 
   et inspecteur de certificats) peuvent exécuter leur sonde sur une passerelle SSH choisie par
   l'utilisateur, ce qui exécute des commandes sur un hôte distant. Cela ne concerne pas
   seulement le pack Audit.
+
+### Recettes
+
+Une recette (voir [TOOLS.md](TOOLS.md#recettes)) est un fichier texte, écrit par
+quelqu'un d'autre, qui demande à Heimdall de lancer un programme déjà présent
+sur l'ordinateur avec une liste d'arguments donnée. En importer une est une
+décision de confiance : à partir de là, lancer l'outil démarre ce programme avec
+ces arguments, avec vos droits. Le pack Recettes est désactivé par défaut.
+
+**Ce qui vous protège.**
+
+- **L'aperçu d'import est la vraie barrière.** Avant que quoi que ce soit soit
+  écrit, Heimdall montre le programme sous la forme du chemin complet qu'il a
+  résolu, puis chaque argument exactement comme écrit dans le fichier, un par
+  ligne. Les caractères de contrôle et invisibles, et tout caractère hors de
+  l'ASCII imprimable dans le programme, les arguments et les valeurs par défaut,
+  sont montrés sous la forme `\uXXXX`. Ce modèle suppose que l'aperçu est lu : les
+  autres règles ci-dessous limitent ce qu'un fichier peut demander, elles ne
+  jugent pas de ce à quoi il sert.
+- **Des règles structurelles.** Le programme doit être un vrai `.exe` que Heimdall
+  résout lui-même (l'ordre de recherche du système d'exploitation n'est jamais
+  utilisé), et son emplacement final, une fois les liens suivis, doit se trouver
+  sous le dossier Windows, Program Files, Program Files (x86) ou un dossier que
+  vous avez ajouté. Il n'est jamais lancé par un interpréteur de commandes : la
+  liste d'arguments est transmise telle quelle, un élément valant un argument,
+  sans guillemets, découpage ni jonction. Aucune variable d'environnement n'est
+  développée. Un texte fixe qui contient un chemin réseau, une URL, un `%` ou un
+  `@` initial est refusé à l'import, comme un choix ou une valeur par défaut qui
+  serait toujours refusé à l'exécution. Une valeur saisie est soumise à une règle
+  commune (aucun caractère de contrôle, aucun `-`, `/` ou `@` initial à l'endroit
+  où elle ouvre un argument, aucun chemin réseau ou de périphérique dans un champ
+  `path`) et à la validation de son type.
+- **Un garde-fou, en seconde ligne seulement.** Une liste de noms
+  d'interpréteurs de commandes, d'interpréteurs de scripts et d'exécutables
+  relais (`cmd`, `powershell`, `python`, `rundll32` et les autres de la liste de
+  [TOOLS.md](TOOLS.md#recettes)) est vérifiée sur le nom de fichier et sur le nom
+  de fichier d'origine de la ressource de version. Il arrête l'erreur évidente.
+  Ce n'est pas une frontière (voir plus bas).
+- **Les octets que vous avez acceptés.** Le SHA-256 du fichier importé est
+  enregistré. Un fichier de recette modifié ensuite, ou déposé à la main dans le
+  dossier, n'est pas chargé.
+- **Le programme que vous avez accepté.** Le chemin auquel le programme s'est
+  résolu à l'import est enregistré et comparé avant chaque exécution. Si le nom
+  mène désormais à un autre fichier, ou à rien, l'exécution ne démarre pas et la
+  recette doit être importée à nouveau.
+- **Un dossier de travail neuf.** Chaque exécution reçoit un dossier de travail
+  neuf et vide, supprimé ensuite.
+- **Des exécutions bornées.** Au plus 1 Mio de sortie est conservé, et une
+  exécution est arrêtée au délai de la recette (60 secondes par défaut, 600 au
+  plus).
+- **La politique.** Une organisation peut interdire le pack (voir plus bas).
+
+**Ce qui ne vous protège pas.**
+
+- Ces règles ne rendent pas une recette sûre. Un programme légitime peut faire du
+  mal par ses propres arguments : celui qui supprime, écrit, lit ou envoie ce
+  qu'on lui dit de supprimer, d'écrire, de lire ou d'envoyer le fait. Un
+  programme lancé par une recette a les droits et l'environnement de Heimdall, et
+  un dossier de travail vide ne l'empêche pas d'utiliser n'importe quel autre
+  dossier. Rien ici n'est un bac à sable.
+- Le garde-fou est une liste de noms. Une copie d'un interpréteur sous un autre
+  nom, avec un nom de fichier d'origine neutre dans sa ressource de version, le
+  franchit, tout comme un programme anodin par son nom mais qui lance d'autres
+  programmes ou charge des modules complémentaires.
+- Il existe une fenêtre entre la vérification du programme et son lancement : un
+  fichier remplacé pendant cet intervalle n'est pas détecté. La comparaison
+  faite avant chaque exécution compare des chemins : un programme remplacé sur
+  place, au même chemin, n'est donc pas détecté non plus. Un dossier que vous
+  ajoutez à la liste est approuvé en entier : n'importe quel `.exe` qu'il
+  contient peut être nommé par une recette.
+- La règle des dossiers lit le texte du chemin. Une lettre de lecteur associée à
+  un partage réseau n'est pas détectée comme un emplacement réseau.
+- Le comportement avec certaines formes de chemin inhabituelles (noms courts
+  8.3, lecteurs substitués) et le fait que l'arrêt d'une exécution arrête aussi
+  les processus que le programme a lancés n'ont pas été vérifiés par un vrai
+  test, et rien n'est promis à leur sujet.
+- Une recette n'est ni signée ni relue par le projet. L'auteur est un texte que
+  le fichier affirme, et Heimdall l'affiche comme non vérifié. Un catalogue
+  communautaire ne fait pas partie de cette version : une recette vient de qui
+  vous donne le fichier.
+
+**Politique de machine.** La valeur `ToolPackRecipes`, une `REG_DWORD` sous
+`HKLM\Software\Policies\Heimdall` (la clé des autres valeurs de pack, voir
+[Politique de machine des packs d'outils](#politique-de-machine-des-packs-doutils)),
+mise à `0`, interdit le pack. L'interrupteur du pack est alors sur arrêt et
+désactivé, avec une ligne qui dit que le pack est défini par la politique de
+l'organisation ; les outils de recette ne sont pas listés et sont refusés
+quand on tente de les lancer ; le bouton **Importer une recette...** est
+désactivé et un import est refusé. Les fichiers de recette déjà sur le disque
+restent où ils sont. Comme pour les autres packs, c'est une commodité pour les
+administrateurs, pas une frontière de sécurité.
 
 ### Garanties de validation des remontées distantes
 
