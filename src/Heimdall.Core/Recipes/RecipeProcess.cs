@@ -30,13 +30,22 @@ internal interface IRecipeProcess : IDisposable
     /// <summary>The exit code; valid once the process has exited.</summary>
     int ExitCode { get; }
 
+    /// <summary>
+    /// True when the process could not be placed in a job that ends its children with the run, so
+    /// that only an interrupted run kills them.
+    /// </summary>
+    bool JobUnavailable { get; }
+
     /// <summary>Closes the standard input so the program sees the end of its input at once.</summary>
     void CloseStandardInput();
 
     /// <summary>Completes when the process has exited; throws <see cref="OperationCanceledException"/> when the token fires first.</summary>
     Task WaitForExitAsync(CancellationToken cancellationToken);
 
-    /// <summary>Kills the process and every process it started. Best effort; never throws.</summary>
+    /// <summary>
+    /// Kills the process and every process it started. Best effort; never throws. Disposing the
+    /// process also ends whatever is left in its job, when it has one.
+    /// </summary>
     void KillTree();
 }
 
@@ -55,15 +64,28 @@ internal sealed class SystemRecipeProcessLauncher : IRecipeProcessLauncher
     public IRecipeProcess Start(ProcessStartInfo startInfo)
     {
         Process process = new() { StartInfo = startInfo };
+        RecipeJob? job = RecipeJob.TryCreate();
         try
         {
             if (!process.Start())
                 throw new InvalidOperationException("The process did not start.");
 
-            return new SystemRecipeProcess(process);
+            // The process is placed in the job right after it starts: Process.Start offers no way to
+            // start it suspended, so a child started in the few instants before this call is not in
+            // the job. A failure (a job that forbids nesting, a process already gone) is not an error
+            // of the run; it is reported as data, and only an interrupted run kills the children then.
+            bool contained = job is not null && job.TryAssign(process);
+            if (!contained)
+            {
+                job?.Dispose();
+                job = null;
+            }
+
+            return new SystemRecipeProcess(process, job);
         }
         catch
         {
+            job?.Dispose();
             process.Dispose();
             throw;
         }
@@ -73,10 +95,15 @@ internal sealed class SystemRecipeProcessLauncher : IRecipeProcessLauncher
     {
         private readonly Process _process;
 
-        public SystemRecipeProcess(Process process)
+        private readonly RecipeJob? _job;
+
+        public SystemRecipeProcess(Process process, RecipeJob? job)
         {
             _process = process;
+            _job = job;
         }
+
+        public bool JobUnavailable => _job is null;
 
         public Stream StandardOutput => _process.StandardOutput.BaseStream;
 
@@ -100,6 +127,7 @@ internal sealed class SystemRecipeProcessLauncher : IRecipeProcessLauncher
 
         public void KillTree()
         {
+            _job?.Terminate();
             try
             {
                 _process.Kill(entireProcessTree: true);
@@ -110,6 +138,12 @@ internal sealed class SystemRecipeProcessLauncher : IRecipeProcessLauncher
             }
         }
 
-        public void Dispose() => _process.Dispose();
+        public void Dispose()
+        {
+            // Closing the job ends every process still in it, which is what keeps a child that
+            // outlived the program from running on after the run.
+            _job?.Dispose();
+            _process.Dispose();
+        }
     }
 }

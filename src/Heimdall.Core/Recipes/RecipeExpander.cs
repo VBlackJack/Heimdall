@@ -58,17 +58,19 @@ public static class RecipeExpander
     /// <param name="values">The typed values keyed by input name; a missing or blank entry means "no value" (a bool is <c>true</c> or <c>false</c>).</param>
     /// <param name="host">The host of the selected session, or null when there is none.</param>
     /// <param name="port">The port of the selected session as text, or null when there is none.</param>
+    /// <param name="converter">What the machine does to a character; the real machine when null.</param>
     /// <exception cref="InvalidOperationException">A token is not well formed, which a validated recipe cannot be.</exception>
     public static RecipeExpansion Expand(
         Recipe recipe,
         IReadOnlyDictionary<string, string?> values,
         string? host = null,
-        string? port = null)
+        string? port = null,
+        IRecipeCharacterConverter? converter = null)
     {
         ArgumentNullException.ThrowIfNull(recipe);
         ArgumentNullException.ThrowIfNull(values);
 
-        Expansion run = new(recipe, host, port);
+        Expansion run = new(recipe, host, port, converter);
         run.ResolveInputs(values);
         run.ExpandArguments();
         return run.Finish();
@@ -76,6 +78,8 @@ public static class RecipeExpander
 
     private sealed class Expansion
     {
+        private readonly IRecipeCharacterConverter? _converter;
+
         private readonly Recipe _recipe;
 
         private readonly string? _host;
@@ -88,8 +92,9 @@ public static class RecipeExpander
 
         private readonly List<RecipeRefusal> _refusals = [];
 
-        public Expansion(Recipe recipe, string? host, string? port)
+        public Expansion(Recipe recipe, string? host, string? port, IRecipeCharacterConverter? converter)
         {
+            _converter = converter;
             _recipe = recipe;
             _host = host;
             _port = port;
@@ -152,7 +157,7 @@ public static class RecipeExpander
                 return;
             }
 
-            if (RecipeValueRule.Check(input, value, placeholderStartsToken: false) != RecipeValueRefusal.None)
+            if (RecipeValueRule.Check(input, value, placeholderStartsToken: false, _converter) != RecipeValueRefusal.None)
             {
                 _refusals.Add(new RecipeRefusal(RecipeValueRefusal.NotABoolean, input.Name, path));
                 _resolved[input.Name] = RecipeFormat.FalseText;
@@ -256,8 +261,10 @@ public static class RecipeExpander
             if (refused)
                 return;
 
+            // The last line of defence: whatever its source, a final argument must not read as a network
+            // path, an NT or device path or a URL, with either separator and in any mix.
             string final = token.ToString();
-            if (ContainsDoubledSeparator(final))
+            if (RecipeText.ContainsNetworkPathShape(final))
             {
                 _refusals.Add(new RecipeRefusal(RecipeValueRefusal.ForbiddenSequenceInArgument, string.Empty, path));
                 return;
@@ -287,12 +294,6 @@ public static class RecipeExpander
 
             return null;
         }
-
-        /// <summary>The last line of defence: a doubled separator or a URL marker can only come from values.</summary>
-        private static bool ContainsDoubledSeparator(string argument)
-            => argument.Contains(@"\\", StringComparison.Ordinal)
-                || argument.Contains("//", StringComparison.Ordinal)
-                || argument.Contains("://", StringComparison.Ordinal);
 
         private string ValueOf(TemplateSegment segment, string path, out bool available)
         {
@@ -324,16 +325,16 @@ public static class RecipeExpander
             switch (segment.Kind)
             {
                 case TemplateSegmentKind.Host:
-                    return RecipeValueRule.CheckHost(value, startsToken);
+                    return RecipeValueRule.CheckHost(value, startsToken, _converter);
                 case TemplateSegmentKind.Port:
-                    return RecipeValueRule.CheckPort(value, startsToken);
+                    return RecipeValueRule.CheckPort(value, startsToken, _converter);
                 default:
                     RecipeInput? input = _recipe.FindInput(segment.Text);
                     if (input is null)
                         throw new InvalidOperationException("The recipe was not validated: a placeholder names no input.");
 
                     // An empty optional value (only possible outside a group) has nothing to check.
-                    return value.Length == 0 ? RecipeValueRefusal.None : RecipeValueRule.Check(input, value, startsToken);
+                    return value.Length == 0 ? RecipeValueRefusal.None : RecipeValueRule.Check(input, value, startsToken, _converter);
             }
         }
 

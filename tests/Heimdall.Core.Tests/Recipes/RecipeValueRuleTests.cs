@@ -23,8 +23,8 @@ public sealed class RecipeValueRuleTests
 {
     private static RecipeInput Field(RecipeInputType type) => RecipeTestData.Input("f", type);
 
-    private static RecipeValueRefusal Check(RecipeInputType type, string? value, bool startsToken = false)
-        => RecipeValueRule.Check(Field(type), value, startsToken);
+    private static RecipeValueRefusal Check(RecipeInputType type, string? value, bool startsToken = false, IRecipeCharacterConverter? converter = null)
+        => RecipeValueRule.Check(Field(type), value, startsToken, converter ?? FakeCharacterConverter.Plain);
 
     [Fact]
     public void AnUnpairedSurrogate_IsRefusedForEveryType()
@@ -87,7 +87,8 @@ public sealed class RecipeValueRuleTests
     [InlineData("a-b")]
     [InlineData("a/b")]
     [InlineData("a@b")]
-    [InlineData(" lead")]
+    [InlineData("a\\b")]
+    [InlineData("a b")]
     public void ADashSlashOrAtInsideTheValue_IsAcceptedEvenAtTokenStart(string value)
     {
         RecipeValueRefusal verdict = Check(RecipeInputType.String, value, startsToken: true);
@@ -144,7 +145,6 @@ public sealed class RecipeValueRuleTests
     [InlineData(@"\rooted\dir")]
     [InlineData("/rooted/dir")]
     [InlineData(@"\")]
-    [InlineData(@"\??\C:\x")]
     public void AnyPathStartingWithASingleSeparator_IsRefusedAsRooted(string path)
     {
         Assert.Equal(RecipeValueRefusal.RootedPath, Check(RecipeInputType.Path, path));
@@ -285,11 +285,10 @@ public sealed class RecipeValueRuleTests
     [Theory]
     [InlineData(" example.com")]
     [InlineData("example.com ")]
-    [InlineData("\u00A0example.com")]
     public void AHostnameWithSurroundingWhitespace_IsRefusedAsIs(string value)
     {
         Assert.Equal(RecipeValueRefusal.SurroundingWhitespace, Check(RecipeInputType.Hostname, value));
-        Assert.Equal(RecipeValueRefusal.SurroundingWhitespace, RecipeValueRule.CheckHost(value, false));
+        Assert.Equal(RecipeValueRefusal.SurroundingWhitespace, RecipeValueRule.CheckHost(value, false, FakeCharacterConverter.Plain));
         Assert.Equal(RecipeValueRefusal.SurroundingWhitespace, Check(RecipeInputType.IpAddress, value));
     }
 

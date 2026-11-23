@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace Heimdall.Core.Recipes;
@@ -30,20 +31,28 @@ public static class RecipeValidator
 
     private static readonly Regex Semver = new(SemverPattern, RegexOptions.NonBacktracking | RegexOptions.CultureInvariant);
 
+    /// <summary>Stands for the value of a placeholder that is not the one being examined.</summary>
+    private const string NeutralValue = "x";
+
     private static readonly int MaxIdLength = (RecipeLimits.MaxIdPartLength * 2) + 1;
 
     /// <summary>Validates a recipe. The errors carry no position, since no source text is known.</summary>
-    public static IReadOnlyList<RecipeError> Validate(Recipe recipe)
+    /// <param name="recipe">The recipe.</param>
+    /// <param name="converter">What the machine does to a character; the real machine when null.</param>
+    public static IReadOnlyList<RecipeError> Validate(Recipe recipe, IRecipeCharacterConverter? converter = null)
     {
         ArgumentNullException.ThrowIfNull(recipe);
-        return Validate(recipe, null);
+        return Validate(recipe, null, converter);
     }
 
     /// <summary>Validates a recipe and attaches the position of each entry when the source is known.</summary>
-    internal static IReadOnlyList<RecipeError> Validate(Recipe recipe, Func<string, RecipePosition?>? positionOf)
+    internal static IReadOnlyList<RecipeError> Validate(
+        Recipe recipe,
+        Func<string, RecipePosition?>? positionOf,
+        IRecipeCharacterConverter? converter = null)
     {
         ArgumentNullException.ThrowIfNull(recipe);
-        return new Run(recipe, positionOf).Execute();
+        return new Run(recipe, positionOf, converter).Execute();
     }
 
     private enum TokenContext
@@ -59,6 +68,8 @@ public static class RecipeValidator
 
         private readonly Func<string, RecipePosition?>? _positionOf;
 
+        private readonly IRecipeCharacterConverter? _converter;
+
         private readonly List<RecipeError> _errors = [];
 
         private readonly Dictionary<string, RecipeInput> _inputs = new(StringComparer.Ordinal);
@@ -67,10 +78,11 @@ public static class RecipeValidator
 
         private int _tokenCount;
 
-        public Run(Recipe recipe, Func<string, RecipePosition?>? positionOf)
+        public Run(Recipe recipe, Func<string, RecipePosition?>? positionOf, IRecipeCharacterConverter? converter)
         {
             _recipe = recipe;
             _positionOf = positionOf;
+            _converter = converter;
         }
 
         public IReadOnlyList<RecipeError> Execute()
@@ -150,8 +162,11 @@ public static class RecipeValidator
             }
         }
 
-        /// <summary>Checks a displayed or fixed text; returns true when it raised no error.</summary>
-        private bool CheckText(string path, string? text, int maxLength, bool forbidden)
+        /// <summary>
+        /// Checks a displayed or fixed text; returns true when it raised no error. A text that becomes
+        /// an argument (<paramref name="argument"/>) is also refused when it holds a look-alike character.
+        /// </summary>
+        private bool CheckText(string path, string? text, int maxLength, bool forbidden, bool argument = false)
         {
             int before = _errors.Count;
             if (string.IsNullOrWhiteSpace(text))
@@ -172,11 +187,21 @@ public static class RecipeValidator
                 return false;
             }
 
+            if (argument && RecipeText.ContainsLookAlikeCharacter(text, _converter))
+            {
+                Add(RecipeErrorCode.ForbiddenLookAlikeCharacter, path, fragment: LookAlikeFragment(text));
+                return false;
+            }
+
             if (forbidden)
                 CheckForbiddenFragments(path, text);
 
             return _errors.Count == before;
         }
+
+        /// <summary>The text with every character outside printable ASCII written as an escape, so that the look-alike can be told from the ASCII one.</summary>
+        private static string LookAlikeFragment(string text)
+            => RecipeText.MakeSafe(RecipeText.Escape(text, escapeNonAscii: true));
 
         private void CheckForbiddenFragments(string path, string text)
         {
@@ -233,20 +258,11 @@ public static class RecipeValidator
                 return;
             }
 
-            if (input.Pattern is not null)
+            if (input.Pattern is not null
+                && CheckText(patternPath, input.Pattern, RecipeLimits.MaxPatternLength, forbidden: false)
+                && !RecipePatterns.IsValid(input.Pattern))
             {
-                if (input.Pattern.Length == 0)
-                {
-                    Add(RecipeErrorCode.EmptyValue, patternPath);
-                }
-                else if (input.Pattern.Length > RecipeLimits.MaxPatternLength)
-                {
-                    Add(RecipeErrorCode.TooLong, patternPath, actual: input.Pattern.Length, limit: RecipeLimits.MaxPatternLength);
-                }
-                else if (!RecipePatterns.IsValid(input.Pattern))
-                {
-                    Add(RecipeErrorCode.InvalidPattern, patternPath, fragment: RecipeText.MakeSafe(input.Pattern));
-                }
+                Add(RecipeErrorCode.InvalidPattern, patternPath, fragment: RecipeText.MakeSafe(input.Pattern));
             }
 
             if (input.MaxLength is int maxLength)
@@ -283,7 +299,7 @@ public static class RecipeValidator
             {
                 string value = input.Choices[index];
                 string valuePath = RecipePath.Index(choicesPath, index);
-                if (CheckText(valuePath, value, RecipeLimits.MaxChoiceLength, forbidden: true) && !seen.Add(value))
+                if (CheckText(valuePath, value, RecipeLimits.MaxChoiceLength, forbidden: true, argument: true) && !seen.Add(value))
                     Add(RecipeErrorCode.DuplicateChoice, valuePath, fragment: RecipeText.MakeSafe(value));
             }
         }
@@ -334,6 +350,12 @@ public static class RecipeValidator
                 return;
             }
 
+            if (RecipeText.ContainsLookAlikeCharacter(value, _converter))
+            {
+                Add(RecipeErrorCode.ForbiddenLookAlikeCharacter, defaultPath, fragment: LookAlikeFragment(value));
+                return;
+            }
+
             int before = _errors.Count;
             CheckForbiddenFragments(defaultPath, value);
             if (_errors.Count > before)
@@ -342,7 +364,7 @@ public static class RecipeValidator
             if (input.Type == RecipeInputType.Choice && (input.Choices is null || input.Choices.Count == 0))
                 return;
 
-            RecipeValueRefusal refusal = RecipeValueRule.Check(input, value, placeholderStartsToken: false);
+            RecipeValueRefusal refusal = RecipeValueRule.Check(input, value, placeholderStartsToken: false, _converter);
             if (refusal == RecipeValueRefusal.None)
                 return;
 
@@ -417,6 +439,12 @@ public static class RecipeValidator
                 return;
             }
 
+            if (RecipeText.ContainsLookAlikeCharacter(token, _converter))
+            {
+                Add(RecipeErrorCode.ForbiddenLookAlikeCharacter, path, fragment: LookAlikeFragment(token));
+                return;
+            }
+
             CheckForbiddenFragments(path, token);
 
             TemplateParse parse = RecipeTemplate.Parse(token);
@@ -434,11 +462,11 @@ public static class RecipeValidator
             {
                 TemplateSegment segment = parse.Segments[index];
                 if (segment.Kind == TemplateSegmentKind.Input)
-                    CheckInputReference(path, segment.Text, context, wholeToken, startsToken: index == 0);
+                    CheckInputReference(path, segment.Text, context, wholeToken, parse, index);
             }
         }
 
-        private void CheckInputReference(string path, string name, TokenContext context, bool wholeToken, bool startsToken)
+        private void CheckInputReference(string path, string name, TokenContext context, bool wholeToken, TemplateParse parse, int segmentIndex)
         {
             if (!_inputs.TryGetValue(name, out RecipeInput? input))
             {
@@ -460,27 +488,75 @@ public static class RecipeValidator
             if (context == TokenContext.Bare && input.IsOptional)
                 Add(RecipeErrorCode.OptionalInputInBareToken, path, name: RecipeText.MakeSafe(name));
 
-            if (startsToken)
-                CheckFixedValues(path, input);
+            CheckFixedValues(path, input, parse, segmentIndex);
         }
 
         /// <summary>
-        /// A value the author fixed (a choice, a default) is checked with the rule the expander applies
-        /// at run time, for the position where the placeholder starts its token, so that a recipe which
-        /// validates cannot carry a choice or a default that is always refused.
+        /// A value the author fixed (a choice, a default) is checked with what the expander does at run
+        /// time at the very place the placeholder stands: the value rule for that position, the
+        /// separator-join check against the literal text just before and after it, and the final-argument
+        /// check on the whole token. A recipe that validates therefore cannot carry a choice or a default
+        /// that is always refused.
         /// </summary>
-        private void CheckFixedValues(string path, RecipeInput input)
+        private void CheckFixedValues(string path, RecipeInput input, TemplateParse parse, int segmentIndex)
         {
             IEnumerable<string> fixedValues = input.Type == RecipeInputType.Choice
                 ? (input.Choices ?? []).Concat(input.Default is null ? [] : [input.Default])
                 : input.Default is null ? [] : [input.Default];
 
+            bool startsToken = segmentIndex == 0;
+            char? before = LiteralNeighbour(parse, segmentIndex - 1, last: true);
+            char? after = LiteralNeighbour(parse, segmentIndex + 1, last: false);
+
             foreach (string value in fixedValues.Distinct(StringComparer.Ordinal))
             {
-                RecipeValueRefusal refusal = RecipeValueRule.Check(input, value, placeholderStartsToken: true);
-                if (refusal is RecipeValueRefusal.LeadingDash or RecipeValueRefusal.LeadingSlash or RecipeValueRefusal.LeadingAt)
+                // A value that is wrong for its own type is reported as an invalid default or choice.
+                if (RecipeValueRule.Check(input, value, placeholderStartsToken: false, _converter) != RecipeValueRefusal.None)
+                    continue;
+
+                RecipeValueRefusal verdict = RecipeValueRule.Check(input, value, startsToken, _converter);
+                if (verdict is RecipeValueRefusal.LeadingDash or RecipeValueRefusal.LeadingSlash or RecipeValueRefusal.LeadingAt)
+                {
                     Add(RecipeErrorCode.FixedValueStartsWithOptionCharacter, path, name: RecipeText.MakeSafe(input.Name), fragment: RecipeText.MakeSafe(value));
+                    continue;
+                }
+
+                bool refused = verdict != RecipeValueRefusal.None
+                    || RecipeValueRule.CheckSeparatorJoin(value, before, after) != RecipeValueRefusal.None
+                    || (RecipeText.ContainsNetworkPathShape(TokenWith(parse, segmentIndex, value))
+                        && !RecipeText.ContainsNetworkPathShape(TokenWith(parse, segmentIndex, NeutralValue)));
+                if (refused)
+                    Add(RecipeErrorCode.FixedValueRefusedAtRun, path, name: RecipeText.MakeSafe(input.Name), fragment: RecipeText.MakeSafe(value));
             }
+        }
+
+        /// <summary>The first or last character of the literal text next to a placeholder; null when the neighbour is not literal text.</summary>
+        private static char? LiteralNeighbour(TemplateParse parse, int index, bool last)
+        {
+            if (index < 0 || index >= parse.Segments.Count)
+                return null;
+
+            TemplateSegment segment = parse.Segments[index];
+            if (segment.Kind != TemplateSegmentKind.Literal || segment.Text.Length == 0)
+                return null;
+
+            return last ? segment.Text[^1] : segment.Text[0];
+        }
+
+        /// <summary>The token as it would be after substitution: the given value at one place, a neutral letter for every other placeholder.</summary>
+        private static string TokenWith(TemplateParse parse, int segmentIndex, string value)
+        {
+            StringBuilder token = new();
+            for (int index = 0; index < parse.Segments.Count; index++)
+            {
+                TemplateSegment segment = parse.Segments[index];
+                if (index == segmentIndex)
+                    token.Append(value);
+                else
+                    token.Append(segment.Kind == TemplateSegmentKind.Literal ? segment.Text : NeutralValue);
+            }
+
+            return token.ToString();
         }
 
         private void CheckLabels()

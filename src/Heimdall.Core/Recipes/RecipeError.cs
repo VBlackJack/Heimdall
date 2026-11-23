@@ -148,6 +148,26 @@ public enum RecipeErrorCode
     /// the input, <c>Fragment</c> the value, <c>Path</c> the token that uses the input.
     /// </summary>
     FixedValueStartsWithOptionCharacter,
+
+    /// <summary>A literal text holds a backslash and a slash in a row, in either order (a network path as Windows reads it).</summary>
+    ForbiddenMixedSeparators,
+
+    /// <summary>A literal text holds the NT object prefix: a separator, <c>??</c> and a separator.</summary>
+    ForbiddenNtPathPrefix,
+
+    /// <summary>
+    /// A text that becomes an argument holds a character that a program reading its command line in
+    /// an ANSI or OEM code page would be handed as an ASCII one (a full-width hyphen, a typographic quote).
+    /// </summary>
+    ForbiddenLookAlikeCharacter,
+
+    /// <summary>
+    /// A choice or a default the author fixed would always be refused at run time, at the place its
+    /// placeholder stands, for a reason other than an option character: it would start with a
+    /// separator or a space there, or join the text around it into a network path or a URL.
+    /// <c>Name</c> is the input, <c>Fragment</c> the value, <c>Path</c> the token that uses the input.
+    /// </summary>
+    FixedValueRefusedAtRun,
 }
 
 /// <summary>A place in the source text, one-based.</summary>

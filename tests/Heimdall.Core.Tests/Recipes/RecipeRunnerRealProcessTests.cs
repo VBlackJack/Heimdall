@@ -30,6 +30,14 @@ public sealed class RecipeRunnerRealProcessTests : IDisposable
 
     private static readonly TimeSpan LeftoverWait = TimeSpan.FromSeconds(10);
 
+    /// <summary>
+    /// How long a child of the program may outlive the run: closing the job ends it at once, so the
+    /// wait is short enough that only that, and not a later garbage collection, can explain a pass.
+    /// </summary>
+    private const long NoCollectionBytes = 16L * 1024 * 1024;
+
+    private static readonly TimeSpan OrphanWait = TimeSpan.FromSeconds(3);
+
     private readonly ScratchFolder _scratch = new();
 
     public void Dispose() => _scratch.Dispose();
@@ -131,6 +139,102 @@ public sealed class RecipeRunnerRealProcessTests : IDisposable
         Assert.Null(result.ExitCode);
         Assert.True(clock.Elapsed < TimeSpan.FromSeconds(60));
         await AssertNoProcessLeftAsync(WaitForName, before);
+    }
+
+    [Fact]
+    public async Task AChildThatTheProgramLeavesRunning_IsEndedWhenTheRunEnds()
+    {
+        // forfiles starts "cmd /c start /b waitfor ..." for the one file that matches: cmd, then
+        // forfiles, exit at once and leave waitfor running for two minutes with no one to wait for it.
+        string forfiles = System32("forfiles.exe");
+        if (!File.Exists(forfiles))
+            return;
+
+        HashSet<int> before = ProcessIds(WaitForName);
+        string[] arguments =
+        [
+            "/P", Environment.SystemDirectory,
+            "/M", "hostname.exe",
+            "/C", "cmd /c start /b waitfor /T 120 HeimdallRecipeTestSignalOrphan",
+        ];
+
+        RecipeRunResult result = await new RecipeRunner().RunAsync(MakeRecipe(timeoutSeconds: 60), forfiles, arguments, EmptyFolder());
+
+        Assert.True(result.Status is RecipeRunStatus.Succeeded or RecipeRunStatus.FailedExitCode, result.Status.ToString());
+        Assert.False(result.JobUnavailable);
+        await AssertNoNewProcessAsync(WaitForName, before, OrphanWait);
+    }
+
+    [Fact]
+    public async Task DisposingTheStartedProcess_EndsItsJob_WithoutWaitingForTheGarbageCollector()
+    {
+        // The job handle also closes when it is finalized, so the garbage collector is held off while
+        // the process is disposed: only the disposal itself can explain the child being gone.
+        HashSet<int> before = ProcessIds(WaitForName);
+        ProcessStartInfo info = new(System32("waitfor.exe"))
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            WorkingDirectory = EmptyFolder(),
+        };
+        info.ArgumentList.Add("/T");
+        info.ArgumentList.Add("120");
+        info.ArgumentList.Add("HeimdallRecipeTestSignalDispose");
+
+        bool held = GC.TryStartNoGCRegion(NoCollectionBytes);
+        try
+        {
+            IRecipeProcess process = new SystemRecipeProcessLauncher().Start(info);
+            Assert.False(process.JobUnavailable);
+            process.Dispose();
+
+            await AssertNoNewProcessAsync(WaitForName, before, OrphanWait);
+        }
+        finally
+        {
+            if (held && System.Runtime.GCSettings.LatencyMode == System.Runtime.GCLatencyMode.NoGCRegion)
+                GC.EndNoGCRegion();
+        }
+    }
+
+    private static HashSet<int> ProcessIds(string name)
+    {
+        Process[] found = Process.GetProcessesByName(name);
+        HashSet<int> ids = [.. found.Select(process => process.Id)];
+        foreach (Process process in found)
+            process.Dispose();
+
+        return ids;
+    }
+
+    /// <summary>Waits for every process named so that was not there before to be gone; kills the ones that are not, then fails.</summary>
+    private static async Task AssertNoNewProcessAsync(string name, HashSet<int> before, TimeSpan wait)
+    {
+        Stopwatch clock = Stopwatch.StartNew();
+        List<int> left = [.. ProcessIds(name).Except(before)];
+        while (left.Count > 0 && clock.Elapsed < wait)
+        {
+            await Task.Delay(100);
+            left = [.. ProcessIds(name).Except(before)];
+        }
+
+        foreach (int id in left)
+        {
+            try
+            {
+                using Process leftover = Process.GetProcessById(id);
+                leftover.Kill(entireProcessTree: true);
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException)
+            {
+                // Gone in the meantime.
+            }
+        }
+
+        Assert.True(left.Count == 0, $"{left.Count} new process(es) named {name} outlived the run.");
     }
 
     [Fact]

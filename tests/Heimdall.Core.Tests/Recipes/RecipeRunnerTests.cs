@@ -110,6 +110,9 @@ internal sealed class FakeRecipeProcess : IRecipeProcess
 
     public int ExitCode => ExitCodeValue;
 
+    /// <summary>What the process reports about its job; false means it was contained.</summary>
+    public bool JobUnavailable { get; set; }
+
     public void CloseStandardInput() => InputClosedCount++;
 
     public Task WaitForExitAsync(CancellationToken cancellationToken) => _exited.Task.WaitAsync(cancellationToken);
@@ -538,6 +541,63 @@ public sealed class RecipeRunnerTests : IDisposable
 
         Assert.Equal(RecipeRunStatus.Cancelled, result.Status);
         Assert.Equal(1, launcher.Process.KillCount);
+        Assert.True(launcher.Process.Disposed);
+    }
+
+    [Fact]
+    public async Task AContainedProcess_ReportsNothingAboutItsJob()
+    {
+        FakeRecipeLauncher launcher = new() { OnStart = process => process.Finish(0) };
+
+        RecipeRunResult result = await Run(launcher, MakeRecipe());
+
+        Assert.True(result.IsSuccess);
+        Assert.False(result.JobUnavailable);
+    }
+
+    [Fact]
+    public async Task AProcessThatCouldNotBePutInAJob_StillRuns_AndTheResultSaysSoAsData()
+    {
+        FakeRecipeLauncher launcher = new() { OnStart = process => { process.JobUnavailable = true; process.Finish(0); } };
+
+        RecipeRunResult succeeded = await Run(launcher, MakeRecipe());
+
+        Assert.True(succeeded.IsSuccess);
+        Assert.True(succeeded.JobUnavailable);
+        Assert.True(launcher.Process.Disposed);
+
+        FakeRecipeLauncher failing = new() { OnStart = process => { process.JobUnavailable = true; process.Finish(5); } };
+        RecipeRunResult failed = await Run(failing, MakeRecipe());
+
+        Assert.Equal(RecipeRunStatus.FailedExitCode, failed.Status);
+        Assert.True(failed.JobUnavailable);
+    }
+
+    [Fact]
+    public async Task AProcessThatCouldNotBePutInAJob_IsStillKilledWhenTheRunIsInterrupted()
+    {
+        FakeRecipeLauncher launcher = new() { OnStart = process => process.JobUnavailable = true };
+        using CancellationTokenSource cancel = new();
+
+        Task<RecipeRunResult> run = Run(launcher, MakeRecipe(), token: cancel.Token);
+        await cancel.CancelAsync();
+        RecipeRunResult result = await run;
+
+        Assert.Equal(RecipeRunStatus.Cancelled, result.Status);
+        Assert.True(result.JobUnavailable);
+        Assert.Equal(1, launcher.Process.KillCount);
+        Assert.True(launcher.Process.Disposed);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(3)]
+    public async Task TheProcessIsDisposedWhateverTheExitCode_WhichIsWhatEndsItsJob(int exitCode)
+    {
+        FakeRecipeLauncher launcher = new() { OnStart = process => process.Finish(exitCode) };
+
+        await Run(launcher, MakeRecipe());
+
         Assert.True(launcher.Process.Disposed);
     }
 

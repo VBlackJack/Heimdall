@@ -40,6 +40,9 @@ public enum RecipeFolderRefusal
     /// <summary>The text holds a control or format character, a percent sign, a wildcard, a stray colon, or a part Windows would silently rename.</summary>
     ForbiddenCharacter,
 
+    /// <summary>The text is the root of a drive (<c>D:\</c>): trusting a whole drive is never what a program folder means.</summary>
+    DriveRoot,
+
     /// <summary>The folder is already in the list.</summary>
     AlreadyListed,
 
@@ -99,6 +102,9 @@ public static class RecipeFolderRule
 
         if (!IsDriveRooted(text))
             return RecipeFolderRefusal.NotAbsolute;
+
+        if (text[DriveRootLength..].TrimEnd(Separators).Length == 0)
+            return RecipeFolderRefusal.DriveRoot;
 
         string[] segments = text[DriveRootLength..].Split(Separators);
         for (int index = 0; index < segments.Length; index++)

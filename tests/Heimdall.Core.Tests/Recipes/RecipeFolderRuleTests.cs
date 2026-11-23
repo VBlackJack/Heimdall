@@ -26,7 +26,6 @@ public sealed class RecipeFolderRuleTests
     [InlineData(@"D:\Tools\")]
     [InlineData("D:/Tools")]
     [InlineData(@"d:\Sysinternals Suite")]
-    [InlineData(@"D:\")]
     [InlineData(@"C:\Program Files (x86)\Vendor")]
     public void AnAbsolutePathOnALocalDriveIsAccepted(string folder)
         => Assert.Equal(RecipeFolderRefusal.None, RecipeFolderRule.Check(folder));

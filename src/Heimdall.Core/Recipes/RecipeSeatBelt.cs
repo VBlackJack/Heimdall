@@ -41,7 +41,13 @@ public static class RecipeSeatBelt
 
     private static readonly char[] TrailingTrim = [' ', '.'];
 
-    /// <summary>File names, without extension, that are refused. Compared ignoring case.</summary>
+    /// <summary>
+    /// File names, without extension, that are refused. Compared ignoring case. This is a second line
+    /// of defence and not a boundary: a tool missing from it is not thereby safe, and the import
+    /// preview, where the user reads the program and every argument, is what decides. Browsers are
+    /// here because their switches start other commands; compilers and script hosts because they run
+    /// what they are given.
+    /// </summary>
     public static readonly FrozenSet<string> RefusedNames = FrozenSet.ToFrozenSet(
         [
             "cmd", "powershell", "pwsh", "bash", "sh", "zsh", "wsl", "cscript", "wscript", "mshta",
@@ -51,6 +57,9 @@ public static class RecipeSeatBelt
             "curl", "ssh", "scp", "sftp", "ftp", "tftp", "git", "tar", "robocopy", "xcopy",
             "expand", "extrac32", "makecab", "hh", "control", "explorer", "conhost", "cmstp",
             "odbcconf", "pcalua", "scriptrunner", "at", "taskkill",
+            "msedge", "chrome", "firefox", "brave", "opera", "SyncAppvPublishingServer", "wt",
+            "tttracer", "pcwrun", "esentutl", "replace", "mmc", "msdt", "runas", "dotnet",
+            "csc", "vbc", "jsc", "ie4uinit", "presentationhost",
         ],
         StringComparer.OrdinalIgnoreCase);
 

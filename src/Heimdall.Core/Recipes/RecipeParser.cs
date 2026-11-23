@@ -29,7 +29,9 @@ public static class RecipeParser
     private static readonly byte[] Utf8Bom = [0xEF, 0xBB, 0xBF];
 
     /// <summary>Parses and validates a recipe from text.</summary>
-    public static RecipeParseResult Parse(string? text)
+    /// <param name="text">The file text.</param>
+    /// <param name="converter">What the machine does to a character; the real machine when null.</param>
+    public static RecipeParseResult Parse(string? text, IRecipeCharacterConverter? converter = null)
     {
         if (string.IsNullOrEmpty(text))
             return RecipeParseResult.Failure([new RecipeError(RecipeErrorCode.EmptyDocument)]);
@@ -38,11 +40,13 @@ public static class RecipeParser
         if (text.Length > RecipeLimits.MaxFileBytes)
             return Oversize(Encoding.UTF8.GetByteCount(text));
 
-        return Parse(Encoding.UTF8.GetBytes(text));
+        return Parse(Encoding.UTF8.GetBytes(text), converter);
     }
 
     /// <summary>Parses and validates a recipe from UTF-8 bytes (a byte order mark is tolerated).</summary>
-    public static RecipeParseResult Parse(ReadOnlySpan<byte> utf8)
+    /// <param name="utf8">The file bytes.</param>
+    /// <param name="converter">What the machine does to a character; the real machine when null.</param>
+    public static RecipeParseResult Parse(ReadOnlySpan<byte> utf8, IRecipeCharacterConverter? converter = null)
     {
         if (utf8.Length > RecipeLimits.MaxFileBytes)
             return Oversize(utf8.Length);
@@ -66,7 +70,7 @@ public static class RecipeParser
         if (recipe is null || errors.Count > 0)
             return RecipeParseResult.Failure(Cap(errors));
 
-        IReadOnlyList<RecipeError> problems = RecipeValidator.Validate(recipe, mapper.PositionOf);
+        IReadOnlyList<RecipeError> problems = RecipeValidator.Validate(recipe, mapper.PositionOf, converter);
         return problems.Count == 0
             ? RecipeParseResult.Success(recipe)
             : RecipeParseResult.Failure(Cap(problems));

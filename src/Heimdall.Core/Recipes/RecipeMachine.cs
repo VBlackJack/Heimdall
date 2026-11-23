@@ -15,6 +15,8 @@
  */
 
 using System.Diagnostics;
+using System.Security.AccessControl;
+using System.Security.Principal;
 
 namespace Heimdall.Core.Recipes;
 
@@ -49,6 +51,12 @@ public interface IRecipeMachine
     /// or it cannot be read. Reading it never executes the file.
     /// </summary>
     string? ReadOriginalFileName(string path);
+
+    /// <summary>
+    /// The permission entries that allow something on a file or a folder, read without opening it
+    /// for writing; null when they cannot be read. Entries that deny are left out.
+    /// </summary>
+    IReadOnlyList<RecipeAccessRule>? ReadAllowRules(string path);
 }
 
 /// <summary>The real machine.</summary>
@@ -90,6 +98,37 @@ public sealed class RecipeMachine : IRecipeMachine
             return string.IsNullOrWhiteSpace(name) ? null : name;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException)
+        {
+            return null;
+        }
+    }
+
+    /// <inheritdoc />
+    public IReadOnlyList<RecipeAccessRule>? ReadAllowRules(string path)
+    {
+        if (!OperatingSystem.IsWindows())
+            return null;
+
+        try
+        {
+            // Only the permission list is requested, and the item is opened for reading its security.
+            FileSystemSecurity security = Directory.Exists(path)
+                ? new DirectoryInfo(path).GetAccessControl(AccessControlSections.Access)
+                : new FileInfo(path).GetAccessControl(AccessControlSections.Access);
+
+            List<RecipeAccessRule> rules = [];
+            foreach (FileSystemAccessRule rule in security.GetAccessRules(true, true, typeof(SecurityIdentifier)))
+            {
+                if (rule.AccessControlType != AccessControlType.Allow)
+                    continue;
+
+                bool inheritOnly = (rule.PropagationFlags & PropagationFlags.InheritOnly) != 0;
+                rules.Add(new RecipeAccessRule(rule.IdentityReference.Value, (int)rule.FileSystemRights, inheritOnly));
+            }
+
+            return rules;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException or PlatformNotSupportedException)
         {
             return null;
         }

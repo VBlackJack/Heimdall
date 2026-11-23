@@ -23,6 +23,16 @@ public sealed class RecipeExpanderTests
 {
     private static readonly IReadOnlyDictionary<string, string?> NoValues = new Dictionary<string, string?>();
 
+    private static IRecipeCharacterConverter Plain => FakeCharacterConverter.Plain;
+
+    private static RecipeExpansion Expand(
+        Recipe recipe,
+        IReadOnlyDictionary<string, string?> values,
+        string? host = null,
+        string? port = null,
+        IRecipeCharacterConverter? converter = null)
+        => RecipeExpander.Expand(recipe, values, host, port, converter ?? Plain);
+
     private static IReadOnlyDictionary<string, string?> Values(params (string Name, string? Value)[] entries)
         => entries.ToDictionary(entry => entry.Name, entry => entry.Value);
 
@@ -31,7 +41,7 @@ public sealed class RecipeExpanderTests
 
     private static Recipe Checked(Recipe recipe)
     {
-        Assert.Empty(RecipeValidator.Validate(recipe));
+        Assert.Empty(RecipeValidator.Validate(recipe, Plain));
         return recipe;
     }
 
@@ -45,14 +55,13 @@ public sealed class RecipeExpanderTests
         { "a\\\"b" },
         { "x\\" },
         { "C:\\path with space\\" },
-        { "\\\"" },
         { "caf\u00E9 \u00FC\u00F1" },
         { "a'b" },
         { "a;b|c&d" },
         { "a^b!c" },
         { "a$b`c" },
         { "(x)" },
-        { " leading and trailing " },
+        { "trailing " },
         { "*.txt" },
         { "a=b" },
     };
@@ -63,7 +72,7 @@ public sealed class RecipeExpanderTests
     {
         Recipe recipe = Checked(RecipeTestData.With([Text("v", required: true)], RecipeArgument.Bare("{in:v}")));
 
-        RecipeExpansion result = RecipeExpander.Expand(recipe, Values(("v", value)));
+        RecipeExpansion result = Expand(recipe, Values(("v", value)));
 
         Assert.True(result.Succeeded);
         string argument = Assert.Single(result.Arguments);
@@ -71,13 +80,22 @@ public sealed class RecipeExpanderTests
         Assert.Equal(System.Text.Encoding.UTF8.GetBytes(value), System.Text.Encoding.UTF8.GetBytes(argument));
     }
 
+    /// <summary>Values that are fine inside a token but cannot start one: a backslash or a space first.</summary>
+    public static TheoryData<string> ValuesThatCannotStartAToken => new()
+    {
+        { "\\\"" },
+        { " leading and trailing " },
+        { "\\" },
+    };
+
     [Theory]
     [MemberData(nameof(AwkwardValues))]
+    [MemberData(nameof(ValuesThatCannotStartAToken))]
     public void AValueInsideAToken_StaysInsideThatOneArgument(string value)
     {
         Recipe recipe = Checked(RecipeTestData.With([Text("v", required: true)], RecipeArgument.Bare("--name={in:v}"), RecipeArgument.Bare("after")));
 
-        RecipeExpansion result = RecipeExpander.Expand(recipe, Values(("v", value)));
+        RecipeExpansion result = Expand(recipe, Values(("v", value)));
 
         Assert.True(result.Succeeded);
         Assert.Equal(["--name=" + value, "after"], result.Arguments);
@@ -91,7 +109,7 @@ public sealed class RecipeExpanderTests
             Arguments = [RecipeArgument.Bare("-n"), RecipeArgument.Bare("/all"), RecipeArgument.Group(["--x", "two words"])],
         });
 
-        RecipeExpansion result = RecipeExpander.Expand(recipe, NoValues);
+        RecipeExpansion result = Expand(recipe, NoValues);
 
         Assert.Equal(["-n", "/all", "--x", "two words"], result.Arguments);
     }
@@ -105,10 +123,10 @@ public sealed class RecipeExpanderTests
             RecipeArgument.Group(["--extra", "{in:extra}"]),
             RecipeArgument.Bare("last")));
 
-        RecipeExpansion dropped = RecipeExpander.Expand(recipe, NoValues);
-        RecipeExpansion blank = RecipeExpander.Expand(recipe, Values(("extra", "   ")));
-        RecipeExpansion nullValue = RecipeExpander.Expand(recipe, Values(("extra", null)));
-        RecipeExpansion kept = RecipeExpander.Expand(recipe, Values(("extra", "value")));
+        RecipeExpansion dropped = Expand(recipe, NoValues);
+        RecipeExpansion blank = Expand(recipe, Values(("extra", "   ")));
+        RecipeExpansion nullValue = Expand(recipe, Values(("extra", null)));
+        RecipeExpansion kept = Expand(recipe, Values(("extra", "value")));
 
         Assert.Equal(["first", "last"], dropped.Arguments);
         Assert.Equal(["first", "last"], blank.Arguments);
@@ -123,9 +141,9 @@ public sealed class RecipeExpanderTests
             [Text("a"), Text("b")],
             RecipeArgument.Group(["{in:a}", "{in:b}"])));
 
-        Assert.Empty(RecipeExpander.Expand(recipe, Values(("a", "x"))).Arguments);
-        Assert.Empty(RecipeExpander.Expand(recipe, Values(("b", "y"))).Arguments);
-        Assert.Equal(["x", "y"], RecipeExpander.Expand(recipe, Values(("a", "x"), ("b", "y"))).Arguments);
+        Assert.Empty(Expand(recipe, Values(("a", "x"))).Arguments);
+        Assert.Empty(Expand(recipe, Values(("b", "y"))).Arguments);
+        Assert.Equal(["x", "y"], Expand(recipe, Values(("a", "x"), ("b", "y"))).Arguments);
     }
 
     [Fact]
@@ -135,7 +153,7 @@ public sealed class RecipeExpanderTests
             [Text("req", required: true), Text("dflt", defaultValue: "d")],
             RecipeArgument.Group(["--a", "{in:req}", "--b={in:dflt}"])));
 
-        RecipeExpansion result = RecipeExpander.Expand(recipe, Values(("req", "r")));
+        RecipeExpansion result = Expand(recipe, Values(("req", "r")));
 
         Assert.Equal(["--a", "r", "--b=d"], result.Arguments);
     }
@@ -147,9 +165,9 @@ public sealed class RecipeExpanderTests
             [RecipeTestData.Input("count", RecipeInputType.Int, defaultValue: "4")],
             RecipeArgument.Group(["-n", "{in:count}"])));
 
-        Assert.Equal(["-n", "4"], RecipeExpander.Expand(recipe, NoValues).Arguments);
-        Assert.Equal(["-n", "4"], RecipeExpander.Expand(recipe, Values(("count", " "))).Arguments);
-        Assert.Equal(["-n", "9"], RecipeExpander.Expand(recipe, Values(("count", "9"))).Arguments);
+        Assert.Equal(["-n", "4"], Expand(recipe, NoValues).Arguments);
+        Assert.Equal(["-n", "4"], Expand(recipe, Values(("count", " "))).Arguments);
+        Assert.Equal(["-n", "9"], Expand(recipe, Values(("count", "9"))).Arguments);
     }
 
     [Fact]
@@ -157,7 +175,7 @@ public sealed class RecipeExpanderTests
     {
         Recipe recipe = Checked(RecipeTestData.With([Text("v", required: true)], RecipeArgument.Bare("{in:v}")));
 
-        RecipeExpansion result = RecipeExpander.Expand(recipe, NoValues);
+        RecipeExpansion result = Expand(recipe, NoValues);
 
         Assert.False(result.Succeeded);
         Assert.Empty(result.Arguments);
@@ -173,10 +191,10 @@ public sealed class RecipeExpanderTests
         RecipeInput flag = RecipeTestData.Input("flag", RecipeInputType.Bool) with { WhenTrue = ["-v", "--level", "3"] };
         Recipe recipe = Checked(RecipeTestData.With([flag], RecipeArgument.Bare("before"), RecipeArgument.Bare("{in:flag}"), RecipeArgument.Bare("after")));
 
-        Assert.Equal(["before", "-v", "--level", "3", "after"], RecipeExpander.Expand(recipe, Values(("flag", "true"))).Arguments);
-        Assert.Equal(["before", "-v", "--level", "3", "after"], RecipeExpander.Expand(recipe, Values(("flag", "TRUE"))).Arguments);
-        Assert.Equal(["before", "after"], RecipeExpander.Expand(recipe, Values(("flag", "false"))).Arguments);
-        Assert.Equal(["before", "after"], RecipeExpander.Expand(recipe, NoValues).Arguments);
+        Assert.Equal(["before", "-v", "--level", "3", "after"], Expand(recipe, Values(("flag", "true"))).Arguments);
+        Assert.Equal(["before", "-v", "--level", "3", "after"], Expand(recipe, Values(("flag", "TRUE"))).Arguments);
+        Assert.Equal(["before", "after"], Expand(recipe, Values(("flag", "false"))).Arguments);
+        Assert.Equal(["before", "after"], Expand(recipe, NoValues).Arguments);
     }
 
     [Fact]
@@ -185,8 +203,8 @@ public sealed class RecipeExpanderTests
         RecipeInput flag = RecipeTestData.Input("flag", RecipeInputType.Bool, defaultValue: "true") with { WhenTrue = ["-v"] };
         Recipe recipe = Checked(RecipeTestData.With([flag], RecipeArgument.Bare("{in:flag}")));
 
-        Assert.Equal(["-v"], RecipeExpander.Expand(recipe, NoValues).Arguments);
-        Assert.Empty(RecipeExpander.Expand(recipe, Values(("flag", "false"))).Arguments);
+        Assert.Equal(["-v"], Expand(recipe, NoValues).Arguments);
+        Assert.Empty(Expand(recipe, Values(("flag", "false"))).Arguments);
     }
 
     [Fact]
@@ -195,7 +213,7 @@ public sealed class RecipeExpanderTests
         RecipeInput flag = RecipeTestData.Input("flag", RecipeInputType.Bool) with { WhenTrue = ["-v"] };
         Recipe recipe = Checked(RecipeTestData.With([flag], RecipeArgument.Bare("{in:flag}")));
 
-        RecipeExpansion result = RecipeExpander.Expand(recipe, Values(("flag", "maybe")));
+        RecipeExpansion result = Expand(recipe, Values(("flag", "maybe")));
 
         Assert.Equal(RecipeValueRefusal.NotABoolean, Assert.Single(result.Refusals).Reason);
     }
@@ -206,8 +224,8 @@ public sealed class RecipeExpanderTests
         RecipeInput flag = RecipeTestData.Input("flag", RecipeInputType.Bool) with { WhenTrue = ["--tag", "{in:tag}"] };
         Recipe recipe = Checked(RecipeTestData.With([flag, Text("tag")], RecipeArgument.Bare("{in:flag}")));
 
-        Assert.Empty(RecipeExpander.Expand(recipe, Values(("flag", "true"))).Arguments);
-        Assert.Equal(["--tag", "x"], RecipeExpander.Expand(recipe, Values(("flag", "true"), ("tag", "x"))).Arguments);
+        Assert.Empty(Expand(recipe, Values(("flag", "true"))).Arguments);
+        Assert.Equal(["--tag", "x"], Expand(recipe, Values(("flag", "true"), ("tag", "x"))).Arguments);
     }
 
     [Theory]
@@ -221,7 +239,7 @@ public sealed class RecipeExpanderTests
     {
         Recipe recipe = Checked(WithBare(token));
 
-        RecipeExpansion result = RecipeExpander.Expand(recipe, NoValues, host: "h", port: "1");
+        RecipeExpansion result = Expand(recipe, NoValues, host: "h", port: "1");
 
         Assert.Equal([expected], result.Arguments);
     }
@@ -237,7 +255,7 @@ public sealed class RecipeExpanderTests
             Arguments = [RecipeArgument.Bare("{Host}"), RecipeArgument.Group(["-p", "{Port}"]), RecipeArgument.Bare("--addr={Host}:{Port}")],
         });
 
-        RecipeExpansion result = RecipeExpander.Expand(recipe, NoValues, "server01.example.com", "2222");
+        RecipeExpansion result = Expand(recipe, NoValues, "server01.example.com", "2222");
 
         Assert.Equal(["server01.example.com", "-p", "2222", "--addr=server01.example.com:2222"], result.Arguments);
     }
@@ -247,7 +265,7 @@ public sealed class RecipeExpanderTests
     {
         Recipe recipe = Checked(RecipeTestData.Minimal() with { Arguments = [RecipeArgument.Bare("{Host}"), RecipeArgument.Bare("{Port}")] });
 
-        RecipeExpansion result = RecipeExpander.Expand(recipe, NoValues);
+        RecipeExpansion result = Expand(recipe, NoValues);
 
         Assert.False(result.Succeeded);
         Assert.Equal(2, result.Refusals.Count);
@@ -264,7 +282,7 @@ public sealed class RecipeExpanderTests
     {
         Recipe recipe = Checked(RecipeTestData.Minimal() with { Arguments = [RecipeArgument.Bare("{Host}"), RecipeArgument.Bare("{Port}")] });
 
-        RecipeExpansion result = RecipeExpander.Expand(recipe, NoValues, host, port);
+        RecipeExpansion result = Expand(recipe, NoValues, host, port);
 
         Assert.False(result.Succeeded);
         RecipeRefusal refusal = Assert.Single(result.Refusals);
@@ -282,8 +300,8 @@ public sealed class RecipeExpanderTests
             [Text("v", required: true)],
             RecipeArgument.Bare("--value={in:v}")));
 
-        RecipeExpansion atStart = RecipeExpander.Expand(recipe, Values(("v", "-rf")));
-        RecipeExpansion embedded = RecipeExpander.Expand(inside, Values(("v", "-rf")));
+        RecipeExpansion atStart = Expand(recipe, Values(("v", "-rf")));
+        RecipeExpansion embedded = Expand(inside, Values(("v", "-rf")));
 
         Assert.Equal(RecipeValueRefusal.LeadingDash, Assert.Single(atStart.Refusals).Reason);
         Assert.Equal("arguments[0]", atStart.Refusals[0].Path);
@@ -295,7 +313,7 @@ public sealed class RecipeExpanderTests
     {
         Recipe recipe = Checked(RecipeTestData.With([Text("v", required: true)], RecipeArgument.Bare("{{{in:v}")));
 
-        RecipeExpansion result = RecipeExpander.Expand(recipe, Values(("v", "-x")));
+        RecipeExpansion result = Expand(recipe, Values(("v", "-x")));
 
         Assert.Equal(["{-x"], result.Arguments);
     }
@@ -308,7 +326,7 @@ public sealed class RecipeExpanderTests
             RecipeArgument.Bare("{in:a}"),
             RecipeArgument.Group(["-n", "{in:n}"])));
 
-        RecipeExpansion result = RecipeExpander.Expand(recipe, Values(("a", "/c"), ("n", "x")));
+        RecipeExpansion result = Expand(recipe, Values(("a", "/c"), ("n", "x")));
 
         Assert.Equal(2, result.Refusals.Count);
         Assert.Contains(result.Refusals, r => r is { Reason: RecipeValueRefusal.LeadingSlash, Subject: "a", Path: "arguments[0]" });
@@ -321,7 +339,7 @@ public sealed class RecipeExpanderTests
     {
         Recipe recipe = Checked(RecipeTestData.With([Text("v", required: true)], RecipeArgument.Bare("x{in:v}")));
 
-        RecipeExpansion result = RecipeExpander.Expand(recipe, Values(("v", "a\u202Eb")));
+        RecipeExpansion result = Expand(recipe, Values(("v", "a\u202Eb")));
 
         Assert.Equal(RecipeValueRefusal.ControlCharacter, Assert.Single(result.Refusals).Reason);
     }
@@ -333,8 +351,8 @@ public sealed class RecipeExpanderTests
             [RecipeTestData.Input("p", RecipeInputType.Path, required: true)],
             RecipeArgument.Bare("--file={in:p}")));
 
-        Assert.Equal(["--file=C:\\data\\x.txt"], RecipeExpander.Expand(recipe, Values(("p", "C:\\data\\x.txt"))).Arguments);
-        Assert.Equal(RecipeValueRefusal.UncPath, Assert.Single(RecipeExpander.Expand(recipe, Values(("p", "\\\\srv\\share"))).Refusals).Reason);
+        Assert.Equal(["--file=C:\\data\\x.txt"], Expand(recipe, Values(("p", "C:\\data\\x.txt"))).Arguments);
+        Assert.Equal(RecipeValueRefusal.UncPath, Assert.Single(Expand(recipe, Values(("p", "\\\\srv\\share"))).Refusals).Reason);
     }
 
     [Fact]
@@ -343,9 +361,9 @@ public sealed class RecipeExpanderTests
         RecipeInput mode = RecipeTestData.Input("mode", RecipeInputType.Choice, defaultValue: "fast") with { Choices = ["fast", "slow"] };
         Recipe recipe = Checked(RecipeTestData.With([mode], RecipeArgument.Bare("--mode={in:mode}")));
 
-        Assert.Equal(["--mode=fast"], RecipeExpander.Expand(recipe, NoValues).Arguments);
-        Assert.Equal(["--mode=slow"], RecipeExpander.Expand(recipe, Values(("mode", "slow"))).Arguments);
-        Assert.Equal(RecipeValueRefusal.NotInChoices, Assert.Single(RecipeExpander.Expand(recipe, Values(("mode", "other"))).Refusals).Reason);
+        Assert.Equal(["--mode=fast"], Expand(recipe, NoValues).Arguments);
+        Assert.Equal(["--mode=slow"], Expand(recipe, Values(("mode", "slow"))).Arguments);
+        Assert.Equal(RecipeValueRefusal.NotInChoices, Assert.Single(Expand(recipe, Values(("mode", "other"))).Refusals).Reason);
     }
 
     [Fact]
@@ -353,7 +371,7 @@ public sealed class RecipeExpanderTests
     {
         Recipe recipe = Checked(RecipeTestData.Minimal() with { Arguments = [RecipeArgument.Bare("x")] });
 
-        Assert.Equal(["x"], RecipeExpander.Expand(recipe, Values(("ghost", "boo"))).Arguments);
+        Assert.Equal(["x"], Expand(recipe, Values(("ghost", "boo"))).Arguments);
     }
 
     [Fact]
@@ -362,8 +380,8 @@ public sealed class RecipeExpanderTests
         Recipe recipe = RecipeTestData.ParseValid(RecipeTestData.FullJson);
         IReadOnlyDictionary<string, string?> values = Values(("target", "server1"), ("verbose", "true"), ("extra", "abc"));
 
-        RecipeExpansion first = RecipeExpander.Expand(recipe, values, "h", "22");
-        RecipeExpansion second = RecipeExpander.Expand(recipe, values, "h", "22");
+        RecipeExpansion first = Expand(recipe, values, "h", "22");
+        RecipeExpansion second = Expand(recipe, values, "h", "22");
 
         Assert.True(first.Succeeded);
         Assert.Equal(first.Arguments, second.Arguments);
@@ -377,7 +395,7 @@ public sealed class RecipeExpanderTests
             [RecipeTestData.Input("p", RecipeInputType.Path, required: true)],
             RecipeArgument.Bare(@"--file=\{in:p}")));
 
-        RecipeExpansion result = RecipeExpander.Expand(recipe, Values(("p", @"\srv\share")));
+        RecipeExpansion result = Expand(recipe, Values(("p", @"\srv\share")));
 
         Assert.False(result.Succeeded);
         Assert.Equal(RecipeValueRefusal.RootedPath, Assert.Single(result.Refusals).Reason);
@@ -392,7 +410,7 @@ public sealed class RecipeExpanderTests
     {
         Recipe recipe = Checked(RecipeTestData.With([Text("v", required: true)], RecipeArgument.Bare(token)));
 
-        RecipeExpansion result = RecipeExpander.Expand(recipe, Values(("v", value)));
+        RecipeExpansion result = Expand(recipe, Values(("v", value)));
 
         Assert.Equal(RecipeValueRefusal.SeparatorJoin, Assert.Single(result.Refusals).Reason);
         Assert.Empty(result.Arguments);
@@ -406,7 +424,7 @@ public sealed class RecipeExpanderTests
     {
         Recipe recipe = Checked(RecipeTestData.With([Text("v", required: true)], RecipeArgument.Bare(token)));
 
-        RecipeExpansion result = RecipeExpander.Expand(recipe, Values(("v", value)));
+        RecipeExpansion result = Expand(recipe, Values(("v", value)));
 
         Assert.Equal(RecipeValueRefusal.SeparatorJoin, Assert.Single(result.Refusals).Reason);
     }
@@ -416,8 +434,8 @@ public sealed class RecipeExpanderTests
     {
         Recipe recipe = Checked(RecipeTestData.With([Text("a", required: true), Text("b", required: true)], RecipeArgument.Bare("{in:a}{in:b}")));
 
-        RecipeExpansion refused = RecipeExpander.Expand(recipe, Values(("a", "dir/"), ("b", "/file")));
-        RecipeExpansion accepted = RecipeExpander.Expand(recipe, Values(("a", "dir/"), ("b", "file")));
+        RecipeExpansion refused = Expand(recipe, Values(("a", "dir/"), ("b", "/file")));
+        RecipeExpansion accepted = Expand(recipe, Values(("a", "dir/"), ("b", "file")));
 
         Assert.NotEmpty(refused.Refusals);
         Assert.All(refused.Refusals, refusal => Assert.Equal(RecipeValueRefusal.SeparatorJoin, refusal.Reason));
@@ -429,7 +447,7 @@ public sealed class RecipeExpanderTests
     {
         Recipe recipe = Checked(RecipeTestData.With([Text("a", required: true), Text("b", required: true)], RecipeArgument.Bare(@"--p={in:a}\{in:b}")));
 
-        RecipeExpansion result = RecipeExpander.Expand(recipe, Values(("a", "dir"), ("b", "file.txt")));
+        RecipeExpansion result = Expand(recipe, Values(("a", "dir"), ("b", "file.txt")));
 
         Assert.Equal([@"--p=dir\file.txt"], result.Arguments);
     }
@@ -443,7 +461,7 @@ public sealed class RecipeExpanderTests
     {
         Recipe recipe = Checked(RecipeTestData.With([Text("v", required: true)], RecipeArgument.Bare("--v={in:v}")));
 
-        RecipeExpansion result = RecipeExpander.Expand(recipe, Values(("v", value)));
+        RecipeExpansion result = Expand(recipe, Values(("v", value)));
 
         Assert.False(result.Succeeded);
         RecipeRefusal refusal = Assert.Single(result.Refusals);
@@ -457,6 +475,6 @@ public sealed class RecipeExpanderTests
     {
         Recipe broken = RecipeTestData.Minimal() with { Arguments = [RecipeArgument.Bare("{oops")] };
 
-        Assert.Throws<InvalidOperationException>(() => RecipeExpander.Expand(broken, NoValues));
+        Assert.Throws<InvalidOperationException>(() => Expand(broken, NoValues));
     }
 }

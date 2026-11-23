@@ -6841,5 +6841,14 @@
   "RecipeImportReplaceArgumentsSame": "Argumentos: sin cambios",
   "RecipeImportReplaceArgumentsChanged": "Argumentos: modificados, l\u00e9alos m\u00e1s abajo",
   "RecipeImportReplaceFieldsSame": "Campos: sin cambios",
-  "RecipeImportReplaceFieldsChanged": "Campos: modificados, l\u00e9alos m\u00e1s abajo"
+  "RecipeImportReplaceFieldsChanged": "Campos: modificados, l\u00e9alos m\u00e1s abajo",
+  "RecipeRefusalLookAlikeCharacter": "El valor contiene un car\u00e1cter que se parece a uno normal (una comilla tipogr\u00e1fica, un guion largo, una letra de ancho completo o un espacio de no separaci\u00f3n). Vuelva a escribirlo con caracteres normales del teclado.",
+  "RecipeRefusalLeadingBackslash": "El valor no debe empezar por una barra invertida.",
+  "RecipeErrorForbiddenMixedSeparators": "Una barra invertida junto a una barra (una ruta de red) no se permite en el texto fijo de una receta.",
+  "RecipeErrorForbiddenNtPathPrefix": "Un separador de ruta seguido de dos signos de interrogaci\u00f3n y de otro separador (un prefijo de ruta del sistema) no se permite en el texto fijo de una receta.",
+  "RecipeErrorForbiddenLookAlikeCharacter": "El texto contiene un car\u00e1cter que se parece a uno normal, como una comilla tipogr\u00e1fica, un guion largo o una letra de ancho completo: {4}. Sustit\u00fayalo por un car\u00e1cter normal.",
+  "RecipeErrorFixedValueRefusedAtRun": "El valor fijo \"{4}\" del campo \"{1}\" siempre se rechazar\u00eda al ejecutar, en {0}: no debe empezar por un espacio ni por una barra invertida justo donde el campo abre un argumento, ni formar un separador doble con el texto contiguo (por ejemplo, un valor que termina en barra antes de un texto que empieza por otra). Cambie el valor o el texto que rodea al campo.",
+  "RecipeProgramRefusalWritableByUser": "El programa \"{0}\" est\u00e1 en un lugar que un usuario que no es administrador puede modificar. Mu\u00e9valo a una carpeta protegida o, si conf\u00eda en \u00e9l, a\u00f1ada su carpeta a las carpetas de programas permitidas.",
+  "RecipeProgramRefusalCannotReadPermissions": "No se pudieron leer los permisos del programa \"{0}\" ni los de las carpetas que lo contienen.",
+  "RecipeFolderRefusalDriveRoot": "No se puede a\u00f1adir una unidad entera: elija una carpeta de ella."
 }

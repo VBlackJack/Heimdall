@@ -51,6 +51,15 @@ public enum RecipeProgramRefusal
 
     /// <summary>The original file name in the version resource is a shell, an interpreter or a proxy executable.</summary>
     ShellOrInterpreterByOriginalName,
+
+    /// <summary>
+    /// The file, or a folder between it and the root it sits under, lets someone who is not an
+    /// administrator change it, so what runs could be swapped without any approval.
+    /// </summary>
+    WritableByUser,
+
+    /// <summary>The permissions of the file or of a folder above it could not be read.</summary>
+    CannotReadPermissions,
 }
 
 /// <summary>The outcome of resolving a program.</summary>
@@ -140,7 +149,7 @@ public sealed class RecipeProgramResolver : IRecipeProgramResolver, IRecipeProgr
         if (program.Length > RecipeLimits.MaxProgramLength)
             return RecipeProgramVerdict.Refused(RecipeProgramRefusal.InvalidShape, program);
 
-        List<string> roots = BuildRoots(allowedFolders);
+        ProgramRoots roots = BuildRoots(allowedFolders);
 
         if (IsDrivePathShape(program))
             return ResolveAbsolute(program, roots);
@@ -202,7 +211,7 @@ public sealed class RecipeProgramResolver : IRecipeProgramResolver, IRecipeProgr
         => fileName.Length > ExecutableExtension.Length
             && fileName.EndsWith(ExecutableExtension, StringComparison.OrdinalIgnoreCase);
 
-    private static bool UnderAny(string path, List<string> roots)
+    private static bool UnderAny(string path, IReadOnlyList<string> roots)
     {
         foreach (string root in roots)
         {
@@ -225,15 +234,20 @@ public sealed class RecipeProgramResolver : IRecipeProgramResolver, IRecipeProgr
         }
     }
 
-    private List<string> BuildRoots(IReadOnlyList<string> allowedFolders)
+    private ProgramRoots BuildRoots(IReadOnlyList<string> allowedFolders)
     {
-        List<string> roots = [];
-        AddRoot(_machine, roots, _machine.WindowsDirectory);
-        AddRoot(_machine, roots, _machine.ProgramFilesDirectory);
-        AddRoot(_machine, roots, _machine.ProgramFilesX86Directory);
+        ProgramRoots roots = new();
+        AddRoot(_machine, roots.BuiltIn, _machine.WindowsDirectory);
+        AddRoot(_machine, roots.BuiltIn, _machine.ProgramFilesDirectory);
+        AddRoot(_machine, roots.BuiltIn, _machine.ProgramFilesX86Directory);
 
+        // A folder the user added is only taken as written when it still passes the rule it was
+        // added under: a hand-edited setting (a path with .. parts, a drive root) never widens the roots.
         foreach (string folder in allowedFolders)
-            AddRoot(_machine, roots, folder);
+        {
+            if (RecipeFolderRule.Check(folder) == RecipeFolderRefusal.None)
+                AddRoot(_machine, roots.User, RecipeFolderRule.Normalize(folder));
+        }
 
         return roots;
     }
@@ -244,13 +258,14 @@ public sealed class RecipeProgramResolver : IRecipeProgramResolver, IRecipeProgr
         if (full is null)
             return;
 
-        roots.Add(full.TrimEnd(TrimmedRootEnd));
+        string trimmed = full.TrimEnd(TrimmedRootEnd);
+        roots.Add(trimmed);
 
         // A root that is itself reached through a link, a subst drive or a short name is also accepted
         // under its final form, which is the form a file inside it resolves to.
         string? final = machine.ResolveFinalPath(full);
         string? finalFull = final is null ? null : Canonicalize(final);
-        if (finalFull is not null && !string.Equals(finalFull.TrimEnd(TrimmedRootEnd), roots[^1], StringComparison.OrdinalIgnoreCase))
+        if (finalFull is not null && !string.Equals(finalFull.TrimEnd(TrimmedRootEnd), trimmed, StringComparison.OrdinalIgnoreCase))
             roots.Add(finalFull.TrimEnd(TrimmedRootEnd));
     }
 
@@ -274,7 +289,7 @@ public sealed class RecipeProgramResolver : IRecipeProgramResolver, IRecipeProgr
         return IsDrivePathShape(text) ? Canonicalize(text) : null;
     }
 
-    private RecipeProgramVerdict ResolveAbsolute(string program, List<string> roots)
+    private RecipeProgramVerdict ResolveAbsolute(string program, ProgramRoots roots)
     {
         // Every folder segment must be an ordinary name: no empty one, no trailing dot or space, which
         // Windows would silently trim into a different folder.
@@ -306,7 +321,7 @@ public sealed class RecipeProgramResolver : IRecipeProgramResolver, IRecipeProgr
         return Verify(canonical, program, roots);
     }
 
-    private RecipeProgramVerdict ResolveBare(string program, List<string> roots)
+    private RecipeProgramVerdict ResolveBare(string program, ProgramRoots roots)
     {
         string fileName = program;
         if (fileName.IndexOf('.') < 0)
@@ -324,7 +339,7 @@ public sealed class RecipeProgramResolver : IRecipeProgramResolver, IRecipeProgr
                 continue;
 
             string? candidate = Canonicalize(Path.Combine(directory, fileName));
-            if (candidate is null || !UnderAny(candidate, roots) || !_machine.FileExists(candidate))
+            if (candidate is null || !UnderAny(candidate, roots.All) || !_machine.FileExists(candidate))
                 continue;
 
             // The first file found decides: a later refusal is not worked around by trying the next entry.
@@ -334,19 +349,19 @@ public sealed class RecipeProgramResolver : IRecipeProgramResolver, IRecipeProgr
         return RecipeProgramVerdict.Refused(RecipeProgramRefusal.NotFound, program);
     }
 
-    private static string? AcceptablePathEntry(string entry, List<string> roots)
+    private static string? AcceptablePathEntry(string entry, ProgramRoots roots)
     {
         string text = entry.Trim();
         if (text.Length >= 2 && text[0] == Quote && text[^1] == Quote)
             text = text[1..^1];
 
         string? full = CanonicalFolder(text);
-        return full is not null && UnderAny(full, roots) ? full : null;
+        return full is not null && UnderAny(full, roots.All) ? full : null;
     }
 
-    private RecipeProgramVerdict Verify(string canonical, string program, List<string> roots)
+    private RecipeProgramVerdict Verify(string canonical, string program, ProgramRoots roots)
     {
-        if (!UnderAny(canonical, roots))
+        if (!UnderAny(canonical, roots.All))
             return RecipeProgramVerdict.Refused(RecipeProgramRefusal.OutsideAllowedRoots, program);
 
         if (!HasExecutableExtension(Path.GetFileName(canonical)))
@@ -360,7 +375,7 @@ public sealed class RecipeProgramResolver : IRecipeProgramResolver, IRecipeProgr
         if (finalFull is null)
             return RecipeProgramVerdict.Refused(RecipeProgramRefusal.CannotResolve, program);
 
-        if (!UnderAny(finalFull, roots))
+        if (!UnderAny(finalFull, roots.All))
             return RecipeProgramVerdict.Refused(RecipeProgramRefusal.LinkLeavesAllowedRoots, program);
 
         if (!HasExecutableExtension(Path.GetFileName(finalFull)))
@@ -373,6 +388,59 @@ public sealed class RecipeProgramResolver : IRecipeProgramResolver, IRecipeProgr
         if (original is not null && RecipeSeatBelt.IsRefusedFileName(original))
             return RecipeProgramVerdict.Refused(RecipeProgramRefusal.ShellOrInterpreterByOriginalName, program);
 
+        RecipeProgramRefusal permission = CheckPermissions(finalFull, roots);
+        if (permission != RecipeProgramRefusal.None)
+            return RecipeProgramVerdict.Refused(permission, program);
+
         return RecipeProgramVerdict.Resolved(finalFull);
+    }
+
+    /// <summary>
+    /// Under Windows or Program Files, the file and every folder from it up to its root must not let
+    /// a user who is not an administrator change them: some folders there are writable by anyone.
+    /// A program under a folder the user added is not checked, because the user chose to trust it.
+    /// </summary>
+    private RecipeProgramRefusal CheckPermissions(string finalPath, ProgramRoots roots)
+    {
+        if (UnderAny(finalPath, roots.User))
+            return RecipeProgramRefusal.None;
+
+        string? root = null;
+        foreach (string candidate in roots.BuiltIn)
+        {
+            if (IsUnderOrEqual(finalPath, candidate) && (root is null || candidate.Length > root.Length))
+                root = candidate;
+        }
+
+        if (root is null)
+            return RecipeProgramRefusal.OutsideAllowedRoots;
+
+        string? current = finalPath;
+        while (current is not null && IsUnderOrEqual(current, root))
+        {
+            IReadOnlyList<RecipeAccessRule>? rules = _machine.ReadAllowRules(current);
+            if (rules is null)
+                return RecipeProgramRefusal.CannotReadPermissions;
+
+            if (RecipeAccessPolicy.GrantsModificationToStandardUsers(rules))
+                return RecipeProgramRefusal.WritableByUser;
+
+            if (string.Equals(current.TrimEnd(TrimmedRootEnd), root, StringComparison.OrdinalIgnoreCase))
+                break;
+
+            current = Path.GetDirectoryName(current);
+        }
+
+        return RecipeProgramRefusal.None;
+    }
+
+    /// <summary>The folders a program may sit under: the built-in ones, and the ones the user added.</summary>
+    private sealed class ProgramRoots
+    {
+        public List<string> BuiltIn { get; } = [];
+
+        public List<string> User { get; } = [];
+
+        public IReadOnlyList<string> All => [.. BuiltIn, .. User];
     }
 }

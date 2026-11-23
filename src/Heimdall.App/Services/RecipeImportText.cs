@@ -97,6 +97,10 @@ public static class RecipeImportText
         RecipeErrorCode.ForbiddenPercent => "RecipeErrorForbiddenPercent",
         RecipeErrorCode.ForbiddenLeadingAt => "RecipeErrorForbiddenLeadingAt",
         RecipeErrorCode.FixedValueStartsWithOptionCharacter => "RecipeErrorFixedValueStartsWithOptionCharacter",
+        RecipeErrorCode.ForbiddenMixedSeparators => "RecipeErrorForbiddenMixedSeparators",
+        RecipeErrorCode.ForbiddenNtPathPrefix => "RecipeErrorForbiddenNtPathPrefix",
+        RecipeErrorCode.ForbiddenLookAlikeCharacter => "RecipeErrorForbiddenLookAlikeCharacter",
+        RecipeErrorCode.FixedValueRefusedAtRun => "RecipeErrorFixedValueRefusedAtRun",
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, "An error without a text."),
     };
 
@@ -115,6 +119,8 @@ public static class RecipeImportText
         RecipeProgramRefusal.CannotResolve => "RecipeProgramRefusalCannotResolve",
         RecipeProgramRefusal.ShellOrInterpreter => "RecipeProgramRefusalShellOrInterpreter",
         RecipeProgramRefusal.ShellOrInterpreterByOriginalName => "RecipeProgramRefusalShellOrInterpreterByOriginalName",
+        RecipeProgramRefusal.WritableByUser => "RecipeProgramRefusalWritableByUser",
+        RecipeProgramRefusal.CannotReadPermissions => "RecipeProgramRefusalCannotReadPermissions",
         _ => throw new ArgumentOutOfRangeException(nameof(refusal), refusal, "A refusal without a text."),
     };
 
@@ -159,6 +165,7 @@ public static class RecipeImportText
         RecipeFolderRefusal.Device => "RecipeFolderRefusalDevice",
         RecipeFolderRefusal.NotAbsolute => "RecipeFolderRefusalNotAbsolute",
         RecipeFolderRefusal.ForbiddenCharacter => "RecipeFolderRefusalForbiddenCharacter",
+        RecipeFolderRefusal.DriveRoot => "RecipeFolderRefusalDriveRoot",
         RecipeFolderRefusal.AlreadyListed => "RecipeFolderRefusalAlreadyListed",
         RecipeFolderRefusal.ListFull => "RecipeFolderRefusalListFull",
         _ => throw new ArgumentOutOfRangeException(nameof(refusal), refusal, "A refusal without a text."),

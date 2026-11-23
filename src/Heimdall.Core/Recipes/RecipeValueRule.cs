@@ -39,6 +39,12 @@ public enum RecipeValueRefusal
     /// <summary>The value holds a control, format, separator or unpaired surrogate character.</summary>
     ControlCharacter,
 
+    /// <summary>
+    /// The value holds a character that a program reading its command line in an ANSI or OEM code
+    /// page would be handed as an ASCII one (a full-width hyphen, a typographic quote, a no-break space).
+    /// </summary>
+    LookAlikeCharacter,
+
     /// <summary>The value starts with <c>-</c> where its placeholder starts the token.</summary>
     LeadingDash,
 
@@ -47,6 +53,9 @@ public enum RecipeValueRefusal
 
     /// <summary>The value starts with <c>@</c> where its placeholder starts the token.</summary>
     LeadingAt,
+
+    /// <summary>The value starts with a backslash where its placeholder starts the token.</summary>
+    LeadingBackslash,
 
     /// <summary>The path is a UNC path.</summary>
     UncPath,
@@ -63,7 +72,7 @@ public enum RecipeValueRefusal
     /// <summary>A part of the path is a DOS device name.</summary>
     DeviceName,
 
-    /// <summary>The value has leading or trailing white space where none is allowed.</summary>
+    /// <summary>The value has trailing white space, or leading white space where its placeholder starts the token, where none is allowed.</summary>
     SurroundingWhitespace,
 
     /// <summary>The value is not an integer.</summary>
@@ -84,7 +93,10 @@ public enum RecipeValueRefusal
     /// </summary>
     SeparatorJoin,
 
-    /// <summary>A final argument holds a doubled separator or a URL scheme marker, whatever its source.</summary>
+    /// <summary>
+    /// A final argument holds two separators in a row (either form, in any mix), the NT prefix or a
+    /// URL scheme marker, whatever its source.
+    /// </summary>
     ForbiddenSequenceInArgument,
 
     /// <summary>The value is not a valid host name.</summary>
@@ -134,11 +146,16 @@ public static class RecipeValueRule
     /// <param name="field">The input the value is for.</param>
     /// <param name="candidate">The value exactly as it would be substituted.</param>
     /// <param name="placeholderStartsToken">True when the placeholder is the very first thing of its token.</param>
-    public static RecipeValueRefusal Check(RecipeInput field, string? candidate, bool placeholderStartsToken)
+    /// <param name="converter">What the machine does to a character; the real machine when null.</param>
+    public static RecipeValueRefusal Check(
+        RecipeInput field,
+        string? candidate,
+        bool placeholderStartsToken,
+        IRecipeCharacterConverter? converter = null)
     {
         ArgumentNullException.ThrowIfNull(field);
 
-        RecipeValueRefusal common = CheckCommon(candidate, placeholderStartsToken);
+        RecipeValueRefusal common = CheckCommon(candidate, placeholderStartsToken, converter);
         if (common != RecipeValueRefusal.None)
             return common;
 
@@ -161,9 +178,12 @@ public static class RecipeValueRule
     /// Checks the value of the <c>{Host}</c> placeholder with the strictest host validation of
     /// <see cref="InputValidator"/> (the DNS-checked <c>Hostname</c> pattern).
     /// </summary>
-    public static RecipeValueRefusal CheckHost(string? candidate, bool placeholderStartsToken)
+    public static RecipeValueRefusal CheckHost(
+        string? candidate,
+        bool placeholderStartsToken,
+        IRecipeCharacterConverter? converter = null)
     {
-        RecipeValueRefusal common = CheckCommon(candidate, placeholderStartsToken);
+        RecipeValueRefusal common = CheckCommon(candidate, placeholderStartsToken, converter);
         return common != RecipeValueRefusal.None ? common : CheckHostname(candidate!);
     }
 
@@ -171,9 +191,12 @@ public static class RecipeValueRule
     /// Checks the value of the <c>{Port}</c> placeholder: ASCII digits only, inside the range
     /// <see cref="InputValidator.ValidatePortRange"/> accepts, and matching its <c>Port</c> pattern.
     /// </summary>
-    public static RecipeValueRefusal CheckPort(string? candidate, bool placeholderStartsToken)
+    public static RecipeValueRefusal CheckPort(
+        string? candidate,
+        bool placeholderStartsToken,
+        IRecipeCharacterConverter? converter = null)
     {
-        RecipeValueRefusal common = CheckCommon(candidate, placeholderStartsToken);
+        RecipeValueRefusal common = CheckCommon(candidate, placeholderStartsToken, converter);
         if (common != RecipeValueRefusal.None)
             return common;
 
@@ -202,7 +225,7 @@ public static class RecipeValueRule
         return before || after ? RecipeValueRefusal.SeparatorJoin : RecipeValueRefusal.None;
     }
 
-    private static RecipeValueRefusal CheckCommon(string? candidate, bool placeholderStartsToken)
+    private static RecipeValueRefusal CheckCommon(string? candidate, bool placeholderStartsToken, IRecipeCharacterConverter? converter)
     {
         if (string.IsNullOrEmpty(candidate))
             return RecipeValueRefusal.Empty;
@@ -210,8 +233,16 @@ public static class RecipeValueRule
         if (RecipeText.ContainsRefusedCharacter(candidate))
             return RecipeValueRefusal.ControlCharacter;
 
+        if (RecipeText.ContainsLookAlikeCharacter(candidate, converter))
+            return RecipeValueRefusal.LookAlikeCharacter;
+
         if (placeholderStartsToken)
         {
+            // A leading space is dropped or kept depending on the program, and a leading option
+            // character, backslash or at sign changes what the whole argument means.
+            if (char.IsWhiteSpace(candidate[0]))
+                return RecipeValueRefusal.SurroundingWhitespace;
+
             switch (candidate[0])
             {
                 case '-':
@@ -220,6 +251,8 @@ public static class RecipeValueRule
                     return RecipeValueRefusal.LeadingSlash;
                 case '@':
                     return RecipeValueRefusal.LeadingAt;
+                case '\\':
+                    return RecipeValueRefusal.LeadingBackslash;
             }
         }
 
@@ -318,6 +351,9 @@ public static class RecipeValueRule
 
     private static RecipeValueRefusal CheckPath(string value)
     {
+        if (RecipeText.HasNtPrefix(value) && IsSeparator(value[0]) && value[1] == '?')
+            return RecipeValueRefusal.DevicePath;
+
         if (IsSeparator(value[0]) && value.Length >= RootedPrefixLength && IsSeparator(value[1]))
         {
             int marker = RootedPrefixLength;
@@ -362,7 +398,7 @@ public static class RecipeValueRule
         return RecipeValueRefusal.None;
     }
 
-    private static bool IsSeparator(char c) => c is '\\' or '/';
+    private static bool IsSeparator(char c) => RecipeText.IsSeparator(c);
 
     private static bool IsDeviceName(string part)
     {

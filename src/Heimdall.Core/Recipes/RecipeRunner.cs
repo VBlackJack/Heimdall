@@ -80,6 +80,12 @@ public sealed record RecipeRunResult(
     /// <summary>True when the program ended on its own with a success exit code.</summary>
     public bool IsSuccess => Status == RecipeRunStatus.Succeeded;
 
+    /// <summary>
+    /// True when the process could not be placed in a job object (Heimdall may itself run in a job
+    /// that forbids nesting), so that a child it left behind was only killed if the run was interrupted.
+    /// </summary>
+    public bool JobUnavailable { get; init; }
+
     internal static RecipeRunResult Refused(RecipeRunRefusal refusal)
         => new(RecipeRunStatus.Refused, null, string.Empty, string.Empty, false, null, refusal);
 
@@ -90,6 +96,8 @@ public sealed record RecipeRunResult(
 /// <summary>
 /// Runs one resolved program with an already expanded argument list: no shell, no window, no
 /// elevation, every argument a separate <c>ArgumentList</c> entry, output captured within a bound.
+/// Every process runs inside a job object that ends its children when the run ends, whatever the
+/// outcome; when the job cannot be used the result says so.
 /// </summary>
 public sealed class RecipeRunner : IRecipeRunner
 {
@@ -249,7 +257,8 @@ public sealed class RecipeRunner : IRecipeRunner
         }
 
         // The pipes close with the process. A grandchild that kept one open must not hold the run: the
-        // readers get a short grace and are then cancelled, and nothing is left running afterwards.
+        // readers get a short grace and are then cancelled. What the program left running is ended when
+        // the process is disposed, which closes its job.
         drain.CancelAfter(RecipeLimits.DrainGraceMilliseconds);
         await Task.WhenAll(outputPump, errorPump).ConfigureAwait(false);
 
@@ -257,14 +266,15 @@ public sealed class RecipeRunner : IRecipeRunner
         string text = output.Text;
         string errorText = merge ? string.Empty : error.Text;
 
+        bool jobUnavailable = process.JobUnavailable;
         if (interrupted is not null)
-            return new RecipeRunResult(interrupted.Value, null, text, errorText, truncated, null, RecipeRunRefusal.None);
+            return new RecipeRunResult(interrupted.Value, null, text, errorText, truncated, null, RecipeRunRefusal.None) { JobUnavailable = jobUnavailable };
 
         int exitCode = process.ExitCode;
         RecipeRunStatus status = recipe.SuccessExitCodes.Contains(exitCode)
             ? RecipeRunStatus.Succeeded
             : RecipeRunStatus.FailedExitCode;
-        return new RecipeRunResult(status, exitCode, text, errorText, truncated, null, RecipeRunRefusal.None);
+        return new RecipeRunResult(status, exitCode, text, errorText, truncated, null, RecipeRunRefusal.None) { JobUnavailable = jobUnavailable };
     }
 
     private static async Task WaitUntilGoneAsync(IRecipeProcess process)

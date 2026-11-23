@@ -20,8 +20,10 @@ using Microsoft.Win32.SafeHandles;
 namespace Heimdall.Core.Recipes;
 
 /// <summary>
-/// The two Windows calls the recipe layer needs and no managed API offers: the final path of an
-/// open file (every junction and link followed, parents included) and the OEM code page.
+/// The Windows calls the recipe layer needs and no managed API offers: the final path of an
+/// open file (every junction and link followed, parents included), the OEM code page, and the
+/// conversion of a character to the ANSI or OEM code page with the best-fit mapping that a program
+/// reading its command line would be served.
 /// </summary>
 internal static class RecipeProgramNative
 {
@@ -87,6 +89,34 @@ internal static class RecipeProgramNative
     /// <summary>The OEM code page of the machine (the code page of a console child), or 0 off Windows.</summary>
     internal static int OemCodePage() => OperatingSystem.IsWindows() ? (int)GetOEMCP() : 0;
 
+    /// <summary><c>CP_ACP</c>: the ANSI code page of the machine.</summary>
+    internal const uint AnsiCodePage = 0;
+
+    /// <summary><c>CP_OEMCP</c>: the OEM code page of the machine.</summary>
+    internal const uint OemCodePageId = 1;
+
+    /// <summary>Longest conversion of one character: a surrogate pair in a multi-byte code page.</summary>
+    private const int ConvertedBufferBytes = 8;
+
+    private const byte AsciiLimit = 0x80;
+
+    private const byte QuestionMark = (byte)'?';
+
+    /// <summary>
+    /// True when one character converts, in the given code page and with Windows' default best-fit
+    /// mapping, to a single ASCII byte other than <c>?</c>. No default-character pointer is passed:
+    /// the call refuses one for some code pages, and the converted byte is all that is read.
+    /// </summary>
+    internal static bool BecomesAscii(string character, uint codePage)
+    {
+        if (!OperatingSystem.IsWindows() || character.Length == 0)
+            return false;
+
+        byte[] buffer = new byte[ConvertedBufferBytes];
+        int written = WideCharToMultiByte(codePage, 0, character, character.Length, buffer, buffer.Length, IntPtr.Zero, IntPtr.Zero);
+        return written == 1 && buffer[0] < AsciiLimit && buffer[0] != QuestionMark;
+    }
+
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern SafeFileHandle CreateFileW(
         string fileName,
@@ -106,4 +136,15 @@ internal static class RecipeProgramNative
 
     [DllImport("kernel32.dll")]
     private static extern uint GetOEMCP();
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+    private static extern int WideCharToMultiByte(
+        uint codePage,
+        uint flags,
+        string text,
+        int textLength,
+        [Out] byte[] bytes,
+        int byteLength,
+        IntPtr defaultChar,
+        IntPtr usedDefaultChar);
 }

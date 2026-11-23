@@ -35,6 +35,9 @@ public sealed class RecipeProgramResolverTests
         "curl", "ssh", "scp", "sftp", "ftp", "tftp", "git", "tar", "robocopy", "xcopy",
         "expand", "extrac32", "makecab", "hh", "control", "explorer", "conhost", "cmstp",
         "odbcconf", "pcalua", "scriptrunner", "at", "taskkill",
+        "msedge", "chrome", "firefox", "brave", "opera", "SyncAppvPublishingServer", "wt",
+        "tttracer", "pcwrun", "esentutl", "replace", "mmc", "msdt", "runas", "dotnet",
+        "csc", "vbc", "jsc", "ie4uinit", "presentationhost",
     ];
 
     public static TheoryData<string> EverySeatBeltName()

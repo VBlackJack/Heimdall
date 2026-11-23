@@ -18,6 +18,35 @@ using Heimdall.Core.Recipes;
 
 namespace Heimdall.Core.Tests.Recipes;
 
+/// <summary>
+/// A machine whose code pages are described by the test: it turns exactly the characters it was told
+/// about into an ASCII one, and keeps every other character as itself. A test that does not care
+/// about the code page of the machine it runs on passes <see cref="Plain"/>.
+/// </summary>
+internal sealed class FakeCharacterConverter : IRecipeCharacterConverter
+{
+    private readonly HashSet<string> _becomesAscii = new(StringComparer.Ordinal);
+
+    /// <summary>A machine that keeps every character as itself.</summary>
+    public static FakeCharacterConverter Plain => new();
+
+    /// <summary>Every character this converter was asked about, in order.</summary>
+    public List<string> Asked { get; } = [];
+
+    /// <summary>Makes a character become an ASCII one.</summary>
+    public FakeCharacterConverter Fold(string character)
+    {
+        _becomesAscii.Add(character);
+        return this;
+    }
+
+    public bool BecomesAscii(string character)
+    {
+        Asked.Add(character);
+        return _becomesAscii.Contains(character);
+    }
+}
+
 /// <summary>Shared builders for the recipe tests.</summary>
 internal static class RecipeTestData
 {

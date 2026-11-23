@@ -53,9 +53,40 @@ internal sealed class FakeRecipeMachine : IRecipeMachine
 
     public string? ReadOriginalFileName(string path) => OriginalNames.GetValueOrDefault(path);
 
+    /// <summary>The permission entries of a file or folder; one that is not listed grants nothing but to the trusted principals.</summary>
+    public Dictionary<string, List<RecipeAccessRule>> Rules { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Paths whose permissions cannot be read.</summary>
+    public HashSet<string> UnreadablePermissions { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Every path whose permissions the resolver asked about, in order.</summary>
+    public List<string> PermissionReads { get; } = [];
+
+    public IReadOnlyList<RecipeAccessRule>? ReadAllowRules(string path)
+    {
+        PermissionReads.Add(path);
+        if (UnreadablePermissions.Contains(path))
+            return null;
+
+        return Rules.TryGetValue(path, out List<RecipeAccessRule>? rules) ? rules : [];
+    }
+
     public FakeRecipeMachine WithFile(string path)
     {
         Files.Add(path);
+        return this;
+    }
+
+    /// <summary>Gives a principal an access mask on a file or folder.</summary>
+    public FakeRecipeMachine WithRule(string path, string sid, int mask, bool inheritOnly = false)
+    {
+        if (!Rules.TryGetValue(path, out List<RecipeAccessRule>? rules))
+        {
+            rules = [];
+            Rules[path] = rules;
+        }
+
+        rules.Add(new RecipeAccessRule(sid, mask, inheritOnly));
         return this;
     }
 }
@@ -80,6 +111,9 @@ internal sealed class TempRecipeMachine : IRecipeMachine
     public string? ResolveFinalPath(string path) => _real.ResolveFinalPath(path);
 
     public string? ReadOriginalFileName(string path) => _real.ReadOriginalFileName(path);
+
+    /// <summary>The temporary folder is writable by its user by nature: its permissions are not what these tests are about.</summary>
+    public IReadOnlyList<RecipeAccessRule>? ReadAllowRules(string path) => [];
 }
 
 /// <summary>A scratch folder under the temporary directory, removed with the test.</summary>
