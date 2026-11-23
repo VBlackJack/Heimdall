@@ -18,6 +18,7 @@ using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
+using Heimdall.App.Services;
 using Heimdall.App.ViewModels.Tools;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
@@ -29,7 +30,7 @@ namespace Heimdall.App.Views.Tools;
 /// this class hosts it, forwards the busy state to the tab, copies the output, and cancels a run
 /// that is under way when the tab closes.
 /// </summary>
-public partial class RecipeToolView : UserControl, IToolView
+public partial class RecipeToolView : UserControl, IToolView, IStaleToolView
 {
     private readonly RecipeToolViewModel _viewModel;
     private Action<bool>? _setBusy;
@@ -55,6 +56,9 @@ public partial class RecipeToolView : UserControl, IToolView
         _localizer = localizer;
         _viewModel.Initialize(context, localizer);
     }
+
+    /// <inheritdoc />
+    public bool IsStale => _viewModel.CheckStale();
 
     /// <summary>A run under way is cancelled when the tab closes, so the tab can always close.</summary>
     public bool CanClose() => true;

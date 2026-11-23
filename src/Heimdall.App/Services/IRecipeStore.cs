@@ -131,11 +131,26 @@ public sealed class RecipeStoreResult
 }
 
 /// <summary>
+/// What a recipe view needs to know about the imported recipe it was built from: whether it is
+/// still the one that is imported. A replaced or removed recipe leaves open views behind, and those
+/// must not run the old recipe.
+/// </summary>
+public interface IRecipeVersions
+{
+    /// <summary>Raised after a recipe was added, replaced or removed, on the thread that did it.</summary>
+    event Action? Changed;
+
+    /// <summary>The lowercase hexadecimal SHA-256 of the bytes imported under the id, or null when no recipe has that id.</summary>
+    /// <param name="id">The recipe id.</param>
+    string? CurrentSha256(string id);
+}
+
+/// <summary>
 /// The imported recipes: one file each in the recipes folder, and an index that records which
 /// files were imported. Importing is the trust step, so a file merely placed in the folder is not
 /// loaded. The store does not resolve programs and does not run anything.
 /// </summary>
-public interface IRecipeStore
+public interface IRecipeStore : IRecipeVersions
 {
     /// <summary>
     /// Reads every imported recipe. A file that is not indexed, whose bytes changed since the

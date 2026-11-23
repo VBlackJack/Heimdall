@@ -92,7 +92,24 @@ internal sealed class FakeToolAvailability : IToolAvailability
 
     public bool PackForbidden { get; set; }
 
-    public event Action? Changed;
+    private Action? _changed;
+
+    /// <summary>How many handlers are attached to <see cref="Changed"/> now.</summary>
+    public int SubscriberCount { get; private set; }
+
+    public event Action? Changed
+    {
+        add
+        {
+            _changed += value;
+            SubscriberCount++;
+        }
+        remove
+        {
+            _changed -= value;
+            SubscriberCount--;
+        }
+    }
 
     public ToolAvailabilityState GetState(string toolId) => State;
 
@@ -100,13 +117,75 @@ internal sealed class FakeToolAvailability : IToolAvailability
 
     public bool IsPackForbiddenByPolicy(ToolPack pack) => PackForbidden;
 
-    public void RaiseChanged() => Changed?.Invoke();
+    public void RaiseChanged() => _changed?.Invoke();
+}
+
+/// <summary>
+/// The imported version of each recipe, which a test moves to stand for a replacement or a removal.
+/// Every recipe reads as the one with <see cref="RecipeBuilders.StoredSha256"/> until told otherwise.
+/// </summary>
+internal sealed class FakeRecipeVersions : IRecipeVersions
+{
+    private readonly Dictionary<string, string?> _overrides = new(StringComparer.Ordinal);
+
+    private Action? _changed;
+
+    /// <summary>How many handlers are attached to <see cref="Changed"/> now.</summary>
+    public int SubscriberCount { get; private set; }
+
+    public event Action? Changed
+    {
+        add
+        {
+            _changed += value;
+            SubscriberCount++;
+        }
+        remove
+        {
+            _changed -= value;
+            SubscriberCount--;
+        }
+    }
+
+    public string? CurrentSha256(string id)
+        => _overrides.TryGetValue(id, out string? sha) ? sha : RecipeBuilders.StoredSha256;
+
+    /// <summary>The recipe was replaced by one with other bytes; the event is raised unless <paramref name="announce"/> is false.</summary>
+    public void Replace(string id, string sha256, bool announce = true)
+    {
+        _overrides[id] = sha256;
+        if (announce)
+        {
+            _changed?.Invoke();
+        }
+    }
+
+    /// <summary>The recipe was removed.</summary>
+    public void Remove(string id)
+    {
+        _overrides[id] = null;
+        _changed?.Invoke();
+    }
+
+    /// <summary>The recipe was imported again with the bytes it first had.</summary>
+    public void ImportAgain(string id, string sha256)
+    {
+        _overrides[id] = sha256;
+        _changed?.Invoke();
+    }
 }
 
 /// <summary>A recipe store held in memory.</summary>
 internal sealed class FakeRecipeStore : IRecipeStore
 {
     public List<LoadedRecipe> Recipes { get; } = [];
+
+    public event Action? Changed;
+
+    public string? CurrentSha256(string id)
+        => Recipes.FirstOrDefault(item => item.Recipe.Id == id)?.Entry.Sha256;
+
+    public void RaiseChanged() => Changed?.Invoke();
 
     public int LoadCount { get; private set; }
 
@@ -116,7 +195,14 @@ internal sealed class FakeRecipeStore : IRecipeStore
         return new RecipeLoadResult([.. Recipes], []);
     }
 
-    public IReadOnlyList<RecipeStoreEntry> List() => [.. Recipes.Select(item => item.Entry)];
+    /// <summary>How many times <see cref="List"/> was asked.</summary>
+    public int ListCount { get; private set; }
+
+    public IReadOnlyList<RecipeStoreEntry> List()
+    {
+        ListCount++;
+        return [.. Recipes.Select(item => item.Entry)];
+    }
 
     public RecipeStoreResult Add(byte[] bytes, string resolvedProgramPath) => throw new NotSupportedException();
 
@@ -131,6 +217,9 @@ internal sealed class FakeRecipeStore : IRecipeStore
 internal static class RecipeBuilders
 {
     public const string StoredPath = @"C:\Windows\System32\ping.exe";
+
+    /// <summary>The hash every built recipe is stored under, and every view model is created with.</summary>
+    public static readonly string StoredSha256 = new('a', 64);
 
     public static RecipeInput Input(
         string name,
@@ -171,7 +260,7 @@ internal static class RecipeBuilders
             Icon: null);
 
     public static LoadedRecipe Loaded(Recipe recipe, string storedPath = StoredPath)
-        => new(recipe, new RecipeStoreEntry(recipe.Id, RecipeStore.FileNameFor(recipe.Id), new string('a', 64), storedPath, DateTimeOffset.UnixEpoch));
+        => new(recipe, new RecipeStoreEntry(recipe.Id, RecipeStore.FileNameFor(recipe.Id), StoredSha256, storedPath, DateTimeOffset.UnixEpoch));
 }
 
 /// <summary>A view model over fakes, a real run-folder service in a temporary folder, and the shipped English locale.</summary>
@@ -183,8 +272,8 @@ internal sealed class RecipeViewModelHarness : IDisposable
     {
         _root = root;
         Localizer = localizer;
-        WorkFolders = new RecipeWorkFolders(root);
-        Services = new RecipeToolServices(Runner, Resolver, WorkFolders, Availability, () => AllowedFolders);
+        WorkFolders = new RecipeWorkFolders(Path.Combine(root, "recipe-runs"));
+        Services = new RecipeToolServices(Runner, Resolver, WorkFolders, Availability, () => AllowedFolders, Versions);
     }
 
     public FakeRecipeRunner Runner { get; } = new();
@@ -192,6 +281,8 @@ internal sealed class RecipeViewModelHarness : IDisposable
     public FakeRecipeProgramResolver Resolver { get; } = new();
 
     public FakeToolAvailability Availability { get; } = new();
+
+    public FakeRecipeVersions Versions { get; } = new();
 
     public RecipeWorkFolders WorkFolders { get; }
 
@@ -215,7 +306,7 @@ internal sealed class RecipeViewModelHarness : IDisposable
 
     public RecipeToolViewModel Create(Recipe recipe, ToolContext? context = null)
     {
-        RecipeToolViewModel viewModel = new(recipe, RecipeBuilders.StoredPath, Services);
+        RecipeToolViewModel viewModel = new(recipe, RecipeBuilders.StoredPath, RecipeBuilders.StoredSha256, Services);
         viewModel.Initialize(context, Localizer);
         return viewModel;
     }

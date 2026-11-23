@@ -162,7 +162,10 @@ public sealed partial class SettingsViewModelTests
     [Fact]
     public void AnAuditOnlyListIsNowAModificationBecauseRecipesIsOffByDefaultToo()
     {
-        FakeConfigManager config = new() { Settings = new AppSettings { DisabledToolPacks = [nameof(ToolPack.Audit)] } };
+        FakeConfigManager config = new()
+        {
+            Settings = new AppSettings { DisabledToolPacks = [nameof(ToolPack.Audit)], RecipesPackMigrated = true },
+        };
         SettingsViewModel viewModel = LoadedToolPackPanel(config);
 
         Assert.True(viewModel.IsModifiedFromDefault(nameof(SettingsViewModel.DisabledToolPacks)));

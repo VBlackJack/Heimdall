@@ -395,6 +395,65 @@ public sealed class RecipeStoreTests : IDisposable
         Assert.Contains(result.Issues, issue => issue.Code == RecipeLoadIssueCode.IndexEntryInvalid);
     }
 
+    private const string UnreadableIndexCorrupt = "corrupt";
+    private const string UnreadableIndexNewer = "newer";
+    private const string UnreadableIndexLocked = "locked";
+
+    // An index that exists and cannot be read must stop every write: starting from an empty list
+    // would replace it and drop the trust record of each recipe it holds.
+    [Theory]
+    [InlineData(UnreadableIndexCorrupt, false)]
+    [InlineData(UnreadableIndexNewer, false)]
+    [InlineData(UnreadableIndexLocked, false)]
+    [InlineData(UnreadableIndexCorrupt, true)]
+    [InlineData(UnreadableIndexNewer, true)]
+    [InlineData(UnreadableIndexLocked, true)]
+    public void AnUnreadableIndexMakesAddAndReplaceFailAndLeavesItUntouched(string kind, bool replace)
+    {
+        RecipeStore store = NewStore();
+        Assert.True(store.Add(RecipeTestFiles.Bytes("acme.ping"), RecipeTestFiles.ResolvedProgram).Succeeded);
+        string indexPath = Path.Combine(RecipesDirectory, RecipeStore.IndexFileName);
+        if (kind == UnreadableIndexCorrupt)
+        {
+            File.WriteAllText(indexPath, "{ not json");
+        }
+        else if (kind == UnreadableIndexNewer)
+        {
+            File.WriteAllText(indexPath, "{ \"schemaVersion\": 99, \"recipes\": [] }");
+        }
+
+        byte[] before = File.ReadAllBytes(indexPath);
+        byte[] candidate = replace
+            ? RecipeTestFiles.Bytes("acme.ping", name: "Changed")
+            : RecipeTestFiles.Bytes("acme.other");
+
+        RecipeStoreResult result;
+        using (FileStream? hold = kind == UnreadableIndexLocked
+            ? new FileStream(indexPath, FileMode.Open, FileAccess.Read, FileShare.None)
+            : null)
+        {
+            result = replace
+                ? store.Replace(candidate, RecipeTestFiles.ResolvedProgram)
+                : store.Add(candidate, RecipeTestFiles.ResolvedProgram);
+        }
+
+        Assert.Equal(RecipeStoreFailure.StorageError, result.Failure);
+        Assert.Equal(before, File.ReadAllBytes(indexPath));
+        Assert.False(File.Exists(FileOf("acme.other")));
+        Assert.Equal(RecipeTestFiles.Bytes("acme.ping"), File.ReadAllBytes(FileOf("acme.ping")));
+    }
+
+    [Fact]
+    public void AMissingIndexInAnExistingFolderIsAnEmptyStoreAndAnAddSucceeds()
+    {
+        Directory.CreateDirectory(RecipesDirectory);
+
+        RecipeStoreResult added = NewStore().Add(RecipeTestFiles.Bytes(), RecipeTestFiles.ResolvedProgram);
+
+        Assert.True(added.Succeeded);
+        Assert.Single(NewStore().List());
+    }
+
     private void WriteIndex(string id, string fileName, string sha256)
     {
         string json = $$"""

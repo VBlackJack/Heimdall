@@ -897,7 +897,7 @@ public partial class App : System.Windows.Application
         services.AddSingleton<IRecipeStore>(
             _ => new RecipeStore(_dataRoot ?? ApplicationDataPathResolver.Resolve()));
         services.AddSingleton<IRecipeWorkFolders>(
-            _ => new RecipeWorkFolders(_dataRoot ?? ApplicationDataPathResolver.Resolve()));
+            _ => new RecipeWorkFolders(RecipeWorkFolders.DefaultRoot(_dataRoot ?? ApplicationDataPathResolver.Resolve())));
 
         // Registers the tool of each imported recipe while the Recipes pack is on. Each recipe view
         // reads the folders the user allowed in Settings at the moment a run starts.
@@ -911,7 +911,8 @@ public partial class App : System.Windows.Application
                 new RecipeProgramResolver(),
                 workFolders,
                 availability,
-                () => (IReadOnlyList<string>?)configManager.CurrentSettings?.RecipeProgramFolders ?? []));
+                () => (IReadOnlyList<string>?)configManager.CurrentSettings?.RecipeProgramFolders ?? [],
+                sp.GetRequiredService<IRecipeStore>()));
             return new RecipeToolRegistrar(
                 sp.GetRequiredService<ToolRegistry>(),
                 availability,

@@ -77,6 +77,9 @@ public sealed class RecipeStore : IRecipeStore
         _directory = Core.Configuration.ApplicationDataPathResolver.GetRecipesDirectory(dataRoot);
     }
 
+    /// <inheritdoc />
+    public event Action? Changed;
+
     /// <summary>The file name a recipe of this id is stored under.</summary>
     public static string FileNameFor(string id) => FileNamePrefix + id + RecipeFormat.FileExtension;
 
@@ -130,15 +133,44 @@ public sealed class RecipeStore : IRecipeStore
     }
 
     /// <inheritdoc />
+    public string? CurrentSha256(string id)
+    {
+        ArgumentNullException.ThrowIfNull(id);
+
+        lock (_gate)
+        {
+            if (!Directory.Exists(_directory) || !TryReadIndex(out List<RecipeStoreEntry> entries, issues: null))
+            {
+                return null;
+            }
+
+            return entries.Find(entry => string.Equals(entry.Id, id, StringComparison.Ordinal))?.Sha256;
+        }
+    }
+
+    /// <inheritdoc />
     public RecipeStoreResult Add(byte[] bytes, string resolvedProgramPath)
-        => Write(bytes, resolvedProgramPath, replace: false);
+        => Announce(Write(bytes, resolvedProgramPath, replace: false));
 
     /// <inheritdoc />
     public RecipeStoreResult Replace(byte[] bytes, string resolvedProgramPath)
-        => Write(bytes, resolvedProgramPath, replace: true);
+        => Announce(Write(bytes, resolvedProgramPath, replace: true));
 
     /// <inheritdoc />
-    public RecipeStoreResult Remove(string id)
+    public RecipeStoreResult Remove(string id) => Announce(RemoveCore(id));
+
+    // Raised outside the lock, so a subscriber that asks the store something cannot deadlock.
+    private RecipeStoreResult Announce(RecipeStoreResult result)
+    {
+        if (result.Succeeded)
+        {
+            Changed?.Invoke();
+        }
+
+        return result;
+    }
+
+    private RecipeStoreResult RemoveCore(string id)
     {
         ArgumentNullException.ThrowIfNull(id);
 
@@ -226,10 +258,13 @@ public sealed class RecipeStore : IRecipeStore
 
         lock (_gate)
         {
+            // An index that exists and cannot be read is not an empty store: writing from an empty
+            // list would replace it and drop the trust record of every other recipe. A missing index
+            // is an empty store.
             List<RecipeStoreEntry> entries = [];
             if (Directory.Exists(_directory) && !TryReadIndex(out entries, issues: null))
             {
-                entries = [];
+                return RecipeStoreResult.Fail(RecipeStoreFailure.StorageError);
             }
 
             int position = entries.FindIndex(entry => string.Equals(entry.Id, recipe.Id, StringComparison.Ordinal));

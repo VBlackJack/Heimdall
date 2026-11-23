@@ -144,7 +144,7 @@ public sealed class RecipeToolViewTests
     {
         await WpfTestHost.Dispatcher.InvokeAsync(() =>
         {
-            RecipeToolViewModel viewModel = new(Recipe(), @"C:\Windows\System32\ping.exe", Services());
+            RecipeToolViewModel viewModel = new(Recipe(), @"C:\Windows\System32\ping.exe", StoredSha256, Services());
             RecipeToolView view = new(viewModel);
             view.Initialize(new ToolContext(), WpfTestHost.Localizer);
             Layout(view);
@@ -178,7 +178,7 @@ public sealed class RecipeToolViewTests
         await WpfTestHost.Dispatcher.InvokeAsync(async () =>
         {
             CountingRunner runner = new();
-            RecipeToolViewModel viewModel = new(Recipe(), @"C:\Windows\System32\ping.exe", Services(runner));
+            RecipeToolViewModel viewModel = new(Recipe(), @"C:\Windows\System32\ping.exe", StoredSha256, Services(runner));
             RecipeToolView view = new(viewModel);
             view.Initialize(new ToolContext(), WpfTestHost.Localizer);
             Layout(view);
@@ -202,7 +202,7 @@ public sealed class RecipeToolViewTests
         {
             TaskCompletionSource<RecipeRunResult> gate = new();
             CountingRunner runner = new() { Gate = gate.Task };
-            RecipeToolViewModel viewModel = new(Recipe(), @"C:\Windows\System32\ping.exe", Services(runner));
+            RecipeToolViewModel viewModel = new(Recipe(), @"C:\Windows\System32\ping.exe", StoredSha256, Services(runner));
             RecipeToolView view = new(viewModel);
             view.Initialize(new ToolContext(), WpfTestHost.Localizer);
             viewModel.Fields[0].Text = "host.example";
@@ -243,7 +243,21 @@ public sealed class RecipeToolViewTests
             new SameProgramResolver(),
             new FolderlessWorkFolders(),
             new AvailableTools(),
-            () => []);
+            () => [],
+            new SameVersions());
+
+    private static readonly string StoredSha256 = new('a', 64);
+
+    private sealed class SameVersions : IRecipeVersions
+    {
+        public event Action? Changed
+        {
+            add { }
+            remove { }
+        }
+
+        public string? CurrentSha256(string id) => StoredSha256;
+    }
 
     private sealed class CountingRunner : IRecipeRunner
     {

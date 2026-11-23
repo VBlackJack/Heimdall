@@ -786,7 +786,13 @@ ces arguments, avec vos droits. Le pack Recettes est désactivé par défaut.
   résolu, puis chaque argument exactement comme écrit dans le fichier, un par
   ligne. Les caractères de contrôle et invisibles, et tout caractère hors de
   l'ASCII imprimable dans le programme, les arguments et les valeurs par défaut,
-  sont montrés sous la forme `\uXXXX`. Ce modèle suppose que l'aperçu est lu : les
+  sont montrés sous la forme `\uXXXX`. Chaque traduction que porte le fichier
+  (langue, nom, description et libellés des champs) est listée aussi, parce que
+  l'outil l'affiche à la place du texte anglais quand l'interface est dans cette
+  langue. Pour un remplacement, chacun de l'auteur, du nom, de la description,
+  des traductions, de la sortie et de son encodage, du mode de conservation de
+  l'erreur standard, des codes de sortie de succès et du délai est dit inchangé
+  ou modifié, sur une ligne à part. Ce modèle suppose que l'aperçu est lu : les
   autres règles ci-dessous limitent ce qu'un fichier peut demander, elles ne
   jugent pas de ce à quoi il sert.
 - **Des règles structurelles.** Le programme doit être un vrai `.exe` que Heimdall
@@ -796,12 +802,33 @@ ces arguments, avec vos droits. Le pack Recettes est désactivé par défaut.
   vous avez ajouté. Il n'est jamais lancé par un interpréteur de commandes : la
   liste d'arguments est transmise telle quelle, un élément valant un argument,
   sans guillemets, découpage ni jonction. Aucune variable d'environnement n'est
-  développée. Un texte fixe qui contient un chemin réseau, une URL, un `%` ou un
-  `@` initial est refusé à l'import, comme un choix ou une valeur par défaut qui
-  serait toujours refusé à l'exécution. Une valeur saisie est soumise à une règle
-  commune (aucun caractère de contrôle, aucun `-`, `/` ou `@` initial à l'endroit
-  où elle ouvre un argument, aucun chemin réseau ou de périphérique dans un champ
-  `path`) et à la validation de son type.
+  développée. Un texte fixe qui contient un chemin réseau (deux séparateurs de
+  suite, sous l'une ou l'autre forme et en toute combinaison : une barre oblique
+  inverse à côté d'une barre oblique compte), une URL, le préfixe de chemin
+  système (un séparateur, deux points d'interrogation et un séparateur), un `%`,
+  un `@` initial ou un caractère qui ressemble à un caractère ordinaire est
+  refusé à l'import. Un choix ou une valeur par défaut est soumis à l'import à la
+  règle que rencontre une valeur saisie à l'exécution (voir plus bas) : celui qui
+  serait toujours refusé est donc refusé avec le fichier. La racine d'un lecteur
+  ne peut pas être ajoutée comme dossier autorisé. Une valeur saisie est soumise
+  à une règle commune (aucun caractère de contrôle, aucun caractère qui
+  ressemble à un caractère ordinaire, aucune espace, aucun `-`, `/`, `@` ou
+  barre oblique inverse initial à l'endroit où elle ouvre un argument, aucun
+  chemin réseau ou de périphérique dans un champ `path`) et à la validation de
+  son type.
+- **Les racines autorisées sont vérifiées, pas approuvées en entier.** Un
+  programme sous le dossier Windows, Program Files ou Program Files (x86) est
+  refusé quand un utilisateur qui n'est pas administrateur peut modifier son
+  fichier ou un dossier au-dessus (jusqu'à cette racine), ou quand ces
+  permissions ne peuvent pas être lues. Un dossier que vous avez ajouté est
+  approuvé en entier et n'est pas vérifié.
+- **Les caractères qui ressemblent à d'autres.** Un caractère que Windows
+  transformerait en caractère ASCII ordinaire pour un programme qui lit sa ligne
+  de commande dans une page de codes (un trait d'union pleine chasse, un
+  guillemet typographique, une espace insécable) est refusé dans le texte fixe
+  et dans les valeurs saisies. La règle suit les pages de codes de la machine :
+  certaines majuscules accentuées et certaines ligatures peuvent donc être
+  refusées dans un argument sur certaines machines, et acceptées sur d'autres.
 - **Un garde-fou, en seconde ligne seulement.** Une liste de noms
   d'interpréteurs de commandes, d'interpréteurs de scripts et d'exécutables
   relais (`cmd`, `powershell`, `python`, `rundll32` et les autres de la liste de
@@ -816,10 +843,34 @@ ces arguments, avec vos droits. Le pack Recettes est désactivé par défaut.
   mène désormais à un autre fichier, ou à rien, l'exécution ne démarre pas et la
   recette doit être importée à nouveau.
 - **Un dossier de travail neuf.** Chaque exécution reçoit un dossier de travail
-  neuf et vide, supprimé ensuite.
-- **Des exécutions bornées.** Au plus 1 Mio de sortie est conservé, et une
-  exécution est arrêtée au délai de la recette (60 secondes par défaut, 600 au
-  plus).
+  neuf et vide, supprimé ensuite. Il est créé sous un dossier Heimdall de votre
+  dossier temporaire, et non dans le dossier de données : un chemin relatif donné
+  à un programme ne peut donc pas atteindre les paramètres de Heimdall.
+- **Des exécutions bornées.** Au plus 1 Mio de sortie est conservé par flux
+  (2 Mio en tout quand l'erreur standard est gardée à part), et une exécution est
+  arrêtée au délai de la recette (60 secondes par défaut, 600 au plus). Une
+  exécution en cours est aussi arrêtée quand le pack est désactivé ou devient
+  interdit.
+- **Les processus que le programme a lancés.** Le programme est démarré dans un
+  objet de travail (job) Windows qui arrête les processus qu'il a lancés quand
+  l'exécution prend fin. Si Windows refuse de le créer (par exemple quand
+  Heimdall tourne lui-même dans un job qui interdit l'imbrication), seule une
+  exécution interrompue (arrêtée ou ayant dépassé le délai) arrête l'arbre de
+  processus.
+- **Un onglet ouvert ne peut pas lancer une ancienne recette.** Un onglet garde la
+  recette avec laquelle il a été ouvert. Une fois la recette remplacée, ou
+  supprimée puis importée à nouveau, l'onglet le dit dans son en-tête et refuse
+  de s'exécuter, et ouvrir l'outil ouvre un nouvel onglet au lieu de remettre
+  celui-ci au premier plan.
+- **Le pack reste désactivé tant qu'il n'a pas été choisi.** Le pack Recettes
+  compte comme désactivé tant que l'étape unique n'a pas été exécutée ou que vous
+  n'avez pas activé l'interrupteur et enregistré : une étape qui a échoué ou a été
+  sautée (un fichier de paramètres écrit par une version plus récente n'est
+  jamais modifié) ne le laisse donc pas activé. Un fichier de paramètres importé
+  depuis les Paramètres ne l'active pas non plus : un fichier écrit par une
+  version antérieure le laisse tel quel, et seul un fichier écrit par cette
+  version où le pack était activé l'active, avec une ligne à part dans la
+  confirmation ("Active le pack Recettes").
 - **La politique.** Une organisation peut interdire le pack (voir plus bas).
 
 **Ce qui ne vous protège pas.**
@@ -840,12 +891,17 @@ ces arguments, avec vos droits. Le pack Recettes est désactivé par défaut.
   place, au même chemin, n'est donc pas détecté non plus. Un dossier que vous
   ajoutez à la liste est approuvé en entier : n'importe quel `.exe` qu'il
   contient peut être nommé par une recette.
+- La vérification des permissions des dossiers Windows et Program Files lit les
+  règles de permission seulement, celles du fichier et de chaque dossier
+  au-dessus. Elle ne lit pas le propriétaire. C'est une limite contre le cas
+  évident, pas une garantie que personne d'autre ne peut modifier le fichier.
 - La règle des dossiers lit le texte du chemin. Une lettre de lecteur associée à
   un partage réseau n'est pas détectée comme un emplacement réseau.
 - Le comportement avec certaines formes de chemin inhabituelles (noms courts
-  8.3, lecteurs substitués) et le fait que l'arrêt d'une exécution arrête aussi
-  les processus que le programme a lancés n'ont pas été vérifiés par un vrai
-  test, et rien n'est promis à leur sujet.
+  8.3, lecteurs substitués) n'a pas été vérifié par un vrai test, et rien n'est
+  promis à son sujet. Le fait que l'arrêt d'une exécution arrête aussi les
+  processus que le programme a lancés a été vérifié par un seul vrai test avec un
+  programme standard, et rien n'est promis au-delà.
 - Une recette n'est ni signée ni relue par le projet. L'auteur est un texte que
   le fichier affirme, et Heimdall l'affiche comme non vérifié. Un catalogue
   communautaire ne fait pas partie de cette version : une recette vient de qui
@@ -1484,7 +1540,7 @@ remplacer la destination.
   bloquante (la suite moins les cas marqués `CIUnstable` ou `RequiresDesktop`,
   qui tournent dans deux autres lanes signalant leurs échecs sans faire rougir
   l'exécution), la parité des locales JSON (chaque catalogue porte exactement
-  le jeu de clés anglais, actuellement 6 600+ clés) et une analyse informative
+  le jeu de clés anglais, actuellement 6 700+ clés) et une analyse informative
   `dotnet list package --vulnerable`.
 - Analyse des dépendances pour revue manuelle : `dotnet list Heimdall.slnx
   package --vulnerable --include-transitive`. La CI émet des avertissements mais

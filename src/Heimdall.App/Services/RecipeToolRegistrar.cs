@@ -39,7 +39,7 @@ public sealed class RecipeToolViewFactory
     public IToolView Create(LoadedRecipe loaded)
     {
         ArgumentNullException.ThrowIfNull(loaded);
-        return new RecipeToolView(new RecipeToolViewModel(loaded.Recipe, loaded.Entry.ResolvedProgramPath, _services));
+        return new RecipeToolView(new RecipeToolViewModel(loaded.Recipe, loaded.Entry.ResolvedProgramPath, loaded.Entry.Sha256, _services));
     }
 }
 

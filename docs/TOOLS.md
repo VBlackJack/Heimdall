@@ -263,10 +263,19 @@ against is in [SECURITY.md](SECURITY.md#recipes).
 **Turn the pack on.** The Recipes pack is off by default, on a fresh install
 and on an install that already existed (a one-time step at the first start of
 this version lists it among the turned-off packs, and never turns it off again
-once you have turned it on). The switch is in
+once you have turned it on). The pack counts as off until that step has run or
+you have turned the switch on and saved, so a start where the step could not run
+(a settings file written by a newer Heimdall is never written to) does not leave
+it on. The switch is in
 `Settings > Advanced > Tools & integrations > Tool packs` and carries a warning
 line. When the organisation forbids the pack by policy, the switch is off and
 disabled and import is refused (see [SECURITY.md](SECURITY.md#recipes)).
+
+A settings file imported with **Import settings** never turns the pack on by
+itself. A file exported by an earlier version leaves it as it is. A file exported
+by this version turns it on only when it comes from an installation where the pack
+was on; the confirmation then shows a line of its own, "Turns the Recipes pack
+on", among the lines to check first.
 
 **Import.** In `Settings > Advanced > Tools & integrations > Recipes`, choose
 **Import a recipe...** and pick the file. Import is possible while the pack is
@@ -286,8 +295,10 @@ with a nested list marked as one that is kept or dropped as a whole; the name,
 the author (marked unverified), the id, the version and the description; every
 field with its type, whether it is required, its default, its choices, its
 pattern and its maximum length, and the arguments a switch adds when it is on;
-whether the recipe reads the host and the port of the selected session; how the
-output is shown; and the timeout. A control or invisible character is written
+every translation of the recipe (the language, the name, the description and the
+field labels), since the tool shows it instead of the English text when the
+interface is in that language; whether the recipe reads the host and the port of
+the selected session; how the output is shown; and the timeout. A control or invisible character is written
 as `\uXXXX`. In the program, the arguments and the defaults, every character
 outside printable ASCII is written as `\uXXXX` too, so a look-alike letter
 cannot pass for the ASCII one.
@@ -306,16 +317,34 @@ the recipe needs one, and every value typed (see "What is refused" below). It
 then resolves the program again and compares the result with the path recorded
 at import: when the program now resolves to another file, or no longer
 resolves, the run is refused and the message asks you to import the recipe
-again. It creates a fresh, empty working folder for the run under `recipe-runs`
-in the data folder, and removes it afterwards (the leftovers of an earlier
-crash are removed at start). The program starts without a window, with its
-standard input closed, with the rights and the environment of Heimdall itself.
-At most 1 MiB of output is kept: the rest is read and discarded, and a line
-says the output was cut. The run ends at the timeout of the recipe.
+again. It creates a fresh, empty working folder for the run under
+`Heimdall-recipe-runs` in your temporary folder (in a subfolder named after the
+data folder in use, so that two instances never share it), not in the data folder (so that
+a relative path given to a program cannot reach the settings of Heimdall), and
+removes it afterwards (the leftovers of an earlier crash are removed at start).
+The program starts without a window, with its standard input closed, with the
+rights and the environment of Heimdall itself, inside a Windows job object that
+ends the processes it started when the run ends; when Windows refuses to create
+the job, only a run that is stopped or times out kills the process tree. At most
+1 MiB of output is kept per stream (2 MiB in all when standard error is kept
+apart): the rest is read and discarded, and a line says the output was cut. The
+run ends at the timeout of the recipe, and also when the pack is turned off or
+becomes forbidden.
+
+**Replacing or removing a recipe that has a tab open.** A tab keeps the recipe
+it was opened with. Once that recipe is replaced, or removed and imported
+again, the tab says "This recipe was replaced or removed after this tab was
+opened. Close this tab and open the tool again." in its header, **Run** is
+disabled, and a run refuses to start. Opening the tool never focuses such a
+tab: it opens a new one.
 
 **Replace.** Importing a file whose `id` is already imported is a replacement.
 The preview is titled "Replace recipe" and states the old and the new version,
-and whether the arguments, the fields and the program changed.
+and whether the arguments, the fields and the program changed. Each of the
+author, the name, the description, the translations, the output and its
+encoding, the way standard error is kept, the success exit codes and the timeout
+is also said on a line of its own, as "unchanged" or "changed", comparing the
+parsed recipes and not the bytes.
 
 **Export.** The export button of a recipe in the Settings list writes a copy of
 the file exactly as it was imported. It refuses when the stored file no longer
@@ -335,9 +364,9 @@ carry recipes.
 from the Windows folder, Program Files and Program Files (x86). To allow
 another folder, use **Add a folder...** in the same Recipes section of the
 Settings, then save the settings and import the recipe again. A folder must be
-a full path on a drive letter (`D:\Tools`), at most 240 characters, with no
-network path, no device path, no `.` or `..` part, no `%`, no wildcard and no
-part that ends with a dot or a space. At most 32 folders are kept. A settings
+a full path on a drive letter (`D:\Tools`) and not the root of a drive
+(`D:\`), at most 240 characters, with no network path, no device path, no `.` or
+`..` part, no `%`, no wildcard and no part that ends with a dot or a space. At most 32 folders are kept. A settings
 file that carries this list is flagged as sensitive in the import preview.
 
 ### Writing a recipe
@@ -527,6 +556,10 @@ used. It must satisfy all of this:
 - it exists, and once every link or junction is followed its final location is
   under the Windows folder, Program Files, Program Files (x86) or a folder
   allowed in Settings. A link that leads outside them is refused;
+- under the Windows folder, Program Files or Program Files (x86), neither the
+  file nor any folder above it (up to that root) may let a user who is not an
+  administrator change it, and the permissions must be readable. A folder allowed
+  in Settings is trusted as a whole and is not checked this way;
 - a bare name is looked for only in the entries of the `PATH` variable that are
   themselves under those folders, in `PATH` order; the first file found
   decides. The current folder and the folder of Heimdall are never searched;
@@ -545,8 +578,11 @@ boundary (see [SECURITY.md](SECURITY.md#recipes)). It holds: `cmd`,
 `msbuild`, `certutil`, `bitsadmin`, `wmic`, `forfiles`, `schtasks`, `sc`, `reg`,
 `net`, `net1`, `curl`, `ssh`, `scp`, `sftp`, `ftp`, `tftp`, `git`, `tar`,
 `robocopy`, `xcopy`, `expand`, `extrac32`, `makecab`, `hh`, `control`,
-`explorer`, `conhost`, `cmstp`, `odbcconf`, `pcalua`, `scriptrunner`, `at` and
-`taskkill`, plus the shell targets the rest of Heimdall already refuses (such
+`explorer`, `conhost`, `cmstp`, `odbcconf`, `pcalua`, `scriptrunner`, `at`,
+`taskkill`, `msedge`, `chrome`, `firefox`, `brave`, `opera`,
+`SyncAppvPublishingServer`, `wt`, `tttracer`, `pcwrun`, `esentutl`, `replace`,
+`mmc`, `msdt`, `runas`, `dotnet`, `csc`, `vbc`, `jsc`, `ie4uinit` and
+`presentationhost`, plus the shell targets the rest of Heimdall already refuses (such
 as the script extensions `.bat`, `.cmd`, `.ps1`, `.vbs`, `.js`, `.wsf` and
 `.hta`).
 
@@ -577,11 +613,19 @@ each with its line and column when it is known.
   stands alone in a token (put it in a nested list); a switch is mixed with
   other text.
 - The fixed text (the program, a token, a `whenTrue` token, a default, a choice)
-  holds a double backslash or a double slash (a network path), `://` (a URL), a
-  `%` (an environment variable), or starts with `@` (a response file). The
-  entry at fault is named.
-- A choice or a default starts with `-`, `/` or `@` where its field starts an
-  argument. It would be refused at every run, so the file is refused at
+  holds two separators in a row (a double backslash, a double slash, or a
+  backslash next to a slash in either order: a network path), `://` (a URL), the
+  system path prefix (a separator, two question marks and a separator), a `%` (an
+  environment variable), a character that looks like a plain one (a typographic
+  quote, a long dash, a full-width letter, a no-break space, or any character the
+  code pages of the machine turn into an ASCII one), or starts with `@` (a
+  response file). The entry at fault is named. The look-alike rule follows the
+  code pages of the machine, so some accented capitals and ligatures can be
+  refused in an argument on some machines and accepted on others.
+- A choice or a default would be refused at every run by the rule a typed value
+  meets (see below): it holds a control or look-alike character, it starts with
+  `-`, `/`, `@`, a backslash or a space where its field starts an argument, or
+  it joins the text next to it into a doubled separator. The file is refused at
   import. Keep the character in the fixed text of the token and list only the
   bare values: write `"-type={in:record}"` with the choices `A` and `MX`, not
   `"{in:record}"` with the choices `-type=A` and `-type=MX`.
@@ -594,14 +638,16 @@ its version resource). The message names the program and, when the cause is the
 folder, tells you to add the folder in Settings, save, and import again.
 
 **A typed value, at each run.** A required field that is empty; a value with a
-control or invisible character; a value that starts with `-`, `/` or `@` where
-its placeholder starts the argument (a leading `-` is how a value gets read as
-an option, a leading `@` as a response file); a value that does not fit its
+control or invisible character, or a look-alike one; a value that starts with
+`-`, `/`, `@`, a backslash or a space where its placeholder starts the argument
+(a leading `-` is how a value gets read as an option, a leading `@` as a
+response file); a value that does not fit its
 type (see the table above); a value that is too long, outside its choices or
 that does not match its pattern; a value that, joined to the fixed text next to
 it, would make a doubled separator (a network path or the start of a URL); and
-any final argument that holds a double backslash, a double slash or `://`,
-whatever its source. The field shows the reason.
+any final argument that holds two separators in a row (in either form and in
+any mix), the system path prefix or `://`, whatever its source. The field shows
+the reason.
 
 **The program has changed, at each run.** When the program no longer resolves to
 the path recorded at import (another file now answers to the same name, or it

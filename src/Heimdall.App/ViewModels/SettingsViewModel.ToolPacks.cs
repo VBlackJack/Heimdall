@@ -17,6 +17,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using Heimdall.App.Services;
 using Heimdall.App.ViewModels.Settings;
+using Heimdall.Core.Configuration;
 using Heimdall.Core.Models;
 
 namespace Heimdall.App.ViewModels;
@@ -39,6 +40,13 @@ public partial class SettingsViewModel
     private readonly IToolAvailability? _toolAvailability;
     private readonly ToolRegistry _toolRegistry;
     private IReadOnlyList<ToolPackSwitchViewModel>? _toolPackSwitches;
+    private readonly IUiDispatcher? _toolPackUiDispatcher;
+
+    /// <summary>
+    /// Whether the Recipes pack's marker is set in the pending settings. The pack counts as off while
+    /// it is not, whatever the list says, so the switch reads off until the user turns it on.
+    /// </summary>
+    private bool _recipesPackMigrated;
 
     /// <summary>
     /// The pending list of switched-off pack names. Bound to the settings file member of the
@@ -159,13 +167,45 @@ public partial class SettingsViewModel
                 _toolRegistry.All.Count(descriptor => descriptor.Pack == current),
                 _toolAvailability?.IsPackForbiddenByPolicy(current) ?? false,
                 PackCarriesWarning(current),
-                () => !ListsPack(DisabledToolPacks, current),
-                enabled => DisabledToolPacks = WithPackState(DisabledToolPacks, current, enabled));
+                () => !ListsPack(DisabledToolPacks, current) && (current != ToolPack.Recipes || _recipesPackMigrated),
+                enabled => WriteToolPackState(current, enabled));
             ApplyToolPackTexts(toolPackSwitch);
             switches.Add(toolPackSwitch);
         }
 
         return switches;
+    }
+
+    private void WriteToolPackState(ToolPack pack, bool enabled)
+    {
+        if (enabled && pack == ToolPack.Recipes && !_recipesPackMigrated)
+        {
+            // The list may already lack the pack while the marker is missing: the choice then lives in
+            // the marker alone, which the comparison with the saved settings cannot see.
+            _recipesPackMigrated = true;
+            MarkEditTheComparisonCannotSee();
+        }
+
+        string[] next = WithPackState(DisabledToolPacks, pack, enabled);
+        if (!next.SequenceEqual(DisabledToolPacks, StringComparer.Ordinal))
+        {
+            DisabledToolPacks = next;
+        }
+    }
+
+    /// <summary>Reads the marker of the Recipes pack from the settings the panel was loaded from.</summary>
+    private void LoadRecipesPackMarker(AppSettings settings)
+    {
+        _recipesPackMigrated = settings.RecipesPackMigrated;
+        if (_toolPackSwitches is null)
+        {
+            return;
+        }
+
+        foreach (ToolPackSwitchViewModel toolPackSwitch in _toolPackSwitches)
+        {
+            toolPackSwitch.RefreshState();
+        }
     }
 
     /// <summary>Rewords every switch, after the interface language changed.</summary>
@@ -217,6 +257,18 @@ public partial class SettingsViewModel
     /// removed, since the count is read from the registry and the registry changes after the panel is built.
     /// </summary>
     private void OnRecipeToolsChanged()
+    {
+        // The registry raises the event on whatever thread registered the recipes.
+        if (_toolPackUiDispatcher is null || _toolPackUiDispatcher.CheckAccess())
+        {
+            ApplyRecipeToolCount();
+            return;
+        }
+
+        _ = _toolPackUiDispatcher.InvokeAsync(ApplyRecipeToolCount);
+    }
+
+    private void ApplyRecipeToolCount()
     {
         if (_toolPackSwitches is null)
         {

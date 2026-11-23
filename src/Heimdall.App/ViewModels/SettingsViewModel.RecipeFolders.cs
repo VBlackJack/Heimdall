@@ -113,6 +113,6 @@ public partial class SettingsViewModel
         RecipeProgramFolders = [.. RecipeProgramFolders.Where(item => !string.Equals(item, folder, StringComparison.OrdinalIgnoreCase))];
     }
 
-    /// <summary>Rewords the recipe list after the interface language changed.</summary>
-    private void RefreshRecipeTexts() => Recipes?.Refresh();
+    /// <summary>Rewords the recipe list after the interface language changed; it does not read the folder if the list was never shown.</summary>
+    private void RefreshRecipeTexts() => Recipes?.RefreshIfLoaded();
 }

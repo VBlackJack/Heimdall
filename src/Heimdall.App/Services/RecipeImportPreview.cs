@@ -104,6 +104,9 @@ public static class RecipeImportPreview
         AppendInputs(localizer, text, recipe);
         text.AppendLine();
 
+        AppendTranslations(localizer, text, recipe);
+        text.AppendLine();
+
         text.AppendLine(localizer.Format(
             "RecipeImportPreviewSession",
             YesNo(localizer, plan.SessionUse.UsesHost),
@@ -179,7 +182,36 @@ public static class RecipeImportPreview
         text.AppendLine(Indent + (string.Equals(oldPath, plan.ResolvedProgramPath, StringComparison.OrdinalIgnoreCase)
             ? localizer["RecipeImportReplaceProgramSame"]
             : localizer.Format("RecipeImportReplaceProgramChanged", Exact(oldPath), Exact(plan.ResolvedProgramPath))));
+
+        if (plan.Previous is { } old)
+        {
+            AppendUnchangedOrChanged(localizer, text, string.Equals(old.Author, plan.Recipe.Author, StringComparison.Ordinal), "RecipeImportReplaceAuthorSame", "RecipeImportReplaceAuthorChanged");
+            AppendUnchangedOrChanged(localizer, text, string.Equals(old.Name, plan.Recipe.Name, StringComparison.Ordinal), "RecipeImportReplaceNameSame", "RecipeImportReplaceNameChanged");
+            AppendUnchangedOrChanged(localizer, text, string.Equals(old.Description, plan.Recipe.Description, StringComparison.Ordinal), "RecipeImportReplaceDescriptionSame", "RecipeImportReplaceDescriptionChanged");
+            AppendUnchangedOrChanged(localizer, text, SameTranslations(old, plan.Recipe), "RecipeImportReplaceTranslationsSame", "RecipeImportReplaceTranslationsChanged");
+            AppendUnchangedOrChanged(localizer, text, old.Output == plan.Recipe.Output && old.OutputEncoding == plan.Recipe.OutputEncoding, "RecipeImportReplaceOutputSame", "RecipeImportReplaceOutputChanged");
+            AppendUnchangedOrChanged(localizer, text, old.Stderr == plan.Recipe.Stderr, "RecipeImportReplaceStderrSame", "RecipeImportReplaceStderrChanged");
+            AppendUnchangedOrChanged(localizer, text, old.SuccessExitCodes.SequenceEqual(plan.Recipe.SuccessExitCodes), "RecipeImportReplaceExitCodesSame", "RecipeImportReplaceExitCodesChanged");
+            AppendUnchangedOrChanged(localizer, text, old.TimeoutSeconds == plan.Recipe.TimeoutSeconds, "RecipeImportReplaceTimeoutSame", "RecipeImportReplaceTimeoutChanged");
+        }
     }
+
+    // One line per property, and only the words "unchanged" or "changed": what changed is read in the
+    // preview below, which shows the new recipe whole.
+    private static void AppendUnchangedOrChanged(LocalizationManager localizer, StringBuilder text, bool same, string sameKey, string changedKey)
+        => text.AppendLine(Indent + localizer[same ? sameKey : changedKey]);
+
+    /// <summary>Whether two recipes carry the same translations, compared as parsed: every language, name, description and field label.</summary>
+    private static bool SameTranslations(Recipe left, Recipe right)
+        => left.Labels.Count == right.Labels.Count
+            && left.Labels.All(pair =>
+                right.Labels.TryGetValue(pair.Key, out RecipeLabels? other)
+                && string.Equals(pair.Value.Name, other.Name, StringComparison.Ordinal)
+                && string.Equals(pair.Value.Description, other.Description, StringComparison.Ordinal)
+                && pair.Value.Fields.Count == other.Fields.Count
+                && pair.Value.Fields.All(field =>
+                    other.Fields.TryGetValue(field.Key, out string? label)
+                    && string.Equals(field.Value, label, StringComparison.Ordinal)));
 
     /// <summary>Whether two recipes pass the same arguments, compared as parsed (groups and tokens), not as bytes.</summary>
     private static bool SameArguments(Recipe left, Recipe right)
@@ -230,6 +262,37 @@ public static class RecipeImportPreview
             {
                 number++;
                 text.AppendLine(Token(localizer, "RecipeImportPreviewGroupArgument", number, token));
+            }
+        }
+    }
+
+    // Every translation is shown, because the view shows it instead of the English text when the
+    // interface is in that language: a label that was never read here could say anything.
+    private static void AppendTranslations(LocalizationManager localizer, StringBuilder text, Recipe recipe)
+    {
+        text.AppendLine(localizer["RecipeImportPreviewLabelsHeading"]);
+        if (recipe.Labels.Count == 0)
+        {
+            text.AppendLine(Indent + localizer["RecipeImportPreviewNone"]);
+            return;
+        }
+
+        foreach ((string tag, RecipeLabels labels) in recipe.Labels.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+        {
+            text.AppendLine(localizer.Format("RecipeImportPreviewLabelsLanguage", Plain(tag)));
+            if (labels.Name is not null)
+            {
+                text.AppendLine(localizer.Format("RecipeImportPreviewLabelsName", Plain(labels.Name)));
+            }
+
+            if (labels.Description is not null)
+            {
+                text.AppendLine(localizer.Format("RecipeImportPreviewLabelsDescription", Plain(labels.Description)));
+            }
+
+            foreach ((string field, string label) in labels.Fields.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+            {
+                text.AppendLine(localizer.Format("RecipeImportPreviewLabelsField", Exact(field), Plain(label)));
             }
         }
     }

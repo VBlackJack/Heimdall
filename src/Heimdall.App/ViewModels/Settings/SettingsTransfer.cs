@@ -37,6 +37,10 @@ internal sealed record SettingsTransferChange(string Key, JsonNode? Before, Json
 /// the vault material, the PIN hash and its lockout, the Git access token, the gateways and
 /// their stored passwords, window geometry, the last selection, the migration markers - so a
 /// secret added to the settings type later cannot leak through an export nobody updated.</para>
+/// <para>One marker travels besides the allow-list: <see cref="AppSettings.RecipesPackMigrated"/>, so an
+/// import can tell a file written by a build that knows the Recipes pack from an older one. An older
+/// file lists only the packs of its day, so laying its list over the settings must not turn Recipes on;
+/// only a file that carries the marker and does not list the pack, whose owner turned it on, does.</para>
 /// <para>Two panel settings are held back as well: the credential provider unlock secret, which is
 /// a secret the panel happens to edit, and the tools panel toggle, which is window state. A path
 /// under the user's own profile is machine-specific and is left out unless the user asks for it.
@@ -55,6 +59,12 @@ internal static class SettingsTransfer
     internal const string VersionProperty = "version";
 
     internal const string SettingsProperty = "settings";
+
+    /// <summary>
+    /// The key of the change that stands for "this file turns the Recipes pack on". It is not a
+    /// setting: the preview words it as a line of its own, among the sensitive ones.
+    /// </summary>
+    internal const string RecipesPackTurnedOnKey = "RecipesPackTurnedOn";
 
     /// <summary>Panel settings that are never exported, although the panel edits them.</summary>
     private static readonly HashSet<string> HeldBack = new(StringComparer.Ordinal)
@@ -123,6 +133,11 @@ internal static class SettingsTransfer
                 : value?.DeepClone();
         }
 
+        if (settings.RecipesPackMigrated)
+        {
+            exported[nameof(AppSettings.RecipesPackMigrated)] = true;
+        }
+
         return new JsonObject
         {
             [FormatProperty] = FormatName,
@@ -153,6 +168,7 @@ internal static class SettingsTransfer
 
         JsonObject merged = JsonSerializer.SerializeToNode(current)!.AsObject();
         List<SettingsTransferChange> changed = [];
+        bool turnsRecipesPackOn = false;
         foreach ((string key, JsonNode? fileValue) in imported)
         {
             if (!TransferableKeys.Contains(key))
@@ -171,6 +187,11 @@ internal static class SettingsTransfer
             // A folder a recipe may run programs from has to pass the same rule as one added in the
             // panel: a network or device path in a settings file is dropped, not carried over.
             JsonNode? value = key == nameof(AppSettings.RecipeProgramFolders) ? KeepAcceptableFolders(fileValue) : fileValue;
+            if (key == nameof(AppSettings.DisabledToolPacks))
+            {
+                value = KeepRecipesPackOff(current, fileValue, imported, out bool turnsOn);
+                turnsRecipesPackOn |= turnsOn;
+            }
 
             JsonNode? before = merged[key];
             if (!JsonNode.DeepEquals(before, value))
@@ -179,6 +200,12 @@ internal static class SettingsTransfer
             }
 
             merged[key] = value?.DeepClone();
+        }
+
+        if (turnsRecipesPackOn)
+        {
+            merged[nameof(AppSettings.RecipesPackMigrated)] = true;
+            changed.Add(new SettingsTransferChange(RecipesPackTurnedOnKey, JsonValue.Create(false), JsonValue.Create(true)));
         }
 
         AppSettings result = merged.Deserialize<AppSettings>()
@@ -203,6 +230,40 @@ internal static class SettingsTransfer
         UriBuilder builder = new(uri) { UserName = string.Empty, Password = string.Empty };
         return JsonValue.Create(builder.Uri.ToString());
     }
+
+    /// <summary>
+    /// The list of switched-off packs a settings file would set, with the Recipes pack kept in it when
+    /// it is in the list now and the file does not speak for it: a file written before the pack
+    /// existed lists only the packs of its day, and no file turns a pack that runs programs on by
+    /// leaving it out. A file that carries <see cref="AppSettings.RecipesPackMigrated"/> was written by
+    /// a build that knows the pack, so leaving it out of the list is the owner's choice.
+    /// </summary>
+    private static JsonNode? KeepRecipesPackOff(AppSettings current, JsonNode? fileValue, JsonObject imported, out bool turnsOn)
+    {
+        turnsOn = false;
+        if (fileValue is not JsonArray fileList
+            || !SettingsViewModel.ListsPack(current.DisabledToolPacks, Heimdall.Core.Models.ToolPack.Recipes)
+            || fileList.Any(IsRecipesPackName))
+        {
+            return fileValue;
+        }
+
+        if (imported[nameof(AppSettings.RecipesPackMigrated)] is JsonValue marker
+            && marker.GetValueKind() == JsonValueKind.True)
+        {
+            turnsOn = true;
+            return fileValue;
+        }
+
+        JsonArray kept = (JsonArray)fileList.DeepClone();
+        kept.Add(nameof(Heimdall.Core.Models.ToolPack.Recipes));
+        return kept;
+    }
+
+    private static bool IsRecipesPackName(JsonNode? item)
+        => item is JsonValue scalar
+            && scalar.GetValueKind() == JsonValueKind.String
+            && SettingsViewModel.ListsPack([scalar.GetValue<string>()], Heimdall.Core.Models.ToolPack.Recipes);
 
     /// <summary>The folders of a settings file that pass <see cref="RecipeFolderRule"/>, in their stored form; other values are left alone.</summary>
     private static JsonNode? KeepAcceptableFolders(JsonNode? value)

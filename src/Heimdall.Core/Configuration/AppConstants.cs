@@ -48,8 +48,12 @@ public static class AppConstants
     /// <summary>Writable subfolder holding the imported recipe files and their index.</summary>
     public const string RecipesDirectoryName = "recipes";
 
-    /// <summary>Writable subfolder holding one fresh working folder per recipe run; emptied at start.</summary>
-    public const string RecipeRunsDirectoryName = "recipe-runs";
+    /// <summary>
+    /// Subfolder of the user's temporary folder holding one fresh working folder per recipe run; emptied
+    /// at start. It sits outside the data directory so that a relative path in a recipe cannot reach
+    /// the settings.
+    /// </summary>
+    public const string RecipeRunsTempDirectoryName = "Heimdall-recipe-runs";
 
     /// <summary>Writable notes subfolder within the legacy relative config path.</summary>
     public const string NotesDirectoryName = "notes";

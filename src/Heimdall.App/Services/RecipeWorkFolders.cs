@@ -15,6 +15,8 @@
  */
 
 using System.IO;
+using System.Security.Cryptography;
+using System.Text;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Logging;
 
@@ -38,19 +40,43 @@ public interface IRecipeWorkFolders
     void CleanStale();
 }
 
-/// <summary>The run folders of the application, one subfolder per run under the data directory.</summary>
+/// <summary>
+/// The run folders of the application, one subfolder per run under a root in the user's temporary
+/// folder. The root is not under the data directory on purpose: a program run from a folder there
+/// could reach the settings through a relative path.
+/// </summary>
 public sealed class RecipeWorkFolders : IRecipeWorkFolders
 {
     private const string FolderIdFormat = "N";
 
+    /// <summary>How many hexadecimal characters of the digest of the data directory name the root.</summary>
+    private const int RootKeyLength = 16;
+
     private readonly string _root;
 
-    /// <summary>Creates the service over the run folder root of a data directory.</summary>
+    /// <summary>Creates the service over a run folder root.</summary>
+    /// <param name="root">The folder under which each run gets its own folder; <see cref="DefaultRoot(string)"/> in production.</param>
+    public RecipeWorkFolders(string root)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(root);
+        _root = Path.GetFullPath(root);
+    }
+
+    /// <summary>
+    /// The production root: a folder in the user's temporary folder named after a digest of the data
+    /// directory, so that two instances on different data directories never share a root (one's
+    /// stale cleanup would delete the other's live run folder) and the same data directory finds
+    /// its root again after a restart.
+    /// </summary>
     /// <param name="dataRoot">The application data directory (the one <c>--data-dir</c> overrides).</param>
-    public RecipeWorkFolders(string dataRoot)
+    public static string DefaultRoot(string dataRoot)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(dataRoot);
-        _root = Path.GetFullPath(ApplicationDataPathResolver.GetRecipeRunsDirectory(dataRoot));
+
+        string full = Path.GetFullPath(dataRoot).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        byte[] digest = SHA256.HashData(Encoding.UTF8.GetBytes(full.ToUpperInvariant()));
+        string key = Convert.ToHexStringLower(digest)[..RootKeyLength];
+        return Path.Combine(Path.GetTempPath(), AppConstants.RecipeRunsTempDirectoryName, key);
     }
 
     /// <inheritdoc />

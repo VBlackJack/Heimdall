@@ -1458,8 +1458,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         IToolAvailability? toolAvailability = null,
         ToolRegistry? toolRegistry = null,
         RecipeSettingsViewModel? recipes = null,
-        IRecipeFileDialogs? recipeFileDialogs = null)
+        IRecipeFileDialogs? recipeFileDialogs = null,
+        IUiDispatcher? uiDispatcher = null)
     {
+        _toolPackUiDispatcher = uiDispatcher;
         _sftpSudoFallbackPolicy = sftpSudoFallbackPolicy ?? new SftpSudoFallbackPolicy();
         _toolAvailability = toolAvailability;
         _toolRegistry = toolRegistry ?? new ToolRegistry();
@@ -1860,6 +1862,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             CollapseTunnelsPanelByDefault = settings.CollapseTunnelsPanelByDefault;
             ExternalEditorPath = settings.ExternalEditorPath;
             DisabledToolPacks = settings.DisabledToolPacks?.ToArray() ?? [];
+            LoadRecipesPackMarker(settings);
             RecipeProgramFolders = settings.RecipeProgramFolders?.ToArray() ?? [];
 
             // Updates
@@ -2357,6 +2360,11 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         settings.CollapseTunnelsPanelByDefault = CollapseTunnelsPanelByDefault;
         settings.ExternalEditorPath = ExternalEditorPath;
         settings.DisabledToolPacks = [.. DisabledToolPacks];
+        if (_recipesPackMigrated)
+        {
+            ToolPackMigration.RecordRecipesPackChoice(settings);
+        }
+
         settings.RecipeProgramFolders = [.. RecipeProgramFolders];
         settings.UpdateCheckEnabled = UpdateCheckEnabled;
         settings.UpdateCheckIntervalHours = UpdateCheckIntervalHours;

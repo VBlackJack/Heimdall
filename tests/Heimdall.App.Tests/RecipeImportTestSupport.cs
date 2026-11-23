@@ -187,7 +187,9 @@ internal static class RecipeImportFiles
         string author = "Acme",
         string description = "Ping the selected host.",
         string argumentsJson = "[\"-n\", \"{Host}\"]",
-        string inputsJson = "[]")
+        string inputsJson = "[]",
+        string? labelsJson = null,
+        string? extraProperties = null)
         => $$"""
             {
               "schemaVersion": 1,
@@ -198,9 +200,12 @@ internal static class RecipeImportFiles
               "description": "{{description}}",
               "program": "{{program}}",
               "arguments": {{argumentsJson}},
-              "inputs": {{inputsJson}}
+              "inputs": {{inputsJson}}{{OptionalProperty("labels", labelsJson)}}{{(extraProperties is null ? string.Empty : "," + extraProperties)}}
             }
             """;
+
+    private static string OptionalProperty(string name, string? json)
+        => json is null ? string.Empty : $",\"{name}\": {json}";
 
     public static byte[] Bytes(
         string id = "acme.ping",
@@ -210,8 +215,10 @@ internal static class RecipeImportFiles
         string author = "Acme",
         string description = "Ping the selected host.",
         string argumentsJson = "[\"-n\", \"{Host}\"]",
-        string inputsJson = "[]")
-        => Encoding.UTF8.GetBytes(Json(id, version, program, name, author, description, argumentsJson, inputsJson));
+        string inputsJson = "[]",
+        string? labelsJson = null,
+        string? extraProperties = null)
+        => Encoding.UTF8.GetBytes(Json(id, version, program, name, author, description, argumentsJson, inputsJson, labelsJson, extraProperties));
 
     /// <summary>Writes a recipe file in <paramref name="folder"/> and returns its path.</summary>
     public static string Write(string folder, byte[] bytes, string fileName = "recipe.heimdall-recipe.json")

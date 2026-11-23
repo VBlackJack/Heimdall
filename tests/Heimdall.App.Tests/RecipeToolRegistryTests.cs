@@ -320,8 +320,8 @@ public sealed class RecipeToolRegistryTests
         ToolRegistry registry = new();
         registry.RegisterRecipeTools([RecipeTestFiles.Recipe("acme.ping")], NoView);
         ToolPackPolicy open = new(_ => null);
-        AppSettings off = new() { DisabledToolPacks = [nameof(ToolPack.Recipes)] };
-        AppSettings on = new();
+        AppSettings off = new() { DisabledToolPacks = [nameof(ToolPack.Recipes)], RecipesPackMigrated = true };
+        AppSettings on = new() { RecipesPackMigrated = true };
 
         Assert.Equal(ToolAvailabilityState.DisabledByUser, new ToolAvailability(registry, open, () => off, _ => { }).GetState("TOOL:RCP:acme.ping"));
         Assert.Equal(ToolAvailabilityState.Available, new ToolAvailability(registry, open, () => on, _ => { }).GetState("TOOL:RCP:acme.ping"));

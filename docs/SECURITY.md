@@ -707,20 +707,41 @@ pack is off by default.
   Heimdall shows the program as the full path it resolved, then every argument
   exactly as written in the file, one per line. Control and invisible
   characters, and every character outside printable ASCII in the program, the
-  arguments and the defaults, are shown as `\uXXXX`. This model assumes the
-  preview is read: the other rules below are limits on what a file can ask for,
-  not a judgment on what it is for.
+  arguments and the defaults, are shown as `\uXXXX`. Every translation the file
+  carries (language, name, description and field labels) is listed too, because
+  the tool shows it instead of the English text when the interface is in that
+  language. For a replacement, each of the author, the name, the description,
+  the translations, the output and its encoding, the way standard error is kept,
+  the success exit codes and the timeout is said to be unchanged or changed, on
+  a line of its own. This model assumes the preview is read: the other rules
+  below are limits on what a file can ask for, not a judgment on what it is for.
 - **Structural rules.** The program must be a real `.exe` that Heimdall resolves
   itself (the operating system search order is never used), and its final
   location, once links are followed, must lie under the Windows folder, Program
   Files, Program Files (x86) or a folder you added. It is never started through a
   shell: the argument list is passed as is, one token being one argument, with
   no quoting, splitting or joining. No environment variable is expanded. Fixed
-  text that holds a network path, a URL, a `%` or a leading `@` is refused at
-  import, and so is a choice or a default that would always be refused at run
-  time. A typed value is held to a common rule (no control character, no
-  leading `-`, `/` or `@` where it starts an argument, no network or device
-  path in a `path` field) and to the validation of its type.
+  text that holds a network path (two separators in a row, in either form and in
+  any mix, so a backslash next to a slash counts), a URL, the system path prefix
+  (a separator, two question marks and a separator), a `%`, a leading `@` or a
+  character that looks like a plain one is refused at import. A choice or a
+  default is held at import to the rule a typed value meets at run time (see
+  below), so one that would always be refused is refused with the file. A drive
+  root cannot be added as an allowed folder. A typed value is held to a common
+  rule (no control character, no look-alike character, no leading space, `-`,
+  `/`, `@` or backslash where it starts an argument, no network or device path in
+  a `path` field) and to the validation of its type.
+- **Allowed roots are checked, not trusted as a whole.** A program under the
+  Windows folder, Program Files or Program Files (x86) is refused when a user who
+  is not an administrator can change its file or a folder above it (up to that
+  root), or when those permissions cannot be read. A folder you added is trusted
+  as a whole and is not checked.
+- **Look-alike characters.** A character that Windows would turn into a plain
+  ASCII one for a program that reads its command line in a code page (a
+  full-width hyphen, a typographic quote, a no-break space) is refused in the
+  fixed text and in typed values. The rule follows the code pages of the machine,
+  so some accented capitals and ligatures can be refused in an argument on some
+  machines and accepted on others.
 - **A seat belt, as a second line only.** A list of names of shells,
   interpreters and proxy executables (`cmd`, `powershell`, `python`, `rundll32`
   and the others listed in [TOOLS.md](TOOLS.md#recipes)) is checked on the file
@@ -733,9 +754,29 @@ pack is off by default.
   recorded and compared before each run. If the name now leads to another file,
   or to nothing, the run does not start and the recipe has to be imported again.
 - **A fresh working folder.** Each run gets a new, empty working folder, removed
-  afterwards.
-- **Bounded runs.** At most 1 MiB of output is kept, and a run is stopped at the
-  timeout of the recipe (60 seconds by default, 600 at most).
+  afterwards. It is created under a Heimdall folder in your temporary folder, not
+  in the data folder, so that a relative path given to a program cannot reach the
+  settings of Heimdall.
+- **Bounded runs.** At most 1 MiB of output is kept per stream (2 MiB in all when
+  standard error is kept apart), and a run is stopped at the timeout of the
+  recipe (60 seconds by default, 600 at most). A run under way is also stopped
+  when the pack is turned off or becomes forbidden.
+- **The processes the program started.** The program is started inside a Windows
+  job object that ends the processes it started when the run ends. If Windows
+  refuses to create it (for example when Heimdall itself runs inside a job that
+  forbids nesting), only a run that is interrupted (stopped or timed out) kills
+  the process tree.
+- **An open tab cannot run an old recipe.** A tab keeps the recipe it was opened
+  with. Once the recipe is replaced, or removed and imported again, the tab says
+  so in its header and refuses to run, and opening the tool opens a new tab
+  instead of focusing that one.
+- **The pack stays off until it was chosen.** The Recipes pack counts as off until
+  the one-time step has run or you turned the switch on and saved, so a step that
+  failed or was skipped (a settings file written by a newer Heimdall is never
+  written to) does not leave it on. A settings file imported from Settings does
+  not turn it on either: a file written by an earlier version leaves it as it
+  is, and only a file written by this version where the pack was on turns it
+  on, with a line of its own in the confirmation ("Turns the Recipes pack on").
 - **The policy.** An organisation can forbid the pack (see below).
 
 **What does not protect you.**
@@ -754,11 +795,16 @@ pack is off by default.
   is a comparison of paths, so a program replaced in place, at the same path, is
   not detected either. A folder you add to the list is trusted as a whole: any
   `.exe` under it can be named by a recipe.
+- The permission check of the Windows and Program Files folders reads the
+  permission rules only, those of the file and of each folder above it. It does
+  not read the owner. It is a limit on the obvious case, not a guarantee that
+  nobody else can change the file.
 - The folder rule reads the text of the path. A drive letter that is mapped to a
   network share is not detected as a network location.
-- Behavior with some unusual path forms (short 8.3 names, substituted drives) and
-  whether ending a run also ends the processes the program started have not been
-  verified by a real test, and nothing is promised about them.
+- Behavior with some unusual path forms (short 8.3 names, substituted drives) has
+  not been verified by a real test, and nothing is promised about it. That ending
+  a run also ends the processes the program started was verified by one real
+  test with a stock program, and nothing is promised beyond it.
 - A recipe is not signed and not reviewed by the project. The author is a text
   the file claims, and Heimdall shows it as unverified. A community catalogue is
   not part of this version: a recipe comes from whoever gives you the file.
@@ -1334,7 +1380,7 @@ caller refuses: there is no fallback to a primitive that could replace the desti
   `dotnet format --verify-no-changes`, the blocking test lane (the suite minus
   the cases marked `CIUnstable` or `RequiresDesktop`, which run in two further
   lanes that report their failures without turning the run red), JSON locale
-  parity (every catalogue holds exactly the English key set, currently 6,600+
+  parity (every catalogue holds exactly the English key set, currently 6,700+
   keys each), and an informational `dotnet list package --vulnerable` scan.
 - Dependency scan for manual review: `dotnet list Heimdall.slnx package
   --vulnerable --include-transitive`. CI emits warnings but does not gate on

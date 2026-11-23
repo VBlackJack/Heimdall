@@ -38,7 +38,7 @@ public sealed class RecipeToolRegistrarTests
 
         public Rig(bool packOn, bool forbidden = false, int recipeCount = 2)
         {
-            Settings = new AppSettings { DisabledToolPacks = packOn ? [] : [nameof(ToolPack.Recipes)] };
+            Settings = new AppSettings { DisabledToolPacks = packOn ? [] : [nameof(ToolPack.Recipes)], RecipesPackMigrated = true };
             ToolPackPolicy policy = new(name => forbidden && name == "ToolPackRecipes" ? ToolPackPolicy.ForbiddenValue : null);
             Availability = new ToolAvailability(Registry, policy, () => Settings, handler => _settingsChanged = handler);
             for (int index = 0; index < recipeCount; index++)
@@ -296,6 +296,14 @@ public sealed class RecipeToolRegistrarTests
 
     private sealed class ThrowingStore : IRecipeStore
     {
+        public event Action? Changed
+        {
+            add { }
+            remove { }
+        }
+
+        public string? CurrentSha256(string id) => null;
+
         public RecipeLoadResult LoadAll() => throw new IOException("disk");
 
         public IReadOnlyList<RecipeStoreEntry> List() => [];

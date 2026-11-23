@@ -16,16 +16,19 @@
 
 using System.IO;
 using Heimdall.App.Services;
+using Heimdall.Core.Configuration;
 
 namespace Heimdall.App.Tests;
 
-/// <summary>The run folders: a fresh empty one per run under the data directory, removed afterwards.</summary>
+/// <summary>The run folders: a fresh empty one per run under the runs root, which is outside the data directory, removed afterwards.</summary>
 public sealed class RecipeWorkFoldersTests : IDisposable
 {
     private readonly string _root = Path.Combine(
         Path.GetTempPath(), "heimdall-recipe-workfolders-tests", Guid.NewGuid().ToString("N"));
 
     public RecipeWorkFoldersTests() => Directory.CreateDirectory(_root);
+
+    private string RunsRoot => Path.Combine(_root, "runs");
 
     public void Dispose()
     {
@@ -40,9 +43,9 @@ public sealed class RecipeWorkFoldersTests : IDisposable
     }
 
     [Fact]
-    public void EachFolderIsNewEmptyAbsoluteAndUnderTheRunsFolderOfTheDataDirectory()
+    public void EachFolderIsNewEmptyAbsoluteAndUnderTheRunsRoot()
     {
-        RecipeWorkFolders folders = new(_root);
+        RecipeWorkFolders folders = new(RunsRoot);
 
         string first = folders.Create();
         string second = folders.Create();
@@ -51,13 +54,51 @@ public sealed class RecipeWorkFoldersTests : IDisposable
         Assert.True(Path.IsPathFullyQualified(first));
         Assert.True(Directory.Exists(first));
         Assert.Empty(Directory.EnumerateFileSystemEntries(first));
-        Assert.Equal(Path.GetFullPath(Path.Combine(_root, "recipe-runs")), Path.GetDirectoryName(first));
+        Assert.Equal(Path.GetFullPath(RunsRoot), Path.GetDirectoryName(first));
+    }
+
+    [Fact]
+    public void TheProductionRootIsUnderTheUserTemporaryFolderAndNotUnderTheDataDirectory()
+    {
+        string data = Path.Combine(_root, "data");
+
+        string root = Path.GetFullPath(RecipeWorkFolders.DefaultRoot(data));
+
+        string temp = Path.GetFullPath(Path.GetTempPath());
+        Assert.StartsWith(Path.Combine(temp, AppConstants.RecipeRunsTempDirectoryName) + Path.DirectorySeparatorChar, root, StringComparison.OrdinalIgnoreCase);
+        Assert.False(root.StartsWith(Path.GetFullPath(data), StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void TwoDataDirectoriesGiveTwoRootsAndTheSameOneGivesTheSameRootInAnyCase()
+    {
+        string one = RecipeWorkFolders.DefaultRoot(Path.Combine(_root, "dataone"));
+        string two = RecipeWorkFolders.DefaultRoot(Path.Combine(_root, "datatwo"));
+
+        Assert.NotEqual(one, two);
+        Assert.Equal(one, RecipeWorkFolders.DefaultRoot(Path.Combine(_root, "dataone")));
+        Assert.Equal(one, RecipeWorkFolders.DefaultRoot(Path.Combine(_root, "DATAONE")));
+        Assert.Equal(one, RecipeWorkFolders.DefaultRoot(Path.Combine(_root, "dataone") + Path.DirectorySeparatorChar));
+        Assert.Equal(16, Path.GetFileName(one).Length);
+    }
+
+    [Fact]
+    public void CleaningTheStaleFoldersOfOneRootLeavesALiveFolderOfAnotherRoot()
+    {
+        RecipeWorkFolders mine = new(Path.Combine(_root, "mine"));
+        RecipeWorkFolders other = new(Path.Combine(_root, "other"));
+        string live = other.Create();
+        mine.Create();
+
+        mine.CleanStale();
+
+        Assert.True(Directory.Exists(live));
     }
 
     [Fact]
     public void DeleteRemovesAFolderWithItsContent()
     {
-        RecipeWorkFolders folders = new(_root);
+        RecipeWorkFolders folders = new(RunsRoot);
         string folder = folders.Create();
         File.WriteAllText(Path.Combine(folder, "left.txt"), "x");
 
@@ -69,27 +110,27 @@ public sealed class RecipeWorkFoldersTests : IDisposable
     [Fact]
     public void DeleteNeverTouchesAnythingOutsideTheRunsFolder()
     {
-        RecipeWorkFolders folders = new(_root);
+        RecipeWorkFolders folders = new(RunsRoot);
         string outside = Path.Combine(_root, "important");
         Directory.CreateDirectory(outside);
         string deeper = Path.Combine(folders.Create(), "sub");
         Directory.CreateDirectory(deeper);
 
         folders.Delete(outside);
-        folders.Delete(Path.Combine(_root, "recipe-runs"));
+        folders.Delete(RunsRoot);
         folders.Delete(deeper);
         folders.Delete(string.Empty);
         folders.Delete(Path.Combine(_root, "recipe-runs", "..", "important"));
 
         Assert.True(Directory.Exists(outside));
         Assert.True(Directory.Exists(deeper));
-        Assert.True(Directory.Exists(Path.Combine(_root, "recipe-runs")));
+        Assert.True(Directory.Exists(RunsRoot));
     }
 
     [Fact]
     public void DeletingAFolderThatIsGoneIsNotAnError()
     {
-        RecipeWorkFolders folders = new(_root);
+        RecipeWorkFolders folders = new(RunsRoot);
         string folder = folders.Create();
         folders.Delete(folder);
 
@@ -99,7 +140,7 @@ public sealed class RecipeWorkFoldersTests : IDisposable
     [Fact]
     public void CleanStaleRemovesWhatACrashLeftBehindAndKeepsTheRunsFolder()
     {
-        RecipeWorkFolders folders = new(_root);
+        RecipeWorkFolders folders = new(RunsRoot);
         string one = folders.Create();
         string two = folders.Create();
         File.WriteAllText(Path.Combine(two, "x.txt"), "x");
@@ -108,7 +149,7 @@ public sealed class RecipeWorkFoldersTests : IDisposable
 
         Assert.False(Directory.Exists(one));
         Assert.False(Directory.Exists(two));
-        Assert.True(Directory.Exists(Path.Combine(_root, "recipe-runs")));
+        Assert.True(Directory.Exists(RunsRoot));
     }
 
     [Fact]

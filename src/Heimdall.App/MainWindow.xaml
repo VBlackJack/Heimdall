@@ -5786,7 +5786,7 @@
                                 </Border>
 
                                 <!-- Recipes: import, replace, export and remove recipe files -->
-                                <Border x:Name="Mw_SettingsRecipesCard" Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
+                                <Border x:Name="Mw_SettingsRecipesCard" behaviors:LoadWhenShownBehavior.Command="{Binding Settings.Recipes.EnsureLoadedCommand}" Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
                                         <TextBlock x:Name="Mw_SettingsRecipesTitle" Text="{loc:Translate SettingsSectionRecipes}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,4"/>
                                         <TextBlock x:Name="Mw_SettingsRecipesDesc" Text="{loc:Translate SettingsRecipesIntro}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap" Margin="0,0,0,12"/>

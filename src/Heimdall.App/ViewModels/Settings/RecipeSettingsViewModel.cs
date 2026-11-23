@@ -32,6 +32,9 @@ namespace Heimdall.App.ViewModels.Settings;
 /// preview, and a file that fails any check is refused with its reasons and never stored.
 /// </summary>
 /// <remarks>
+/// Nothing is read from the recipes folder when the view model is built: the list is read the first
+/// time the card is shown (see <see cref="EnsureLoaded"/>) and after each import, replacement or
+/// removal, so an application start never loads and hashes every recipe file.
 /// After each change the recipe tools of the registry are reloaded through the delegate, so the
 /// Tools tab, the sidebar and the palette follow without a restart. While the Recipes pack is off the
 /// recipe is stored and not registered; while the organisation policy forbids the pack nothing is
@@ -50,6 +53,7 @@ public sealed class RecipeSettingsViewModel : ObservableObject, IDisposable
     private readonly IRecipeFileDialogs _files;
     private readonly Action _reloadTools;
     private bool _disposed;
+    private bool _loaded;
 
     /// <summary>Creates the view model.</summary>
     /// <param name="store">The imported recipes.</param>
@@ -77,8 +81,8 @@ public sealed class RecipeSettingsViewModel : ObservableObject, IDisposable
         _reloadTools = reloadTools ?? throw new ArgumentNullException(nameof(reloadTools));
 
         ImportCommand = new AsyncRelayCommand(ImportAsync, () => !IsForbiddenByPolicy);
+        EnsureLoadedCommand = new RelayCommand(EnsureLoaded);
         _localizer.LocaleChanged += OnLocaleChanged;
-        Refresh();
     }
 
     /// <summary>The imported recipes, in the order of the index.</summary>
@@ -102,9 +106,34 @@ public sealed class RecipeSettingsViewModel : ObservableObject, IDisposable
     /// <summary>Picks a recipe file, shows the preview and, once confirmed, stores it.</summary>
     public IAsyncRelayCommand ImportCommand { get; }
 
+    /// <summary>Reads the list the first time it is needed; the view runs it when the card is shown.</summary>
+    public IRelayCommand EnsureLoadedCommand { get; }
+
+    /// <summary>Reads the store and builds the list unless that was already done.</summary>
+    public void EnsureLoaded()
+    {
+        if (!_loaded && !_disposed)
+        {
+            Refresh();
+        }
+    }
+
+    /// <summary>Rebuilds the list when it was read before, and only says the words again otherwise.</summary>
+    public void RefreshIfLoaded()
+    {
+        if (_loaded)
+        {
+            Refresh();
+            return;
+        }
+
+        NotifyPolicy();
+    }
+
     /// <summary>Reads the store again and rebuilds the list.</summary>
     public void Refresh()
     {
+        _loaded = true;
         LoadedRecipe[] loaded = [.. _store.LoadAll().Recipes];
         Items.Clear();
         foreach (RecipeStoreEntry entry in _store.List())
@@ -117,6 +146,11 @@ public sealed class RecipeSettingsViewModel : ObservableObject, IDisposable
 
         OnPropertyChanged(nameof(HasItems));
         OnPropertyChanged(nameof(IsEmpty));
+        NotifyPolicy();
+    }
+
+    private void NotifyPolicy()
+    {
         OnPropertyChanged(nameof(IsForbiddenByPolicy));
         OnPropertyChanged(nameof(PolicyText));
         OnPropertyChanged(nameof(HasPolicyText));

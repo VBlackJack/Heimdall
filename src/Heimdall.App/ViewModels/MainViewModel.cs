@@ -1449,8 +1449,10 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
 
         if (!isNetworkTool && !hasContext)
         {
+            // A tab whose recipe was replaced or removed since it was opened is not the tool any
+            // more: it stays for the user to close, and opening the tool makes a fresh one.
             var existing = Connection.ActiveSessions
-                .FirstOrDefault(s => s.ConnectionType == connectionType);
+                .FirstOrDefault(s => s.ConnectionType == connectionType && s.HostControl is not IStaleToolView { IsStale: true });
             if (existing is not null)
             {
                 Connection.ActiveSession = existing;
@@ -1520,7 +1522,9 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
             return false;
         }
 
-        string label = ToolRegistry.GetById(toolId)?.ResolveLabel(_localizer.GetString) ?? toolId;
+        // A recipe is named the way its tab names it, so a refusal never shows its name without its author.
+        ToolDescriptor? refused = ToolRegistry.GetById(toolId);
+        string label = refused is null ? toolId : RecipeToolText.TabTitle(refused, _localizer.GetString);
         StatusText = _localizer.Format(ToolUnavailableException.MessageKeyFor(state), label);
         Core.Logging.FileLogger.Info($"Tool '{toolId}' refused: {state}.");
         return true;

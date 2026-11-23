@@ -275,12 +275,22 @@ ce qu'elles ne protègent pas, est dans [SECURITY.md](SECURITY.md#recettes).
 **Activer le pack.** Le pack Recettes est désactivé par défaut, sur une
 installation neuve comme sur une installation qui existait déjà (une étape
 unique, au premier démarrage de cette version, le range parmi les packs
-désactivés, et ne le désactive plus jamais une fois que vous l'avez activé).
-L'interrupteur se trouve dans
+désactivés, et ne le désactive plus jamais une fois que vous l'avez activé). Le
+pack compte comme désactivé tant que cette étape n'a pas été exécutée ou que
+vous n'avez pas activé l'interrupteur et enregistré : un démarrage où l'étape n'a
+pas pu s'exécuter (un fichier de paramètres écrit par une version plus récente
+n'est jamais modifié) ne le laisse donc pas activé. L'interrupteur se trouve
+dans
 `Paramètres > Avancé > Outils et intégrations > Packs d'outils` et porte une
 ligne d'avertissement. Quand l'organisation interdit le pack par une politique,
 l'interrupteur est sur arrêt et désactivé, et l'import est refusé (voir
 [SECURITY.md](SECURITY.md#recettes)).
+
+Un fichier de paramètres importé avec **Importer des paramètres** n'active jamais
+le pack de lui-même. Un fichier exporté par une version antérieure le laisse tel
+quel. Un fichier exporté par cette version ne l'active que s'il vient d'une
+installation où le pack était activé ; la confirmation montre alors une ligne à
+part, "Active le pack Recettes", parmi les lignes à vérifier en premier.
 
 **Importer.** Dans `Paramètres > Avancé > Outils et intégrations > Recettes`,
 choisissez **Importer une recette...** et sélectionnez le fichier. L'import est
@@ -303,8 +313,11 @@ signalée comme conservée ou omise en bloc ; le nom, l'auteur (marqué non
 vérifié), l'identifiant, la version et la description ; chaque champ avec son
 type, son caractère obligatoire ou facultatif, sa valeur par défaut, ses choix,
 son motif et sa longueur maximale, et les arguments qu'un interrupteur ajoute
-quand il est activé ; si la recette lit l'hôte et le port de la session
-sélectionnée ; la façon dont la sortie est affichée ; et le délai. Un caractère
+quand il est activé ; chaque traduction de la recette (la langue, le nom, la
+description et les libellés des champs), puisque l'outil l'affiche à la place du
+texte anglais quand l'interface est dans cette langue ; si la recette lit l'hôte
+et le port de la session sélectionnée ; la façon dont la sortie est affichée ; et
+le délai. Un caractère
 de contrôle ou invisible est écrit `\uXXXX`. Dans le programme, les arguments
 et les valeurs par défaut, tout caractère hors de l'ASCII imprimable est écrit
 `\uXXXX` lui aussi : une lettre qui ressemble à une lettre ASCII ne peut donc pas
@@ -327,18 +340,37 @@ saisie (voir "Ce qui est refusé" plus bas). Il résout ensuite à nouveau le
 programme et compare le résultat au chemin enregistré à l'import : quand le
 programme correspond désormais à un autre fichier, ou ne se résout plus,
 l'exécution est refusée et le message demande d'importer à nouveau la recette. Il
-crée pour l'exécution un dossier de travail neuf et vide sous `recipe-runs`
-dans le dossier de données, et le supprime ensuite (les restes d'un arrêt brutal
+crée pour l'exécution un dossier de travail neuf et vide sous
+`Heimdall-recipe-runs` dans votre dossier temporaire (dans un sous-dossier nommé
+d'après le dossier de données utilisé, pour que deux instances ne le partagent
+jamais), et non dans le dossier de
+données (un chemin relatif donné à un programme ne peut donc pas atteindre les
+paramètres de Heimdall), et le supprime ensuite (les restes d'un arrêt brutal
 précédent sont supprimés au démarrage). Le programme démarre sans fenêtre, avec
 son entrée standard fermée, avec les droits et l'environnement de Heimdall
-lui-même. Au plus 1 Mio de sortie est conservé : le reste est lu puis jeté, et
-une ligne indique que la sortie a été coupée. L'exécution prend fin au délai de
-la recette.
+lui-même, dans un objet de travail (job) Windows qui arrête les processus qu'il a
+lancés quand l'exécution prend fin ; quand Windows refuse de créer le job, seule
+une exécution arrêtée ou ayant dépassé le délai arrête l'arbre de processus. Au
+plus 1 Mio de sortie est conservé par flux (2 Mio en tout quand l'erreur standard
+est gardée à part) : le reste est lu puis jeté, et une ligne indique que la
+sortie a été coupée. L'exécution prend fin au délai de la recette, et aussi
+quand le pack est désactivé ou devient interdit.
+
+**Remplacer ou supprimer une recette dont un onglet est ouvert.** Un onglet garde
+la recette avec laquelle il a été ouvert. Une fois cette recette remplacée, ou
+supprimée puis importée à nouveau, l'onglet affiche dans son en-tête "Cette
+recette a été remplacée ou supprimée après l'ouverture de cet onglet. Fermez cet
+onglet et ouvrez de nouveau l'outil.", **Exécuter** est désactivé, et une
+exécution refuse de démarrer. Ouvrir l'outil ne remet jamais un tel onglet au
+premier plan : cela en ouvre un nouveau.
 
 **Remplacer.** Importer un fichier dont l'`id` est déjà importé est un
 remplacement. L'aperçu s'intitule "Remplacer la recette" et indique l'ancienne
 et la nouvelle version, et si les arguments, les champs et le programme ont
-changé.
+changé. Chacun de l'auteur, du nom, de la description, des traductions, de la
+sortie et de son encodage, du mode de conservation de l'erreur standard, des
+codes de sortie de succès et du délai est aussi dit sur une ligne à part,
+"inchangé" ou "modifié", en comparant les recettes analysées et non les octets.
 
 **Exporter.** Le bouton d'export d'une recette, dans la liste des Paramètres,
 écrit une copie du fichier exactement tel qu'il a été importé. Il refuse quand
@@ -359,10 +391,10 @@ peut toujours lancer un programme depuis le dossier Windows, Program Files et
 Program Files (x86). Pour en autoriser un autre, utilisez **Ajouter un
 dossier...** dans la même section Recettes des Paramètres, enregistrez les
 paramètres puis importez à nouveau la recette. Un dossier doit être un chemin
-complet sur une lettre de lecteur (`D:\Outils`), de 240 caractères au plus, sans
-chemin réseau, sans chemin de périphérique, sans partie `.` ou `..`, sans `%`,
-sans caractère générique et sans partie qui se termine par un point ou une
-espace. Au plus 32 dossiers sont conservés. Un fichier de paramètres qui porte
+complet sur une lettre de lecteur (`D:\Outils`) et non la racine d'un lecteur
+(`D:\`), de 240 caractères au plus, sans chemin réseau, sans chemin de
+périphérique, sans partie `.` ou `..`, sans `%`, sans caractère générique et sans
+partie qui se termine par un point ou une espace. Au plus 32 dossiers sont conservés. Un fichier de paramètres qui porte
 cette liste est signalé comme sensible dans l'aperçu d'import.
 
 ### Écrire une recette
@@ -562,6 +594,11 @@ tout ceci :
 - il existe et, une fois tous les liens et jonctions suivis, son emplacement
   final est sous le dossier Windows, Program Files, Program Files (x86) ou un
   dossier autorisé dans les Paramètres. Un lien qui mène en dehors est refusé ;
+- sous le dossier Windows, Program Files ou Program Files (x86), ni le fichier ni
+  aucun dossier au-dessus (jusqu'à cette racine) ne doit permettre à un
+  utilisateur qui n'est pas administrateur de le modifier, et les permissions
+  doivent être lisibles. Un dossier autorisé dans les Paramètres est approuvé en
+  entier et n'est pas vérifié de cette façon ;
 - un simple nom n'est cherché que dans les entrées de la variable `PATH` qui sont
   elles-mêmes sous ces dossiers, dans l'ordre de `PATH` ; le premier fichier
   trouvé décide. Le dossier courant et le dossier de Heimdall ne sont jamais
@@ -582,8 +619,11 @@ frontière (voir [SECURITY.md](SECURITY.md#recettes)). Elle contient : `cmd`,
 `msbuild`, `certutil`, `bitsadmin`, `wmic`, `forfiles`, `schtasks`, `sc`, `reg`,
 `net`, `net1`, `curl`, `ssh`, `scp`, `sftp`, `ftp`, `tftp`, `git`, `tar`,
 `robocopy`, `xcopy`, `expand`, `extrac32`, `makecab`, `hh`, `control`,
-`explorer`, `conhost`, `cmstp`, `odbcconf`, `pcalua`, `scriptrunner`, `at` et
-`taskkill`, plus les cibles d'interpréteur que le reste de Heimdall refuse déjà
+`explorer`, `conhost`, `cmstp`, `odbcconf`, `pcalua`, `scriptrunner`, `at`,
+`taskkill`, `msedge`, `chrome`, `firefox`, `brave`, `opera`,
+`SyncAppvPublishingServer`, `wt`, `tttracer`, `pcwrun`, `esentutl`, `replace`,
+`mmc`, `msdt`, `runas`, `dotnet`, `csc`, `vbc`, `jsc`, `ie4uinit` et
+`presentationhost`, plus les cibles d'interpréteur que le reste de Heimdall refuse déjà
 (comme les extensions de script `.bat`, `.cmd`, `.ps1`, `.vbs`, `.js`, `.wsf` et
 `.hta`).
 
@@ -617,13 +657,25 @@ connues.
   facultatif se trouve seul dans un élément (placez-le dans une liste
   imbriquée) ; un interrupteur est mêlé à d'autre texte.
 - Le texte fixe (le programme, un élément, un élément de `whenTrue`, une valeur
-  par défaut, un choix) contient une double barre oblique inverse ou une double
-  barre oblique (un chemin réseau), `://` (une URL), un `%` (une variable
-  d'environnement), ou commence par `@` (un fichier de réponses). L'entrée en
-  cause est nommée.
-- Un choix ou une valeur par défaut commence par `-`, `/` ou `@` à l'endroit où
-  son champ ouvre un argument. Il serait refusé à chaque exécution : le fichier
-  est donc refusé à l'import. Gardez le caractère dans le texte fixe de
+  par défaut, un choix) contient deux séparateurs de suite (une double barre
+  oblique inverse, une double barre oblique, ou une barre oblique inverse à côté
+  d'une barre oblique, dans un sens ou dans l'autre : un chemin réseau), `://`
+  (une URL), le préfixe de chemin système (un séparateur, deux points
+  d'interrogation et un séparateur), un `%` (une variable d'environnement), un
+  caractère qui ressemble à un caractère ordinaire (un guillemet typographique,
+  un tiret long, une lettre pleine chasse, une espace insécable, ou tout
+  caractère que les pages de codes de la machine transforment en caractère
+  ASCII), ou commence par `@` (un fichier de réponses). L'entrée en cause est
+  nommée. La règle des caractères qui ressemblent à d'autres suit les pages de
+  codes de la machine : certaines majuscules accentuées et certaines ligatures
+  peuvent donc être refusées dans un argument sur certaines machines, et
+  acceptées sur d'autres.
+- Un choix ou une valeur par défaut serait refusé à chaque exécution par la règle
+  que rencontre une valeur saisie (voir plus bas) : il contient un caractère de
+  contrôle ou qui ressemble à un autre, il commence par `-`, `/`, `@`, une barre
+  oblique inverse ou une espace à l'endroit où son champ ouvre un argument, ou il
+  forme un séparateur doublé avec le texte voisin. Le fichier est refusé à
+  l'import. Gardez le caractère dans le texte fixe de
   l'élément et ne listez que les valeurs nues : écrivez `"-type={in:record}"`
   avec les choix `A` et `MX`, et non `"{in:record}"` avec les choix `-type=A` et
   `-type=MX`.
@@ -638,15 +690,16 @@ dit d'ajouter le dossier dans les Paramètres, d'enregistrer, puis d'importer à
 nouveau.
 
 **Une valeur saisie, à chaque exécution.** Un champ obligatoire vide ; une valeur
-avec un caractère de contrôle ou invisible ; une valeur qui commence par `-`,
-`/` ou `@` à l'endroit où son marqueur ouvre l'argument (un `-` initial est la
-façon dont une valeur est lue comme une option, un `@` initial comme un fichier
-de réponses) ; une valeur qui ne convient pas à son type (voir le tableau
+avec un caractère de contrôle ou invisible, ou qui ressemble à un autre ; une
+valeur qui commence par `-`, `/`, `@`, une barre oblique inverse ou une espace à
+l'endroit où son marqueur ouvre l'argument (un `-` initial est la façon dont une
+valeur est lue comme une option, un `@` initial comme un fichier de réponses) ; une valeur qui ne convient pas à son type (voir le tableau
 ci-dessus) ; une valeur trop longue, hors de ses choix ou qui ne satisfait pas
 son motif ; une valeur qui, jointe au texte fixe voisin, formerait un séparateur
 doublé (un chemin réseau ou le début d'une URL) ; et tout argument final qui
-contient une double barre oblique inverse, une double barre oblique ou `://`,
-quelle que soit son origine. Le champ affiche la raison.
+contient deux séparateurs de suite (sous l'une ou l'autre forme et en toute
+combinaison), le préfixe de chemin système ou `://`, quelle que soit son origine.
+Le champ affiche la raison.
 
 **Le programme a changé, à chaque exécution.** Quand le programme ne se résout
 plus au chemin enregistré à l'import (un autre fichier répond désormais à ce

@@ -84,7 +84,19 @@ public static class ToolPackMigration
             settings.DisabledToolPacks.Add(packName);
         }
 
-        settings.RecipesPackMigrated = true;
+        RecordRecipesPackChoice(settings);
         return true;
+    }
+
+    /// <summary>
+    /// Records that the state of the Recipes pack is the user's or the step's own, which is what ends
+    /// the fail-closed rule that keeps the pack off while the marker is missing. The one place that
+    /// sets the marker besides the step itself: turning the switch on in Settings goes through it.
+    /// </summary>
+    /// <param name="settings">The settings to mark, changed in place.</param>
+    public static void RecordRecipesPackChoice(AppSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        settings.RecipesPackMigrated = true;
     }
 }

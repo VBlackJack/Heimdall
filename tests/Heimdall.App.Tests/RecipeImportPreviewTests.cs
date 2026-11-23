@@ -348,4 +348,159 @@ public sealed class RecipeImportPreviewTests
         Assert.Equal(RecipeImportPreview.ImportConfirmKey, RecipeImportPreview.ConfirmKey(PlanOf(RecipeImportFiles.Bytes())));
         Assert.Equal(RecipeImportPreview.ReplaceConfirmKey, RecipeImportPreview.ConfirmKey(PlanOf(RecipeImportFiles.Bytes(), existing: existing)));
     }
+
+    // ---- translations are read before the recipe is stored ---------------------------------------
+
+    private const string TargetField = "[{\"name\":\"target\",\"type\":\"string\",\"label\":\"Target\",\"required\":false}]";
+
+    private const string TwoLanguages = "{\"fr\": {\"name\": \"Sonde\", \"description\": \"Sonde l'h\\u00f4te.\", \"fields\": {\"target\": \"Cible\"}}, \"es-MX\": {\"name\": \"Sonda\"}}";
+
+    [Fact]
+    public async Task EveryTranslationIsListedAfterTheFieldsWithItsLanguageNameDescriptionAndFieldLabels()
+    {
+        byte[] bytes = RecipeImportFiles.Bytes(inputsJson: TargetField, labelsJson: TwoLanguages);
+
+        string text = RecipeImportPreview.Compose(await EnglishAsync(), PlanOf(bytes));
+        string[] lines = Lines(text);
+
+        Assert.Contains("  Language fr:", lines);
+        Assert.Contains("    Name: Sonde", lines);
+        Assert.Contains("    Description: Sonde l'h\u00f4te.", lines);
+        Assert.Contains("    Field target: Cible", lines);
+        Assert.Contains("  Language es-MX:", lines);
+        Assert.Contains("    Name: Sonda", lines);
+        int fields = text.IndexOf("Fields the user fills in", StringComparison.Ordinal);
+        int translations = text.IndexOf("Translations.", StringComparison.Ordinal);
+        int session = text.IndexOf("Reads from the selected session", StringComparison.Ordinal);
+        Assert.True(fields >= 0 && fields < translations && translations < session, text);
+    }
+
+    [Fact]
+    public async Task ARecipeWithoutTranslationsSaysSoUnderTheTranslationsHeading()
+    {
+        string[] lines = Lines(RecipeImportPreview.Compose(await EnglishAsync(), PlanOf(RecipeImportFiles.Bytes())));
+
+        int heading = Array.FindIndex(lines, line => line.StartsWith("Translations.", StringComparison.Ordinal));
+        Assert.True(heading >= 0);
+        Assert.Equal("  (none)", lines[heading + 1]);
+    }
+
+    // ---- the replacement says, property by property, whether it changed --------------------------
+
+    private static readonly RecipeStoreEntry ExistingEntry = new(
+        "acme.ping", RecipeStore.FileNameFor("acme.ping"), new string('a', 64), @"C:\Windows\System32\ping.exe", DateTimeOffset.UnixEpoch);
+
+    private static readonly string[] ReplacementProperties =
+        ["Author", "Name", "Description", "Translations", "Output and encoding", "Standard error", "Success exit codes", "Timeout"];
+
+    private static async Task<string[]> ChangedPropertiesAsync(byte[] before, byte[] after)
+    {
+        LocalizationManager localizer = await EnglishAsync();
+        string text = RecipeImportPreview.Compose(localizer, PlanOf(after, existing: ExistingEntry, previous: PlanOf(before).Recipe));
+        string[] lines = Lines(text);
+        List<string> changed = [];
+        foreach (string property in ReplacementProperties)
+        {
+            string same = $"  {property}: unchanged";
+            string different = $"  {property}: changed";
+            Assert.True(
+                lines.Contains(same, StringComparer.Ordinal) ^ lines.Contains(different, StringComparer.Ordinal),
+                $"{property} must say exactly one of unchanged or changed:{Environment.NewLine}{text}");
+            if (lines.Contains(different, StringComparer.Ordinal))
+            {
+                changed.Add(property);
+            }
+        }
+
+        return [.. changed];
+    }
+
+    [Fact]
+    public async Task AReplacementWithTheSameParsedRecipeSaysEveryPropertyIsUnchanged()
+    {
+        byte[] before = RecipeImportFiles.Bytes(inputsJson: TargetField, labelsJson: TwoLanguages);
+        // Same recipe, other bytes: the translations are written in the other order.
+        byte[] after = RecipeImportFiles.Bytes(
+            inputsJson: TargetField,
+            labelsJson: "{\"es-MX\": {\"name\": \"Sonda\"}, \"fr\": {\"fields\": {\"target\": \"Cible\"}, \"description\": \"Sonde l'h\\u00f4te.\", \"name\": \"Sonde\"}}");
+
+        Assert.Empty(await ChangedPropertiesAsync(before, after));
+    }
+
+    [Fact]
+    public async Task AChangedAuthorIsTheOnlyLineThatSaysChanged()
+        => Assert.Equal(["Author"], await ChangedPropertiesAsync(RecipeImportFiles.Bytes(), RecipeImportFiles.Bytes(author: "Other")));
+
+    [Fact]
+    public async Task AChangedNameIsTheOnlyLineThatSaysChanged()
+        => Assert.Equal(["Name"], await ChangedPropertiesAsync(RecipeImportFiles.Bytes(), RecipeImportFiles.Bytes(name: "Pong")));
+
+    [Fact]
+    public async Task AChangedDescriptionIsTheOnlyLineThatSaysChanged()
+        => Assert.Equal(["Description"], await ChangedPropertiesAsync(RecipeImportFiles.Bytes(), RecipeImportFiles.Bytes(description: "Another text.")));
+
+    [Fact]
+    public async Task AChangedTranslationIsTheOnlyLineThatSaysChanged()
+    {
+        byte[] before = RecipeImportFiles.Bytes(inputsJson: TargetField, labelsJson: TwoLanguages);
+
+        Assert.Equal(
+            ["Translations"],
+            await ChangedPropertiesAsync(before, RecipeImportFiles.Bytes(inputsJson: TargetField, labelsJson: "{\"fr\": {\"name\": \"Sonde\"}}")));
+        Assert.Equal(
+            ["Translations"],
+            await ChangedPropertiesAsync(
+                before,
+                RecipeImportFiles.Bytes(
+                    inputsJson: TargetField,
+                    labelsJson: "{\"fr\": {\"name\": \"Sonde\", \"description\": \"Sonde l'h\\u00f4te.\", \"fields\": {\"target\": \"But\"}}, \"es-MX\": {\"name\": \"Sonda\"}}")));
+        Assert.Equal(
+            ["Translations"],
+            await ChangedPropertiesAsync(RecipeImportFiles.Bytes(), RecipeImportFiles.Bytes(labelsJson: "{\"fr\": {\"name\": \"Sonde\"}}")));
+    }
+
+    [Theory]
+    [InlineData("\"output\": \"csv\"")]
+    [InlineData("\"outputEncoding\": \"oem\"")]
+    public async Task AChangedOutputOrEncodingIsTheOnlyLineThatSaysChanged(string extra)
+        => Assert.Equal(["Output and encoding"], await ChangedPropertiesAsync(RecipeImportFiles.Bytes(), RecipeImportFiles.Bytes(extraProperties: extra)));
+
+    [Fact]
+    public async Task AChangedStandardErrorModeIsTheOnlyLineThatSaysChanged()
+        => Assert.Equal(["Standard error"], await ChangedPropertiesAsync(RecipeImportFiles.Bytes(), RecipeImportFiles.Bytes(extraProperties: "\"stderr\": \"merge\"")));
+
+    [Fact]
+    public async Task ChangedSuccessExitCodesAreTheOnlyLineThatSaysChanged()
+        => Assert.Equal(["Success exit codes"], await ChangedPropertiesAsync(RecipeImportFiles.Bytes(), RecipeImportFiles.Bytes(extraProperties: "\"successExitCodes\": [0, 1]")));
+
+    [Fact]
+    public async Task AChangedTimeoutIsTheOnlyLineThatSaysChanged()
+        => Assert.Equal(["Timeout"], await ChangedPropertiesAsync(RecipeImportFiles.Bytes(), RecipeImportFiles.Bytes(extraProperties: "\"timeoutSeconds\": 30")));
+
+    [Fact]
+    public async Task AReplacementOfAnUnreadableCopySaysNothingAboutThePropertiesItCannotCompare()
+    {
+        string text = RecipeImportPreview.Compose(await EnglishAsync(), PlanOf(RecipeImportFiles.Bytes(), existing: ExistingEntry, previous: null));
+
+        foreach (string property in ReplacementProperties)
+        {
+            Assert.DoesNotContain($"  {property}: ", text, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public async Task TheNewPropertyLinesAndTheTranslationsAreWordedInTheThreeLanguages()
+    {
+        byte[] bytes = RecipeImportFiles.Bytes(inputsJson: TargetField, labelsJson: TwoLanguages);
+        foreach (string locale in new[] { "fr", "es" })
+        {
+            LocalizationManager localizer = new();
+            await localizer.LoadAsync(Path.Combine(RecipeViewModelHarness.RepositoryRoot(), "locales"), locale);
+
+            string text = RecipeImportPreview.Compose(localizer, PlanOf(bytes, existing: ExistingEntry, previous: PlanOf(RecipeImportFiles.Bytes()).Recipe));
+
+            Assert.DoesNotContain("RecipeImportReplace", text, StringComparison.Ordinal);
+            Assert.DoesNotContain("RecipeImportPreviewLabels", text, StringComparison.Ordinal);
+        }
+    }
 }

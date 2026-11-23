@@ -33,12 +33,14 @@ namespace Heimdall.App.ViewModels.Tools;
 /// <param name="WorkFolders">Gives each run its own empty folder.</param>
 /// <param name="Availability">Says whether the tool may be used right now.</param>
 /// <param name="AllowedFolders">Reads the folders the user allowed in Settings, each time a run starts.</param>
+/// <param name="Versions">Says whether the recipe the view was built from is still the one that is imported.</param>
 public sealed record RecipeToolServices(
     IRecipeRunner Runner,
     IRecipeProgramResolver Resolver,
     IRecipeWorkFolders WorkFolders,
     IToolAvailability Availability,
-    Func<IReadOnlyList<string>> AllowedFolders);
+    Func<IReadOnlyList<string>> AllowedFolders,
+    IRecipeVersions Versions);
 
 /// <summary>
 /// The recipe tool: input fields built from the recipe, the session target it reads, one run at a
@@ -50,6 +52,7 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
 {
     private readonly Recipe _recipe;
     private readonly string _storedProgramPath;
+    private readonly string _storedSha256;
     private readonly RecipeToolServices _services;
     private readonly RecipeSessionUse _sessionUse;
     private readonly string _toolId;
@@ -74,6 +77,16 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     private string _sessionTargetText = string.Empty;
+
+    /// <summary>
+    /// True once the recipe this view was built from was replaced or removed. It stays true: the
+    /// view keeps the old recipe and the old program path, and a tab that ran them under the new
+    /// recipe name would show the user something other than what runs.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(StaleText))]
+    [NotifyCanExecuteChangedFor(nameof(RunCommand))]
+    private bool _isStale;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsIdle))]
@@ -120,21 +133,52 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
     /// <summary>Creates the view model of a recipe.</summary>
     /// <param name="recipe">A recipe that passed the validator.</param>
     /// <param name="storedProgramPath">The path the program resolved to when the recipe was imported.</param>
+    /// <param name="storedSha256">The SHA-256 of the bytes that were imported, which is what a later replacement is told apart by.</param>
     /// <param name="services">What running a recipe needs.</param>
-    public RecipeToolViewModel(Recipe recipe, string storedProgramPath, RecipeToolServices services)
+    public RecipeToolViewModel(Recipe recipe, string storedProgramPath, string storedSha256, RecipeToolServices services)
     {
         ArgumentNullException.ThrowIfNull(recipe);
         ArgumentNullException.ThrowIfNull(storedProgramPath);
+        ArgumentNullException.ThrowIfNull(storedSha256);
         ArgumentNullException.ThrowIfNull(services);
 
         _recipe = recipe;
         _storedProgramPath = storedProgramPath;
+        _storedSha256 = storedSha256;
         _services = services;
         _sessionUse = RecipeSessionUse.Of(recipe);
         _toolId = ToolDescriptor.RecipeIdPrefix + recipe.Id;
         _title = recipe.Name;
         _description = recipe.Description;
         _fields = [.. recipe.Inputs.Select(input => new RecipeFieldViewModel(input, input.Label))];
+        _services.Availability.Changed += OnAvailabilityChanged;
+        _services.Versions.Changed += OnRecipesChanged;
+    }
+
+    /// <summary>The line that says the recipe was replaced or removed; empty while it is the imported one.</summary>
+    public string StaleText => IsStale ? T("RecipeStaleMessage") : string.Empty;
+
+    /// <summary>
+    /// Compares what this view holds with the recipe that is imported now, and latches
+    /// <see cref="IsStale"/> when the recipe is gone or its bytes differ.
+    /// </summary>
+    /// <returns>True when the view no longer matches the imported recipe.</returns>
+    public bool CheckStale()
+    {
+        if (IsStale)
+        {
+            return true;
+        }
+
+        string? current = _services.Versions.CurrentSha256(_recipe.Id);
+        if (current is not null && string.Equals(current, _storedSha256, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        FileLogger.Info($"[Recipes] The tab of '{_recipe.Id}' no longer matches the imported recipe");
+        IsStale = true;
+        return true;
     }
 
     /// <summary>The input fields, in the order of the recipe.</summary>
@@ -267,7 +311,7 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
     [RelayCommand(CanExecute = nameof(CanStop))]
     private void Stop() => CancelRun();
 
-    private bool CanRun() => !_disposed && !IsRunning;
+    private bool CanRun() => !_disposed && !IsRunning && !IsStale;
 
     private bool CanStop() => !_disposed && IsRunning;
 
@@ -283,6 +327,8 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
         }
 
         _disposed = true;
+        _services.Availability.Changed -= OnAvailabilityChanged;
+        _services.Versions.Changed -= OnRecipesChanged;
         if (_localizer is not null)
         {
             _localizer.LocaleChanged -= OnLocaleChanged;
@@ -310,9 +356,11 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
 
     private void CancelRun()
     {
+        // Read once: the run can release its token on another thread while this one cancels it.
+        CancellationTokenSource? source = _runCancellation;
         try
         {
-            _runCancellation?.Cancel();
+            source?.Cancel();
         }
         catch (ObjectDisposedException)
         {
@@ -333,23 +381,51 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
         _runCancellation = null;
     }
 
-    private bool CheckAvailable()
+    // Turning the pack off takes the recipe tools out of the registry, so the id is unknown for that
+    // reason too: the pack, not the recipe, is what to name when it is the cause.
+    private ToolAvailabilityState CurrentState()
     {
         ToolAvailabilityState state = _services.Availability.GetState(_toolId);
-        if (state == ToolAvailabilityState.Unknown)
+        if (state != ToolAvailabilityState.Unknown)
         {
-            // Turning the pack off takes the recipe tools out of the registry, so the id is unknown
-            // for that reason too: the pack, not the recipe, is what to name when it is the cause.
-            if (_services.Availability.IsPackForbiddenByPolicy(ToolPack.Recipes))
-            {
-                state = ToolAvailabilityState.ForbiddenByPolicy;
-            }
-            else if (!_services.Availability.IsPackEnabled(ToolPack.Recipes))
-            {
-                state = ToolAvailabilityState.DisabledByUser;
-            }
+            return state;
         }
 
+        if (_services.Availability.IsPackForbiddenByPolicy(ToolPack.Recipes))
+        {
+            return ToolAvailabilityState.ForbiddenByPolicy;
+        }
+
+        return _services.Availability.IsPackEnabled(ToolPack.Recipes) ? state : ToolAvailabilityState.DisabledByUser;
+    }
+
+    // The availability service raises its event on a pool thread; cancelling a token is safe from any thread.
+    private void OnAvailabilityChanged()
+    {
+        if (!_disposed && IsRunning && CurrentState() != ToolAvailabilityState.Available)
+        {
+            FileLogger.Info($"[Recipes] The run of '{_recipe.Id}' was cancelled: the tool is no longer available");
+            CancelRun();
+        }
+    }
+
+    private void OnRecipesChanged()
+    {
+        if (!_disposed)
+        {
+            CheckStale();
+        }
+    }
+
+    private bool CheckAvailable()
+    {
+        if (CheckStale())
+        {
+            GeneralError = T("RecipeStaleMessage");
+            return false;
+        }
+
+        ToolAvailabilityState state = CurrentState();
         if (state == ToolAvailabilityState.Available)
         {
             return true;
@@ -521,6 +597,7 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
         }
 
         SessionTargetText = DescribeSessionTarget();
+        OnPropertyChanged(nameof(StaleText));
         if (_lastResult is { } result)
         {
             StatusText = RecipeRunText.Describe(localizer, result, _recipe.TimeoutSeconds);

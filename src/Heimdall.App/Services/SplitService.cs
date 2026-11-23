@@ -380,7 +380,7 @@ public sealed class SplitService : ISplitService
         {
             SetStatusText?.Invoke(_localizer.Format(
                 ToolUnavailableException.MessageKeyFor(availability),
-                descriptor.ResolveLabel(_localizer.GetString)));
+                RecipeToolText.TabTitle(descriptor, _localizer.GetString)));
             return false;
         }
 

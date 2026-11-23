@@ -43,6 +43,12 @@
                            FontSize="{StaticResource FontSizeCaption}"
                            Foreground="{DynamicResource WarningTextBrush}"
                            TextWrapping="Wrap"/>
+                <TextBlock x:Name="HeaderStale" Text="{Binding StaleText}"
+                           Margin="{StaticResource MarginSubsectionTop}"
+                           FontSize="{StaticResource FontSizeBody}"
+                           Foreground="{DynamicResource WarningTextBrush}"
+                           TextWrapping="Wrap"
+                           Visibility="{Binding IsStale, Converter={StaticResource BoolToVisibilityConverter}}"/>
                 <TextBlock x:Name="HeaderDescription" Text="{Binding Description}"
                            Margin="{StaticResource MarginSubsectionTop}"
                            FontSize="{StaticResource FontSizeBody}"

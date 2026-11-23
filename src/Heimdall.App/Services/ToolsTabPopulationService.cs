@@ -731,7 +731,7 @@ public sealed class ToolsTabPopulationService
             HorizontalContentAlignment = HorizontalAlignment.Stretch,
             VerticalContentAlignment = VerticalAlignment.Stretch,
             Cursor = System.Windows.Input.Cursors.Hand,
-            ToolTip = descBlock.Text.Length > 0 ? descBlock.Text : null,
+            ToolTip = ResolveCardToolTip(descriptor, localize),
             Template = btnTemplate
         };
         AutomationProperties.SetName(launchButton, RecipeToolText.AccessibleName(descriptor, localize));
@@ -867,6 +867,21 @@ public sealed class ToolsTabPopulationService
         var descKey = descriptor.DescriptionKey ?? $"ToolDesc{descriptor.Id}";
         var descText = localize(descKey);
         return descText != descKey ? descText : string.Empty;
+    }
+
+    /// <summary>
+    /// The tooltip of a card: the description, and for a recipe the provenance first, so the author
+    /// is named wherever the card is read, followed by the description when there is one.
+    /// </summary>
+    internal static string? ResolveCardToolTip(ToolDescriptor descriptor, Func<string, string> localize)
+    {
+        string description = ResolveCardDescription(descriptor, localize);
+        if (RecipeToolText.ProvenanceOf(descriptor, localize) is not { } provenance)
+        {
+            return description.Length > 0 ? description : null;
+        }
+
+        return description.Length > 0 ? provenance + Environment.NewLine + description : provenance;
     }
 
     /// <summary>

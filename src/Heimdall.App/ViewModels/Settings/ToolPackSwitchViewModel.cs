@@ -99,13 +99,19 @@ public sealed class ToolPackSwitchViewModel : ObservableObject
         get => !IsForbiddenByPolicy && _readEnabled();
         set
         {
-            if (IsForbiddenByPolicy || value == _readEnabled())
+            // Turning a pack off is always written: the Recipes pack reads off while its marker is
+            // missing, and the choice has to reach the list all the same.
+            bool before = _readEnabled();
+            if (IsForbiddenByPolicy || (value && before))
             {
                 return;
             }
 
             _writeEnabled(value);
-            OnPropertyChanged();
+            if (value != before)
+            {
+                OnPropertyChanged();
+            }
         }
     }
 
