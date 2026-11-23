@@ -86,7 +86,7 @@ public sealed class ToolPackSettingsTests : IDisposable
     }
 
     [Fact]
-    public async Task AFreshInstallDisablesExactlyTheAuditPack()
+    public async Task AFreshInstallDisablesExactlyTheAuditAndRecipesPacks()
     {
         string installRoot = AppContext.BaseDirectory;
         string dataRoot = Path.Combine(_root, "data");
@@ -98,7 +98,7 @@ public sealed class ToolPackSettingsTests : IDisposable
         await manager.InitializeAsync();
         AppSettings loaded = await manager.LoadSettingsAsync();
 
-        Assert.Equal([nameof(ToolPack.Audit)], loaded.DisabledToolPacks);
+        Assert.Equal([nameof(ToolPack.Audit), nameof(ToolPack.Recipes)], loaded.DisabledToolPacks);
         ToolRegistry registry = new();
         ToolAvailability availability = new(registry, new ToolPackPolicy(_ => null), () => loaded, _ => { });
         string[] disabledIds = registry.All

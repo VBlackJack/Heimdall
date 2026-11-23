@@ -158,7 +158,7 @@ public partial class SettingsViewModel
                 current,
                 _toolRegistry.All.Count(descriptor => descriptor.Pack == current),
                 _toolAvailability?.IsPackForbiddenByPolicy(current) ?? false,
-                current == ToolPack.Audit,
+                PackCarriesWarning(current),
                 () => !ListsPack(DisabledToolPacks, current),
                 enabled => DisabledToolPacks = WithPackState(DisabledToolPacks, current, enabled));
             ApplyToolPackTexts(toolPackSwitch);
@@ -192,7 +192,7 @@ public partial class SettingsViewModel
                 ToolPackCountOneKey,
                 ToolPackCountKey,
                 toolPackSwitch.ToolCount),
-            toolPackSwitch.CarriesWarning ? _localizer[ToolPackWarningKey] : string.Empty,
+            toolPackSwitch.CarriesWarning ? _localizer[ToolPackWarningKey(toolPackSwitch.Pack)] : string.Empty,
             toolPackSwitch.IsForbiddenByPolicy ? _localizer[ToolPackPolicyKey] : string.Empty);
     }
 
@@ -206,7 +206,29 @@ public partial class SettingsViewModel
 
     private const string ToolPackCountKey = "SettingsToolPackCount";
 
-    private const string ToolPackWarningKey = "SettingsToolPackAuditWarning";
+    /// <summary>The locale key of a pack's caution line, composed from the member name of the pack.</summary>
+    internal static string ToolPackWarningKey(ToolPack pack) => "SettingsToolPack" + pack + "Warning";
+
+    /// <summary>Whether the pack shows a caution line: the packs that probe targets or run programs written by others.</summary>
+    private static bool PackCarriesWarning(ToolPack pack) => pack is ToolPack.Audit or ToolPack.Recipes;
+
+    /// <summary>
+    /// Brings the tool count of the Recipes switch up to date after recipe tools were registered or
+    /// removed, since the count is read from the registry and the registry changes after the panel is built.
+    /// </summary>
+    private void OnRecipeToolsChanged()
+    {
+        if (_toolPackSwitches is null)
+        {
+            return;
+        }
+
+        foreach (ToolPackSwitchViewModel toolPackSwitch in _toolPackSwitches.Where(item => item.Pack == ToolPack.Recipes))
+        {
+            toolPackSwitch.UpdateToolCount(_toolRegistry.All.Count(descriptor => descriptor.Pack == ToolPack.Recipes));
+            ApplyToolPackTexts(toolPackSwitch);
+        }
+    }
 
     private const string ToolPackPolicyKey = "SettingsToolPackSetByPolicy";
 }

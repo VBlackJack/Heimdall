@@ -1461,6 +1461,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         _sftpSudoFallbackPolicy = sftpSudoFallbackPolicy ?? new SftpSudoFallbackPolicy();
         _toolAvailability = toolAvailability;
         _toolRegistry = toolRegistry ?? new ToolRegistry();
+        _toolRegistry.RecipeToolsChanged += OnRecipeToolsChanged;
         _configManager = configManager;
         _gitIdentityReader = gitIdentityReader;
         _sharedSessions = sharedSessions;
@@ -4702,6 +4703,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         UnsubscribeSharedSessionSourceTracking();
         UnsubscribeFromSharedSessionProvider();
         _localizer.LocaleChanged -= OnPanelLocaleChanged;
+        _toolRegistry.RecipeToolsChanged -= OnRecipeToolsChanged;
         TrustedHostKeys.Dispose();
         TrustedRdpCertificates.Dispose();
         TrustedWebCertificates?.Dispose();

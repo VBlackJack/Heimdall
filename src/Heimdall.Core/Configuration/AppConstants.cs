@@ -45,6 +45,9 @@ public static class AppConstants
     /// <summary>Restrictive staging root for verified application updates.</summary>
     public const string UpdatesDirectoryName = "updates";
 
+    /// <summary>Writable subfolder holding the imported recipe files and their index.</summary>
+    public const string RecipesDirectoryName = "recipes";
+
     /// <summary>Writable notes subfolder within the legacy relative config path.</summary>
     public const string NotesDirectoryName = "notes";
 

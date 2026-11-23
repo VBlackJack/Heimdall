@@ -154,5 +154,6 @@
     "cmdLibGitSyncAuthorEmail": "heimdall@local",
     "cmdLibGitSyncOnStartup": false,
     "cmdLibGitSyncAutoPush": true,
-    "disabledToolPacks": ["Audit"]
+    "disabledToolPacks": ["Audit", "Recipes"],
+    "recipesPackMigrated": true
 }

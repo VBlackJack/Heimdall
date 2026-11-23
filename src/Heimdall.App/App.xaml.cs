@@ -483,6 +483,10 @@ public partial class App : System.Windows.Application
                 localization,
                 _serviceProvider.GetRequiredService<IDialogService>());
 
+            // One time, for an install that predates the Recipes pack: list it among the packs
+            // that are off. Before anything asks which packs are enabled.
+            await RunToolPackMigrationAsync(configManager);
+
             // Scan for external tools (NirSoft, Sysinternals) on a background thread.
             // Fire-and-forget: results land in ToolRegistry via Dispatcher callback.
             _ = Task.Run(() => ScanExternalTools(settings));
@@ -492,6 +496,10 @@ public partial class App : System.Windows.Application
             // dialog are picked up automatically; it also re-arms its timer when
             // the user changes the interval in Settings via SettingsChanged.
             _serviceProvider.GetRequiredService<SessionHealthMonitor>().Start(settings);
+
+            // Read the imported recipes before the main window exists, so what was skipped is in
+            // the log from the first start. The recipe tools themselves are not registered yet.
+            LoadImportedRecipes();
 
             // Close splash before showing main window
             splash.Close();
@@ -783,6 +791,51 @@ public partial class App : System.Windows.Application
         }
     }
 
+    private static async Task RunToolPackMigrationAsync(IConfigManager configManager)
+    {
+        try
+        {
+            if (await ToolPackMigration.RunAsync(configManager))
+            {
+                Core.Logging.FileLogger.Info("[App] The Recipes pack was listed among the packs that are off");
+            }
+        }
+        catch (Exception ex)
+        {
+            // A failed step leaves the marker unset, so it runs again at the next start.
+            Core.Logging.FileLogger.Error("[App] The tool pack migration failed", ex);
+        }
+    }
+
+    /// <summary>
+    /// Loads the imported recipes and logs every file that was skipped, by code and file name only.
+    /// Does nothing while the Recipes pack is off or forbidden, which is the default, so a user who
+    /// never turned it on has nothing read from disk.
+    /// </summary>
+    private void LoadImportedRecipes()
+    {
+        if (_serviceProvider is null) return;
+
+        try
+        {
+            if (!_serviceProvider.GetRequiredService<IToolAvailability>().IsPackEnabled(Core.Models.ToolPack.Recipes))
+            {
+                return;
+            }
+
+            RecipeLoadResult result = _serviceProvider.GetRequiredService<IRecipeStore>().LoadAll();
+            Core.Logging.FileLogger.Info($"[App] Loaded {result.Recipes.Count} recipe(s), skipped {result.Issues.Count}");
+            foreach (RecipeLoadIssue issue in result.Issues)
+            {
+                Core.Logging.FileLogger.Warn($"[App] Recipe skipped: {issue.Code} ({issue.FileName})");
+            }
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Error("[App] Recipes could not be loaded", ex);
+        }
+    }
+
     private void ConfigureServices(IServiceCollection services, string dataRoot)
     {
         // Core services
@@ -836,6 +889,11 @@ public partial class App : System.Windows.Application
         // the single decision on whether a tool may be used (registry pack, user setting, policy).
         services.AddSingleton<ToolPackPolicy>(_ => new ToolPackPolicy());
         services.AddSingleton<IToolAvailability, ToolAvailability>();
+
+        // The imported recipes, under the data directory like the other writable state, so a
+        // --data-dir instance shares nothing with the user's own.
+        services.AddSingleton<IRecipeStore>(
+            _ => new RecipeStore(_dataRoot ?? ApplicationDataPathResolver.Resolve()));
 
         // The single place the real preset location is resolved. Neither the storage nor the
         // view model can reach it any more: their parameterless constructors are gone.

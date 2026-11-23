@@ -137,6 +137,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     private System.ComponentModel.PropertyChangedEventHandler? _selectedExternalToolPropertyChangedHandler;
     private Action? _externalToolsChangedHandler;
     private Action? _toolAvailabilityChangedHandler;
+    private Action? _recipeToolsChangedHandler;
     private Action<string>? _localeChangedHandler;
     private ExternalToolItemViewModel? _trackedExternalToolForPreview;
 
@@ -318,6 +319,21 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             });
         };
         viewModel.ToolAvailability.Changed += _toolAvailabilityChangedHandler;
+
+        // A recipe tool that appears, changes or goes away alters every listing at once: the two
+        // cached ones, and the saved tool entries of the server tree, whose state (a removed recipe
+        // becomes unavailable, an imported one available again) comes from the registry. The
+        // registry raises this on whatever thread registered the recipes.
+        _recipeToolsChangedHandler = () =>
+        {
+            Dispatcher.BeginInvoke(() =>
+            {
+                viewModel.ToolsTab.OnExternalToolsChanged();
+                viewModel.Sidebar.OnExternalToolsChanged();
+                viewModel.ServerList.RefreshToolAvailability();
+            });
+        };
+        viewModel.ToolRegistry.RecipeToolsChanged += _recipeToolsChangedHandler;
         viewModel.ServerList.ToolStateResolver = viewModel.ToolAvailability.GetState;
 
         // Wire split button callback from embedded views
@@ -4856,6 +4872,8 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
                 vm.ToolRegistry.ExternalToolsChanged -= _externalToolsChangedHandler;
             if (_toolAvailabilityChangedHandler is not null)
                 vm.ToolAvailability.Changed -= _toolAvailabilityChangedHandler;
+            if (_recipeToolsChangedHandler is not null)
+                vm.ToolRegistry.RecipeToolsChanged -= _recipeToolsChangedHandler;
             if (_localeChangedHandler is not null)
                 vm.GetLocalizer().LocaleChanged -= _localeChangedHandler;
             vm.ToolsTab.SectionsInvalidated -= OnToolsTabSectionsInvalidated;

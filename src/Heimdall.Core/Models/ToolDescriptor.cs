@@ -31,6 +31,8 @@ namespace Heimdall.Core.Models;
 /// <param name="DescriptionKey">Optional explicit i18n key for the tool description. When null, the convention <c>ToolDesc{Id}</c> is used.</param>
 /// <param name="ExternalProviderName">Provider display name for dynamically-detected external tools. Null for built-in tools.</param>
 /// <param name="Pack">The pack the tool belongs to, which decides whether it can be switched off. Null for tools outside the packs (detected external tools, test probes), which are always available.</param>
+/// <param name="RecipeAuthor">The author written in the recipe file, display only and never verified. Set for a tool that comes from a recipe, and only then.</param>
+/// <param name="RecipeDescription">The description written in the recipe file, as plain text. Set for a tool that comes from a recipe, and only then.</param>
 public sealed record ToolDescriptor(
     string Id,
     ToolCategory Category,
@@ -42,8 +44,16 @@ public sealed record ToolDescriptor(
     string? IconResourceKey = null,
     string? DescriptionKey = null,
     string? ExternalProviderName = null,
-    ToolPack? Pack = null)
+    ToolPack? Pack = null,
+    string? RecipeAuthor = null,
+    string? RecipeDescription = null)
 {
+    /// <summary>The id prefix of a tool that comes from a recipe file.</summary>
+    public const string RecipeIdPrefix = "RCP:";
+
+    /// <summary>True when the tool comes from a recipe file rather than from the application.</summary>
+    public bool IsRecipe => RecipeAuthor is not null;
+
     /// <summary>
     /// The prefixed tool type string used in connection type fields, e.g. "TOOL:PING".
     /// </summary>
@@ -58,10 +68,13 @@ public sealed record ToolDescriptor(
     /// machine (<see cref="ExternalProviderName"/> set) it is the product's own name, such as
     /// "Autorunsc", which no locale defines: looked up as a key it would miss, be logged as a
     /// missing translation, and only then fall back to itself. Such a name is returned as is.
+    /// The name of a tool that comes from a recipe is text written by someone else and is returned
+    /// as is for a stronger reason: looked up as a key, a recipe named like a locale key would
+    /// display that key's text instead of its own name.
     /// </remarks>
     public string ResolveLabel(Func<string, string> localize)
     {
         ArgumentNullException.ThrowIfNull(localize);
-        return ExternalProviderName is null ? localize(LabelKey) : LabelKey;
+        return ExternalProviderName is null && !IsRecipe ? localize(LabelKey) : LabelKey;
     }
 }
