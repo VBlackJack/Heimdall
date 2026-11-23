@@ -2303,9 +2303,12 @@
                                            Foreground="{DynamicResource WarningTextBrush}" Margin="0,12,0,0"
                                            FontSize="{StaticResource FontSizeBodyLarge}" TextWrapping="Wrap"/>
 
+                                <!-- An unavailable tool cannot be opened: the button is disabled and the warning line
+                                     above carries the reason. The command's own CanExecute still applies on top. -->
                                 <Button x:Name="Mw_ToolDetailOpenBtn" Content="{loc:Translate DetailBtnOpenInTab}"
                                         Command="{Binding ServerList.ConnectCommand}"
                                         CommandParameter="{Binding ServerList.SelectedServer}"
+                                        IsEnabled="{Binding ServerList.ToolDetailIsUnavailable, Converter={StaticResource InvertBoolConverter}, FallbackValue=True}"
                                         Style="{DynamicResource PrimaryButtonStyle}"
                                         Width="140" HorizontalAlignment="Left"
                                         Margin="0,20,0,0"
@@ -6629,7 +6632,7 @@
                         </ListBox.GroupStyle>
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <DockPanel Margin="10,6">
+                                <DockPanel x:Name="PaletteRowContent" Margin="10,6">
                                     <Border DockPanel.Dock="Left"
                                             Width="3"
                                             CornerRadius="1.5"
@@ -6714,6 +6717,14 @@
                                         </StackPanel>
                                     </StackPanel>
                                 </DockPanel>
+                                <DataTemplate.Triggers>
+                                    <!-- A saved tool entry whose pack is off or forbidden is dimmed as in the tree: the
+                                         row content only, so selection, hover and focus chrome stay. The fallback is
+                                         purely defensive. -->
+                                    <DataTrigger Binding="{Binding IsToolUnavailable, FallbackValue=False}" Value="True">
+                                        <Setter TargetName="PaletteRowContent" Property="Opacity" Value="{StaticResource OpacityDisabled}"/>
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                         <ListBox.ItemContainerStyle>
