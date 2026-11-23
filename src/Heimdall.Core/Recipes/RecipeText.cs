@@ -24,6 +24,10 @@ public static class RecipeText
 {
     private const string EllipsisText = "...";
 
+    private const char PrintableAsciiStart = ' ';
+
+    private const char PrintableAsciiEnd = '~';
+
     /// <summary>
     /// True when the text holds a character no recipe text may carry: a control character (Cc), a
     /// format character (Cf, which includes the right-to-left override), a line or paragraph
@@ -56,6 +60,37 @@ public static class RecipeText
 
             char c = text[index];
             if (IsRefused(text, index))
+            {
+                builder.Append("\\u").Append(((int)c).ToString("X4", CultureInfo.InvariantCulture));
+            }
+            else
+            {
+                builder.Append(c);
+            }
+        }
+
+        return builder.ToString();
+    }
+
+    /// <summary>
+    /// Makes a text safe to show whole, as plain text: every refused character (see
+    /// <see cref="ContainsRefusedCharacter"/>) becomes a <c>\uXXXX</c> escape and nothing is cut.
+    /// With <paramref name="escapeNonAscii"/> every character outside printable ASCII is escaped
+    /// too, so that a look-alike letter in a program or an argument cannot pass for the ASCII one.
+    /// </summary>
+    /// <param name="text">The text from a recipe.</param>
+    /// <param name="escapeNonAscii">Whether characters outside printable ASCII are escaped as well.</param>
+    public static string Escape(string? text, bool escapeNonAscii)
+    {
+        if (string.IsNullOrEmpty(text))
+            return string.Empty;
+
+        StringBuilder builder = new(text.Length);
+        for (int index = 0; index < text.Length; index++)
+        {
+            char c = text[index];
+            bool outsideAscii = c is < PrintableAsciiStart or > PrintableAsciiEnd;
+            if (IsRefused(text, index) || (escapeNonAscii && outsideAscii))
             {
                 builder.Append("\\u").Append(((int)c).ToString("X4", CultureInfo.InvariantCulture));
             }

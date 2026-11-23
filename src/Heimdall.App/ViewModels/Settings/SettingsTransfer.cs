@@ -17,6 +17,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Heimdall.Core.Configuration;
+using Heimdall.Core.Recipes;
 
 namespace Heimdall.App.ViewModels.Settings;
 
@@ -152,7 +153,7 @@ internal static class SettingsTransfer
 
         JsonObject merged = JsonSerializer.SerializeToNode(current)!.AsObject();
         List<SettingsTransferChange> changed = [];
-        foreach ((string key, JsonNode? value) in imported)
+        foreach ((string key, JsonNode? fileValue) in imported)
         {
             if (!TransferableKeys.Contains(key))
             {
@@ -161,11 +162,15 @@ internal static class SettingsTransfer
 
             // A null for a setting that cannot be null, or a null inside a list, passed the import
             // and threw only once the panel loaded it, after the user had confirmed.
-            if ((value is null && !AcceptsNull(key))
-                || (value is JsonArray items && items.Any(item => item is null)))
+            if ((fileValue is null && !AcceptsNull(key))
+                || (fileValue is JsonArray items && items.Any(item => item is null)))
             {
                 throw new FormatException($"The settings file holds an empty value for {key}.");
             }
+
+            // A folder a recipe may run programs from has to pass the same rule as one added in the
+            // panel: a network or device path in a settings file is dropped, not carried over.
+            JsonNode? value = key == nameof(AppSettings.RecipeProgramFolders) ? KeepAcceptableFolders(fileValue) : fileValue;
 
             JsonNode? before = merged[key];
             if (!JsonNode.DeepEquals(before, value))
@@ -197,6 +202,32 @@ internal static class SettingsTransfer
 
         UriBuilder builder = new(uri) { UserName = string.Empty, Password = string.Empty };
         return JsonValue.Create(builder.Uri.ToString());
+    }
+
+    /// <summary>The folders of a settings file that pass <see cref="RecipeFolderRule"/>, in their stored form; other values are left alone.</summary>
+    private static JsonNode? KeepAcceptableFolders(JsonNode? value)
+    {
+        if (value is not JsonArray folders)
+        {
+            return value;
+        }
+
+        JsonArray kept = [];
+        List<string> seen = [];
+        foreach (JsonNode? item in folders)
+        {
+            if (item is not JsonValue scalar || !scalar.TryGetValue(out string? text)
+                || RecipeFolderRule.Check(text, seen) != RecipeFolderRefusal.None)
+            {
+                continue;
+            }
+
+            string normalized = RecipeFolderRule.Normalize(text);
+            seen.Add(normalized);
+            kept.Add(normalized);
+        }
+
+        return kept;
     }
 
     private static readonly System.Reflection.NullabilityInfoContext Nullability = new();

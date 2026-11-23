@@ -5785,6 +5785,71 @@
                                     </StackPanel>
                                 </Border>
 
+                                <!-- Recipes: import, replace, export and remove recipe files -->
+                                <Border x:Name="Mw_SettingsRecipesCard" Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
+                                    <StackPanel>
+                                        <TextBlock x:Name="Mw_SettingsRecipesTitle" Text="{loc:Translate SettingsSectionRecipes}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,4"/>
+                                        <TextBlock x:Name="Mw_SettingsRecipesDesc" Text="{loc:Translate SettingsRecipesIntro}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap" Margin="0,0,0,12"/>
+                                        <TextBlock x:Name="Mw_SettingsRecipesPolicy" Text="{Binding Settings.Recipes.PolicyText}" Visibility="{Binding Settings.Recipes.HasPolicyText, Converter={StaticResource BoolToVisibilityConverter}}" Foreground="{DynamicResource WarningTextBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                        <Button x:Name="Mw_SettingsRecipeImportButton" Content="{loc:Translate SettingsRecipeImportButton}" Command="{Binding Settings.Recipes.ImportCommand}" HorizontalAlignment="Left" Style="{DynamicResource SecondaryButtonStyle}" Padding="8,3" FontSize="{StaticResource FontSizeCaption}"/>
+                                        <TextBlock x:Name="Mw_SettingsRecipeListEmpty" Text="{loc:Translate SettingsRecipeListEmpty}" Visibility="{Binding Settings.Recipes.IsEmpty, Converter={StaticResource BoolToVisibilityConverter}}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,8,0,0"/>
+                                        <ItemsControl x:Name="Mw_SettingsRecipeList" ItemsSource="{Binding Settings.Recipes.Items}" IsTabStop="False" Margin="0,4,0,0">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="0,8,0,0">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel>
+                                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" TextWrapping="Wrap"/>
+                                                            <TextBlock Text="{Binding ProvenanceText}" Visibility="{Binding IsAvailable, Converter={StaticResource BoolToVisibilityConverter}}" Foreground="{DynamicResource WarningTextBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap"/>
+                                                            <TextBlock Text="{Binding VersionText}" Visibility="{Binding IsAvailable, Converter={StaticResource BoolToVisibilityConverter}}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap"/>
+                                                            <TextBlock Text="{Binding ProgramText}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap"/>
+                                                            <TextBlock Text="{Binding UnavailableText}" Visibility="{Binding HasUnavailableText, Converter={StaticResource BoolToVisibilityConverter}}" Foreground="{DynamicResource WarningTextBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap"/>
+                                                        </StackPanel>
+                                                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top" Margin="8,0,0,0">
+                                                            <Button Content="{loc:Translate BtnExport}" Command="{Binding ExportCommand}" AutomationProperties.Name="{Binding ExportAccessibleName}" Style="{DynamicResource SecondaryButtonStyle}" Padding="8,3" FontSize="{StaticResource FontSizeCaption}"/>
+                                                            <Button Content="{loc:Translate BtnRemove}" Command="{Binding RemoveCommand}" AutomationProperties.Name="{Binding RemoveAccessibleName}" Style="{DynamicResource SecondaryButtonStyle}" Padding="8,3" FontSize="{StaticResource FontSizeCaption}" Margin="4,0,0,0"/>
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Folders recipes may run programs from -->
+                                <Border x:Name="Mw_SettingsRecipeFoldersCard" Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
+                                    <StackPanel>
+                                        <TextBlock x:Name="Mw_SettingsRecipeFoldersTitle" Text="{loc:Translate SettingsLabelRecipeProgramFolders}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,4"/>
+                                        <TextBlock x:Name="Mw_SettingsRecipeFoldersDesc" Text="{loc:Translate SettingsRecipeFoldersIntro}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap" Margin="0,0,0,12"/>
+                                        <TextBlock x:Name="Mw_SettingsRecipeFolderListEmpty" Text="{loc:Translate SettingsRecipeFolderListEmpty}" Visibility="{Binding Settings.IsRecipeProgramFoldersEmpty, Converter={StaticResource BoolToVisibilityConverter}}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,8"/>
+                                        <StackPanel x:Name="Mw_SettingsRecipeFolderEditor">
+                                            <ItemsControl x:Name="Mw_SettingsRecipeFolderList" ItemsSource="{Binding Settings.RecipeProgramFolders}" IsTabStop="False">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Grid Margin="0,0,0,6">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*"/>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock Text="{Binding}" Foreground="{DynamicResource TextPrimaryBrush}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                                                            <Button Grid.Column="1" Content="{loc:Translate BtnRemove}"
+                                                                    Command="{Binding DataContext.Settings.RemoveRecipeProgramFolderCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                                    CommandParameter="{Binding}" AutomationProperties.HelpText="{Binding}"
+                                                                    Style="{DynamicResource SecondaryButtonStyle}" Padding="8,3" FontSize="{StaticResource FontSizeCaption}" Margin="8,0,0,0"/>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                            <Button x:Name="Mw_SettingsRecipeFolderAdd" Content="{loc:Translate SettingsRecipeFolderAdd}" Command="{Binding Settings.AddRecipeProgramFolderCommand}" HorizontalAlignment="Left" Style="{DynamicResource SecondaryButtonStyle}" Padding="8,3" FontSize="{StaticResource FontSizeCaption}" Margin="0,4,0,0"/>
+                                            <TextBlock x:Name="Mw_SettingsRecipeFolderStatus" Text="{Binding Settings.RecipeProgramFolderStatus, NotifyOnTargetUpdated=True}" Visibility="{Binding Settings.HasRecipeProgramFolderStatus, Converter={StaticResource BoolToVisibilityConverter}}" Foreground="{DynamicResource WarningTextBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,6,0,0" AutomationProperties.LiveSetting="Polite" behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"/>
+                                        </StackPanel>
+                                        <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[RecipeProgramFolders]}"/>
+                                    </StackPanel>
+                                </Border>
+
                                 <!-- External Editor -->
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>

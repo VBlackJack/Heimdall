@@ -1456,7 +1456,9 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         IGitIdentityReader? gitIdentityReader = null,
         SftpSudoFallbackPolicy? sftpSudoFallbackPolicy = null,
         IToolAvailability? toolAvailability = null,
-        ToolRegistry? toolRegistry = null)
+        ToolRegistry? toolRegistry = null,
+        RecipeSettingsViewModel? recipes = null,
+        IRecipeFileDialogs? recipeFileDialogs = null)
     {
         _sftpSudoFallbackPolicy = sftpSudoFallbackPolicy ?? new SftpSudoFallbackPolicy();
         _toolAvailability = toolAvailability;
@@ -1479,6 +1481,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         TrustedHostKeys = trustedHostKeys;
         TrustedRdpCertificates = trustedRdpCertificates;
         TrustedWebCertificates = trustedWebCertificates;
+        AttachRecipes(recipes, recipeFileDialogs);
 
         // The banner and the tab badges are derived from the error set, so they have to follow it
         // rather than hold the shape it had when Save was last pressed.
@@ -1499,6 +1502,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         RefreshAllDefaultMarkers();
         RefreshSecurityPosture();
         RefreshToolPackTexts();
+        RefreshRecipeTexts();
 
         // Worded from the localizer and otherwise raised only when their own state moves.
         OnPropertyChanged(nameof(SkippedVersionText));
@@ -1856,6 +1860,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             CollapseTunnelsPanelByDefault = settings.CollapseTunnelsPanelByDefault;
             ExternalEditorPath = settings.ExternalEditorPath;
             DisabledToolPacks = settings.DisabledToolPacks?.ToArray() ?? [];
+            RecipeProgramFolders = settings.RecipeProgramFolders?.ToArray() ?? [];
 
             // Updates
             UpdateCheckEnabled = settings.UpdateCheckEnabled;
@@ -2352,6 +2357,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         settings.CollapseTunnelsPanelByDefault = CollapseTunnelsPanelByDefault;
         settings.ExternalEditorPath = ExternalEditorPath;
         settings.DisabledToolPacks = [.. DisabledToolPacks];
+        settings.RecipeProgramFolders = [.. RecipeProgramFolders];
         settings.UpdateCheckEnabled = UpdateCheckEnabled;
         settings.UpdateCheckIntervalHours = UpdateCheckIntervalHours;
 
@@ -4707,6 +4713,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         TrustedHostKeys.Dispose();
         TrustedRdpCertificates.Dispose();
         TrustedWebCertificates?.Dispose();
+        Recipes?.Dispose();
         GC.SuppressFinalize(this);
     }
 

@@ -83,7 +83,7 @@ public sealed class RecipeProgramFoldersSettingTests : IDisposable
     }
 
     [Fact]
-    public void ASettingsFileCannotAddAFolderBecauseThePanelDoesNotEditTheListYet()
+    public void ASettingsFileCanNowCarryTheListBecauseThePanelEditsItAndTheChangeIsReportedWithItsKey()
     {
         JsonObject file = new()
         {
@@ -94,8 +94,9 @@ public sealed class RecipeProgramFoldersSettingTests : IDisposable
 
         (AppSettings merged, IReadOnlyList<SettingsTransferChange> changed) = SettingsTransfer.Import(new AppSettings(), file);
 
-        Assert.Empty(merged.RecipeProgramFolders);
-        Assert.DoesNotContain(changed, item => item.Key == nameof(AppSettings.RecipeProgramFolders));
+        Assert.Equal([@"D:\Tools"], merged.RecipeProgramFolders);
+        Assert.Contains(changed, item => item.Key == nameof(AppSettings.RecipeProgramFolders));
+        Assert.Contains(nameof(AppSettings.RecipeProgramFolders), SettingsImportPreview.SensitiveKeys);
     }
 
     [Fact]

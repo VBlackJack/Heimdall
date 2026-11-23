@@ -50,9 +50,9 @@ public sealed class RecipeToolSurfaceTests
         LocalizationManager french = await LocalizerAsync("fr");
         LocalizationManager spanish = await LocalizerAsync("es");
 
-        Assert.Equal("Recipe by Acme (unverified)", RecipeToolText.Provenance("Acme", english.GetString));
-        Assert.Equal("Recette de Acme (non v\u00e9rifi\u00e9e)", RecipeToolText.Provenance("Acme", french.GetString));
-        Assert.Equal("Receta de Acme (sin verificar)", RecipeToolText.Provenance("Acme", spanish.GetString));
+        Assert.Equal("Unverified recipe by Acme", RecipeToolText.Provenance("Acme", english.GetString));
+        Assert.Equal("Recette non v\u00e9rifi\u00e9e de Acme", RecipeToolText.Provenance("Acme", french.GetString));
+        Assert.Equal("Receta sin verificar de Acme", RecipeToolText.Provenance("Acme", spanish.GetString));
     }
 
     [Fact]
@@ -62,7 +62,7 @@ public sealed class RecipeToolSurfaceTests
 
         string title = RecipeToolText.TabTitle(DescriptorOf(), localizer.GetString);
 
-        Assert.Equal("Probe - Recipe by Acme (unverified)", title);
+        Assert.Equal("Probe - Unverified recipe by Acme", title);
     }
 
     [Fact]
@@ -83,7 +83,7 @@ public sealed class RecipeToolSurfaceTests
 
         string name = RecipeToolText.AccessibleName(DescriptorOf(), localizer.GetString);
 
-        Assert.Equal("Probe, Recipe by Acme (unverified)", name);
+        Assert.Equal("Probe, Unverified recipe by Acme", name);
     }
 
     [Fact]
@@ -95,10 +95,10 @@ public sealed class RecipeToolSurfaceTests
 
         Assert.Equal("RCP:acme.probe", row.Id);
         Assert.Equal("Probe", row.Name);
-        Assert.Equal("Recipe by Acme (unverified)", row.Provenance);
+        Assert.Equal("Unverified recipe by Acme", row.Provenance);
         Assert.True(row.HasProvenance);
-        Assert.Equal("Probe, Recipe by Acme (unverified)", row.AccessibleName);
-        Assert.Equal("Probe - Recipe by Acme (unverified)", row.ToolTipText);
+        Assert.Equal("Probe, Unverified recipe by Acme", row.AccessibleName);
+        Assert.Equal("Probe - Unverified recipe by Acme", row.ToolTipText);
         Assert.Contains("unverified", row.Searchable);
         Assert.Contains("acme", row.Searchable);
     }
@@ -127,8 +127,8 @@ public sealed class RecipeToolSurfaceTests
         SidebarToolItemViewModel row = ToolsTabPopulationService.CreateSidebarToolItem(fake, localizer.GetString);
 
         Assert.Equal("PaletteToolPing", row.Name);
-        Assert.Equal("Recipe by Acme (unverified)", row.Provenance);
-        Assert.Equal("PaletteToolPing - Recipe by Acme (unverified)", RecipeToolText.TabTitle(fake, localizer.GetString));
+        Assert.Equal("Unverified recipe by Acme", row.Provenance);
+        Assert.Equal("PaletteToolPing - Unverified recipe by Acme", RecipeToolText.TabTitle(fake, localizer.GetString));
         Assert.Equal("Probes the thing.", ToolsTabPopulationService.ResolveCardDescription(fake, localizer.GetString));
     }
 
@@ -143,7 +143,7 @@ public sealed class RecipeToolSurfaceTests
         SidebarToolItemViewModel row = ToolsTabPopulationService.CreateSidebarToolItem(lookalike, localizer.GetString);
 
         Assert.StartsWith(pingName, title, StringComparison.Ordinal);
-        Assert.EndsWith("(unverified)", title, StringComparison.Ordinal);
+        Assert.EndsWith("recipe by Acme", title, StringComparison.Ordinal);
         Assert.NotNull(row.Provenance);
         Assert.NotEqual("PING", row.Id);
     }
@@ -159,7 +159,7 @@ public sealed class RecipeToolSurfaceTests
         ServerItemViewModel recipeRow = (ServerItemViewModel)build.Invoke(palette, [DescriptorOf()])!;
         ServerItemViewModel builtInRow = (ServerItemViewModel)build.Invoke(palette, [ping])!;
 
-        Assert.Equal("Probe - Recipe by Acme (unverified)", recipeRow.DisplayName);
+        Assert.Equal("Probe - Unverified recipe by Acme", recipeRow.DisplayName);
         Assert.Equal("tool-rcp:acme.probe", recipeRow.Id);
         Assert.Equal(ping.ResolveLabel(localizer.GetString), builtInRow.DisplayName);
     }
@@ -191,7 +191,7 @@ public sealed class RecipeToolSurfaceTests
         ToolDescriptor recipe = DescriptorOf();
         ToolDescriptor ping = new ToolRegistry().GetById("PING")!;
 
-        Assert.Equal("Probe - Recipe by Acme (unverified)", MainViewModel.TitleOfToolTab(recipe, "my own title", localizer.GetString));
+        Assert.Equal("Probe - Unverified recipe by Acme", MainViewModel.TitleOfToolTab(recipe, "my own title", localizer.GetString));
         Assert.Equal("my own title", MainViewModel.TitleOfToolTab(ping, "my own title", localizer.GetString));
         Assert.Equal("kept", MainViewModel.TitleOfToolTab(null, "kept", localizer.GetString));
     }

@@ -114,10 +114,10 @@ public sealed class RecipeToolViewTests
 
             string[] texts = [.. LogicalDescendants<TextBlock>(card).Select(block => block.Text)];
             Assert.Contains("ToolDescPING", texts);
-            Assert.Contains("Recipe by Acme (unverified)", texts);
+            Assert.Contains("Unverified recipe by Acme", texts);
             Assert.Contains("ToolDescPING <b>raw</b>", texts);
             Button launch = LogicalDescendants<Button>(card).First(button => button.Tag is ToolDescriptor);
-            Assert.Equal("ToolDescPING, Recipe by Acme (unverified)", AutomationProperties.GetName(launch));
+            Assert.Equal("ToolDescPING, Unverified recipe by Acme", AutomationProperties.GetName(launch));
         }).Task;
     }
 
@@ -150,7 +150,7 @@ public sealed class RecipeToolViewTests
             Layout(view);
 
             Assert.Equal("Probe", view.FindName("HeaderTitle") is TextBlock title ? title.Text : null);
-            Assert.Equal("Recipe by Acme (unverified)", ((TextBlock)view.FindName("HeaderProvenance")).Text);
+            Assert.Equal("Unverified recipe by Acme", ((TextBlock)view.FindName("HeaderProvenance")).Text);
             Assert.Equal("Probes the thing.", ((TextBlock)view.FindName("HeaderDescription")).Text);
 
             TextBox box = Assert.Single(Descendants<TextBox>(view), item => AutomationProperties.GetName(item) == "Target host");

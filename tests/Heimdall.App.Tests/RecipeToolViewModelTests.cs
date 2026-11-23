@@ -801,6 +801,6 @@ public sealed class RecipeToolViewModelTests
 
         RecipeToolViewModel viewModel = harness.Create(Recipe(author: "Acme"));
 
-        Assert.Equal("Recipe by Acme (unverified)", viewModel.Provenance);
+        Assert.Equal("Unverified recipe by Acme", viewModel.Provenance);
     }
 }

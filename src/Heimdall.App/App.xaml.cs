@@ -920,6 +920,28 @@ public partial class App : System.Windows.Application
                 workFolders);
         });
 
+        // Importing, replacing, exporting and removing recipes from Settings. The pickers are a seam so
+        // that no test opens a real dialog; a change reloads the recipe tools, so the Tools tab, the
+        // sidebar and the palette follow without a restart.
+        services.AddSingleton<IRecipeFileDialogs>(
+            sp => new Win32RecipeFileDialogs(sp.GetRequiredService<LocalizationManager>()));
+        services.AddSingleton<RecipeImportService>(sp => new RecipeImportService(
+            sp.GetRequiredService<IRecipeStore>(),
+            new RecipeProgramResolver(),
+            sp.GetRequiredService<IToolAvailability>()));
+        services.AddTransient<RecipeSettingsViewModel>(sp =>
+        {
+            RecipeToolRegistrar registrar = sp.GetRequiredService<RecipeToolRegistrar>();
+            return new RecipeSettingsViewModel(
+                sp.GetRequiredService<IRecipeStore>(),
+                sp.GetRequiredService<RecipeImportService>(),
+                sp.GetRequiredService<IConfigManager>(),
+                sp.GetRequiredService<IDialogService>(),
+                sp.GetRequiredService<LocalizationManager>(),
+                sp.GetRequiredService<IRecipeFileDialogs>(),
+                registrar.Reload);
+        });
+
         // The single place the real preset location is resolved. Neither the storage nor the
         // view model can reach it any more: their parameterless constructors are gone.
         services.AddSingleton<IPasswordPresetStorage>(
