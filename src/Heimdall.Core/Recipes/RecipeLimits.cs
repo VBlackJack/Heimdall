@@ -111,4 +111,13 @@ public static class RecipeLimits
 
     /// <summary>Longest value accepted for the <c>int</c> and <c>number</c> types, in characters.</summary>
     public const int MaxNumericValueLength = 64;
+
+    /// <summary>Most bytes kept from the output of a run; the rest is read and discarded.</summary>
+    public const int MaxCaptureBytes = 1024 * 1024;
+
+    /// <summary>How long the readers may keep draining after the process ended, in milliseconds.</summary>
+    public const int DrainGraceMilliseconds = 2000;
+
+    /// <summary>How long to wait for a killed process to be gone, in milliseconds.</summary>
+    public const int KillWaitMilliseconds = 5000;
 }
