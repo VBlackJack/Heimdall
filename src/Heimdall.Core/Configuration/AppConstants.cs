@@ -48,6 +48,9 @@ public static class AppConstants
     /// <summary>Writable subfolder holding the imported recipe files and their index.</summary>
     public const string RecipesDirectoryName = "recipes";
 
+    /// <summary>Writable subfolder holding one fresh working folder per recipe run; emptied at start.</summary>
+    public const string RecipeRunsDirectoryName = "recipe-runs";
+
     /// <summary>Writable notes subfolder within the legacy relative config path.</summary>
     public const string NotesDirectoryName = "notes";
 

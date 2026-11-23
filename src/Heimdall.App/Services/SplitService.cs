@@ -394,7 +394,7 @@ public sealed class SplitService : ISplitService
         }
 
         var connectionType = $"TOOL:{toolId.ToUpperInvariant()}";
-        var title = descriptor.ResolveLabel(_localizer.GetString);
+        var title = RecipeToolText.TabTitle(descriptor, _localizer.GetString);
         ToolContext? context = !string.IsNullOrEmpty(argument)
             ? new ToolContext(Argument: argument)
             : null;

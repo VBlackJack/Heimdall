@@ -91,7 +91,7 @@ public sealed record RecipeRunResult(
 /// Runs one resolved program with an already expanded argument list: no shell, no window, no
 /// elevation, every argument a separate <c>ArgumentList</c> entry, output captured within a bound.
 /// </summary>
-public sealed class RecipeRunner
+public sealed class RecipeRunner : IRecipeRunner
 {
     private const int ReadChunkBytes = 4096;
 

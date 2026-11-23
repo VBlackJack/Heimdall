@@ -438,6 +438,14 @@ public sealed class AppSettings
     /// the key keeps it in its extension data and writes it back unchanged.
     /// </summary>
     public bool RecipesPackMigrated { get; set; }
+
+    /// <summary>
+    /// Folders, besides Windows and Program Files, that a recipe may run a program from. Empty by
+    /// default, read each time a recipe runs, and flagged sensitive in the settings import preview:
+    /// a settings file cannot widen where recipes may run programs without the user being told.
+    /// Optional on purpose, like <see cref="RecipesPackMigrated"/>: the schema version is not bumped.
+    /// </summary>
+    public List<string> RecipeProgramFolders { get; set; } = new();
     public bool OnboardingCompleted { get; set; }
     public double WindowWidth { get; set; }
     public double WindowHeight { get; set; }

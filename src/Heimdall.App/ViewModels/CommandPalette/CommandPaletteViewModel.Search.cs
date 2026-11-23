@@ -137,7 +137,7 @@ public sealed partial class CommandPaletteViewModel
                     initialResults.Add(new ServerItemViewModel
                     {
                         Id = $"tool-{desc.Id.ToLowerInvariant()}",
-                        DisplayName = desc.ResolveLabel(_localizer.GetString),
+                        DisplayName = RecipeToolText.TabTitle(desc, _localizer.GetString),
                         ConnectionType = desc.ToolType,
                         Group = _localizer["PaletteRecentToolsHeader"]
                     });
@@ -393,7 +393,7 @@ public sealed partial class CommandPaletteViewModel
     private ServerItemViewModel BuildToolPaletteItem(ToolDescriptor descriptor) => new()
     {
         Id = $"tool-{descriptor.Id.ToLowerInvariant()}",
-        DisplayName = descriptor.ResolveLabel(_localizer.GetString),
+        DisplayName = RecipeToolText.TabTitle(descriptor, _localizer.GetString),
         ConnectionType = descriptor.ToolType,
         Group = _localizer[descriptor.CategoryLabelKey]
     };

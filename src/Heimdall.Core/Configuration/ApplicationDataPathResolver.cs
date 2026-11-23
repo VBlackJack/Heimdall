@@ -125,6 +125,13 @@ public static class ApplicationDataPathResolver
         return Path.Combine(dataRoot, AppConstants.RecipesDirectoryName);
     }
 
+    /// <summary>Resolves the folder under which each recipe run gets its own working folder.</summary>
+    public static string GetRecipeRunsDirectory(string dataRoot)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(dataRoot);
+        return Path.Combine(dataRoot, AppConstants.RecipeRunsDirectoryName);
+    }
+
     /// <summary>Resolves the restrictive staging root for application updates.</summary>
     public static string GetUpdatesDirectory(string dataRoot)
     {

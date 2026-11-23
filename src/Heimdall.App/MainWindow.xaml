@@ -1535,7 +1535,7 @@
                                             <StackPanel Orientation="Horizontal"
                                                         Margin="0,1"
                                                         Cursor="Hand"
-                                                        ToolTip="{Binding Name}">
+                                                        ToolTip="{Binding ToolTipText}">
                                                 <Path Width="14" Height="14"
                                                       Stretch="Uniform"
                                                       VerticalAlignment="Center"
@@ -1554,6 +1554,14 @@
                                                            VerticalAlignment="Center"
                                                            TextTrimming="CharacterEllipsis"
                                                            AutomationProperties.Name="{Binding Name}"/>
+                                                <!-- A tool that comes from a recipe: "Recipe by ... (unverified)", as text -->
+                                                <TextBlock Text="{Binding Provenance}"
+                                                           Margin="{StaticResource MarginInlineControl}"
+                                                           Foreground="{DynamicResource WarningTextBrush}"
+                                                           FontSize="{StaticResource FontSizeSmallCaption}"
+                                                           VerticalAlignment="Center"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           Visibility="{Binding HasProvenance, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                             </StackPanel>
                                         </DataTemplate>
                                     </TreeView.Resources>

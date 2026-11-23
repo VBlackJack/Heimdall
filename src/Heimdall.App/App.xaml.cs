@@ -36,6 +36,7 @@ using Heimdall.App.ViewModels.Tunnels;
 using Heimdall.Core.Certificates;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
+using Heimdall.Core.Recipes;
 using Heimdall.Core.Security;
 using Heimdall.Core.Security.Vault;
 using Heimdall.Core.SessionHealth;
@@ -808,9 +809,10 @@ public partial class App : System.Windows.Application
     }
 
     /// <summary>
-    /// Loads the imported recipes and logs every file that was skipped, by code and file name only.
-    /// Does nothing while the Recipes pack is off or forbidden, which is the default, so a user who
-    /// never turned it on has nothing read from disk.
+    /// Starts the registrar of the recipe tools: it loads the imported recipes and registers their
+    /// tools while the Recipes pack is on and not forbidden, logging every file it skips by code and
+    /// file name only. Does nothing while the pack is off, which is the default, so a user who never
+    /// turned it on has nothing read from disk. It then follows the pack for the rest of the run.
     /// </summary>
     private void LoadImportedRecipes()
     {
@@ -818,22 +820,22 @@ public partial class App : System.Windows.Application
 
         try
         {
-            if (!_serviceProvider.GetRequiredService<IToolAvailability>().IsPackEnabled(Core.Models.ToolPack.Recipes))
-            {
-                return;
-            }
-
-            RecipeLoadResult result = _serviceProvider.GetRequiredService<IRecipeStore>().LoadAll();
-            Core.Logging.FileLogger.Info($"[App] Loaded {result.Recipes.Count} recipe(s), skipped {result.Issues.Count}");
-            foreach (RecipeLoadIssue issue in result.Issues)
-            {
-                Core.Logging.FileLogger.Warn($"[App] Recipe skipped: {issue.Code} ({issue.FileName})");
-            }
+            _serviceProvider.GetRequiredService<RecipeToolRegistrar>().Start();
         }
         catch (Exception ex)
         {
             Core.Logging.FileLogger.Error("[App] Recipes could not be loaded", ex);
         }
+    }
+
+    /// <summary>Stops the registrar from following the Recipes pack.</summary>
+    private void ReleaseRecipeTools()
+    {
+        try
+        {
+            _serviceProvider?.GetService<RecipeToolRegistrar>()?.Dispose();
+        }
+        catch (Exception ex) { Core.Logging.FileLogger.Warn($"[App] recipe tools cleanup: {ex.Message}"); }
     }
 
     private void ConfigureServices(IServiceCollection services, string dataRoot)
@@ -894,6 +896,29 @@ public partial class App : System.Windows.Application
         // --data-dir instance shares nothing with the user's own.
         services.AddSingleton<IRecipeStore>(
             _ => new RecipeStore(_dataRoot ?? ApplicationDataPathResolver.Resolve()));
+        services.AddSingleton<IRecipeWorkFolders>(
+            _ => new RecipeWorkFolders(_dataRoot ?? ApplicationDataPathResolver.Resolve()));
+
+        // Registers the tool of each imported recipe while the Recipes pack is on. Each recipe view
+        // reads the folders the user allowed in Settings at the moment a run starts.
+        services.AddSingleton<RecipeToolRegistrar>(sp =>
+        {
+            ConfigManager configManager = sp.GetRequiredService<ConfigManager>();
+            IToolAvailability availability = sp.GetRequiredService<IToolAvailability>();
+            IRecipeWorkFolders workFolders = sp.GetRequiredService<IRecipeWorkFolders>();
+            RecipeToolViewFactory viewFactory = new(new RecipeToolServices(
+                new RecipeRunner(),
+                new RecipeProgramResolver(),
+                workFolders,
+                availability,
+                () => (IReadOnlyList<string>?)configManager.CurrentSettings?.RecipeProgramFolders ?? []));
+            return new RecipeToolRegistrar(
+                sp.GetRequiredService<ToolRegistry>(),
+                availability,
+                sp.GetRequiredService<IRecipeStore>(),
+                viewFactory.Create,
+                workFolders);
+        });
 
         // The single place the real preset location is resolved. Neither the storage nor the
         // view model can reach it any more: their parameterless constructors are gone.
@@ -1862,6 +1887,7 @@ public partial class App : System.Windows.Application
         // reads their order.
         ReleaseRdpArtifacts();
         ReleaseTunnels();
+        ReleaseRecipeTools();
         StopScheduler();
         StopX11Server();
         ReleaseSleepPrevention();

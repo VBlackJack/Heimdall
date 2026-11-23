@@ -90,7 +90,7 @@ public enum RecipeProgramComparison
 /// runner is given the final path so that a junction swapped later cannot redirect it, but a file
 /// replaced inside an allowed folder is not detected here.
 /// </remarks>
-public sealed class RecipeProgramResolver
+public sealed class RecipeProgramResolver : IRecipeProgramResolver
 {
     private const string ExecutableExtension = ".exe";
 

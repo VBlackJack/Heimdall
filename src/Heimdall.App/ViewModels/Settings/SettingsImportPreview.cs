@@ -65,6 +65,7 @@ internal static class SettingsImportPreview
         "CmdLibGitSyncUrl",
         "SharedSessionSources",
         "DisabledToolPacks",
+        "RecipeProgramFolders",
     };
 
     private const string ListSeparator = ", ";
