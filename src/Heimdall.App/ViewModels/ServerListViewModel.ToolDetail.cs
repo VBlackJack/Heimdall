@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using Heimdall.App.Services;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Models;
 
@@ -34,6 +35,47 @@ public partial class ServerListViewModel
     /// registry; left unset, the pane shows nothing, which is also the test-time default.
     /// </summary>
     internal Func<string, ToolDescriptor?>? ToolDescriptorResolver { get; set; }
+
+    private Func<string, ToolAvailabilityState>? _toolStateResolver;
+
+    /// <summary>
+    /// Says whether a tool may be used. Wired by the window from the availability service; left
+    /// unset, every saved tool entry counts as usable.
+    /// </summary>
+    internal Func<string, ToolAvailabilityState>? ToolStateResolver
+    {
+        get => _toolStateResolver;
+        set
+        {
+            _toolStateResolver = value;
+            RefreshToolAvailability();
+        }
+    }
+
+    /// <summary>
+    /// Re-reads the tool state of every saved tool entry and of the detail pane. Call on the UI
+    /// thread after the availability of the packs changed.
+    /// </summary>
+    internal void RefreshToolAvailability()
+    {
+        foreach (ServerItemViewModel server in _allServers)
+        {
+            server.ToolStateResolver = _toolStateResolver;
+            server.RefreshToolAvailability();
+        }
+
+        OnPropertyChanged(nameof(ToolDetailUnavailableReason));
+        OnPropertyChanged(nameof(ToolDetailIsUnavailable));
+    }
+
+    /// <summary>
+    /// The sentence that names why the selected tool entry cannot be used, or null when it can.
+    /// </summary>
+    public string? ToolDetailUnavailableReason =>
+        SelectedToolDescriptor is not null ? SelectedServer?.ToolUnavailableReason : null;
+
+    /// <summary>True when the detail pane shows a tool entry that cannot be used.</summary>
+    public bool ToolDetailIsUnavailable => ToolDetailUnavailableReason is not null;
 
     /// <summary>The selected tool's display name, or empty when no tool is selected.</summary>
     public string ToolDetailName =>
@@ -77,5 +119,7 @@ public partial class ServerListViewModel
         OnPropertyChanged(nameof(ToolDetailName));
         OnPropertyChanged(nameof(ToolDetailCategory));
         OnPropertyChanged(nameof(ToolDetailDescription));
+        OnPropertyChanged(nameof(ToolDetailUnavailableReason));
+        OnPropertyChanged(nameof(ToolDetailIsUnavailable));
     }
 }

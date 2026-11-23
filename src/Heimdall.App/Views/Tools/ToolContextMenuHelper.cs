@@ -34,7 +34,19 @@ namespace Heimdall.App.Views.Tools;
 public static class ToolContextMenuHelper
 {
     /// <summary>
+    /// True when a cross-tool action that opens the tool <paramref name="toolId"/> should be offered.
+    /// </summary>
+    /// <remarks>
+    /// A null predicate offers everything: a view given a context that did not come through the
+    /// session manager keeps every action it had. A refused tool is left out of the menu rather
+    /// than shown and then refused on click.
+    /// </remarks>
+    public static bool IsToolOffered(Func<string, bool>? isToolAvailable, string toolId) =>
+        isToolAvailable is null || isToolAvailable(toolId);
+
+    /// <summary>
     /// Builds host-centric actions: Ping, Port Scanner, Cert Inspector, Whois, DNS, Open in Browser, Add to Servers.
+    /// An action that opens a tool <paramref name="isToolAvailable"/> refuses is left out.
     /// </summary>
     public static List<object> BuildHostActions(
         string ip,
@@ -43,7 +55,8 @@ public static class ToolContextMenuHelper
         LocalizationManager? localizer,
         Action<string, string, ToolContext?> openToolCallback,
         Action<SessionLaunchRequest>? openSessionCallback = null,
-        Action<SessionLaunchRequest, string?>? addServerCallback = null)
+        Action<SessionLaunchRequest, string?>? addServerCallback = null,
+        Func<string, bool>? isToolAvailable = null)
     {
         var items = new List<object>();
 
@@ -78,32 +91,47 @@ public static class ToolContextMenuHelper
 
         AddSeparator(items);
 
+        // The tools this menu opens. Each entry is built only when its tool may be used, and the
+        // separator above is not left behind when none of them is.
         // Open in Ping
-        var ping = new MenuItem { Header = L(localizer, "ToolCtxOpenPing") };
-        ping.Click += (_, _) => openToolCallback("PING", L(localizer, "PaletteToolPing"),
-            new ToolContext(TargetHost: ip));
-        items.Add(ping);
+        if (IsToolOffered(isToolAvailable, "PING"))
+        {
+            var ping = new MenuItem { Header = L(localizer, "ToolCtxOpenPing") };
+            ping.Click += (_, _) => openToolCallback("PING", L(localizer, "PaletteToolPing"),
+                new ToolContext(TargetHost: ip));
+            items.Add(ping);
+        }
 
         // Open in Port Scanner
-        var portScan = new MenuItem { Header = L(localizer, "ToolCtxOpenPortScan") };
-        portScan.Click += (_, _) => openToolCallback("PORTSCAN", L(localizer, "PaletteToolPortScan"),
-            new ToolContext(TargetHost: ip));
-        items.Add(portScan);
+        if (IsToolOffered(isToolAvailable, "PORTSCAN"))
+        {
+            var portScan = new MenuItem { Header = L(localizer, "ToolCtxOpenPortScan") };
+            portScan.Click += (_, _) => openToolCallback("PORTSCAN", L(localizer, "PaletteToolPortScan"),
+                new ToolContext(TargetHost: ip));
+            items.Add(portScan);
+        }
 
         // Open in DNS Lookup
-        var dns = new MenuItem { Header = L(localizer, "ToolCtxOpenDns") };
-        dns.Click += (_, _) => openToolCallback("DNS", L(localizer, "PaletteToolDns"),
-            new ToolContext(TargetHost: ip));
-        items.Add(dns);
+        if (IsToolOffered(isToolAvailable, "DNS"))
+        {
+            var dns = new MenuItem { Header = L(localizer, "ToolCtxOpenDns") };
+            dns.Click += (_, _) => openToolCallback("DNS", L(localizer, "PaletteToolDns"),
+                new ToolContext(TargetHost: ip));
+            items.Add(dns);
+        }
 
         // Open in Whois
-        var whois = new MenuItem { Header = L(localizer, "ToolCtxOpenWhois") };
-        whois.Click += (_, _) => openToolCallback("WHOIS", L(localizer, "PaletteToolWhois"),
-            new ToolContext(TargetHost: ip));
-        items.Add(whois);
+        if (IsToolOffered(isToolAvailable, "WHOIS"))
+        {
+            var whois = new MenuItem { Header = L(localizer, "ToolCtxOpenWhois") };
+            whois.Click += (_, _) => openToolCallback("WHOIS", L(localizer, "PaletteToolWhois"),
+                new ToolContext(TargetHost: ip));
+            items.Add(whois);
+        }
 
         // Open in Cert Inspector (if TLS port detected)
-        if (openPorts?.Any(p => p is 443 or 8443 or 636 or 993 or 995) == true)
+        if (openPorts?.Any(p => p is 443 or 8443 or 636 or 993 or 995) == true
+            && IsToolOffered(isToolAvailable, "CERT"))
         {
             var tlsPort = openPorts.First(p => p is 443 or 8443 or 636 or 993 or 995);
             var cert = new MenuItem { Header = L(localizer, "ToolCtxOpenCertInspector") };
@@ -148,6 +176,13 @@ public static class ToolContextMenuHelper
                 addServerCallback(session, hostname);
             };
             items.Add(addServer);
+        }
+
+        // Every tool entry may have been left out with no browser entry and no add-server entry
+        // after the separator that precedes them: the menu never ends with one.
+        while (items.Count > 0 && items[^1] is Separator)
+        {
+            items.RemoveAt(items.Count - 1);
         }
 
         return items;
@@ -314,8 +349,17 @@ public static class ToolContextMenuHelper
         return null;
     }
 
+    /// <summary>
+    /// Adds a separator unless the menu is empty or already ends with one, so a group left empty by
+    /// a hidden entry never leaves two separators side by side.
+    /// </summary>
     private static void AddSeparator(List<object> items)
     {
+        if (items.Count == 0 || items[^1] is Separator)
+        {
+            return;
+        }
+
         items.Add(new Separator());
     }
 

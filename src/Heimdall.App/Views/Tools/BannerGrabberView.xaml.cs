@@ -41,6 +41,7 @@ public partial class BannerGrabberView : UserControl, IToolView
     private bool _disposed;
     private GatewayRouteSelector? _routeSelector;
     private Action<string, string, ToolContext?>? _openToolAction;
+    private Func<string, bool>? _isToolAvailable;
     private Action<bool>? _setBusy;
     private readonly ToolAsyncStateController _viewState;
     private readonly ObservableCollection<BannerResult> _results = [];
@@ -76,6 +77,7 @@ public partial class BannerGrabberView : UserControl, IToolView
     {
         _localizer = localizer;
         _openToolAction = ToolContextMenuHelper.GetOpenToolAction(context);
+        _isToolAvailable = context?.IsToolAvailable;
         _setBusy = context?.SetBusyAction;
         _vm.Initialize(localizer);
         ApplyLocalization();
@@ -376,7 +378,8 @@ public partial class BannerGrabberView : UserControl, IToolView
             menu.Items.Add(copyBanner);
         }
 
-        if (_openToolAction is not null && row.HasBanner)
+        if (_openToolAction is not null && row.HasBanner
+            && ToolContextMenuHelper.IsToolOffered(_isToolAvailable, "PORTSCAN"))
         {
             menu.Items.Add(new Separator());
 

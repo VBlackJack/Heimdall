@@ -649,6 +649,49 @@ External-editor opens are serialized and linked to their owner's lifetime. Closi
 the owner cancels pending downloads; registration, watcher creation and editor launch
 cannot resume after disposal.
 
+### Tool packs machine policy
+
+The built-in tools are grouped in packs (see the Pack column of [TOOLS.md](TOOLS.md)). An
+organisation can forbid an optional pack on a machine with one DWORD value per pack, under the
+same key as the SFTP cap, `HKLM\Software\Policies\Heimdall`:
+
+| Value | Pack |
+|---|---|
+| `ToolPackEssentials` | Essentials |
+| `ToolPackNetworkDiagnostics` | Network diagnostics |
+| `ToolPackAdministration` | Administration |
+| `ToolPackAudit` | Audit and reconnaissance |
+
+- `0` forbids the pack. `1` means no restriction. Any other number, and an absent value,
+  means no policy for that pack; `2` is reserved for a later "forced on" and is treated as
+  no restriction today. The Core pack has no value: it can never be forbidden.
+- A forbidden pack beats the user's choice. Its tools are hidden and refused, and its switch in
+  `Settings > Advanced > Tools & integrations > Tool packs` shows off and disabled, with a line
+  saying the pack is set by the organisation's policy. The user's own choice stays in the
+  settings file, so lifting the policy gives it back.
+- Only the per-machine hive is read, because the per-user hive is writable by the user the
+  policy constrains. Two readers exist, the tool availability service and the privilege
+  launcher's own; each reads the values once, the first time it needs them, so a change needs a
+  restart.
+- Only a `REG_DWORD` equal to `0` forbids a pack. Any other type or value, and a key that cannot
+  be read, means no policy.
+- The privilege launcher also refuses to launch while the Audit pack is forbidden, whether it
+  was reached from the tool or started with a hand-built command line.
+
+This is a convenience for administrators, **not a security boundary**: the tools stay in the
+binary and on disk, and a local administrator can change the policy. It also does not reach
+everything that resembles a pack's tools. Known limits:
+
+- The Windows services tool elevates through `runas` to start, stop and restart services. It
+  belongs to the Administration pack, not to Audit, so forbidding Audit does not remove that
+  elevation path.
+- The server context menu sends Wake-on-LAN packets on its own, with or without the Wake-on-LAN
+  tool.
+- Detected external tools, such as Sysinternals PsExec, are outside the packs.
+- Several network diagnostics tools (ping, DNS lookup, WHOIS, HTTP headers, traceroute and the
+  certificate inspector) can run their probe on an SSH gateway the user picks, which runs
+  commands on a remote host. This is not specific to the Audit pack.
+
 ### Remote upload commit guarantees
 
 Every remote write uploads to a unique temporary path next to the destination

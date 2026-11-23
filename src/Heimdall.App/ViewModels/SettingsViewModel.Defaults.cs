@@ -17,8 +17,10 @@
 using System.Globalization;
 using System.IO;
 using System.Reflection;
+using Heimdall.App.Services;
 using Heimdall.App.ViewModels.Settings;
 using Heimdall.Core.Configuration;
+using Heimdall.Core.Models;
 
 namespace Heimdall.App.ViewModels;
 
@@ -161,7 +163,9 @@ public partial class SettingsViewModel
 
     /// <summary>Whether the pending value of a marked setting differs from its factory default.</summary>
     internal bool IsModifiedFromDefault(string setting)
-        => !PanelValuesEqual(MarkerProperties[setting].Panel.GetValue(this), DefaultPanelValueOf(setting));
+        => setting == nameof(DisabledToolPacks)
+            ? ToolPackListsDifferOutsidePolicy((string[])DefaultPanelValueOf(setting)!)
+            : !PanelValuesEqual(setting, MarkerProperties[setting].Panel.GetValue(this), DefaultPanelValueOf(setting));
 
     /// <summary>
     /// Puts the factory default back into one setting as a pending edit.
@@ -176,6 +180,11 @@ public partial class SettingsViewModel
     {
         PropertyInfo panel = MarkerProperties[setting].Panel;
         object? value = DefaultPanelValueOf(setting);
+        if (setting == nameof(DisabledToolPacks))
+        {
+            value = WithPolicyPacksKept((string[])value!);
+        }
+
         panel.SetValue(this, value);
 
         if (value is int number
@@ -210,11 +219,35 @@ public partial class SettingsViewModel
 
     private void UpdateDefaultMarker(SettingDefaultState state)
     {
-        string defaultText = FormatDefaultValue(DefaultPanelValueOf(state.Setting));
+        object? defaultValue = DefaultPanelValueOf(state.Setting);
+        string defaultText = state.Setting == nameof(DisabledToolPacks) && defaultValue is string[] disabledPacks
+            ? FormatDisabledToolPacksDefault(disabledPacks)
+            : FormatDefaultValue(defaultValue);
         state.DefaultText = defaultText;
         state.BadgeAccessibleName = _localizer.Format("SettingsModifiedFromDefault", defaultText);
         state.ResetAccessibleName = _localizer.Format("SettingsResetToDefaultAccessible", defaultText);
         state.IsModified = IsModifiedFromDefault(state.Setting);
+    }
+
+    /// <summary>
+    /// Words the default of the list of switched-off packs as the setting's label followed by the
+    /// pack names, so the marker cannot read as the packs being on by default.
+    /// </summary>
+    /// <remarks>An entry that names no pack of this build stays as written.</remarks>
+    internal string FormatDisabledToolPacksDefault(string[] list)
+    {
+        ArgumentNullException.ThrowIfNull(list);
+
+        string[] names =
+        [
+            .. list.Select(entry => ToolAvailability.TryParseOptionalPack(entry, out ToolPack pack)
+                ? _localizer[ToolPackLabelKey(pack)]
+                : entry),
+        ];
+        return _localizer.Format(
+            "SettingsDefaultValueLabeled",
+            _localizer["SettingsLabelToolPacksDisabled"],
+            FormatDefaultValue(names));
     }
 
     private string FormatDefaultValue(object? value) => value switch
@@ -251,10 +284,12 @@ public partial class SettingsViewModel
     /// <summary>Whether two panel values mean the same setting.</summary>
     /// <remarks>
     /// Blank text equals blank text, because Save writes a blank optional path as null: a field
-    /// holding only spaces is the default, not a modification.
+    /// holding only spaces is the default, not a modification. The list of switched-off packs is
+    /// compared as a set of packs, so its order, case and padding do not count.
     /// </remarks>
-    private static bool PanelValuesEqual(object? current, object? fallback) => (current, fallback) switch
+    private static bool PanelValuesEqual(string setting, object? current, object? fallback) => (current, fallback) switch
     {
+        (string[] left, string[] right) when setting == nameof(DisabledToolPacks) => ToolPackListsEqual(left, right),
         (string[] left, string[] right) => left.SequenceEqual(right, StringComparer.Ordinal),
         (string left, string right) => (string.IsNullOrWhiteSpace(left) && string.IsNullOrWhiteSpace(right))
             || string.Equals(left, right, StringComparison.Ordinal),

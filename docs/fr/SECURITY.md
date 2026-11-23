@@ -724,6 +724,52 @@ Les ouvertures d'éditeur externe sont sérialisées et liées à la durée de v
 propriétaire. Sa fermeture annule les téléchargements en cours ; l'enregistrement,
 la création du surveillant et le lancement de l'éditeur ne reprennent pas après sa destruction.
 
+### Politique de machine des packs d'outils
+
+Les outils intégrés sont regroupés en packs (voir la colonne Pack de [TOOLS.md](TOOLS.md)). Une
+organisation peut interdire un pack facultatif sur une machine avec une valeur DWORD par pack,
+sous la même clé que le plafond SFTP, `HKLM\Software\Policies\Heimdall` :
+
+| Valeur | Pack |
+|---|---|
+| `ToolPackEssentials` | Essentiels |
+| `ToolPackNetworkDiagnostics` | Diagnostic réseau |
+| `ToolPackAdministration` | Administration |
+| `ToolPackAudit` | Audit et reconnaissance |
+
+- `0` interdit le pack. `1` signifie aucune restriction. Tout autre nombre, et une valeur
+  absente, signifient aucune politique pour ce pack ; `2` est réservé à un futur "forcé
+  activé" et est traité aujourd'hui comme aucune restriction. Le pack Noyau n'a pas de valeur :
+  il ne peut jamais être interdit.
+- Un pack interdit l'emporte sur le choix de l'utilisateur. Ses outils sont masqués et refusés,
+  et son interrupteur dans `Paramètres > Avancé > Outils et intégrations > Packs d'outils`
+  est sur arrêt et désactivé, avec une ligne qui dit que le pack est défini par la politique de
+  l'organisation. Le choix de l'utilisateur reste dans le fichier de paramètres : lever la
+  politique le lui rend.
+- Seule la ruche par machine est lue, parce que la ruche par utilisateur est modifiable par
+  l'utilisateur que la politique contraint. Deux lecteurs existent, le service de disponibilité
+  des outils et celui du lanceur de privilèges ; chacun lit les valeurs une seule fois, la
+  première fois qu'il en a besoin : une modification demande un redémarrage.
+- Seule une valeur `REG_DWORD` égale à `0` interdit un pack. Tout autre type ou valeur, et une
+  clé illisible, signifient aucune politique.
+- Le lanceur de privilèges refuse aussi de lancer tant que le pack Audit est interdit, qu'il
+  ait été atteint depuis l'outil ou démarré avec une ligne de commande construite à la main.
+
+C'est une commodité pour les administrateurs, **pas une frontière de sécurité** : les outils
+restent dans le binaire et sur le disque, et un administrateur local peut modifier la politique.
+Elle n'atteint pas non plus tout ce qui ressemble aux outils d'un pack. Limites connues :
+
+- L'outil des services Windows s'élève par `runas` pour démarrer, arrêter et redémarrer des
+  services. Il appartient au pack Administration, pas à Audit : interdire Audit ne supprime donc
+  pas ce chemin d'élévation.
+- Le menu contextuel des serveurs envoie lui-même des paquets Wake-on-LAN, avec ou sans l'outil
+  Wake-on-LAN.
+- Les outils externes détectés, comme Sysinternals PsExec, sont hors des packs.
+- Plusieurs outils de diagnostic réseau (ping, recherche DNS, WHOIS, en-têtes HTTP, traceroute
+  et inspecteur de certificats) peuvent exécuter leur sonde sur une passerelle SSH choisie par
+  l'utilisateur, ce qui exécute des commandes sur un hôte distant. Cela ne concerne pas
+  seulement le pack Audit.
+
 ### Garanties de validation des remontées distantes
 
 Chaque écriture distante commence par une remontée vers un chemin temporaire

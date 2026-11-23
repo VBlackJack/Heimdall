@@ -403,6 +403,21 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
     {
         get
         {
+            string spoken = SpokenName;
+
+            // A saved entry of a tool that may not be used says so, with the reason, in the name a
+            // screen reader reads: the dimmed look alone reaches nobody who cannot see it.
+            return ToolUnavailableReason is { } reason
+                && _localizer?.HasKey("SessionTreeServerAccessibleNameToolUnavailable") == true
+                    ? Format("SessionTreeServerAccessibleNameToolUnavailable", spoken, reason)
+                    : spoken;
+        }
+    }
+
+    private string SpokenName
+    {
+        get
+        {
             string key = IsShared ? "SessionTreeServerAccessibleNameShared"
                 : IsFavorite ? "SessionTreeServerAccessibleNameFavorite"
                 : "SessionTreeServerAccessibleName";
@@ -500,10 +515,62 @@ public partial class ServerItemViewModel : ObservableObject, IInlineRenameNode, 
                 lines.Add(SharedReadOnlyText);
             }
 
+            // Why a saved tool entry is dimmed: its pack is turned off or forbidden.
+            if (ToolUnavailableReason is { } toolReason)
+            {
+                lines.Add(toolReason);
+            }
+
             return lines.Count == 0
                 ? null
                 : string.Join(System.Environment.NewLine, lines);
         }
+    }
+
+    /// <summary>
+    /// Says whether the tool a saved <c>TOOL:*</c> entry points at may be used. Wired by the list
+    /// that owns the row; left unset, every tool is available, which is also the test-time default.
+    /// </summary>
+    internal Func<string, ToolAvailabilityState>? ToolStateResolver { get; set; }
+
+    /// <summary>
+    /// True for a saved tool entry whose tool is switched off or forbidden. The entry stays in the
+    /// tree and in the saved file, so it is back as soon as the pack is.
+    /// </summary>
+    public bool IsToolUnavailable => ToolUnavailableReason is not null;
+
+    /// <summary>
+    /// The sentence that names why a saved tool entry cannot be used, or null when it can, or when
+    /// the row is not a tool entry.
+    /// </summary>
+    /// <remarks>
+    /// An id the registry does not know is not a refusal here: opening it shows the placeholder
+    /// tab it always did, and nothing about it is dimmed.
+    /// </remarks>
+    public string? ToolUnavailableReason
+    {
+        get
+        {
+            if (ToolStateResolver is not { } resolve
+                || !ConnectionTypeCatalog.IsToolConnectionType(ConnectionType))
+            {
+                return null;
+            }
+
+            ToolAvailabilityState state = resolve(ConnectionTypeCatalog.StripToolPrefix(ConnectionType));
+            return ToolUnavailableException.IsRefusal(state)
+                ? Format(ToolUnavailableException.MessageKeyFor(state), DisplayName)
+                : null;
+        }
+    }
+
+    /// <summary>Re-reads the tool state after the availability of the packs changed.</summary>
+    internal void RefreshToolAvailability()
+    {
+        OnPropertyChanged(nameof(IsToolUnavailable));
+        OnPropertyChanged(nameof(ToolUnavailableReason));
+        OnPropertyChanged(nameof(AccessibleName));
+        OnPropertyChanged(nameof(RowTooltipText));
     }
 
     public string ConnectionTypeBadge => ConnectionType.ToUpperInvariant() switch

@@ -41,6 +41,7 @@ public partial class PortScannerView : UserControl, IToolView
     private bool _disposed;
     private GatewayRouteSelector? _routeSelector;
     private Action<string, string, ToolContext?>? _openToolAction;
+    private Func<string, bool>? _isToolAvailable;
     private Action<bool>? _setBusy;
     private readonly ObservableCollection<PortScanResult> _results = [];
     private readonly PortScanViewModel _vm;
@@ -70,6 +71,7 @@ public partial class PortScannerView : UserControl, IToolView
         _localizer = localizer;
         if (_localizer is not null) _localizer.LocaleChanged += OnLocaleChanged;
         _openToolAction = ToolContextMenuHelper.GetOpenToolAction(context);
+        _isToolAvailable = context?.IsToolAvailable;
         _setBusy = context?.SetBusyAction;
         _vm.Initialize(localizer);
         ApplyLocalization();
@@ -452,11 +454,16 @@ public partial class PortScannerView : UserControl, IToolView
             menu.Items.Add(copyBanner);
         }
 
-        if (_openToolAction is not null && row.IsOpen)
+        // The certificate entry is left out when its tool may not be used; the separator goes with
+        // the group when nothing is left to offer.
+        bool offerCert = row.Port is 443 or 8443 or 636 or 993 or 995
+            && ToolContextMenuHelper.IsToolOffered(_isToolAvailable, "CERT");
+        bool offerBrowser = row.Port is 80 or 443 or 8080 or 8443 or 8006 or 5000 or 3000 or 9090;
+        if (_openToolAction is not null && row.IsOpen && (offerCert || offerBrowser))
         {
             menu.Items.Add(new Separator());
 
-            if (row.Port is 443 or 8443 or 636 or 993 or 995)
+            if (offerCert)
             {
                 var cert = new MenuItem { Header = L("ToolCtxOpenCertInspector") };
                 cert.Click += (_, _) => _openToolAction(
@@ -466,7 +473,7 @@ public partial class PortScannerView : UserControl, IToolView
                 menu.Items.Add(cert);
             }
 
-            if (row.Port is 80 or 443 or 8080 or 8443 or 8006 or 5000 or 3000 or 9090)
+            if (offerBrowser)
             {
                 var scheme = row.Port is 443 or 8443 ? "https" : "http";
                 var url = $"{scheme}://{host}:{row.Port}";

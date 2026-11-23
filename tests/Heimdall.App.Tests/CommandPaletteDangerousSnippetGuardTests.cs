@@ -158,7 +158,8 @@ public sealed class CommandPaletteDangerousSnippetGuardTests
                 embeddedSessionManager,
                 connectionService,
                 toolRegistry,
-                dialogService, new PaneCloseArbiter());
+                dialogService, new PaneCloseArbiter(),
+                AlwaysAvailableToolAvailability.Instance);
             FakeUiDispatcher dispatcher = new();
             ConnectionViewModel connection = new(
                 localizer,
@@ -243,7 +244,8 @@ public sealed class CommandPaletteDangerousSnippetGuardTests
                     hostKeyStore,
                     RejectingHostKeyVerifier.Instance,
                     configManager),
-                new MaskedCopyTestSupport.RecordingClipboard());
+                new MaskedCopyTestSupport.RecordingClipboard(),
+                AlwaysAvailableToolAvailability.Instance);
 
             return new PaletteHarness(rootPath, main, dialogService, embeddedSessionManager, order);
         }

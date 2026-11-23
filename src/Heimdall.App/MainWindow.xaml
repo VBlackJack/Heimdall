@@ -931,7 +931,7 @@
                                             Background="Transparent"
                                             ToolTip="{Binding RowTooltipText}"
                                             ToolTipService.InitialShowDelay="{StaticResource SessionTreeRowToolTipDelay}">
-                                        <Grid>
+                                        <Grid x:Name="ServerRowContent">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto"/>
                                                 <ColumnDefinition Width="Auto"/>
@@ -1119,6 +1119,12 @@
                                         <DataTrigger Binding="{Binding IsSelected, FallbackValue=False}" Value="True">
                                             <Setter TargetName="ServerSelectionChrome" Property="Background" Value="{DynamicResource TreeRowSelectedBrush}"/>
                                             <Setter TargetName="ServerSelectionChrome" Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
+                                        </DataTrigger>
+                                        <!-- A saved tool entry whose pack is off or forbidden: the content is dimmed, not the
+                                             chrome, so the selection edge stays. The row tooltip and the spoken name carry
+                                             the reason; the dimming is for the eye only. -->
+                                        <DataTrigger Binding="{Binding IsToolUnavailable}" Value="True">
+                                            <Setter TargetName="ServerRowContent" Property="Opacity" Value="{StaticResource OpacityDisabled}"/>
                                         </DataTrigger>
                                     </DataTemplate.Triggers>
                                 </DataTemplate>
@@ -2288,6 +2294,13 @@
                                 <TextBlock x:Name="Mw_ToolDetailDescription"
                                            Text="{Binding ServerList.ToolDetailDescription}"
                                            Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,12,0,0"
+                                           FontSize="{StaticResource FontSizeBodyLarge}" TextWrapping="Wrap"/>
+
+                                <!-- Why the selected tool cannot be opened: its pack is turned off or forbidden. -->
+                                <TextBlock x:Name="Mw_ToolDetailUnavailable"
+                                           Text="{Binding ServerList.ToolDetailUnavailableReason}"
+                                           Visibility="{Binding ServerList.ToolDetailIsUnavailable, Converter={StaticResource BoolToVisibilityConverter}}"
+                                           Foreground="{DynamicResource WarningTextBrush}" Margin="0,12,0,0"
                                            FontSize="{StaticResource FontSizeBodyLarge}" TextWrapping="Wrap"/>
 
                                 <Button x:Name="Mw_ToolDetailOpenBtn" Content="{loc:Translate DetailBtnOpenInTab}"
@@ -5735,6 +5748,31 @@
                                             <ColumnDefinition Width="*" MaxWidth="{StaticResource SettingsContentMaxWidth}"/>
                                         </Grid.ColumnDefinitions>
                                     <StackPanel>
+
+                                <!-- Tool packs -->
+                                <Border x:Name="Mw_SettingsToolPacksCard" Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
+                                    <StackPanel>
+                                        <TextBlock x:Name="Mw_SettingsToolPacksTitle" Text="{loc:Translate SettingsSectionToolPacks}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,4"/>
+                                        <TextBlock x:Name="Mw_SettingsToolPacksDesc" Text="{loc:Translate SettingsToolPacksIntro}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap" Margin="0,0,0,12"/>
+                                        <ItemsControl x:Name="Mw_SettingsToolPackList" ItemsSource="{Binding Settings.ToolPackSwitches}" IsTabStop="False">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel Margin="0,0,0,12">
+                                                        <CheckBox IsChecked="{Binding IsEnabled}" IsEnabled="{Binding IsEditable}" Content="{Binding Label}" Foreground="{DynamicResource TextPrimaryBrush}"
+                                                                  AutomationProperties.HelpText="{Binding Description}"/>
+                                                        <StackPanel Margin="24,2,0,0">
+                                                            <TextBlock Text="{Binding Description}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap"/>
+                                                            <TextBlock Text="{Binding CountText}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,2,0,0"/>
+                                                            <TextBlock Text="{Binding WarningText}" Visibility="{Binding HasWarning, Converter={StaticResource BoolToVisibilityConverter}}" Foreground="{DynamicResource WarningTextBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                                            <TextBlock Text="{Binding PolicyText}" Visibility="{Binding HasPolicyText, Converter={StaticResource BoolToVisibilityConverter}}" Foreground="{DynamicResource WarningTextBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[DisabledToolPacks]}"/>
+                                    </StackPanel>
+                                </Border>
 
                                 <!-- External Editor -->
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">

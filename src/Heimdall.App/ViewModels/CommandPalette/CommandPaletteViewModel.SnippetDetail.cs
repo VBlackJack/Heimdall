@@ -500,8 +500,6 @@ public sealed partial class CommandPaletteViewModel
         var context = new ToolContext(InitialActionId: action.Id);
         var title = _localizer["PaletteToolCmdLib"];
 
-        _main.TrackRecentTool(ToolRegistry.CommandLibraryToolId);
-
         CloseSnippetDetail();
         IsOpen = false;
 

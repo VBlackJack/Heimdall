@@ -45,6 +45,7 @@ public sealed class SplitService : ISplitService
     private readonly IEmbeddedSessionManager _sessionManager;
     private readonly IConnectionService _connectionService;
     private readonly ToolRegistry _toolRegistry;
+    private readonly IToolAvailability _toolAvailability;
     private readonly IDialogService _dialogService;
     private readonly IPaneCloseArbiter _closeArbiter;
 
@@ -94,6 +95,7 @@ public sealed class SplitService : ISplitService
         ToolRegistry toolRegistry,
         IDialogService dialogService,
         IPaneCloseArbiter closeArbiter,
+        IToolAvailability toolAvailability,
         IProfileLookup? profileLookup = null)
     {
         _configManager = configManager;
@@ -104,6 +106,7 @@ public sealed class SplitService : ISplitService
         _sessionManager = sessionManager;
         _connectionService = connectionService;
         _toolRegistry = toolRegistry;
+        _toolAvailability = toolAvailability;
         _dialogService = dialogService;
         _closeArbiter = closeArbiter ?? throw new ArgumentNullException(nameof(closeArbiter));
 
@@ -340,10 +343,21 @@ public sealed class SplitService : ISplitService
 
     // ── Split with tool (synchronous) ────────────────────────────────
 
+    /// <inheritdoc />
+    void ISplitService.SplitSessionWithTool(
+        SessionTabViewModel session,
+        string paletteToolPayload,
+        SplitOrientation orientation,
+        string? paneId)
+        => SplitSessionWithTool(session, paletteToolPayload, orientation, paneId);
+
     /// <summary>
-    /// Docks a built-in tool into a new pane. No network connection needed.
+    /// Docks a built-in tool into a new pane. No network connection needed. A tool whose pack is
+    /// switched off, or forbidden by policy, is refused before any pane is built, and the status
+    /// text names the reason.
     /// </summary>
-    public void SplitSessionWithTool(
+    /// <returns>True when the pane was added; false when nothing was split, for whatever reason.</returns>
+    public bool SplitSessionWithTool(
         SessionTabViewModel session,
         string paletteToolPayload,
         SplitOrientation orientation,
@@ -351,7 +365,7 @@ public sealed class SplitService : ISplitService
     {
         if (RefuseWhilePendingCompanion(session))
         {
-            return;
+            return false;
         }
 
         var pipeIndex = paletteToolPayload.IndexOf('|');
@@ -359,15 +373,24 @@ public sealed class SplitService : ISplitService
         var argument = pipeIndex >= 0 ? paletteToolPayload[(pipeIndex + 1)..] : null;
 
         var descriptor = _toolRegistry.GetById(toolId);
-        if (descriptor is null) return;
+        if (descriptor is null) return false;
+
+        ToolAvailabilityState availability = _toolAvailability.GetState(toolId);
+        if (ToolUnavailableException.IsRefusal(availability))
+        {
+            SetStatusText?.Invoke(_localizer.Format(
+                ToolUnavailableException.MessageKeyFor(availability),
+                descriptor.ResolveLabel(_localizer.GetString)));
+            return false;
+        }
 
         var targetPane = ResolvePaneOrPrimary(session, paneId);
-        if (targetPane is null) return;
+        if (targetPane is null) return false;
 
         if (SplitTreeHelper.CountLeaves(session.RootContent) >= MaxPanesPerTab)
         {
             SetStatusText?.Invoke(_localizer["SplitMaxPanesReached"]);
-            return;
+            return false;
         }
 
         var connectionType = $"TOOL:{toolId.ToUpperInvariant()}";
@@ -399,6 +422,7 @@ public sealed class SplitService : ISplitService
 
         Core.Logging.FileLogger.Info(
             $"Split session '{session.Title}' with tool '{title}' as {orientation}.");
+        return true;
     }
 
     // ── Merge existing session ───────────────────────────────────────

@@ -483,7 +483,6 @@ public sealed class ContextMenuFactory
         openItem.Click += (_, _) =>
         {
             var toolId = ConnectionTypeCatalog.StripToolPrefix(tool.ConnectionType!);
-            vm.TrackRecentTool(toolId.ToUpperInvariant());
             var context = ToolEntryContextFactory.ForTreeEntry(tool);
             _ = vm.OpenToolTabAsync(toolId, tool.DisplayName, context);
         };

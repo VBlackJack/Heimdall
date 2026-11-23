@@ -109,7 +109,7 @@ public sealed class RdpHostPoolSettingsTests : IDisposable
     [Fact]
     public void AManagerWithoutAConfigurationSource_RunsOnThePoolsDefaults()
     {
-        EmbeddedSessionManager manager = new(null!, null!, null!, null!, null!, null!, null!, null!, null!, null!);
+        EmbeddedSessionManager manager = new(null!, null!, null!, null!, null!, null!, null!, null!, null!, null!, AlwaysAvailableToolAvailability.Instance);
 
         Assert.Equal(ReusableHostPool<RdpActiveXHost>.DefaultCapacity, manager.RdpHostProvider.Capacity);
         Assert.Equal(ReusableHostPool<RdpActiveXHost>.DefaultIdleExpiry, manager.RdpHostProvider.IdleExpiry);
@@ -122,7 +122,7 @@ public sealed class RdpHostPoolSettingsTests : IDisposable
     {
         ConfigManager configManager = new(_root);
         await configManager.InitializeAsync();
-        EmbeddedSessionManager manager = new(null!, null!, null!, null!, null!, null!, null!, null!, null!, configManager);
+        EmbeddedSessionManager manager = new(null!, null!, null!, null!, null!, null!, null!, null!, null!, configManager, AlwaysAvailableToolAvailability.Instance);
 
         await configManager.SaveSettingsAsync(new AppSettings
         {
@@ -148,7 +148,7 @@ public sealed class RdpHostPoolSettingsTests : IDisposable
     [Fact]
     public void DisposingTheManagerTwice_IsHarmless()
     {
-        EmbeddedSessionManager manager = new(null!, null!, null!, null!, null!, null!, null!, null!, null!, null!);
+        EmbeddedSessionManager manager = new(null!, null!, null!, null!, null!, null!, null!, null!, null!, null!, AlwaysAvailableToolAvailability.Instance);
 
         manager.Dispose();
         manager.Dispose();

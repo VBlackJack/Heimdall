@@ -4980,7 +4980,9 @@ public sealed partial class SettingsViewModelTests : IDisposable
         Heimdall.App.Services.SharedSessions.ISharedSessionProvider? sharedSessions = null,
         Heimdall.App.Services.SharedSessions.SharedSessionSecretStore? sharedSecrets = null,
         IGitIdentityReader? gitIdentityReader = null,
-        SftpSudoFallbackPolicy? sftpSudoFallbackPolicy = null)
+        SftpSudoFallbackPolicy? sftpSudoFallbackPolicy = null,
+        Heimdall.App.Services.IToolAvailability? toolAvailability = null,
+        Heimdall.App.Services.ToolRegistry? toolRegistry = null)
     {
         localizer ??= new LocalizationManager();
         sftpSudoFallbackPolicy ??= new SftpSudoFallbackPolicy(() => null);
@@ -5020,7 +5022,9 @@ public sealed partial class SettingsViewModelTests : IDisposable
             sharedSessions: sharedSessions,
             sharedSecrets: sharedSecrets,
             gitIdentityReader: gitIdentityReader,
-            sftpSudoFallbackPolicy: sftpSudoFallbackPolicy);
+            sftpSudoFallbackPolicy: sftpSudoFallbackPolicy,
+            toolAvailability: toolAvailability,
+            toolRegistry: toolRegistry);
     }
 
     // ── Git sync author prefill (D-03) ────────────────────────────

@@ -1454,9 +1454,13 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         Services.SharedSessions.ISharedSessionProvider? sharedSessions = null,
         Services.SharedSessions.SharedSessionSecretStore? sharedSecrets = null,
         IGitIdentityReader? gitIdentityReader = null,
-        SftpSudoFallbackPolicy? sftpSudoFallbackPolicy = null)
+        SftpSudoFallbackPolicy? sftpSudoFallbackPolicy = null,
+        IToolAvailability? toolAvailability = null,
+        ToolRegistry? toolRegistry = null)
     {
         _sftpSudoFallbackPolicy = sftpSudoFallbackPolicy ?? new SftpSudoFallbackPolicy();
+        _toolAvailability = toolAvailability;
+        _toolRegistry = toolRegistry ?? new ToolRegistry();
         _configManager = configManager;
         _gitIdentityReader = gitIdentityReader;
         _sharedSessions = sharedSessions;
@@ -1493,6 +1497,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     {
         RefreshAllDefaultMarkers();
         RefreshSecurityPosture();
+        RefreshToolPackTexts();
 
         // Worded from the localizer and otherwise raised only when their own state moves.
         OnPropertyChanged(nameof(SkippedVersionText));
@@ -1849,6 +1854,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             PreventSleepDuringSession = settings.PreventSleepDuringSession;
             CollapseTunnelsPanelByDefault = settings.CollapseTunnelsPanelByDefault;
             ExternalEditorPath = settings.ExternalEditorPath;
+            DisabledToolPacks = settings.DisabledToolPacks?.ToArray() ?? [];
 
             // Updates
             UpdateCheckEnabled = settings.UpdateCheckEnabled;
@@ -2344,6 +2350,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         settings.PreventSleepDuringSession = PreventSleepDuringSession;
         settings.CollapseTunnelsPanelByDefault = CollapseTunnelsPanelByDefault;
         settings.ExternalEditorPath = ExternalEditorPath;
+        settings.DisabledToolPacks = [.. DisabledToolPacks];
         settings.UpdateCheckEnabled = UpdateCheckEnabled;
         settings.UpdateCheckIntervalHours = UpdateCheckIntervalHours;
 
@@ -2647,6 +2654,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         var defaults = await LoadFactoryDefaultsAsync(cancellationToken);
         defaults.SshGateways = keptGateways;
 
+        // A pack the organization policy forbids is not the user's to change, so the reset leaves its
+        // entry as it stands and lifting the policy gives the user's own choice back.
+        defaults.DisabledToolPacks = [.. WithPolicyPacksKept(defaults.DisabledToolPacks)];
+
         // The language and the theme are kept. A reset that switches the interface into English
         // under a user who reads French leaves them in front of a panel they cannot read, the one
         // place from which they would have to find their way back; the confirmation says so.
@@ -2867,6 +2878,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         bool savedTftp = _savedFileShareEnableTftp;
         bool savedTranscripts = _savedSessionLoggingEnabled;
         merged.SshGateways = keptGateways;
+
+        // A pack the organisation policy forbids is not the user's to change, so the file leaves
+        // the user's own choice for it alone, the way the resets do.
+        merged.DisabledToolPacks = [.. WithPolicyPacksKept(merged.DisabledToolPacks)];
 
         LoadFromSettings(merged);
         _originalLocale = localeToReturnTo;

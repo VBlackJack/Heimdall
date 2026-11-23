@@ -70,7 +70,7 @@ public sealed class ToolsTabPopulationService
     /// </summary>
     public ObservableCollection<SidebarToolCategoryViewModel> BuildSidebarToolsData(MainViewModel vm)
     {
-        var grouped = _toolRegistry.All
+        var grouped = vm.ToolAvailability.ListedTools(_toolRegistry.All)
             .GroupBy(d => d.Category)
             .OrderBy(g => g.Key);
 
@@ -137,7 +137,9 @@ public sealed class ToolsTabPopulationService
 
     /// <summary>
     /// Resolves a tool descriptor by ID and builds the corresponding sidebar leaf.
-    /// Returns <c>null</c> when the tool no longer exists in the registry.
+    /// Returns <c>null</c> when the tool no longer exists in the registry or is not
+    /// available (its pack is turned off or forbidden): a stored favorite id of such a
+    /// tool stays stored but is not shown.
     /// </summary>
     public SidebarToolItemViewModel? CreateSidebarToolItem(MainViewModel vm, string toolId)
     {
@@ -146,7 +148,9 @@ public sealed class ToolsTabPopulationService
 
         var descriptor = _toolRegistry.All.FirstOrDefault(
             d => string.Equals(d.Id, toolId, StringComparison.OrdinalIgnoreCase));
-        return descriptor is null ? null : CreateSidebarToolItem(vm, descriptor);
+        return descriptor is null || !vm.ToolAvailability.IsListed(descriptor)
+            ? null
+            : CreateSidebarToolItem(vm, descriptor);
     }
 
     private static SidebarToolCategoryViewModel CreateSidebarCategory(
@@ -243,22 +247,21 @@ public sealed class ToolsTabPopulationService
         var hasFilter = !string.IsNullOrEmpty(filter);
         var matchingToolCount = 0;
 
+        // Every section below reads this projection: a tool of a turned-off or forbidden pack is
+        // not shown, while its favorite or recent id stays stored for when the pack comes back.
+        var listedTools = vm.ToolAvailability.ListedTools(_toolRegistry.All).ToList();
+
         // ── Favorites section ──
         if (!hasFilter)
         {
-            var favIds = vm.FavoriteToolIds;
-            if (favIds.Count > 0)
+            var favTools = ResolveListedTools(listedTools, vm.FavoriteToolIds);
+            if (favTools.Count > 0)
             {
                 AddToolsTabSectionHeader(target, vm.Localize("ToolsFavoritesHeader"), "WarningTextBrush");
                 var favPanel = new WrapPanel { Margin = new Thickness(0, 0, 0, 16) };
-                foreach (var favId in favIds)
+                foreach (var desc in favTools)
                 {
-                    var desc = _toolRegistry.All.FirstOrDefault(
-                        d => string.Equals(d.Id, favId, StringComparison.OrdinalIgnoreCase));
-                    if (desc is not null)
-                    {
-                        favPanel.Children.Add(CreateToolsTabCard(desc, vm, onCardClick, onPinClick));
-                    }
+                    favPanel.Children.Add(CreateToolsTabCard(desc, vm, onCardClick, onPinClick));
                 }
                 target.Children.Add(favPanel);
             }
@@ -276,19 +279,14 @@ public sealed class ToolsTabPopulationService
             }
 
             // ── Recent section ──
-            var recentIds = vm.RecentToolIds;
-            if (recentIds.Count > 0)
+            var recentTools = ResolveListedTools(listedTools, vm.RecentToolIds);
+            if (recentTools.Count > 0)
             {
                 AddToolsTabSectionHeader(target, vm.Localize("ToolsRecentHeader"), "AccentTextBrush");
                 var recentPanel = new WrapPanel { Margin = new Thickness(0, 0, 0, 16) };
-                foreach (var rid in recentIds)
+                foreach (var desc in recentTools)
                 {
-                    var desc = _toolRegistry.All.FirstOrDefault(
-                        d => string.Equals(d.Id, rid, StringComparison.OrdinalIgnoreCase));
-                    if (desc is not null)
-                    {
-                        recentPanel.Children.Add(CreateToolsTabCard(desc, vm, onCardClick, onPinClick));
-                    }
+                    recentPanel.Children.Add(CreateToolsTabCard(desc, vm, onCardClick, onPinClick));
                 }
                 target.Children.Add(recentPanel);
             }
@@ -301,7 +299,7 @@ public sealed class ToolsTabPopulationService
         }
 
         string? lastCategory = null;
-        var sorted = _toolRegistry.All
+        var sorted = listedTools
             .OrderBy(d => d.Category)
             .ThenBy(d => d.ResolveLabel(vm.Localize), StringComparer.OrdinalIgnoreCase);
 
@@ -389,7 +387,29 @@ public sealed class ToolsTabPopulationService
             target.Children.Add(emptyState);
         }
 
-        return hasFilter ? matchingToolCount : _toolRegistry.All.Count;
+        return hasFilter ? matchingToolCount : listedTools.Count;
+    }
+
+    /// <summary>
+    /// Maps stored tool ids to their descriptors in order, keeping only those in the listed
+    /// projection. Ids of unknown or unavailable tools are skipped, not removed from storage.
+    /// </summary>
+    internal static List<ToolDescriptor> ResolveListedTools(
+        IReadOnlyList<ToolDescriptor> listedTools,
+        IEnumerable<string> toolIds)
+    {
+        var resolved = new List<ToolDescriptor>();
+        foreach (var toolId in toolIds)
+        {
+            var desc = listedTools.FirstOrDefault(
+                d => string.Equals(d.Id, toolId, StringComparison.OrdinalIgnoreCase));
+            if (desc is not null)
+            {
+                resolved.Add(desc);
+            }
+        }
+
+        return resolved;
     }
 
     private void RenderToolsTabExternalCategory(

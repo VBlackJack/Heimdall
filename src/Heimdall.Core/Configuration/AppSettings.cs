@@ -421,6 +421,15 @@ public sealed class AppSettings
     public bool SessionTabGroupsOnOwnRow { get; set; }
     public Dictionary<string, bool> SidebarExpandedCategories { get; set; } = new();
     public List<string> FavoriteToolIds { get; set; } = new();
+
+    /// <summary>
+    /// Names of the optional tool packs the user switched off (members of
+    /// <see cref="Models.ToolPack"/>, for example "Audit"). Empty by default, so a settings file
+    /// that predates the key disables nothing and a pack added by a later build is on until the
+    /// user turns it off. <see cref="Models.ToolPack.Core"/> and names this build does not know are
+    /// ignored when the list is read. An organisation policy can forbid a pack on top of this list.
+    /// </summary>
+    public List<string> DisabledToolPacks { get; set; } = new();
     public bool OnboardingCompleted { get; set; }
     public double WindowWidth { get; set; }
     public double WindowHeight { get; set; }

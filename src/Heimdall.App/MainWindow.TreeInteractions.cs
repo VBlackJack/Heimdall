@@ -435,7 +435,6 @@ public partial class MainWindow
     private static void OpenSessionTreeToolTab(MainViewModel vm, ServerItemViewModel server)
     {
         var toolId = ConnectionTypeCatalog.StripToolPrefix(server.ConnectionType);
-        vm.TrackRecentTool(toolId.ToUpperInvariant());
         var context = Services.ToolEntryContextFactory.ForTreeEntry(server);
         _ = vm.OpenToolTabAsync(toolId, server.DisplayName, context);
     }

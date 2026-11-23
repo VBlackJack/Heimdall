@@ -356,6 +356,9 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     /// <summary>Centralized tool registry shared with MainWindow for menus.</summary>
     public ToolRegistry ToolRegistry { get; }
 
+    /// <summary>Decides whether each tool may be listed and opened, from its pack, the user's settings and the machine policy.</summary>
+    public IToolAvailability ToolAvailability { get; }
+
     /// <summary>Sidebar (Sessions / Tools tabs) state and commands.</summary>
     public SidebarViewModel Sidebar { get; }
 
@@ -435,7 +438,8 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         IPaneCloseArbiter closeArbiter,
         ICommandPaletteViewModelFactory commandPaletteFactory,
         ITunnelsViewModelFactory tunnelsFactory,
-        IClipboardService clipboard)
+        IClipboardService clipboard,
+        IToolAvailability toolAvailability)
     {
         _closeArbiter = closeArbiter ?? throw new ArgumentNullException(nameof(closeArbiter));
         _configManager = configManager;
@@ -454,6 +458,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         _sessionRestore = sessionRestore;
         _uiDispatcher = uiDispatcher;
         ToolRegistry = toolRegistry;
+        ToolAvailability = toolAvailability ?? throw new ArgumentNullException(nameof(toolAvailability));
         Split = splitService;
 
         // Built from the SAME arbiter instance every other close path uses: a clearance obtained in
@@ -514,8 +519,10 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
                 cancellationToken);
 
         // Wire cross-tool navigation so tools can open other tool tabs
+        // These opens never recorded a recent tool (a tool opening another tool, a command captured
+        // from a terminal), and still do not.
         _embeddedSessionManager.OpenToolCallback = (toolId, title, ctx) =>
-            OpenToolTabAsync(toolId, title, ctx);
+            OpenToolTabAsync(toolId, title, ctx, recordRecent: false);
 
         // Wire the session opener so a tool can connect to a host it discovered.
         _embeddedSessionManager.OpenSessionCallback = ConnectAdHocSessionAsync;
@@ -536,7 +543,6 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         // (SessionReady is handled by SessionCoordinator, not here)
         _onToolSessionRequested = (toolId, title, ctx) =>
         {
-            TrackRecentTool(toolId.ToUpperInvariant());
             OpenToolTabAsync(toolId, title, ctx).SafeFireAndForget();
         };
         ServerList.ToolSessionRequested += _onToolSessionRequested;
@@ -1395,9 +1401,22 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     /// Opens a non-connection tool as a session tab, bypassing
     /// ConnectionService and ConnectionStateMachine entirely.
     /// </summary>
-    internal async Task OpenToolTabAsync(string toolId, string title, ToolContext? context)
+    /// <remarks>
+    /// A tool whose pack is switched off, or forbidden by policy, is refused before anything else:
+    /// no session is added, no existing tab is focused, and the status bar names the reason. A
+    /// successful open or focus records the tool as recently used unless <paramref name="recordRecent"/>
+    /// is false, so no caller records it itself. A tool whose open fails is never recorded.
+    /// </remarks>
+    /// <param name="recordRecent">Whether a successful open or focus counts as a recent use; the routes that never recorded pass false.</param>
+    /// <returns>What happened to the request; <see cref="ToolOpenOutcome.Refused"/> is not an error.</returns>
+    internal async Task<ToolOpenOutcome> OpenToolTabAsync(string toolId, string title, ToolContext? context, bool recordRecent = true)
     {
         await Task.CompletedTask;
+
+        if (TryRefuseTool(toolId))
+        {
+            return ToolOpenOutcome.Refused;
+        }
 
         var connectionType = $"TOOL:{toolId.ToUpperInvariant()}";
 
@@ -1413,7 +1432,8 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
             {
                 Connection.ActiveSession = openLibrary;
                 target.PrefillNewAction(capture);
-                return;
+                TrackRecentToolWhen(recordRecent, toolId);
+                return ToolOpenOutcome.FocusedExisting;
             }
         }
 
@@ -1440,7 +1460,8 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
                     commandLibraryView.PreselectAction(context.InitialActionId!);
                 }
 
-                return;
+                TrackRecentToolWhen(recordRecent, toolId);
+                return ToolOpenOutcome.FocusedExisting;
             }
         }
 
@@ -1462,5 +1483,35 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
             Connection.HasActiveSessions = Connection.ActiveSessions.Count > 0;
             throw;
         }
+
+        TrackRecentToolWhen(recordRecent, toolId);
+        return ToolOpenOutcome.Opened;
+    }
+
+    private void TrackRecentToolWhen(bool recordRecent, string toolId)
+    {
+        if (recordRecent)
+        {
+            TrackRecentTool(toolId.ToUpperInvariant());
+        }
+    }
+
+    /// <summary>
+    /// Refuses a tool whose pack is switched off or forbidden by policy, telling the user why
+    /// through the status bar. An unknown id is not refused: it keeps its placeholder tab.
+    /// </summary>
+    /// <returns>True when the tool was refused.</returns>
+    private bool TryRefuseTool(string toolId)
+    {
+        ToolAvailabilityState state = ToolAvailability.GetState(toolId);
+        if (!ToolUnavailableException.IsRefusal(state))
+        {
+            return false;
+        }
+
+        string label = ToolRegistry.GetById(toolId)?.ResolveLabel(_localizer.GetString) ?? toolId;
+        StatusText = _localizer.Format(ToolUnavailableException.MessageKeyFor(state), label);
+        Core.Logging.FileLogger.Info($"Tool '{toolId}' refused: {state}.");
+        return true;
     }
 }

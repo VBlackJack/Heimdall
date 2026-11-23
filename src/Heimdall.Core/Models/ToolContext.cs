@@ -28,6 +28,9 @@ namespace Heimdall.Core.Models;
 /// beside <see cref="SendCommandAction"/>, which runs it.
 /// <see cref="InitialCommandText"/> is a command captured from a terminal: the Command Library
 /// opens its editor for a new action prefilled with it.
+/// <see cref="IsToolAvailable"/> says whether another tool, by id, may be used right now; a view
+/// asks it before it offers an action that opens that tool. Null means every tool is available,
+/// which is what a context built outside the session manager gets.
 /// </summary>
 public sealed record ToolContext(
     string? TargetHost = null,
@@ -52,4 +55,5 @@ public sealed record ToolContext(
     string? DocumentContent = null,
     Configuration.RemoteOs RemoteOs = Configuration.RemoteOs.Auto,
     Action<string>? InsertTextAction = null,
-    string? InitialCommandText = null);
+    string? InitialCommandText = null,
+    Func<string, bool>? IsToolAvailable = null);

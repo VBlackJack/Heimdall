@@ -267,7 +267,8 @@ public sealed class CommandLibraryCaptureTests
             null!,
             null!,
             null!,
-            null!);
+            null!,
+            AlwaysAvailableToolAvailability.Instance);
 
     private static ActionModel ExistingAction()
         => CommandLibraryTestHelpers.CreateLinuxAction("existing", "Disk usage", "df -h");
