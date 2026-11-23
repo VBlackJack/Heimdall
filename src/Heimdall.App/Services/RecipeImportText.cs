@@ -27,9 +27,9 @@ namespace Heimdall.App.Services;
 /// a text match in all three. The Core types carry codes only.
 /// </summary>
 /// <remarks>
-/// Every error text takes the same four arguments: {0} the place in the recipe (a structural path
+/// Every error text takes the same five arguments: {0} the place in the recipe (a structural path
 /// such as <c>arguments[2][0]</c>), {1} the property, input or fragment involved, {2} the offending
-/// size or number and {3} the bound it broke. A text uses the ones it needs.
+/// size or number, {3} the bound it broke and {4} the offending text. A text uses the ones it needs.
 /// </remarks>
 public static class RecipeImportText
 {
@@ -96,6 +96,7 @@ public static class RecipeImportText
         RecipeErrorCode.ForbiddenUrl => "RecipeErrorForbiddenUrl",
         RecipeErrorCode.ForbiddenPercent => "RecipeErrorForbiddenPercent",
         RecipeErrorCode.ForbiddenLeadingAt => "RecipeErrorForbiddenLeadingAt",
+        RecipeErrorCode.FixedValueStartsWithOptionCharacter => "RecipeErrorFixedValueStartsWithOptionCharacter",
         _ => throw new ArgumentOutOfRangeException(nameof(code), code, "An error without a text."),
     };
 
@@ -176,7 +177,8 @@ public static class RecipeImportText
             error.Path ?? string.Empty,
             error.Name ?? error.Fragment ?? string.Empty,
             (error.Actual ?? 0).ToString(CultureInfo.CurrentCulture),
-            (error.Limit ?? 0).ToString(CultureInfo.CurrentCulture));
+            (error.Limit ?? 0).ToString(CultureInfo.CurrentCulture),
+            error.Fragment ?? string.Empty);
 
         bool hasPath = !string.IsNullOrEmpty(error.Path);
         if (error.Position is { } position)

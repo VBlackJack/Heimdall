@@ -130,7 +130,7 @@ public sealed partial class RecipeImportTextTests
     }
 
     [Fact]
-    public void EveryErrorTextOfTheImportHasTheSameFourArgumentsToChooseFrom()
+    public void EveryErrorTextOfTheImportHasTheSameFiveArgumentsToChooseFrom()
     {
         Dictionary<string, string> english = ReadLocale("en");
 
@@ -139,7 +139,7 @@ public sealed partial class RecipeImportTextTests
             string text = english[RecipeImportText.KeyFor(code)];
             foreach (Match match in PlaceholderPattern().Matches(text))
             {
-                Assert.InRange(int.Parse(match.Value.Trim('{', '}'), System.Globalization.CultureInfo.InvariantCulture), 0, 3);
+                Assert.InRange(int.Parse(match.Value.Trim('{', '}'), System.Globalization.CultureInfo.InvariantCulture), 0, 4);
             }
         }
     }
@@ -221,6 +221,24 @@ public sealed partial class RecipeImportTextTests
         Assert.Equal("The file is not valid JSON. (line 2, column 9)", positionOnly);
         Assert.Equal("An argument is empty. (in arguments[0])", pathOnly);
         Assert.Equal("The file is empty.", neither);
+    }
+
+    [Fact]
+    public async Task AFixedValueThatStartsWithADashTellsTheAuthorToKeepTheDashInTheArgument()
+    {
+        LocalizationManager localizer = await EnglishAsync();
+        RecipeError error = new(
+            RecipeErrorCode.FixedValueStartsWithOptionCharacter,
+            Path: "arguments[0]",
+            Name: "record",
+            Fragment: "-type=A");
+
+        string text = RecipeImportText.Describe(localizer, error);
+
+        Assert.Contains("\"-type=A\"", text, StringComparison.Ordinal);
+        Assert.Contains("\"record\"", text, StringComparison.Ordinal);
+        Assert.Contains("Keep that character in the fixed text of the argument, for example \"-type={in:record}\"", text, StringComparison.Ordinal);
+        Assert.Contains("(in arguments[0])", text, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -6835,5 +6835,10 @@
   "SettingsRecipeListEmpty": "Aucune recette n'est import\u00e9e.",
   "SettingsRecipeFoldersIntro": "Les recettes peuvent toujours lancer des programmes de Windows et de Program Files. Ajoutez un dossier ici pour leur permettre d'y lancer aussi un programme. Seuls les dossiers d'un lecteur local sont accept\u00e9s. Une modification s'applique une fois les param\u00e8tres enregistr\u00e9s.",
   "SettingsRecipeFolderListEmpty": "Aucun dossier n'a \u00e9t\u00e9 ajout\u00e9.",
-  "SettingsRecipeFolderAdd": "Ajouter un dossier..."
+  "SettingsRecipeFolderAdd": "Ajouter un dossier...",
+  "RecipeErrorFixedValueStartsWithOptionCharacter": "La valeur fixe \"{4}\" du champ \"{1}\" serait toujours refus\u00e9e \u00e0 l'ex\u00e9cution, car elle commence par un tiret, une barre oblique ou @ \u00e0 l'endroit o\u00f9 le champ ouvre un argument. Gardez ce caract\u00e8re dans le texte fixe de l'argument, par exemple \"-type={{in:record}}\", et ne listez que les valeurs nues comme choix.",
+  "RecipeImportReplaceArgumentsSame": "Arguments : inchang\u00e9s",
+  "RecipeImportReplaceArgumentsChanged": "Arguments : modifi\u00e9s, lisez-les ci-dessous",
+  "RecipeImportReplaceFieldsSame": "Champs : inchang\u00e9s",
+  "RecipeImportReplaceFieldsChanged": "Champs : modifi\u00e9s, lisez-les ci-dessous"
 }

@@ -141,6 +141,13 @@ public enum RecipeErrorCode
 
     /// <summary>A literal text starts with <c>@</c> (a response file).</summary>
     ForbiddenLeadingAt,
+
+    /// <summary>
+    /// A choice or a default the author fixed would always be refused at run time, because it starts
+    /// with <c>-</c>, <c>/</c> or <c>@</c> where its placeholder starts the argument: <c>Name</c> is
+    /// the input, <c>Fragment</c> the value, <c>Path</c> the token that uses the input.
+    /// </summary>
+    FixedValueStartsWithOptionCharacter,
 }
 
 /// <summary>A place in the source text, one-based.</summary>

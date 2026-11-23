@@ -85,6 +85,15 @@ public static class RecipeImportPreview
             text.AppendLine();
         }
 
+        // What decides the answer comes first, because the dialog is small and scrolls: the program,
+        // then its arguments, then who wrote it and the rest.
+        text.AppendLine(localizer["RecipeImportPreviewProgram"]);
+        text.AppendLine(Indent + Exact(plan.ResolvedProgramPath));
+        text.AppendLine();
+
+        AppendArguments(localizer, text, recipe);
+        text.AppendLine();
+
         text.AppendLine(localizer.Format("RecipeImportPreviewName", Plain(recipe.Name)));
         text.AppendLine(localizer.Format("RecipeImportPreviewAuthor", Plain(recipe.Author)));
         text.AppendLine(localizer.Format("RecipeImportPreviewId", Plain(recipe.Id)));
@@ -92,12 +101,6 @@ public static class RecipeImportPreview
         text.AppendLine(localizer.Format("RecipeImportPreviewDescription", Plain(recipe.Description)));
         text.AppendLine();
 
-        text.AppendLine(localizer["RecipeImportPreviewProgram"]);
-        text.AppendLine(Indent + Exact(plan.ResolvedProgramPath));
-        text.AppendLine();
-
-        AppendArguments(localizer, text, recipe);
-        text.AppendLine();
         AppendInputs(localizer, text, recipe);
         text.AppendLine();
 
@@ -164,6 +167,12 @@ public static class RecipeImportPreview
         else
         {
             text.AppendLine(Indent + localizer.Format("RecipeImportReplaceVersion", Plain(previous.Version), Plain(plan.Recipe.Version)));
+            text.AppendLine(Indent + localizer[SameArguments(previous, plan.Recipe)
+                ? "RecipeImportReplaceArgumentsSame"
+                : "RecipeImportReplaceArgumentsChanged"]);
+            text.AppendLine(Indent + localizer[SameFields(previous, plan.Recipe)
+                ? "RecipeImportReplaceFieldsSame"
+                : "RecipeImportReplaceFieldsChanged"]);
         }
 
         string? oldPath = plan.Existing?.ResolvedProgramPath;
@@ -171,6 +180,27 @@ public static class RecipeImportPreview
             ? localizer["RecipeImportReplaceProgramSame"]
             : localizer.Format("RecipeImportReplaceProgramChanged", Exact(oldPath), Exact(plan.ResolvedProgramPath))));
     }
+
+    /// <summary>Whether two recipes pass the same arguments, compared as parsed (groups and tokens), not as bytes.</summary>
+    private static bool SameArguments(Recipe left, Recipe right)
+        => left.Arguments.Count == right.Arguments.Count
+            && left.Arguments.Zip(right.Arguments).All(pair =>
+                pair.First.IsGroup == pair.Second.IsGroup
+                && pair.First.Tokens.SequenceEqual(pair.Second.Tokens, StringComparer.Ordinal));
+
+    /// <summary>Whether two recipes ask for the same fields, compared as parsed (every property, the lists item by item).</summary>
+    private static bool SameFields(Recipe left, Recipe right)
+        => left.Inputs.Count == right.Inputs.Count
+            && left.Inputs.Zip(right.Inputs).All(pair =>
+                pair.First.Name == pair.Second.Name
+                && pair.First.Type == pair.Second.Type
+                && pair.First.Label == pair.Second.Label
+                && pair.First.Required == pair.Second.Required
+                && pair.First.Default == pair.Second.Default
+                && pair.First.Pattern == pair.Second.Pattern
+                && pair.First.MaxLength == pair.Second.MaxLength
+                && (pair.First.Choices ?? []).SequenceEqual(pair.Second.Choices ?? [], StringComparer.Ordinal)
+                && (pair.First.WhenTrue ?? []).SequenceEqual(pair.Second.WhenTrue ?? [], StringComparer.Ordinal));
 
     private static void AppendArguments(LocalizationManager localizer, StringBuilder text, Recipe recipe)
     {

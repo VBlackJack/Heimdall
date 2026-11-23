@@ -260,6 +260,77 @@ public sealed class RecipeImportPreviewTests
     }
 
     [Fact]
+    public async Task TheProgramAndTheArgumentsComeBeforeWhoWroteTheRecipe()
+    {
+        string text = RecipeImportPreview.Compose(await EnglishAsync(), PlanOf(RecipeImportFiles.Bytes()));
+
+        int warning = text.IndexOf("This recipe was written by someone else", StringComparison.Ordinal);
+        int program = text.IndexOf("Program that will run", StringComparison.Ordinal);
+        int arguments = text.IndexOf("Arguments, one per line", StringComparison.Ordinal);
+        int name = text.IndexOf("Name: Ping", StringComparison.Ordinal);
+        int fields = text.IndexOf("Fields the user fills in", StringComparison.Ordinal);
+        int session = text.IndexOf("Reads from the selected session", StringComparison.Ordinal);
+        int output = text.IndexOf("The output is shown as", StringComparison.Ordinal);
+        int timeout = text.IndexOf("It is stopped after", StringComparison.Ordinal);
+
+        Assert.True(warning == 0 && warning < program && program < arguments && arguments < name, text);
+        Assert.True(name < fields && fields < session && session < output && output < timeout, text);
+    }
+
+    [Fact]
+    public async Task AReplacementBlockStaysRightAfterTheWarningAndBeforeTheProgram()
+    {
+        RecipeStoreEntry existing = new("acme.ping", RecipeStore.FileNameFor("acme.ping"), new string('a', 64), @"C:\Windows\System32\ping.exe", DateTimeOffset.UnixEpoch);
+        RecipeImportPlan old = PlanOf(RecipeImportFiles.Bytes(version: "1.0.0"));
+
+        string text = RecipeImportPreview.Compose(await EnglishAsync(), PlanOf(RecipeImportFiles.Bytes(version: "1.1.0"), existing: existing, previous: old.Recipe));
+
+        int warning = text.IndexOf("This recipe was written by someone else", StringComparison.Ordinal);
+        int replace = text.IndexOf("This replaces the recipe", StringComparison.Ordinal);
+        int program = text.IndexOf("Program that will run", StringComparison.Ordinal);
+        Assert.True(warning < replace && replace < program, text);
+    }
+
+    [Fact]
+    public async Task AReplacementSaysWhetherTheArgumentsAndTheFieldsDifferComparingParsedRecipesNotBytes()
+    {
+        RecipeStoreEntry existing = new("acme.ping", RecipeStore.FileNameFor("acme.ping"), new string('a', 64), @"C:\Windows\System32\ping.exe", DateTimeOffset.UnixEpoch);
+        RecipeImportPlan old = PlanOf(RecipeImportFiles.Bytes(version: "1.0.0", description: "Old text."));
+
+        // Different bytes (version, description, spacing), same arguments and fields.
+        string same = RecipeImportPreview.Compose(
+            await EnglishAsync(),
+            PlanOf(RecipeImportFiles.Bytes(version: "1.1.0", description: "New text.", argumentsJson: "[ \"-n\" ,   \"{Host}\" ]"), existing: existing, previous: old.Recipe));
+
+        Assert.Contains("Arguments: unchanged", same, StringComparison.Ordinal);
+        Assert.Contains("Fields: unchanged", same, StringComparison.Ordinal);
+
+        string changed = RecipeImportPreview.Compose(
+            await EnglishAsync(),
+            PlanOf(
+                RecipeImportFiles.Bytes(
+                    version: "1.1.0",
+                    argumentsJson: "[\"-n\", \"9\", \"{Host}\"]",
+                    inputsJson: "[{\"name\":\"w\",\"type\":\"int\",\"label\":\"W\",\"required\":false}]"),
+                existing: existing,
+                previous: old.Recipe));
+
+        Assert.Contains("Arguments: changed, read them below", changed, StringComparison.Ordinal);
+        Assert.Contains("Fields: changed, read them below", changed, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AReplacementOfAnUnreadableCopyDoesNotClaimAnythingAboutArgumentsOrFields()
+    {
+        RecipeStoreEntry existing = new("acme.ping", RecipeStore.FileNameFor("acme.ping"), new string('a', 64), @"C:.exe", DateTimeOffset.UnixEpoch);
+
+        string text = RecipeImportPreview.Compose(await EnglishAsync(), PlanOf(RecipeImportFiles.Bytes(), existing: existing, previous: null));
+
+        Assert.DoesNotContain("Arguments: ", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Fields: ", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ANewRecipeShowsNoReplacementSection()
     {
         string text = RecipeImportPreview.Compose(await EnglishAsync(), PlanOf(RecipeImportFiles.Bytes()));

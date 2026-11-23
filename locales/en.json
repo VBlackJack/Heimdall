@@ -6836,5 +6836,10 @@
   "SettingsRecipeListEmpty": "No recipe is imported.",
   "SettingsRecipeFoldersIntro": "Recipes may always run programs from Windows and Program Files. Add a folder here to let them run a program from it too. Only folders on a local drive are accepted. A change applies once the settings are saved.",
   "SettingsRecipeFolderListEmpty": "No folder was added.",
-  "SettingsRecipeFolderAdd": "Add a folder..."
+  "SettingsRecipeFolderAdd": "Add a folder...",
+  "RecipeErrorFixedValueStartsWithOptionCharacter": "The fixed value \"{4}\" of the field \"{1}\" would always be refused at run time, because it starts with a dash, a slash or @ right where the field starts an argument. Keep that character in the fixed text of the argument, for example \"-type={{in:record}}\", and list only the bare values as choices.",
+  "RecipeImportReplaceArgumentsSame": "Arguments: unchanged",
+  "RecipeImportReplaceArgumentsChanged": "Arguments: changed, read them below",
+  "RecipeImportReplaceFieldsSame": "Fields: unchanged",
+  "RecipeImportReplaceFieldsChanged": "Fields: changed, read them below"
 }

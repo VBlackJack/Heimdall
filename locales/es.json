@@ -6836,5 +6836,10 @@
   "SettingsRecipeListEmpty": "No hay ninguna receta importada.",
   "SettingsRecipeFoldersIntro": "Las recetas siempre pueden ejecutar programas de Windows y de Program Files. A\u00f1ada aqu\u00ed una carpeta para que tambi\u00e9n puedan ejecutar un programa de ella. Solo se aceptan carpetas de una unidad local. Un cambio se aplica al guardar la configuraci\u00f3n.",
   "SettingsRecipeFolderListEmpty": "No se a\u00f1adi\u00f3 ninguna carpeta.",
-  "SettingsRecipeFolderAdd": "A\u00f1adir una carpeta..."
+  "SettingsRecipeFolderAdd": "A\u00f1adir una carpeta...",
+  "RecipeErrorFixedValueStartsWithOptionCharacter": "El valor fijo \"{4}\" del campo \"{1}\" se rechazar\u00eda siempre al ejecutar, porque empieza por un guion, una barra o @ justo donde el campo abre un argumento. Conserve ese car\u00e1cter en el texto fijo del argumento, por ejemplo \"-type={{in:record}}\", y enumere solo los valores sin \u00e9l como opciones.",
+  "RecipeImportReplaceArgumentsSame": "Argumentos: sin cambios",
+  "RecipeImportReplaceArgumentsChanged": "Argumentos: modificados, l\u00e9alos m\u00e1s abajo",
+  "RecipeImportReplaceFieldsSame": "Campos: sin cambios",
+  "RecipeImportReplaceFieldsChanged": "Campos: modificados, l\u00e9alos m\u00e1s abajo"
 }

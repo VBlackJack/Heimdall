@@ -430,14 +430,15 @@ public static class RecipeValidator
             }
 
             bool wholeToken = parse.Segments.Count == 1 && parse.Segments[0].Kind == TemplateSegmentKind.Input;
-            foreach (TemplateSegment segment in parse.Segments)
+            for (int index = 0; index < parse.Segments.Count; index++)
             {
+                TemplateSegment segment = parse.Segments[index];
                 if (segment.Kind == TemplateSegmentKind.Input)
-                    CheckInputReference(path, segment.Text, context, wholeToken);
+                    CheckInputReference(path, segment.Text, context, wholeToken, startsToken: index == 0);
             }
         }
 
-        private void CheckInputReference(string path, string name, TokenContext context, bool wholeToken)
+        private void CheckInputReference(string path, string name, TokenContext context, bool wholeToken, bool startsToken)
         {
             if (!_inputs.TryGetValue(name, out RecipeInput? input))
             {
@@ -458,6 +459,28 @@ public static class RecipeValidator
 
             if (context == TokenContext.Bare && input.IsOptional)
                 Add(RecipeErrorCode.OptionalInputInBareToken, path, name: RecipeText.MakeSafe(name));
+
+            if (startsToken)
+                CheckFixedValues(path, input);
+        }
+
+        /// <summary>
+        /// A value the author fixed (a choice, a default) is checked with the rule the expander applies
+        /// at run time, for the position where the placeholder starts its token, so that a recipe which
+        /// validates cannot carry a choice or a default that is always refused.
+        /// </summary>
+        private void CheckFixedValues(string path, RecipeInput input)
+        {
+            IEnumerable<string> fixedValues = input.Type == RecipeInputType.Choice
+                ? (input.Choices ?? []).Concat(input.Default is null ? [] : [input.Default])
+                : input.Default is null ? [] : [input.Default];
+
+            foreach (string value in fixedValues.Distinct(StringComparer.Ordinal))
+            {
+                RecipeValueRefusal refusal = RecipeValueRule.Check(input, value, placeholderStartsToken: true);
+                if (refusal is RecipeValueRefusal.LeadingDash or RecipeValueRefusal.LeadingSlash or RecipeValueRefusal.LeadingAt)
+                    Add(RecipeErrorCode.FixedValueStartsWithOptionCharacter, path, name: RecipeText.MakeSafe(input.Name), fragment: RecipeText.MakeSafe(value));
+            }
         }
 
         private void CheckLabels()
