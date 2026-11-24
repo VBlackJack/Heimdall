@@ -315,14 +315,16 @@ et la description ; chaque champ avec son type, son caractère obligatoire ou
 facultatif, sa valeur par défaut, ses choix, son motif et sa longueur maximale,
 et les arguments qu'un interrupteur ajoute quand il est activé ; chaque
 traduction de la recette (la langue, le nom, la description et les libellés des
-champs), puisque l'outil l'affiche à la place du texte anglais quand l'interface
-est dans cette langue ; si la recette lit l'hôte et le port de la session
-sélectionnée ; la façon dont la sortie est affichée, la façon dont elle est
-décodée, ce que devient l'erreur standard, les codes de sortie qui comptent
-comme un succès et l'icône ; et le délai. Un caractère de contrôle ou invisible
-est écrit `\uXXXX`. Dans le programme, les arguments et les valeurs par défaut,
-tout caractère hors de l'ASCII imprimable est écrit `\uXXXX` lui aussi : une
-lettre qui ressemble à une lettre ASCII ne peut donc pas passer pour elle.
+champs), puisque l'outil ouvert l'affiche à la place du texte anglais quand
+l'interface est dans cette langue (le titre de l'onglet dans la barre d'onglets,
+les listes d'outils, la recherche et les Paramètres montrent le nom écrit dans
+la recette) ; si la recette lit l'hôte et le port de la session sélectionnée ;
+la façon dont la sortie est affichée, la façon dont elle est décodée, ce que
+devient l'erreur standard, les codes de sortie qui comptent comme un succès et
+l'icône ; et le délai. Un caractère de contrôle ou invisible est écrit `\uXXXX`.
+Dans le programme, les arguments et les valeurs par défaut, tout caractère hors
+de l'ASCII imprimable est écrit `\uXXXX` lui aussi : une lettre qui ressemble à
+une lettre ASCII ne peut donc pas passer pour elle.
 
 **Où l'outil apparaît.** Dans l'onglet Outils sous un titre Recettes, dans
 l'arborescence Outils de la barre latérale et dans la palette de commandes, avec
@@ -566,8 +568,11 @@ Un champ `bool` se place dans `arguments` comme un élément isolé entier
 activé, en rien quand il est désactivé. Il ne peut ni se mêler à d'autre texte
 dans un élément, ni se placer dans une liste imbriquée.
 
-64 éléments au plus en tout (éléments isolés, membres de listes imbriquées et
-éléments de `whenTrue` ensemble), chacun de 512 caractères au plus.
+64 éléments au plus en tout, chacun de 512 caractères au plus : un pour chaque
+élément isolé et chaque membre de liste imbriquée et, pour chaque endroit où un
+interrupteur est placé, le nombre de ses éléments de `whenTrue`. Le nombre donné
+dans l'erreur est le pire cas et peut dépasser le nombre d'éléments écrits dans
+le fichier.
 
 #### Valeurs de session
 
@@ -584,10 +589,12 @@ doit être un numéro de port valide.
 partie de 2 à 8 lettres, puis des parties de 1 à 8 lettres ou chiffres, 35
 caractères au plus) à un objet doté des propriétés facultatives `name`,
 `description` et `fields` (une table qui associe un nom de champ à son libellé
-traduit). Heimdall utilise l'entrée dont la balise est la langue de
-l'interface, sinon la première entrée de même langue principale, sinon les
-textes anglais de la recette. Une traduction d'un champ qui n'existe pas est
-refusée.
+traduit). Heimdall utilise l'entrée dont la balise est la langue de l'interface,
+sinon la première entrée de même langue principale, sinon les textes anglais de
+la recette. L'outil ouvert montre le nom, la description et les libellés de
+champs traduits ; le titre de l'onglet dans la barre d'onglets, les listes
+d'outils, la recherche et les Paramètres montrent le nom écrit dans la recette.
+Une traduction d'un champ qui n'existe pas est refusée.
 
 #### Quel programme peut être lancé
 

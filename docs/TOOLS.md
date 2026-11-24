@@ -296,14 +296,16 @@ is kept or dropped as a whole; the name, the author (marked unverified), the id,
 the version and the description; every field with its type, whether it is
 required, its default, its choices, its pattern and its maximum length, and the
 arguments a switch adds when it is on; every translation of the recipe (the
-language, the name, the description and the field labels), since the tool shows
-it instead of the English text when the interface is in that language; whether
-the recipe reads the host and the port of the selected session; how the output
-is shown, how it is decoded, what happens to standard error, the exit codes that
-count as success and the icon; and the timeout. A control or invisible character
-is written as `\uXXXX`. In the program, the arguments and the defaults, every
-character outside printable ASCII is written as `\uXXXX` too, so a look-alike
-letter cannot pass for the ASCII one.
+language, the name, the description and the field labels), since the open tool
+shows it instead of the English text when the interface is in that language (the
+title of the tab in the strip, the tool lists, the search and Settings show the
+name written in the recipe); whether the recipe reads the host and the port of
+the selected session; how the output is shown, how it is decoded, what happens
+to standard error, the exit codes that count as success and the icon; and the
+timeout. A control or invisible character is written as `\uXXXX`. In the
+program, the arguments and the defaults, every character outside printable ASCII
+is written as `\uXXXX` too, so a look-alike letter cannot pass for the ASCII
+one.
 
 **Where the tool appears.** In the Tools tab under a Recipes heading, in the
 sidebar Tools tree and in the command palette, marked "Unverified recipe by
@@ -532,8 +534,10 @@ A `bool` field is placed in `arguments` as a whole bare token (`"{in:details}"`)
 and expands to its `whenTrue` tokens when it is on, to nothing when it is off.
 It cannot be mixed with other text in a token, nor placed in a nested list.
 
-At most 64 tokens in all (bare tokens, nested-list members and `whenTrue`
-tokens together), each at most 512 characters.
+At most 64 tokens in all, each at most 512 characters: one for each bare token
+and each nested-list member, and, for each place a switch stands, the number of
+its `whenTrue` tokens. The number in the error is the worst case and can exceed
+the number of tokens written in the file.
 
 #### Session values
 
@@ -550,8 +554,10 @@ letters, then parts of 1 to 8 letters or digits, 35 characters at most) to an
 object with the optional properties `name`, `description` and `fields` (a map
 from a field name to its translated label). Heimdall uses the entry whose tag is
 the language of the interface, else the first entry with the same primary
-language, else the English texts of the recipe. A translation of a field that
-does not exist is refused.
+language, else the English texts of the recipe. The open tool shows the
+translated name, description and field labels; the title of the tab in the
+strip, the tool lists, the search and Settings show the name written in the
+recipe. A translation of a field that does not exist is refused.
 
 #### Which program may run
 

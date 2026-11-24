@@ -55,7 +55,12 @@ public static class RecipeLimits
     /// <summary>Longest program text (a bare file name or an absolute path).</summary>
     public const int MaxProgramLength = 260;
 
-    /// <summary>Most tokens in a recipe, counting bare tokens, group members and <c>whenTrue</c> tokens.</summary>
+    /// <summary>
+    /// Most tokens a recipe can produce: one for each bare token and each group member, and, for each place a
+    /// switch stands as a bare token, the number of its <c>whenTrue</c> tokens. The declared <c>whenTrue</c>
+    /// tokens are not counted on their own, so the number reported is the worst case and can exceed the number of
+    /// tokens written in the file.
+    /// </summary>
     public const int MaxTokens = 64;
 
     /// <summary>Longest token, default value or choice value.</summary>

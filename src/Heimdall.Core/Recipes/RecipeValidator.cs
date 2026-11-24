@@ -93,7 +93,7 @@ public static class RecipeValidator
             CheckText(RecipePath.Author, _recipe.Author, RecipeLimits.MaxAuthorLength, forbidden: false);
             CheckText(RecipePath.Name, _recipe.Name, RecipeLimits.MaxNameLength, forbidden: false);
             CheckText(RecipePath.Description, _recipe.Description, RecipeLimits.MaxDescriptionLength, forbidden: false);
-            CheckText(RecipePath.Program, _recipe.Program, RecipeLimits.MaxProgramLength, forbidden: true);
+            CheckText(RecipePath.Program, _recipe.Program, RecipeLimits.MaxProgramLength, forbidden: true, onCommandLine: true);
             CheckInputs();
             CheckArguments();
             CheckLabels();
@@ -163,10 +163,11 @@ public static class RecipeValidator
         }
 
         /// <summary>
-        /// Checks a displayed or fixed text; returns true when it raised no error. A text that becomes
-        /// an argument (<paramref name="argument"/>) is also refused when it holds a look-alike character.
+        /// Checks a displayed or fixed text; returns true when it raised no error. A text that reaches
+        /// the command line (<paramref name="onCommandLine"/>: the program, a choice) is also refused when it holds a
+        /// look-alike character.
         /// </summary>
-        private bool CheckText(string path, string? text, int maxLength, bool forbidden, bool argument = false)
+        private bool CheckText(string path, string? text, int maxLength, bool forbidden, bool onCommandLine = false)
         {
             int before = _errors.Count;
             if (string.IsNullOrWhiteSpace(text))
@@ -187,7 +188,7 @@ public static class RecipeValidator
                 return false;
             }
 
-            if (argument && RecipeText.ContainsLookAlikeCharacter(text, _converter))
+            if (onCommandLine && RecipeText.ContainsLookAlikeCharacter(text, _converter))
             {
                 Add(RecipeErrorCode.ForbiddenLookAlikeCharacter, path, fragment: LookAlikeFragment(text));
                 return false;
@@ -299,7 +300,7 @@ public static class RecipeValidator
             {
                 string value = input.Choices[index];
                 string valuePath = RecipePath.Index(choicesPath, index);
-                if (CheckText(valuePath, value, RecipeLimits.MaxChoiceLength, forbidden: true, argument: true) && !seen.Add(value))
+                if (CheckText(valuePath, value, RecipeLimits.MaxChoiceLength, forbidden: true, onCommandLine: true) && !seen.Add(value))
                     Add(RecipeErrorCode.DuplicateChoice, valuePath, fragment: RecipeText.MakeSafe(value));
             }
         }
@@ -419,7 +420,10 @@ public static class RecipeValidator
 
         private void CheckToken(string path, string? token, TokenContext context)
         {
-            _tokenCount++;
+            // What the expander can produce: a switch placed as a bare token becomes its whenTrue tokens, once
+            // per placement, so the declared whenTrue tokens themselves are not counted.
+            if (context != TokenContext.WhenTrue)
+                _tokenCount += TokensProducedBy(token, context);
 
             if (string.IsNullOrEmpty(token))
             {
@@ -464,6 +468,25 @@ public static class RecipeValidator
                 if (segment.Kind == TemplateSegmentKind.Input)
                     CheckInputReference(path, segment.Text, context, wholeToken, parse, index);
             }
+        }
+
+        /// <summary>How many tokens one written token can become: its own count, or the whenTrue count of a switch placed alone.</summary>
+        private int TokensProducedBy(string? token, TokenContext context)
+        {
+            if (context != TokenContext.Bare || string.IsNullOrEmpty(token))
+                return 1;
+
+            TemplateParse parse = RecipeTemplate.Parse(token);
+            if (parse.Failure is null
+                && parse.Segments.Count == 1
+                && parse.Segments[0].Kind == TemplateSegmentKind.Input
+                && _inputs.TryGetValue(parse.Segments[0].Text, out RecipeInput? input)
+                && input.Type == RecipeInputType.Bool)
+            {
+                return input.WhenTrue?.Count ?? 0;
+            }
+
+            return 1;
         }
 
         private void CheckInputReference(string path, string name, TokenContext context, bool wholeToken, TemplateParse parse, int segmentIndex)

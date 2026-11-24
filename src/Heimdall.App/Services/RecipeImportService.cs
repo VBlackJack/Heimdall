@@ -147,20 +147,20 @@ public sealed class RecipeImportService
         byte[] bytes;
         try
         {
-            FileInfo info = new(path);
-            if (info.Exists && info.Length > RecipeLimits.MaxFileBytes)
+            // One read of one open handle, stopped at the cap: nothing is asked of the size first.
+            CappedRead read = CappedFileReader.Read(path, RecipeLimits.MaxFileBytes);
+            if (read.Bytes is not { } content)
             {
-                // Over the cap the file is never read: the size alone refuses it.
                 return RecipeImportOutcome.Invalid(
                 [
                     new RecipeError(
                         RecipeErrorCode.FileTooLarge,
-                        Actual: (int)Math.Min(info.Length, int.MaxValue),
+                        Actual: (int)Math.Min(read.Length, int.MaxValue),
                         Limit: RecipeLimits.MaxFileBytes),
                 ]);
             }
 
-            bytes = File.ReadAllBytes(path);
+            bytes = content;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or ArgumentException)
         {
