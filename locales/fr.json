@@ -6874,5 +6874,19 @@
   "RecipeImportReplaceTimeoutChanged": "D\u00e9lai maximal : modifi\u00e9",
   "SettingsImportPreviewRecipesOn": "Active le pack Recettes : des recettes pourront alors \u00eatre import\u00e9es et lanc\u00e9es sur cet ordinateur.",
   "RecipeStoreFailureIndexDamaged": "La liste des recettes import\u00e9es contient une entr\u00e9e que Heimdall ne peut pas lire : rien n'a \u00e9t\u00e9 modifi\u00e9. Fermez Heimdall, r\u00e9parez ou supprimez le fichier {0} dans le dossier des recettes du r\u00e9pertoire de donn\u00e9es, puis importez de nouveau vos recettes.",
-  "RecipeFolderNoticeBuiltInRoot": "Ce dossier a \u00e9t\u00e9 ajout\u00e9. Les programmes situ\u00e9s sous Windows ou Program Files restent v\u00e9rifi\u00e9s : une recette ne peut en utiliser un que si un utilisateur non administrateur ne peut pas le modifier. Pour le reste de ce dossier, n'importe quel programme peut \u00eatre nomm\u00e9 par une recette."
+  "RecipeFolderNoticeBuiltInRoot": "Ce dossier a \u00e9t\u00e9 ajout\u00e9. Les programmes situ\u00e9s sous Windows ou Program Files restent v\u00e9rifi\u00e9s : une recette ne peut en utiliser un que si un utilisateur non administrateur ne peut pas le modifier. Pour le reste de ce dossier, n'importe quel programme peut \u00eatre nomm\u00e9 par une recette.",
+  "RecipeFolderRefusalLeadsToDriveRoot": "Ce dossier m\u00e8ne \u00e0 la racine d'un lecteur, qui ne peut pas \u00eatre autoris\u00e9e en entier.",
+  "RecipeFolderRefusalLeadsToNetwork": "Ce dossier m\u00e8ne \u00e0 un emplacement r\u00e9seau (un lecteur r\u00e9seau connect\u00e9 ou un lien vers un partage). Les recettes ne peuvent lancer des programmes que depuis un lecteur local.",
+  "RecipeImportPreviewProgramAsWritten": "Programme tel qu'\u00e9crit dans le fichier : {0}",
+  "RecipeImportPreviewEncoding": "La sortie est lue en : {0}",
+  "RecipeImportEncodingUtf8": "UTF-8",
+  "RecipeImportEncodingOem": "la page de codes OEM de la console",
+  "RecipeImportPreviewStderr": "Erreur standard : {0}",
+  "RecipeImportStderrSeparate": "gard\u00e9e \u00e0 part et affich\u00e9e comme sortie d'erreur",
+  "RecipeImportStderrMerge": "m\u00e9lang\u00e9e \u00e0 la sortie",
+  "RecipeImportPreviewExitCodes": "Codes de sortie comptant comme un succ\u00e8s : {0}",
+  "RecipeImportPreviewIcon": "Ic\u00f4ne : {0}",
+  "RecipeImportReplaceIconSame": "Ic\u00f4ne : inchang\u00e9e",
+  "RecipeImportReplaceIconChanged": "Ic\u00f4ne : modifi\u00e9e",
+  "RecipeFolderRefusalLeadsToUnallowedLocation": "Ce dossier m\u00e8ne \u00e0 un emplacement qui ne peut pas \u00eatre autoris\u00e9 : le chemin vers lequel il m\u00e8ne est trop long, ou n'est pas un chemin ordinaire de dossier local."
 }

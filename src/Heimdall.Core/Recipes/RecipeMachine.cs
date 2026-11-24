@@ -53,10 +53,11 @@ public interface IRecipeMachine
     string? ReadOriginalFileName(string path);
 
     /// <summary>
-    /// The permission entries that allow something on a file or a folder, read without opening it
-    /// for writing; null when they cannot be read. Entries that deny are left out.
+    /// The owner and the permission entries that allow something on a file or a folder, read in one call
+    /// without opening it for writing; null when they cannot be read. Entries that deny are left out. The
+    /// owner is null when only it could not be read.
     /// </summary>
-    IReadOnlyList<RecipeAccessRule>? ReadAllowRules(string path);
+    RecipeItemAccess? ReadAccess(string path);
 }
 
 /// <summary>The real machine.</summary>
@@ -103,18 +104,24 @@ public sealed class RecipeMachine : IRecipeMachine
         }
     }
 
+    /// <summary>The permission entries only, from the same single read as <see cref="ReadAccess"/>.</summary>
+    /// <param name="path">A file or a folder.</param>
+    public IReadOnlyList<RecipeAccessRule>? ReadAllowRules(string path) => ReadAccess(path)?.Rules;
+
     /// <inheritdoc />
-    public IReadOnlyList<RecipeAccessRule>? ReadAllowRules(string path)
+    public RecipeItemAccess? ReadAccess(string path)
     {
         if (!OperatingSystem.IsWindows())
             return null;
 
         try
         {
-            // Only the permission list is requested, and the item is opened for reading its security.
+            // The permission list and the owner come from one call on one opening of the item, which is
+            // opened for reading its security only.
+            const AccessControlSections Sections = AccessControlSections.Access | AccessControlSections.Owner;
             FileSystemSecurity security = Directory.Exists(path)
-                ? new DirectoryInfo(path).GetAccessControl(AccessControlSections.Access)
-                : new FileInfo(path).GetAccessControl(AccessControlSections.Access);
+                ? new DirectoryInfo(path).GetAccessControl(Sections)
+                : new FileInfo(path).GetAccessControl(Sections);
 
             List<RecipeAccessRule> rules = [];
             foreach (FileSystemAccessRule rule in security.GetAccessRules(true, true, typeof(SecurityIdentifier)))
@@ -126,7 +133,8 @@ public sealed class RecipeMachine : IRecipeMachine
                 rules.Add(new RecipeAccessRule(rule.IdentityReference.Value, (int)rule.FileSystemRights, inheritOnly));
             }
 
-            return rules;
+            string? owner = (security.GetOwner(typeof(SecurityIdentifier)) as SecurityIdentifier)?.Value;
+            return new RecipeItemAccess(owner, rules);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or ArgumentException or PlatformNotSupportedException)
         {

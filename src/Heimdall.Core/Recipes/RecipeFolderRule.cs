@@ -46,6 +46,15 @@ public enum RecipeFolderRefusal
     /// <summary>The folder is already in the list.</summary>
     AlreadyListed,
 
+    /// <summary>The folder is written as an ordinary path but leads to the root of a drive (a link, a substituted drive).</summary>
+    LeadsToDriveRoot,
+
+    /// <summary>The folder is written as an ordinary path but leads to a network location (a mapped network drive, a link to a share).</summary>
+    LeadsToNetwork,
+
+    /// <summary>The folder leads to a location that fails the rule for another reason (a path too long, a character or a part the rule refuses).</summary>
+    LeadsToUnallowedLocation,
+
     /// <summary>The list already holds the most folders it keeps.</summary>
     ListFull,
 }
@@ -153,6 +162,43 @@ public static class RecipeFolderRule
         }
 
         return existing.Count >= MaxFolders ? RecipeFolderRefusal.ListFull : RecipeFolderRefusal.None;
+    }
+
+    /// <summary>
+    /// Checks the final form of a folder, the path it leads to once every link, mapped drive and substituted
+    /// drive is followed, with the whole rule that a folder written by the user passes, so that Settings and the
+    /// program resolver judge it the same way. A drive root and a network path keep their own refusals; any
+    /// other refusal of the rule becomes <see cref="RecipeFolderRefusal.LeadsToUnallowedLocation"/>. A final
+    /// form that is unknown (the folder is missing, the drive is absent) is not refused.
+    /// </summary>
+    /// <param name="finalForm">The final path of the folder, or null when it could not be resolved.</param>
+    public static RecipeFolderRefusal CheckFinalForm(string? finalForm)
+    {
+        if (string.IsNullOrWhiteSpace(finalForm))
+            return RecipeFolderRefusal.None;
+
+        string text = finalForm.Trim();
+        if (text.StartsWith(@"\\", StringComparison.Ordinal) || text.StartsWith("//", StringComparison.Ordinal))
+            return RecipeFolderRefusal.LeadsToNetwork;
+
+        string canonical;
+        try
+        {
+            canonical = Path.GetFullPath(text);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException or IOException)
+        {
+            return RecipeFolderRefusal.LeadsToUnallowedLocation;
+        }
+
+        string trimmed = canonical.TrimEnd(Separators);
+        if (trimmed.Length == DriveColonIndex + 1 && char.IsAsciiLetter(trimmed[0]) && trimmed[DriveColonIndex] == DriveSeparator)
+            return RecipeFolderRefusal.LeadsToDriveRoot;
+
+        if (canonical.StartsWith(@"\\", StringComparison.Ordinal))
+            return RecipeFolderRefusal.LeadsToNetwork;
+
+        return Check(canonical) == RecipeFolderRefusal.None ? RecipeFolderRefusal.None : RecipeFolderRefusal.LeadsToUnallowedLocation;
     }
 
     /// <summary>

@@ -237,22 +237,22 @@ public sealed class RecipeProgramResolver : IRecipeProgramResolver, IRecipeProgr
     private ProgramRoots BuildRoots(IReadOnlyList<string> allowedFolders)
     {
         ProgramRoots roots = new();
-        AddRoot(_machine, roots.BuiltIn, _machine.WindowsDirectory);
-        AddRoot(_machine, roots.BuiltIn, _machine.ProgramFilesDirectory);
-        AddRoot(_machine, roots.BuiltIn, _machine.ProgramFilesX86Directory);
+        AddRoot(_machine, roots.BuiltIn, _machine.WindowsDirectory, userFolder: false);
+        AddRoot(_machine, roots.BuiltIn, _machine.ProgramFilesDirectory, userFolder: false);
+        AddRoot(_machine, roots.BuiltIn, _machine.ProgramFilesX86Directory, userFolder: false);
 
         // A folder the user added is only taken as written when it still passes the rule it was
         // added under: a hand-edited setting (a path with .. parts, a drive root) never widens the roots.
         foreach (string folder in allowedFolders)
         {
             if (RecipeFolderRule.Check(folder) == RecipeFolderRefusal.None)
-                AddRoot(_machine, roots.User, RecipeFolderRule.Normalize(folder));
+                AddRoot(_machine, roots.User, RecipeFolderRule.Normalize(folder), userFolder: true);
         }
 
         return roots;
     }
 
-    private static void AddRoot(IRecipeMachine machine, List<string> roots, string? folder)
+    private static void AddRoot(IRecipeMachine machine, List<string> roots, string? folder, bool userFolder)
     {
         string? full = CanonicalFolder(folder);
         if (full is null)
@@ -262,11 +262,17 @@ public sealed class RecipeProgramResolver : IRecipeProgramResolver, IRecipeProgr
         roots.Add(trimmed);
 
         // A root that is itself reached through a link, a subst drive or a short name is also accepted
-        // under its final form, which is the form a file inside it resolves to.
+        // under its final form, which is the form a file inside it resolves to. For a folder the user
+        // added, that form has to pass the rule the written form passed: a link to a drive root, or a
+        // mapped network drive whose final form is a share, never widens the roots.
         string? final = machine.ResolveFinalPath(full);
         string? finalFull = final is null ? null : Canonicalize(final);
-        if (finalFull is not null && !string.Equals(finalFull.TrimEnd(TrimmedRootEnd), trimmed, StringComparison.OrdinalIgnoreCase))
+        if (finalFull is not null
+            && !string.Equals(finalFull.TrimEnd(TrimmedRootEnd), trimmed, StringComparison.OrdinalIgnoreCase)
+            && (!userFolder || RecipeFolderRule.CheckFinalForm(finalFull) == RecipeFolderRefusal.None))
+        {
             roots.Add(finalFull.TrimEnd(TrimmedRootEnd));
+        }
     }
 
     /// <summary>
@@ -397,7 +403,8 @@ public sealed class RecipeProgramResolver : IRecipeProgramResolver, IRecipeProgr
 
     /// <summary>
     /// Under Windows or Program Files, the file and every folder from it up to its root must not let
-    /// a user who is not an administrator change them: some folders there are writable by anyone.
+    /// a user who is not an administrator change them, by its permissions or by owning it: some folders
+    /// there are writable by anyone.
     /// A folder the user added is trusted only outside those roots: adding one that covers part of
     /// Windows or Program Files does not switch the check off for what lies under it.
     /// </summary>
@@ -416,12 +423,19 @@ public sealed class RecipeProgramResolver : IRecipeProgramResolver, IRecipeProgr
         string? current = finalPath;
         while (current is not null && IsUnderOrEqual(current, root))
         {
-            IReadOnlyList<RecipeAccessRule>? rules = _machine.ReadAllowRules(current);
-            if (rules is null)
+            RecipeItemAccess? access = _machine.ReadAccess(current);
+
+            // An owner that cannot be read is as unknown as a permission list that cannot be read.
+            if (access?.OwnerSid is null)
                 return RecipeProgramRefusal.CannotReadPermissions;
 
-            if (RecipeAccessPolicy.GrantsModificationToStandardUsers(rules))
+            // The owner of an item can rewrite its permissions whatever the list says, so an owner that is
+            // not trusted is refused like a list that lets a standard user write.
+            if (!RecipeAccessPolicy.IsTrustedOwner(access.OwnerSid)
+                || RecipeAccessPolicy.GrantsModificationToStandardUsers(access.Rules))
+            {
                 return RecipeProgramRefusal.WritableByUser;
+            }
 
             if (string.Equals(current.TrimEnd(TrimmedRootEnd), root, StringComparison.OrdinalIgnoreCase))
                 break;

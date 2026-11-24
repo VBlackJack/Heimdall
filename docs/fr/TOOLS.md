@@ -307,21 +307,22 @@ pack n'est pas activé. Heimdall alors :
 **Lire l'aperçu.** Il montre, dans cet ordre : un avertissement disant que la
 recette a été écrite par quelqu'un d'autre et ne peut pas être vérifiée ; pour
 un remplacement, ce qui change ; le programme qui sera lancé, sous la forme du
-chemin complet trouvé sur cet ordinateur ; chaque argument, un par ligne entre
-crochets, exactement comme écrit dans le fichier, une liste imbriquée étant
-signalée comme conservée ou omise en bloc ; le nom, l'auteur (marqué non
-vérifié), l'identifiant, la version et la description ; chaque champ avec son
-type, son caractère obligatoire ou facultatif, sa valeur par défaut, ses choix,
-son motif et sa longueur maximale, et les arguments qu'un interrupteur ajoute
-quand il est activé ; chaque traduction de la recette (la langue, le nom, la
-description et les libellés des champs), puisque l'outil l'affiche à la place du
-texte anglais quand l'interface est dans cette langue ; si la recette lit l'hôte
-et le port de la session sélectionnée ; la façon dont la sortie est affichée ; et
-le délai. Un caractère
-de contrôle ou invisible est écrit `\uXXXX`. Dans le programme, les arguments
-et les valeurs par défaut, tout caractère hors de l'ASCII imprimable est écrit
-`\uXXXX` lui aussi : une lettre qui ressemble à une lettre ASCII ne peut donc pas
-passer pour elle.
+chemin complet trouvé sur cet ordinateur, et le texte du programme tel qu'écrit
+dans le fichier ; chaque argument, un par ligne entre crochets, exactement comme
+écrit dans le fichier, une liste imbriquée étant signalée comme conservée ou
+omise en bloc ; le nom, l'auteur (marqué non vérifié), l'identifiant, la version
+et la description ; chaque champ avec son type, son caractère obligatoire ou
+facultatif, sa valeur par défaut, ses choix, son motif et sa longueur maximale,
+et les arguments qu'un interrupteur ajoute quand il est activé ; chaque
+traduction de la recette (la langue, le nom, la description et les libellés des
+champs), puisque l'outil l'affiche à la place du texte anglais quand l'interface
+est dans cette langue ; si la recette lit l'hôte et le port de la session
+sélectionnée ; la façon dont la sortie est affichée, la façon dont elle est
+décodée, ce que devient l'erreur standard, les codes de sortie qui comptent
+comme un succès et l'icône ; et le délai. Un caractère de contrôle ou invisible
+est écrit `\uXXXX`. Dans le programme, les arguments et les valeurs par défaut,
+tout caractère hors de l'ASCII imprimable est écrit `\uXXXX` lui aussi : une
+lettre qui ressemble à une lettre ASCII ne peut donc pas passer pour elle.
 
 **Où l'outil apparaît.** Dans l'onglet Outils sous un titre Recettes, dans
 l'arborescence Outils de la barre latérale et dans la palette de commandes, avec
@@ -398,8 +399,10 @@ sans partie qui se termine par un point ou une espace. Au plus 32 dossiers sont
 conservés. Ajouter un dossier qui est le dossier Windows, Program Files ou
 Program Files (x86), qui se trouve sous l'un d'eux ou qui en contient un est
 accepté, et les Paramètres affichent un avis : les programmes situés sous ces
-dossiers restent vérifiés. Un fichier de paramètres qui porte cette liste est
-signalé comme sensible dans l'aperçu d'import.
+dossiers restent vérifiés. Un dossier qui mène à la racine d'un lecteur ou à un
+emplacement réseau (un lecteur réseau connecté, un lien vers un partage) est
+refusé, quelle que soit la façon dont il est écrit. Un fichier de paramètres qui
+porte cette liste est signalé comme sensible dans l'aperçu d'import.
 
 ### Écrire une recette
 
@@ -600,13 +603,17 @@ tout ceci :
   dossier autorisé dans les Paramètres. Un lien qui mène en dehors est refusé ;
 - sous le dossier Windows, Program Files ou Program Files (x86), ni le fichier
   ni aucun dossier au-dessus (jusqu'à cette racine) ne doit permettre à un
-  utilisateur qui n'est pas administrateur de le modifier, et les permissions
-  doivent être lisibles. La confiance accordée à un dossier autorisé dans les
-  Paramètres dépend de l'endroit où se trouve le programme, pas de celui du
-  dossier : un programme situé hors de Windows et de Program Files, sous un tel
-  dossier, est approuvé en entier et n'est pas vérifié de cette façon, alors
-  qu'un programme sous Windows ou Program Files est toujours vérifié, même quand
-  un dossier autorisé le couvre ;
+  utilisateur qui n'est pas administrateur de le modifier, par ses permissions
+  ou parce qu'il en est propriétaire (un propriétaire autre que le système, les
+  administrateurs ou le service d'installation), et les permissions et le
+  propriétaire doivent être lisibles. Une entrée OWNER RIGHTS n'est pas prise en
+  compte : un propriétaire non approuvé est refusé quoi qu'elle dise. La
+  confiance accordée à un dossier autorisé dans les Paramètres dépend de
+  l'endroit où se trouve le programme, pas de celui du dossier : un programme
+  situé hors de Windows et de Program Files, sous un tel dossier, est approuvé
+  en entier et n'est pas vérifié de cette façon, alors qu'un programme sous
+  Windows ou Program Files est toujours vérifié, même quand un dossier autorisé
+  le couvre ;
 - un simple nom n'est cherché que dans les entrées de la variable `PATH` qui sont
   elles-mêmes sous ces dossiers, dans l'ordre de `PATH` ; le premier fichier
   trouvé décide. Le dossier courant et le dossier de Heimdall ne sont jamais

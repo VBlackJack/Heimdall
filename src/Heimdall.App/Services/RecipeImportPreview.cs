@@ -89,6 +89,7 @@ public static class RecipeImportPreview
         // then its arguments, then who wrote it and the rest.
         text.AppendLine(localizer["RecipeImportPreviewProgram"]);
         text.AppendLine(Indent + Exact(plan.ResolvedProgramPath));
+        text.AppendLine(Indent + localizer.Format("RecipeImportPreviewProgramAsWritten", Exact(recipe.Program)));
         text.AppendLine();
 
         AppendArguments(localizer, text, recipe);
@@ -112,6 +113,16 @@ public static class RecipeImportPreview
             YesNo(localizer, plan.SessionUse.UsesHost),
             YesNo(localizer, plan.SessionUse.UsesPort)));
         text.AppendLine(localizer.Format("RecipeImportPreviewOutput", OutputWords(localizer, recipe.Output)));
+        text.AppendLine(localizer.Format("RecipeImportPreviewEncoding", localizer[KeyFor(recipe.OutputEncoding)]));
+        text.AppendLine(localizer.Format("RecipeImportPreviewStderr", localizer[KeyFor(recipe.Stderr)]));
+        text.AppendLine(localizer.Format(
+            "RecipeImportPreviewExitCodes",
+            string.Join(
+                localizer["RecipeImportPreviewListSeparator"],
+                recipe.SuccessExitCodes.Select(code => code.ToString(CultureInfo.InvariantCulture)))));
+        text.AppendLine(localizer.Format(
+            "RecipeImportPreviewIcon",
+            recipe.Icon is null ? localizer["RecipeImportPreviewNone"] : Exact(recipe.Icon)));
         text.Append(localizer.FormatCount(
             recipe.TimeoutSeconds,
             "RecipeImportPreviewTimeoutOne",
@@ -144,6 +155,24 @@ public static class RecipeImportPreview
         RecipeOutputFormat.Csv => "RecipeImportOutputCsv",
         RecipeOutputFormat.Json => "RecipeImportOutputJson",
         _ => throw new ArgumentOutOfRangeException(nameof(format), format, "An output format without a text."),
+    };
+
+    /// <summary>The key of the words that name an output encoding.</summary>
+    /// <param name="encoding">The encoding.</param>
+    public static string KeyFor(RecipeOutputEncoding encoding) => encoding switch
+    {
+        RecipeOutputEncoding.Utf8 => "RecipeImportEncodingUtf8",
+        RecipeOutputEncoding.Oem => "RecipeImportEncodingOem",
+        _ => throw new ArgumentOutOfRangeException(nameof(encoding), encoding, "An output encoding without a text."),
+    };
+
+    /// <summary>The key of the words that say what happens to standard error.</summary>
+    /// <param name="mode">The mode.</param>
+    public static string KeyFor(RecipeStderrMode mode) => mode switch
+    {
+        RecipeStderrMode.Separate => "RecipeImportStderrSeparate",
+        RecipeStderrMode.Merge => "RecipeImportStderrMerge",
+        _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, "A standard error mode without a text."),
     };
 
     private static string OutputWords(LocalizationManager localizer, RecipeOutputFormat format) => localizer[KeyFor(format)];
@@ -193,6 +222,7 @@ public static class RecipeImportPreview
             AppendUnchangedOrChanged(localizer, text, old.Stderr == plan.Recipe.Stderr, "RecipeImportReplaceStderrSame", "RecipeImportReplaceStderrChanged");
             AppendUnchangedOrChanged(localizer, text, old.SuccessExitCodes.SequenceEqual(plan.Recipe.SuccessExitCodes), "RecipeImportReplaceExitCodesSame", "RecipeImportReplaceExitCodesChanged");
             AppendUnchangedOrChanged(localizer, text, old.TimeoutSeconds == plan.Recipe.TimeoutSeconds, "RecipeImportReplaceTimeoutSame", "RecipeImportReplaceTimeoutChanged");
+            AppendUnchangedOrChanged(localizer, text, string.Equals(old.Icon, plan.Recipe.Icon, StringComparison.Ordinal), "RecipeImportReplaceIconSame", "RecipeImportReplaceIconChanged");
         }
     }
 

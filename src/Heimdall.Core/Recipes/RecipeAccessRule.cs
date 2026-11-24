@@ -27,6 +27,13 @@ namespace Heimdall.Core.Recipes;
 public sealed record RecipeAccessRule(string Sid, int AccessMask, bool InheritOnly);
 
 /// <summary>
+/// What one read of a file or folder tells about who may change it: the owner and the entries that allow something.
+/// </summary>
+/// <param name="OwnerSid">The security identifier of the owner in its text form, or null when it cannot be read.</param>
+/// <param name="Rules">The entries that allow something.</param>
+public sealed record RecipeItemAccess(string? OwnerSid, IReadOnlyList<RecipeAccessRule> Rules);
+
+/// <summary>
 /// Decides whether the permissions of a file or folder let someone who is not an administrator
 /// change what a program would run: replace the file, add or delete entries, or take over the
 /// permissions. Reading and executing never count.
@@ -77,6 +84,16 @@ public static class RecipeAccessPolicy
         WriteData | AppendData | DeleteSubdirectoriesAndFiles | Delete | ChangePermissions | TakeOwnership | GenericWrite | GenericAll;
 
     private static readonly string[] TrustedSids = [SystemSid, AdministratorsSid, TrustedInstallerSid];
+
+    /// <summary>
+    /// True when the owner is the system, the administrators or the installer service. An owner can always
+    /// rewrite the permissions of what it owns, so a file or folder owned by anyone else can be changed by
+    /// that owner whatever its permission list says. An OWNER RIGHTS entry (S-1-3-4), which can limit what the
+    /// owner may do, is deliberately not honoured: an untrusted owner is refused whatever such an entry says.
+    /// </summary>
+    /// <param name="ownerSid">The security identifier of the owner, or null when it is unknown.</param>
+    public static bool IsTrustedOwner(string? ownerSid)
+        => ownerSid is not null && Array.Exists(TrustedSids, sid => string.Equals(sid, ownerSid, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
     /// True when some entry gives a modifying right to a principal other than the system, the

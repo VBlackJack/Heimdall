@@ -819,11 +819,16 @@ ces arguments, avec vos droits. Le pack Recettes est désactivé par défaut.
 - **Les racines autorisées sont vérifiées, pas approuvées en entier.** Un
   programme sous le dossier Windows, Program Files ou Program Files (x86) est
   refusé quand un utilisateur qui n'est pas administrateur peut modifier son
-  fichier ou un dossier au-dessus (jusqu'à cette racine), ou quand ces
-  permissions ne peuvent pas être lues. Un dossier que vous avez ajouté est
+  fichier ou un dossier au-dessus (jusqu'à cette racine), par ses permissions ou
+  parce qu'il en est propriétaire (un propriétaire autre que le système, les
+  administrateurs ou le service d'installation), ou quand ces permissions ou ce
+  propriétaire ne peuvent pas être lus. Un dossier que vous avez ajouté est
   approuvé en entier et n'est pas vérifié, mais seulement pour ce qui se trouve
   hors de Windows et de Program Files : ajouter un dossier qui en couvre une
-  partie ne désactive pas la vérification.
+  partie ne désactive pas la vérification. Un dossier qui mène à la racine d'un
+  lecteur ou à un emplacement réseau (un lecteur réseau connecté, un lien vers
+  un partage) est refusé à l'ajout, et sa forme finale n'est jamais approuvée
+  quand un programme s'exécute.
 - **Les caractères qui ressemblent à d'autres.** Un caractère que Windows
   transformerait en caractère ASCII ordinaire pour un programme qui lit sa ligne
   de commande dans la page de codes ANSI de la machine (un trait d'union pleine
@@ -902,16 +907,32 @@ ces arguments, avec vos droits. Le pack Recettes est désactivé par défaut.
   Windows ou Program Files est toujours vérifié, quels que soient les dossiers
   ajoutés.
 - La vérification des permissions des dossiers Windows et Program Files lit les
-  règles de permission seulement, celles du fichier et de chaque dossier
-  au-dessus. Elle ne lit pas le propriétaire. C'est une limite contre le cas
-  évident, pas une garantie que personne d'autre ne peut modifier le fichier.
-- La règle des dossiers lit le texte du chemin. Une lettre de lecteur associée à
-  un partage réseau n'est pas détectée comme un emplacement réseau.
+  règles de permission et le propriétaire du fichier et de chaque dossier
+  au-dessus. Un propriétaire non approuvé est refusé quelles que soient les
+  règles : une entrée OWNER RIGHTS, qui peut limiter ce qu'un propriétaire peut
+  faire, n'est volontairement pas prise en compte. C'est une limite contre le
+  cas évident, pas une garantie que personne d'autre ne peut modifier le
+  fichier.
+- La règle des dossiers lit le texte du chemin, puis le chemin auquel il mène
+  une fois les liens et les lecteurs réseau suivis : un lecteur réseau connecté,
+  un lien vers un partage et un lien vers la racine d'un lecteur sont refusés.
+  Un dossier dont la forme finale ne peut pas être résolue (il est absent, son
+  lecteur est absent) est accepté tel qu'il est écrit, et ce vers quoi il mène
+  est vérifié à nouveau quand un programme s'exécute.
 - Le comportement avec certaines formes de chemin inhabituelles (noms courts
   8.3, lecteurs substitués) n'a pas été vérifié par un vrai test, et rien n'est
   promis à son sujet. Le fait que l'arrêt d'une exécution arrête aussi les
   processus que le programme a lancés a été vérifié par un seul vrai test avec un
   programme standard, et rien n'est promis au-delà.
+- Un tableau affiché par un outil est neutralisé quand il est copié, qu'il
+  s'agisse de la sortie d'une recette en CSV ou en JSON ou du tableau d'un outil
+  externe : une cellule qui commence par `=`, `+`, `-`, `@` ou un guillemet
+  double reçoit une apostrophe initiale, pour qu'un tableur ne la lise pas comme
+  une formule, et une tabulation ou un saut de ligne dans une cellule devient
+  une espace. Une valeur qui commence par `-` ou `+` (un nombre négatif, un
+  décalage horaire, un numéro de téléphone) est donc copiée avec une apostrophe
+  initiale et se colle comme du texte. La sortie en texte brut est copiée telle
+  quelle.
 - Une recette n'est ni signée ni relue par le projet. L'auteur est un texte que
   le fichier affirme, et Heimdall l'affiche comme non vérifié. Un catalogue
   communautaire ne fait pas partie de cette version : une recette vient de qui

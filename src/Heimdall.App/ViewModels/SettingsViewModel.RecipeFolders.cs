@@ -114,10 +114,23 @@ public partial class SettingsViewModel
             return false;
         }
 
-        RecipeProgramFolderStatus = string.Empty;
         string normalized = RecipeFolderRule.Normalize(folder);
+
+        // Where the folder really leads: a mapped network drive or a link can be written as a local path.
+        // A folder that cannot be resolved (missing, drive absent) is accepted as written.
+        string? finalForm = RecipeFolderMachine.ResolveFinalPath(normalized);
+        RecipeFolderRefusal leads = RecipeFolderRule.CheckFinalForm(finalForm);
+        if (leads != RecipeFolderRefusal.None)
+        {
+            RecipeProgramFolderStatus = RecipeImportText.Describe(_localizer, leads, RecipeFolderRule.MaxFolders);
+            return false;
+        }
+
+        RecipeProgramFolderStatus = string.Empty;
         RecipeProgramFolders = [.. RecipeProgramFolders, normalized];
-        if (RecipeFolderRule.TouchesRoot(normalized, BuiltInRecipeRoots()))
+        string[] builtInRoots = BuiltInRecipeRoots();
+        if (RecipeFolderRule.TouchesRoot(normalized, builtInRoots)
+            || (finalForm is not null && RecipeFolderRule.TouchesRoot(finalForm, builtInRoots)))
         {
             RecipeProgramFolderNotice = _localizer["RecipeFolderNoticeBuiltInRoot"];
         }

@@ -6875,5 +6875,19 @@
   "RecipeImportReplaceTimeoutChanged": "Timeout: changed",
   "SettingsImportPreviewRecipesOn": "Turns the Recipes pack on: recipes can then be imported and run on this computer.",
   "RecipeStoreFailureIndexDamaged": "The list of imported recipes holds an entry that Heimdall cannot read, so nothing was changed. Close Heimdall, repair or delete the file {0} in the recipes folder of the data directory, then import your recipes again.",
-  "RecipeFolderNoticeBuiltInRoot": "This folder was added. Programs under Windows or Program Files stay checked: a recipe may use one only if a user who is not an administrator cannot change it. For the rest of this folder, any program can be named by a recipe."
+  "RecipeFolderNoticeBuiltInRoot": "This folder was added. Programs under Windows or Program Files stay checked: a recipe may use one only if a user who is not an administrator cannot change it. For the rest of this folder, any program can be named by a recipe.",
+  "RecipeFolderRefusalLeadsToDriveRoot": "This folder leads to the root of a drive, which cannot be allowed as a whole.",
+  "RecipeFolderRefusalLeadsToNetwork": "This folder leads to a network location (a mapped network drive or a link to a share). Recipes may only run programs from a local drive.",
+  "RecipeImportPreviewProgramAsWritten": "Program as written in the file: {0}",
+  "RecipeImportPreviewEncoding": "The output is read as: {0}",
+  "RecipeImportEncodingUtf8": "UTF-8",
+  "RecipeImportEncodingOem": "the OEM code page of the console",
+  "RecipeImportPreviewStderr": "Standard error: {0}",
+  "RecipeImportStderrSeparate": "kept apart and shown as error output",
+  "RecipeImportStderrMerge": "mixed into the output",
+  "RecipeImportPreviewExitCodes": "Exit codes that count as success: {0}",
+  "RecipeImportPreviewIcon": "Icon: {0}",
+  "RecipeImportReplaceIconSame": "Icon: unchanged",
+  "RecipeImportReplaceIconChanged": "Icon: changed",
+  "RecipeFolderRefusalLeadsToUnallowedLocation": "This folder leads to a location that cannot be allowed: the path it leads to is too long, or is not an ordinary local folder path."
 }

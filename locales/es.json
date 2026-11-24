@@ -6875,5 +6875,19 @@
   "RecipeImportReplaceTimeoutChanged": "Tiempo l\u00edmite: modificado",
   "SettingsImportPreviewRecipesOn": "Activa el paquete Recetas: despu\u00e9s se podr\u00e1n importar y ejecutar recetas en este equipo.",
   "RecipeStoreFailureIndexDamaged": "La lista de recetas importadas contiene una entrada que Heimdall no puede leer, por lo que no se cambi\u00f3 nada. Cierre Heimdall, repare o elimine el archivo {0} en la carpeta de recetas del directorio de datos y vuelva a importar sus recetas.",
-  "RecipeFolderNoticeBuiltInRoot": "Se a\u00f1adi\u00f3 esta carpeta. Los programas ubicados en Windows o Program Files siguen siendo verificados: una receta solo puede usar uno si un usuario que no es administrador no puede modificarlo. Para el resto de esta carpeta, una receta puede nombrar cualquier programa."
+  "RecipeFolderNoticeBuiltInRoot": "Se a\u00f1adi\u00f3 esta carpeta. Los programas ubicados en Windows o Program Files siguen siendo verificados: una receta solo puede usar uno si un usuario que no es administrador no puede modificarlo. Para el resto de esta carpeta, una receta puede nombrar cualquier programa.",
+  "RecipeFolderRefusalLeadsToDriveRoot": "Esta carpeta lleva a la ra\u00edz de una unidad, que no se puede permitir en su totalidad.",
+  "RecipeFolderRefusalLeadsToNetwork": "Esta carpeta lleva a una ubicaci\u00f3n de red (una unidad de red asignada o un v\u00ednculo hacia un recurso compartido). Las recetas solo pueden ejecutar programas desde una unidad local.",
+  "RecipeImportPreviewProgramAsWritten": "Programa tal como est\u00e1 escrito en el archivo: {0}",
+  "RecipeImportPreviewEncoding": "La salida se lee como: {0}",
+  "RecipeImportEncodingUtf8": "UTF-8",
+  "RecipeImportEncodingOem": "la p\u00e1gina de c\u00f3digos OEM de la consola",
+  "RecipeImportPreviewStderr": "Error est\u00e1ndar: {0}",
+  "RecipeImportStderrSeparate": "se conserva aparte y se muestra como salida de error",
+  "RecipeImportStderrMerge": "se mezcla con la salida",
+  "RecipeImportPreviewExitCodes": "C\u00f3digos de salida que cuentan como correctos: {0}",
+  "RecipeImportPreviewIcon": "Icono: {0}",
+  "RecipeImportReplaceIconSame": "Icono: sin cambios",
+  "RecipeImportReplaceIconChanged": "Icono: modificado",
+  "RecipeFolderRefusalLeadsToUnallowedLocation": "Esta carpeta lleva a una ubicaci\u00f3n que no se puede permitir: la ruta a la que lleva es demasiado larga, o no es una ruta ordinaria de carpeta local."
 }

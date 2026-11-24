@@ -46,6 +46,7 @@ public partial class ExternalToolWrapperView : UserControl, IToolView
     public ExternalToolWrapperView()
     {
         InitializeComponent();
+        TabularGridCopy.Attach(ResultsGrid);
         _viewState = new ToolAsyncStateController(
             null, LoadingBar, TxtError, null, null, TxtStatus,
             BtnRun, TxtArguments);
