@@ -150,6 +150,18 @@ internal sealed class FakeRecipeVersions : IRecipeVersions
     public string? CurrentSha256(string id)
         => _overrides.TryGetValue(id, out string? sha) ? sha : RecipeBuilders.StoredSha256;
 
+    private readonly Dictionary<string, string> _paths = new(StringComparer.Ordinal);
+
+    public string? CurrentProgramPath(string id)
+        => _overrides.TryGetValue(id, out string? sha) && sha is null ? null : _paths.TryGetValue(id, out string? path) ? path : RecipeBuilders.StoredPath;
+
+    /// <summary>The same bytes were imported again, and the program now resolves to <paramref name="path"/>.</summary>
+    public void ImportAgainResolvingTo(string id, string path)
+    {
+        _paths[id] = path;
+        _changed?.Invoke();
+    }
+
     /// <summary>The recipe was replaced by one with other bytes; the event is raised unless <paramref name="announce"/> is false.</summary>
     public void Replace(string id, string sha256, bool announce = true)
     {
@@ -184,6 +196,9 @@ internal sealed class FakeRecipeStore : IRecipeStore
 
     public string? CurrentSha256(string id)
         => Recipes.FirstOrDefault(item => item.Recipe.Id == id)?.Entry.Sha256;
+
+    public string? CurrentProgramPath(string id)
+        => Recipes.FirstOrDefault(item => item.Recipe.Id == id)?.Entry.ResolvedProgramPath;
 
     public void RaiseChanged() => Changed?.Invoke();
 

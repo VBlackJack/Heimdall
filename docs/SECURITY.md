@@ -755,14 +755,15 @@ pack is off by default.
   or to nothing, the run does not start and the recipe has to be imported again.
 - **A fresh working folder.** Each run gets a new, empty working folder, removed
   afterwards. It is created under a Heimdall folder in your temporary folder, not
-  in the data folder, so that a relative path given to a program cannot reach the
-  settings of Heimdall.
+  in the data folder, so a program does not start next to the settings of Heimdall.
 - **Bounded runs.** At most 1 MiB of output is kept per stream (2 MiB in all when
   standard error is kept apart), and a run is stopped at the timeout of the
   recipe (60 seconds by default, 600 at most). A run under way is also stopped
   when the pack is turned off or becomes forbidden.
-- **The processes the program started.** The program is started inside a Windows
-  job object that ends the processes it started when the run ends. If Windows
+- **The processes the program started.** The program is placed in a Windows job
+  object right after it starts, and the job ends the processes it started when
+  the run ends. A process the program launched in that very first instant can
+  escape the job. If Windows
   refuses to create it (for example when Heimdall itself runs inside a job that
   forbids nesting), only a run that is interrupted (stopped or timed out) kills
   the process tree.
@@ -786,6 +787,8 @@ pack is off by default.
   to, does so. A program started by a recipe has the rights and the environment
   of Heimdall, and an empty working folder does not keep it from using any other
   folder. Nothing here is a sandbox.
+- A recipe can name any file the user can reach, including through a relative
+  path with `..`. Nothing confines a program to its run folder.
 - The seat belt is a list of names. A copy of an interpreter under another name,
   with a neutral original file name in its version resource, passes it, and so
   does a program that is harmless by name but runs other programs or loads

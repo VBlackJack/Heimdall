@@ -143,6 +143,10 @@ public interface IRecipeVersions
     /// <summary>The lowercase hexadecimal SHA-256 of the bytes imported under the id, or null when no recipe has that id.</summary>
     /// <param name="id">The recipe id.</param>
     string? CurrentSha256(string id);
+
+    /// <summary>The program path resolved when the recipe was imported under the id, or null when no recipe has that id.</summary>
+    /// <param name="id">The recipe id.</param>
+    string? CurrentProgramPath(string id);
 }
 
 /// <summary>

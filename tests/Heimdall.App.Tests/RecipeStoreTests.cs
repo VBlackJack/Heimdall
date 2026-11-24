@@ -443,6 +443,58 @@ public sealed class RecipeStoreTests : IDisposable
         Assert.Equal(RecipeTestFiles.Bytes("acme.ping"), File.ReadAllBytes(FileOf("acme.ping")));
     }
 
+    [Theory]
+    [InlineData(UnreadableIndexCorrupt)]
+    [InlineData(UnreadableIndexNewer)]
+    public void RemoveOnAnUnreadableIndexIsAStorageErrorNotAMissingRecipe(string kind)
+    {
+        RecipeStore store = NewStore();
+        Assert.True(store.Add(RecipeTestFiles.Bytes("acme.ping"), RecipeTestFiles.ResolvedProgram).Succeeded);
+        string indexPath = Path.Combine(RecipesDirectory, RecipeStore.IndexFileName);
+        File.WriteAllText(indexPath, kind == UnreadableIndexCorrupt ? "{ not json" : "{ \"schemaVersion\": 99, \"recipes\": [] }");
+        byte[] before = File.ReadAllBytes(indexPath);
+
+        RecipeStoreResult result = store.Remove("acme.ping");
+
+        Assert.Equal(RecipeStoreFailure.StorageError, result.Failure);
+        Assert.Equal(before, File.ReadAllBytes(indexPath));
+        Assert.True(File.Exists(FileOf("acme.ping")));
+    }
+
+    // An entry the store cannot build is skipped when reading, but a write must not rewrite the index
+    // without it: that would silently drop it.
+    [Theory]
+    [InlineData("invalid", "add")]
+    [InlineData("invalid", "replace")]
+    [InlineData("invalid", "remove")]
+    [InlineData("duplicate", "add")]
+    [InlineData("duplicate", "replace")]
+    [InlineData("duplicate", "remove")]
+    public void AnIndexWithAnEntryThatCannotBeBuiltRefusesEveryWriteAndStaysUntouched(string defect, string write)
+    {
+        RecipeStore store = NewStore();
+        Assert.True(store.Add(RecipeTestFiles.Bytes("acme.ping"), RecipeTestFiles.ResolvedProgram).Succeeded);
+        string indexPath = Path.Combine(RecipesDirectory, RecipeStore.IndexFileName);
+        System.Text.Json.Nodes.JsonObject index = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(indexPath))!.AsObject();
+        System.Text.Json.Nodes.JsonArray items = index["recipes"]!.AsArray();
+        items.Add(defect == "duplicate"
+            ? items[0]!.DeepClone()
+            : new System.Text.Json.Nodes.JsonObject { ["id"] = "Not Plain", ["fileName"] = "x" });
+        File.WriteAllText(indexPath, index.ToJsonString());
+        byte[] before = File.ReadAllBytes(indexPath);
+
+        RecipeStoreResult result = write switch
+        {
+            "add" => store.Add(RecipeTestFiles.Bytes("acme.other"), RecipeTestFiles.ResolvedProgram),
+            "replace" => store.Replace(RecipeTestFiles.Bytes("acme.ping", name: "Changed"), RecipeTestFiles.ResolvedProgram),
+            _ => store.Remove("acme.ping"),
+        };
+
+        Assert.Equal(RecipeStoreFailure.StorageError, result.Failure);
+        Assert.Equal(before, File.ReadAllBytes(indexPath));
+        Assert.Single(store.LoadAll().Recipes);
+    }
+
     [Fact]
     public void AMissingIndexInAnExistingFolderIsAnEmptyStoreAndAnAddSucceeds()
     {

@@ -50,8 +50,7 @@ public static class AppConstants
 
     /// <summary>
     /// Subfolder of the user's temporary folder holding one fresh working folder per recipe run; emptied
-    /// at start. It sits outside the data directory so that a relative path in a recipe cannot reach
-    /// the settings.
+    /// at start. It sits apart from the data directory, so a program does not start next to the settings.
     /// </summary>
     public const string RecipeRunsTempDirectoryName = "Heimdall-recipe-runs";
 

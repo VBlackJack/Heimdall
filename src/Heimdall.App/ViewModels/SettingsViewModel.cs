@@ -2861,7 +2861,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             string json = await File.ReadAllTextAsync(path, cancellationToken);
             AppSettings current = await _configManager.LoadSettingsAsync();
             WritePanelInto(current);
-            (merged, changed) = SettingsTransfer.Import(current, System.Text.Json.Nodes.JsonNode.Parse(json));
+            (merged, changed) = SettingsTransfer.Import(
+                current,
+                System.Text.Json.Nodes.JsonNode.Parse(json),
+                IsToolPackForbiddenByPolicy(Heimdall.Core.Models.ToolPack.Recipes));
         }
         catch (Exception ex) when (ex is JsonException or FormatException or InvalidOperationException or IOException or UnauthorizedAccessException)
         {

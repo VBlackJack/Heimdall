@@ -844,16 +844,17 @@ ces arguments, avec vos droits. Le pack Recettes est désactivé par défaut.
   recette doit être importée à nouveau.
 - **Un dossier de travail neuf.** Chaque exécution reçoit un dossier de travail
   neuf et vide, supprimé ensuite. Il est créé sous un dossier Heimdall de votre
-  dossier temporaire, et non dans le dossier de données : un chemin relatif donné
-  à un programme ne peut donc pas atteindre les paramètres de Heimdall.
+  dossier temporaire, et non dans le dossier de données : un programme ne démarre
+  donc pas à côté des paramètres de Heimdall.
 - **Des exécutions bornées.** Au plus 1 Mio de sortie est conservé par flux
   (2 Mio en tout quand l'erreur standard est gardée à part), et une exécution est
   arrêtée au délai de la recette (60 secondes par défaut, 600 au plus). Une
   exécution en cours est aussi arrêtée quand le pack est désactivé ou devient
   interdit.
-- **Les processus que le programme a lancés.** Le programme est démarré dans un
-  objet de travail (job) Windows qui arrête les processus qu'il a lancés quand
-  l'exécution prend fin. Si Windows refuse de le créer (par exemple quand
+- **Les processus que le programme a lancés.** Le programme est placé dans un
+  objet de travail (job) Windows juste après son démarrage, et le job arrête les
+  processus qu'il a lancés quand l'exécution prend fin. Un processus que le
+  programme a lancé dans ce tout premier instant peut échapper au job. Si Windows refuse de le créer (par exemple quand
   Heimdall tourne lui-même dans un job qui interdit l'imbrication), seule une
   exécution interrompue (arrêtée ou ayant dépassé le délai) arrête l'arbre de
   processus.
@@ -881,6 +882,9 @@ ces arguments, avec vos droits. Le pack Recettes est désactivé par défaut.
   programme lancé par une recette a les droits et l'environnement de Heimdall, et
   un dossier de travail vide ne l'empêche pas d'utiliser n'importe quel autre
   dossier. Rien ici n'est un bac à sable.
+- Une recette peut nommer tout fichier que l'utilisateur peut atteindre, y compris
+  par un chemin relatif avec `..`. Rien ne confine un programme à son dossier
+  d'exécution.
 - Le garde-fou est une liste de noms. Une copie d'un interpréteur sous un autre
   nom, avec un nom de fichier d'origine neutre dans sa ressource de version, le
   franchit, tout comme un programme anodin par son nom mais qui lance d'autres

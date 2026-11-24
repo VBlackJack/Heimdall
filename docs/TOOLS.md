@@ -319,12 +319,13 @@ at import: when the program now resolves to another file, or no longer
 resolves, the run is refused and the message asks you to import the recipe
 again. It creates a fresh, empty working folder for the run under
 `Heimdall-recipe-runs` in your temporary folder (in a subfolder named after the
-data folder in use, so that two instances never share it), not in the data folder (so that
-a relative path given to a program cannot reach the settings of Heimdall), and
+data folder in use, so that two instances never share it), not in the data folder (so a
+program does not start next to the settings of Heimdall), and
 removes it afterwards (the leftovers of an earlier crash are removed at start).
 The program starts without a window, with its standard input closed, with the
-rights and the environment of Heimdall itself, inside a Windows job object that
-ends the processes it started when the run ends; when Windows refuses to create
+rights and the environment of Heimdall itself, placed in a Windows job object right
+after it starts, which ends the processes it started when the run ends (a
+process launched in that very first instant can escape it); when Windows refuses to create
 the job, only a run that is stopped or times out kills the process tree. At most
 1 MiB of output is kept per stream (2 MiB in all when standard error is kept
 apart): the rest is read and discarded, and a line says the output was cut. The

@@ -149,9 +149,15 @@ internal static class SettingsTransfer
     /// <summary>
     /// Lays the settings of a settings file over <paramref name="current"/>.
     /// </summary>
+    /// <param name="current">The settings the file is laid over.</param>
+    /// <param name="document">The parsed settings file.</param>
+    /// <param name="recipesPackForbidden">Whether the organisation policy forbids the Recipes pack.</param>
     /// <returns>The merged settings, and the settings whose value changed with both values.</returns>
     /// <exception cref="FormatException">The document is not a settings file this build reads.</exception>
-    internal static (AppSettings Merged, IReadOnlyList<SettingsTransferChange> Changed) Import(AppSettings current, JsonNode? document)
+    internal static (AppSettings Merged, IReadOnlyList<SettingsTransferChange> Changed) Import(
+        AppSettings current,
+        JsonNode? document,
+        bool recipesPackForbidden = false)
     {
         ArgumentNullException.ThrowIfNull(current);
 
@@ -189,7 +195,7 @@ internal static class SettingsTransfer
             JsonNode? value = key == nameof(AppSettings.RecipeProgramFolders) ? KeepAcceptableFolders(fileValue) : fileValue;
             if (key == nameof(AppSettings.DisabledToolPacks))
             {
-                value = KeepRecipesPackOff(current, fileValue, imported, out bool turnsOn);
+                value = KeepRecipesPackOff(current, fileValue, imported, recipesPackForbidden, out bool turnsOn);
                 turnsRecipesPackOn |= turnsOn;
             }
 
@@ -238,7 +244,7 @@ internal static class SettingsTransfer
     /// leaving it out. A file that carries <see cref="AppSettings.RecipesPackMigrated"/> was written by
     /// a build that knows the pack, so leaving it out of the list is the owner's choice.
     /// </summary>
-    private static JsonNode? KeepRecipesPackOff(AppSettings current, JsonNode? fileValue, JsonObject imported, out bool turnsOn)
+    private static JsonNode? KeepRecipesPackOff(AppSettings current, JsonNode? fileValue, JsonObject imported, bool forbidden, out bool turnsOn)
     {
         turnsOn = false;
         if (fileValue is not JsonArray fileList
@@ -248,7 +254,9 @@ internal static class SettingsTransfer
             return fileValue;
         }
 
-        if (imported[nameof(AppSettings.RecipesPackMigrated)] is JsonValue marker
+        // Under a policy veto the pack stays off whatever the file says, so the file does not get to set the marker.
+        if (!forbidden
+            && imported[nameof(AppSettings.RecipesPackMigrated)] is JsonValue marker
             && marker.GetValueKind() == JsonValueKind.True)
         {
             turnsOn = true;

@@ -83,6 +83,19 @@ public sealed class RecipeToolStaleTabTests
     }
 
     [Fact]
+    public async Task TheSameBytesImportedAgainWithTheProgramResolvingElsewhereIsStale()
+    {
+        using RecipeViewModelHarness harness = await RecipeViewModelHarness.CreateAsync();
+        RecipeToolViewModel viewModel = harness.Create(Recipe());
+
+        harness.Versions.ImportAgainResolvingTo(ToolIdOfRecipe, @"C:\Tools\other\ping.exe");
+        await viewModel.RunCommand.ExecuteAsync(null);
+
+        Assert.True(viewModel.IsStale);
+        Assert.Empty(harness.Runner.Calls);
+    }
+
+    [Fact]
     public async Task TheRunChecksTheStoreItselfWhenNoChangeWasAnnounced()
     {
         using RecipeViewModelHarness harness = await RecipeViewModelHarness.CreateAsync();

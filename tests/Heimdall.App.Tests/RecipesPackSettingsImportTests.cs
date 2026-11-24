@@ -108,6 +108,21 @@ public sealed class RecipesPackSettingsImportTests
     }
 
     [Fact]
+    public void UnderAPolicyVetoAFileThatTurnsThePackOnAddsNoNoticeAndSetsNoMarker()
+    {
+        AppSettings current = new() { DisabledToolPacks = [nameof(ToolPack.Audit), nameof(ToolPack.Recipes)] };
+
+        (AppSettings merged, IReadOnlyList<SettingsTransferChange> changed) = SettingsTransfer.Import(
+            current,
+            FileOf([nameof(ToolPack.Audit)], marker: true),
+            recipesPackForbidden: true);
+
+        Assert.DoesNotContain(changed, change => change.Key == SettingsTransfer.RecipesPackTurnedOnKey);
+        Assert.False(merged.RecipesPackMigrated);
+        Assert.Contains(nameof(ToolPack.Recipes), merged.DisabledToolPacks);
+    }
+
+    [Fact]
     public void AMarkerThatIsNotTrueDoesNotTurnThePackOn()
     {
         (AppSettings merged, IReadOnlyList<SettingsTransferChange> changed) = SettingsTransfer.Import(

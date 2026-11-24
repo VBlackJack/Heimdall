@@ -133,7 +133,12 @@ public sealed class RecipeStore : IRecipeStore
     }
 
     /// <inheritdoc />
-    public string? CurrentSha256(string id)
+    public string? CurrentProgramPath(string id) => CurrentEntry(id)?.ResolvedProgramPath;
+
+    /// <inheritdoc />
+    public string? CurrentSha256(string id) => CurrentEntry(id)?.Sha256;
+
+    private RecipeStoreEntry? CurrentEntry(string id)
     {
         ArgumentNullException.ThrowIfNull(id);
 
@@ -144,7 +149,7 @@ public sealed class RecipeStore : IRecipeStore
                 return null;
             }
 
-            return entries.Find(entry => string.Equals(entry.Id, id, StringComparison.Ordinal))?.Sha256;
+            return entries.Find(entry => string.Equals(entry.Id, id, StringComparison.Ordinal));
         }
     }
 
@@ -176,9 +181,15 @@ public sealed class RecipeStore : IRecipeStore
 
         lock (_gate)
         {
-            if (!Directory.Exists(_directory) || !TryReadIndex(out List<RecipeStoreEntry> entries, issues: null))
+            if (!Directory.Exists(_directory))
             {
                 return RecipeStoreResult.Fail(RecipeStoreFailure.NotFound);
+            }
+
+            // An index that cannot be read in full is not rewritten from what could be read of it.
+            if (!TryReadIndex(out List<RecipeStoreEntry> entries, issues: null, forWrite: true))
+            {
+                return RecipeStoreResult.Fail(RecipeStoreFailure.StorageError);
             }
 
             int position = entries.FindIndex(entry => string.Equals(entry.Id, id, StringComparison.Ordinal));
@@ -262,7 +273,7 @@ public sealed class RecipeStore : IRecipeStore
             // list would replace it and drop the trust record of every other recipe. A missing index
             // is an empty store.
             List<RecipeStoreEntry> entries = [];
-            if (Directory.Exists(_directory) && !TryReadIndex(out entries, issues: null))
+            if (Directory.Exists(_directory) && !TryReadIndex(out entries, issues: null, forWrite: true))
             {
                 return RecipeStoreResult.Fail(RecipeStoreFailure.StorageError);
             }
@@ -406,7 +417,9 @@ public sealed class RecipeStore : IRecipeStore
         }
     }
 
-    private bool TryReadIndex(out List<RecipeStoreEntry> entries, List<RecipeLoadIssue>? issues)
+    // forWrite: the caller is about to rewrite the index, so an entry that could not be built (invalid or
+    // duplicate) counts as an index that cannot be read, rather than being dropped from the rewrite.
+    private bool TryReadIndex(out List<RecipeStoreEntry> entries, List<RecipeLoadIssue>? issues, bool forWrite = false)
     {
         entries = [];
         string indexPath = Path.Combine(_directory, IndexFileName);
@@ -445,6 +458,12 @@ public sealed class RecipeStore : IRecipeStore
             if (!TryBuildEntry(item, out RecipeStoreEntry? entry) || !seen.Add(entry.Id))
             {
                 issues?.Add(new RecipeLoadIssue(RecipeLoadIssueCode.IndexEntryInvalid, item?.FileName ?? IndexFileName, item?.Id));
+                if (forWrite)
+                {
+                    entries = [];
+                    return false;
+                }
+
                 continue;
             }
 

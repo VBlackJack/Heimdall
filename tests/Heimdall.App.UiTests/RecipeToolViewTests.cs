@@ -257,6 +257,8 @@ public sealed class RecipeToolViewTests
         }
 
         public string? CurrentSha256(string id) => StoredSha256;
+
+        public string? CurrentProgramPath(string id) => @"C:\Windows\System32\ping.exe";
     }
 
     private sealed class CountingRunner : IRecipeRunner

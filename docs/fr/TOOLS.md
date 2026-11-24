@@ -344,12 +344,12 @@ crée pour l'exécution un dossier de travail neuf et vide sous
 `Heimdall-recipe-runs` dans votre dossier temporaire (dans un sous-dossier nommé
 d'après le dossier de données utilisé, pour que deux instances ne le partagent
 jamais), et non dans le dossier de
-données (un chemin relatif donné à un programme ne peut donc pas atteindre les
-paramètres de Heimdall), et le supprime ensuite (les restes d'un arrêt brutal
+données (un programme ne démarre donc pas à côté des paramètres de Heimdall), et le supprime ensuite (les restes d'un arrêt brutal
 précédent sont supprimés au démarrage). Le programme démarre sans fenêtre, avec
 son entrée standard fermée, avec les droits et l'environnement de Heimdall
-lui-même, dans un objet de travail (job) Windows qui arrête les processus qu'il a
-lancés quand l'exécution prend fin ; quand Windows refuse de créer le job, seule
+lui-même, placé dans un objet de travail (job) Windows juste après son démarrage, qui
+arrête les processus qu'il a lancés quand l'exécution prend fin (un processus
+lancé dans ce tout premier instant peut y échapper) ; quand Windows refuse de créer le job, seule
 une exécution arrêtée ou ayant dépassé le délai arrête l'arbre de processus. Au
 plus 1 Mio de sortie est conservé par flux (2 Mio en tout quand l'erreur standard
 est gardée à part) : le reste est lu puis jeté, et une ligne indique que la

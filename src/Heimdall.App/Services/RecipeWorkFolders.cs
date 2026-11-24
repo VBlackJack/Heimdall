@@ -42,8 +42,8 @@ public interface IRecipeWorkFolders
 
 /// <summary>
 /// The run folders of the application, one subfolder per run under a root in the user's temporary
-/// folder. The root is not under the data directory on purpose: a program run from a folder there
-/// could reach the settings through a relative path.
+/// folder. The root is not under the data directory on purpose, so a program does not start next to
+/// the settings. That is a starting place, not a confinement: nothing keeps a program in its folder.
 /// </summary>
 public sealed class RecipeWorkFolders : IRecipeWorkFolders
 {
