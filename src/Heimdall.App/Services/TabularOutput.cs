@@ -15,9 +15,11 @@
  */
 
 using System.Data;
+using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Text.Json;
+using Heimdall.Core.Security;
 
 namespace Heimdall.App.Services;
 
@@ -109,6 +111,22 @@ public sealed class TabularOutput
         }
     }
 
+    /// <summary>
+    /// One cell as it is copied: a tab, a carriage return or a line feed inside it becomes a single space, so it
+    /// stays one cell of one row, and a value that a spreadsheet would read as a formula gets a leading apostrophe.
+    /// </summary>
+    /// <param name="value">The text of a header or a cell, or null.</param>
+    public static string SanitizeCell(string? value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return string.Empty;
+        }
+
+        string flat = value.Replace('\t', ' ').Replace('\r', ' ').Replace('\n', ' ');
+        return InputValidator.SanitizeCsvCell(flat);
+    }
+
     /// <summary>The table as tab separated text with a header line, for the clipboard.</summary>
     /// <param name="table">The table to write out.</param>
     public static string ToTabSeparated(DataTable table)
@@ -125,7 +143,7 @@ public sealed class TabularOutput
                 sb.Append(CellSeparator);
             }
 
-            sb.Append(table.Columns[i].ColumnName);
+            sb.Append(SanitizeCell(table.Columns[i].ColumnName));
         }
 
         sb.AppendLine();
@@ -140,7 +158,7 @@ public sealed class TabularOutput
                     sb.Append(CellSeparator);
                 }
 
-                sb.Append(row[i]);
+                sb.Append(SanitizeCell(row[i] is DBNull ? null : Convert.ToString(row[i], CultureInfo.CurrentCulture)));
             }
 
             sb.AppendLine();

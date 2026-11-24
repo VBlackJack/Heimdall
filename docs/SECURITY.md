@@ -732,12 +732,16 @@ pack is off by default.
   `/`, `@` or backslash where it starts an argument, no network or device path in
   a `path` field) and to the validation of its type.
 - **Allowed roots are checked, not trusted as a whole.** A program under the
-  Windows folder, Program Files or Program Files (x86) is refused when a user who
-  is not an administrator can change its file or a folder above it (up to that
-  root), or when those permissions cannot be read. A folder you added is trusted
-  as a whole and is not checked, but only for what lies outside Windows and
-  Program Files: adding a folder that covers part of them does not switch the
-  check off.
+  Windows folder, Program Files or Program Files (x86) is refused when a user
+  who is not an administrator can change its file or a folder above it (up to
+  that root), through its permissions or by owning it (an owner other than the
+  system, the administrators or the installer service), or when those
+  permissions or that owner cannot be read. A folder you added is trusted as a
+  whole and is not checked, but only for what lies outside Windows and Program
+  Files: adding a folder that covers part of them does not switch the check off.
+  A folder that leads to the root of a drive or to a network location (a mapped
+  network drive, a link to a share) is refused when you add it, and its final
+  form is never trusted when a program runs.
 - **Look-alike characters.** A character that Windows would turn into a plain
   ASCII one for a program that reads its command line in the ANSI code page of
   the machine (a full-width hyphen, a typographic quote, a no-break space) is
@@ -804,15 +808,25 @@ pack is off by default.
   there can be named by a recipe, while a program under Windows or Program Files
   is always checked, whatever folders you added.
 - The permission check of the Windows and Program Files folders reads the
-  permission rules only, those of the file and of each folder above it. It does
-  not read the owner. It is a limit on the obvious case, not a guarantee that
-  nobody else can change the file.
-- The folder rule reads the text of the path. A drive letter that is mapped to a
-  network share is not detected as a network location.
+  permission rules and the owner of the file and of each folder above it. An
+  untrusted owner is refused whatever the rules say: an OWNER RIGHTS entry,
+  which can limit what an owner may do, is deliberately not honoured. It is a
+  limit on the obvious case, not a guarantee that nobody else can change the
+  file.
+- The folder rule reads the text of the path, and then the path it leads to once
+  links and mapped drives are followed: a mapped network drive, a link to a
+  share and a link to a drive root are refused. A folder whose final form cannot
+  be resolved (it is missing, its drive is absent) is accepted as written, and
+  what it leads to is checked again when a program runs.
 - Behavior with some unusual path forms (short 8.3 names, substituted drives) has
   not been verified by a real test, and nothing is promised about it. That ending
   a run also ends the processes the program started was verified by one real
   test with a stock program, and nothing is promised beyond it.
+- A table shown by a tool (the output of a recipe as CSV or JSON) is neutralized
+  when it is copied: a cell that starts with `=`, `+`, `-` or `@` gets a leading
+  apostrophe, so a spreadsheet does not read it as a formula, and a tab or a
+  line break inside a cell becomes a space. Plain text output is copied as it
+  is.
 - A recipe is not signed and not reviewed by the project. The author is a text
   the file claims, and Heimdall shows it as unverified. A community catalogue is
   not part of this version: a recipe comes from whoever gives you the file.

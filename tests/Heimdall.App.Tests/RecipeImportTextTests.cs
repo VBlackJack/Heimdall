@@ -97,6 +97,16 @@ public sealed partial class RecipeImportTextTests
         {
             yield return RecipeImportPreview.KeyFor(format);
         }
+
+        foreach (RecipeOutputEncoding encoding in Enum.GetValues<RecipeOutputEncoding>())
+        {
+            yield return RecipeImportPreview.KeyFor(encoding);
+        }
+
+        foreach (RecipeStderrMode mode in Enum.GetValues<RecipeStderrMode>())
+        {
+            yield return RecipeImportPreview.KeyFor(mode);
+        }
     }
 
     [Theory]

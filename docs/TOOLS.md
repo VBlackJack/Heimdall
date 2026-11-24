@@ -288,20 +288,22 @@ Tools tab until the pack is on. Heimdall then:
 3. shows a preview and waits for a confirmation. Nothing is written before it.
 
 **Read the preview.** It shows, in this order: a warning that the recipe was
-written by someone else and cannot be verified; for a replacement, what
-changes; the program that will run, as the full path found on this computer;
-every argument, one per line between brackets, exactly as written in the file,
-with a nested list marked as one that is kept or dropped as a whole; the name,
-the author (marked unverified), the id, the version and the description; every
-field with its type, whether it is required, its default, its choices, its
-pattern and its maximum length, and the arguments a switch adds when it is on;
-every translation of the recipe (the language, the name, the description and the
-field labels), since the tool shows it instead of the English text when the
-interface is in that language; whether the recipe reads the host and the port of
-the selected session; how the output is shown; and the timeout. A control or invisible character is written
-as `\uXXXX`. In the program, the arguments and the defaults, every character
-outside printable ASCII is written as `\uXXXX` too, so a look-alike letter
-cannot pass for the ASCII one.
+written by someone else and cannot be verified; for a replacement, what changes;
+the program that will run, as the full path found on this computer, and the
+program text as written in the file; every argument, one per line between
+brackets, exactly as written in the file, with a nested list marked as one that
+is kept or dropped as a whole; the name, the author (marked unverified), the id,
+the version and the description; every field with its type, whether it is
+required, its default, its choices, its pattern and its maximum length, and the
+arguments a switch adds when it is on; every translation of the recipe (the
+language, the name, the description and the field labels), since the tool shows
+it instead of the English text when the interface is in that language; whether
+the recipe reads the host and the port of the selected session; how the output
+is shown, how it is decoded, what happens to standard error, the exit codes that
+count as success and the icon; and the timeout. A control or invisible character
+is written as `\uXXXX`. In the program, the arguments and the defaults, every
+character outside printable ASCII is written as `\uXXXX` too, so a look-alike
+letter cannot pass for the ASCII one.
 
 **Where the tool appears.** In the Tools tab under a Recipes heading, in the
 sidebar Tools tree and in the command palette, marked "Unverified recipe by
@@ -370,8 +372,10 @@ characters, with no network path, no device path, no `.` or `..` part, no `%`,
 no wildcard and no part that ends with a dot or a space. At most 32 folders are
 kept. Adding a folder that is, lies under or contains the Windows folder,
 Program Files or Program Files (x86) is accepted, and Settings shows a notice:
-programs under those folders stay checked. A settings file that carries this
-list is flagged as sensitive in the import preview.
+programs under those folders stay checked. A folder that leads to the root of a
+drive or to a network location (a mapped network drive, a link to a share) is
+refused, whatever it is written as. A settings file that carries this list is
+flagged as sensitive in the import preview.
 
 ### Writing a recipe
 
@@ -562,12 +566,15 @@ used. It must satisfy all of this:
   allowed in Settings. A link that leads outside them is refused;
 - under the Windows folder, Program Files or Program Files (x86), neither the
   file nor any folder above it (up to that root) may let a user who is not an
-  administrator change it, and the permissions must be readable. The trust you
-  give a folder allowed in Settings depends on where the program lies, not on
-  where the folder lies: a program outside Windows and Program Files under such
-  a folder is trusted as a whole and is not checked this way, while a program
-  under Windows or Program Files is always checked, even when an allowed folder
-  covers it;
+  administrator change it, through its permissions or by owning it (an owner
+  other than the system, the administrators or the installer service), and the
+  permissions and the owner must be readable. An OWNER RIGHTS entry is not
+  honoured: an untrusted owner is refused whatever it says. The trust you give a
+  folder allowed in Settings depends on where the program lies, not on where the
+  folder lies: a program outside Windows and Program Files under such a folder
+  is trusted as a whole and is not checked this way, while a program under
+  Windows or Program Files is always checked, even when an allowed folder covers
+  it;
 - a bare name is looked for only in the entries of the `PATH` variable that are
   themselves under those folders, in `PATH` order; the first file found
   decides. The current folder and the folder of Heimdall are never searched;

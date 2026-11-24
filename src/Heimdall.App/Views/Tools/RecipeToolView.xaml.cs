@@ -44,6 +44,7 @@ public partial class RecipeToolView : UserControl, IToolView, IStaleToolView
         ArgumentNullException.ThrowIfNull(viewModel);
 
         InitializeComponent();
+        TabularGridCopy.Attach(ResultsGrid);
         _viewModel = viewModel;
         DataContext = viewModel;
         viewModel.PropertyChanged += OnViewModelPropertyChanged;

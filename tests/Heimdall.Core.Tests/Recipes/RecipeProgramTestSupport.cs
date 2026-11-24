@@ -62,13 +62,28 @@ internal sealed class FakeRecipeMachine : IRecipeMachine
     /// <summary>Every path whose permissions the resolver asked about, in order.</summary>
     public List<string> PermissionReads { get; } = [];
 
-    public IReadOnlyList<RecipeAccessRule>? ReadAllowRules(string path)
+    /// <summary>The owner of a file or folder that is not listed: a trusted one, so a test is about what it says it is about.</summary>
+    public string DefaultOwner { get; set; } = RecipeAccessPolicy.AdministratorsSid;
+
+    /// <summary>The owner of a file or folder; a null value is an owner that cannot be read.</summary>
+    public Dictionary<string, string?> Owners { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    public RecipeItemAccess? ReadAccess(string path)
     {
         PermissionReads.Add(path);
         if (UnreadablePermissions.Contains(path))
             return null;
 
-        return Rules.TryGetValue(path, out List<RecipeAccessRule>? rules) ? rules : [];
+        List<RecipeAccessRule> rules = Rules.TryGetValue(path, out List<RecipeAccessRule>? listed) ? listed : [];
+        string? owner = Owners.TryGetValue(path, out string? named) ? named : DefaultOwner;
+        return new RecipeItemAccess(owner, rules);
+    }
+
+    /// <summary>Gives a file or folder an owner; null means the owner cannot be read.</summary>
+    public FakeRecipeMachine WithOwner(string path, string? sid)
+    {
+        Owners[path] = sid;
+        return this;
     }
 
     public FakeRecipeMachine WithFile(string path)
@@ -113,7 +128,7 @@ internal sealed class TempRecipeMachine : IRecipeMachine
     public string? ReadOriginalFileName(string path) => _real.ReadOriginalFileName(path);
 
     /// <summary>The temporary folder is writable by its user by nature: its permissions are not what these tests are about.</summary>
-    public IReadOnlyList<RecipeAccessRule>? ReadAllowRules(string path) => [];
+    public RecipeItemAccess? ReadAccess(string path) => new(RecipeAccessPolicy.AdministratorsSid, []);
 }
 
 /// <summary>A scratch folder under the temporary directory, removed with the test.</summary>

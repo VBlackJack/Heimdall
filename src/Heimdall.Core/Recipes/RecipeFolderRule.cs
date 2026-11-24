@@ -46,6 +46,12 @@ public enum RecipeFolderRefusal
     /// <summary>The folder is already in the list.</summary>
     AlreadyListed,
 
+    /// <summary>The folder is written as an ordinary path but leads to the root of a drive (a link, a substituted drive).</summary>
+    LeadsToDriveRoot,
+
+    /// <summary>The folder is written as an ordinary path but leads to a network location (a mapped network drive, a link to a share).</summary>
+    LeadsToNetwork,
+
     /// <summary>The list already holds the most folders it keeps.</summary>
     ListFull,
 }
@@ -153,6 +159,27 @@ public static class RecipeFolderRule
         }
 
         return existing.Count >= MaxFolders ? RecipeFolderRefusal.ListFull : RecipeFolderRefusal.None;
+    }
+
+    /// <summary>
+    /// Checks the final form of a folder, the path it leads to once every link, mapped drive and substituted
+    /// drive is followed. A folder whose final form is a drive root or a network path is refused; a final form
+    /// that is unknown (the folder is missing, the drive is absent) is not.
+    /// </summary>
+    /// <param name="finalForm">The final path of the folder, or null when it could not be resolved.</param>
+    public static RecipeFolderRefusal CheckFinalForm(string? finalForm)
+    {
+        if (string.IsNullOrWhiteSpace(finalForm))
+            return RecipeFolderRefusal.None;
+
+        string text = finalForm.Trim();
+        if (text.StartsWith(@"\\", StringComparison.Ordinal) || text.StartsWith("//", StringComparison.Ordinal))
+            return RecipeFolderRefusal.LeadsToNetwork;
+
+        string trimmed = text.TrimEnd(Separators);
+        return trimmed.Length == DriveColonIndex + 1 && char.IsAsciiLetter(trimmed[0]) && trimmed[DriveColonIndex] == DriveSeparator
+            ? RecipeFolderRefusal.LeadsToDriveRoot
+            : RecipeFolderRefusal.None;
     }
 
     /// <summary>
