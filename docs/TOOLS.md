@@ -362,13 +362,16 @@ not loaded. At most 200 recipes can be imported. The Settings export does not
 carry recipes.
 
 **The folders recipes may run programs from.** A recipe may always run a program
-from the Windows folder, Program Files and Program Files (x86). To allow
-another folder, use **Add a folder...** in the same Recipes section of the
-Settings, then save the settings and import the recipe again. A folder must be
-a full path on a drive letter (`D:\Tools`) and not the root of a drive
-(`D:\`), at most 240 characters, with no network path, no device path, no `.` or
-`..` part, no `%`, no wildcard and no part that ends with a dot or a space. At most 32 folders are kept. A settings
-file that carries this list is flagged as sensitive in the import preview.
+from the Windows folder, Program Files and Program Files (x86). To allow another
+folder, use **Add a folder...** in the same Recipes section of the Settings,
+then save the settings and import the recipe again. A folder must be a full path
+on a drive letter (`D:\Tools`) and not the root of a drive (`D:\`), at most 240
+characters, with no network path, no device path, no `.` or `..` part, no `%`,
+no wildcard and no part that ends with a dot or a space. At most 32 folders are
+kept. Adding a folder that is, lies under or contains the Windows folder,
+Program Files or Program Files (x86) is accepted, and Settings shows a notice:
+programs under those folders stay checked. A settings file that carries this
+list is flagged as sensitive in the import preview.
 
 ### Writing a recipe
 

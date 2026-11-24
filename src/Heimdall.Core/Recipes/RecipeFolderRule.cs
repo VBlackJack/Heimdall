@@ -156,6 +156,39 @@ public static class RecipeFolderRule
     }
 
     /// <summary>
+    /// True when a folder equals one of the roots, lies under one, or contains one: whole path segments,
+    /// ignoring case and trailing separators, the same test as the program resolver uses. Adding such a
+    /// folder is accepted, but it relaxes nothing for the programs under those roots, which stay checked.
+    /// A null or empty root is ignored.
+    /// </summary>
+    /// <param name="folder">A folder text <see cref="Check(string?)"/> accepted.</param>
+    /// <param name="roots">The built-in roots: the Windows folder, Program Files and Program Files (x86).</param>
+    public static bool TouchesRoot(string folder, IEnumerable<string?> roots)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
+        ArgumentNullException.ThrowIfNull(roots);
+
+        string trimmedFolder = Normalize(folder).TrimEnd(Separators);
+        foreach (string? root in roots)
+        {
+            if (string.IsNullOrWhiteSpace(root))
+                continue;
+
+            string trimmedRoot = root.Trim().Replace('/', '\\').TrimEnd(Separators);
+            if (trimmedRoot.Length == 0)
+                continue;
+
+            if (RecipeProgramResolver.IsUnderOrEqual(trimmedFolder, trimmedRoot)
+                || RecipeProgramResolver.IsUnderOrEqual(trimmedRoot, trimmedFolder))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// The form a folder is stored in: trimmed, with backslashes, and without a trailing separator
     /// except for a drive root. Call it only on a text <see cref="Check(string?)"/> accepted.
     /// </summary>

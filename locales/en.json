@@ -6874,5 +6874,6 @@
   "RecipeImportReplaceTimeoutSame": "Timeout: unchanged",
   "RecipeImportReplaceTimeoutChanged": "Timeout: changed",
   "SettingsImportPreviewRecipesOn": "Turns the Recipes pack on: recipes can then be imported and run on this computer.",
-  "RecipeStoreFailureIndexDamaged": "The list of imported recipes holds an entry that Heimdall cannot read, so nothing was changed. Close Heimdall, repair or delete the file {0} in the recipes folder of the data directory, then import your recipes again."
+  "RecipeStoreFailureIndexDamaged": "The list of imported recipes holds an entry that Heimdall cannot read, so nothing was changed. Close Heimdall, repair or delete the file {0} in the recipes folder of the data directory, then import your recipes again.",
+  "RecipeFolderNoticeBuiltInRoot": "This folder was added. Programs under Windows or Program Files stay checked: a recipe may use one only if a user who is not an administrator cannot change it. For the rest of this folder, any program can be named by a recipe."
 }

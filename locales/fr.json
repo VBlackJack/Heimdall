@@ -6873,5 +6873,6 @@
   "RecipeImportReplaceTimeoutSame": "D\u00e9lai maximal : inchang\u00e9",
   "RecipeImportReplaceTimeoutChanged": "D\u00e9lai maximal : modifi\u00e9",
   "SettingsImportPreviewRecipesOn": "Active le pack Recettes : des recettes pourront alors \u00eatre import\u00e9es et lanc\u00e9es sur cet ordinateur.",
-  "RecipeStoreFailureIndexDamaged": "La liste des recettes import\u00e9es contient une entr\u00e9e que Heimdall ne peut pas lire : rien n'a \u00e9t\u00e9 modifi\u00e9. Fermez Heimdall, r\u00e9parez ou supprimez le fichier {0} dans le dossier des recettes du r\u00e9pertoire de donn\u00e9es, puis importez de nouveau vos recettes."
+  "RecipeStoreFailureIndexDamaged": "La liste des recettes import\u00e9es contient une entr\u00e9e que Heimdall ne peut pas lire : rien n'a \u00e9t\u00e9 modifi\u00e9. Fermez Heimdall, r\u00e9parez ou supprimez le fichier {0} dans le dossier des recettes du r\u00e9pertoire de donn\u00e9es, puis importez de nouveau vos recettes.",
+  "RecipeFolderNoticeBuiltInRoot": "Ce dossier a \u00e9t\u00e9 ajout\u00e9. Les programmes situ\u00e9s sous Windows ou Program Files restent v\u00e9rifi\u00e9s : une recette ne peut en utiliser un que si un utilisateur non administrateur ne peut pas le modifier. Pour le reste de ce dossier, n'importe quel programme peut \u00eatre nomm\u00e9 par une recette."
 }
