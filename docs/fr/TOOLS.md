@@ -594,12 +594,15 @@ tout ceci :
 - il existe et, une fois tous les liens et jonctions suivis, son emplacement
   final est sous le dossier Windows, Program Files, Program Files (x86) ou un
   dossier autorisé dans les Paramètres. Un lien qui mène en dehors est refusé ;
-- sous le dossier Windows, Program Files ou Program Files (x86), ni le fichier ni
-  aucun dossier au-dessus (jusqu'à cette racine) ne doit permettre à un
+- sous le dossier Windows, Program Files ou Program Files (x86), ni le fichier
+  ni aucun dossier au-dessus (jusqu'à cette racine) ne doit permettre à un
   utilisateur qui n'est pas administrateur de le modifier, et les permissions
-  doivent être lisibles. Un dossier autorisé dans les Paramètres est approuvé en
-  entier et n'est pas vérifié de cette façon seulement quand il se trouve hors de
-  Windows et de Program Files ;
+  doivent être lisibles. La confiance accordée à un dossier autorisé dans les
+  Paramètres dépend de l'endroit où se trouve le programme, pas de celui du
+  dossier : un programme situé hors de Windows et de Program Files, sous un tel
+  dossier, est approuvé en entier et n'est pas vérifié de cette façon, alors
+  qu'un programme sous Windows ou Program Files est toujours vérifié, même quand
+  un dossier autorisé le couvre ;
 - un simple nom n'est cherché que dans les entrées de la variable `PATH` qui sont
   elles-mêmes sous ces dossiers, dans l'ordre de `PATH` ; le premier fichier
   trouvé décide. Le dossier courant et le dossier de Heimdall ne sont jamais
@@ -669,9 +672,9 @@ connues.
   ASCII), ou commence par `@` (un fichier de réponses). L'entrée en cause est
   nommée. La règle des caractères qui ressemblent à d'autres suit la page de
   codes ANSI de la machine (celle dans laquelle un programme lit sa ligne de
-  commande) : certaines majuscules accentuées et certaines ligatures
-  peuvent donc être refusées dans un argument sur certaines machines, et
-  acceptées sur d'autres.
+  commande) : certaines majuscules accentuées et certaines ligatures peuvent
+  donc être refusées dans un argument sur certaines machines, et acceptées sur
+  d'autres.
 - Un choix ou une valeur par défaut serait refusé à chaque exécution par la règle
   que rencontre une valeur saisie (voir plus bas) : il contient un caractère de
   contrôle ou qui ressemble à un autre, il commence par `-`, `/`, `@`, une barre

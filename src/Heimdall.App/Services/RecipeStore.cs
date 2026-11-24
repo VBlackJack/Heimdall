@@ -97,7 +97,7 @@ public sealed class RecipeStore : IRecipeStore
             List<RecipeLoadIssue> issues = [];
             HashSet<string> indexedFiles = new(StringComparer.OrdinalIgnoreCase);
 
-            if (!TryReadIndex(out List<RecipeStoreEntry> entries, issues))
+            if (!TryReadIndex(out List<RecipeStoreEntry> entries, issues, out _))
             {
                 entries = [];
             }
@@ -126,17 +126,14 @@ public sealed class RecipeStore : IRecipeStore
     {
         lock (_gate)
         {
-            return Directory.Exists(_directory) && TryReadIndex(out List<RecipeStoreEntry> entries, issues: null)
+            return Directory.Exists(_directory) && TryReadIndex(out List<RecipeStoreEntry> entries, issues: null, out _)
                 ? entries
                 : [];
         }
     }
 
     /// <inheritdoc />
-    public string? CurrentProgramPath(string id) => CurrentEntry(id)?.ResolvedProgramPath;
-
-    /// <inheritdoc />
-    public string? CurrentSha256(string id) => CurrentEntry(id)?.Sha256;
+    public RecipeStoreEntry? Current(string id) => CurrentEntry(id);
 
     private RecipeStoreEntry? CurrentEntry(string id)
     {
@@ -144,7 +141,7 @@ public sealed class RecipeStore : IRecipeStore
 
         lock (_gate)
         {
-            if (!Directory.Exists(_directory) || !TryReadIndex(out List<RecipeStoreEntry> entries, issues: null))
+            if (!Directory.Exists(_directory) || !TryReadIndex(out List<RecipeStoreEntry> entries, issues: null, out _))
             {
                 return null;
             }
@@ -187,9 +184,9 @@ public sealed class RecipeStore : IRecipeStore
             }
 
             // An index that cannot be read in full is not rewritten from what could be read of it.
-            if (!TryReadIndex(out List<RecipeStoreEntry> entries, issues: null, forWrite: true))
+            if (!TryReadIndex(out List<RecipeStoreEntry> entries, issues: null, out bool damaged, forWrite: true))
             {
-                return RecipeStoreResult.Fail(RecipeStoreFailure.StorageError);
+                return RecipeStoreResult.Fail(damaged ? RecipeStoreFailure.IndexDamaged : RecipeStoreFailure.StorageError);
             }
 
             int position = entries.FindIndex(entry => string.Equals(entry.Id, id, StringComparison.Ordinal));
@@ -209,7 +206,7 @@ public sealed class RecipeStore : IRecipeStore
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                FileLogger.Warn($"Recipe store: the index could not be written while removing a recipe: {ex.Message}");
+                FileLogger.Warn($"Recipe store: the index could not be written while removing a recipe ({ex.GetType().Name})");
                 return RecipeStoreResult.Fail(RecipeStoreFailure.StorageError);
             }
 
@@ -219,7 +216,7 @@ public sealed class RecipeStore : IRecipeStore
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                FileLogger.Warn($"Recipe store: the file {removed.FileName} could not be deleted: {ex.Message}");
+                FileLogger.Warn($"Recipe store: the file {removed.FileName} could not be deleted ({ex.GetType().Name})");
             }
 
             return RecipeStoreResult.Success();
@@ -233,7 +230,7 @@ public sealed class RecipeStore : IRecipeStore
 
         lock (_gate)
         {
-            if (!Directory.Exists(_directory) || !TryReadIndex(out List<RecipeStoreEntry> entries, issues: null))
+            if (!Directory.Exists(_directory) || !TryReadIndex(out List<RecipeStoreEntry> entries, issues: null, out _))
             {
                 return null;
             }
@@ -273,9 +270,10 @@ public sealed class RecipeStore : IRecipeStore
             // list would replace it and drop the trust record of every other recipe. A missing index
             // is an empty store.
             List<RecipeStoreEntry> entries = [];
-            if (Directory.Exists(_directory) && !TryReadIndex(out entries, issues: null, forWrite: true))
+            bool damaged = false;
+            if (Directory.Exists(_directory) && !TryReadIndex(out entries, issues: null, out damaged, forWrite: true))
             {
-                return RecipeStoreResult.Fail(RecipeStoreFailure.StorageError);
+                return RecipeStoreResult.Fail(damaged ? RecipeStoreFailure.IndexDamaged : RecipeStoreFailure.StorageError);
             }
 
             int position = entries.FindIndex(entry => string.Equals(entry.Id, recipe.Id, StringComparison.Ordinal));
@@ -323,7 +321,7 @@ public sealed class RecipeStore : IRecipeStore
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                FileLogger.Warn($"Recipe store: recipe {recipe.Id} could not be stored: {ex.Message}");
+                FileLogger.Warn($"Recipe store: recipe {recipe.Id} could not be stored ({ex.GetType().Name})");
                 RestoreAfterFailure(filePath, previousBytes);
                 return RecipeStoreResult.Fail(RecipeStoreFailure.StorageError);
             }
@@ -346,7 +344,7 @@ public sealed class RecipeStore : IRecipeStore
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             // The leftover file is not indexed, or no longer matches its entry: it loads as nothing.
-            FileLogger.Warn($"Recipe store: the previous state of a recipe file could not be restored: {ex.Message}");
+            FileLogger.Warn($"Recipe store: the previous state of a recipe file could not be restored ({ex.GetType().Name})");
         }
     }
 
@@ -390,7 +388,7 @@ public sealed class RecipeStore : IRecipeStore
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            FileLogger.Warn($"Recipe store: the folder could not be listed: {ex.Message}");
+            FileLogger.Warn($"Recipe store: the folder could not be listed ({ex.GetType().Name})");
             return [];
         }
     }
@@ -419,8 +417,11 @@ public sealed class RecipeStore : IRecipeStore
 
     // forWrite: the caller is about to rewrite the index, so an entry that could not be built (invalid or
     // duplicate) counts as an index that cannot be read, rather than being dropped from the rewrite.
-    private bool TryReadIndex(out List<RecipeStoreEntry> entries, List<RecipeLoadIssue>? issues, bool forWrite = false)
+    // damaged: set when forWrite refused because an entry could not be built, as opposed to an index that
+    // could not be read or parsed at all.
+    private bool TryReadIndex(out List<RecipeStoreEntry> entries, List<RecipeLoadIssue>? issues, out bool damaged, bool forWrite = false)
     {
+        damaged = false;
         entries = [];
         string indexPath = Path.Combine(_directory, IndexFileName);
         if (!File.Exists(indexPath))
@@ -441,7 +442,7 @@ public sealed class RecipeStore : IRecipeStore
         }
         catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
         {
-            FileLogger.Warn($"Recipe store: the index could not be read: {ex.Message}");
+            FileLogger.Warn($"Recipe store: the index could not be read ({ex.GetType().Name})");
             issues?.Add(new RecipeLoadIssue(RecipeLoadIssueCode.IndexUnreadable, IndexFileName, null));
             return false;
         }
@@ -461,6 +462,7 @@ public sealed class RecipeStore : IRecipeStore
                 if (forWrite)
                 {
                     entries = [];
+                    damaged = true;
                     return false;
                 }
 

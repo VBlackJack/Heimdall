@@ -6872,5 +6872,6 @@
   "RecipeImportReplaceExitCodesChanged": "Codes de sortie de succ\u00e8s : modifi\u00e9s",
   "RecipeImportReplaceTimeoutSame": "D\u00e9lai maximal : inchang\u00e9",
   "RecipeImportReplaceTimeoutChanged": "D\u00e9lai maximal : modifi\u00e9",
-  "SettingsImportPreviewRecipesOn": "Active le pack Recettes : des recettes pourront alors \u00eatre import\u00e9es et lanc\u00e9es sur cet ordinateur."
+  "SettingsImportPreviewRecipesOn": "Active le pack Recettes : des recettes pourront alors \u00eatre import\u00e9es et lanc\u00e9es sur cet ordinateur.",
+  "RecipeStoreFailureIndexDamaged": "La liste des recettes import\u00e9es contient une entr\u00e9e que Heimdall ne peut pas lire : rien n'a \u00e9t\u00e9 modifi\u00e9. Fermez Heimdall, r\u00e9parez ou supprimez le fichier {0} dans le dossier des recettes du r\u00e9pertoire de donn\u00e9es, puis importez de nouveau vos recettes."
 }

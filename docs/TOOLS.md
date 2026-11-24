@@ -559,9 +559,12 @@ used. It must satisfy all of this:
   allowed in Settings. A link that leads outside them is refused;
 - under the Windows folder, Program Files or Program Files (x86), neither the
   file nor any folder above it (up to that root) may let a user who is not an
-  administrator change it, and the permissions must be readable. A folder allowed
-  in Settings is trusted as a whole and is not checked this way only when it lies
-  outside Windows and Program Files;
+  administrator change it, and the permissions must be readable. The trust you
+  give a folder allowed in Settings depends on where the program lies, not on
+  where the folder lies: a program outside Windows and Program Files under such
+  a folder is trusted as a whole and is not checked this way, while a program
+  under Windows or Program Files is always checked, even when an allowed folder
+  covers it;
 - a bare name is looked for only in the entries of the `PATH` variable that are
   themselves under those folders, in `PATH` order; the first file found
   decides. The current folder and the folder of Heimdall are never searched;
@@ -617,13 +620,14 @@ each with its line and column when it is known.
 - The fixed text (the program, a token, a `whenTrue` token, a default, a choice)
   holds two separators in a row (a double backslash, a double slash, or a
   backslash next to a slash in either order: a network path), `://` (a URL), the
-  system path prefix (a separator, two question marks and a separator), a `%` (an
-  environment variable), a character that looks like a plain one (a typographic
-  quote, a long dash, a full-width letter, a no-break space, or any character the
-  ANSI code page of the machine turns into an ASCII one), or starts with `@` (a
-  response file). The entry at fault is named. The look-alike rule follows the
-  ANSI code page of the machine (the one a program reads its command line in), so some accented capitals and ligatures can be
-  refused in an argument on some machines and accepted on others.
+  system path prefix (a separator, two question marks and a separator), a `%`
+  (an environment variable), a character that looks like a plain one (a
+  typographic quote, a long dash, a full-width letter, a no-break space, or any
+  character the ANSI code page of the machine turns into an ASCII one), or
+  starts with `@` (a response file). The entry at fault is named. The look-alike
+  rule follows the ANSI code page of the machine (the one a program reads its
+  command line in), so some accented capitals and ligatures can be refused in an
+  argument on some machines and accepted on others.
 - A choice or a default would be refused at every run by the rule a typed value
   meets (see below): it holds a control or look-alike character, it starts with
   `-`, `/`, `@`, a backslash or a space where its field starts an argument, or

@@ -302,9 +302,7 @@ public sealed class RecipeToolRegistrarTests
             remove { }
         }
 
-        public string? CurrentSha256(string id) => null;
-
-        public string? CurrentProgramPath(string id) => null;
+        public RecipeStoreEntry? Current(string id) => null;
 
         public RecipeLoadResult LoadAll() => throw new IOException("disk");
 

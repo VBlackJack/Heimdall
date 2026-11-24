@@ -110,6 +110,21 @@ public sealed class RecipeToolStaleTabTests
     }
 
     [Fact]
+    public async Task OneStaleCheckIsOneReadOfTheCurrentVersion()
+    {
+        using RecipeViewModelHarness harness = await RecipeViewModelHarness.CreateAsync();
+        RecipeToolViewModel viewModel = harness.Create(Recipe());
+        int before = harness.Versions.ReadCount;
+
+        Assert.False(viewModel.CheckStale());
+        Assert.Equal(before + 1, harness.Versions.ReadCount);
+
+        await viewModel.RunCommand.ExecuteAsync(null);
+
+        Assert.Equal(before + 2, harness.Versions.ReadCount);
+    }
+
+    [Fact]
     public async Task AnUnchangedRecipeRuns()
     {
         using RecipeViewModelHarness harness = await RecipeViewModelHarness.CreateAsync();

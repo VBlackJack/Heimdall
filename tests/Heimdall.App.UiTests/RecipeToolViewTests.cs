@@ -256,9 +256,8 @@ public sealed class RecipeToolViewTests
             remove { }
         }
 
-        public string? CurrentSha256(string id) => StoredSha256;
-
-        public string? CurrentProgramPath(string id) => @"C:\Windows\System32\ping.exe";
+        public RecipeStoreEntry? Current(string id)
+            => new(id, RecipeStore.FileNameFor(id), StoredSha256, @"C:\Windows\System32\ping.exe", DateTimeOffset.UnixEpoch);
     }
 
     private sealed class CountingRunner : IRecipeRunner

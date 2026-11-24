@@ -147,13 +147,23 @@ internal sealed class FakeRecipeVersions : IRecipeVersions
         }
     }
 
-    public string? CurrentSha256(string id)
-        => _overrides.TryGetValue(id, out string? sha) ? sha : RecipeBuilders.StoredSha256;
-
     private readonly Dictionary<string, string> _paths = new(StringComparer.Ordinal);
 
-    public string? CurrentProgramPath(string id)
-        => _overrides.TryGetValue(id, out string? sha) && sha is null ? null : _paths.TryGetValue(id, out string? path) ? path : RecipeBuilders.StoredPath;
+    /// <summary>How many times the current version was asked for.</summary>
+    public int ReadCount { get; private set; }
+
+    public RecipeStoreEntry? Current(string id)
+    {
+        ReadCount++;
+        string? sha = _overrides.TryGetValue(id, out string? overridden) ? overridden : RecipeBuilders.StoredSha256;
+        if (sha is null)
+        {
+            return null;
+        }
+
+        string path = _paths.TryGetValue(id, out string? moved) ? moved : RecipeBuilders.StoredPath;
+        return new RecipeStoreEntry(id, RecipeStore.FileNameFor(id), sha, path, DateTimeOffset.UnixEpoch);
+    }
 
     /// <summary>The same bytes were imported again, and the program now resolves to <paramref name="path"/>.</summary>
     public void ImportAgainResolvingTo(string id, string path)
@@ -194,11 +204,8 @@ internal sealed class FakeRecipeStore : IRecipeStore
 
     public event Action? Changed;
 
-    public string? CurrentSha256(string id)
-        => Recipes.FirstOrDefault(item => item.Recipe.Id == id)?.Entry.Sha256;
-
-    public string? CurrentProgramPath(string id)
-        => Recipes.FirstOrDefault(item => item.Recipe.Id == id)?.Entry.ResolvedProgramPath;
+    public RecipeStoreEntry? Current(string id)
+        => Recipes.FirstOrDefault(item => item.Recipe.Id == id)?.Entry;
 
     public void RaiseChanged() => Changed?.Invoke();
 

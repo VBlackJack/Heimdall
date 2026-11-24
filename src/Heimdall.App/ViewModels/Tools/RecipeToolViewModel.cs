@@ -170,11 +170,10 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
             return true;
         }
 
-        string? current = _services.Versions.CurrentSha256(_recipe.Id);
-        string? currentPath = _services.Versions.CurrentProgramPath(_recipe.Id);
+        RecipeStoreEntry? current = _services.Versions.Current(_recipe.Id);
         if (current is not null
-            && string.Equals(current, _storedSha256, StringComparison.OrdinalIgnoreCase)
-            && string.Equals(currentPath, _storedProgramPath, StringComparison.OrdinalIgnoreCase))
+            && string.Equals(current.Sha256, _storedSha256, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(current.ResolvedProgramPath, _storedProgramPath, StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }
@@ -552,7 +551,6 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
         {
             FileLogger.Warn($"[Recipes] The run of '{_recipe.Id}' was not placed in a job object: only an interrupted run ends the processes it started");
         }
-
 
         StatusText = RecipeRunText.Describe(Localizer, result, _recipe.TimeoutSeconds);
         IsStatusFailure = !result.IsSuccess;

@@ -490,9 +490,63 @@ public sealed class RecipeStoreTests : IDisposable
             _ => store.Remove("acme.ping"),
         };
 
-        Assert.Equal(RecipeStoreFailure.StorageError, result.Failure);
+        Assert.Equal(RecipeStoreFailure.IndexDamaged, result.Failure);
         Assert.Equal(before, File.ReadAllBytes(indexPath));
         Assert.Single(store.LoadAll().Recipes);
+    }
+
+    [Fact]
+    public void AnUnparsableIndexStaysAStorageErrorAndIsNotReportedAsADamagedEntry()
+    {
+        RecipeStore store = NewStore();
+        Assert.True(store.Add(RecipeTestFiles.Bytes("acme.ping"), RecipeTestFiles.ResolvedProgram).Succeeded);
+        File.WriteAllText(Path.Combine(RecipesDirectory, RecipeStore.IndexFileName), "{ not json");
+
+        Assert.Equal(RecipeStoreFailure.StorageError, store.Add(RecipeTestFiles.Bytes("acme.other"), RecipeTestFiles.ResolvedProgram).Failure);
+        Assert.Equal(RecipeStoreFailure.StorageError, store.Remove("acme.ping").Failure);
+    }
+
+    // The Settings list tells the user to remove a recipe whose file changed and import it again.
+    [Fact]
+    public void ARecipeWhoseFileNoLongerMatchesItsHashCanStillBeRemoved()
+    {
+        RecipeStore store = NewStore();
+        Assert.True(store.Add(RecipeTestFiles.Bytes("acme.ping"), RecipeTestFiles.ResolvedProgram).Succeeded);
+        Assert.True(store.Add(RecipeTestFiles.Bytes("acme.other"), RecipeTestFiles.ResolvedProgram).Succeeded);
+        File.WriteAllBytes(FileOf("acme.ping"), RecipeTestFiles.Bytes("acme.ping", name: "Edited by hand"));
+        Assert.Contains(store.LoadAll().Issues, issue => issue.Code == RecipeLoadIssueCode.HashMismatch);
+
+        RecipeStoreResult removed = store.Remove("acme.ping");
+
+        Assert.True(removed.Succeeded);
+        Assert.False(File.Exists(FileOf("acme.ping")));
+        Assert.Equal(["acme.other"], store.List().Select(entry => entry.Id));
+        Assert.True(store.Add(RecipeTestFiles.Bytes("acme.ping"), RecipeTestFiles.ResolvedProgram).Succeeded);
+    }
+
+    [Fact]
+    public void ARecipeWhoseFileIsGoneCanStillBeRemoved()
+    {
+        RecipeStore store = NewStore();
+        Assert.True(store.Add(RecipeTestFiles.Bytes("acme.ping"), RecipeTestFiles.ResolvedProgram).Succeeded);
+        File.Delete(FileOf("acme.ping"));
+
+        Assert.True(store.Remove("acme.ping").Succeeded);
+        Assert.Empty(store.List());
+    }
+
+    [Fact]
+    public void TheStoreAnswersAboutAnImportedRecipeWithOneEntryHoldingTheHashAndThePath()
+    {
+        RecipeStore store = NewStore();
+        Assert.True(store.Add(RecipeTestFiles.Bytes("acme.ping"), RecipeTestFiles.ResolvedProgram).Succeeded);
+
+        RecipeStoreEntry? current = store.Current("acme.ping");
+
+        Assert.NotNull(current);
+        Assert.Equal(RecipeTestFiles.ResolvedProgram, current.ResolvedProgramPath);
+        Assert.Equal(Convert.ToHexStringLower(SHA256.HashData(RecipeTestFiles.Bytes("acme.ping"))), current.Sha256);
+        Assert.Null(store.Current("acme.nobody"));
     }
 
     [Fact]

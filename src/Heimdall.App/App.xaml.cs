@@ -835,7 +835,7 @@ public partial class App : System.Windows.Application
         {
             _serviceProvider?.GetService<RecipeToolRegistrar>()?.Dispose();
         }
-        catch (Exception ex) { Core.Logging.FileLogger.Warn($"[App] recipe tools cleanup: {ex.Message}"); }
+        catch (Exception ex) { Core.Logging.FileLogger.Warn($"[App] recipe tools cleanup ({ex.GetType().Name})"); }
     }
 
     private void ConfigureServices(IServiceCollection services, string dataRoot)

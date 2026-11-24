@@ -191,7 +191,7 @@ public sealed class RecipeToolRegistrar : IDisposable
             catch (Exception ex) when (ex is not OutOfMemoryException)
             {
                 // A failure to read the store must not take the application, or the settings change, down.
-                FileLogger.Error("[Recipes] The recipe tools could not be registered", ex);
+                FileLogger.Error($"[Recipes] The recipe tools could not be registered ({ex.GetType().Name})");
             }
         }
     }

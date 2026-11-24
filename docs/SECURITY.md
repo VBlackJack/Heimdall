@@ -742,8 +742,9 @@ pack is off by default.
   ASCII one for a program that reads its command line in the ANSI code page of
   the machine (a full-width hyphen, a typographic quote, a no-break space) is
   refused in the fixed text and in typed values. The rule follows the ANSI code
-  page of the machine, the one a program reads its command line in, so some accented capitals and ligatures can be refused in an argument on some
-  machines and accepted on others.
+  page of the machine, the one a program reads its command line in, so some
+  accented capitals and ligatures can be refused in an argument on some machines
+  and accepted on others.
 - **A seat belt, as a second line only.** A list of names of shells,
   interpreters and proxy executables (`cmd`, `powershell`, `python`, `rundll32`
   and the others listed in [TOOLS.md](TOOLS.md#recipes)) is checked on the file
@@ -798,8 +799,10 @@ pack is off by default.
 - There is a window between the check of the program and its start: a file
   replaced in that interval is not detected. The comparison made before each run
   is a comparison of paths, so a program replaced in place, at the same path, is
-  not detected either. A folder you add to the list is trusted as a whole: any
-  `.exe` under it can be named by a recipe.
+  not detected either. A folder you add to the list is trusted as a whole only
+  for programs that lie outside Windows and Program Files: any `.exe` under it
+  there can be named by a recipe, while a program under Windows or Program Files
+  is always checked, whatever folders you added.
 - The permission check of the Windows and Program Files folders reads the
   permission rules only, those of the file and of each folder above it. It does
   not read the owner. It is a limit on the obvious case, not a guarantee that

@@ -97,8 +97,14 @@ public enum RecipeStoreFailure
     /// <summary>The store already holds the most recipes it keeps.</summary>
     TooManyRecipes,
 
-    /// <summary>The disk refused the write; the previous state was kept as far as it could be.</summary>
+    /// <summary>The disk refused the write, or the index could not be read or parsed at all; the previous state was kept as far as it could be.</summary>
     StorageError,
+
+    /// <summary>
+    /// The index can be read but holds an entry that cannot be built, or an id twice. Nothing was changed,
+    /// because a rewrite would drop that entry.
+    /// </summary>
+    IndexDamaged,
 }
 
 /// <summary>The outcome of adding, replacing or removing a recipe.</summary>
@@ -140,13 +146,12 @@ public interface IRecipeVersions
     /// <summary>Raised after a recipe was added, replaced or removed, on the thread that did it.</summary>
     event Action? Changed;
 
-    /// <summary>The lowercase hexadecimal SHA-256 of the bytes imported under the id, or null when no recipe has that id.</summary>
+    /// <summary>
+    /// The index entry of the recipe imported under the id, or null when there is none. One read answers for
+    /// both the bytes (<see cref="RecipeStoreEntry.Sha256"/>) and the program path it was imported with.
+    /// </summary>
     /// <param name="id">The recipe id.</param>
-    string? CurrentSha256(string id);
-
-    /// <summary>The program path resolved when the recipe was imported under the id, or null when no recipe has that id.</summary>
-    /// <param name="id">The recipe id.</param>
-    string? CurrentProgramPath(string id);
+    RecipeStoreEntry? Current(string id);
 }
 
 /// <summary>

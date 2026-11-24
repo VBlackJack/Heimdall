@@ -6873,5 +6873,6 @@
   "RecipeImportReplaceExitCodesChanged": "Success exit codes: changed",
   "RecipeImportReplaceTimeoutSame": "Timeout: unchanged",
   "RecipeImportReplaceTimeoutChanged": "Timeout: changed",
-  "SettingsImportPreviewRecipesOn": "Turns the Recipes pack on: recipes can then be imported and run on this computer."
+  "SettingsImportPreviewRecipesOn": "Turns the Recipes pack on: recipes can then be imported and run on this computer.",
+  "RecipeStoreFailureIndexDamaged": "The list of imported recipes holds an entry that Heimdall cannot read, so nothing was changed. Close Heimdall, repair or delete the file {0} in the recipes folder of the data directory, then import your recipes again."
 }

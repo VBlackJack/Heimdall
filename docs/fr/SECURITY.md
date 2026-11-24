@@ -896,8 +896,11 @@ ces arguments, avec vos droits. Le pack Recettes est désactivé par défaut.
   fichier remplacé pendant cet intervalle n'est pas détecté. La comparaison
   faite avant chaque exécution compare des chemins : un programme remplacé sur
   place, au même chemin, n'est donc pas détecté non plus. Un dossier que vous
-  ajoutez à la liste est approuvé en entier : n'importe quel `.exe` qu'il
-  contient peut être nommé par une recette.
+  ajoutez à la liste n'est approuvé en entier que pour les programmes situés
+  hors de Windows et de Program Files : n'importe quel `.exe` qu'il contient à
+  cet endroit peut être nommé par une recette, alors qu'un programme sous
+  Windows ou Program Files est toujours vérifié, quels que soient les dossiers
+  ajoutés.
 - La vérification des permissions des dossiers Windows et Program Files lit les
   règles de permission seulement, celles du fichier et de chaque dossier
   au-dessus. Elle ne lit pas le propriétaire. C'est une limite contre le cas

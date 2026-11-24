@@ -151,6 +151,7 @@ public static class RecipeImportText
         RecipeStoreFailure.InvalidProgramPath => "RecipeStoreFailureInvalidProgramPath",
         RecipeStoreFailure.TooManyRecipes => "RecipeStoreFailureTooManyRecipes",
         RecipeStoreFailure.StorageError => "RecipeStoreFailureStorageError",
+        RecipeStoreFailure.IndexDamaged => "RecipeStoreFailureIndexDamaged",
         _ => throw new ArgumentOutOfRangeException(nameof(failure), failure, "A failure without a text."),
     };
 
@@ -230,6 +231,12 @@ public static class RecipeImportText
         if (result.Failure == RecipeStoreFailure.InvalidRecipe && result.Errors.Count > 0)
         {
             return DescribeProblems(localizer, result.Errors);
+        }
+
+        // The damaged-index text names the index file, which the store knows and a locale should not repeat.
+        if (result.Failure == RecipeStoreFailure.IndexDamaged)
+        {
+            return localizer.Format("RecipeStoreFailureIndexDamaged", RecipeStore.IndexFileName);
         }
 
         return KeyFor(result.Failure) is { } key ? localizer[key] : string.Empty;
