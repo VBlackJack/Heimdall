@@ -463,7 +463,7 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
         return CheckState();
     }
 
-    // The tool must still be available; the message names the title the tab shows, which is in the language of
+    // The tool must still be available; the message names the title the open tool shows, which is in the language of
     // the interface, not the name written in the file.
     private bool CheckState()
     {

@@ -121,12 +121,25 @@ public sealed class RecipeToolProgramCheckTests
         using RecipeViewModelHarness harness = await RecipeViewModelHarness.CreateAsync();
         using Rig rig = await RigAsync(harness);
         rig.Resolver.Blocking = false;
-        int callerThread = Environment.CurrentManagedThreadId;
 
-        await rig.ViewModel.RunCommand.ExecuteAsync(null);
+        // The run is started from a dedicated thread that is not a pool thread and stays occupied until the run
+        // is over, so the pool can never hand the comparison back to the thread that called RunAsync.
+        int callerThread = 0;
+        Task started = Task.Factory.StartNew(
+            () =>
+            {
+                callerThread = Environment.CurrentManagedThreadId;
+                rig.ViewModel.RunCommand.ExecuteAsync(null).GetAwaiter().GetResult();
+            },
+            CancellationToken.None,
+            TaskCreationOptions.LongRunning,
+            TaskScheduler.Default);
+        await started.WaitAsync(Bound);
 
+        Assert.NotEqual(0, callerThread);
         Assert.NotEqual(0, rig.Resolver.ThreadId);
         Assert.NotEqual(callerThread, rig.Resolver.ThreadId);
+        Assert.Single(harness.Runner.Calls);
     }
 
     [Fact]
