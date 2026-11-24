@@ -205,7 +205,7 @@ public sealed class RecipeSettingsViewModel : ObservableObject, IDisposable
 
         // The preview is the barrier: nothing is written until this returns true, and the button
         // that declines is the one Enter takes.
-        bool confirmed = await _dialogs.ShowConfirmAsync(
+        bool confirmed = await _dialogs.ShowLargeConfirmAsync(
             _localizer[RecipeImportPreview.TitleKey(plan)],
             RecipeImportPreview.Compose(_localizer, plan),
             ConfirmSeverityWarning,

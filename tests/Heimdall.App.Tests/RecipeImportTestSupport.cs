@@ -98,7 +98,10 @@ internal sealed class RecipeRecordingDialogs : IDialogService
 
     public Func<ConfirmCall, Task>? OnConfirm { get; set; }
 
-    public sealed record ConfirmCall(string Title, string Message, string Severity, string? ConfirmLabel, string? DeclineLabel);
+    public sealed record ConfirmCall(string Title, string Message, string Severity, string? ConfirmLabel, string? DeclineLabel, bool Large = false);
+
+    public Task<bool> ShowLargeConfirmAsync(string title, string message, string severity, string confirmLabel, string declineLabel)
+        => Record(new ConfirmCall(title, message, severity, confirmLabel, declineLabel, Large: true));
 
     public Task<bool> ShowConfirmAsync(string title, string message, string severity = "info")
         => Record(new ConfirmCall(title, message, severity, null, null));
