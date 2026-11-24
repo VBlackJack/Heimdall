@@ -40,7 +40,7 @@ public enum RecipeValueRefusal
     ControlCharacter,
 
     /// <summary>
-    /// The value holds a character that a program reading its command line in an ANSI or OEM code
+    /// The value holds a character that a program reading its command line in the ANSI code
     /// page would be handed as an ASCII one (a full-width hyphen, a typographic quote, a no-break space).
     /// </summary>
     LookAlikeCharacter,

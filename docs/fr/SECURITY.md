@@ -826,9 +826,10 @@ ces arguments, avec vos droits. Le pack Recettes est désactivé par défaut.
   partie ne désactive pas la vérification.
 - **Les caractères qui ressemblent à d'autres.** Un caractère que Windows
   transformerait en caractère ASCII ordinaire pour un programme qui lit sa ligne
-  de commande dans une page de codes (un trait d'union pleine chasse, un
-  guillemet typographique, une espace insécable) est refusé dans le texte fixe
-  et dans les valeurs saisies. La règle suit les pages de codes de la machine :
+  de commande dans la page de codes ANSI de la machine (un trait d'union pleine
+  chasse, un guillemet typographique, une espace insécable) est refusé dans le
+  texte fixe et dans les valeurs saisies. La règle suit la page de codes ANSI de
+  la machine, celle dans laquelle un programme lit sa ligne de commande :
   certaines majuscules accentuées et certaines ligatures peuvent donc être
   refusées dans un argument sur certaines machines, et acceptées sur d'autres.
 - **Un garde-fou, en seconde ligne seulement.** Une liste de noms

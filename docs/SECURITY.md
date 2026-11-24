@@ -739,10 +739,10 @@ pack is off by default.
   Program Files: adding a folder that covers part of them does not switch the
   check off.
 - **Look-alike characters.** A character that Windows would turn into a plain
-  ASCII one for a program that reads its command line in a code page (a
-  full-width hyphen, a typographic quote, a no-break space) is refused in the
-  fixed text and in typed values. The rule follows the code pages of the machine,
-  so some accented capitals and ligatures can be refused in an argument on some
+  ASCII one for a program that reads its command line in the ANSI code page of
+  the machine (a full-width hyphen, a typographic quote, a no-break space) is
+  refused in the fixed text and in typed values. The rule follows the ANSI code
+  page of the machine, the one a program reads its command line in, so some accented capitals and ligatures can be refused in an argument on some
   machines and accepted on others.
 - **A seat belt, as a second line only.** A list of names of shells,
   interpreters and proxy executables (`cmd`, `powershell`, `python`, `rundll32`

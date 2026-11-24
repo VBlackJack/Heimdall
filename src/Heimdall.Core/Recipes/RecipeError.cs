@@ -157,7 +157,7 @@ public enum RecipeErrorCode
 
     /// <summary>
     /// A text that becomes an argument holds a character that a program reading its command line in
-    /// an ANSI or OEM code page would be handed as an ASCII one (a full-width hyphen, a typographic quote).
+    /// the ANSI code page would be handed as an ASCII one (a full-width hyphen, a typographic quote).
     /// </summary>
     ForbiddenLookAlikeCharacter,
 

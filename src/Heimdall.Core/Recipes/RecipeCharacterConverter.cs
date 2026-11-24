@@ -19,7 +19,7 @@ using System.Collections.Concurrent;
 namespace Heimdall.Core.Recipes;
 
 /// <summary>
-/// What the machine does to a character when a program reads its command line in the ANSI or OEM
+/// What the machine does to a character when a program reads its command line in the ANSI
 /// code page: the seam that lets a test describe a machine without depending on the real one.
 /// </summary>
 public interface IRecipeCharacterConverter
@@ -48,7 +48,6 @@ public sealed class RecipeCharacterConverter : IRecipeCharacterConverter
         ArgumentNullException.ThrowIfNull(character);
         return _answers.GetOrAdd(
             character,
-            static text => RecipeProgramNative.BecomesAscii(text, RecipeProgramNative.AnsiCodePage)
-                || RecipeProgramNative.BecomesAscii(text, RecipeProgramNative.OemCodePageId));
+            static text => RecipeProgramNative.BecomesAscii(text, RecipeProgramNative.AnsiCodePage));
     }
 }

@@ -241,8 +241,8 @@ public static class RecipeText
     }
 
     /// <summary>
-    /// True when the text holds a character that a program reading its command line in an ANSI or
-    /// OEM code page would be handed as a different, ASCII one (a full-width hyphen that becomes a
+    /// True when the text holds a character that a program reading its command line in the ANSI
+    /// code page would be handed as a different, ASCII one (a full-width hyphen that becomes a
     /// hyphen, a full-width quote that becomes a double quote, and so on). See <see cref="FindLookAlike"/>.
     /// </summary>
     /// <param name="text">The text to examine.</param>

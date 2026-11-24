@@ -22,7 +22,7 @@ namespace Heimdall.Core.Recipes;
 /// <summary>
 /// The Windows calls the recipe layer needs and no managed API offers: the final path of an
 /// open file (every junction and link followed, parents included), the OEM code page, and the
-/// conversion of a character to the ANSI or OEM code page with the best-fit mapping that a program
+/// conversion of a character to the ANSI code page with the best-fit mapping that a program
 /// reading its command line would be served.
 /// </summary>
 internal static class RecipeProgramNative
@@ -89,11 +89,8 @@ internal static class RecipeProgramNative
     /// <summary>The OEM code page of the machine (the code page of a console child), or 0 off Windows.</summary>
     internal static int OemCodePage() => OperatingSystem.IsWindows() ? (int)GetOEMCP() : 0;
 
-    /// <summary><c>CP_ACP</c>: the ANSI code page of the machine.</summary>
+    /// <summary><c>CP_ACP</c>: the ANSI code page of the machine, the one a program reads its command line in.</summary>
     internal const uint AnsiCodePage = 0;
-
-    /// <summary><c>CP_OEMCP</c>: the OEM code page of the machine.</summary>
-    internal const uint OemCodePageId = 1;
 
     /// <summary>Longest conversion of one character: a surrogate pair in a multi-byte code page.</summary>
     private const int ConvertedBufferBytes = 8;

@@ -175,6 +175,25 @@ public sealed class RecipeLookAlikeTests
         Assert.False(RecipeCharacterConverter.Instance.BecomesAscii("\u4E2D"));
     }
 
+    // Depends on the machine: the ANSI code page decides, so this only asserts on a 1252 machine.
+    [Fact]
+    public void OnAnAnsi1252Machine_TheRealConverterAcceptsLettersThatPage1252KeepsAndRefusesTheFoldedOnes()
+    {
+        const int WesternEuropeanAnsiCodePage = 1252;
+        if (System.Globalization.CultureInfo.InstalledUICulture.TextInfo.ANSICodePage != WesternEuropeanAnsiCodePage)
+        {
+            return;
+        }
+
+        // A capital with a grave accent, a ligature and a superscript one reach the program as themselves.
+        Assert.False(RecipeText.ContainsLookAlikeCharacter("\u00C0"));
+        Assert.False(RecipeText.ContainsLookAlikeCharacter("\u0153"));
+        Assert.False(RecipeText.ContainsLookAlikeCharacter("\u00B9"));
+        Assert.True(RecipeText.ContainsLookAlikeCharacter("\uFF0D"));
+        Assert.True(RecipeText.ContainsLookAlikeCharacter("\u201C"));
+        Assert.True(RecipeText.ContainsLookAlikeCharacter("\u00A0"));
+    }
+
     [Fact]
     public void TheRealMachine_StillRefusesTheFoldedBlocksWithoutAskingItsCodePage()
     {

@@ -665,10 +665,11 @@ connues.
   d'interrogation et un séparateur), un `%` (une variable d'environnement), un
   caractère qui ressemble à un caractère ordinaire (un guillemet typographique,
   un tiret long, une lettre pleine chasse, une espace insécable, ou tout
-  caractère que les pages de codes de la machine transforment en caractère
+  caractère que la page de codes ANSI de la machine transforme en caractère
   ASCII), ou commence par `@` (un fichier de réponses). L'entrée en cause est
-  nommée. La règle des caractères qui ressemblent à d'autres suit les pages de
-  codes de la machine : certaines majuscules accentuées et certaines ligatures
+  nommée. La règle des caractères qui ressemblent à d'autres suit la page de
+  codes ANSI de la machine (celle dans laquelle un programme lit sa ligne de
+  commande) : certaines majuscules accentuées et certaines ligatures
   peuvent donc être refusées dans un argument sur certaines machines, et
   acceptées sur d'autres.
 - Un choix ou une valeur par défaut serait refusé à chaque exécution par la règle

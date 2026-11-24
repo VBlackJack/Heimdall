@@ -620,9 +620,9 @@ each with its line and column when it is known.
   system path prefix (a separator, two question marks and a separator), a `%` (an
   environment variable), a character that looks like a plain one (a typographic
   quote, a long dash, a full-width letter, a no-break space, or any character the
-  code pages of the machine turn into an ASCII one), or starts with `@` (a
+  ANSI code page of the machine turns into an ASCII one), or starts with `@` (a
   response file). The entry at fault is named. The look-alike rule follows the
-  code pages of the machine, so some accented capitals and ligatures can be
+  ANSI code page of the machine (the one a program reads its command line in), so some accented capitals and ligatures can be
   refused in an argument on some machines and accepted on others.
 - A choice or a default would be refused at every run by the rule a typed value
   meets (see below): it holds a control or look-alike character, it starts with
