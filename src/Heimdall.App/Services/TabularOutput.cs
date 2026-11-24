@@ -124,7 +124,10 @@ public sealed class TabularOutput
         }
 
         string flat = value.Replace('\t', ' ').Replace('\r', ' ').Replace('\n', ' ');
-        return InputValidator.SanitizeCsvCell(flat);
+
+        // A paste into a spreadsheet may read a leading double quote as a text qualifier, strip it and
+        // evaluate what is left. The shared CSV rule is not changed: CSV exporters quote their own fields.
+        return flat[0] == '"' ? "'" + flat : InputValidator.SanitizeCsvCell(flat);
     }
 
     /// <summary>The table as tab separated text with a header line, for the clipboard.</summary>

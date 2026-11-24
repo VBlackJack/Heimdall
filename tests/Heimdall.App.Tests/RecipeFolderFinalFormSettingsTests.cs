@@ -133,4 +133,58 @@ public sealed partial class SettingsViewModelTests
             Assert.NotEqual(key, localizer[key]);
         }
     }
+
+    public static TheoryData<string, bool> FinalFormsOfALink => new()
+    {
+        { @"E:\real\tools", true },
+        { @"E:\" + new string('a', 250), false },
+        { @"E:\real\a*b", false },
+        { @"E:\real\a|b", false },
+        { @"C:\", false },
+        { @"\\srv\share\x", false },
+    };
+
+    [Theory]
+    [MemberData(nameof(FinalFormsOfALink))]
+    public async Task SettingsJudgesAFinalFormTheSameWayAsTheResolver(string finalForm, bool accepted)
+    {
+        (SettingsViewModel viewModel, FolderFinalFormMachine machine, LocalizationManager localizer) = await FolderPanelAsync();
+        machine.Finals[@"D:\link"] = finalForm;
+
+        bool added = viewModel.TryAddRecipeProgramFolder(@"D:\link");
+
+        Assert.Equal(accepted, added);
+        Assert.Equal(accepted, RecipeFolderRule.CheckFinalForm(finalForm) == RecipeFolderRefusal.None);
+        Assert.Equal(accepted, viewModel.RecipeProgramFolders.Length == 1);
+        if (!accepted)
+        {
+            Assert.False(string.IsNullOrEmpty(viewModel.RecipeProgramFolderStatus));
+        }
+    }
+
+    [Fact]
+    public async Task ATooLongFinalForm_IsRefusedAtAddTimeWithTheGenericText()
+    {
+        (SettingsViewModel viewModel, FolderFinalFormMachine machine, LocalizationManager localizer) = await FolderPanelAsync();
+        machine.Finals[@"D:\link"] = @"E:\" + new string('a', 250);
+
+        bool added = viewModel.TryAddRecipeProgramFolder(@"D:\link");
+
+        Assert.False(added);
+        Assert.Empty(viewModel.RecipeProgramFolders);
+        Assert.Equal(localizer["RecipeFolderRefusalLeadsToUnallowedLocation"], viewModel.RecipeProgramFolderStatus);
+        Assert.StartsWith("This folder leads to a location that cannot be allowed", viewModel.RecipeProgramFolderStatus, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("en")]
+    [InlineData("fr")]
+    [InlineData("es")]
+    public async Task TheGenericRefusalHasItsTextInTheThreeLanguages(string locale)
+    {
+        LocalizationManager localizer = await LoadLocalizerForToolPacksAsync(locale);
+
+        Assert.True(localizer.HasKey("RecipeFolderRefusalLeadsToUnallowedLocation"));
+        Assert.NotEqual("RecipeFolderRefusalLeadsToUnallowedLocation", localizer["RecipeFolderRefusalLeadsToUnallowedLocation"]);
+    }
 }

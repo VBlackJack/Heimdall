@@ -171,6 +171,7 @@ public static class RecipeImportText
         RecipeFolderRefusal.ListFull => "RecipeFolderRefusalListFull",
         RecipeFolderRefusal.LeadsToDriveRoot => "RecipeFolderRefusalLeadsToDriveRoot",
         RecipeFolderRefusal.LeadsToNetwork => "RecipeFolderRefusalLeadsToNetwork",
+        RecipeFolderRefusal.LeadsToUnallowedLocation => "RecipeFolderRefusalLeadsToUnallowedLocation",
         _ => throw new ArgumentOutOfRangeException(nameof(refusal), refusal, "A refusal without a text."),
     };
 

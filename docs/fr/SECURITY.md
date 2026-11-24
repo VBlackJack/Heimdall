@@ -924,11 +924,15 @@ ces arguments, avec vos droits. Le pack Recettes est désactivé par défaut.
   promis à son sujet. Le fait que l'arrêt d'une exécution arrête aussi les
   processus que le programme a lancés a été vérifié par un seul vrai test avec un
   programme standard, et rien n'est promis au-delà.
-- Un tableau affiché par un outil (la sortie d'une recette en CSV ou en JSON)
-  est neutralisé quand il est copié : une cellule qui commence par `=`, `+`, `-`
-  ou `@` reçoit une apostrophe initiale, pour qu'un tableur ne la lise pas comme
+- Un tableau affiché par un outil est neutralisé quand il est copié, qu'il
+  s'agisse de la sortie d'une recette en CSV ou en JSON ou du tableau d'un outil
+  externe : une cellule qui commence par `=`, `+`, `-`, `@` ou un guillemet
+  double reçoit une apostrophe initiale, pour qu'un tableur ne la lise pas comme
   une formule, et une tabulation ou un saut de ligne dans une cellule devient
-  une espace. La sortie en texte brut est copiée telle quelle.
+  une espace. Une valeur qui commence par `-` ou `+` (un nombre négatif, un
+  décalage horaire, un numéro de téléphone) est donc copiée avec une apostrophe
+  initiale et se colle comme du texte. La sortie en texte brut est copiée telle
+  quelle.
 - Une recette n'est ni signée ni relue par le projet. L'auteur est un texte que
   le fichier affirme, et Heimdall l'affiche comme non vérifié. Un catalogue
   communautaire ne fait pas partie de cette version : une recette vient de qui

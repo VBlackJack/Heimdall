@@ -98,6 +98,16 @@ public sealed class RecipeImportPreviewDecidingLinesTests
 
         Assert.Contains("  Icon: changed", changed);
         Assert.Contains("  Icon: unchanged", same);
+
+        // The only one: every other replacement line says unchanged, in both previews.
+        string[] others = ["Arguments", "Fields", "Program", "Author", "Name", "Description", "Translations", "Output and encoding", "Standard error", "Success exit codes", "Timeout"];
+        foreach (string property in others)
+        {
+            Assert.Contains($"  {property}: unchanged", changed);
+            Assert.DoesNotContain($"  {property}: changed", changed);
+        }
+
+        Assert.DoesNotContain("  Icon: changed", same);
     }
 
     [Theory]

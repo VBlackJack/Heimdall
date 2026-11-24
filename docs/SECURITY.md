@@ -822,11 +822,13 @@ pack is off by default.
   not been verified by a real test, and nothing is promised about it. That ending
   a run also ends the processes the program started was verified by one real
   test with a stock program, and nothing is promised beyond it.
-- A table shown by a tool (the output of a recipe as CSV or JSON) is neutralized
-  when it is copied: a cell that starts with `=`, `+`, `-` or `@` gets a leading
+- A table shown by a tool is neutralized when it is copied, whether it is the
+  output of a recipe as CSV or JSON or the table of an external tool: a cell
+  that starts with `=`, `+`, `-`, `@` or a double quote gets a leading
   apostrophe, so a spreadsheet does not read it as a formula, and a tab or a
-  line break inside a cell becomes a space. Plain text output is copied as it
-  is.
+  line break inside a cell becomes a space. A value that starts with `-` or `+`
+  (a negative number, a time offset, a phone number) is therefore copied with a
+  leading apostrophe and pastes as text. Plain text output is copied as it is.
 - A recipe is not signed and not reviewed by the project. The author is a text
   the file claims, and Heimdall shows it as unverified. A community catalogue is
   not part of this version: a recipe comes from whoever gives you the file.

@@ -121,4 +121,40 @@ public sealed class TabularOutputCopyTests
 
         Assert.Equal(["'=HYPERLINK(1)", "a b", string.Empty, "'-5"], row.Select(cell => cell.Content));
     }
+
+    [Theory]
+    [InlineData("\"=1+1\"", "'\"=1+1\"")]
+    [InlineData("\"text\"", "'\"text\"")]
+    [InlineData("say \"hello\"", "say \"hello\"")]
+    [InlineData("a=\"b\"", "a=\"b\"")]
+    public void ACellThatStartsWithADoubleQuote_GetsALeadingApostrophe_ButAQuoteInsideIsLeftAlone(string cell, string expected)
+        => Assert.Equal(expected, Copy("Name", cell).Split(Environment.NewLine)[1]);
+
+    [Fact]
+    public void AHeaderThatStartsWithADoubleQuote_IsNeutralizedToo()
+        => Assert.Equal("'\"=cmd\"", Copy("\"=cmd\"", "x").Split(Environment.NewLine)[0]);
+
+    [Fact]
+    public void AQuotedFormulaAfterATab_StaysInOneCell_AndTheCellStartsWithItsFirstCharacter()
+    {
+        string row = Copy("A", "a\t\"=1+1\"").Split(Environment.NewLine)[1];
+
+        Assert.DoesNotContain('\t', row);
+        Assert.Equal("a \"=1+1\"", row);
+    }
+
+    [Fact]
+    public void ACellThatStartsWithAQuoteAfterATab_IsFlattenedFirst_ThenJudgedOnItsFirstCharacter()
+        => Assert.Equal(" \"=1+1\"", Copy("A", "\t\"=1+1\"").Split(Environment.NewLine)[1]);
+
+    [Fact]
+    public void TheGridsOwnCopy_NeutralizesAQuotedFormulaToo()
+    {
+        DataGridColumn column = new DataGridTextColumn();
+        List<DataGridClipboardCellContent> row = [new(item: "row", column, "\"=1+1\"")];
+
+        TabularGridCopy.Sanitize(row);
+
+        Assert.Equal("'\"=1+1\"", row[0].Content);
+    }
 }

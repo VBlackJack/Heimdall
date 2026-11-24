@@ -269,7 +269,7 @@ public sealed class RecipeProgramResolver : IRecipeProgramResolver, IRecipeProgr
         string? finalFull = final is null ? null : Canonicalize(final);
         if (finalFull is not null
             && !string.Equals(finalFull.TrimEnd(TrimmedRootEnd), trimmed, StringComparison.OrdinalIgnoreCase)
-            && (!userFolder || RecipeFolderRule.Check(finalFull) == RecipeFolderRefusal.None))
+            && (!userFolder || RecipeFolderRule.CheckFinalForm(finalFull) == RecipeFolderRefusal.None))
         {
             roots.Add(finalFull.TrimEnd(TrimmedRootEnd));
         }

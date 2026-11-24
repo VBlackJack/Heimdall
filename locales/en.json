@@ -6888,5 +6888,6 @@
   "RecipeImportPreviewExitCodes": "Exit codes that count as success: {0}",
   "RecipeImportPreviewIcon": "Icon: {0}",
   "RecipeImportReplaceIconSame": "Icon: unchanged",
-  "RecipeImportReplaceIconChanged": "Icon: changed"
+  "RecipeImportReplaceIconChanged": "Icon: changed",
+  "RecipeFolderRefusalLeadsToUnallowedLocation": "This folder leads to a location that cannot be allowed: the path it leads to is too long, or is not an ordinary local folder path."
 }

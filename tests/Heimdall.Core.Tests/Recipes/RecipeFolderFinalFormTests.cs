@@ -85,4 +85,40 @@ public sealed class RecipeFolderFinalFormTests
 
         Assert.True(Resolve(machine, @"D:\tools\tool.exe", @"D:\tools").IsResolved);
     }
+
+    public static TheoryData<string, bool> FinalForms => new()
+    {
+        { @"E:\real\tools", true },
+        { @"E:\real\tools\", true },
+        { @"E:\" + new string('a', 250), false },
+        { @"E:\real\a*b", false },
+        { @"E:\real\a|b", false },
+        { @"C:\", false },
+        { @"\\srv\share\x", false },
+        { @"\\srv\share", false },
+    };
+
+    [Theory]
+    [MemberData(nameof(FinalForms))]
+    public void TheResolverAndTheRuleJudgeAFinalFormTheSameWay(string finalForm, bool accepted)
+    {
+        string link = @"D:\link";
+        FakeRecipeMachine machine = new FakeRecipeMachine().WithFile(link + @"\tool.exe");
+        machine.Finals[link] = finalForm;
+        machine.Finals[link + @"\tool.exe"] = finalForm.TrimEnd('\\') + @"\tool.exe";
+
+        RecipeProgramVerdict verdict = Resolve(machine, link + @"\tool.exe", link);
+
+        Assert.Equal(accepted, RecipeFolderRule.CheckFinalForm(finalForm) == RecipeFolderRefusal.None);
+        Assert.Equal(accepted, verdict.IsResolved);
+    }
+
+    [Fact]
+    public void ATooLongFinalForm_IsTheGenericRefusal_AndADriveRootAndANetworkPathKeepTheirOwn()
+    {
+        Assert.Equal(RecipeFolderRefusal.LeadsToUnallowedLocation, RecipeFolderRule.CheckFinalForm(@"E:\" + new string('a', 250)));
+        Assert.Equal(RecipeFolderRefusal.LeadsToUnallowedLocation, RecipeFolderRule.CheckFinalForm(@"E:\real\a*b"));
+        Assert.Equal(RecipeFolderRefusal.LeadsToDriveRoot, RecipeFolderRule.CheckFinalForm(@"C:\"));
+        Assert.Equal(RecipeFolderRefusal.LeadsToNetwork, RecipeFolderRule.CheckFinalForm(@"\\srv\share\x"));
+    }
 }

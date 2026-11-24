@@ -6887,5 +6887,6 @@
   "RecipeImportPreviewExitCodes": "Codes de sortie comptant comme un succ\u00e8s : {0}",
   "RecipeImportPreviewIcon": "Ic\u00f4ne : {0}",
   "RecipeImportReplaceIconSame": "Ic\u00f4ne : inchang\u00e9e",
-  "RecipeImportReplaceIconChanged": "Ic\u00f4ne : modifi\u00e9e"
+  "RecipeImportReplaceIconChanged": "Ic\u00f4ne : modifi\u00e9e",
+  "RecipeFolderRefusalLeadsToUnallowedLocation": "Ce dossier m\u00e8ne \u00e0 un emplacement qui ne peut pas \u00eatre autoris\u00e9 : le chemin vers lequel il m\u00e8ne est trop long, ou n'est pas un chemin ordinaire de dossier local."
 }

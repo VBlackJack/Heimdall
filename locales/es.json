@@ -6888,5 +6888,6 @@
   "RecipeImportPreviewExitCodes": "C\u00f3digos de salida que cuentan como correctos: {0}",
   "RecipeImportPreviewIcon": "Icono: {0}",
   "RecipeImportReplaceIconSame": "Icono: sin cambios",
-  "RecipeImportReplaceIconChanged": "Icono: modificado"
+  "RecipeImportReplaceIconChanged": "Icono: modificado",
+  "RecipeFolderRefusalLeadsToUnallowedLocation": "Esta carpeta lleva a una ubicaci\u00f3n que no se puede permitir: la ruta a la que lleva es demasiado larga, o no es una ruta ordinaria de carpeta local."
 }
