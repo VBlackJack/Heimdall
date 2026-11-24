@@ -31,6 +31,7 @@ public sealed class ToolPackPolicyTests
         ToolPack.NetworkDiagnostics,
         ToolPack.Administration,
         ToolPack.Audit,
+        ToolPack.Recipes,
     ];
 
     [Theory]

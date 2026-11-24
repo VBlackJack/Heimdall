@@ -79,7 +79,9 @@ public partial class ServerListViewModel
 
     /// <summary>The selected tool's display name, or empty when no tool is selected.</summary>
     public string ToolDetailName =>
-        SelectedToolDescriptor is { } tool ? tool.ResolveLabel(LocalizeOrRaw) : "";
+        SelectedToolDescriptor is { } tool
+            ? (tool.IsRecipe ? RecipeToolText.TabTitle(tool, LocalizeOrRaw) : tool.ResolveLabel(LocalizeOrRaw))
+            : "";
 
     /// <summary>The selected tool's category label, or empty when no tool is selected.</summary>
     public string ToolDetailCategory =>
@@ -94,6 +96,11 @@ public partial class ServerListViewModel
             if (tool is null)
             {
                 return "";
+            }
+
+            if (tool.IsRecipe)
+            {
+                return tool.RecipeDescription ?? "";
             }
 
             string key = tool.DescriptionKey ?? $"ToolDesc{tool.Id}";

@@ -32,7 +32,7 @@ namespace Heimdall.App.Tests;
 public sealed partial class SettingsViewModelTests
 {
     private static readonly ToolPack[] OptionalPacks =
-        [ToolPack.Essentials, ToolPack.NetworkDiagnostics, ToolPack.Administration, ToolPack.Audit];
+        [ToolPack.Essentials, ToolPack.NetworkDiagnostics, ToolPack.Administration, ToolPack.Audit, ToolPack.Recipes];
 
     private static ToolAvailability AvailabilityForbidding(params ToolPack[] forbidden)
         => new(
@@ -205,7 +205,7 @@ public sealed partial class SettingsViewModelTests
         foreach (ToolPackSwitchViewModel toolPackSwitch in viewModel.ToolPackSwitches)
         {
             int expected = registry.All.Count(descriptor => descriptor.Pack == toolPackSwitch.Pack);
-            Assert.True(expected > 0, toolPackSwitch.Pack + " holds no tool");
+            Assert.True(expected > 0 || toolPackSwitch.Pack == ToolPack.Recipes, toolPackSwitch.Pack + " holds no tool");
             Assert.Equal(expected, toolPackSwitch.ToolCount);
             Assert.Equal(
                 expected.ToString(System.Globalization.CultureInfo.InvariantCulture) + " tools",
@@ -219,14 +219,14 @@ public sealed partial class SettingsViewModelTests
     }
 
     [Fact]
-    public async Task OnlyTheAuditSwitch_CarriesTheWarning_AndTheSwitchesAreWordedFromTheLocale()
+    public async Task OnlyTheAuditAndRecipesSwitches_CarryTheWarning_AndTheSwitchesAreWordedFromTheLocale()
     {
         LocalizationManager localizer = await LoadLocalizerForToolPacksAsync("en");
         SettingsViewModel viewModel = CreateViewModel(new FakeConfigManager(), localizer: localizer);
 
         foreach (ToolPackSwitchViewModel toolPackSwitch in viewModel.ToolPackSwitches)
         {
-            Assert.Equal(toolPackSwitch.Pack == ToolPack.Audit, toolPackSwitch.HasWarning);
+            Assert.Equal(toolPackSwitch.Pack is ToolPack.Audit or ToolPack.Recipes, toolPackSwitch.HasWarning);
             Assert.Equal(localizer[SettingsViewModel.ToolPackLabelKey(toolPackSwitch.Pack)], toolPackSwitch.Label);
             Assert.Equal(localizer[SettingsViewModel.ToolPackDescriptionKey(toolPackSwitch.Pack)], toolPackSwitch.Description);
         }
@@ -260,7 +260,7 @@ public sealed partial class SettingsViewModelTests
         Assert.True(viewModel.Defaults[nameof(SettingsViewModel.DisabledToolPacks)].IsModified);
 
         viewModel.ResetSettingToDefault(nameof(SettingsViewModel.DisabledToolPacks));
-        Assert.Equal([nameof(ToolPack.Audit)], viewModel.DisabledToolPacks);
+        Assert.Equal([nameof(ToolPack.Audit), nameof(ToolPack.Recipes)], viewModel.DisabledToolPacks);
         Assert.False(SwitchOf(viewModel, ToolPack.Audit).IsEnabled);
     }
 
@@ -334,10 +334,10 @@ public sealed partial class SettingsViewModelTests
         SettingsViewModel viewModel = CreateViewModel(config);
         viewModel.LoadFromSettings(SettingsViewModel.ParseFactoryDefaults(ReadFactoryDefaultsFileForToolPacks()));
 
-        viewModel.LoadFromSettings(new AppSettings { DisabledToolPacks = ["audit"] });
+        viewModel.LoadFromSettings(new AppSettings { DisabledToolPacks = ["audit", "recipes"] });
         Assert.False(viewModel.Defaults[nameof(SettingsViewModel.DisabledToolPacks)].IsModified);
 
-        viewModel.LoadFromSettings(new AppSettings { DisabledToolPacks = [" AUDIT "] });
+        viewModel.LoadFromSettings(new AppSettings { DisabledToolPacks = [" AUDIT ", " Recipes "] });
         Assert.False(viewModel.Defaults[nameof(SettingsViewModel.DisabledToolPacks)].IsModified);
     }
 
@@ -361,7 +361,7 @@ public sealed partial class SettingsViewModelTests
 
         viewModel.ResetSettingToDefault(nameof(SettingsViewModel.DisabledToolPacks));
 
-        Assert.Empty(viewModel.DisabledToolPacks);
+        Assert.Equal([nameof(ToolPack.Recipes)], viewModel.DisabledToolPacks);
 
         FakeConfigManager listed = new()
         {
@@ -371,7 +371,7 @@ public sealed partial class SettingsViewModelTests
 
         other.ResetSettingToDefault(nameof(SettingsViewModel.DisabledToolPacks));
 
-        Assert.Equal([nameof(ToolPack.Audit)], other.DisabledToolPacks);
+        Assert.Equal([nameof(ToolPack.Recipes), nameof(ToolPack.Audit)], other.DisabledToolPacks);
     }
 
     [Fact]
@@ -390,7 +390,7 @@ public sealed partial class SettingsViewModelTests
     [Fact]
     public void TheDefaultMarker_IgnoresAForbiddenPack()
     {
-        FakeConfigManager config = new() { Settings = new AppSettings { DisabledToolPacks = [] } };
+        FakeConfigManager config = new() { Settings = new AppSettings { DisabledToolPacks = [nameof(ToolPack.Recipes)] } };
         SettingsViewModel viewModel = CreateViewModel(config, toolAvailability: AvailabilityForbidding(ToolPack.Audit));
         viewModel.LoadFromSettings(config.Settings);
         Assert.False(viewModel.Defaults[nameof(SettingsViewModel.DisabledToolPacks)].IsModified);
@@ -400,8 +400,8 @@ public sealed partial class SettingsViewModelTests
     }
 
     [Theory]
-    [InlineData("en", "Tool packs turned off: Audit and reconnaissance", "Modified from default: Tool packs turned off: Audit and reconnaissance", "Reset to the default value: Tool packs turned off: Audit and reconnaissance")]
-    [InlineData("fr", "Packs d'outils désactivés : Audit et reconnaissance", "Modifié, valeur par défaut : Packs d'outils désactivés : Audit et reconnaissance", "Rétablir la valeur par défaut : Packs d'outils désactivés : Audit et reconnaissance")]
+    [InlineData("en", "Tool packs turned off: Audit and reconnaissance, Recipes", "Modified from default: Tool packs turned off: Audit and reconnaissance, Recipes", "Reset to the default value: Tool packs turned off: Audit and reconnaissance, Recipes")]
+    [InlineData("fr", "Packs d'outils désactivés : Audit et reconnaissance, Recettes", "Modifié, valeur par défaut : Packs d'outils désactivés : Audit et reconnaissance, Recettes", "Rétablir la valeur par défaut : Packs d'outils désactivés : Audit et reconnaissance, Recettes")]
     public async Task TheDefaultMarker_NamesTheSettingAndThePacks_NotTheRawEnumName(
         string locale,
         string expectedDefault,

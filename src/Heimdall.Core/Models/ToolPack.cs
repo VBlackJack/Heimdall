@@ -40,4 +40,10 @@ public enum ToolPack
 
     /// <summary>Scanning, enumeration and credential-testing tools, sensitive by nature.</summary>
     Audit,
+
+    /// <summary>
+    /// Tools described by recipe files written by other people, each one running a program already
+    /// present on this machine. Off by default, on fresh and on existing installs.
+    /// </summary>
+    Recipes,
 }

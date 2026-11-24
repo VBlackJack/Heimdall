@@ -30,6 +30,9 @@ namespace Heimdall.App.Services;
 /// The policy beats the user's setting. <see cref="ToolPack.Core"/> and pack names this build does
 /// not know are ignored in a hand-edited settings file. The effective set is computed once and
 /// again on each settings change, never per call, because reading the current settings clones them.
+/// The Recipes pack fails closed: it counts as off until <see cref="AppSettings.RecipesPackMigrated"/>
+/// says the one-time step ran or the user chose, so a step that failed or was skipped (a settings
+/// file of a newer schema is never written) cannot leave it on for the session.
 /// </remarks>
 public sealed class ToolAvailability : IToolAvailability
 {
@@ -72,7 +75,7 @@ public sealed class ToolAvailability : IToolAvailability
         // was in force before it. Not yet loaded: nothing is disabled until they are.
         if (currentSettings() is { } loaded)
         {
-            _enabled = ComputeEnabled(loaded.DisabledToolPacks);
+            _enabled = ComputeEnabled(loaded);
         }
 
         subscribeToSettingsChanged(OnSettingsChanged);
@@ -113,14 +116,15 @@ public sealed class ToolAvailability : IToolAvailability
     public bool IsPackForbiddenByPolicy(ToolPack pack) => _policy.IsForbidden(pack);
 
     /// <summary>
-    /// Turns a settings list into the set of packs it leaves enabled, policy applied. Case is
+    /// Turns the settings into the set of packs they leave enabled, policy applied. Case is
     /// ignored, and names that are not an optional pack of this build (including numbers, which
-    /// <see cref="Enum.TryParse{TEnum}(string, bool, out TEnum)"/> would accept) are dropped.
+    /// <see cref="Enum.TryParse{TEnum}(string, bool, out TEnum)"/> would accept) are dropped. The
+    /// Recipes pack is left out while the settings do not carry its marker, and before they exist.
     /// </summary>
-    internal FrozenSet<ToolPack> ComputeEnabled(IEnumerable<string>? disabledNames)
+    internal FrozenSet<ToolPack> ComputeEnabled(AppSettings? settings)
     {
         HashSet<ToolPack> disabled = [];
-        if (disabledNames is not null)
+        if (settings?.DisabledToolPacks is { } disabledNames)
         {
             foreach (string? name in disabledNames)
             {
@@ -129,6 +133,11 @@ public sealed class ToolAvailability : IToolAvailability
                     disabled.Add(pack);
                 }
             }
+        }
+
+        if (settings is not { RecipesPackMigrated: true })
+        {
+            disabled.Add(ToolPack.Recipes);
         }
 
         return Enum.GetValues<ToolPack>()
@@ -169,7 +178,7 @@ public sealed class ToolAvailability : IToolAvailability
             // Not cached before the first load: the answer is "nothing disabled" and must be
             // asked for again once the settings exist.
             AppSettings? settings = _currentSettings();
-            FrozenSet<ToolPack> computed = ComputeEnabled(settings?.DisabledToolPacks);
+            FrozenSet<ToolPack> computed = ComputeEnabled(settings);
             if (settings is not null)
             {
                 _enabled = computed;
@@ -189,7 +198,7 @@ public sealed class ToolAvailability : IToolAvailability
         lock (_gate)
         {
             AppSettings current = _currentSettings() ?? settings;
-            next = ComputeEnabled(current.DisabledToolPacks);
+            next = ComputeEnabled(current);
             previous = _enabled ?? ComputeEnabled(null);
             _enabled = next;
         }

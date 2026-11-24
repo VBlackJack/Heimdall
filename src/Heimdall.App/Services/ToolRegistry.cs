@@ -17,6 +17,7 @@
 using System.Collections.Frozen;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Models;
+using Heimdall.Core.Recipes;
 
 namespace Heimdall.App.Services;
 
@@ -42,6 +43,12 @@ public sealed class ToolRegistry
     // Dynamic external tool overlay (populated after startup scan)
     private readonly List<ToolEntry> _externalEntries = [];
     private readonly Dictionary<string, ToolEntry> _externalById = new(StringComparer.OrdinalIgnoreCase);
+
+    // Recipe overlay (tools described by imported recipe files). Kept apart from the external
+    // overlay so that replacing one never drops the other; both are guarded by _externalLock,
+    // because the composed list and the id lookups must change together.
+    private readonly List<ToolEntry> _recipeEntries = [];
+    private readonly Dictionary<string, ToolEntry> _recipeById = new(StringComparer.OrdinalIgnoreCase);
     private readonly object _externalLock = new();
 
     /// <summary>All tool descriptors in display order (for menus and palette).</summary>
@@ -49,6 +56,12 @@ public sealed class ToolRegistry
 
     /// <summary>Raised when external tools are registered after a provider scan.</summary>
     public event Action? ExternalToolsChanged;
+
+    /// <summary>
+    /// Raised when the set of recipe tools changes. May be raised on any thread; a subscriber that
+    /// touches the UI marshals itself.
+    /// </summary>
+    public event Action? RecipeToolsChanged;
 
     public ToolRegistry()
     {
@@ -172,12 +185,81 @@ public sealed class ToolRegistry
                 _externalById[id] = entry;
             }
 
-            // Rebuild the All list: built-in entries + external entries
-            All = _entries.Concat(_externalEntries).Select(e => e.Descriptor).ToList();
+            // Rebuild the All list: built-in entries + external entries + recipe entries
+            RebuildAll();
         }
 
         ExternalToolsChanged?.Invoke();
     }
+
+    /// <summary>
+    /// Replaces the recipe tools with one tool per recipe, each opened through the supplied factory.
+    /// </summary>
+    /// <param name="recipes">The recipes to list, in display order. A repeated id keeps its last entry.</param>
+    /// <param name="viewFactory">Creates the view of a recipe; called on the UI thread when the tool is opened.</param>
+    /// <remarks>
+    /// Thread-safe, like <see cref="RegisterExternalTools"/>. The external overlay and the built-in
+    /// list are untouched, and <see cref="RegisterExternalTools"/> leaves the recipes alone in turn.
+    /// A recipe tool belongs to <see cref="ToolPack.Recipes"/> and carries the recipe's author and
+    /// description as text, never as a locale key; its only palette alias is its own id.
+    /// </remarks>
+    public void RegisterRecipeTools(IReadOnlyList<Recipe> recipes, Func<Recipe, IToolView> viewFactory)
+    {
+        ArgumentNullException.ThrowIfNull(recipes);
+        ArgumentNullException.ThrowIfNull(viewFactory);
+
+        lock (_externalLock)
+        {
+            _recipeEntries.Clear();
+            _recipeById.Clear();
+
+            foreach (Recipe recipe in recipes)
+            {
+                ToolDescriptor descriptor = CreateRecipeDescriptor(recipe);
+                Recipe captured = recipe;
+                ToolEntry entry = new(descriptor, () => viewFactory(captured));
+
+                if (_recipeById.TryGetValue(descriptor.Id, out ToolEntry previous))
+                {
+                    _recipeEntries.Remove(previous);
+                }
+
+                _recipeEntries.Add(entry);
+                _recipeById[descriptor.Id] = entry;
+            }
+
+            RebuildAll();
+            s_registeredRecipeGeometry = _recipeEntries.ToFrozenDictionary(
+                entry => entry.Descriptor.Id,
+                entry => entry.Descriptor.IconResourceKey ?? ExternalGeometryKey,
+                StringComparer.OrdinalIgnoreCase);
+        }
+
+        RecipeToolsChanged?.Invoke();
+    }
+
+    /// <summary>The descriptor of the tool a recipe becomes.</summary>
+    internal static ToolDescriptor CreateRecipeDescriptor(Recipe recipe)
+    {
+        ArgumentNullException.ThrowIfNull(recipe);
+
+        return new ToolDescriptor(
+            Id: ToolDescriptor.RecipeIdPrefix + recipe.Id,
+            Category: ToolCategory.External,
+            CategoryLabelKey: "ToolCategoryExternal",
+            LabelKey: recipe.Name,
+            LabelWithArgKey: null,
+            CommandPrefixes: [recipe.Id],
+            IsNetworkTool: false,
+            IconResourceKey: RecipeGeometryKeyOf(recipe.Icon),
+            Pack: ToolPack.Recipes,
+            RecipeAuthor: recipe.Author,
+            RecipeDescription: recipe.Description);
+    }
+
+    // Callers hold _externalLock: the composed list is rebuilt from the three sources together.
+    private void RebuildAll()
+        => All = _entries.Concat(_externalEntries).Concat(_recipeEntries).Select(e => e.Descriptor).ToList();
 
     /// <summary>
     /// Registers one tool under the external overlay with a factory the caller supplies.
@@ -199,7 +281,7 @@ public sealed class ToolRegistry
             var entry = new ToolEntry(descriptor, factory);
             _externalEntries.Add(entry);
             _externalById[descriptor.Id] = entry;
-            All = _entries.Concat(_externalEntries).Select(e => e.Descriptor).ToList();
+            RebuildAll();
         }
     }
 
@@ -213,7 +295,8 @@ public sealed class ToolRegistry
         if (_byId.TryGetValue(key, out var entry)) return entry.Descriptor;
         lock (_externalLock)
         {
-            return _externalById.TryGetValue(key, out var ext) ? ext.Descriptor : null;
+            if (_externalById.TryGetValue(key, out var ext)) return ext.Descriptor;
+            return _recipeById.TryGetValue(key, out var recipe) ? recipe.Descriptor : null;
         }
     }
 
@@ -231,6 +314,8 @@ public sealed class ToolRegistry
         {
             if (_externalById.TryGetValue(key, out var ext))
                 return ext.Factory();
+            if (_recipeById.TryGetValue(key, out var recipe))
+                return recipe.Factory();
         }
         throw new ArgumentException($"Unknown tool ID: {toolId}", nameof(toolId));
     }
@@ -371,6 +456,28 @@ public sealed class ToolRegistry
         ["TCPPING"] = "ToolNetworkBrush",
     }.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
 
+    // The built-in glyph of each icon key a recipe may name (see RecipeIcons). A recipe never
+    // carries art of its own; a key outside the set falls back to the generic external glyph.
+    private static readonly FrozenDictionary<string, string> s_recipeGeometryKeys = new Dictionary<string, string>(StringComparer.Ordinal)
+    {
+        [RecipeIcons.Default] = "Geo.Tool.External",
+        ["terminal"] = "Geo.Tool.CommandLibrary",
+        ["network"] = "Geo.Tool.NetworkScanner",
+        ["search"] = "Geo.Tool.DnsLookup",
+        ["document"] = "Geo.Tool.LogViewer",
+        ["shield"] = "Geo.Tool.PasswordAudit",
+        ["clock"] = "Geo.Tool.DateTime",
+        ["server"] = "Geo.Tool.ServiceStatusDashboard",
+    }.ToFrozenDictionary(StringComparer.Ordinal);
+
+    private const string ExternalGeometryKey = "Geo.Tool.External";
+
+    /// <summary>The geometry resource key for the icon key of a recipe; null or unknown gives the default glyph.</summary>
+    internal static string RecipeGeometryKeyOf(string? iconKey)
+        => iconKey is not null && s_recipeGeometryKeys.TryGetValue(iconKey, out string? geoKey)
+            ? geoKey
+            : ExternalGeometryKey;
+
     /// <summary>
     /// Returns the Geometry resource key for a tool (e.g. "TOOL:PING" → "Geo.Tool.NetworkScanner").
     /// Used by XAML converters that lack DI access.
@@ -380,8 +487,21 @@ public sealed class ToolRegistry
         var key = StripPrefix(toolId);
         if (s_geometryKeys.TryGetValue(key, out var geoKey)) return geoKey;
         // External tools (EXT:*) use the generic external icon
-        return key.StartsWith("EXT:", StringComparison.OrdinalIgnoreCase) ? "Geo.Tool.External" : null;
+        if (key.StartsWith("EXT:", StringComparison.OrdinalIgnoreCase)) return ExternalGeometryKey;
+        // A recipe tool (RCP:*): the glyph of the icon key its recipe names, as last registered.
+        // This lookup has no registry to ask, so the application's one registry publishes them.
+        if (key.StartsWith(ToolDescriptor.RecipeIdPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return s_registeredRecipeGeometry.TryGetValue(key, out string? recipeGeoKey) ? recipeGeoKey : ExternalGeometryKey;
+        }
+
+        return null;
     }
+
+    // Published by RegisterRecipeTools for the static lookups above (XAML converters have no DI
+    // access). A single application registry exists, so the last registration is the truth.
+    private static volatile FrozenDictionary<string, string> s_registeredRecipeGeometry =
+        FrozenDictionary<string, string>.Empty;
 
     /// <summary>
     /// Returns the category brush resource key for a tool (e.g. "TOOL:PING" → "ToolNetworkBrush").
@@ -391,8 +511,11 @@ public sealed class ToolRegistry
     {
         var key = StripPrefix(toolId);
         if (s_categoryBrushKeys.TryGetValue(key, out var brushKey)) return brushKey;
-        // External tools (EXT:*) use the external brush
-        return key.StartsWith("EXT:", StringComparison.OrdinalIgnoreCase) ? "ToolExternalBrush" : "ToolBadgeBrush";
+        // External tools (EXT:*) and recipe tools (RCP:*) use the external brush
+        return key.StartsWith("EXT:", StringComparison.OrdinalIgnoreCase)
+            || key.StartsWith(ToolDescriptor.RecipeIdPrefix, StringComparison.OrdinalIgnoreCase)
+            ? "ToolExternalBrush"
+            : "ToolBadgeBrush";
     }
 
     private static string StripPrefix(string toolId)

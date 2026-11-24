@@ -65,6 +65,8 @@ internal static class SettingsImportPreview
         "CmdLibGitSyncUrl",
         "SharedSessionSources",
         "DisabledToolPacks",
+        "RecipeProgramFolders",
+        SettingsTransfer.RecipesPackTurnedOnKey,
     };
 
     private const string ListSeparator = ", ";
@@ -87,11 +89,15 @@ internal static class SettingsImportPreview
         string lines = string.Join(
             Environment.NewLine,
             others.Take(MaxLines).Select(change => DescribeChange(localizer, change)));
+
+        // The notice that the file turns the Recipes pack on is a line of its own, not a setting: the
+        // count in the header is the number of settings.
+        int settingCount = changes.Count(change => change.Key != SettingsTransfer.RecipesPackTurnedOnKey);
         string text = localizer.FormatCount(
-            changes.Count,
+            settingCount,
             "SettingsImportPreviewOne",
             "SettingsImportPreview",
-            changes.Count,
+            settingCount,
             lines);
 
         int rest = others.Count - MaxLines;
@@ -128,6 +134,11 @@ internal static class SettingsImportPreview
     {
         ArgumentNullException.ThrowIfNull(localizer);
         ArgumentNullException.ThrowIfNull(change);
+
+        if (change.Key == SettingsTransfer.RecipesPackTurnedOnKey)
+        {
+            return localizer["SettingsImportPreviewRecipesOn"];
+        }
 
         string name = SettingsLabelCatalog.TryGetPlace(change.Key, out SettingsPanelPlace? place) && place is not null
             ? DescribePlace(localizer, place)

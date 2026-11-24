@@ -143,8 +143,8 @@ ajouter une entrée de registre et l'implémentation `IToolView` correspondante.
 - `DescriptionKey` : clé de description explicite optionnelle ; lorsqu'elle est
   nulle, l'interface applique la convention `ToolDesc{Id}`
 - `Pack` : le `ToolPack` auquel l'outil appartient (`Core`, `Essentials`,
-  `NetworkDiagnostics`, `Administration` ou `Audit`) ; nul pour les outils
-  externes détectés, qui n'appartiennent à aucun pack
+  `NetworkDiagnostics`, `Administration`, `Audit` ou `Recipes`) ; nul pour
+  les outils externes détectés, qui n'appartiennent à aucun pack
 
 La colonne Pack des tableaux du catalogue ci-dessus donne le pack de chaque
 outil intégré. Un outil dont le pack est désactivé dans les Paramètres, ou
@@ -243,6 +243,485 @@ avertissement d'élévation en amont.
 Règle de licence : les binaires tiers sont uniquement détectés et encapsulés. Ne
 redistribuez pas les outils NirSoft, Sysinternals, NanaRun ou d'autres outils
 tiers dans les paquets Heimdall, sauf si leur licence l'autorise explicitement.
+
+## Recettes
+
+Une recette est un fichier texte qui décrit un outil : un programme déjà présent
+sur l'ordinateur, les champs que l'utilisateur remplit, les arguments donnés au
+programme et la façon d'afficher sa sortie. Importer le fichier ajoute l'outil à
+Heimdall, à côté des outils intégrés. La version courte est dans
+[FEATURES.md](FEATURES.md#recettes) ; ce que les règles ci-dessous protègent, et
+ce qu'elles ne protègent pas, est dans [SECURITY.md](SECURITY.md#recettes).
+
+### Ce qu'est une recette, et ce qu'elle n'est pas
+
+- C'est un seul fichier JSON, en UTF-8 (une marque d'ordre des octets est
+  acceptée), nommé `*.heimdall-recipe.json`, de 64 Kio au plus.
+- Elle lance un programme déjà présent sur l'ordinateur. Elle ne fournit aucun
+  script ni aucun binaire, et rien n'est téléchargé pour elle.
+- Elle ne passe jamais par un interpréteur de commandes. Le programme est lancé
+  directement, et chaque élément de la liste d'arguments lui parvient comme un
+  argument distinct : rien n'est découpé, mis entre guillemets ou joint en
+  route.
+- Elle n'est ni signée ni relue. L'auteur écrit dans le fichier est affiché comme
+  non vérifié partout où l'outil apparaît.
+- Elle est aussi dangereuse que le programme qu'elle nomme et les arguments
+  qu'elle donne. Les règles ci-dessous restreignent ce qu'une recette peut
+  demander ; elles ne rendent pas une recette sûre. L'aperçu d'import est la
+  vraie barrière : lisez-le, et n'importez que ce à quoi vous faites confiance.
+
+### Utiliser une recette
+
+**Activer le pack.** Le pack Recettes est désactivé par défaut, sur une
+installation neuve comme sur une installation qui existait déjà (une étape
+unique, au premier démarrage de cette version, le range parmi les packs
+désactivés, et ne le désactive plus jamais une fois que vous l'avez activé). Le
+pack compte comme désactivé tant que cette étape n'a pas été exécutée ou que
+vous n'avez pas activé l'interrupteur et enregistré : un démarrage où l'étape n'a
+pas pu s'exécuter (un fichier de paramètres écrit par une version plus récente
+n'est jamais modifié) ne le laisse donc pas activé. L'interrupteur se trouve
+dans
+`Paramètres > Avancé > Outils et intégrations > Packs d'outils` et porte une
+ligne d'avertissement. Quand l'organisation interdit le pack par une politique,
+l'interrupteur est sur arrêt et désactivé, et l'import est refusé (voir
+[SECURITY.md](SECURITY.md#recettes)).
+
+Un fichier de paramètres importé avec **Importer des paramètres** n'active jamais
+le pack de lui-même. Un fichier exporté par une version antérieure le laisse tel
+quel. Un fichier exporté par cette version ne l'active que s'il vient d'une
+installation où le pack était activé ; la confirmation montre alors une ligne à
+part, "Active le pack Recettes", parmi les lignes à vérifier en premier.
+
+**Importer.** Dans `Paramètres > Avancé > Outils et intégrations > Recettes`,
+choisissez **Importer une recette...** et sélectionnez le fichier. L'import est
+possible quand le pack est désactivé : la recette est enregistrée, et la
+confirmation précise qu'elle n'apparaîtra pas dans l'onglet Outils tant que le
+pack n'est pas activé. Heimdall alors :
+
+1. refuse le fichier, en listant chaque problème avec sa ligne et sa colonne,
+   quand ce n'est pas une recette valide (voir "Ce qui est refusé" plus bas) ;
+2. résout le programme et refuse le fichier quand ce programme n'a pas le droit
+   de s'exécuter ;
+3. affiche un aperçu et attend une confirmation. Rien n'est écrit avant.
+
+**Lire l'aperçu.** Il montre, dans cet ordre : un avertissement disant que la
+recette a été écrite par quelqu'un d'autre et ne peut pas être vérifiée ; pour
+un remplacement, ce qui change ; le programme qui sera lancé, sous la forme du
+chemin complet trouvé sur cet ordinateur ; chaque argument, un par ligne entre
+crochets, exactement comme écrit dans le fichier, une liste imbriquée étant
+signalée comme conservée ou omise en bloc ; le nom, l'auteur (marqué non
+vérifié), l'identifiant, la version et la description ; chaque champ avec son
+type, son caractère obligatoire ou facultatif, sa valeur par défaut, ses choix,
+son motif et sa longueur maximale, et les arguments qu'un interrupteur ajoute
+quand il est activé ; chaque traduction de la recette (la langue, le nom, la
+description et les libellés des champs), puisque l'outil l'affiche à la place du
+texte anglais quand l'interface est dans cette langue ; si la recette lit l'hôte
+et le port de la session sélectionnée ; la façon dont la sortie est affichée ; et
+le délai. Un caractère
+de contrôle ou invisible est écrit `\uXXXX`. Dans le programme, les arguments
+et les valeurs par défaut, tout caractère hors de l'ASCII imprimable est écrit
+`\uXXXX` lui aussi : une lettre qui ressemble à une lettre ASCII ne peut donc pas
+passer pour elle.
+
+**Où l'outil apparaît.** Dans l'onglet Outils sous un titre Recettes, dans
+l'arborescence Outils de la barre latérale et dans la palette de commandes, avec
+la mention "Recette non vérifiée de {auteur}" sur la carte, la ligne et le titre
+de l'onglet. Ouvrez-le, remplissez les champs et choisissez **Exécuter** ;
+**Arrêter** interrompt une exécution en cours. La sortie s'affiche en texte ou
+en tableau (voir `output`). Quand la recette garde l'erreur standard à part,
+elle s'affiche sous "Sortie d'erreur". La ligne d'état dit si l'exécution a
+réussi, a échoué avec un code de sortie, a dépassé le délai, a été annulée ou n'a
+pas pu être lancée.
+
+**Ce qui se passe à chaque exécution.** Avant que quoi que ce soit démarre,
+Heimdall vérifie que le pack est activé et que la recette est toujours importée,
+qu'une session est sélectionnée quand la recette en a besoin, et chaque valeur
+saisie (voir "Ce qui est refusé" plus bas). Il résout ensuite à nouveau le
+programme et compare le résultat au chemin enregistré à l'import : quand le
+programme correspond désormais à un autre fichier, ou ne se résout plus,
+l'exécution est refusée et le message demande d'importer à nouveau la recette. Il
+crée pour l'exécution un dossier de travail neuf et vide sous
+`Heimdall-recipe-runs` dans votre dossier temporaire (dans un sous-dossier nommé
+d'après le dossier de données utilisé, pour que deux instances ne le partagent
+jamais), et non dans le dossier de
+données (un programme ne démarre donc pas à côté des paramètres de Heimdall), et le supprime ensuite (les restes d'un arrêt brutal
+précédent sont supprimés au démarrage). Le programme démarre sans fenêtre, avec
+son entrée standard fermée, avec les droits et l'environnement de Heimdall
+lui-même, placé dans un objet de travail (job) Windows juste après son démarrage, qui
+arrête les processus qu'il a lancés quand l'exécution prend fin (un processus
+lancé dans ce tout premier instant peut y échapper) ; quand Windows refuse de créer le job, seule
+une exécution arrêtée ou ayant dépassé le délai arrête l'arbre de processus. Au
+plus 1 Mio de sortie est conservé par flux (2 Mio en tout quand l'erreur standard
+est gardée à part) : le reste est lu puis jeté, et une ligne indique que la
+sortie a été coupée. L'exécution prend fin au délai de la recette, et aussi
+quand le pack est désactivé ou devient interdit.
+
+**Remplacer ou supprimer une recette dont un onglet est ouvert.** Un onglet garde
+la recette avec laquelle il a été ouvert. Une fois cette recette remplacée, ou
+supprimée puis importée à nouveau, l'onglet affiche dans son en-tête "Cette
+recette a été remplacée ou supprimée après l'ouverture de cet onglet. Fermez cet
+onglet et ouvrez de nouveau l'outil.", **Exécuter** est désactivé, et une
+exécution refuse de démarrer. Ouvrir l'outil ne remet jamais un tel onglet au
+premier plan : cela en ouvre un nouveau.
+
+**Remplacer.** Importer un fichier dont l'`id` est déjà importé est un
+remplacement. L'aperçu s'intitule "Remplacer la recette" et indique l'ancienne
+et la nouvelle version, et si les arguments, les champs et le programme ont
+changé. Chacun de l'auteur, du nom, de la description, des traductions, de la
+sortie et de son encodage, du mode de conservation de l'erreur standard, des
+codes de sortie de succès et du délai est aussi dit sur une ligne à part,
+"inchangé" ou "modifié", en comparant les recettes analysées et non les octets.
+
+**Exporter.** Le bouton d'export d'une recette, dans la liste des Paramètres,
+écrit une copie du fichier exactement tel qu'il a été importé. Il refuse quand
+le fichier enregistré ne correspond plus à ce qui a été importé.
+
+**Supprimer.** Le bouton de suppression demande d'abord confirmation. L'outil
+disparaît, et tout ce qui est enregistré et l'utilise devient indisponible.
+
+**Où les recettes sont stockées.** Un fichier par recette dans le dossier
+`recipes` du dossier de données (nommé d'après l'identifiant), plus un index qui
+garde, pour chaque recette, le SHA-256 des octets importés et le chemin du
+programme résolu à l'import. Une recette dont le fichier a été modifié, ou qui a
+été déposée à la main dans le dossier, n'est pas chargée. Au plus 200 recettes
+peuvent être importées. L'export des paramètres ne transporte pas les recettes.
+
+**Les dossiers d'où les recettes peuvent lancer des programmes.** Une recette
+peut toujours lancer un programme depuis le dossier Windows, Program Files et
+Program Files (x86). Pour en autoriser un autre, utilisez **Ajouter un
+dossier...** dans la même section Recettes des Paramètres, enregistrez les
+paramètres puis importez à nouveau la recette. Un dossier doit être un chemin
+complet sur une lettre de lecteur (`D:\Outils`) et non la racine d'un lecteur
+(`D:\`), de 240 caractères au plus, sans chemin réseau, sans chemin de
+périphérique, sans partie `.` ou `..`, sans `%`, sans caractère générique et sans
+partie qui se termine par un point ou une espace. Au plus 32 dossiers sont conservés. Un fichier de paramètres qui porte
+cette liste est signalé comme sensible dans l'aperçu d'import.
+
+### Écrire une recette
+
+Une recette s'écrit à la main, comme un fichier texte, à partir du format
+ci-dessous. Heimdall n'a pas d'éditeur pour cela. JSON n'a pas de commentaires
+(un commentaire ou une virgule finale est une erreur de syntaxe) : l'exemple est
+donc suivi d'un tableau qui l'explique.
+
+```json
+{
+  "schemaVersion": 1,
+  "id": "example.name-lookup",
+  "version": "1.0.0",
+  "author": "Example",
+  "name": "Name lookup",
+  "description": "Looks up a DNS record for a name, and can ask a DNS server of your choice.",
+  "labels": {
+    "fr": {
+      "name": "Recherche de nom",
+      "description": "Recherche un enregistrement DNS pour un nom, et peut interroger le serveur DNS de votre choix.",
+      "fields": {
+        "query": "Nom à rechercher",
+        "record": "Type d'enregistrement",
+        "server": "Serveur DNS (facultatif)",
+        "details": "Afficher les détails"
+      }
+    }
+  },
+  "program": "nslookup.exe",
+  "arguments": [
+    "-type={in:record}",
+    "{in:details}",
+    "{in:query}",
+    ["{in:server}"]
+  ],
+  "inputs": [
+    { "name": "query", "type": "hostname", "label": "Name to look up", "required": true },
+    { "name": "record", "type": "choice", "label": "Record type", "choices": ["A", "AAAA", "MX", "TXT"], "default": "A" },
+    { "name": "server", "type": "hostname", "label": "DNS server (optional)" },
+    { "name": "details", "type": "bool", "label": "Show details", "default": false, "whenTrue": ["-debug"] }
+  ],
+  "output": "text",
+  "outputEncoding": "oem",
+  "stderr": "merge",
+  "successExitCodes": [0],
+  "timeoutSeconds": 20,
+  "icon": "search"
+}
+```
+
+| Partie de l'exemple | Ce qu'elle fait |
+|---|---|
+| `schemaVersion`, `id`, `version`, `author` | La version du format, l'identité `auteur.nom` que Heimdall ne renomme jamais, une version sémantique, et l'auteur, affiché et toujours marqué non vérifié |
+| `name`, `description` | Textes en anglais, obligatoires |
+| `labels` | Traductions facultatives du nom, de la description et des libellés de champs, rangées par balise de langue |
+| `program` | Un simple nom de fichier : Heimdall trouve lui-même `nslookup.exe`, dans Windows, Program Files ou un dossier autorisé |
+| `"-type={in:record}"` | Un argument fait de texte fixe et d'un champ. La valeur de `record` est choisie dans une liste fermée : elle ne peut jamais être lue comme une option |
+| `"{in:details}"` | Un interrupteur placé seul comme élément entier. Activé, il ajoute les éléments de son `whenTrue` (ici `-debug`) ; désactivé, il n'ajoute rien |
+| `"{in:query}"` | Un champ obligatoire qui remplit un argument entier. Une valeur saisie qui commence par `-`, `/` ou `@` est refusée ici |
+| `["{in:server}"]` | Une liste imbriquée. `server` est facultatif : toute la liste est omise quand le champ est vide |
+| `inputs` | Les champs, dans l'ordre où ils sont affichés |
+| `output`, `outputEncoding`, `stderr` | La sortie est affichée en texte, décodée avec la page de code OEM de la console, l'erreur standard y étant mêlée |
+| `successExitCodes`, `timeoutSeconds` | Les codes de sortie qui comptent comme un succès, et le nombre de secondes au bout duquel l'exécution est arrêtée |
+| `icon` | Une des clés d'icône intégrées |
+
+#### Propriétés de premier niveau
+
+Les noms de propriété sont sensibles à la casse. Une propriété que le format ne
+définit pas est refusée, comme une propriété qui apparaît deux fois dans le même
+objet.
+
+| Propriété | Type | Obligatoire | Règle |
+|---|---|---|---|
+| `schemaVersion` | entier | oui | `1` est la seule version que cette version lit. Un nombre plus grand est refusé, et le message nomme la version prise en charge |
+| `id` | chaîne | oui | `auteur.nom` : deux parties séparées par un point, chacune de 1 à 32 caractères parmi les minuscules, les chiffres et le tiret, ne commençant ni ne finissant par un tiret. Il identifie la recette (remplacement, favoris, entrées enregistrées) |
+| `version` | chaîne | oui | Une version sémantique comme `1.2.3`, avec des parties de préversion et de build facultatives ; 64 caractères au plus. Affichage et aperçu de remplacement seulement |
+| `author` | chaîne | oui | 64 caractères au plus. Affiché, toujours comme non vérifié |
+| `name` | chaîne | oui | 64 caractères au plus |
+| `description` | chaîne | oui | 500 caractères au plus |
+| `labels` | objet | non | Traductions, voir plus bas. 16 langues au plus |
+| `program` | chaîne | oui | Un simple nom de fichier ou un chemin complet avec une lettre de lecteur ; 260 caractères au plus. Voir "Quel programme peut être lancé" |
+| `arguments` | tableau | non | La liste d'arguments, voir plus bas. 64 éléments au plus en tout |
+| `inputs` | tableau | non | Les champs, voir plus bas. 16 au plus |
+| `output` | chaîne | non | `text` (par défaut), `csv` ou `json`. Les deux derniers s'affichent en tableau |
+| `outputEncoding` | chaîne | non | `utf8` (par défaut) ou `oem`, la page de code OEM de la console, dans laquelle écrivent la plupart des outils console de Windows |
+| `stderr` | chaîne | non | `separate` (par défaut) : gardée à part et affichée comme sortie d'erreur. `merge` : mêlée à la sortie |
+| `successExitCodes` | tableau d'entiers | non | `[0]` par défaut. De 1 à 16 entrées. Un code de sortie hors de la liste est signalé comme un échec |
+| `timeoutSeconds` | entier | non | 60 par défaut, de 1 à 600. Le programme est arrêté quand ce délai est écoulé |
+| `icon` | chaîne | non | `tool` (par défaut), `terminal`, `network`, `search`, `document`, `shield`, `clock` ou `server` |
+
+Chaque texte affiché (auteur, nom, description, libellés) ne doit pas être vide
+et ne doit contenir ni caractère de contrôle, ni caractère de mise en forme
+invisible (comme le forçage de l'écriture de droite à gauche), ni séparateur de
+ligne ou de paragraphe, ni substitut isolé.
+
+#### Champs
+
+Chaque entrée de `inputs` est un objet doté de ces propriétés :
+
+| Propriété | Type | Obligatoire | Règle |
+|---|---|---|---|
+| `name` | chaîne | oui | Une lettre, puis des lettres, des chiffres ou des tirets bas ; 32 caractères au plus ; unique dans la recette. C'est ce que désigne `{in:name}` |
+| `type` | chaîne | oui | `string`, `int`, `number`, `bool`, `hostname`, `ipaddress`, `path` ou `choice` |
+| `label` | chaîne | oui | 64 caractères au plus |
+| `required` | booléen | non | `false` par défaut. Une valeur par défaut compte comme une valeur fournie |
+| `default` | chaîne, nombre ou booléen | non | Une chaîne (tout type sauf `bool`), un nombre (`int` et `number` seulement) ou `true` ou `false` (`bool` seulement). 512 caractères au plus. Soumise aux mêmes règles de texte fixe qu'un élément d'argument, et valide pour le type de son champ |
+| `pattern` | chaîne | `string` seulement | Une expression régulière que la valeur entière doit satisfaire ; 256 caractères au plus. Une valeur pour laquelle la comparaison dure plus de 250 ms est refusée |
+| `maxLength` | entier | `string` seulement | De 1 à 1024. 256 en l'absence de valeur |
+| `choices` | tableau de chaînes | `choice` seulement, alors obligatoire | De 1 à 64 valeurs, chacune de 128 caractères au plus, sans doublon |
+| `whenTrue` | tableau de chaînes | `bool` seulement, alors obligatoire | Les éléments que l'interrupteur ajoute quand il est activé. Ils suivent les règles des éléments d'argument |
+
+Une propriété qui n'est pas permise pour le type de son champ est refusée. Un
+champ `bool` doit figurer dans `arguments` comme élément entier, sinon le fichier
+est refusé.
+
+Ce que chaque type accepte à l'exécution :
+
+| Type | Accepte |
+|---|---|
+| `string` | Tout texte dans la limite de `maxLength` et conforme à `pattern` s'il y en a un |
+| `int` | Un entier sur 32 bits, avec un signe facultatif, 64 caractères au plus |
+| `number` | Un nombre décimal fini écrit avec un point, exposant permis, 64 caractères au plus |
+| `bool` | Activé ou désactivé. Une valeur vide est désactivée |
+| `hostname` | Un nom d'hôte valide, sans espace avant ni après |
+| `ipaddress` | Une adresse IPv4 ou IPv6 (chiffres hexadécimaux, deux-points et queue pointée facultative), sans identifiant de zone (`%`), sans crochets et sans espace avant ni après |
+| `path` | Un chemin local. Refusés : un chemin réseau, un chemin de périphérique (`\\?\`, `\\.\`), un chemin qui commence par un seul séparateur sans lettre de lecteur, un deux-points ailleurs que juste après la lettre de lecteur, une partie qui se termine par un point ou une espace, et une partie qui est un nom de périphérique DOS (`CON`, `PRN`, `AUX`, `NUL`, `COM1` à `COM9`, `LPT1` à `LPT9`) |
+| `choice` | L'une des valeurs de `choices`, comparée exactement |
+
+#### Arguments, marqueurs et listes imbriquées
+
+`arguments` est un tableau. Chaque entrée est soit une chaîne (un élément), soit
+un tableau de chaînes (une liste imbriquée d'éléments). Un élément est
+exactement un argument du programme : Heimdall ne met rien entre guillemets, ne
+découpe rien et ne joint rien, si bien qu'une valeur qui contient des espaces ou
+des guillemets parvient quand même au programme comme un seul argument.
+
+Dans un élément, un marqueur est remplacé par une valeur :
+
+| Écrit | Remplacé par |
+|---|---|
+| `{in:name}` | La valeur du champ `name`, saisie par l'utilisateur ou prise dans sa valeur par défaut |
+| `{Host}` | L'hôte de la session sélectionnée |
+| `{Port}` | Le port de la session sélectionnée |
+| `{{` et `}}` | Une `{` littérale et une `}` littérale |
+
+La syntaxe est fermée et sensible à la casse : tout autre emploi d'une accolade,
+un marqueur qui ne nomme aucun champ et un élément vide sont refusés à l'import.
+Aucune variable d'environnement n'est jamais développée, et un `%` dans le texte
+fixe est refusé.
+
+Un champ est *facultatif* quand ce n'est pas un interrupteur, qu'il n'est pas
+obligatoire et qu'il n'a pas de valeur par défaut non vide. Un champ facultatif
+ne peut pas servir dans un élément isolé, car la liste d'arguments deviendrait
+ambiguë quand il est vide : placez l'élément dans une liste imbriquée. Une liste
+imbriquée est omise en bloc dès qu'un champ facultatif qu'elle utilise est vide.
+Les éléments de `whenTrue` suivent la même règle. Un champ obligatoire, ou doté
+d'une valeur par défaut, peut servir partout.
+
+Un champ `bool` se place dans `arguments` comme un élément isolé entier
+(`"{in:details}"`) et se développe en éléments de son `whenTrue` quand il est
+activé, en rien quand il est désactivé. Il ne peut ni se mêler à d'autre texte
+dans un élément, ni se placer dans une liste imbriquée.
+
+64 éléments au plus en tout (éléments isolés, membres de listes imbriquées et
+éléments de `whenTrue` ensemble), chacun de 512 caractères au plus.
+
+#### Valeurs de session
+
+`{Host}` et `{Port}` sont les seules valeurs qu'une recette peut lire dans une
+session, et elles viennent de la session sélectionnée dans l'arborescence.
+Quand une recette utilise l'un des deux et qu'aucune session n'est sélectionnée,
+l'outil le dit et ne s'exécute pas : sélectionnez une session, puis rouvrez
+l'outil. L'hôte passe par la validation de nom d'hôte la plus stricte et le port
+doit être un numéro de port valide.
+
+#### Traductions
+
+`labels` associe une balise de langue (comme `fr` ou `fr-CA` : une première
+partie de 2 à 8 lettres, puis des parties de 1 à 8 lettres ou chiffres, 35
+caractères au plus) à un objet doté des propriétés facultatives `name`,
+`description` et `fields` (une table qui associe un nom de champ à son libellé
+traduit). Heimdall utilise l'entrée dont la balise est la langue de
+l'interface, sinon la première entrée de même langue principale, sinon les
+textes anglais de la recette. Une traduction d'un champ qui n'existe pas est
+refusée.
+
+#### Quel programme peut être lancé
+
+`program` est un simple nom de fichier (`nslookup`, `ping.exe` ; `.exe` est
+ajouté quand le nom n'a pas de point) ou un chemin complet qui commence par une
+lettre de lecteur. Heimdall le résout lui-même en chemin complet ; l'ordre de
+recherche du système d'exploitation n'est jamais utilisé. Il doit satisfaire
+tout ceci :
+
+- le fichier se termine par `.exe` (ni `.cmd`, ni `.bat`, ni `.com`, ni `.scr`) ;
+- il existe et, une fois tous les liens et jonctions suivis, son emplacement
+  final est sous le dossier Windows, Program Files, Program Files (x86) ou un
+  dossier autorisé dans les Paramètres. Un lien qui mène en dehors est refusé ;
+- sous le dossier Windows, Program Files ou Program Files (x86), ni le fichier
+  ni aucun dossier au-dessus (jusqu'à cette racine) ne doit permettre à un
+  utilisateur qui n'est pas administrateur de le modifier, et les permissions
+  doivent être lisibles. La confiance accordée à un dossier autorisé dans les
+  Paramètres dépend de l'endroit où se trouve le programme, pas de celui du
+  dossier : un programme situé hors de Windows et de Program Files, sous un tel
+  dossier, est approuvé en entier et n'est pas vérifié de cette façon, alors
+  qu'un programme sous Windows ou Program Files est toujours vérifié, même quand
+  un dossier autorisé le couvre ;
+- un simple nom n'est cherché que dans les entrées de la variable `PATH` qui sont
+  elles-mêmes sous ces dossiers, dans l'ordre de `PATH` ; le premier fichier
+  trouvé décide. Le dossier courant et le dossier de Heimdall ne sont jamais
+  parcourus ;
+- ce n'est pas un interpréteur de commandes ni de scripts (voir la liste
+  ci-dessous) ;
+- le nom de fichier d'origine inscrit dans la ressource de version du fichier
+  n'est pas non plus sur cette liste.
+
+Le texte du programme ne peut contenir ni `%` ni caractère de contrôle, et ne
+peut pas être un chemin relatif ou réseau.
+
+La liste des noms refusés est un garde-fou contre une erreur courante, pas une
+frontière (voir [SECURITY.md](SECURITY.md#recettes)). Elle contient : `cmd`,
+`powershell`, `pwsh`, `bash`, `sh`, `zsh`, `wsl`, `cscript`, `wscript`, `mshta`,
+`python`, `pythonw`, `py`, `node`, `perl`, `ruby`, `php`, `java`, `javaw`,
+`msiexec`, `rundll32`, `regsvr32`, `regsvcs`, `regasm`, `installutil`,
+`msbuild`, `certutil`, `bitsadmin`, `wmic`, `forfiles`, `schtasks`, `sc`, `reg`,
+`net`, `net1`, `curl`, `ssh`, `scp`, `sftp`, `ftp`, `tftp`, `git`, `tar`,
+`robocopy`, `xcopy`, `expand`, `extrac32`, `makecab`, `hh`, `control`,
+`explorer`, `conhost`, `cmstp`, `odbcconf`, `pcalua`, `scriptrunner`, `at`,
+`taskkill`, `msedge`, `chrome`, `firefox`, `brave`, `opera`,
+`SyncAppvPublishingServer`, `wt`, `tttracer`, `pcwrun`, `esentutl`, `replace`,
+`mmc`, `msdt`, `runas`, `dotnet`, `csc`, `vbc`, `jsc`, `ie4uinit` et
+`presentationhost`, plus les cibles d'interpréteur que le reste de Heimdall refuse déjà
+(comme les extensions de script `.bat`, `.cmd`, `.ps1`, `.vbs`, `.js`, `.wsf` et
+`.hta`).
+
+#### Version du schéma
+
+`schemaVersion` vaut `1`. Toute addition au format l'incrémente : un fichier
+écrit pour un format plus récent n'est donc jamais compris à moitié. Une version
+supérieure à celle que cette version lit est refusée, avec un message qui donne
+les deux numéros et demande de mettre Heimdall à jour. La liste des clés d'icône
+fait partie du format, et l'élargir incrémente la version.
+
+### Ce qui est refusé
+
+**Dans le fichier, à l'import.** Heimdall signale tous les problèmes qu'il
+trouve (jusqu'à 50), chacun avec sa ligne et sa colonne quand elles sont
+connues.
+
+- Le fichier est vide, plus grand que 64 Kio, n'est pas du JSON ou de l'UTF-8
+  valide, ou est imbriqué sur plus de 8 niveaux.
+- Une propriété est inconnue ou apparaît deux fois ; une propriété obligatoire
+  manque ; une valeur n'a pas le bon type ; un texte, une liste ou un nombre est
+  hors de ses limites.
+- L'`id`, la `version`, un nom de champ ou une balise de langue est mal formé ;
+  deux champs portent le même nom ; une traduction nomme un champ qui n'existe
+  pas ; l'icône n'est pas dans la liste.
+- Une propriété est employée sur un type qui ne la permet pas, un `choice` n'a
+  pas de liste ou a une valeur par défaut hors de cette liste, un `bool` n'a pas
+  de `whenTrue` ou n'est jamais placé dans les arguments, un motif ne compile
+  pas, une valeur par défaut n'est pas valide pour son type.
+- Un marqueur est inconnu ou mal formé, ne nomme aucun champ, ou un champ
+  facultatif se trouve seul dans un élément (placez-le dans une liste
+  imbriquée) ; un interrupteur est mêlé à d'autre texte.
+- Le texte fixe (le programme, un élément, un élément de `whenTrue`, une valeur
+  par défaut, un choix) contient deux séparateurs de suite (une double barre
+  oblique inverse, une double barre oblique, ou une barre oblique inverse à côté
+  d'une barre oblique, dans un sens ou dans l'autre : un chemin réseau), `://`
+  (une URL), le préfixe de chemin système (un séparateur, deux points
+  d'interrogation et un séparateur), un `%` (une variable d'environnement), un
+  caractère qui ressemble à un caractère ordinaire (un guillemet typographique,
+  un tiret long, une lettre pleine chasse, une espace insécable, ou tout
+  caractère que la page de codes ANSI de la machine transforme en caractère
+  ASCII), ou commence par `@` (un fichier de réponses). L'entrée en cause est
+  nommée. La règle des caractères qui ressemblent à d'autres suit la page de
+  codes ANSI de la machine (celle dans laquelle un programme lit sa ligne de
+  commande) : certaines majuscules accentuées et certaines ligatures peuvent
+  donc être refusées dans un argument sur certaines machines, et acceptées sur
+  d'autres.
+- Un choix ou une valeur par défaut serait refusé à chaque exécution par la règle
+  que rencontre une valeur saisie (voir plus bas) : il contient un caractère de
+  contrôle ou qui ressemble à un autre, il commence par `-`, `/`, `@`, une barre
+  oblique inverse ou une espace à l'endroit où son champ ouvre un argument, ou il
+  forme un séparateur doublé avec le texte voisin. Le fichier est refusé à
+  l'import. Gardez le caractère dans le texte fixe de
+  l'élément et ne listez que les valeurs nues : écrivez `"-type={in:record}"`
+  avec les choix `A` et `MX`, et non `"{in:record}"` avec les choix `-type=A` et
+  `-type=MX`.
+
+**Dans le programme, à l'import.** Le programme n'est pas un `.exe`, n'est ni un
+simple nom ni un chemin avec lettre de lecteur, est introuvable, se trouve en
+dehors de Windows, de Program Files et des dossiers autorisés, est un lien qui
+mène en dehors, ou est un interpréteur de commandes ou de scripts, ou un
+exécutable relais (d'après son nom de fichier ou le nom d'origine de sa ressource
+de version). Le message nomme le programme et, quand la cause est le dossier,
+dit d'ajouter le dossier dans les Paramètres, d'enregistrer, puis d'importer à
+nouveau.
+
+**Une valeur saisie, à chaque exécution.** Un champ obligatoire vide ; une valeur
+avec un caractère de contrôle ou invisible, ou qui ressemble à un autre ; une
+valeur qui commence par `-`, `/`, `@`, une barre oblique inverse ou une espace à
+l'endroit où son marqueur ouvre l'argument (un `-` initial est la façon dont une
+valeur est lue comme une option, un `@` initial comme un fichier de réponses) ; une valeur qui ne convient pas à son type (voir le tableau
+ci-dessus) ; une valeur trop longue, hors de ses choix ou qui ne satisfait pas
+son motif ; une valeur qui, jointe au texte fixe voisin, formerait un séparateur
+doublé (un chemin réseau ou le début d'une URL) ; et tout argument final qui
+contient deux séparateurs de suite (sous l'une ou l'autre forme et en toute
+combinaison), le préfixe de chemin système ou `://`, quelle que soit son origine.
+Le champ affiche la raison.
+
+**Le programme a changé, à chaque exécution.** Quand le programme ne se résout
+plus au chemin enregistré à l'import (un autre fichier répond désormais à ce
+nom, ou il a été déplacé, supprimé ou n'est plus autorisé), l'exécution ne
+démarre pas. Importez à nouveau la recette pour accepter le nouvel emplacement.
+
+### Fichiers sources
+
+- `src/Heimdall.Core/Recipes/` : le format (`RecipeFormat`, `RecipeLimits`,
+  `RecipeIcons`), l'analyseur et le validateur stricts, la règle des valeurs,
+  l'expanseur, le résolveur de programme, la liste des programmes refusés et
+  l'exécuteur.
+- `src/Heimdall.App/Services/RecipeStore.cs` : stockage et chargement.
+- `src/Heimdall.App/Services/RecipeImportService.cs` et
+  `RecipeImportPreview.cs` : import, remplacement et texte de l'aperçu.
+- `src/Heimdall.App/Services/RecipeToolRegistrar.cs` : enregistrement des
+  recettes importées comme outils.
 
 ## Moteur d'audit SecNumCloud
 

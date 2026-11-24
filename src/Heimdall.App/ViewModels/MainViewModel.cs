@@ -1420,6 +1420,10 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
 
         var connectionType = $"TOOL:{toolId.ToUpperInvariant()}";
 
+        // The tab of a recipe tool says what it is whichever route opened it: the recipe's own name,
+        // then the word "Recipe" and its author, marked as unverified.
+        title = TitleOfToolTab(ToolRegistry.GetById(toolId), title, _localizer.GetString);
+
         // A command captured from a terminal lands in the library tab already open rather than
         // in a second one. The capture carries the session's host, which would otherwise make
         // it an open "with context" below, and every capture would add a tab.
@@ -1445,8 +1449,10 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
 
         if (!isNetworkTool && !hasContext)
         {
+            // A tab whose recipe was replaced or removed since it was opened is not the tool any
+            // more: it stays for the user to close, and opening the tool makes a fresh one.
             var existing = Connection.ActiveSessions
-                .FirstOrDefault(s => s.ConnectionType == connectionType);
+                .FirstOrDefault(s => s.ConnectionType == connectionType && s.HostControl is not IStaleToolView { IsStale: true });
             if (existing is not null)
             {
                 Connection.ActiveSession = existing;
@@ -1488,6 +1494,13 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         return ToolOpenOutcome.Opened;
     }
 
+    /// <summary>
+    /// The title of a tool tab: the one the route asked for, except for a recipe tool, whose tab
+    /// always says what it is whichever route opened it.
+    /// </summary>
+    internal static string TitleOfToolTab(ToolDescriptor? descriptor, string requestedTitle, Func<string, string> localize)
+        => descriptor is { IsRecipe: true } ? RecipeToolText.TabTitle(descriptor, localize) : requestedTitle;
+
     private void TrackRecentToolWhen(bool recordRecent, string toolId)
     {
         if (recordRecent)
@@ -1509,7 +1522,9 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
             return false;
         }
 
-        string label = ToolRegistry.GetById(toolId)?.ResolveLabel(_localizer.GetString) ?? toolId;
+        // A recipe is named the way its tab names it, so a refusal never shows its name without its author.
+        ToolDescriptor? refused = ToolRegistry.GetById(toolId);
+        string label = refused is null ? toolId : RecipeToolText.TabTitle(refused, _localizer.GetString);
         StatusText = _localizer.Format(ToolUnavailableException.MessageKeyFor(state), label);
         Core.Logging.FileLogger.Info($"Tool '{toolId}' refused: {state}.");
         return true;

@@ -46,6 +46,7 @@ public sealed class ToolRegistryPackTests
             "PORTSCAN", "BANNER", "SNMPWALK", "FWTEST", "NETMAP", "TLSAUDIT", "SMBENUM", "DEFAULTCREDS",
             "SECNUMCLOUD", "PRIVLAUNCH",
         ],
+        [ToolPack.Recipes] = [],
     };
 
     private static string[] IdsOf(ToolRegistry registry, ToolPack pack)

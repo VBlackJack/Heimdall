@@ -1,0 +1,265 @@
+<!--
+  Copyright 2026 Julien Bombled
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+<UserControl x:Class="Heimdall.App.Views.Tools.RecipeToolView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:behaviors="clr-namespace:Heimdall.App.Behaviors"
+             xmlns:loc="clr-namespace:Heimdall.App.Localization"
+             Background="{DynamicResource BackgroundBrush}">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header: the recipe's own name, who wrote it (never verified), and what it says it does.
+             All of it is plain text bound as text: nothing in a recipe is a locale key or markup. -->
+        <Border Grid.Row="0" Padding="{StaticResource ToolHeaderPadding}"
+                Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource BorderStrongBrush}"
+                BorderThickness="0,0,0,1">
+            <StackPanel>
+                <TextBlock x:Name="HeaderTitle" Text="{Binding Title}"
+                           FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextPrimaryBrush}"
+                           TextTrimming="CharacterEllipsis"/>
+                <TextBlock x:Name="HeaderProvenance" Text="{Binding Provenance}"
+                           FontSize="{StaticResource FontSizeCaption}"
+                           Foreground="{DynamicResource WarningTextBrush}"
+                           TextWrapping="Wrap"/>
+                <TextBlock x:Name="HeaderStale" Text="{Binding StaleText}"
+                           Margin="{StaticResource MarginSubsectionTop}"
+                           FontSize="{StaticResource FontSizeBody}"
+                           Foreground="{DynamicResource WarningTextBrush}"
+                           TextWrapping="Wrap"
+                           Visibility="{Binding IsStale, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                <TextBlock x:Name="HeaderDescription" Text="{Binding Description}"
+                           Margin="{StaticResource MarginSubsectionTop}"
+                           FontSize="{StaticResource FontSizeBody}"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           TextWrapping="Wrap"/>
+                <TextBlock x:Name="TxtSessionTarget" Text="{Binding SessionTargetText}"
+                           Margin="{StaticResource MarginSubsectionTop}"
+                           FontSize="{StaticResource FontSizeCaption}"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           TextWrapping="Wrap"
+                           Visibility="{Binding UsesSession, Converter={StaticResource BoolToVisibilityConverter}}"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Input fields, generated from the recipe -->
+        <ScrollViewer Grid.Row="1" MaxHeight="320" VerticalScrollBarVisibility="Auto"
+                      Focusable="False">
+            <ItemsControl x:Name="FieldList" ItemsSource="{Binding Fields}"
+                          Margin="{StaticResource ToolHeaderPadding}"
+                          IsTabStop="False">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Margin="{StaticResource MarginStackItem}">
+                            <TextBlock Text="{Binding Label}"
+                                       Margin="{StaticResource MarginLabelBottom}"
+                                       FontSize="{StaticResource FontSizeCaption}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Visibility="{Binding ShowLabel, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                            <TextBox Text="{Binding Text, UpdateSourceTrigger=PropertyChanged}"
+                                     IsReadOnly="{Binding IsLocked}"
+                                     Visibility="{Binding IsText, Converter={StaticResource BoolToVisibilityConverter}}"
+                                     FontSize="{StaticResource FontSizeBodyLarge}" FontFamily="{StaticResource FontFamilyMonospace}"
+                                     Padding="{StaticResource PaddingInput}"
+                                     Background="{DynamicResource CardBrush}"
+                                     Foreground="{DynamicResource TextPrimaryBrush}"
+                                     BorderBrush="{DynamicResource BorderBrush}"
+                                     AutomationProperties.Name="{Binding AutomationName}"/>
+                            <CheckBox IsChecked="{Binding IsChecked, Mode=TwoWay}"
+                                      Content="{Binding Label}"
+                                      IsEnabled="{Binding IsLocked, Converter={StaticResource InvertBoolConverter}}"
+                                      Visibility="{Binding IsBool, Converter={StaticResource BoolToVisibilityConverter}}"
+                                      Foreground="{DynamicResource TextPrimaryBrush}"
+                                      AutomationProperties.Name="{Binding AutomationName}"/>
+                            <ComboBox ItemsSource="{Binding Choices}"
+                                      SelectedItem="{Binding SelectedChoice, Mode=TwoWay}"
+                                      IsEnabled="{Binding IsLocked, Converter={StaticResource InvertBoolConverter}}"
+                                      Visibility="{Binding IsChoice, Converter={StaticResource BoolToVisibilityConverter}}"
+                                      MinWidth="160" HorizontalAlignment="Left"
+                                      Background="{DynamicResource CardBrush}"
+                                      Foreground="{DynamicResource TextPrimaryBrush}"
+                                      AutomationProperties.Name="{Binding AutomationName}"/>
+                            <!-- Why the last run refused this value: heard when it appears -->
+                            <TextBlock Text="{Binding Error, NotifyOnTargetUpdated=True}"
+                                       Style="{StaticResource ToolInlineErrorTextStyle}"
+                                       Margin="{StaticResource MarginSubsectionTop}"
+                                       Visibility="{Binding HasError, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                        </StackPanel>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <!-- Actions, the progress of a run, and why a run did not start -->
+        <Border Grid.Row="2" Padding="{StaticResource ToolHeaderPadding}"
+                Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource BorderStrongBrush}"
+                BorderThickness="0,1,0,1">
+            <StackPanel>
+                <StackPanel Orientation="Horizontal">
+                    <Button x:Name="BtnRun"
+                            Content="{loc:Translate RecipeBtnRun}"
+                            Command="{Binding RunCommand}"
+                            Style="{DynamicResource PrimaryButtonStyle}"
+                            Padding="{StaticResource PaddingButtonPrimary}"
+                            VerticalAlignment="Center"
+                            TabIndex="0"
+                            AutomationProperties.Name="{loc:Translate RecipeBtnRun}"/>
+                    <Button x:Name="BtnStop"
+                            Content="{loc:Translate RecipeBtnStop}"
+                            Command="{Binding StopCommand}"
+                            Style="{DynamicResource SecondaryButtonStyle}"
+                            Padding="{StaticResource PaddingButtonPrimary}"
+                            Margin="{StaticResource MarginInlineControl}"
+                            VerticalAlignment="Center"
+                            TabIndex="1"
+                            AutomationProperties.Name="{loc:Translate RecipeBtnStop}"/>
+                </StackPanel>
+                <ProgressBar x:Name="RunProgress" Style="{StaticResource ToolLoadingBarStyle}"
+                             Margin="{StaticResource MarginSubsectionTop}"
+                             Visibility="{Binding IsRunning, Converter={StaticResource BoolToVisibilityConverter}}"
+                             AutomationProperties.Name="{loc:Translate RecipeA11yRunning}"/>
+                <TextBlock x:Name="TxtGeneralError" Text="{Binding GeneralError, NotifyOnTargetUpdated=True}"
+                           Style="{StaticResource ToolInlineErrorTextStyle}"
+                           Margin="{StaticResource MarginSubsectionTop}"
+                           Visibility="{Binding HasGeneralError, Converter={StaticResource BoolToVisibilityConverter}}"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Result: how the run ended, then the output as a grid or as text, then standard error -->
+        <Grid Grid.Row="3">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <TextBlock x:Name="TxtStatus" Grid.Row="0" Text="{Binding StatusText, NotifyOnTargetUpdated=True}"
+                       Margin="{StaticResource ToolHeaderPadding}"
+                       FontSize="{StaticResource FontSizeBody}" FontWeight="SemiBold"
+                       Foreground="{DynamicResource TextPrimaryBrush}"
+                       TextWrapping="Wrap"
+                       AutomationProperties.LiveSetting="Polite"
+                       behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"
+                       Visibility="{Binding HasStatus, Converter={StaticResource BoolToVisibilityConverter}}"/>
+            <TextBlock x:Name="TxtTruncation" Grid.Row="1" Text="{Binding TruncationText}"
+                       Margin="{StaticResource ToolHeaderPadding}"
+                       FontSize="{StaticResource FontSizeCaption}"
+                       Foreground="{DynamicResource WarningTextBrush}"
+                       TextWrapping="Wrap"
+                       Visibility="{Binding HasTruncation, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+            <DataGrid x:Name="ResultsGrid" Grid.Row="2"
+                      ItemsSource="{Binding OutputView}"
+                      Visibility="{Binding ShowGrid, Converter={StaticResource BoolToVisibilityConverter}}"
+                      AutoGenerateColumns="True" IsReadOnly="True"
+                      CanUserSortColumns="True" CanUserReorderColumns="True"
+                      HeadersVisibility="Column" GridLinesVisibility="Horizontal"
+                      SelectionMode="Extended" SelectionUnit="FullRow"
+                      Background="{DynamicResource BackgroundBrush}"
+                      Foreground="{DynamicResource TextPrimaryBrush}"
+                      RowBackground="{DynamicResource BackgroundBrush}"
+                      AlternatingRowBackground="{DynamicResource SurfaceBrush}"
+                      BorderBrush="{DynamicResource BorderBrush}"
+                      HorizontalGridLinesBrush="{DynamicResource BorderBrush}"
+                      FontSize="{StaticResource FontSizeBody}"
+                      TabIndex="2"
+                      AutomationProperties.Name="{loc:Translate RecipeOutputLabel}">
+                <!-- Columns are generated from a DataTable, so a row is a DataRowView and its
+                     indexer is the only stable handle: two cells read aloud beat the type name. -->
+                <DataGrid.RowStyle>
+                    <Style TargetType="{x:Type DataGridRow}"
+                           BasedOn="{StaticResource ThemedDataGridRowStyle}">
+                        <Setter Property="AutomationProperties.Name">
+                            <Setter.Value>
+                                <MultiBinding Converter="{StaticResource AccessibleRowNameConverter}">
+                                    <Binding Source="{x:Static loc:LocalizationSource.Instance}"
+                                             Path="[A11yRecipeResultRow]"/>
+                                    <Binding Path="[0]"/>
+                                    <Binding Path="[1]"/>
+                                </MultiBinding>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </DataGrid.RowStyle>
+            </DataGrid>
+
+            <TextBox x:Name="TxtOutput" Grid.Row="2" Text="{Binding OutputText, Mode=OneWay}"
+                     Visibility="{Binding ShowText, Converter={StaticResource BoolToVisibilityConverter}}"
+                     FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}"
+                     Padding="{StaticResource PaddingInput}"
+                     IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
+                     VerticalScrollBarVisibility="Auto"
+                     HorizontalScrollBarVisibility="Auto"
+                     Background="{DynamicResource BackgroundBrush}"
+                     Foreground="{DynamicResource TextPrimaryBrush}"
+                     BorderThickness="0"
+                     TabIndex="3"
+                     AutomationProperties.Name="{loc:Translate RecipeOutputLabel}"/>
+
+            <!-- Standard error, when the recipe keeps it apart -->
+            <StackPanel Grid.Row="3"
+                        Visibility="{Binding HasErrorOutput, Converter={StaticResource BoolToVisibilityConverter}}">
+                <TextBlock Text="{loc:Translate RecipeErrorOutputLabel}"
+                           Margin="{StaticResource ToolHeaderPadding}"
+                           FontSize="{StaticResource FontSizeCaption}" FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextSecondaryBrush}"/>
+                <TextBox x:Name="TxtErrorOutput" Text="{Binding ErrorOutputText, Mode=OneWay}"
+                         MaxHeight="160"
+                         FontSize="{StaticResource FontSizeBody}" FontFamily="{StaticResource FontFamilyMonospace}"
+                         Padding="{StaticResource PaddingInput}"
+                         IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap"
+                         VerticalScrollBarVisibility="Auto"
+                         Background="{DynamicResource BackgroundBrush}"
+                         Foreground="{DynamicResource ErrorTextBrush}"
+                         BorderThickness="0"
+                         TabIndex="4"
+                         AutomationProperties.Name="{loc:Translate RecipeErrorOutputLabel}"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- Footer -->
+        <Border Grid.Row="4" Padding="{StaticResource ToolFooterPadding}"
+                Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource BorderStrongBrush}"
+                BorderThickness="0,1,0,0">
+            <DockPanel>
+                <Button x:Name="BtnCopy" DockPanel.Dock="Right"
+                        Content="{loc:Translate ToolBtnCopyToClipboard}"
+                        Click="OnCopyClick"
+                        IsEnabled="{Binding HasOutput}"
+                        Style="{DynamicResource SecondaryButtonStyle}"
+                        Padding="{StaticResource PaddingButtonCopy}" Margin="{StaticResource MarginInlineControl}"
+                        TabIndex="5"
+                        ToolTip="{loc:Translate ToolBtnCopyToClipboard}"
+                        AutomationProperties.Name="{loc:Translate ToolBtnCopyToClipboard}"/>
+                <TextBlock x:Name="TxtRowCount" Text="{Binding RowCountText}"
+                           FontSize="{StaticResource FontSizeSmallCaption}"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           VerticalAlignment="Center"/>
+            </DockPanel>
+        </Border>
+    </Grid>
+</UserControl>

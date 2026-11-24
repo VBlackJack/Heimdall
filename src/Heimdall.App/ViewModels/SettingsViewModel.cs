@@ -1456,11 +1456,16 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         IGitIdentityReader? gitIdentityReader = null,
         SftpSudoFallbackPolicy? sftpSudoFallbackPolicy = null,
         IToolAvailability? toolAvailability = null,
-        ToolRegistry? toolRegistry = null)
+        ToolRegistry? toolRegistry = null,
+        RecipeSettingsViewModel? recipes = null,
+        IRecipeFileDialogs? recipeFileDialogs = null,
+        IUiDispatcher? uiDispatcher = null)
     {
+        _toolPackUiDispatcher = uiDispatcher;
         _sftpSudoFallbackPolicy = sftpSudoFallbackPolicy ?? new SftpSudoFallbackPolicy();
         _toolAvailability = toolAvailability;
         _toolRegistry = toolRegistry ?? new ToolRegistry();
+        _toolRegistry.RecipeToolsChanged += OnRecipeToolsChanged;
         _configManager = configManager;
         _gitIdentityReader = gitIdentityReader;
         _sharedSessions = sharedSessions;
@@ -1478,6 +1483,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         TrustedHostKeys = trustedHostKeys;
         TrustedRdpCertificates = trustedRdpCertificates;
         TrustedWebCertificates = trustedWebCertificates;
+        AttachRecipes(recipes, recipeFileDialogs);
 
         // The banner and the tab badges are derived from the error set, so they have to follow it
         // rather than hold the shape it had when Save was last pressed.
@@ -1498,6 +1504,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         RefreshAllDefaultMarkers();
         RefreshSecurityPosture();
         RefreshToolPackTexts();
+        RefreshRecipeTexts();
 
         // Worded from the localizer and otherwise raised only when their own state moves.
         OnPropertyChanged(nameof(SkippedVersionText));
@@ -1855,6 +1862,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             CollapseTunnelsPanelByDefault = settings.CollapseTunnelsPanelByDefault;
             ExternalEditorPath = settings.ExternalEditorPath;
             DisabledToolPacks = settings.DisabledToolPacks?.ToArray() ?? [];
+            LoadRecipesPackMarker(settings);
+            RecipeProgramFolders = settings.RecipeProgramFolders?.ToArray() ?? [];
 
             // Updates
             UpdateCheckEnabled = settings.UpdateCheckEnabled;
@@ -2351,6 +2360,12 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         settings.CollapseTunnelsPanelByDefault = CollapseTunnelsPanelByDefault;
         settings.ExternalEditorPath = ExternalEditorPath;
         settings.DisabledToolPacks = [.. DisabledToolPacks];
+        if (_recipesPackMigrated)
+        {
+            ToolPackMigration.RecordRecipesPackChoice(settings);
+        }
+
+        settings.RecipeProgramFolders = [.. RecipeProgramFolders];
         settings.UpdateCheckEnabled = UpdateCheckEnabled;
         settings.UpdateCheckIntervalHours = UpdateCheckIntervalHours;
 
@@ -2846,7 +2861,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             string json = await File.ReadAllTextAsync(path, cancellationToken);
             AppSettings current = await _configManager.LoadSettingsAsync();
             WritePanelInto(current);
-            (merged, changed) = SettingsTransfer.Import(current, System.Text.Json.Nodes.JsonNode.Parse(json));
+            (merged, changed) = SettingsTransfer.Import(
+                current,
+                System.Text.Json.Nodes.JsonNode.Parse(json),
+                IsToolPackForbiddenByPolicy(Heimdall.Core.Models.ToolPack.Recipes));
         }
         catch (Exception ex) when (ex is JsonException or FormatException or InvalidOperationException or IOException or UnauthorizedAccessException)
         {
@@ -4702,9 +4720,11 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         UnsubscribeSharedSessionSourceTracking();
         UnsubscribeFromSharedSessionProvider();
         _localizer.LocaleChanged -= OnPanelLocaleChanged;
+        _toolRegistry.RecipeToolsChanged -= OnRecipeToolsChanged;
         TrustedHostKeys.Dispose();
         TrustedRdpCertificates.Dispose();
         TrustedWebCertificates?.Dispose();
+        Recipes?.Dispose();
         GC.SuppressFinalize(this);
     }
 

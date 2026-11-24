@@ -430,6 +430,22 @@ public sealed class AppSettings
     /// ignored when the list is read. An organisation policy can forbid a pack on top of this list.
     /// </summary>
     public List<string> DisabledToolPacks { get; set; } = new();
+
+    /// <summary>
+    /// Whether the one-time step that turns the Recipes pack off for an install that predates it
+    /// has run (see <see cref="ToolPackMigration"/>). Additive on purpose: the schema version is not
+    /// bumped, because a bump locks older builds out of writing settings. A build that does not know
+    /// the key keeps it in its extension data and writes it back unchanged.
+    /// </summary>
+    public bool RecipesPackMigrated { get; set; }
+
+    /// <summary>
+    /// Folders, besides Windows and Program Files, that a recipe may run a program from. Empty by
+    /// default, read each time a recipe runs, and flagged sensitive in the settings import preview:
+    /// a settings file cannot widen where recipes may run programs without the user being told.
+    /// Optional on purpose, like <see cref="RecipesPackMigrated"/>: the schema version is not bumped.
+    /// </summary>
+    public List<string> RecipeProgramFolders { get; set; } = new();
     public bool OnboardingCompleted { get; set; }
     public double WindowWidth { get; set; }
     public double WindowHeight { get; set; }

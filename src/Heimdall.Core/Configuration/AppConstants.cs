@@ -45,6 +45,15 @@ public static class AppConstants
     /// <summary>Restrictive staging root for verified application updates.</summary>
     public const string UpdatesDirectoryName = "updates";
 
+    /// <summary>Writable subfolder holding the imported recipe files and their index.</summary>
+    public const string RecipesDirectoryName = "recipes";
+
+    /// <summary>
+    /// Subfolder of the user's temporary folder holding one fresh working folder per recipe run; emptied
+    /// at start. It sits apart from the data directory, so a program does not start next to the settings.
+    /// </summary>
+    public const string RecipeRunsTempDirectoryName = "Heimdall-recipe-runs";
+
     /// <summary>Writable notes subfolder within the legacy relative config path.</summary>
     public const string NotesDirectoryName = "notes";
 

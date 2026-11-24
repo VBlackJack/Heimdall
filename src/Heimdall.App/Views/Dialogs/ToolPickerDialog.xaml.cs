@@ -121,14 +121,9 @@ public partial class ToolPickerDialog : Window
 
     private ToolPickerOption CreateOption(ToolDescriptor descriptor)
     {
-        var label = descriptor.ResolveLabel(_localizer.GetString);
+        var label = ToolPickerText.DisplayName(descriptor, _localizer.GetString);
         var category = _localizer[descriptor.CategoryLabelKey];
-        var descKey = $"ToolDesc{descriptor.Id}";
-        var description = _localizer[descKey];
-        if (string.Equals(description, descKey, StringComparison.Ordinal))
-        {
-            description = string.Empty;
-        }
+        var description = ToolPickerText.Description(descriptor, _localizer.GetString);
 
         var brushKey = ToolRegistry.GetCategoryBrushKey(descriptor.Id);
         var categoryBrush = Application.Current.TryFindResource(brushKey) as Brush

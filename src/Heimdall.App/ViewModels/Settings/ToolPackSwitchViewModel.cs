@@ -67,7 +67,19 @@ public sealed class ToolPackSwitchViewModel : ObservableObject
     public ToolPack Pack { get; }
 
     /// <summary>How many tools of the registry belong to the pack.</summary>
-    public int ToolCount { get; }
+    public int ToolCount { get; private set; }
+
+    /// <summary>Sets the tool count after the registry changed (the recipe tools arrive after the panel exists).</summary>
+    internal void UpdateToolCount(int toolCount)
+    {
+        if (toolCount == ToolCount)
+        {
+            return;
+        }
+
+        ToolCount = toolCount;
+        OnPropertyChanged(nameof(ToolCount));
+    }
 
     /// <summary>True when the organisation policy forbids the pack, whatever the user chose.</summary>
     public bool IsForbiddenByPolicy { get; }
@@ -87,13 +99,19 @@ public sealed class ToolPackSwitchViewModel : ObservableObject
         get => !IsForbiddenByPolicy && _readEnabled();
         set
         {
-            if (IsForbiddenByPolicy || value == _readEnabled())
+            // Turning a pack off is always written: the Recipes pack reads off while its marker is
+            // missing, and the choice has to reach the list all the same.
+            bool before = _readEnabled();
+            if (IsForbiddenByPolicy || (value && before))
             {
                 return;
             }
 
             _writeEnabled(value);
-            OnPropertyChanged();
+            if (value != before)
+            {
+                OnPropertyChanged();
+            }
         }
     }
 
