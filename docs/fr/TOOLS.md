@@ -598,7 +598,8 @@ tout ceci :
   aucun dossier au-dessus (jusqu'à cette racine) ne doit permettre à un
   utilisateur qui n'est pas administrateur de le modifier, et les permissions
   doivent être lisibles. Un dossier autorisé dans les Paramètres est approuvé en
-  entier et n'est pas vérifié de cette façon ;
+  entier et n'est pas vérifié de cette façon seulement quand il se trouve hors de
+  Windows et de Program Files ;
 - un simple nom n'est cherché que dans les entrées de la variable `PATH` qui sont
   elles-mêmes sous ces dossiers, dans l'ordre de `PATH` ; le premier fichier
   trouvé décide. Le dossier courant et le dossier de Heimdall ne sont jamais

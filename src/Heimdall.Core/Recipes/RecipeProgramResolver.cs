@@ -398,13 +398,11 @@ public sealed class RecipeProgramResolver : IRecipeProgramResolver, IRecipeProgr
     /// <summary>
     /// Under Windows or Program Files, the file and every folder from it up to its root must not let
     /// a user who is not an administrator change them: some folders there are writable by anyone.
-    /// A program under a folder the user added is not checked, because the user chose to trust it.
+    /// A folder the user added is trusted only outside those roots: adding one that covers part of
+    /// Windows or Program Files does not switch the check off for what lies under it.
     /// </summary>
     private RecipeProgramRefusal CheckPermissions(string finalPath, ProgramRoots roots)
     {
-        if (UnderAny(finalPath, roots.User))
-            return RecipeProgramRefusal.None;
-
         string? root = null;
         foreach (string candidate in roots.BuiltIn)
         {
@@ -413,7 +411,7 @@ public sealed class RecipeProgramResolver : IRecipeProgramResolver, IRecipeProgr
         }
 
         if (root is null)
-            return RecipeProgramRefusal.OutsideAllowedRoots;
+            return UnderAny(finalPath, roots.User) ? RecipeProgramRefusal.None : RecipeProgramRefusal.OutsideAllowedRoots;
 
         string? current = finalPath;
         while (current is not null && IsUnderOrEqual(current, root))

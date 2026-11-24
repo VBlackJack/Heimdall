@@ -821,7 +821,9 @@ ces arguments, avec vos droits. Le pack Recettes est désactivé par défaut.
   refusé quand un utilisateur qui n'est pas administrateur peut modifier son
   fichier ou un dossier au-dessus (jusqu'à cette racine), ou quand ces
   permissions ne peuvent pas être lues. Un dossier que vous avez ajouté est
-  approuvé en entier et n'est pas vérifié.
+  approuvé en entier et n'est pas vérifié, mais seulement pour ce qui se trouve
+  hors de Windows et de Program Files : ajouter un dossier qui en couvre une
+  partie ne désactive pas la vérification.
 - **Les caractères qui ressemblent à d'autres.** Un caractère que Windows
   transformerait en caractère ASCII ordinaire pour un programme qui lit sa ligne
   de commande dans une page de codes (un trait d'union pleine chasse, un

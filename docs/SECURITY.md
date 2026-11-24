@@ -735,7 +735,9 @@ pack is off by default.
   Windows folder, Program Files or Program Files (x86) is refused when a user who
   is not an administrator can change its file or a folder above it (up to that
   root), or when those permissions cannot be read. A folder you added is trusted
-  as a whole and is not checked.
+  as a whole and is not checked, but only for what lies outside Windows and
+  Program Files: adding a folder that covers part of them does not switch the
+  check off.
 - **Look-alike characters.** A character that Windows would turn into a plain
   ASCII one for a program that reads its command line in a code page (a
   full-width hyphen, a typographic quote, a no-break space) is refused in the

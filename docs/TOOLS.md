@@ -560,7 +560,8 @@ used. It must satisfy all of this:
 - under the Windows folder, Program Files or Program Files (x86), neither the
   file nor any folder above it (up to that root) may let a user who is not an
   administrator change it, and the permissions must be readable. A folder allowed
-  in Settings is trusted as a whole and is not checked this way;
+  in Settings is trusted as a whole and is not checked this way only when it lies
+  outside Windows and Program Files;
 - a bare name is looked for only in the entries of the `PATH` variable that are
   themselves under those folders, in `PATH` order; the first file found
   decides. The current folder and the folder of Heimdall are never searched;

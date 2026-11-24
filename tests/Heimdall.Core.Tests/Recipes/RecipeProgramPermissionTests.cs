@@ -193,13 +193,38 @@ public sealed class RecipeProgramPermissionTests
     }
 
     [Fact]
-    public void AUserFolderInsideTheWindowsFolder_IsAlsoTrusted_ButOnlyForWhatLiesInsideIt()
+    public void AUserFolderInsideTheWindowsFolder_DoesNotSwitchTheCheckOff_ForWhatLiesInsideIt()
     {
         FakeRecipeMachine machine = Machine(TempProgram).WithRule(Temp, UsersSid, FullControl);
         machine.WithFile(System32 + @"\other.exe").WithRule(System32, UsersSid, FullControl);
 
-        Assert.True(Resolve(machine, TempProgram, [Temp]).IsResolved);
+        Assert.Equal(RecipeProgramRefusal.WritableByUser, Resolve(machine, TempProgram, [Temp]).Refusal);
         Assert.Equal(RecipeProgramRefusal.WritableByUser, Resolve(machine, System32 + @"\other.exe", [Temp]).Refusal);
+    }
+
+    [Fact]
+    public void AUserFolderThatIsAWritableSubfolderOfWindows_StillRefusesAProgramInIt()
+    {
+        FakeRecipeMachine machine = Machine(TempProgram).WithRule(Temp, UsersSid, Modify);
+
+        Assert.Equal(RecipeProgramRefusal.WritableByUser, Resolve(machine, TempProgram, [Temp]).Refusal);
+    }
+
+    [Fact]
+    public void AUserFolderThatIsTheWindowsFolderItself_StillRefusesAProgramInAWritableSubfolder()
+    {
+        FakeRecipeMachine machine = Machine(TempProgram).WithRule(Temp, UsersSid, Modify);
+
+        Assert.Equal(RecipeProgramRefusal.WritableByUser, Resolve(machine, TempProgram, [@"C:\Windows"]).Refusal);
+    }
+
+    [Fact]
+    public void AUserFolderUnderWindows_WithNothingWritableOnTheWay_Resolves()
+    {
+        FakeRecipeMachine machine = Machine(System32 + @"\tool.exe");
+
+        Assert.Equal(RecipeProgramRefusal.None, Resolve(machine, System32 + @"\tool.exe", [System32]).Refusal);
+        Assert.NotEmpty(machine.PermissionReads);
     }
 
     [Fact]
