@@ -393,9 +393,13 @@ dossier...** dans la même section Recettes des Paramètres, enregistrez les
 paramètres puis importez à nouveau la recette. Un dossier doit être un chemin
 complet sur une lettre de lecteur (`D:\Outils`) et non la racine d'un lecteur
 (`D:\`), de 240 caractères au plus, sans chemin réseau, sans chemin de
-périphérique, sans partie `.` ou `..`, sans `%`, sans caractère générique et sans
-partie qui se termine par un point ou une espace. Au plus 32 dossiers sont conservés. Un fichier de paramètres qui porte
-cette liste est signalé comme sensible dans l'aperçu d'import.
+périphérique, sans partie `.` ou `..`, sans `%`, sans caractère générique et
+sans partie qui se termine par un point ou une espace. Au plus 32 dossiers sont
+conservés. Ajouter un dossier qui est le dossier Windows, Program Files ou
+Program Files (x86), qui se trouve sous l'un d'eux ou qui en contient un est
+accepté, et les Paramètres affichent un avis : les programmes situés sous ces
+dossiers restent vérifiés. Un fichier de paramètres qui porte cette liste est
+signalé comme sensible dans l'aperçu d'import.
 
 ### Écrire une recette
 

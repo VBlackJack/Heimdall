@@ -6874,5 +6874,6 @@
   "RecipeImportReplaceTimeoutSame": "Tiempo l\u00edmite: sin cambios",
   "RecipeImportReplaceTimeoutChanged": "Tiempo l\u00edmite: modificado",
   "SettingsImportPreviewRecipesOn": "Activa el paquete Recetas: despu\u00e9s se podr\u00e1n importar y ejecutar recetas en este equipo.",
-  "RecipeStoreFailureIndexDamaged": "La lista de recetas importadas contiene una entrada que Heimdall no puede leer, por lo que no se cambi\u00f3 nada. Cierre Heimdall, repare o elimine el archivo {0} en la carpeta de recetas del directorio de datos y vuelva a importar sus recetas."
+  "RecipeStoreFailureIndexDamaged": "La lista de recetas importadas contiene una entrada que Heimdall no puede leer, por lo que no se cambi\u00f3 nada. Cierre Heimdall, repare o elimine el archivo {0} en la carpeta de recetas del directorio de datos y vuelva a importar sus recetas.",
+  "RecipeFolderNoticeBuiltInRoot": "Se a\u00f1adi\u00f3 esta carpeta. Los programas ubicados en Windows o Program Files siguen siendo verificados: una receta solo puede usar uno si un usuario que no es administrador no puede modificarlo. Para el resto de esta carpeta, una receta puede nombrar cualquier programa."
 }

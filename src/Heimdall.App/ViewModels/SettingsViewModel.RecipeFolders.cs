@@ -47,6 +47,17 @@ public partial class SettingsViewModel
     [ObservableProperty]
     private string _recipeProgramFolderStatus = string.Empty;
 
+    /// <summary>
+    /// The notice shown after a folder that touches Windows or Program Files was added; empty otherwise. It is
+    /// not a refusal, so it has a text of its own and does not borrow the warning colour of the status.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasRecipeProgramFolderNotice))]
+    private string _recipeProgramFolderNotice = string.Empty;
+
+    /// <summary>What the folder checks ask of the machine: the roots a folder may touch. Replaceable for tests.</summary>
+    internal IRecipeMachine RecipeFolderMachine { get; set; } = RecipeMachine.Instance;
+
     /// <summary>The imported recipes, their import, export and removal; null where no recipe store was supplied (tests).</summary>
     public RecipeSettingsViewModel? Recipes { get; private set; }
 
@@ -55,6 +66,9 @@ public partial class SettingsViewModel
 
     /// <summary>True when no folder was added: the list shows its empty line.</summary>
     public bool IsRecipeProgramFoldersEmpty => RecipeProgramFolders.Length == 0;
+
+    /// <summary>True when <see cref="RecipeProgramFolderNotice"/> has something to say.</summary>
+    public bool HasRecipeProgramFolderNotice => !string.IsNullOrEmpty(RecipeProgramFolderNotice);
 
     /// <summary>True when <see cref="RecipeProgramFolderStatus"/> has something to say.</summary>
     public bool HasRecipeProgramFolderStatus => !string.IsNullOrEmpty(RecipeProgramFolderStatus);
@@ -92,6 +106,7 @@ public partial class SettingsViewModel
     /// <returns>True when the folder was added.</returns>
     internal bool TryAddRecipeProgramFolder(string folder)
     {
+        RecipeProgramFolderNotice = string.Empty;
         RecipeFolderRefusal refusal = RecipeFolderRule.Check(folder, RecipeProgramFolders);
         if (refusal != RecipeFolderRefusal.None)
         {
@@ -100,7 +115,13 @@ public partial class SettingsViewModel
         }
 
         RecipeProgramFolderStatus = string.Empty;
-        RecipeProgramFolders = [.. RecipeProgramFolders, RecipeFolderRule.Normalize(folder)];
+        string normalized = RecipeFolderRule.Normalize(folder);
+        RecipeProgramFolders = [.. RecipeProgramFolders, normalized];
+        if (RecipeFolderRule.TouchesRoot(normalized, BuiltInRecipeRoots()))
+        {
+            RecipeProgramFolderNotice = _localizer["RecipeFolderNoticeBuiltInRoot"];
+        }
+
         return true;
     }
 
@@ -110,9 +131,18 @@ public partial class SettingsViewModel
     private void RemoveRecipeProgramFolder(string? folder)
     {
         RecipeProgramFolderStatus = string.Empty;
+        RecipeProgramFolderNotice = string.Empty;
         RecipeProgramFolders = [.. RecipeProgramFolders.Where(item => !string.Equals(item, folder, StringComparison.OrdinalIgnoreCase))];
     }
 
+    private string[] BuiltInRecipeRoots()
+        => [RecipeFolderMachine.WindowsDirectory, RecipeFolderMachine.ProgramFilesDirectory, RecipeFolderMachine.ProgramFilesX86Directory];
+
     /// <summary>Rewords the recipe list after the interface language changed; it does not read the folder if the list was never shown.</summary>
-    private void RefreshRecipeTexts() => Recipes?.RefreshIfLoaded();
+    private void RefreshRecipeTexts()
+    {
+        // The notice was worded when it was shown; a language change takes it away rather than leave it stale.
+        RecipeProgramFolderNotice = string.Empty;
+        Recipes?.RefreshIfLoaded();
+    }
 }
