@@ -55,7 +55,7 @@ public sealed class RecipeStore : IRecipeStore
     internal const int IndexSchemaVersion = 1;
 
     /// <summary>The largest index file read, in bytes.</summary>
-    private const long MaxIndexBytes = 1024 * 1024;
+    private const int MaxIndexBytes = 1024 * 1024;
 
     private const int MaxIdLength = (RecipeLimits.MaxIdPartLength * 2) + 1;
 
@@ -301,7 +301,7 @@ public sealed class RecipeStore : IRecipeStore
                 resolvedProgramPath,
                 DateTimeOffset.UtcNow);
 
-            byte[]? previousBytes = replace ? TryReadFile(filePath) : null;
+            CappedRead? previous = replace ? TryReadCapped(filePath) : null;
             try
             {
                 EnsureDirectory();
@@ -322,21 +322,25 @@ public sealed class RecipeStore : IRecipeStore
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 FileLogger.Warn($"Recipe store: recipe {recipe.Id} could not be stored ({ex.GetType().Name})");
-                RestoreAfterFailure(filePath, previousBytes);
+                RestoreAfterFailure(filePath, replace, previous);
                 return RecipeStoreResult.Fail(RecipeStoreFailure.StorageError);
             }
         }
     }
 
-    private static void RestoreAfterFailure(string filePath, byte[]? previousBytes)
+    // A new file is deleted again. A replaced file gets its previous content back only when that content was
+    // read whole: when it was too large or could not be read, writing "what was read" would put an empty or a
+    // partial file over it. The index was not changed, so the new file then fails its recorded hash and loads
+    // as nothing, which is the safe direction.
+    private static void RestoreAfterFailure(string filePath, bool replace, CappedRead? previous)
     {
         try
         {
-            if (previousBytes is null)
+            if (!replace)
             {
                 File.Delete(filePath);
             }
-            else
+            else if (previous is { Bytes: { } previousBytes })
             {
                 SecureFileWriter.WriteBytesAtomic(filePath, previousBytes);
             }
@@ -396,20 +400,21 @@ public sealed class RecipeStore : IRecipeStore
     private static bool HashMatches(byte[] bytes, string expectedSha256)
         => string.Equals(Convert.ToHexStringLower(SHA256.HashData(bytes)), expectedSha256, StringComparison.OrdinalIgnoreCase);
 
+    // The bytes of a stored recipe file; an empty array for one over the cap (it can never be a valid recipe and
+    // fails its hash), null when it is missing or cannot be read.
     private static byte[]? TryReadFile(string path)
+    {
+        CappedRead? read = TryReadCapped(path);
+        return read is null ? null : read.Value.Bytes ?? [];
+    }
+
+    private static CappedRead? TryReadCapped(string path)
     {
         try
         {
-            FileInfo info = new(path);
-            if (!info.Exists || info.Length > RecipeLimits.MaxFileBytes)
-            {
-                // An oversize file can never be a valid recipe; it is not read into memory.
-                return info.Exists ? [] : null;
-            }
-
-            return File.ReadAllBytes(path);
+            return CappedFileReader.Read(path, RecipeLimits.MaxFileBytes);
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
         {
             return null;
         }
@@ -432,15 +437,15 @@ public sealed class RecipeStore : IRecipeStore
         IndexDocument? document;
         try
         {
-            FileInfo info = new(indexPath);
-            if (info.Length > MaxIndexBytes)
+            CappedRead read = CappedFileReader.Read(indexPath, MaxIndexBytes);
+            if (read.Bytes is not { } indexBytes)
             {
                 throw new JsonException("The index is larger than it can be.");
             }
 
-            document = JsonSerializer.Deserialize<IndexDocument>(File.ReadAllBytes(indexPath), IndexJsonOptions);
+            document = JsonSerializer.Deserialize<IndexDocument>(indexBytes, IndexJsonOptions);
         }
-        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is JsonException or IOException or UnauthorizedAccessException or NotSupportedException)
         {
             FileLogger.Warn($"Recipe store: the index could not be read ({ex.GetType().Name})");
             issues?.Add(new RecipeLoadIssue(RecipeLoadIssueCode.IndexUnreadable, IndexFileName, null));

@@ -578,4 +578,62 @@ public sealed class RecipeStoreTests : IDisposable
             """;
         File.WriteAllText(Path.Combine(RecipesDirectory, RecipeStore.IndexFileName), json);
     }
+
+    [Fact]
+    public void AnIndexOverItsCap_TakesTheUnreadablePathOnLoad_AndIsAStorageErrorOnWrite()
+    {
+        RecipeStore store = NewStore();
+        Assert.True(store.Add(RecipeTestFiles.Bytes("acme.ping"), RecipeTestFiles.ResolvedProgram).Succeeded);
+        string indexPath = Path.Combine(RecipesDirectory, RecipeStore.IndexFileName);
+        File.WriteAllBytes(indexPath, Enumerable.Repeat((byte)32, 1024 * 1024 + 1).ToArray());
+        byte[] before = File.ReadAllBytes(indexPath);
+
+        RecipeLoadResult loaded = store.LoadAll();
+        RecipeStoreResult added = store.Add(RecipeTestFiles.Bytes("acme.other"), RecipeTestFiles.ResolvedProgram);
+
+        Assert.Empty(loaded.Recipes);
+        Assert.Contains(loaded.Issues, issue => issue.Code == RecipeLoadIssueCode.IndexUnreadable);
+        Assert.Equal(RecipeStoreFailure.StorageError, added.Failure);
+        Assert.Equal(before, File.ReadAllBytes(indexPath));
+    }
+
+    // A replace that fails after the new file was written must not put an empty file over a previous file it could
+    // not read whole (too large): there is nothing to restore it from.
+    [Fact]
+    public void AFailedReplaceOfAFileTooLargeToRead_DoesNotWriteAnEmptyFileOverIt()
+    {
+        RecipeStore store = NewStore();
+        Assert.True(store.Add(RecipeTestFiles.Bytes("acme.ping"), RecipeTestFiles.ResolvedProgram).Succeeded);
+        File.WriteAllBytes(FileOf("acme.ping"), new byte[RecipeLimits.MaxFileBytes + 1]);
+        string indexPath = Path.Combine(RecipesDirectory, RecipeStore.IndexFileName);
+
+        RecipeStoreResult result;
+        using (new FileStream(indexPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            // The index can still be read, but not replaced: the write of the index fails after the file was written.
+            result = store.Replace(RecipeTestFiles.Bytes("acme.ping", name: "Changed"), RecipeTestFiles.ResolvedProgram);
+        }
+
+        Assert.Equal(RecipeStoreFailure.StorageError, result.Failure);
+        Assert.True(new FileInfo(FileOf("acme.ping")).Length > 0, "the file was emptied");
+        Assert.Equal(["acme.ping"], store.List().Select(entry => entry.Id));
+    }
+
+    [Fact]
+    public void AFailedReplaceOfAReadableFile_StillGetsItsPreviousContentBack()
+    {
+        RecipeStore store = NewStore();
+        byte[] original = RecipeTestFiles.Bytes("acme.ping");
+        Assert.True(store.Add(original, RecipeTestFiles.ResolvedProgram).Succeeded);
+        string indexPath = Path.Combine(RecipesDirectory, RecipeStore.IndexFileName);
+
+        RecipeStoreResult result;
+        using (new FileStream(indexPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            result = store.Replace(RecipeTestFiles.Bytes("acme.ping", name: "Changed"), RecipeTestFiles.ResolvedProgram);
+        }
+
+        Assert.Equal(RecipeStoreFailure.StorageError, result.Failure);
+        Assert.Equal(original, File.ReadAllBytes(FileOf("acme.ping")));
+    }
 }

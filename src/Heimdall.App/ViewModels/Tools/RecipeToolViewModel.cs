@@ -260,10 +260,44 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
         SetFieldsLocked(true);
         ClearResult();
 
+        // Created before the first await: Stop and a pack turned off cancel the run from the moment it is
+        // running, including while the program is being compared.
+        CancellationTokenSource cancellation = new();
+        _runCancellation = cancellation;
+
         string? folder = null;
         try
         {
-            if (!CheckAvailable() || !CheckSession() || ExpandValues() is not { } expansion || !CheckProgram())
+            if (!CheckAvailable() || !CheckSession() || ExpandValues() is not { } expansion)
+            {
+                return;
+            }
+
+            // The comparison resolves the program on disk, so it leaves the UI thread; what it needs is read
+            // here and what it answers is applied here.
+            IReadOnlyList<string> allowedFolders = _services.AllowedFolders();
+            RecipeProgramComparison comparison = await Task.Run(
+                () => _services.Resolver.CompareWithStored(_recipe.Program, allowedFolders, _storedProgramPath)).ConfigureAwait(true);
+
+            if (_disposed)
+            {
+                return;
+            }
+
+            if (cancellation.IsCancellationRequested)
+            {
+                Present(new RecipeRunResult(RecipeRunStatus.Cancelled, null, string.Empty, string.Empty, false, null, RecipeRunRefusal.None));
+                return;
+            }
+
+            // The latched flag, not the store again: one read of the store per run.
+            if (IsStale)
+            {
+                GeneralError = T("RecipeStaleMessage");
+                return;
+            }
+
+            if (!CheckState() || !CheckProgram(comparison))
             {
                 return;
             }
@@ -275,13 +309,12 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
             }
 
             _workFolder = folder;
-            _runCancellation = new CancellationTokenSource();
             Task<RecipeRunResult> runnerTask = _services.Runner.RunAsync(
                 _recipe,
                 _storedProgramPath,
                 expansion.Arguments,
                 folder,
-                _runCancellation.Token);
+                cancellation.Token);
             _runnerTask = runnerTask;
 
             RecipeRunResult result = await runnerTask.ConfigureAwait(true);
@@ -427,6 +460,13 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
             return false;
         }
 
+        return CheckState();
+    }
+
+    // The tool must still be available; the message names the title the open tool shows, which is in the language of
+    // the interface, not the name written in the file.
+    private bool CheckState()
+    {
         ToolAvailabilityState state = CurrentState();
         if (state == ToolAvailabilityState.Available)
         {
@@ -434,7 +474,7 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
         }
 
         GeneralError = ToolUnavailableException.IsRefusal(state)
-            ? T(ToolUnavailableException.MessageKeyFor(state), _recipe.Name)
+            ? T(ToolUnavailableException.MessageKeyFor(state), Title)
             : T("RecipeRunToolRemoved");
         return false;
     }
@@ -496,12 +536,8 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
         }
     }
 
-    private bool CheckProgram()
+    private bool CheckProgram(RecipeProgramComparison comparison)
     {
-        RecipeProgramComparison comparison = _services.Resolver.CompareWithStored(
-            _recipe.Program,
-            _services.AllowedFolders(),
-            _storedProgramPath);
         if (comparison == RecipeProgramComparison.Same)
         {
             return true;
