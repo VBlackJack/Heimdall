@@ -52,6 +52,7 @@ public sealed class RecipeSettingsViewModel : ObservableObject, IDisposable
     private readonly LocalizationManager _localizer;
     private readonly IRecipeFileDialogs _files;
     private readonly Action _reloadTools;
+    private readonly IUiDispatcher? _uiDispatcher;
     private bool _disposed;
     private bool _loaded;
 
@@ -63,6 +64,7 @@ public sealed class RecipeSettingsViewModel : ObservableObject, IDisposable
     /// <param name="localizer">The localizer of the current language.</param>
     /// <param name="files">The file and folder pickers.</param>
     /// <param name="reloadTools">Registers the recipe tools again after a change.</param>
+    /// <param name="uiDispatcher">Runs the rewording of the list on the UI thread when the language change arrives on another one; null runs it where it is raised.</param>
     public RecipeSettingsViewModel(
         IRecipeStore store,
         RecipeImportService import,
@@ -70,7 +72,8 @@ public sealed class RecipeSettingsViewModel : ObservableObject, IDisposable
         IDialogService dialogs,
         LocalizationManager localizer,
         IRecipeFileDialogs files,
-        Action reloadTools)
+        Action reloadTools,
+        IUiDispatcher? uiDispatcher = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _import = import ?? throw new ArgumentNullException(nameof(import));
@@ -79,6 +82,7 @@ public sealed class RecipeSettingsViewModel : ObservableObject, IDisposable
         _localizer = localizer ?? throw new ArgumentNullException(nameof(localizer));
         _files = files ?? throw new ArgumentNullException(nameof(files));
         _reloadTools = reloadTools ?? throw new ArgumentNullException(nameof(reloadTools));
+        _uiDispatcher = uiDispatcher;
 
         ImportCommand = new AsyncRelayCommand(ImportAsync, () => !IsForbiddenByPolicy);
         EnsureLoadedCommand = new RelayCommand(EnsureLoaded);
@@ -185,6 +189,19 @@ public sealed class RecipeSettingsViewModel : ObservableObject, IDisposable
     }
 
     private void OnLocaleChanged(string locale)
+    {
+        // The localizer raises the change on the thread that finished loading the language file, and
+        // the list is bound, so only the UI thread may touch it.
+        if (_uiDispatcher is null)
+        {
+            RewordList();
+            return;
+        }
+
+        _uiDispatcher.Invoke(RewordList);
+    }
+
+    private void RewordList()
     {
         foreach (ImportedRecipeItemViewModel item in Items)
         {

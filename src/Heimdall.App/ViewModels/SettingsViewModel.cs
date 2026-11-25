@@ -1503,8 +1503,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     {
         RefreshAllDefaultMarkers();
         RefreshSecurityPosture();
-        RefreshToolPackTexts();
-        RefreshRecipeTexts();
+        RefreshPackAndRecipeTextsOnUiThread();
 
         // Worded from the localizer and otherwise raised only when their own state moves.
         OnPropertyChanged(nameof(SkippedVersionText));
