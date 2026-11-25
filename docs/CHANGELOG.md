@@ -12,6 +12,87 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-11-25: Tool packs, recipes, and packages without the Notes editor source (v2026.112501)
+
+Merged as #887 to #899. The user-facing summary and the upgrade notes are in the release notes.
+
+### Tool packs (#889, #890)
+
+- `ToolPack` on `ToolDescriptor`: Core (Command Library, Notes, permanent), Essentials (26), Network diagnostics
+  (15), Administration (5), Audit and reconnaissance (10). The registry keeps the full catalogue, so a saved entry
+  of a hidden tool still resolves its name and icon.
+- `IToolAvailability` is the one decision, checked before anything is opened, reused or built:
+  `MainViewModel.OpenToolTabAsync`, `SplitService.SplitSessionWithTool`, and a backstop in
+  `EmbeddedSessionManager.CreateToolControl`. Listings read one projection (`ToolAvailabilityExtensions`).
+- `ToolPackPolicy` reads `ToolPack<Name>` = `0` under `HKLM\Software\Policies\Heimdall`; the switch then reads off
+  and locked, and the stored user choice is left untouched. The privilege launcher refuses under a policy that
+  forbids the Audit pack.
+- `config/settings.default.json` disables the Audit pack on a fresh install; an existing settings file has no
+  `disabledToolPacks` key and keeps every pack on. No settings schema change.
+- A saved tree entry of an unavailable tool is dimmed, with the reason in its tooltip, spoken name and detail pane;
+  the detail pane disables "Open in Tab" and the command palette dims the row (#890).
+- A tool whose open fails is no longer recorded as recent. Documented in `docs/SECURITY.md` as a convenience for
+  administrators, not a security boundary, with its known limits.
+
+### Recipes (#891 to #896, #899)
+
+- New pack Recipes (policy value `ToolPackRecipes`), off on fresh and existing installs. Import, replace, export
+  and remove from Settings behind a preview of the resolved program and every argument. A settings import cannot
+  turn the pack on silently, nor under a policy that forbids it.
+- Program resolution: under the Windows folder, Program Files, or a user-added folder. Under Windows and Program
+  Files the file and every parent are refused when a non-administrator can write them or when their owner is not
+  the system, the Administrators or the installer service (#893). A user-added folder is checked in its written
+  and final form; a link to a drive root and a mapped network drive are refused (#893). A notice says when an
+  added folder equals, lies under or contains one of the protected roots (#892).
+- One token is one argument; no shell, no command line built by concatenation, an interpreter deny-list as a seat
+  belt. Only `{Host}` and `{Port}` come from the session. Values and the program name are checked for separators,
+  control characters and look-alike characters in the ANSI code page (#894).
+- A run is placed in a job object with a timeout and an output cap, in a work folder per data directory. The
+  program is compared with the one stored at import off the UI thread; Stop, a pack turned off, a replaced recipe
+  and a closed tab prevent the start, and Stop shows "Stopping..." at once (#894, #896).
+- The validator counts the tokens the expander can produce, not the tokens written. Recipe files are read once,
+  capped, on one handle, for the import, the stored file and the index; a failed replacement no longer writes an
+  empty file (#894).
+- File format settled before release (#895): `whenFalse`, `min` and `max` compared exactly, translatable `hint`,
+  `csvSeparator`, output encodings `ansi` and `utf16le` (one leading byte order mark dropped per stream); `labels`
+  renamed `translations` with `fieldLabels` and `fieldHints`; an unknown icon key of valid shape shows the default
+  icon. Refused: `required` on a switch or next to a default, an unused field, an optional field without default
+  inside a switch, standard error merged into `csv` or `json`, case-only duplicate language tags, duplicate
+  success codes, non-canonical numbers, a blank default.
+- `tests/Heimdall.Core.Tests/Recipes/FormatLock/v1/` pins 37 accepted and 71 refused samples with what they parse
+  and expand to, guarded by `MANIFEST.sha256`.
+- `TabularOutput.SanitizeCell`: copied cells and headers that a spreadsheet would read as a formula get a leading
+  apostrophe (a leading double quote too), embedded tabs and line breaks become spaces. External tool tables go
+  through the same rule (#893).
+- Settings names why a stored recipe did not load: file changed, not accepted by this version, missing,
+  unreadable (#896).
+- The settings panel, the recipe list and a recipe tool reword through `IUiDispatcher` after a language change:
+  the localizer raises it on a pool thread, and rebuilding the bound recipe list there failed the switch (#899).
+- `docs/TOOLS.md` holds the format; `docs/SECURITY.md` the threat model and its limits, including the trusted
+  accounts, the conditional and deny entries, and double-byte code pages (#898). README, user guide and
+  architecture describe packs and recipes in English and French (#897).
+
+### Shared dialog (#896)
+
+- `MessageDialog` sets its window title from the caller's title, or the application name when blank, so screen
+  readers and UI automation name every confirmation.
+
+### Packaging (#888)
+
+- `Build.ps1` no longer copies the working-tree `Assets` folder over the published one, which put back
+  `Assets\milkdown-editor` and the build machine's `node_modules` (6591 files, 70 MB per edition in
+  v2026.112201). The project's `Content` items are the only list.
+- `scripts/StagedPayloadGate.ps1` stops the build in every mode, before anything is archived, if the staged folder
+  holds a tree the project excludes or any `node_modules`. `scripts/Test-StagedPayloadGate.ps1` runs in CI.
+- `installer/innosetup.iss` removes `{app}\Assets\milkdown-editor` on upgrade; `InstallerStaleFileGuardTests`
+  requires that line. The MSI needs nothing (`MajorUpgrade`). ZIP users are not cleaned.
+- A Debug build through `Build.ps1` no longer carries `Assets\drawio`. Release is unaffected.
+
+### Tests (#887)
+
+- `SensitiveLoggingGuardTests` states its two credential logging regimes in the comments instead of citing a
+  file outside the repository.
+
 ## 2026-11-22: Notes no longer lose text typed during a save, updates check every redirect, and closing sessions is safer (v2026.112201)
 
 Merged as #862 to #885. The user-facing summary and the upgrade notes are in the release notes.
