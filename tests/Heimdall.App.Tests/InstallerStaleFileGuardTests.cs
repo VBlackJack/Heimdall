@@ -70,6 +70,19 @@ public sealed class InstallerStaleFileGuardTests
             + "keeps the files a newer version dropped: " + string.Join(", ", missing));
     }
 
+    /// <remarks>
+    /// Earlier installers copied the editor's source tree, with the build machine's package
+    /// install folder, into the application folder. No newer file ever overwrites it, so only
+    /// an explicit removal clears it from an upgraded installation.
+    /// </remarks>
+    [Fact]
+    public void TheUnshippedEditorSource_IsRemovedFromEarlierInstallations()
+    {
+        HashSet<string> deleted = DeletedPaths(File.ReadAllText(Path.Combine(RepositoryRoot(), ScriptPath)));
+
+        Assert.Contains(@"{app}\Assets\" + UnshippedTree, deleted);
+    }
+
     [Fact]
     public void TheScript_NeverDeletesAssetsOrTheApplicationFolderWithAWildcard()
     {

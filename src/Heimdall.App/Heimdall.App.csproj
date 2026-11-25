@@ -38,7 +38,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- All assets except drawio (always copied). -->
+    <!-- All assets, always copied, except two trees: milkdown-editor is the source the
+         Notes editor bundle is built from and never ships; drawio has its own item below.
+         This Exclude is the single list of unshipped asset trees: Build.ps1 stages Assets
+         through publish only, and scripts/StagedPayloadGate.ps1 reads the list from here. -->
     <Content Include="Assets\**\*" Exclude="Assets\milkdown-editor\**;Assets\drawio\**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

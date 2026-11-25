@@ -163,6 +163,16 @@ jobs:
           # The script runs in a child scope, so its `exit 1` does not end this block.
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      # Pure PowerShell over fixture folders, the application project and Build.ps1.
+      # The releases up to 2026.112201 shipped the Notes editor's source tree with the build machine's
+      # node_modules (6591 files, 70 MB per edition): the project excluded the tree and
+      # a later copy of the whole Assets folder put it back.
+      - name: Check the staged payload gate
+        shell: pwsh
+        run: |
+          ./scripts/Test-StagedPayloadGate.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       # Pure PowerShell, no .NET needed. Proves the build's test step survives a failing
       # run under 'Stop' and keeps its output: it used to die on xUnit's first [FAIL]
       # line, before printing the failure, so a red gate never said why.
