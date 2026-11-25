@@ -1,0 +1,110 @@
+{
+  "recipe": {
+    "schemaVersion": 1,
+    "id": "lock.sample",
+    "version": "1.0.0",
+    "author": "Lock",
+    "name": "Sample",
+    "description": "A sample of the version 1 format.",
+    "translations": {},
+    "program": "ping.exe",
+    "arguments": [
+      {
+        "group": false,
+        "tokens": [
+          "--a={in:a}"
+        ]
+      },
+      {
+        "group": false,
+        "tokens": [
+          "--b={in:b}"
+        ]
+      }
+    ],
+    "inputs": [
+      {
+        "name": "a",
+        "type": "Int",
+        "label": "Label a",
+        "required": false,
+        "default": "-2147483648",
+        "pattern": null,
+        "maxLength": null,
+        "choices": null,
+        "whenTrue": null,
+        "whenFalse": null,
+        "min": "-2147483648",
+        "max": "2147483647",
+        "hint": null
+      },
+      {
+        "name": "b",
+        "type": "Int",
+        "label": "Label b",
+        "required": false,
+        "default": "2147483647",
+        "pattern": null,
+        "maxLength": null,
+        "choices": null,
+        "whenTrue": null,
+        "whenFalse": null,
+        "min": "-2147483648",
+        "max": "2147483647",
+        "hint": null
+      }
+    ],
+    "output": "Text",
+    "outputEncoding": "Utf8",
+    "stderr": "Separate",
+    "csvSeparator": "Comma",
+    "successExitCodes": [
+      0
+    ],
+    "timeoutSeconds": 60,
+    "icon": null
+  },
+  "expansions": [
+    {
+      "values": {},
+      "host": null,
+      "port": null,
+      "arguments": [
+        "--a=-2147483648",
+        "--b=2147483647"
+      ]
+    },
+    {
+      "values": {
+        "a": "2147483647",
+        "b": "-2147483648"
+      },
+      "host": null,
+      "port": null,
+      "arguments": [
+        "--a=2147483647",
+        "--b=-2147483648"
+      ]
+    },
+    {
+      "values": {
+        "a": "2147483648",
+        "b": "-2147483649"
+      },
+      "host": null,
+      "port": null,
+      "refusals": [
+        {
+          "reason": "NotAnInteger",
+          "subject": "a",
+          "path": "arguments[0]"
+        },
+        {
+          "reason": "NotAnInteger",
+          "subject": "b",
+          "path": "arguments[1]"
+        }
+      ]
+    }
+  ]
+}

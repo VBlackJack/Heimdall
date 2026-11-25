@@ -389,9 +389,9 @@ public static class RecipeValidator
                 return;
             }
 
-            bool minValid = CheckBound(input, input.Min, minPath, out double min);
-            bool maxValid = CheckBound(input, input.Max, maxPath, out double max);
-            if (minValid && maxValid && input.Min is not null && input.Max is not null && min > max)
+            bool minValid = CheckBound(input, input.Min, minPath, out _);
+            bool maxValid = CheckBound(input, input.Max, maxPath, out _);
+            if (minValid && maxValid && input.Min is not null && input.Max is not null && RecipeNumbers.CompareDecimal(input.Min, input.Max) > 0)
                 Add(RecipeErrorCode.MinAboveMax, minPath, fragment: RecipeText.MakeSafe(input.Min), name: RecipeText.MakeSafe(input.Max));
         }
 

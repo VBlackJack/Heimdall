@@ -331,6 +331,58 @@ public sealed class RecipeOutputDecodingTests : IDisposable
         Assert.DoesNotContain('\uFFFD', result.Output);
     }
 
+    // ---- the mark follows the encoding really used, not the name the recipe gave ----
+
+    private async Task<RecipeRunResult> RunWithCodePagesAsync(RecipeOutputEncoding declared, int ansi, int oem, byte[] bytes)
+    {
+        FakeRecipeLauncher launcher = new() { OnStart = process => { process.Out.Feed(bytes); process.Finish(0); } };
+        RecipeRunner runner = new(launcher, kind => RecipeOutputEncodings.Resolve(kind, ansi, oem));
+
+        return await runner.RunAsync(MakeRecipe(declared), Program, [], _scratch.Dir("work-" + Guid.NewGuid().ToString("N")));
+    }
+
+    [Theory]
+    [InlineData(RecipeOutputEncoding.Ansi, 65001, 850)]
+    [InlineData(RecipeOutputEncoding.Oem, 1252, 65001)]
+    [InlineData(RecipeOutputEncoding.Ansi, 0, 850)]
+    [InlineData(RecipeOutputEncoding.Oem, 850, 0)]
+    [InlineData(RecipeOutputEncoding.Ansi, 99999, 850)]
+    public async Task AMarkIsDroppedWhenAnsiOrOemIsReallyDecodedAsUtf8(RecipeOutputEncoding declared, int ansi, int oem)
+    {
+        RecipeRunResult result = await RunWithCodePagesAsync(declared, ansi, oem, Concat(Utf8Mark, Encoding.UTF8.GetBytes("ok")));
+
+        Assert.Equal("ok", result.Output);
+    }
+
+    [Theory]
+    [InlineData(RecipeOutputEncoding.Ansi, 1252, 850)]
+    [InlineData(RecipeOutputEncoding.Oem, 1252, 850)]
+    public async Task AMarkIsKeptWhenTheCodePageIsASingleByteOne(RecipeOutputEncoding declared, int ansi, int oem)
+    {
+        RecipeRunResult result = await RunWithCodePagesAsync(declared, ansi, oem, Concat(Utf8Mark, [0x6F]));
+
+        Assert.Equal(4, result.Output.Length);
+    }
+
+    [Fact]
+    public async Task AMarkIsStillDroppedForTheDeclaredUtf8AndUtf16()
+    {
+        RecipeRunResult utf8 = await RunWithCodePagesAsync(RecipeOutputEncoding.Utf8, 1252, 850, Concat(Utf8Mark, [0x6F]));
+        RecipeRunResult utf16 = await RunWithCodePagesAsync(RecipeOutputEncoding.Utf16Le, 1252, 850, Concat(Utf16Mark, Utf16("o")));
+
+        Assert.Equal("o", utf8.Output);
+        Assert.Equal("o", utf16.Output);
+    }
+
+    [Fact]
+    public void OnlyUtf8AndUtf16AreEncodingsWhoseMarkIsDropped()
+    {
+        Assert.True(RecipeOutputEncodings.StripsLeadingMark(Encoding.UTF8));
+        Assert.True(RecipeOutputEncodings.StripsLeadingMark(new UnicodeEncoding(false, false)));
+        Assert.False(RecipeOutputEncodings.StripsLeadingMark(RecipeOutputEncodings.Resolve(RecipeOutputEncoding.Ansi, 1252, 850)));
+        Assert.False(RecipeOutputEncodings.StripsLeadingMark(Encoding.ASCII));
+    }
+
     [Fact]
     public async Task ADroppedMarkStillCountsTowardTheByteCap()
     {

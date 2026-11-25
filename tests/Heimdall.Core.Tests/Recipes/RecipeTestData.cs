@@ -77,7 +77,8 @@ internal static class RecipeTestData
             "fr": {
               "name": "Analyse",
               "description": "Analyse une cible.",
-              "fieldLabels": { "target": "Cible" }
+              "fieldLabels": { "target": "Cible" },
+              "fieldHints": { "target": "Un nom d'hote." }
             }
           },
           "program": "C:\\Windows\\System32\\ping.exe",
@@ -93,18 +94,19 @@ internal static class RecipeTestData
             ["--addr", "{in:addr}"]
           ],
           "inputs": [
-            { "name": "target", "type": "hostname", "label": "Target", "required": true },
-            { "name": "count", "type": "int", "label": "Count", "default": 4 },
-            { "name": "verbose", "type": "bool", "label": "Verbose", "default": false, "whenTrue": ["-v", "-d"] },
+            { "name": "target", "type": "hostname", "label": "Target", "required": true, "hint": "A host name." },
+            { "name": "count", "type": "int", "label": "Count", "default": 4, "min": 1, "max": "9" },
+            { "name": "verbose", "type": "bool", "label": "Verbose", "default": false, "whenTrue": ["-v", "-d"], "whenFalse": ["-q"] },
             { "name": "mode", "type": "choice", "label": "Mode", "choices": ["fast", "slow"], "default": "fast" },
             { "name": "extra", "type": "string", "label": "Extra", "pattern": "[a-z]+", "maxLength": 20 },
             { "name": "dir", "type": "path", "label": "Folder" },
-            { "name": "ratio", "type": "number", "label": "Ratio" },
+            { "name": "ratio", "type": "number", "label": "Ratio", "min": "0.5", "max": 2.5 },
             { "name": "addr", "type": "ipaddress", "label": "Address" }
           ],
-          "output": "text",
-          "outputEncoding": "oem",
-          "stderr": "merge",
+          "output": "csv",
+          "outputEncoding": "ansi",
+          "stderr": "separate",
+          "csvSeparator": "semicolon",
           "successExitCodes": [0, 1],
           "timeoutSeconds": 30,
           "icon": "network"

@@ -49,10 +49,21 @@ internal static class RecipeOutputEncodings
         };
     }
 
-    /// <summary>True for the encodings whose output may start with one byte order mark, which is then dropped.</summary>
-    /// <param name="kind">The kind.</param>
-    public static bool StripsLeadingMark(RecipeOutputEncoding kind)
-        => kind is RecipeOutputEncoding.Utf8 or RecipeOutputEncoding.Utf16Le;
+    /// <summary>
+    /// True when a stream is really decoded as UTF-8 or UTF-16 (whatever name the recipe gave: <c>ansi</c> or
+    /// <c>oem</c> on a machine whose code page is UTF-8, and the UTF-8 fallback included): its output may then start
+    /// with one byte order mark, which is dropped.
+    /// </summary>
+    /// <param name="encoding">The encoding the stream is decoded with.</param>
+    public static bool StripsLeadingMark(Encoding encoding)
+    {
+        ArgumentNullException.ThrowIfNull(encoding);
+        return encoding.CodePage is Utf8CodePage or Utf16LittleEndianCodePage;
+    }
+
+    private const int Utf8CodePage = 65001;
+
+    private const int Utf16LittleEndianCodePage = 1200;
 
     private static Encoding FromCodePage(int codePage, Encoding fallback)
     {

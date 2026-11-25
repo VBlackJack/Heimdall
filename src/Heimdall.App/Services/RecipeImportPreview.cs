@@ -388,7 +388,10 @@ public static class RecipeImportPreview
             // A switch is never required and never optional: it is on or off, so it says neither.
             if (input.Type != RecipeInputType.Bool)
             {
-                details.Add(localizer[input.Required ? "RecipeImportPreviewInputRequired" : "RecipeImportPreviewInputOptional"]);
+                // Three words: a field that can be empty is optional; one with a default is never empty.
+                details.Add(localizer[input.Required
+                    ? "RecipeImportPreviewInputRequired"
+                    : input.IsOptional ? "RecipeImportPreviewInputOptional" : "RecipeImportPreviewInputAlwaysSent"]);
             }
 
             if (!string.IsNullOrEmpty(input.Default))

@@ -294,7 +294,8 @@ program text as written in the file; every argument, one per line between
 brackets, exactly as written in the file, with a nested list marked as one that
 is kept or dropped as a whole; the name, the author (marked unverified), the id,
 the version and the description; every field with its type, whether it is
-required (a switch is neither required nor optional), its default, its choices,
+required (a switch is neither required nor optional, and a field with a default
+says "always sent"), its default, its choices,
 its pattern, its maximum length, its range (`range: 1 to 100`, `minimum: 1` or
 `maximum: 100`) and its hint, and the arguments a switch adds when it is on and
 when it is off; every translation of the recipe (the language, the name, the
@@ -500,7 +501,11 @@ stream, and that cap counts bytes, not characters.
 A byte order mark is never used to guess an encoding, and UTF-16 big endian is
 not supported. For `utf8` and `utf16le`, exactly one leading U+FEFF is dropped
 from each stream; a second one, or one further on, is kept as text. When the
-code page of `oem` or `ansi` cannot be read, UTF-8 is used.
+code page of `oem` or `ansi` cannot be read, UTF-8 is used. The mark is dropped
+whenever the stream is really decoded as UTF-8 or UTF-16, whatever name the
+recipe gave: `utf8`, `utf16le`, `oem` or `ansi` on a machine whose code page is
+65001, and the UTF-8 used when a code page cannot be read. Under any other code
+page the bytes of a mark are text.
 
 #### Fields
 
@@ -513,7 +518,7 @@ Each entry of `inputs` is an object with these properties:
 | `label` | string | yes | At most 64 characters |
 | `required` | boolean | no | `false` by default. Refused on a `bool` field, whatever its value, since a switch is never empty. Refused together with a `default`: a field with a default is never left empty, because when the user clears it the default is used, so `required` would say nothing |
 | `default` | string, number or boolean | no | A string (any type except `bool`), a number (`int` and `number` only, written as a JSON number or as a string, which means the same) or `true` or `false` (`bool` only). At most 512 characters. Held to the same fixed-text rules as a token, and it must be valid for the type of its field, and inside `min` and `max` when there are some |
-| `min`, `max` | number or string | `int` and `number` only | The lowest and the highest accepted value, each written like a default and each optional. An `int` bound is a 32-bit integer and a `number` bound a decimal number, both in the strict forms below. `min` above `max` is refused. A value outside the range is refused at run time, and so is a default outside it at import. A `number` is compared as a double-precision number, so two decimal texts that are the same double are equal |
+| `min`, `max` | number or string | `int` and `number` only | The lowest and the highest accepted value, each written like a default and each optional. An `int` bound is a 32-bit integer and a `number` bound a decimal number, both in the strict forms below. `min` above `max` is refused. A value outside the range is refused at run time, and so is a default outside it at import. A `number` is compared exactly, as a decimal: the sign, then the integer digits, then the fraction digits, where trailing zeros of the fraction do not matter and `-0` equals `0` (so `1` and `1.0` are equal, and with a `max` of `1` the value `1.0000000000000001` is refused). No rounding to a double is ever involved, because the program receives the text as typed |
 | `hint` | string | no | A help text shown under the field and read by assistive technologies. At most 200 characters, with no control character, no invisible formatting character and no line break |
 | `pattern` | string | `string` only | A regular expression that the whole value must match; at most 256 characters. A value for which the match lasts more than 250 ms is refused |
 | `maxLength` | integer | `string` only | From 1 to 1024. 256 when absent |
@@ -745,7 +750,8 @@ recipe again to accept the new location.
   expander, the program resolver, the list of refused programs and the runner.
 - `tests/Heimdall.Core.Tests/Recipes/FormatLock/v1/`: the frozen samples of
   version 1, accepted and refused, with the text each must still parse to and
-  the errors each must still give. A sample may be added and never edited.
+  the errors each must still give. A sample may be added, with its line in the
+  manifest, and may never be edited, removed or renamed.
 - `src/Heimdall.App/Services/RecipeStore.cs`: storage and loading.
 - `src/Heimdall.App/Services/RecipeImportService.cs` and
   `RecipeImportPreview.cs`: import, replacement and the preview text.

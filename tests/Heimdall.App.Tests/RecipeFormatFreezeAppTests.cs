@@ -70,7 +70,36 @@ public sealed class RecipeFormatFreezeAppTests
         Assert.DoesNotContain("required", flag, StringComparison.Ordinal);
         Assert.DoesNotContain("optional", flag, StringComparison.Ordinal);
         string number = Assert.Single(lines, line => line.StartsWith("  n:", StringComparison.Ordinal));
-        Assert.Contains("optional", number, StringComparison.Ordinal);
+        Assert.Contains("always sent, default: 4", number, StringComparison.Ordinal);
+        Assert.DoesNotContain("optional", number, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("en", "required", "optional", "always sent")]
+    [InlineData("fr", "required", "optional", "toujours envoy\u00e9")]
+    [InlineData("es", "required", "optional", "siempre enviado")]
+    public async Task ThreeKindsOfFieldHaveThreeWords(string locale, string required, string optional, string always)
+    {
+        byte[] bytes = RecipeImportFiles.Bytes(
+            argumentsJson: "[\"{in:r}\", [\"-o\", \"{in:o}\"], \"{in:d}\"]",
+            inputsJson: $"[{Field("r", "string", ",\"required\":true")},{Field("o", "string")},{Field("d", "string", ",\"default\":\"x\"")}]");
+
+        string[] lines = await PreviewLinesAsync(bytes, locale);
+
+        string r = Assert.Single(lines, line => line.Contains("Label r", StringComparison.Ordinal));
+        string o = Assert.Single(lines, line => line.Contains("Label o", StringComparison.Ordinal));
+        string d = Assert.Single(lines, line => line.Contains("Label d", StringComparison.Ordinal));
+        string[] words = locale == "en" ? [required, optional, always] : [string.Empty, string.Empty, always];
+        Assert.Contains(words[2], d, StringComparison.Ordinal);
+        Assert.DoesNotContain(words[2], r, StringComparison.Ordinal);
+        Assert.DoesNotContain(words[2], o, StringComparison.Ordinal);
+        if (locale == "en")
+        {
+            Assert.Contains("required", r, StringComparison.Ordinal);
+            Assert.Contains("optional", o, StringComparison.Ordinal);
+            Assert.DoesNotContain("optional", d, StringComparison.Ordinal);
+            Assert.DoesNotContain("required", d, StringComparison.Ordinal);
+        }
     }
 
     [Theory]

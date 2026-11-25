@@ -6795,6 +6795,7 @@
   "RecipeImportPreviewInputType": "type: {0}",
   "RecipeImportPreviewInputRequired": "required",
   "RecipeImportPreviewInputOptional": "optional",
+  "RecipeImportPreviewInputAlwaysSent": "always sent",
   "RecipeImportPreviewInputDefault": "default: {0}",
   "RecipeImportPreviewInputChoices": "choices: {0}",
   "RecipeImportPreviewInputPattern": "pattern: {0}",

@@ -482,9 +482,10 @@ public sealed class RecipeFormatFreezeTests
     [InlineData("0.30000000000000004", false)]
     [InlineData("0.3", true)]
     [InlineData("0.09", false)]
-    public void ANumberIsComparedAsADoublePrecisionNumber(string value, bool accepted)
+    [InlineData("0.0999999999999999999", false)]
+    public void ANumberIsComparedExactlyAsADecimal(string value, bool accepted)
     {
-        // 0.10000000000000001 and 0.1 are the same double, so the lower bound lets both through.
+        // The program receives the text as typed: 0.0999999999999999999 is the same double as 0.1 but is below it.
         Recipe recipe = Valid($"[{Input("r", "number", ",\"min\":\"0.1\",\"max\":\"0.3\",\"default\":\"0.2\"")}]", "[\"-r\", \"{in:r}\"]");
 
         Assert.Equal(accepted, Expand(recipe, ("r", value)).Succeeded);

@@ -312,7 +312,8 @@ dans le fichier ; chaque argument, un par ligne entre crochets, exactement comme
 écrit dans le fichier, une liste imbriquée étant signalée comme conservée ou
 omise en bloc ; le nom, l'auteur (marqué non vérifié), l'identifiant, la version
 et la description ; chaque champ avec son type, son caractère obligatoire ou
-facultatif (un interrupteur n'est ni l'un ni l'autre), sa valeur par défaut, ses
+facultatif (un interrupteur n'est ni l'un ni l'autre, et un champ doté d'une
+valeur par défaut dit "toujours envoyé"), sa valeur par défaut, ses
 choix, son motif, sa longueur maximale, sa plage (`plage : 1 à 100`,
 `minimum : 1` ou `maximum : 100`) et son aide, et les arguments qu'un
 interrupteur ajoute quand il est activé et quand il est désactivé ; chaque
@@ -533,7 +534,11 @@ Une marque d'ordre des octets ne sert jamais à deviner un encodage, et l'UTF-16
 gros-boutiste n'est pas pris en charge. Pour `utf8` et `utf16le`, exactement un
 U+FEFF initial est retiré de chaque flux ; un deuxième, ou un autre plus loin,
 est conservé comme du texte. Quand la page de code de `oem` ou de `ansi` ne peut
-pas être lue, l'UTF-8 est utilisé.
+pas être lue, l'UTF-8 est utilisé. La marque est retirée dès que le flux est
+réellement décodé en UTF-8 ou en UTF-16, quel que soit le nom donné par la
+recette : `utf8`, `utf16le`, `oem` ou `ansi` sur une machine dont la page de
+code est 65001, et l'UTF-8 employé quand une page de code ne peut pas être lue.
+Sous toute autre page de code, les octets d'une marque sont du texte.
 
 #### Champs
 
@@ -546,7 +551,7 @@ Chaque entrée de `inputs` est un objet doté de ces propriétés :
 | `label` | chaîne | oui | 64 caractères au plus |
 | `required` | booléen | non | `false` par défaut. Refusé sur un champ `bool`, quelle que soit sa valeur, car un interrupteur n'est jamais vide. Refusé avec un `default` : un champ qui a une valeur par défaut n'est jamais laissé vide, car l'effacer fait utiliser la valeur par défaut, si bien que `required` ne dirait rien |
 | `default` | chaîne, nombre ou booléen | non | Une chaîne (tout type sauf `bool`), un nombre (`int` et `number` seulement, écrit comme un nombre JSON ou comme une chaîne, ce qui revient au même) ou `true` ou `false` (`bool` seulement). 512 caractères au plus. Soumise aux mêmes règles de texte fixe qu'un élément d'argument, valide pour le type de son champ, et comprise entre `min` et `max` quand il y en a |
-| `min`, `max` | nombre ou chaîne | `int` et `number` seulement | La plus petite et la plus grande valeur acceptées, chacune écrite comme une valeur par défaut et chacune facultative. Une borne d'`int` est un entier sur 32 bits et une borne de `number` un nombre décimal, dans les formes strictes ci-dessous. `min` supérieur à `max` est refusé. Une valeur hors de la plage est refusée à l'exécution, et une valeur par défaut hors de la plage à l'import. Un `number` est comparé comme un nombre à double précision : deux textes décimaux qui donnent le même double sont égaux |
+| `min`, `max` | nombre ou chaîne | `int` et `number` seulement | La plus petite et la plus grande valeur acceptées, chacune écrite comme une valeur par défaut et chacune facultative. Une borne d'`int` est un entier sur 32 bits et une borne de `number` un nombre décimal, dans les formes strictes ci-dessous. `min` supérieur à `max` est refusé. Une valeur hors de la plage est refusée à l'exécution, et une valeur par défaut hors de la plage à l'import. Un `number` est comparé exactement, comme un décimal : le signe, puis les chiffres entiers, puis les chiffres de la fraction, les zéros finaux de la fraction ne comptant pas et `-0` valant `0` (donc `1` et `1.0` sont égaux, et avec un `max` de `1` la valeur `1.0000000000000001` est refusée). Aucun arrondi en double n'intervient jamais, car le programme reçoit le texte tel qu'il a été saisi |
 | `hint` | chaîne | non | Un texte d'aide affiché sous le champ et lu par les technologies d'assistance. 200 caractères au plus, sans caractère de contrôle, sans caractère de mise en forme invisible et sans saut de ligne |
 | `pattern` | chaîne | `string` seulement | Une expression régulière que la valeur entière doit satisfaire ; 256 caractères au plus. Une valeur pour laquelle la comparaison dure plus de 250 ms est refusée |
 | `maxLength` | entier | `string` seulement | De 1 à 1024. 256 en l'absence de valeur |
@@ -809,7 +814,8 @@ démarre pas. Importez à nouveau la recette pour accepter le nouvel emplacement
 - `tests/Heimdall.Core.Tests/Recipes/FormatLock/v1/` : les échantillons figés de
   la version 1, acceptés et refusés, avec le texte auquel chacun doit encore
   s'analyser et les erreurs que chacun doit encore donner. Un échantillon peut
-  être ajouté, jamais modifié.
+  être ajouté, avec sa ligne dans le manifeste, jamais modifié, supprimé ni
+  renommé.
 - `src/Heimdall.App/Services/RecipeStore.cs` : stockage et chargement.
 - `src/Heimdall.App/Services/RecipeImportService.cs` et
   `RecipeImportPreview.cs` : import, remplacement et texte de l'aperçu.

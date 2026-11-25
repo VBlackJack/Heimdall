@@ -48,9 +48,10 @@ public sealed class RecipeParserTests
         Recipe recipe = RecipeTestData.ParseValid(RecipeTestData.FullJson);
 
         Assert.Equal("1.2.3-beta.1+build.5", recipe.Version);
-        Assert.Equal(RecipeOutputFormat.Text, recipe.Output);
-        Assert.Equal(RecipeOutputEncoding.Oem, recipe.OutputEncoding);
-        Assert.Equal(RecipeStderrMode.Merge, recipe.Stderr);
+        Assert.Equal(RecipeOutputFormat.Csv, recipe.Output);
+        Assert.Equal(RecipeOutputEncoding.Ansi, recipe.OutputEncoding);
+        Assert.Equal(RecipeStderrMode.Separate, recipe.Stderr);
+        Assert.Equal(RecipeCsvSeparator.Semicolon, recipe.CsvSeparator);
         Assert.Equal([0, 1], recipe.SuccessExitCodes);
         Assert.Equal(30, recipe.TimeoutSeconds);
         Assert.Equal("network", recipe.Icon);
@@ -77,6 +78,15 @@ public sealed class RecipeParserTests
         RecipeTranslation french = recipe.Translations["fr"];
         Assert.Equal("Analyse", french.Name);
         Assert.Equal("Cible", french.FieldLabels["target"]);
+        Assert.Equal("Un nom d'hote.", french.FieldHints["target"]);
+
+        Assert.Equal(["-q"], verbose.WhenFalse);
+        Assert.Equal("1", count.Min);
+        Assert.Equal("9", count.Max);
+        RecipeInput ratio = recipe.FindInput("ratio")!;
+        Assert.Equal("0.5", ratio.Min);
+        Assert.Equal("2.5", ratio.Max);
+        Assert.Equal("A host name.", recipe.FindInput("target")!.Hint);
     }
 
     [Fact]

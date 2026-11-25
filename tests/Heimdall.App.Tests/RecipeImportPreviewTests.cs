@@ -128,7 +128,7 @@ public sealed class RecipeImportPreviewTests
 
         string text = RecipeImportPreview.Compose(await EnglishAsync(), PlanOf(bytes));
 
-        Assert.Contains("  count: Count (type: whole number, optional, default: 4)", text, StringComparison.Ordinal);
+        Assert.Contains("  count: Count (type: whole number, always sent, default: 4)", text, StringComparison.Ordinal);
         Assert.Contains("  mode: Mode (type: one value of a list, required, choices: fast, slow)", text, StringComparison.Ordinal);
     }
 

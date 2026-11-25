@@ -27,11 +27,6 @@ namespace Heimdall.Core.Tests.Recipes;
 /// </summary>
 public sealed class RecipeFormatLockTests
 {
-    /// <summary>The fewest samples the freeze left in each folder; a scan that finds fewer did not reach them.</summary>
-    private const int FewestAccepted = 35;
-
-    private const int FewestRefused = 42;
-
     public static TheoryData<string> AcceptedSamples() => Samples(FormatLockSupport.AcceptedFolder);
 
     public static TheoryData<string> RefusedSamples() => Samples(FormatLockSupport.RefusedFolder);
@@ -55,8 +50,8 @@ public sealed class RecipeFormatLockTests
     public void TheScanReachesTheSubfoldersAndTheFilesOfTheFreeze()
     {
         Assert.True(Directory.Exists(FormatLockSupport.Root), FormatLockSupport.Root);
-        Assert.True(FormatLockSupport.SampleNames(FormatLockSupport.AcceptedFolder).Count >= FewestAccepted);
-        Assert.True(FormatLockSupport.SampleNames(FormatLockSupport.RefusedFolder).Count >= FewestRefused);
+        Assert.True(FormatLockSupport.SampleNames(FormatLockSupport.AcceptedFolder).Count >= FormatLockFrozen.Accepted.Length);
+        Assert.True(FormatLockSupport.SampleNames(FormatLockSupport.RefusedFolder).Count >= FormatLockFrozen.Refused.Length);
         Assert.True(File.Exists(Path.Combine(FormatLockSupport.Root, FormatLockSupport.ManifestFileName)));
     }
 
@@ -124,15 +119,57 @@ public sealed class RecipeFormatLockTests
         }
     }
 
-    [Fact]
-    public void TheManifestListsEveryFileOfTheFreezeOnceAndTheFilesThatWereAddedLaterMayBeMissing()
-    {
-        string[] listed = [.. File.ReadAllLines(Path.Combine(FormatLockSupport.Root, FormatLockSupport.ManifestFileName))
+    private static string[] ManifestPaths()
+        => [.. File.ReadAllLines(Path.Combine(FormatLockSupport.Root, FormatLockSupport.ManifestFileName))
             .Where(line => !string.IsNullOrWhiteSpace(line))
             .Select(line => line.Split("  ", 2, StringSplitOptions.None)[1])];
 
+    [Fact]
+    public void EverySampleFileOnDiskHasAManifestLineAndNothingIsListedTwice()
+    {
+        string[] listed = ManifestPaths();
         Assert.Equal(listed.Length, listed.Distinct(StringComparer.Ordinal).Count());
-        Assert.Equal(2 * (FewestAccepted + FewestRefused), listed.Length);
+
+        foreach (string folder in new[] { FormatLockSupport.AcceptedFolder, FormatLockSupport.RefusedFolder })
+        {
+            foreach (string name in FormatLockSupport.SampleNames(folder))
+            {
+                Assert.Contains($"{folder}/{name}{FormatLockSupport.RecipeSuffix}", listed);
+                Assert.Contains($"{folder}/{name}{FormatLockSupport.ExpectedSuffix}", listed);
+            }
+        }
+    }
+
+    [Fact]
+    public void EveryManifestLineHasItsFile()
+    {
+        foreach (string listed in ManifestPaths())
+            Assert.True(File.Exists(Path.Combine(FormatLockSupport.Root, listed.Replace('/', Path.DirectorySeparatorChar))), "No file for " + listed);
+    }
+
+    [Fact]
+    public void EverySampleOfTheFreezeIsStillThereUnderItsNameAndListedInTheManifest()
+    {
+        string[] listed = ManifestPaths();
+        foreach ((string folder, string[] names) in new[] { (FormatLockSupport.AcceptedFolder, FormatLockFrozen.Accepted), (FormatLockSupport.RefusedFolder, FormatLockFrozen.Refused) })
+        {
+            foreach (string name in names)
+            {
+                foreach (string suffix in new[] { FormatLockSupport.RecipeSuffix, FormatLockSupport.ExpectedSuffix })
+                {
+                    string relative = $"{folder}/{name}{suffix}";
+                    Assert.True(File.Exists(PathOf(folder, name, suffix)), "A frozen sample was removed or renamed: " + relative);
+                    Assert.Contains(relative, listed);
+                }
+            }
+        }
+    }
+
+    [Fact]
+    public void TheNamesOfTheFreezeAreDistinct()
+    {
+        Assert.Equal(FormatLockFrozen.Accepted.Length, FormatLockFrozen.Accepted.Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(FormatLockFrozen.Refused.Length, FormatLockFrozen.Refused.Distinct(StringComparer.Ordinal).Count());
     }
 
     [Fact]

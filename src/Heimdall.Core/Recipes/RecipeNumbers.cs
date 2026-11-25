@@ -58,6 +58,49 @@ internal static class RecipeNumbers
             && double.IsFinite(value);
     }
 
+    /// <summary>
+    /// Compares two texts that are both in the strict decimal form, exactly, as decimals: the sign, then the
+    /// integer digits, then the fraction digits. Trailing zeros of the fraction do not matter and <c>-0</c> equals
+    /// <c>0</c>. Returns a negative number, zero or a positive number as <paramref name="left"/> is below, equal to
+    /// or above <paramref name="right"/>.
+    /// </summary>
+    public static int CompareDecimal(string left, string right)
+    {
+        Split(left, out bool leftNegative, out string leftInteger, out string leftFraction);
+        Split(right, out bool rightNegative, out string rightInteger, out string rightFraction);
+
+        if (leftNegative != rightNegative)
+            return leftNegative ? -1 : 1;
+
+        int magnitude = CompareMagnitude(leftInteger, leftFraction, rightInteger, rightFraction);
+        return leftNegative ? -magnitude : magnitude;
+    }
+
+    private static int CompareMagnitude(string leftInteger, string leftFraction, string rightInteger, string rightFraction)
+    {
+        if (leftInteger.Length != rightInteger.Length)
+            return leftInteger.Length < rightInteger.Length ? -1 : 1;
+
+        int integer = string.CompareOrdinal(leftInteger, rightInteger);
+        if (integer != 0)
+            return integer < 0 ? -1 : 1;
+
+        int fraction = string.CompareOrdinal(leftFraction, rightFraction);
+        return fraction == 0 ? 0 : fraction < 0 ? -1 : 1;
+    }
+
+    // A zero has no sign; the fraction has no trailing zero, so "1.50" and "1.5" split the same way.
+    private static void Split(string text, out bool negative, out string integer, out string fraction)
+    {
+        negative = text.StartsWith(Minus);
+        string unsigned = negative ? text[1..] : text;
+        int dot = unsigned.IndexOf(Dot, StringComparison.Ordinal);
+        integer = dot < 0 ? unsigned : unsigned[..dot];
+        fraction = dot < 0 ? string.Empty : unsigned[(dot + 1)..].TrimEnd('0');
+        if (integer == "0" && fraction.Length == 0)
+            negative = false;
+    }
+
     /// <summary>Reads <c>-?(0|[1-9][0-9]*)</c> from <paramref name="start"/>; <paramref name="end"/> is the index after it.</summary>
     private static bool ScanInteger(string text, int start, out int end)
     {

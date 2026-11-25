@@ -111,6 +111,8 @@ public sealed class RecipeRunner : IRecipeRunner
 
     private readonly IRecipeProcessLauncher _launcher;
 
+    private readonly Func<RecipeOutputEncoding, Encoding> _resolveEncoding;
+
     /// <summary>Creates a runner that starts real processes.</summary>
     public RecipeRunner()
         : this(new SystemRecipeProcessLauncher())
@@ -118,8 +120,15 @@ public sealed class RecipeRunner : IRecipeRunner
     }
 
     internal RecipeRunner(IRecipeProcessLauncher launcher)
+        : this(launcher, RecipeOutputEncodings.Resolve)
+    {
+    }
+
+    /// <summary>Creates a runner with the encodings resolved by <paramref name="resolveEncoding"/>; a test passes code pages it chose.</summary>
+    internal RecipeRunner(IRecipeProcessLauncher launcher, Func<RecipeOutputEncoding, Encoding> resolveEncoding)
     {
         _launcher = launcher ?? throw new ArgumentNullException(nameof(launcher));
+        _resolveEncoding = resolveEncoding ?? throw new ArgumentNullException(nameof(resolveEncoding));
     }
 
     /// <summary>Runs a program.</summary>
@@ -147,7 +156,7 @@ public sealed class RecipeRunner : IRecipeRunner
         if (cancellationToken.IsCancellationRequested)
             return new RecipeRunResult(RecipeRunStatus.Cancelled, null, string.Empty, string.Empty, false, null, RecipeRunRefusal.None);
 
-        Encoding encoding = RecipeOutputEncodings.Resolve(recipe.OutputEncoding);
+        Encoding encoding = _resolveEncoding(recipe.OutputEncoding);
         ProcessStartInfo startInfo = BuildStartInfo(programPath, arguments, workingDirectory, encoding);
 
         IRecipeProcess process;
@@ -235,7 +244,7 @@ public sealed class RecipeRunner : IRecipeRunner
         CaptureBuffer error = merge ? output : new CaptureBuffer();
 
         using CancellationTokenSource drain = new();
-        bool stripMark = RecipeOutputEncodings.StripsLeadingMark(recipe.OutputEncoding);
+        bool stripMark = RecipeOutputEncodings.StripsLeadingMark(encoding);
         Task outputPump = PumpAsync(process.StandardOutput, encoding.GetDecoder(), output, stripMark, drain.Token);
         Task errorPump = PumpAsync(process.StandardError, encoding.GetDecoder(), error, stripMark, drain.Token);
 

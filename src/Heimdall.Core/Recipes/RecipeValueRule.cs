@@ -297,11 +297,12 @@ public static class RecipeValueRule
 
     private static RecipeValueRefusal CheckNumber(RecipeInput field, string value)
     {
-        if (!RecipeNumbers.TryParseNumber(value, out double number))
+        if (!RecipeNumbers.TryParseNumber(value, out _))
             return RecipeValueRefusal.NotANumber;
 
-        bool below = RecipeNumbers.TryParseNumber(field.Min, out double min) && number < min;
-        bool above = RecipeNumbers.TryParseNumber(field.Max, out double max) && number > max;
+        // The program receives the text as typed, so the comparison is exact, as decimals, never as doubles.
+        bool below = RecipeNumbers.TryParseNumber(field.Min, out _) && RecipeNumbers.CompareDecimal(value, field.Min!) < 0;
+        bool above = RecipeNumbers.TryParseNumber(field.Max, out _) && RecipeNumbers.CompareDecimal(value, field.Max!) > 0;
         return below || above ? RecipeValueRefusal.OutOfRange : RecipeValueRefusal.None;
     }
 
