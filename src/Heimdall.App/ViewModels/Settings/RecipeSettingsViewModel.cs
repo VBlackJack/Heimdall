@@ -134,14 +134,29 @@ public sealed class RecipeSettingsViewModel : ObservableObject, IDisposable
     public void Refresh()
     {
         _loaded = true;
-        LoadedRecipe[] loaded = [.. _store.LoadAll().Recipes];
+        RecipeLoadResult loadResult = _store.LoadAll();
+        LoadedRecipe[] loaded = [.. loadResult.Recipes];
+        Dictionary<string, RecipeLoadIssueCode> issuesById = new(StringComparer.Ordinal);
+        foreach (RecipeLoadIssue issue in loadResult.Issues)
+        {
+            if (issue.RecipeId is { } recipeId)
+            {
+                issuesById.TryAdd(recipeId, issue.Code);
+            }
+        }
+
         Items.Clear();
         foreach (RecipeStoreEntry entry in _store.List())
         {
             LoadedRecipe? match = loaded.FirstOrDefault(item => string.Equals(item.Recipe.Id, entry.Id, StringComparison.Ordinal));
-            Items.Add(match is null
-                ? new ImportedRecipeItemViewModel(entry, _localizer, ExportAsync, RemoveAsync)
-                : new ImportedRecipeItemViewModel(match, _localizer, ExportAsync, RemoveAsync));
+            if (match is not null)
+            {
+                Items.Add(new ImportedRecipeItemViewModel(match, _localizer, ExportAsync, RemoveAsync));
+                continue;
+            }
+
+            RecipeLoadIssueCode? issueCode = issuesById.TryGetValue(entry.Id, out RecipeLoadIssueCode code) ? code : null;
+            Items.Add(new ImportedRecipeItemViewModel(entry, issueCode, _localizer, ExportAsync, RemoveAsync));
         }
 
         OnPropertyChanged(nameof(HasItems));
