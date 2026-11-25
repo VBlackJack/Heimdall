@@ -1,0 +1,8 @@
+{
+  "errors": [
+    {
+      "code": "DuplicateLanguageTag",
+      "path": "translations.fr"
+    }
+  ]
+}

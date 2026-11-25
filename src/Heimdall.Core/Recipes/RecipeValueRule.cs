@@ -116,6 +116,9 @@ public enum RecipeValueRefusal
 
     /// <summary>The value is not one of the field's choices.</summary>
     NotInChoices,
+
+    /// <summary>The number is below the <c>min</c> or above the <c>max</c> of the field.</summary>
+    OutOfRange,
 }
 
 /// <summary>
@@ -163,8 +166,8 @@ public static class RecipeValueRule
         return field.Type switch
         {
             RecipeInputType.String => CheckString(field, value),
-            RecipeInputType.Int => CheckInteger(value),
-            RecipeInputType.Number => CheckNumber(value),
+            RecipeInputType.Int => CheckInteger(field, value),
+            RecipeInputType.Number => CheckNumber(field, value),
             RecipeInputType.Bool => CheckBool(value),
             RecipeInputType.Hostname => CheckHostname(value),
             RecipeInputType.IpAddress => CheckIpAddress(value),
@@ -280,20 +283,27 @@ public static class RecipeValueRule
         }
     }
 
-    private static RecipeValueRefusal CheckInteger(string value)
+    // The strict forms live in RecipeNumbers. A bound that is not itself valid is ignored here: the
+    // validator refuses such a file, and a recipe built by hand is not made unusable by it.
+    private static RecipeValueRefusal CheckInteger(RecipeInput field, string value)
     {
-        bool ok = value.Length <= RecipeLimits.MaxNumericValueLength
-            && int.TryParse(value, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out _);
-        return ok ? RecipeValueRefusal.None : RecipeValueRefusal.NotAnInteger;
+        if (!RecipeNumbers.TryParseInt(value, out int number))
+            return RecipeValueRefusal.NotAnInteger;
+
+        bool below = RecipeNumbers.TryParseInt(field.Min, out int min) && number < min;
+        bool above = RecipeNumbers.TryParseInt(field.Max, out int max) && number > max;
+        return below || above ? RecipeValueRefusal.OutOfRange : RecipeValueRefusal.None;
     }
 
-    private static RecipeValueRefusal CheckNumber(string value)
+    private static RecipeValueRefusal CheckNumber(RecipeInput field, string value)
     {
-        const NumberStyles styles = NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint | NumberStyles.AllowExponent;
-        bool ok = value.Length <= RecipeLimits.MaxNumericValueLength
-            && double.TryParse(value, styles, CultureInfo.InvariantCulture, out double number)
-            && double.IsFinite(number);
-        return ok ? RecipeValueRefusal.None : RecipeValueRefusal.NotANumber;
+        if (!RecipeNumbers.TryParseNumber(value, out _))
+            return RecipeValueRefusal.NotANumber;
+
+        // The program receives the text as typed, so the comparison is exact, as decimals, never as doubles.
+        bool below = RecipeNumbers.TryParseNumber(field.Min, out _) && RecipeNumbers.CompareDecimal(value, field.Min!) < 0;
+        bool above = RecipeNumbers.TryParseNumber(field.Max, out _) && RecipeNumbers.CompareDecimal(value, field.Max!) > 0;
+        return below || above ? RecipeValueRefusal.OutOfRange : RecipeValueRefusal.None;
     }
 
     private static RecipeValueRefusal CheckBool(string value)

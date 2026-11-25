@@ -59,7 +59,7 @@ public static class RecipeValidator
     {
         Bare,
         Group,
-        WhenTrue,
+        Switch,
     }
 
     private sealed class Run
@@ -75,6 +75,8 @@ public static class RecipeValidator
         private readonly Dictionary<string, RecipeInput> _inputs = new(StringComparer.Ordinal);
 
         private readonly HashSet<string> _placedBools = new(StringComparer.Ordinal);
+
+        private readonly HashSet<string> _mentioned = new(StringComparer.Ordinal);
 
         private int _tokenCount;
 
@@ -96,7 +98,7 @@ public static class RecipeValidator
             CheckText(RecipePath.Program, _recipe.Program, RecipeLimits.MaxProgramLength, forbidden: true, onCommandLine: true);
             CheckInputs();
             CheckArguments();
-            CheckLabels();
+            CheckTranslations();
             CheckRunSettings();
             return _errors;
         }
@@ -236,11 +238,39 @@ public static class RecipeValidator
                 }
 
                 CheckText(RecipePath.Property(path, RecipePath.Label), input.Label, RecipeLimits.MaxLabelLength, forbidden: false);
+                CheckHint(input, path);
+                CheckRequired(input, path);
                 CheckStringProperties(input, path);
                 CheckChoices(input, path);
-                CheckWhenTrue(input, path);
+                CheckSwitchArguments(input, path);
+                CheckBounds(input, path);
                 CheckDefault(input, path);
             }
+        }
+
+        private void CheckHint(RecipeInput input, string path)
+        {
+            if (input.Hint is not null)
+                CheckText(RecipePath.Property(path, RecipePath.Hint), input.Hint, RecipeLimits.MaxHintLength, forbidden: false);
+        }
+
+        private void CheckRequired(RecipeInput input, string path)
+        {
+            string requiredPath = RecipePath.Property(path, RecipePath.Required);
+            if (input.Type == RecipeInputType.Bool)
+            {
+                // A switch is never required (the file reader reports the property itself; this covers a recipe built by hand).
+                if (input.Required)
+                    Add(RecipeErrorCode.PropertyNotAllowedForType, requiredPath, fragment: RecipePath.Required);
+
+                return;
+            }
+
+            // A field with a default is never omitted: when it is cleared, the default is used. Requiring it says
+            // nothing (the file reader refuses even "required": false next to a default; a recipe built by hand is
+            // held to the same rule through the flag).
+            if (input.Required && input.Default is not null)
+                Add(RecipeErrorCode.RequiredWithDefault, requiredPath, name: RecipeText.MakeSafe(input.Name));
         }
 
         private void CheckStringProperties(RecipeInput input, string path)
@@ -305,25 +335,89 @@ public static class RecipeValidator
             }
         }
 
-        private void CheckWhenTrue(RecipeInput input, string path)
+        private void CheckSwitchArguments(RecipeInput input, string path)
         {
-            string whenPath = RecipePath.Property(path, RecipePath.WhenTrue);
+            string whenTruePath = RecipePath.Property(path, RecipePath.WhenTrue);
+            string whenFalsePath = RecipePath.Property(path, RecipePath.WhenFalse);
             if (input.Type != RecipeInputType.Bool)
             {
                 if (input.WhenTrue is not null)
-                    Add(RecipeErrorCode.PropertyNotAllowedForType, whenPath, fragment: RecipePath.WhenTrue);
+                    Add(RecipeErrorCode.PropertyNotAllowedForType, whenTruePath, fragment: RecipePath.WhenTrue);
+
+                if (input.WhenFalse is not null)
+                    Add(RecipeErrorCode.PropertyNotAllowedForType, whenFalsePath, fragment: RecipePath.WhenFalse);
 
                 return;
             }
 
-            if (input.WhenTrue is null || input.WhenTrue.Count == 0)
+            if (input.WhenTrue is null && input.WhenFalse is null)
             {
-                Add(RecipeErrorCode.MissingWhenTrue, whenPath);
+                Add(RecipeErrorCode.MissingSwitchArguments, whenTruePath);
                 return;
             }
 
-            for (int index = 0; index < input.WhenTrue.Count; index++)
-                CheckToken(RecipePath.Index(whenPath, index), input.WhenTrue[index], TokenContext.WhenTrue);
+            CheckSwitchList(input.WhenTrue, whenTruePath);
+            CheckSwitchList(input.WhenFalse, whenFalsePath);
+        }
+
+        private void CheckSwitchList(IReadOnlyList<string>? tokens, string listPath)
+        {
+            if (tokens is null)
+                return;
+
+            if (tokens.Count == 0)
+            {
+                Add(RecipeErrorCode.MissingSwitchArguments, listPath);
+                return;
+            }
+
+            for (int index = 0; index < tokens.Count; index++)
+                CheckToken(RecipePath.Index(listPath, index), tokens[index], TokenContext.Switch);
+        }
+
+        /// <summary>The <c>min</c> and <c>max</c> of a number: allowed on <c>int</c> and <c>number</c> only, valid, and in order.</summary>
+        private void CheckBounds(RecipeInput input, string path)
+        {
+            string minPath = RecipePath.Property(path, RecipePath.Min);
+            string maxPath = RecipePath.Property(path, RecipePath.Max);
+            if (input.Type is not (RecipeInputType.Int or RecipeInputType.Number))
+            {
+                if (input.Min is not null)
+                    Add(RecipeErrorCode.PropertyNotAllowedForType, minPath, fragment: RecipePath.Min);
+
+                if (input.Max is not null)
+                    Add(RecipeErrorCode.PropertyNotAllowedForType, maxPath, fragment: RecipePath.Max);
+
+                return;
+            }
+
+            bool minValid = CheckBound(input, input.Min, minPath, out _);
+            bool maxValid = CheckBound(input, input.Max, maxPath, out _);
+            if (minValid && maxValid && input.Min is not null && input.Max is not null && RecipeNumbers.CompareDecimal(input.Min, input.Max) > 0)
+                Add(RecipeErrorCode.MinAboveMax, minPath, fragment: RecipeText.MakeSafe(input.Min), name: RecipeText.MakeSafe(input.Max));
+        }
+
+        /// <summary>True when the bound is present and valid; an absent bound raises nothing and is not valid.</summary>
+        private bool CheckBound(RecipeInput input, string? text, string path, out double value)
+        {
+            value = 0;
+            if (text is null)
+                return false;
+
+            bool ok = input.Type == RecipeInputType.Int
+                ? TryParseIntBound(text, out value)
+                : RecipeNumbers.TryParseNumber(text, out value);
+            if (!ok)
+                Add(RecipeErrorCode.InvalidBound, path, fragment: RecipeText.MakeSafe(text));
+
+            return ok;
+        }
+
+        private static bool TryParseIntBound(string text, out double value)
+        {
+            bool ok = RecipeNumbers.TryParseInt(text, out int number);
+            value = number;
+            return ok;
         }
 
         private void CheckDefault(RecipeInput input, string path)
@@ -333,7 +427,7 @@ public static class RecipeValidator
 
             string defaultPath = RecipePath.Property(path, RecipePath.Default);
             string value = input.Default;
-            if (value.Length == 0)
+            if (string.IsNullOrWhiteSpace(value))
             {
                 Add(RecipeErrorCode.EmptyValue, defaultPath);
                 return;
@@ -371,6 +465,8 @@ public static class RecipeValidator
 
             if (input.Type == RecipeInputType.Choice)
                 Add(RecipeErrorCode.InvalidChoiceDefault, defaultPath, fragment: RecipeText.MakeSafe(value));
+            else if (refusal == RecipeValueRefusal.OutOfRange)
+                Add(RecipeErrorCode.DefaultOutOfBounds, defaultPath, name: RecipeText.MakeSafe(input.Name), fragment: RecipeText.MakeSafe(value));
             else
                 Add(RecipeErrorCode.InvalidDefault, defaultPath, fragment: refusal.ToString());
         }
@@ -405,13 +501,18 @@ public static class RecipeValidator
             if (_tokenCount > RecipeLimits.MaxTokens)
                 Add(RecipeErrorCode.TooMany, RecipePath.Arguments, actual: _tokenCount, limit: RecipeLimits.MaxTokens);
 
+            // An input that no argument uses is refused. A switch must be placed as a whole bare token; any
+            // other input is used as soon as a token, a group member or a switch token names it.
             for (int index = 0; index < _recipe.Inputs.Count; index++)
             {
                 RecipeInput input = _recipe.Inputs[index];
-                if (input.Type == RecipeInputType.Bool && !_placedBools.Contains(input.Name))
+                bool used = input.Type == RecipeInputType.Bool
+                    ? _placedBools.Contains(input.Name)
+                    : _mentioned.Contains(input.Name);
+                if (!used)
                 {
                     Add(
-                        RecipeErrorCode.UnreferencedBoolInput,
+                        RecipeErrorCode.UnreferencedInput,
                         RecipePath.Index(RecipePath.Inputs, index),
                         name: RecipeText.MakeSafe(input.Name));
                 }
@@ -420,10 +521,12 @@ public static class RecipeValidator
 
         private void CheckToken(string path, string? token, TokenContext context)
         {
-            // What the expander can produce: a switch placed as a bare token becomes its whenTrue tokens, once
-            // per placement, so the declared whenTrue tokens themselves are not counted.
-            if (context != TokenContext.WhenTrue)
+            // What the expander can produce: a switch placed as a bare token becomes its whenTrue or its
+            // whenFalse tokens, once per placement, so the declared switch tokens themselves are not counted.
+            if (context != TokenContext.Switch)
                 _tokenCount += TokensProducedBy(token, context);
+
+            NoteMentions(token);
 
             if (string.IsNullOrEmpty(token))
             {
@@ -470,7 +573,20 @@ public static class RecipeValidator
             }
         }
 
-        /// <summary>How many tokens one written token can become: its own count, or the whenTrue count of a switch placed alone.</summary>
+        /// <summary>Remembers every input a token names, whatever else is wrong with the token.</summary>
+        private void NoteMentions(string? token)
+        {
+            if (string.IsNullOrEmpty(token))
+                return;
+
+            foreach (TemplateSegment segment in RecipeTemplate.Parse(token).Segments)
+            {
+                if (segment.Kind == TemplateSegmentKind.Input)
+                    _mentioned.Add(segment.Text);
+            }
+        }
+
+        /// <summary>How many tokens one written token can become: its own count, or the larger list of a switch placed alone.</summary>
         private int TokensProducedBy(string? token, TokenContext context)
         {
             if (context != TokenContext.Bare || string.IsNullOrEmpty(token))
@@ -483,7 +599,7 @@ public static class RecipeValidator
                 && _inputs.TryGetValue(parse.Segments[0].Text, out RecipeInput? input)
                 && input.Type == RecipeInputType.Bool)
             {
-                return input.WhenTrue?.Count ?? 0;
+                return Math.Max(input.WhenTrue?.Count ?? 0, input.WhenFalse?.Count ?? 0);
             }
 
             return 1;
@@ -499,7 +615,7 @@ public static class RecipeValidator
 
             if (input.Type == RecipeInputType.Bool)
             {
-                // A switch is placed as a whole bare token, and expands to its whenTrue tokens.
+                // A switch is placed as a whole bare token, and expands to its whenTrue or its whenFalse tokens.
                 if (context == TokenContext.Bare && wholeToken)
                     _placedBools.Add(name);
                 else
@@ -510,6 +626,10 @@ public static class RecipeValidator
 
             if (context == TokenContext.Bare && input.IsOptional)
                 Add(RecipeErrorCode.OptionalInputInBareToken, path, name: RecipeText.MakeSafe(name));
+
+            // The tokens of a switch have no group around them to be dropped: an input there must always have a value.
+            if (context == TokenContext.Switch && input.IsOptional)
+                Add(RecipeErrorCode.OptionalInputInSwitchArguments, path, name: RecipeText.MakeSafe(name));
 
             CheckFixedValues(path, input, parse, segmentIndex);
         }
@@ -582,32 +702,41 @@ public static class RecipeValidator
             return token.ToString();
         }
 
-        private void CheckLabels()
+        private void CheckTranslations()
         {
-            if (_recipe.Labels.Count > RecipeLimits.MaxLabelLanguages)
-                Add(RecipeErrorCode.TooMany, RecipePath.Labels, actual: _recipe.Labels.Count, limit: RecipeLimits.MaxLabelLanguages);
+            if (_recipe.Translations.Count > RecipeLimits.MaxTranslationLanguages)
+                Add(RecipeErrorCode.TooMany, RecipePath.Translations, actual: _recipe.Translations.Count, limit: RecipeLimits.MaxTranslationLanguages);
 
-            foreach ((string language, RecipeLabels labels) in _recipe.Labels)
+            // Ordinal order, so that of two tags that differ only by case the same one is always the one reported.
+            HashSet<string> seenTags = new(StringComparer.OrdinalIgnoreCase);
+            foreach ((string language, RecipeTranslation translation) in _recipe.Translations.OrderBy(pair => pair.Key, StringComparer.Ordinal))
             {
-                string path = RecipePath.Property(RecipePath.Labels, language);
+                string path = RecipePath.Property(RecipePath.Translations, language);
                 if (!RecipeFormat.IsLanguageTag(language))
                     Add(RecipeErrorCode.InvalidLanguageTag, path, fragment: RecipeText.MakeSafe(language));
+                else if (!seenTags.Add(language))
+                    Add(RecipeErrorCode.DuplicateLanguageTag, path, fragment: RecipeText.MakeSafe(language));
 
-                if (labels.Name is not null)
-                    CheckText(RecipePath.Property(path, RecipePath.Name), labels.Name, RecipeLimits.MaxNameLength, forbidden: false);
+                if (translation.Name is not null)
+                    CheckText(RecipePath.Property(path, RecipePath.Name), translation.Name, RecipeLimits.MaxNameLength, forbidden: false);
 
-                if (labels.Description is not null)
-                    CheckText(RecipePath.Property(path, RecipePath.Description), labels.Description, RecipeLimits.MaxDescriptionLength, forbidden: false);
+                if (translation.Description is not null)
+                    CheckText(RecipePath.Property(path, RecipePath.Description), translation.Description, RecipeLimits.MaxDescriptionLength, forbidden: false);
 
-                string fieldsPath = RecipePath.Property(path, RecipePath.Fields);
-                foreach ((string field, string text) in labels.Fields)
-                {
-                    string fieldPath = RecipePath.Property(fieldsPath, field);
-                    if (!_inputs.ContainsKey(field))
-                        Add(RecipeErrorCode.UnknownLabelField, fieldPath, name: RecipeText.MakeSafe(field));
+                CheckFieldTexts(RecipePath.Property(path, RecipePath.FieldLabels), translation.FieldLabels, RecipeLimits.MaxLabelLength);
+                CheckFieldTexts(RecipePath.Property(path, RecipePath.FieldHints), translation.FieldHints, RecipeLimits.MaxHintLength);
+            }
+        }
 
-                    CheckText(fieldPath, text, RecipeLimits.MaxLabelLength, forbidden: false);
-                }
+        private void CheckFieldTexts(string mapPath, IReadOnlyDictionary<string, string> texts, int maxLength)
+        {
+            foreach ((string field, string text) in texts)
+            {
+                string fieldPath = RecipePath.Property(mapPath, field);
+                if (!_inputs.ContainsKey(field))
+                    Add(RecipeErrorCode.UnknownTranslationField, fieldPath, name: RecipeText.MakeSafe(field));
+
+                CheckText(fieldPath, text, maxLength, forbidden: false);
             }
         }
 
@@ -627,8 +756,23 @@ public static class RecipeValidator
             else if (_recipe.SuccessExitCodes.Count > RecipeLimits.MaxSuccessExitCodes)
                 Add(RecipeErrorCode.TooMany, RecipePath.SuccessExitCodes, actual: _recipe.SuccessExitCodes.Count, limit: RecipeLimits.MaxSuccessExitCodes);
 
-            if (_recipe.Icon is not null && !RecipeIcons.Keys.Contains(_recipe.Icon))
-                Add(RecipeErrorCode.UnknownIcon, RecipePath.Icon, fragment: RecipeText.MakeSafe(_recipe.Icon));
+            HashSet<int> seenCodes = [];
+            for (int index = 0; index < _recipe.SuccessExitCodes.Count; index++)
+            {
+                if (!seenCodes.Add(_recipe.SuccessExitCodes[index]))
+                    Add(RecipeErrorCode.DuplicateExitCode, RecipePath.Index(RecipePath.SuccessExitCodes, index), actual: _recipe.SuccessExitCodes[index]);
+            }
+
+            // Any key of the right shape is accepted; a key this version has no glyph for shows the default one.
+            if (_recipe.Icon is not null && !RecipeIcons.IsKeyShape(_recipe.Icon))
+                Add(RecipeErrorCode.InvalidIconKey, RecipePath.Icon, fragment: RecipeText.MakeSafe(_recipe.Icon));
+
+            // A merged stream is a mix of two outputs, which a grid cannot read.
+            if (_recipe.Stderr == RecipeStderrMode.Merge && _recipe.Output != RecipeOutputFormat.Text)
+                Add(RecipeErrorCode.StderrMergeWithStructuredOutput, RecipePath.Stderr);
+
+            if (_recipe.CsvSeparator != RecipeCsvSeparator.Comma && _recipe.Output != RecipeOutputFormat.Csv)
+                Add(RecipeErrorCode.CsvSeparatorWithoutCsvOutput, RecipePath.CsvSeparator);
         }
     }
 }

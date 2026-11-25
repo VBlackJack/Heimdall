@@ -256,9 +256,9 @@ public sealed class RecipeLookAlikeTests
             Author = "Zo\u00EB\u00A0Labs",
             Inputs = [RecipeTestData.Input("v", RecipeInputType.String) with { Label = "L\u2019adresse" }],
             Arguments = [RecipeArgument.Group(["--v", "{in:v}"])],
-            Labels = new Dictionary<string, RecipeLabels>
+            Translations = new Dictionary<string, RecipeTranslation>
             {
-                ["fr"] = new RecipeLabels("Analyse \u2014 rapide", "Cible \u00AB x \u00BB", new Dictionary<string, string> { ["v"] = "Cible\u00A0:" }),
+                ["fr"] = new RecipeTranslation("Analyse \u2014 rapide", "Cible \u00AB x \u00BB", new Dictionary<string, string> { ["v"] = "Cible\u00A0:" }),
             },
         };
 

@@ -76,11 +76,11 @@ public enum RecipeErrorCode
     /// <summary>A language tag is not well formed.</summary>
     InvalidLanguageTag,
 
-    /// <summary>A labels entry names an input that does not exist.</summary>
-    UnknownLabelField,
+    /// <summary>A translation names, in its field labels or its field hints, an input that does not exist.</summary>
+    UnknownTranslationField,
 
-    /// <summary>The icon key is not in the closed set.</summary>
-    UnknownIcon,
+    /// <summary>The icon key is not of the shape the format allows (lowercase letters, digits and single hyphens).</summary>
+    InvalidIconKey,
 
     /// <summary>A property is not allowed for the type of its input: <c>Fragment</c> names the property.</summary>
     PropertyNotAllowedForType,
@@ -100,11 +100,11 @@ public enum RecipeErrorCode
     /// <summary>A <c>pattern</c> is not a valid regular expression.</summary>
     InvalidPattern,
 
-    /// <summary>A <c>bool</c> input has no <c>whenTrue</c> tokens.</summary>
-    MissingWhenTrue,
+    /// <summary>A <c>bool</c> input has neither <c>whenTrue</c> nor <c>whenFalse</c> tokens, or one of the two lists is empty.</summary>
+    MissingSwitchArguments,
 
-    /// <summary>A <c>bool</c> input is never placed in the argument list.</summary>
-    UnreferencedBoolInput,
+    /// <summary>An input is not used by any argument; a <c>bool</c> input must be placed as a whole bare token.</summary>
+    UnreferencedInput,
 
     /// <summary>A token is empty.</summary>
     EmptyToken,
@@ -168,6 +168,33 @@ public enum RecipeErrorCode
     /// <c>Name</c> is the input, <c>Fragment</c> the value, <c>Path</c> the token that uses the input.
     /// </summary>
     FixedValueRefusedAtRun,
+
+    /// <summary>A <c>min</c> or <c>max</c> is not a valid value of the type of its input; <c>Fragment</c> holds it.</summary>
+    InvalidBound,
+
+    /// <summary>The <c>min</c> of an input is above its <c>max</c>.</summary>
+    MinAboveMax,
+
+    /// <summary>The default of an input is outside its <c>min</c> and <c>max</c>.</summary>
+    DefaultOutOfBounds,
+
+    /// <summary>An input is both <c>required</c> and carries a <c>default</c>.</summary>
+    RequiredWithDefault,
+
+    /// <summary>An input used inside the <c>whenTrue</c> or <c>whenFalse</c> tokens of a switch can be empty.</summary>
+    OptionalInputInSwitchArguments,
+
+    /// <summary>Standard error is merged into an output that is read as <c>csv</c> or <c>json</c>.</summary>
+    StderrMergeWithStructuredOutput,
+
+    /// <summary><c>csvSeparator</c> is written although the output is not <c>csv</c>.</summary>
+    CsvSeparatorWithoutCsvOutput,
+
+    /// <summary>Two language tags of the translations differ only by case.</summary>
+    DuplicateLanguageTag,
+
+    /// <summary>An exit code is listed twice in <c>successExitCodes</c>.</summary>
+    DuplicateExitCode,
 }
 
 /// <summary>A place in the source text, one-based.</summary>

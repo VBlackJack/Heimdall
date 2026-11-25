@@ -121,7 +121,7 @@ public sealed class RecipeToolViewModelTests
     private static Recipe Translated() => Recipe(
         name: "Probe",
         inputs: [Input("t", RecipeInputType.Hostname, label: "Target"), Input("c", RecipeInputType.Int, label: "Count")],
-        labels: new Dictionary<string, RecipeLabels>
+        labels: new Dictionary<string, RecipeTranslation>
         {
             ["fr"] = new("Sonde", "Sonde la chose.", new Dictionary<string, string> { ["t"] = "Cible" }),
         });
@@ -154,7 +154,7 @@ public sealed class RecipeToolViewModelTests
     [Fact]
     public void ARegionalTagMatchesItsLanguageAndAnExactTagWinsOverIt()
     {
-        Recipe recipe = Recipe(labels: new Dictionary<string, RecipeLabels>
+        Recipe recipe = Recipe(labels: new Dictionary<string, RecipeTranslation>
         {
             ["fr-CA"] = new("Sonde canadienne", null, new Dictionary<string, string>()),
             ["fr"] = new("Sonde", null, new Dictionary<string, string>()),
@@ -171,7 +171,7 @@ public sealed class RecipeToolViewModelTests
     public async Task ATranslatedNameThatLooksLikeALocaleKeyIsStillPlainText()
     {
         using RecipeViewModelHarness harness = await RecipeViewModelHarness.CreateAsync("fr");
-        Recipe recipe = Recipe(labels: new Dictionary<string, RecipeLabels>
+        Recipe recipe = Recipe(labels: new Dictionary<string, RecipeTranslation>
         {
             ["fr"] = new("PaletteToolPing", null, new Dictionary<string, string>()),
         });

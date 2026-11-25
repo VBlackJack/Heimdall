@@ -36,6 +36,15 @@ public static class RecipeRunText
     /// <summary>The key of the word that stands for a run that ended without a status of its own.</summary>
     public const string UnknownStatusKey = "RecipeStatusUnknown";
 
+    /// <summary>The key of the words for a value between two bounds.</summary>
+    public const string OutOfRangeBetweenKey = "RecipeRefusalOutOfRangeBetween";
+
+    /// <summary>The key of the words for a value below a minimum.</summary>
+    public const string OutOfRangeAtLeastKey = "RecipeRefusalOutOfRangeAtLeast";
+
+    /// <summary>The key of the words for a value above a maximum.</summary>
+    public const string OutOfRangeAtMostKey = "RecipeRefusalOutOfRangeAtMost";
+
     /// <summary>The key of a value refusal, or null for <see cref="RecipeValueRefusal.None"/>.</summary>
     public static string? KeyFor(RecipeValueRefusal refusal) => refusal switch
     {
@@ -67,6 +76,7 @@ public static class RecipeRunText
         RecipeValueRefusal.TooLong => "RecipeRefusalTooLong",
         RecipeValueRefusal.PatternMismatch => "RecipeRefusalPatternMismatch",
         RecipeValueRefusal.NotInChoices => "RecipeRefusalNotInChoices",
+        RecipeValueRefusal.OutOfRange => "RecipeRefusalOutOfRange",
         _ => throw new ArgumentOutOfRangeException(nameof(refusal), refusal, "A refusal without a text."),
     };
 
@@ -110,6 +120,31 @@ public static class RecipeRunText
     {
         ArgumentNullException.ThrowIfNull(localizer);
         return KeyFor(refusal) is { } key ? localizer[key] : string.Empty;
+    }
+
+    /// <summary>
+    /// The words for a value refused for the given input. A value outside its range names the bounds of
+    /// the input, as written in the recipe (so in the invariant culture, whatever the language of the
+    /// interface); any other refusal reads as without the input.
+    /// </summary>
+    /// <param name="localizer">The localizer of the current language.</param>
+    /// <param name="refusal">The refusal.</param>
+    /// <param name="input">The input the value was typed for; may be null.</param>
+    public static string Describe(LocalizationManager localizer, RecipeValueRefusal refusal, RecipeInput? input)
+    {
+        ArgumentNullException.ThrowIfNull(localizer);
+        if (refusal != RecipeValueRefusal.OutOfRange || input is null)
+        {
+            return Describe(localizer, refusal);
+        }
+
+        return (input.Min, input.Max) switch
+        {
+            (not null, not null) => localizer.Format(OutOfRangeBetweenKey, input.Min, input.Max),
+            (not null, null) => localizer.Format(OutOfRangeAtLeastKey, input.Min),
+            (null, not null) => localizer.Format(OutOfRangeAtMostKey, input.Max),
+            _ => Describe(localizer, refusal),
+        };
     }
 
     /// <summary>

@@ -85,13 +85,15 @@
                                      Background="{DynamicResource CardBrush}"
                                      Foreground="{DynamicResource TextPrimaryBrush}"
                                      BorderBrush="{DynamicResource BorderBrush}"
-                                     AutomationProperties.Name="{Binding AutomationName}"/>
+                                     AutomationProperties.Name="{Binding AutomationName}"
+                                     AutomationProperties.HelpText="{Binding Hint}"/>
                             <CheckBox IsChecked="{Binding IsChecked, Mode=TwoWay}"
                                       Content="{Binding Label}"
                                       IsEnabled="{Binding IsLocked, Converter={StaticResource InvertBoolConverter}}"
                                       Visibility="{Binding IsBool, Converter={StaticResource BoolToVisibilityConverter}}"
                                       Foreground="{DynamicResource TextPrimaryBrush}"
-                                      AutomationProperties.Name="{Binding AutomationName}"/>
+                                      AutomationProperties.Name="{Binding AutomationName}"
+                                      AutomationProperties.HelpText="{Binding Hint}"/>
                             <ComboBox ItemsSource="{Binding Choices}"
                                       SelectedItem="{Binding SelectedChoice, Mode=TwoWay}"
                                       IsEnabled="{Binding IsLocked, Converter={StaticResource InvertBoolConverter}}"
@@ -99,7 +101,15 @@
                                       MinWidth="160" HorizontalAlignment="Left"
                                       Background="{DynamicResource CardBrush}"
                                       Foreground="{DynamicResource TextPrimaryBrush}"
-                                      AutomationProperties.Name="{Binding AutomationName}"/>
+                                      AutomationProperties.Name="{Binding AutomationName}"
+                                      AutomationProperties.HelpText="{Binding Hint}"/>
+                            <!-- The help text the recipe gives for this field, plain text -->
+                            <TextBlock Text="{Binding Hint}"
+                                       Margin="{StaticResource MarginSubsectionTop}"
+                                       FontSize="{StaticResource FontSizeCaption}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       TextWrapping="Wrap"
+                                       Visibility="{Binding HasHint, Converter={StaticResource BoolToVisibilityConverter}}"/>
                             <!-- Why the last run refused this value: heard when it appears -->
                             <TextBlock Text="{Binding Error, NotifyOnTargetUpdated=True}"
                                        Style="{StaticResource ToolInlineErrorTextStyle}"

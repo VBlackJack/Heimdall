@@ -312,16 +312,22 @@ dans le fichier ; chaque argument, un par ligne entre crochets, exactement comme
 écrit dans le fichier, une liste imbriquée étant signalée comme conservée ou
 omise en bloc ; le nom, l'auteur (marqué non vérifié), l'identifiant, la version
 et la description ; chaque champ avec son type, son caractère obligatoire ou
-facultatif, sa valeur par défaut, ses choix, son motif et sa longueur maximale,
-et les arguments qu'un interrupteur ajoute quand il est activé ; chaque
-traduction de la recette (la langue, le nom, la description et les libellés des
-champs), puisque l'outil ouvert l'affiche à la place du texte anglais quand
-l'interface est dans cette langue (le titre de l'onglet dans la barre d'onglets,
-les listes d'outils, la recherche et les Paramètres montrent le nom écrit dans
-la recette) ; si la recette lit l'hôte et le port de la session sélectionnée ;
-la façon dont la sortie est affichée, la façon dont elle est décodée, ce que
-devient l'erreur standard, les codes de sortie qui comptent comme un succès et
-l'icône ; et le délai. Un caractère de contrôle ou invisible est écrit `\uXXXX`.
+facultatif (un interrupteur n'est ni l'un ni l'autre, et un champ doté d'une
+valeur par défaut dit "toujours envoyé"), sa valeur par défaut, ses
+choix, son motif, sa longueur maximale, sa plage (`plage : 1 à 100`,
+`minimum : 1` ou `maximum : 100`) et son aide, et les arguments qu'un
+interrupteur ajoute quand il est activé et quand il est désactivé ; chaque
+traduction de la recette (la langue, le nom, la description, les libellés des
+champs et les aides des champs), puisque l'outil ouvert l'affiche à la place du
+texte anglais quand l'interface est dans cette langue (le titre de l'onglet dans
+la barre d'onglets, les listes d'outils, la recherche et les Paramètres montrent
+le nom écrit dans la recette) ; si la recette lit l'hôte et le port de la
+session sélectionnée ; la façon dont la sortie est affichée (pour un tableau lu
+depuis du CSV, le caractère qui sépare ses cellules), la façon dont elle est
+décodée, ce que devient l'erreur standard, les codes de sortie qui comptent
+comme un succès et l'icône (une clé d'icône que cette version de Heimdall ne
+connaît pas est signalée, et l'icône par défaut est affichée) ; et le délai. Un
+caractère de contrôle ou invisible est écrit `\uXXXX`.
 Dans le programme, les arguments et les valeurs par défaut, tout caractère hors
 de l'ASCII imprimable est écrit `\uXXXX` lui aussi : une lettre qui ressemble à
 une lettre ASCII ne peut donc pas passer pour elle.
@@ -356,8 +362,10 @@ lancé dans ce tout premier instant peut y échapper) ; quand Windows refuse de 
 une exécution arrêtée ou ayant dépassé le délai arrête l'arbre de processus. Au
 plus 1 Mio de sortie est conservé par flux (2 Mio en tout quand l'erreur standard
 est gardée à part) : le reste est lu puis jeté, et une ligne indique que la
-sortie a été coupée. L'exécution prend fin au délai de la recette, et aussi
-quand le pack est désactivé ou devient interdit.
+sortie a été coupée. Le plafond compte des octets, pas des caractères : une
+sortie en UTF-16 conserve moitié moins de caractères qu'une sortie en UTF-8 de
+même taille. L'exécution prend fin au délai de la recette, et aussi quand le
+pack est désactivé ou devient interdit.
 
 **Remplacer ou supprimer une recette dont un onglet est ouvert.** Un onglet garde
 la recette avec laquelle il a été ouvert. Une fois cette recette remplacée, ou
@@ -371,9 +379,13 @@ premier plan : cela en ouvre un nouveau.
 remplacement. L'aperçu s'intitule "Remplacer la recette" et indique l'ancienne
 et la nouvelle version, et si les arguments, les champs et le programme ont
 changé. Chacun de l'auteur, du nom, de la description, des traductions, de la
-sortie et de son encodage, du mode de conservation de l'erreur standard, des
-codes de sortie de succès et du délai est aussi dit sur une ligne à part,
+sortie et de son encodage (et, pour un tableau lu depuis du CSV, de son
+séparateur), du mode de conservation de l'erreur standard, des codes de sortie
+de succès, du délai et de l'icône est aussi dit sur une ligne à part,
 "inchangé" ou "modifié", en comparant les recettes analysées et non les octets.
+La ligne des champs compare chaque propriété de chaque champ, plages, aides et
+les deux listes d'un interrupteur comprises, et celle des traductions compare
+les libellés et les aides des champs.
 
 **Exporter.** Le bouton d'export d'une recette, dans la liste des Paramètres,
 écrit une copie du fichier exactement tel qu'il a été importé. Il refuse quand
@@ -421,15 +433,18 @@ donc suivi d'un tableau qui l'explique.
   "author": "Example",
   "name": "Name lookup",
   "description": "Looks up a DNS record for a name, and can ask a DNS server of your choice.",
-  "labels": {
+  "translations": {
     "fr": {
       "name": "Recherche de nom",
       "description": "Recherche un enregistrement DNS pour un nom, et peut interroger le serveur DNS de votre choix.",
-      "fields": {
+      "fieldLabels": {
         "query": "Nom à rechercher",
         "record": "Type d'enregistrement",
         "server": "Serveur DNS (facultatif)",
         "details": "Afficher les détails"
+      },
+      "fieldHints": {
+        "server": "Laissez vide pour utiliser le serveur par défaut."
       }
     }
   },
@@ -443,7 +458,7 @@ donc suivi d'un tableau qui l'explique.
   "inputs": [
     { "name": "query", "type": "hostname", "label": "Name to look up", "required": true },
     { "name": "record", "type": "choice", "label": "Record type", "choices": ["A", "AAAA", "MX", "TXT"], "default": "A" },
-    { "name": "server", "type": "hostname", "label": "DNS server (optional)" },
+    { "name": "server", "type": "hostname", "label": "DNS server (optional)", "hint": "Leave empty to use the default server." },
     { "name": "details", "type": "bool", "label": "Show details", "default": false, "whenTrue": ["-debug"] }
   ],
   "output": "text",
@@ -459,16 +474,16 @@ donc suivi d'un tableau qui l'explique.
 |---|---|
 | `schemaVersion`, `id`, `version`, `author` | La version du format, l'identité `auteur.nom` que Heimdall ne renomme jamais, une version sémantique, et l'auteur, affiché et toujours marqué non vérifié |
 | `name`, `description` | Textes en anglais, obligatoires |
-| `labels` | Traductions facultatives du nom, de la description et des libellés de champs, rangées par balise de langue |
+| `translations` | Traductions facultatives du nom, de la description, des libellés et des aides des champs, rangées par balise de langue |
 | `program` | Un simple nom de fichier : Heimdall trouve lui-même `nslookup.exe`, dans Windows, Program Files ou un dossier autorisé |
 | `"-type={in:record}"` | Un argument fait de texte fixe et d'un champ. La valeur de `record` est choisie dans une liste fermée : elle ne peut jamais être lue comme une option |
-| `"{in:details}"` | Un interrupteur placé seul comme élément entier. Activé, il ajoute les éléments de son `whenTrue` (ici `-debug`) ; désactivé, il n'ajoute rien |
+| `"{in:details}"` | Un interrupteur placé seul comme élément entier. Activé, il ajoute les éléments de son `whenTrue` (ici `-debug`) ; désactivé, il ajoute ceux de son `whenFalse`, ici aucun puisqu'il n'en a pas |
 | `"{in:query}"` | Un champ obligatoire qui remplit un argument entier. Une valeur saisie qui commence par `-`, `/` ou `@` est refusée ici |
 | `["{in:server}"]` | Une liste imbriquée. `server` est facultatif : toute la liste est omise quand le champ est vide |
-| `inputs` | Les champs, dans l'ordre où ils sont affichés |
+| `inputs` | Les champs, dans l'ordre où ils sont affichés. Chaque champ est utilisé par un argument ; `hint` est un texte d'aide affiché sous le champ |
 | `output`, `outputEncoding`, `stderr` | La sortie est affichée en texte, décodée avec la page de code OEM de la console, l'erreur standard y étant mêlée |
 | `successExitCodes`, `timeoutSeconds` | Les codes de sortie qui comptent comme un succès, et le nombre de secondes au bout duquel l'exécution est arrêtée |
-| `icon` | Une des clés d'icône intégrées |
+| `icon` | Une clé d'icône : un mot de minuscules, de chiffres et de tirets isolés. `search` est l'une des clés pour lesquelles cette version a un pictogramme |
 
 #### Propriétés de premier niveau
 
@@ -484,21 +499,46 @@ objet.
 | `author` | chaîne | oui | 64 caractères au plus. Affiché, toujours comme non vérifié |
 | `name` | chaîne | oui | 64 caractères au plus |
 | `description` | chaîne | oui | 500 caractères au plus |
-| `labels` | objet | non | Traductions, voir plus bas. 16 langues au plus |
+| `translations` | objet | non | Traductions, voir plus bas. 16 langues au plus |
 | `program` | chaîne | oui | Un simple nom de fichier ou un chemin complet avec une lettre de lecteur ; 260 caractères au plus. Voir "Quel programme peut être lancé" |
 | `arguments` | tableau | non | La liste d'arguments, voir plus bas. 64 éléments au plus en tout |
 | `inputs` | tableau | non | Les champs, voir plus bas. 16 au plus |
 | `output` | chaîne | non | `text` (par défaut), `csv` ou `json`. Les deux derniers s'affichent en tableau |
-| `outputEncoding` | chaîne | non | `utf8` (par défaut) ou `oem`, la page de code OEM de la console, dans laquelle écrivent la plupart des outils console de Windows |
-| `stderr` | chaîne | non | `separate` (par défaut) : gardée à part et affichée comme sortie d'erreur. `merge` : mêlée à la sortie |
-| `successExitCodes` | tableau d'entiers | non | `[0]` par défaut. De 1 à 16 entrées. Un code de sortie hors de la liste est signalé comme un échec |
+| `outputEncoding` | chaîne | non | Comment les octets de la sortie deviennent du texte : `utf8` (par défaut), `oem` (la page de code OEM de la console), `ansi` (la page de code ANSI du système) ou `utf16le` (UTF-16 petit-boutiste). Voir "Encodages de la sortie" plus bas |
+| `csvSeparator` | chaîne | non | Le caractère entre deux cellules d'un tableau lu depuis du CSV : `comma` (par défaut), `semicolon` ou `tab`. Refusé sauf si `output` vaut `csv`, même quand il dit `comma` |
+| `stderr` | chaîne | non | `separate` (par défaut) : gardée à part et affichée comme sortie d'erreur. `merge` : mêlée à la sortie. `merge` est refusé avec `output` `csv` ou `json`, car un tableau ne peut pas se lire dans deux flux mêlés |
+| `successExitCodes` | tableau d'entiers | non | `[0]` par défaut. De 1 à 16 entrées, sans doublon. Un code de sortie hors de la liste est signalé comme un échec |
 | `timeoutSeconds` | entier | non | 60 par défaut, de 1 à 600. Le programme est arrêté quand ce délai est écoulé |
-| `icon` | chaîne | non | `tool` (par défaut), `terminal`, `network`, `search`, `document`, `shield`, `clock` ou `server` |
+| `icon` | chaîne | non | La clé de l'icône de l'outil : une lettre minuscule, puis des minuscules, des chiffres et des tirets, 32 caractères au plus, sans tiret final et sans deux tirets de suite. `tool` (par défaut), `terminal`, `network`, `search`, `document`, `shield`, `clock` et `server` ont un pictogramme dans cette version ; toute autre clé de cette forme est acceptée et affiche l'icône par défaut |
 
-Chaque texte affiché (auteur, nom, description, libellés) ne doit pas être vide
-et ne doit contenir ni caractère de contrôle, ni caractère de mise en forme
-invisible (comme le forçage de l'écriture de droite à gauche), ni séparateur de
-ligne ou de paragraphe, ni substitut isolé.
+Chaque texte affiché (auteur, nom, description, libellés, aides) ne doit pas
+être vide et ne doit contenir ni caractère de contrôle, ni caractère de mise en
+forme invisible (comme le forçage de l'écriture de droite à gauche), ni
+séparateur de ligne ou de paragraphe, ni substitut isolé.
+
+#### Encodages de la sortie
+
+`outputEncoding` dit comment les octets qu'un programme écrit deviennent du
+texte. L'erreur standard est décodée avec le même encodage que la sortie
+standard. Au plus 1 Mio est conservé par flux, et ce plafond compte des octets,
+pas des caractères.
+
+| Valeur | Décode comme | À utiliser pour |
+|---|---|---|
+| `utf8` | UTF-8. Une marque d'ordre des octets initiale est retirée | Les programmes qui écrivent en UTF-8 |
+| `oem` | La page de code OEM de la console | La plupart des outils console de Windows |
+| `ansi` | La page de code ANSI du système, lue auprès de Windows (jamais l'encodage par défaut de l'environnement d'exécution) | Les programmes qui écrivent en page de code ANSI quand leur sortie est redirigée. Mesuré sous Windows 11 : `certutil`, `sort` et `findstr` le font |
+| `utf16le` | UTF-16 petit-boutiste. Une marque d'ordre des octets initiale est retirée | Les programmes qui écrivent en UTF-16, avec ou sans marque. Mesuré sous Windows 11 : `sfc` et `wsl` l'écrivent sans marque |
+
+Une marque d'ordre des octets ne sert jamais à deviner un encodage, et l'UTF-16
+gros-boutiste n'est pas pris en charge. Pour `utf8` et `utf16le`, exactement un
+U+FEFF initial est retiré de chaque flux ; un deuxième, ou un autre plus loin,
+est conservé comme du texte. Quand la page de code de `oem` ou de `ansi` ne peut
+pas être lue, l'UTF-8 est utilisé. La marque est retirée dès que le flux est
+réellement décodé en UTF-8 ou en UTF-16, quel que soit le nom donné par la
+recette : `utf8`, `utf16le`, `oem` ou `ansi` sur une machine dont la page de
+code est 65001, et l'UTF-8 employé quand une page de code ne peut pas être lue.
+Sous toute autre page de code, les octets d'une marque sont du texte.
 
 #### Champs
 
@@ -509,24 +549,30 @@ Chaque entrée de `inputs` est un objet doté de ces propriétés :
 | `name` | chaîne | oui | Une lettre, puis des lettres, des chiffres ou des tirets bas ; 32 caractères au plus ; unique dans la recette. C'est ce que désigne `{in:name}` |
 | `type` | chaîne | oui | `string`, `int`, `number`, `bool`, `hostname`, `ipaddress`, `path` ou `choice` |
 | `label` | chaîne | oui | 64 caractères au plus |
-| `required` | booléen | non | `false` par défaut. Une valeur par défaut compte comme une valeur fournie |
-| `default` | chaîne, nombre ou booléen | non | Une chaîne (tout type sauf `bool`), un nombre (`int` et `number` seulement) ou `true` ou `false` (`bool` seulement). 512 caractères au plus. Soumise aux mêmes règles de texte fixe qu'un élément d'argument, et valide pour le type de son champ |
+| `required` | booléen | non | `false` par défaut. Refusé sur un champ `bool`, quelle que soit sa valeur, car un interrupteur n'est jamais vide. Refusé avec un `default`, quelle que soit sa valeur (`true` ou `false`) : un champ qui a une valeur par défaut n'est jamais laissé vide, car l'effacer fait utiliser la valeur par défaut, si bien que `required` ne dirait rien |
+| `default` | chaîne, nombre ou booléen | non | Une chaîne (tout type sauf `bool`), un nombre (`int` et `number` seulement, écrit comme un nombre JSON ou comme une chaîne, ce qui revient au même) ou `true` ou `false` (`bool` seulement). 512 caractères au plus. Soumise aux mêmes règles de texte fixe qu'un élément d'argument, valide pour le type de son champ, et comprise entre `min` et `max` quand il y en a |
+| `min`, `max` | nombre ou chaîne | `int` et `number` seulement | La plus petite et la plus grande valeur acceptées, chacune écrite comme une valeur par défaut et chacune facultative. Une borne d'`int` est un entier sur 32 bits et une borne de `number` un nombre décimal, dans les formes strictes ci-dessous. `min` supérieur à `max` est refusé. Une valeur hors de la plage est refusée à l'exécution, et une valeur par défaut hors de la plage à l'import. Un `number` est comparé exactement, comme un décimal : le signe, puis les chiffres entiers, puis les chiffres de la fraction, les zéros finaux de la fraction ne comptant pas (donc `1` et `1.0` sont égaux, et avec un `max` de `1` la valeur `1.0000000000000001` est refusée). Aucun arrondi en double n'intervient jamais, car le programme reçoit le texte tel qu'il a été saisi |
+| `hint` | chaîne | non | Un texte d'aide affiché sous le champ et lu par les technologies d'assistance. 200 caractères au plus, sans caractère de contrôle, sans caractère de mise en forme invisible et sans saut de ligne |
 | `pattern` | chaîne | `string` seulement | Une expression régulière que la valeur entière doit satisfaire ; 256 caractères au plus. Une valeur pour laquelle la comparaison dure plus de 250 ms est refusée |
 | `maxLength` | entier | `string` seulement | De 1 à 1024. 256 en l'absence de valeur |
 | `choices` | tableau de chaînes | `choice` seulement, alors obligatoire | De 1 à 64 valeurs, chacune de 128 caractères au plus, sans doublon |
-| `whenTrue` | tableau de chaînes | `bool` seulement, alors obligatoire | Les éléments que l'interrupteur ajoute quand il est activé. Ils suivent les règles des éléments d'argument |
+| `whenTrue` | tableau de chaînes | `bool` seulement | Les éléments que l'interrupteur ajoute quand il est activé. Ils suivent les règles des éléments d'argument |
+| `whenFalse` | tableau de chaînes | `bool` seulement | Les éléments que l'interrupteur ajoute quand il est désactivé, selon les mêmes règles |
 
-Une propriété qui n'est pas permise pour le type de son champ est refusée. Un
-champ `bool` doit figurer dans `arguments` comme élément entier, sinon le fichier
-est refusé.
+Un champ `bool` a besoin de `whenTrue`, de `whenFalse` ou des deux, et une liste
+écrite ne doit pas être vide. Une propriété qui n'est pas permise pour le type
+de son champ est refusée. Un champ `bool` doit figurer dans `arguments` comme
+élément entier, et tout autre champ doit être utilisé par un argument : dans un
+élément, dans une liste imbriquée ou dans un élément de `whenTrue` ou de
+`whenFalse` d'un interrupteur. Un champ que rien n'utilise est refusé.
 
 Ce que chaque type accepte à l'exécution :
 
 | Type | Accepte |
 |---|---|
 | `string` | Tout texte dans la limite de `maxLength` et conforme à `pattern` s'il y en a un |
-| `int` | Un entier sur 32 bits, avec un signe facultatif, 64 caractères au plus |
-| `number` | Un nombre décimal fini écrit avec un point, exposant permis, 64 caractères au plus |
+| `int` | Un entier sur 32 bits écrit `0` ou `-?[1-9][0-9]*` : `0`, ou des chiffres sans zéro initial avec un signe moins facultatif. Ni signe plus, ni exposant, ni espace, ni zéro avec un signe moins (`-0` est refusé) |
+| `number` | Un nombre décimal fini écrit `-?(0\|[1-9][0-9]*)(\.[0-9]+)?` : la forme d'un entier, puis un point et au moins un chiffre, facultatifs. Ni signe plus, ni zéro initial, ni exposant, ni point seul, ni zéro avec un signe moins (`-0`, `-0.0` et `-0.000` sont refusés ; `-0.5` est accepté), 64 caractères au plus. Écrivez une valeur par défaut ou une borne sous forme de chaîne (`"0.00001"`) : un outil qui remet en forme le JSON peut réécrire le nombre `0.00001` en `1e-5`, ce qui est refusé |
 | `bool` | Activé ou désactivé. Une valeur vide est désactivée |
 | `hostname` | Un nom d'hôte valide, sans espace avant ni après |
 | `ipaddress` | Une adresse IPv4 ou IPv6 (chiffres hexadécimaux, deux-points et queue pointée facultative), sans identifiant de zone (`%`), sans crochets et sans espace avant ni après |
@@ -560,24 +606,38 @@ obligatoire et qu'il n'a pas de valeur par défaut non vide. Un champ facultatif
 ne peut pas servir dans un élément isolé, car la liste d'arguments deviendrait
 ambiguë quand il est vide : placez l'élément dans une liste imbriquée. Une liste
 imbriquée est omise en bloc dès qu'un champ facultatif qu'elle utilise est vide.
-Les éléments de `whenTrue` suivent la même règle. Un champ obligatoire, ou doté
-d'une valeur par défaut, peut servir partout.
+Un champ obligatoire, ou doté d'une valeur par défaut, peut servir partout. Un
+champ doté d'une valeur par défaut n'est jamais laissé vide : quand
+l'utilisateur l'efface, la valeur par défaut est utilisée.
+
+Les éléments d'un interrupteur (`whenTrue` et `whenFalse`) n'ont pas de liste
+imbriquée autour d'eux qui puisse être omise : un champ utilisé là doit être
+obligatoire ou doté d'une valeur par défaut. Un champ facultatif sans valeur par
+défaut y est refusé. Un champ obligatoire, ou `{Host}` ou `{Port}`, qui n'est
+utilisé que dans les éléments de la branche d'un interrupteur qui n'est pas
+active (par exemple dans `whenFalse` alors que l'interrupteur est activé) reste
+obligatoire à l'exécution : sa valeur, ou la session, doit être fournie quel que
+soit l'état de l'interrupteur.
 
 Un champ `bool` se place dans `arguments` comme un élément isolé entier
 (`"{in:details}"`) et se développe en éléments de son `whenTrue` quand il est
-activé, en rien quand il est désactivé. Il ne peut ni se mêler à d'autre texte
+activé et en éléments de son `whenFalse` quand il est désactivé, en rien quand la
+liste de cet état n'a pas été écrite. Il ne peut ni se mêler à d'autre texte
 dans un élément, ni se placer dans une liste imbriquée.
 
 64 éléments au plus en tout, chacun de 512 caractères au plus : un pour chaque
 élément isolé et chaque membre de liste imbriquée et, pour chaque endroit où un
-interrupteur est placé, le nombre de ses éléments de `whenTrue`. Le nombre donné
-dans l'erreur est le pire cas et peut dépasser le nombre d'éléments écrits dans
-le fichier.
+interrupteur est placé, le nombre d'éléments de sa liste la plus longue
+(`whenTrue` ou `whenFalse`). Les éléments des listes ne sont pas comptés pour
+eux-mêmes. Le nombre donné dans l'erreur est le pire cas et peut dépasser le
+nombre d'éléments écrits dans le fichier.
 
 #### Valeurs de session
 
 `{Host}` et `{Port}` sont les seules valeurs qu'une recette peut lire dans une
-session, et elles viennent de la session sélectionnée dans l'arborescence.
+session, et elles viennent de la session sélectionnée dans l'arborescence. Elles
+peuvent figurer dans un élément, dans une liste imbriquée et dans les éléments
+d'un interrupteur (`whenTrue` et `whenFalse`).
 Quand une recette utilise l'un des deux et qu'aucune session n'est sélectionnée,
 l'outil le dit et ne s'exécute pas : sélectionnez une session, puis rouvrez
 l'outil. L'hôte passe par la validation de nom d'hôte la plus stricte et le port
@@ -585,16 +645,22 @@ doit être un numéro de port valide.
 
 #### Traductions
 
-`labels` associe une balise de langue (comme `fr` ou `fr-CA` : une première
-partie de 2 à 8 lettres, puis des parties de 1 à 8 lettres ou chiffres, 35
-caractères au plus) à un objet doté des propriétés facultatives `name`,
-`description` et `fields` (une table qui associe un nom de champ à son libellé
-traduit). Heimdall utilise l'entrée dont la balise est la langue de l'interface,
-sinon la première entrée de même langue principale, sinon les textes anglais de
-la recette. L'outil ouvert montre le nom, la description et les libellés de
-champs traduits ; le titre de l'onglet dans la barre d'onglets, les listes
-d'outils, la recherche et les Paramètres montrent le nom écrit dans la recette.
-Une traduction d'un champ qui n'existe pas est refusée.
+`translations` associe une balise de langue (comme `fr` ou `fr-CA` : une
+première partie de 2 à 8 lettres, puis des parties de 1 à 8 lettres ou chiffres,
+35 caractères au plus) à un objet doté des propriétés facultatives `name`,
+`description`, `fieldLabels` et `fieldHints`, les deux dernières étant des tables
+qui associent un nom de champ à un libellé traduit et à une aide traduite.
+Heimdall utilise l'entrée dont la balise est la langue de l'interface, sinon la
+première entrée de même langue principale (la première balise dans l'ordre
+alphabétique, sans tenir compte de la casse : `fr-BE` vient avant `fr-CA`, quel
+que soit l'ordre dans le fichier), sinon les textes anglais de la recette. L'outil ouvert montre le nom, la description, les libellés et les aides
+des champs traduits (un champ sans aide traduite montre le `hint` écrit dans le
+champ) ; le titre de l'onglet dans la barre d'onglets, les listes d'outils, la
+recherche et les Paramètres montrent le nom écrit dans la recette. Une
+traduction d'un champ qui n'existe pas est refusée, dans l'une ou l'autre
+table. Deux balises qui ne diffèrent que par la casse (`fr` et `FR`) sont
+refusées. Les noms `labels` et `fields`, qu'une ébauche du format employait, sont
+des propriétés inconnues.
 
 #### Quel programme peut être lancé
 
@@ -651,11 +717,15 @@ frontière (voir [SECURITY.md](SECURITY.md#recettes)). Elle contient : `cmd`,
 
 #### Version du schéma
 
-`schemaVersion` vaut `1`. Toute addition au format l'incrémente : un fichier
-écrit pour un format plus récent n'est donc jamais compris à moitié. Une version
-supérieure à celle que cette version lit est refusée, avec un message qui donne
-les deux numéros et demande de mettre Heimdall à jour. La liste des clés d'icône
-fait partie du format, et l'élargir incrémente la version.
+`schemaVersion` vaut `1`, et la version 1 est figée : tout fichier de version 1
+valide dans la publication qui l'a figée continue de se charger, avec le même
+sens, dans chaque publication suivante. Toute addition au format incrémente la
+version : un fichier écrit pour un format plus récent n'est donc jamais compris
+à moitié. Une version supérieure à celle que cette version lit est refusée, avec
+un message qui donne les deux numéros et demande de mettre Heimdall à jour. La
+liste des clés d'icône pour lesquelles cette version a un pictogramme ne fait pas
+partie du format : toute clé de la bonne forme est valide, et une clé qu'une
+version ne connaît pas affiche l'icône par défaut.
 
 ### Ce qui est refusé
 
@@ -668,18 +738,28 @@ connues.
 - Une propriété est inconnue ou apparaît deux fois ; une propriété obligatoire
   manque ; une valeur n'a pas le bon type ; un texte, une liste ou un nombre est
   hors de ses limites.
-- L'`id`, la `version`, un nom de champ ou une balise de langue est mal formé ;
-  deux champs portent le même nom ; une traduction nomme un champ qui n'existe
-  pas ; l'icône n'est pas dans la liste.
-- Une propriété est employée sur un type qui ne la permet pas, un `choice` n'a
-  pas de liste ou a une valeur par défaut hors de cette liste, un `bool` n'a pas
-  de `whenTrue` ou n'est jamais placé dans les arguments, un motif ne compile
-  pas, une valeur par défaut n'est pas valide pour son type.
+- L'`id`, la `version`, un nom de champ, une balise de langue ou la clé d'icône
+  est mal formé ; deux champs portent le même nom ; deux balises de langue ne
+  diffèrent que par la casse ; un code de sortie est listé deux fois ; une
+  traduction nomme un champ qui n'existe pas.
+- Une propriété est employée sur un type qui ne la permet pas (`required` sur un
+  `bool` compris), un `choice` n'a pas de liste ou a une valeur par défaut hors de
+  cette liste, un `bool` n'a ni `whenTrue` ni `whenFalse` ou a une liste vide, un
+  motif ne compile pas, une valeur par défaut n'est pas valide pour son type, un
+  nombre n'est pas écrit dans sa forme stricte, un `min` ou un `max` n'est pas
+  valide ou le `min` est supérieur au `max`, une valeur par défaut est hors de
+  cette plage.
+- Un champ est obligatoire et a une valeur par défaut ; un champ n'est utilisé
+  par aucun argument, ou un interrupteur n'est jamais placé comme élément entier ;
+  un champ facultatif sans valeur par défaut est utilisé dans les éléments d'un
+  interrupteur.
+- L'erreur standard est mêlée à une sortie affichée en tableau (`csv` ou `json`) ;
+  `csvSeparator` est écrit alors que la sortie n'est pas `csv`.
 - Un marqueur est inconnu ou mal formé, ne nomme aucun champ, ou un champ
   facultatif se trouve seul dans un élément (placez-le dans une liste
   imbriquée) ; un interrupteur est mêlé à d'autre texte.
-- Le texte fixe (le programme, un élément, un élément de `whenTrue`, une valeur
-  par défaut, un choix) contient deux séparateurs de suite (une double barre
+- Le texte fixe (le programme, un élément, un élément de `whenTrue` ou de
+  `whenFalse`, une valeur par défaut, un choix) contient deux séparateurs de suite (une double barre
   oblique inverse, une double barre oblique, ou une barre oblique inverse à côté
   d'une barre oblique, dans un sens ou dans l'autre : un chemin réseau), `://`
   (une URL), le préfixe de chemin système (un séparateur, deux points
@@ -712,7 +792,8 @@ de version). Le message nomme le programme et, quand la cause est le dossier,
 dit d'ajouter le dossier dans les Paramètres, d'enregistrer, puis d'importer à
 nouveau.
 
-**Une valeur saisie, à chaque exécution.** Un champ obligatoire vide ; une valeur
+**Une valeur saisie, à chaque exécution.** Un champ obligatoire vide ; un nombre
+hors du `min` et du `max` de son champ (le message nomme les bornes) ; une valeur
 avec un caractère de contrôle ou invisible, ou qui ressemble à un autre ; une
 valeur qui commence par `-`, `/`, `@`, une barre oblique inverse ou une espace à
 l'endroit où son marqueur ouvre l'argument (un `-` initial est la façon dont une
@@ -735,6 +816,11 @@ démarre pas. Importez à nouveau la recette pour accepter le nouvel emplacement
   `RecipeIcons`), l'analyseur et le validateur stricts, la règle des valeurs,
   l'expanseur, le résolveur de programme, la liste des programmes refusés et
   l'exécuteur.
+- `tests/Heimdall.Core.Tests/Recipes/FormatLock/v1/` : les échantillons figés de
+  la version 1, acceptés et refusés, avec le texte auquel chacun doit encore
+  s'analyser et les erreurs que chacun doit encore donner. Un échantillon peut
+  être ajouté, avec sa ligne dans le manifeste, jamais modifié, supprimé ni
+  renommé.
 - `src/Heimdall.App/Services/RecipeStore.cs` : stockage et chargement.
 - `src/Heimdall.App/Services/RecipeImportService.cs` et
   `RecipeImportPreview.cs` : import, remplacement et texte de l'aperçu.

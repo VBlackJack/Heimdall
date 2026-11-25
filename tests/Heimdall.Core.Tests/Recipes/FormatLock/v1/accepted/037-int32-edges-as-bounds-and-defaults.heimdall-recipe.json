@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "lock.sample",
+  "version": "1.0.0",
+  "author": "Lock",
+  "name": "Sample",
+  "description": "A sample of the version 1 format.",
+  "program": "ping.exe",
+  "arguments": ["--a={in:a}", "--b={in:b}"],
+  "inputs": [
+    { "name": "a", "type": "int", "label": "Label a", "min": -2147483648, "max": 2147483647, "default": -2147483648 },
+    { "name": "b", "type": "int", "label": "Label b", "min": "-2147483648", "max": "2147483647", "default": 2147483647 }
+  ]
+}

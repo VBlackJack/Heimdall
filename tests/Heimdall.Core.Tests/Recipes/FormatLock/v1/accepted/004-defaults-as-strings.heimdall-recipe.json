@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "lock.sample",
+  "version": "1.0.0",
+  "author": "Lock",
+  "name": "Sample",
+  "description": "A sample of the version 1 format.",
+  "program": "ping.exe",
+  "arguments": ["--a={in:a}", "--b={in:b}", "--c={in:c}", "--d={in:d}", "--e={in:e}", "--f={in:f}", "--g={in:g}"],
+  "inputs": [
+    { "name": "a", "type": "int", "label": "Label a", "default": "5" },
+    { "name": "b", "type": "number", "label": "Label b", "default": "1.50" },
+    { "name": "c", "type": "string", "label": "Label c", "default": "abc" },
+    { "name": "d", "type": "hostname", "label": "Label d", "default": "example.org" },
+    { "name": "e", "type": "ipaddress", "label": "Label e", "default": "192.0.2.1" },
+    { "name": "f", "type": "path", "label": "Label f", "default": "C:\\Tools\\data" },
+    { "name": "g", "type": "choice", "label": "Label g", "choices": ["x", "y"], "default": "y" }
+  ]
+}

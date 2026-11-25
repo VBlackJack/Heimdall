@@ -1,0 +1,8 @@
+{
+  "errors": [
+    {
+      "code": "EmptyValue",
+      "path": "inputs[0].default"
+    }
+  ]
+}

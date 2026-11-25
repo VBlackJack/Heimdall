@@ -107,7 +107,11 @@ public sealed class RecipeRunner : IRecipeRunner
 
     private const int DriveRootLength = 3;
 
+    private const char ByteOrderMark = '\uFEFF';
+
     private readonly IRecipeProcessLauncher _launcher;
+
+    private readonly Func<RecipeOutputEncoding, Encoding> _resolveEncoding;
 
     /// <summary>Creates a runner that starts real processes.</summary>
     public RecipeRunner()
@@ -116,8 +120,15 @@ public sealed class RecipeRunner : IRecipeRunner
     }
 
     internal RecipeRunner(IRecipeProcessLauncher launcher)
+        : this(launcher, RecipeOutputEncodings.Resolve)
+    {
+    }
+
+    /// <summary>Creates a runner with the encodings resolved by <paramref name="resolveEncoding"/>; a test passes code pages it chose.</summary>
+    internal RecipeRunner(IRecipeProcessLauncher launcher, Func<RecipeOutputEncoding, Encoding> resolveEncoding)
     {
         _launcher = launcher ?? throw new ArgumentNullException(nameof(launcher));
+        _resolveEncoding = resolveEncoding ?? throw new ArgumentNullException(nameof(resolveEncoding));
     }
 
     /// <summary>Runs a program.</summary>
@@ -145,7 +156,7 @@ public sealed class RecipeRunner : IRecipeRunner
         if (cancellationToken.IsCancellationRequested)
             return new RecipeRunResult(RecipeRunStatus.Cancelled, null, string.Empty, string.Empty, false, null, RecipeRunRefusal.None);
 
-        Encoding encoding = RecipeOutputEncodings.Resolve(recipe.OutputEncoding);
+        Encoding encoding = _resolveEncoding(recipe.OutputEncoding);
         ProcessStartInfo startInfo = BuildStartInfo(programPath, arguments, workingDirectory, encoding);
 
         IRecipeProcess process;
@@ -233,8 +244,9 @@ public sealed class RecipeRunner : IRecipeRunner
         CaptureBuffer error = merge ? output : new CaptureBuffer();
 
         using CancellationTokenSource drain = new();
-        Task outputPump = PumpAsync(process.StandardOutput, encoding.GetDecoder(), output, drain.Token);
-        Task errorPump = PumpAsync(process.StandardError, encoding.GetDecoder(), error, drain.Token);
+        bool stripMark = RecipeOutputEncodings.StripsLeadingMark(encoding);
+        Task outputPump = PumpAsync(process.StandardOutput, encoding.GetDecoder(), output, stripMark, drain.Token);
+        Task errorPump = PumpAsync(process.StandardError, encoding.GetDecoder(), error, stripMark, drain.Token);
 
         RecipeRunStatus? interrupted = null;
         using (CancellationTokenSource limit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken))
@@ -290,8 +302,10 @@ public sealed class RecipeRunner : IRecipeRunner
         }
     }
 
-    private static async Task PumpAsync(Stream stream, Decoder decoder, CaptureBuffer sink, CancellationToken token)
+    private static async Task PumpAsync(Stream stream, Decoder decoder, CaptureBuffer sink, bool stripMark, CancellationToken token)
     {
+        // One stream, one mark: standard error that is merged into the output has its own first character.
+        StreamStart start = new(stripMark);
         byte[] buffer = new byte[ReadChunkBytes];
         try
         {
@@ -301,13 +315,24 @@ public sealed class RecipeRunner : IRecipeRunner
                 if (read == 0)
                     break;
 
-                sink.Append(decoder, buffer, read);
+                sink.Append(decoder, buffer, read, start);
             }
         }
         catch (Exception ex) when (ex is OperationCanceledException or IOException or ObjectDisposedException)
         {
             // Cancelled after the grace period, or the pipe broke: what was read so far is kept.
         }
+    }
+
+    /// <summary>Whether the first decoded character of one stream is still to be looked at for a byte order mark.</summary>
+    private sealed class StreamStart
+    {
+        public StreamStart(bool strip)
+        {
+            Pending = strip;
+        }
+
+        public bool Pending { get; set; }
     }
 
     /// <summary>A bounded, thread-safe text buffer; two pumps share one when standard error is merged.</summary>
@@ -330,7 +355,7 @@ public sealed class RecipeRunner : IRecipeRunner
             }
         }
 
-        public void Append(Decoder decoder, byte[] buffer, int count)
+        public void Append(Decoder decoder, byte[] buffer, int count, StreamStart start)
         {
             lock (_gate)
             {
@@ -349,7 +374,15 @@ public sealed class RecipeRunner : IRecipeRunner
 
                 char[] chars = new char[decoder.GetCharCount(buffer, 0, take, flush: false)];
                 int length = decoder.GetChars(buffer, 0, take, chars, 0, flush: false);
-                _text.Append(chars, 0, length);
+                int skip = 0;
+                if (start.Pending && length > 0)
+                {
+                    // Exactly one leading byte order mark of the stream is dropped, and only the first.
+                    start.Pending = false;
+                    skip = chars[0] == ByteOrderMark ? 1 : 0;
+                }
+
+                _text.Append(chars, skip, length - skip);
             }
         }
     }

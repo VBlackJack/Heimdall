@@ -87,7 +87,7 @@ public sealed class RecipeFixedValueTests
     {
         RecipeParseResult result = Parse(
             "[[\"--count\", \"{in:x}\"]]",
-            "[{\"name\":\"x\",\"type\":\"int\",\"label\":\"X\",\"required\":false,\"default\":\"-5\"}]");
+            "[{\"name\":\"x\",\"type\":\"int\",\"label\":\"X\",\"default\":\"-5\"}]");
 
         Assert.Contains(result.Errors, error => error.Code == RecipeErrorCode.FixedValueStartsWithOptionCharacter && error.Path == "arguments[0][1]");
     }
@@ -109,7 +109,7 @@ public sealed class RecipeFixedValueTests
     {
         RecipeParseResult result = Parse(
             "[\"{in:record}\"]",
-            "[{\"name\":\"record\",\"type\":\"choice\",\"label\":\"Record\",\"required\":true,\"choices\":[\"A\",\"AAAA\"],\"default\":\"A\"}]");
+            "[{\"name\":\"record\",\"type\":\"choice\",\"label\":\"Record\",\"choices\":[\"A\",\"AAAA\"],\"default\":\"A\"}]");
 
         Assert.True(result.Succeeded);
     }
@@ -129,6 +129,35 @@ public sealed class RecipeFixedValueTests
         => Assert.Equal(1, RecipeFormat.SupportedSchemaVersion);
 
     /// <summary>
+    /// The theory below returns early on a file that does not parse, so a row that stopped parsing would prove
+    /// nothing. This test reads the rows of that theory: a row is either valid, or refused by the option
+    /// character rule alone (five rows are refused on purpose), and exactly the five others must be valid.
+    /// </summary>
+    [Fact]
+    public void EveryRowOfTheNeverAlwaysRefusedTheoryIsValidOrRefusedForTheOptionCharacterOnly()
+    {
+        const int ValidRows = 5;
+        int valid = 0;
+        System.Reflection.MethodInfo method = typeof(RecipeFixedValueTests).GetMethod(nameof(AValidRecipeNeverHasAChoiceOrADefaultThatIsAlwaysRefused))!;
+        InlineDataAttribute[] rows = [.. method.GetCustomAttributes(typeof(InlineDataAttribute), inherit: false).Cast<InlineDataAttribute>()];
+
+        Assert.NotEmpty(rows);
+        foreach (InlineDataAttribute row in rows)
+        {
+            object?[] data = [.. row.GetData(method).Single()];
+            RecipeParseResult result = Parse((string)data[0]!, (string)data[1]!);
+
+            Assert.True(
+                result.Succeeded || result.Errors.All(error => error.Code == RecipeErrorCode.FixedValueStartsWithOptionCharacter),
+                $"{data[0]} {data[1]}: {string.Join(", ", result.Errors.Select(error => error.Code + "@" + error.Path))}");
+            if (result.Succeeded)
+                valid++;
+        }
+
+        Assert.Equal(ValidRows, valid);
+    }
+
+    /// <summary>
     /// The property that makes the rule worth having: for each of these recipes, if it validates then
     /// every choice and every default expands without refusal at the place it is used.
     /// </summary>
@@ -136,12 +165,12 @@ public sealed class RecipeFixedValueTests
     [InlineData("[\"{in:c}\"]", "[{\"name\":\"c\",\"type\":\"choice\",\"label\":\"C\",\"required\":true,\"choices\":[\"-a\",\"b\"]}]")]
     [InlineData("[\"-t={in:c}\"]", "[{\"name\":\"c\",\"type\":\"choice\",\"label\":\"C\",\"required\":true,\"choices\":[\"-a\",\"b\"]}]")]
     [InlineData("[\"{in:c}\"]", "[{\"name\":\"c\",\"type\":\"choice\",\"label\":\"C\",\"required\":true,\"choices\":[\"/a\",\"b\"]}]")]
-    [InlineData("[\"{in:c}\"]", "[{\"name\":\"c\",\"type\":\"choice\",\"label\":\"C\",\"required\":true,\"choices\":[\"a\",\"b\"],\"default\":\"b\"}]")]
+    [InlineData("[\"{in:c}\"]", "[{\"name\":\"c\",\"type\":\"choice\",\"label\":\"C\",\"choices\":[\"a\",\"b\"],\"default\":\"b\"}]")]
     [InlineData("[\"{in:s}\"]", "[{\"name\":\"s\",\"type\":\"string\",\"label\":\"S\",\"default\":\"-x\"}]")]
     [InlineData("[\"--s={in:s}\"]", "[{\"name\":\"s\",\"type\":\"string\",\"label\":\"S\",\"default\":\"-x\"}]")]
     [InlineData("[\"{in:n}\"]", "[{\"name\":\"n\",\"type\":\"int\",\"label\":\"N\",\"default\":\"-3\"}]")]
     [InlineData("[\"-n={in:n}\"]", "[{\"name\":\"n\",\"type\":\"int\",\"label\":\"N\",\"default\":\"-3\"}]")]
-    [InlineData("[[\"-w\", \"{in:n}\"]]", "[{\"name\":\"n\",\"type\":\"int\",\"label\":\"N\",\"required\":false,\"default\":\"-3\"}]")]
+    [InlineData("[[\"-w\", \"{in:n}\"]]", "[{\"name\":\"n\",\"type\":\"int\",\"label\":\"N\",\"default\":\"-3\"}]")]
     [InlineData("[\"{in:p}\"]", "[{\"name\":\"p\",\"type\":\"path\",\"label\":\"P\",\"default\":\"C:\\\\Tools\"}]")]
     public void AValidRecipeNeverHasAChoiceOrADefaultThatIsAlwaysRefused(string argumentsJson, string inputsJson)
     {

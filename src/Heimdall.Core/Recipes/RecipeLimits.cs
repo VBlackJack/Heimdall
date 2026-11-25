@@ -52,6 +52,9 @@ public static class RecipeLimits
     /// <summary>Longest label of an input.</summary>
     public const int MaxLabelLength = 64;
 
+    /// <summary>Longest hint of an input.</summary>
+    public const int MaxHintLength = 200;
+
     /// <summary>Longest program text (a bare file name or an absolute path).</summary>
     public const int MaxProgramLength = 260;
 
@@ -90,8 +93,8 @@ public static class RecipeLimits
     /// <summary>Length cap applied to a <c>string</c> input that declares none.</summary>
     public const int DefaultStringMaxLength = 256;
 
-    /// <summary>Most translations in the <c>labels</c> map.</summary>
-    public const int MaxLabelLanguages = 16;
+    /// <summary>Most translations in the <c>translations</c> map.</summary>
+    public const int MaxTranslationLanguages = 16;
 
     /// <summary>Longest language tag.</summary>
     public const int MaxLanguageTagLength = 35;
@@ -117,7 +120,13 @@ public static class RecipeLimits
     /// <summary>Longest value accepted for the <c>int</c> and <c>number</c> types, in characters.</summary>
     public const int MaxNumericValueLength = 64;
 
-    /// <summary>Most bytes kept from the output of a run; the rest is read and discarded.</summary>
+    /// <summary>Longest icon key.</summary>
+    public const int MaxIconKeyLength = 32;
+
+    /// <summary>
+    /// Most bytes kept from the output of a run (the cap counts bytes, not characters, whatever the
+    /// encoding); the rest is read and discarded.
+    /// </summary>
     public const int MaxCaptureBytes = 1024 * 1024;
 
     /// <summary>How long the readers may keep draining after the process ended, in milliseconds.</summary>

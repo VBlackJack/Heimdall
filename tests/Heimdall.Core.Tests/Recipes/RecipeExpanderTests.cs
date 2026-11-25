@@ -222,7 +222,10 @@ public sealed class RecipeExpanderTests
     public void AWhenTrueGroup_UsingAnEmptyOptionalInput_IsDropped()
     {
         RecipeInput flag = RecipeTestData.Input("flag", RecipeInputType.Bool) with { WhenTrue = ["--tag", "{in:tag}"] };
-        Recipe recipe = Checked(RecipeTestData.With([flag, Text("tag")], RecipeArgument.Bare("{in:flag}")));
+
+        // The format freeze refuses an optional field inside the arguments of a switch, so this recipe is built by
+        // hand: the expander still drops such a list whole, which is what this test proves.
+        Recipe recipe = RecipeTestData.With([flag, Text("tag")], RecipeArgument.Bare("{in:flag}"));
 
         Assert.Empty(Expand(recipe, Values(("flag", "true"))).Arguments);
         Assert.Equal(["--tag", "x"], Expand(recipe, Values(("flag", "true"), ("tag", "x"))).Arguments);

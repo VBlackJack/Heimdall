@@ -45,7 +45,7 @@ public sealed class RecipeToolViewTests
             Author: author,
             Name: name,
             Description: description,
-            Labels: new Dictionary<string, RecipeLabels>(),
+            Translations: new Dictionary<string, RecipeTranslation>(),
             Program: "ping.exe",
             Arguments: [RecipeArgument.Bare("{in:target}"), RecipeArgument.Bare("{in:flag}")],
             Inputs:
@@ -167,6 +167,52 @@ public sealed class RecipeToolViewTests
             Assert.True(run.IsEnabled);
             Assert.False(stop.IsEnabled);
             Assert.Equal(Visibility.Collapsed, ((ProgressBar)view.FindName("RunProgress")).Visibility);
+
+            view.Dispose();
+        }).Task;
+    }
+
+    [Fact]
+    public async Task AHintIsShownUnderItsFieldAndIsTheHelpTextOfItsControl()
+    {
+        await WpfTestHost.Dispatcher.InvokeAsync(() =>
+        {
+            Recipe recipe = Recipe();
+            recipe = recipe with { Inputs = [.. recipe.Inputs.Select(input => input with { Hint = "Hint for " + input.Name })] };
+            RecipeToolViewModel viewModel = new(recipe, @"C:\Windows\System32\ping.exe", StoredSha256, Services());
+            RecipeToolView view = new(viewModel);
+            view.Initialize(new ToolContext(), WpfTestHost.Localizer);
+            Layout(view);
+
+            TextBox box = Assert.Single(Descendants<TextBox>(view), item => AutomationProperties.GetName(item) == "Target host");
+            CheckBox check = Assert.Single(Descendants<CheckBox>(view), item => AutomationProperties.GetName(item) == "Verbose");
+            ComboBox combo = Assert.Single(Descendants<ComboBox>(view), item => AutomationProperties.GetName(item) == "Mode");
+            Assert.Equal("Hint for target", AutomationProperties.GetHelpText(box));
+            Assert.Equal("Hint for flag", AutomationProperties.GetHelpText(check));
+            Assert.Equal("Hint for mode", AutomationProperties.GetHelpText(combo));
+
+            string[] shown = [.. Descendants<TextBlock>(view).Where(block => block.Visibility == Visibility.Visible).Select(block => block.Text)];
+            Assert.Contains("Hint for target", shown);
+            Assert.Contains("Hint for flag", shown);
+            Assert.Contains("Hint for mode", shown);
+
+            view.Dispose();
+        }).Task;
+    }
+
+    [Fact]
+    public async Task AFieldWithoutAHintShowsNoHintLine()
+    {
+        await WpfTestHost.Dispatcher.InvokeAsync(() =>
+        {
+            RecipeToolViewModel viewModel = new(Recipe(), @"C:\Windows\System32\ping.exe", StoredSha256, Services());
+            RecipeToolView view = new(viewModel);
+            view.Initialize(new ToolContext(), WpfTestHost.Localizer);
+            Layout(view);
+
+            TextBox box = Assert.Single(Descendants<TextBox>(view), item => AutomationProperties.GetName(item) == "Target host");
+            Assert.Equal(string.Empty, AutomationProperties.GetHelpText(box));
+            Assert.All(viewModel.Fields, field => Assert.False(field.HasHint));
 
             view.Dispose();
         }).Task;

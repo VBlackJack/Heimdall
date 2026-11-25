@@ -17,8 +17,8 @@
 namespace Heimdall.Core.Recipes;
 
 /// <summary>Whether a recipe reads the host or the port of the selected session.</summary>
-/// <param name="UsesHost">True when a token or a <c>whenTrue</c> token holds <c>{Host}</c>.</param>
-/// <param name="UsesPort">True when a token or a <c>whenTrue</c> token holds <c>{Port}</c>.</param>
+/// <param name="UsesHost">True when a token, a <c>whenTrue</c> token or a <c>whenFalse</c> token holds <c>{Host}</c>.</param>
+/// <param name="UsesPort">True when a token, a <c>whenTrue</c> token or a <c>whenFalse</c> token holds <c>{Port}</c>.</param>
 public sealed record RecipeSessionUse(bool UsesHost, bool UsesPort)
 {
     /// <summary>True when the recipe needs a session at all.</summary>
@@ -59,6 +59,11 @@ public sealed record RecipeSessionUse(bool UsesHost, bool UsesPort)
         foreach (RecipeInput input in recipe.Inputs)
         {
             foreach (string token in input.WhenTrue ?? [])
+            {
+                yield return token;
+            }
+
+            foreach (string token in input.WhenFalse ?? [])
             {
                 yield return token;
             }

@@ -36,7 +36,7 @@ public sealed class RecipeParserTests
         Assert.Equal(RecipeLimits.DefaultTimeoutSeconds, recipe.TimeoutSeconds);
         Assert.Null(recipe.Icon);
         Assert.Empty(recipe.Inputs);
-        Assert.Empty(recipe.Labels);
+        Assert.Empty(recipe.Translations);
         RecipeArgument only = Assert.Single(recipe.Arguments);
         Assert.False(only.IsGroup);
         Assert.Equal(["{Host}"], only.Tokens);
@@ -49,14 +49,15 @@ public sealed class RecipeParserTests
 
         Assert.Equal("1.2.3-beta.1+build.5", recipe.Version);
         Assert.Equal(RecipeOutputFormat.Csv, recipe.Output);
-        Assert.Equal(RecipeOutputEncoding.Oem, recipe.OutputEncoding);
-        Assert.Equal(RecipeStderrMode.Merge, recipe.Stderr);
+        Assert.Equal(RecipeOutputEncoding.Ansi, recipe.OutputEncoding);
+        Assert.Equal(RecipeStderrMode.Separate, recipe.Stderr);
+        Assert.Equal(RecipeCsvSeparator.Semicolon, recipe.CsvSeparator);
         Assert.Equal([0, 1], recipe.SuccessExitCodes);
         Assert.Equal(30, recipe.TimeoutSeconds);
         Assert.Equal("network", recipe.Icon);
         Assert.Equal(@"C:\Windows\System32\ping.exe", recipe.Program);
 
-        Assert.Equal(6, recipe.Arguments.Count);
+        Assert.Equal(9, recipe.Arguments.Count);
         Assert.True(recipe.Arguments[0].IsGroup);
         Assert.Equal(["-n", "{in:count}"], recipe.Arguments[0].Tokens);
         Assert.False(recipe.Arguments[1].IsGroup);
@@ -74,9 +75,18 @@ public sealed class RecipeParserTests
         Assert.Equal(20, extra.MaxLength);
         Assert.True(recipe.FindInput("target")!.Required);
 
-        RecipeLabels french = recipe.Labels["fr"];
+        RecipeTranslation french = recipe.Translations["fr"];
         Assert.Equal("Analyse", french.Name);
-        Assert.Equal("Cible", french.Fields["target"]);
+        Assert.Equal("Cible", french.FieldLabels["target"]);
+        Assert.Equal("Un nom d'hote.", french.FieldHints["target"]);
+
+        Assert.Equal(["-q"], verbose.WhenFalse);
+        Assert.Equal("1", count.Min);
+        Assert.Equal("9", count.Max);
+        RecipeInput ratio = recipe.FindInput("ratio")!;
+        Assert.Equal("0.5", ratio.Min);
+        Assert.Equal("2.5", ratio.Max);
+        Assert.Equal("A host name.", recipe.FindInput("target")!.Hint);
     }
 
     [Fact]

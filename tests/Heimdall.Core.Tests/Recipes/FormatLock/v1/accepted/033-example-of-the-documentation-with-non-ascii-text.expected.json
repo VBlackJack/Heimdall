@@ -1,0 +1,185 @@
+{
+  "recipe": {
+    "schemaVersion": 1,
+    "id": "example.name-lookup",
+    "version": "1.0.0",
+    "author": "Example",
+    "name": "Name lookup",
+    "description": "Looks up a DNS record for a name, and can ask a DNS server of your choice.",
+    "translations": {
+      "fr": {
+        "name": "Recherche de nom",
+        "description": "Recherche un enregistrement DNS pour un nom, et peut interroger le serveur DNS de votre choix.",
+        "fieldLabels": {
+          "details": "Afficher les d\u00e9tails",
+          "query": "Nom \u00e0 rechercher",
+          "record": "Type d'enregistrement",
+          "server": "Serveur DNS (facultatif)"
+        },
+        "fieldHints": {
+          "server": "Laissez vide pour utiliser le serveur par d\u00e9faut."
+        }
+      }
+    },
+    "program": "nslookup.exe",
+    "arguments": [
+      {
+        "group": false,
+        "tokens": [
+          "-type={in:record}"
+        ]
+      },
+      {
+        "group": false,
+        "tokens": [
+          "{in:details}"
+        ]
+      },
+      {
+        "group": false,
+        "tokens": [
+          "{in:query}"
+        ]
+      },
+      {
+        "group": true,
+        "tokens": [
+          "{in:server}"
+        ]
+      }
+    ],
+    "inputs": [
+      {
+        "name": "query",
+        "type": "Hostname",
+        "label": "Name to look up",
+        "required": true,
+        "default": null,
+        "pattern": null,
+        "maxLength": null,
+        "choices": null,
+        "whenTrue": null,
+        "whenFalse": null,
+        "min": null,
+        "max": null,
+        "hint": null
+      },
+      {
+        "name": "record",
+        "type": "Choice",
+        "label": "Record type",
+        "required": false,
+        "default": "A",
+        "pattern": null,
+        "maxLength": null,
+        "choices": [
+          "A",
+          "AAAA",
+          "MX",
+          "TXT"
+        ],
+        "whenTrue": null,
+        "whenFalse": null,
+        "min": null,
+        "max": null,
+        "hint": null
+      },
+      {
+        "name": "server",
+        "type": "Hostname",
+        "label": "DNS server (optional)",
+        "required": false,
+        "default": null,
+        "pattern": null,
+        "maxLength": null,
+        "choices": null,
+        "whenTrue": null,
+        "whenFalse": null,
+        "min": null,
+        "max": null,
+        "hint": "Leave empty to use the default server."
+      },
+      {
+        "name": "details",
+        "type": "Bool",
+        "label": "Show details",
+        "required": false,
+        "default": "false",
+        "pattern": null,
+        "maxLength": null,
+        "choices": null,
+        "whenTrue": [
+          "-debug"
+        ],
+        "whenFalse": null,
+        "min": null,
+        "max": null,
+        "hint": null
+      }
+    ],
+    "output": "Text",
+    "outputEncoding": "Oem",
+    "stderr": "Merge",
+    "csvSeparator": "Comma",
+    "successExitCodes": [
+      0
+    ],
+    "timeoutSeconds": 20,
+    "icon": "search"
+  },
+  "expansions": [
+    {
+      "values": {
+        "query": "example.org"
+      },
+      "host": null,
+      "port": null,
+      "arguments": [
+        "-type=A",
+        "example.org"
+      ]
+    },
+    {
+      "values": {
+        "details": "true",
+        "query": "example.org",
+        "record": "MX",
+        "server": "dns.example.net"
+      },
+      "host": null,
+      "port": null,
+      "arguments": [
+        "-type=MX",
+        "-debug",
+        "example.org",
+        "dns.example.net"
+      ]
+    },
+    {
+      "values": {
+        "query": "-x"
+      },
+      "host": null,
+      "port": null,
+      "refusals": [
+        {
+          "reason": "LeadingDash",
+          "subject": "query",
+          "path": "arguments[2]"
+        }
+      ]
+    },
+    {
+      "values": {},
+      "host": null,
+      "port": null,
+      "refusals": [
+        {
+          "reason": "RequiredMissing",
+          "subject": "query",
+          "path": "inputs[0]"
+        }
+      ]
+    }
+  ]
+}

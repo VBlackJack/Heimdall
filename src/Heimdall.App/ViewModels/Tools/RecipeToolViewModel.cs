@@ -64,7 +64,13 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
     private Task? _runnerTask;
     private string? _workFolder;
     private RecipeRunResult? _lastResult;
-    private bool _disposed;
+
+    // Held while the runner is started and its task published, and while Dispose reads that task: Dispose can
+    // run on another thread than the run once the comparison has left the UI thread, and must never read the
+    // task of a runner that has already begun. Never held across a wait or an await.
+    private readonly object _runnerGate = new();
+
+    private volatile bool _disposed;
 
     [ObservableProperty]
     private string _title;
@@ -308,14 +314,24 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
                 return;
             }
 
-            _workFolder = folder;
-            Task<RecipeRunResult> runnerTask = _services.Runner.RunAsync(
-                _recipe,
-                _storedProgramPath,
-                expansion.Arguments,
-                folder,
-                cancellation.Token);
-            _runnerTask = runnerTask;
+            Task<RecipeRunResult> runnerTask;
+            lock (_runnerGate)
+            {
+                // Disposed first: the program is not started, and the folder is released by the finally below.
+                if (_disposed)
+                {
+                    return;
+                }
+
+                _workFolder = folder;
+                runnerTask = _services.Runner.RunAsync(
+                    _recipe,
+                    _storedProgramPath,
+                    expansion.Arguments,
+                    folder,
+                    cancellation.Token);
+                _runnerTask = runnerTask;
+            }
 
             RecipeRunResult result = await runnerTask.ConfigureAwait(true);
             if (!_disposed)
@@ -370,20 +386,35 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
         }
 
         CancelRun();
+
+        // After this point no run can start a runner (the flag is set), and one that is starting has published
+        // its task: the lock waits for the start of the runner, not for the run.
+        Task? runnerTask;
+        lock (_runnerGate)
+        {
+            runnerTask = _runnerTask;
+        }
+
         try
         {
             // The runner never needs this thread to finish, so waiting here cannot deadlock.
-            _runnerTask?.Wait(TimeSpan.FromMilliseconds(RecipeLimits.KillWaitMilliseconds + RecipeLimits.DrainGraceMilliseconds));
+            runnerTask?.Wait(TimeSpan.FromMilliseconds(RecipeLimits.KillWaitMilliseconds + RecipeLimits.DrainGraceMilliseconds));
         }
         catch (AggregateException)
         {
             // A failed run has nothing left to wait for.
         }
 
-        if (_workFolder is { } folder)
+        string? leftOver;
+        lock (_runnerGate)
         {
-            _services.WorkFolders.Delete(folder);
+            leftOver = _workFolder;
             _workFolder = null;
+        }
+
+        if (leftOver is not null)
+        {
+            _services.WorkFolders.Delete(leftOver);
         }
 
         GC.SuppressFinalize(this);
@@ -410,8 +441,12 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
             _services.WorkFolders.Delete(folder);
         }
 
-        _workFolder = null;
-        _runnerTask = null;
+        lock (_runnerGate)
+        {
+            _workFolder = null;
+            _runnerTask = null;
+        }
+
         _runCancellation?.Dispose();
         _runCancellation = null;
     }
@@ -517,9 +552,9 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
     {
         foreach (RecipeRefusal refusal in refusals)
         {
-            string words = RecipeRunText.Describe(Localizer, refusal.Reason);
             RecipeFieldViewModel? field = _fields.FirstOrDefault(
                 candidate => string.Equals(candidate.Name, refusal.Subject, StringComparison.Ordinal));
+            string words = RecipeRunText.Describe(Localizer, refusal.Reason, field?.Input);
 
             if (field is not null)
             {
@@ -595,7 +630,7 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
 
         TabularOutput? tabular = _recipe.Output switch
         {
-            RecipeOutputFormat.Csv => TabularOutput.FromCsv(result.Output),
+            RecipeOutputFormat.Csv => TabularOutput.FromCsv(result.Output, _recipe.CsvSeparator),
             RecipeOutputFormat.Json => TabularOutput.FromJson(result.Output),
             _ => null,
         };
@@ -636,6 +671,7 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
         foreach (RecipeFieldViewModel field in _fields)
         {
             field.Label = texts.FieldLabels.TryGetValue(field.Name, out string? label) ? label : field.Input.Label;
+            field.Hint = texts.FieldHints.TryGetValue(field.Name, out string? hint) ? hint : string.Empty;
         }
 
         SessionTargetText = DescribeSessionTarget();

@@ -1,0 +1,87 @@
+{
+  "recipe": {
+    "schemaVersion": 1,
+    "id": "a.b",
+    "version": "0.0.0",
+    "author": "A",
+    "name": "N",
+    "description": "D",
+    "translations": {},
+    "program": "a",
+    "arguments": [
+      {
+        "group": false,
+        "tokens": [
+          "x"
+        ]
+      },
+      {
+        "group": true,
+        "tokens": [
+          "{in:s}"
+        ]
+      }
+    ],
+    "inputs": [
+      {
+        "name": "s",
+        "type": "String",
+        "label": "S",
+        "required": false,
+        "default": null,
+        "pattern": null,
+        "maxLength": 1,
+        "choices": null,
+        "whenTrue": null,
+        "whenFalse": null,
+        "min": null,
+        "max": null,
+        "hint": null
+      }
+    ],
+    "output": "Text",
+    "outputEncoding": "Utf8",
+    "stderr": "Separate",
+    "csvSeparator": "Comma",
+    "successExitCodes": [
+      -1
+    ],
+    "timeoutSeconds": 1,
+    "icon": null
+  },
+  "expansions": [
+    {
+      "values": {
+        "s": "a"
+      },
+      "host": null,
+      "port": null,
+      "arguments": [
+        "x",
+        "a"
+      ]
+    },
+    {
+      "values": {
+        "s": "ab"
+      },
+      "host": null,
+      "port": null,
+      "refusals": [
+        {
+          "reason": "TooLong",
+          "subject": "s",
+          "path": "arguments[1][0]"
+        }
+      ]
+    },
+    {
+      "values": {},
+      "host": null,
+      "port": null,
+      "arguments": [
+        "x"
+      ]
+    }
+  ]
+}

@@ -19,6 +19,7 @@ using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Text.Json;
+using Heimdall.Core.Recipes;
 using Heimdall.Core.Security;
 
 namespace Heimdall.App.Services;
@@ -32,7 +33,9 @@ public sealed class TabularOutput
 {
     private const string ColumnFallbackName = "Column";
 
-    private const char FieldSeparator = ',';
+    private const char CommaSeparator = ',';
+
+    private const char SemicolonSeparator = ';';
 
     private const char Quote = '"';
 
@@ -56,9 +59,10 @@ public sealed class TabularOutput
     /// <summary>True when the output reads as a table with at least one row.</summary>
     public bool IsTable => Table is not null;
 
-    /// <summary>Reads comma separated values: the first row names the columns.</summary>
+    /// <summary>Reads separated values: the first row names the columns.</summary>
     /// <param name="csv">The output text.</param>
-    public static TabularOutput FromCsv(string? csv)
+    /// <param name="separator">The character between two cells; the same quoting rules apply to each.</param>
+    public static TabularOutput FromCsv(string? csv, RecipeCsvSeparator separator = RecipeCsvSeparator.Comma)
     {
         string text = csv ?? string.Empty;
         if (string.IsNullOrWhiteSpace(text))
@@ -68,7 +72,7 @@ public sealed class TabularOutput
 
         try
         {
-            DataTable table = ParseCsv(text);
+            DataTable table = ParseCsv(text, SeparatorChar(separator));
             return table.Rows.Count == 0 ? AsText(text) : new TabularOutput(table, text);
         }
         catch (Exception ex) when (ex is DataException or ArgumentException or IOException)
@@ -228,7 +232,7 @@ public sealed class TabularOutput
     /// Simple RFC 4180-compatible CSV parser. Handles quoted fields with embedded commas and
     /// double-quotes. First row = headers, which become the column names.
     /// </summary>
-    private static DataTable ParseCsv(string csv)
+    private static DataTable ParseCsv(string csv, char separator)
     {
         DataTable table = new();
         using StringReader reader = new(csv);
@@ -238,7 +242,7 @@ public sealed class TabularOutput
             return table;
         }
 
-        foreach (string header in ParseCsvLine(headerLine))
+        foreach (string header in ParseCsvLine(headerLine, separator))
         {
             string colName = header.Trim();
 
@@ -262,7 +266,7 @@ public sealed class TabularOutput
                 continue;
             }
 
-            List<string> fields = ParseCsvLine(line);
+            List<string> fields = ParseCsvLine(line, separator);
             DataRow row = table.NewRow();
             for (int i = 0; i < Math.Min(fields.Count, table.Columns.Count); i++)
             {
@@ -275,7 +279,15 @@ public sealed class TabularOutput
         return table;
     }
 
-    private static List<string> ParseCsvLine(string line)
+    private static char SeparatorChar(RecipeCsvSeparator separator) => separator switch
+    {
+        RecipeCsvSeparator.Comma => CommaSeparator,
+        RecipeCsvSeparator.Semicolon => SemicolonSeparator,
+        RecipeCsvSeparator.Tab => CellSeparator,
+        _ => throw new ArgumentOutOfRangeException(nameof(separator), separator, "A separator without a character."),
+    };
+
+    private static List<string> ParseCsvLine(string line, char separator)
     {
         List<string> fields = [];
         StringBuilder current = new();
@@ -307,7 +319,7 @@ public sealed class TabularOutput
             {
                 inQuotes = true;
             }
-            else if (c == FieldSeparator)
+            else if (c == separator)
             {
                 fields.Add(current.ToString());
                 current.Clear();

@@ -73,11 +73,12 @@ internal static class RecipeTestData
           "author": "Acme Labs",
           "name": "Scan",
           "description": "Scans a target.",
-          "labels": {
+          "translations": {
             "fr": {
               "name": "Analyse",
               "description": "Analyse une cible.",
-              "fields": { "target": "Cible" }
+              "fieldLabels": { "target": "Cible" },
+              "fieldHints": { "target": "Un nom d'hote." }
             }
           },
           "program": "C:\\Windows\\System32\\ping.exe",
@@ -87,21 +88,25 @@ internal static class RecipeTestData
             "--mode={in:mode}",
             ["--extra", "{in:extra}"],
             "{in:target}",
-            ["-p", "{Port}"]
+            ["-p", "{Port}"],
+            ["--dir", "{in:dir}"],
+            ["--ratio", "{in:ratio}"],
+            ["--addr", "{in:addr}"]
           ],
           "inputs": [
-            { "name": "target", "type": "hostname", "label": "Target", "required": true },
-            { "name": "count", "type": "int", "label": "Count", "default": 4 },
-            { "name": "verbose", "type": "bool", "label": "Verbose", "default": false, "whenTrue": ["-v", "-d"] },
+            { "name": "target", "type": "hostname", "label": "Target", "required": true, "hint": "A host name." },
+            { "name": "count", "type": "int", "label": "Count", "default": 4, "min": 1, "max": "9" },
+            { "name": "verbose", "type": "bool", "label": "Verbose", "default": false, "whenTrue": ["-v", "-d"], "whenFalse": ["-q"] },
             { "name": "mode", "type": "choice", "label": "Mode", "choices": ["fast", "slow"], "default": "fast" },
             { "name": "extra", "type": "string", "label": "Extra", "pattern": "[a-z]+", "maxLength": 20 },
             { "name": "dir", "type": "path", "label": "Folder" },
-            { "name": "ratio", "type": "number", "label": "Ratio" },
+            { "name": "ratio", "type": "number", "label": "Ratio", "min": "0.5", "max": 2.5 },
             { "name": "addr", "type": "ipaddress", "label": "Address" }
           ],
           "output": "csv",
-          "outputEncoding": "oem",
-          "stderr": "merge",
+          "outputEncoding": "ansi",
+          "stderr": "separate",
+          "csvSeparator": "semicolon",
           "successExitCodes": [0, 1],
           "timeoutSeconds": 30,
           "icon": "network"
@@ -116,7 +121,7 @@ internal static class RecipeTestData
         Author: "Acme",
         Name: "Ping",
         Description: "Ping the selected host.",
-        Labels: new Dictionary<string, RecipeLabels>(),
+        Translations: new Dictionary<string, RecipeTranslation>(),
         Program: "ping.exe",
         Arguments: [RecipeArgument.Bare("{Host}")],
         Inputs: [],
@@ -130,6 +135,23 @@ internal static class RecipeTestData
     /// <summary>A valid input of the given type, to be modified with <c>with</c>.</summary>
     public static RecipeInput Input(string name, RecipeInputType type, bool required = false, string? defaultValue = null)
         => new(name, type, "Label " + name, required, defaultValue, null, null, null, null);
+
+    /// <summary>
+    /// A valid recipe whose inputs are all used: a switch is placed as a bare token, any other input
+    /// in a group of its own, so that no input is left unreferenced.
+    /// </summary>
+    public static Recipe Using(params RecipeInput[] inputs)
+    {
+        List<RecipeArgument> arguments = [.. Minimal().Arguments];
+        foreach (RecipeInput input in inputs)
+        {
+            arguments.Add(input.Type == RecipeInputType.Bool
+                ? RecipeArgument.Bare("{in:" + input.Name + "}")
+                : RecipeArgument.Group(["--" + input.Name + "={in:" + input.Name + "}"]));
+        }
+
+        return Minimal() with { Inputs = [.. inputs], Arguments = [.. arguments] };
+    }
 
     /// <summary>A recipe whose inputs and arguments are the given ones.</summary>
     public static Recipe With(IEnumerable<RecipeInput> inputs, params RecipeArgument[] arguments)

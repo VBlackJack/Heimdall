@@ -89,6 +89,9 @@ internal static class RecipeProgramNative
     /// <summary>The OEM code page of the machine (the code page of a console child), or 0 off Windows.</summary>
     internal static int OemCodePage() => OperatingSystem.IsWindows() ? (int)GetOEMCP() : 0;
 
+    /// <summary>The system ANSI code page (the one a program writes in when it is not told otherwise), or 0 off Windows.</summary>
+    internal static int SystemAnsiCodePage() => OperatingSystem.IsWindows() ? (int)GetACP() : 0;
+
     /// <summary><c>CP_ACP</c>: the ANSI code page of the machine, the one a program reads its command line in.</summary>
     internal const uint AnsiCodePage = 0;
 
@@ -133,6 +136,9 @@ internal static class RecipeProgramNative
 
     [DllImport("kernel32.dll")]
     private static extern uint GetOEMCP();
+
+    [DllImport("kernel32.dll")]
+    private static extern uint GetACP();
 
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
     private static extern int WideCharToMultiByte(

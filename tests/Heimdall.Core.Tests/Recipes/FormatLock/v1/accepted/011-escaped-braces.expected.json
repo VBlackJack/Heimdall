@@ -1,0 +1,75 @@
+{
+  "recipe": {
+    "schemaVersion": 1,
+    "id": "lock.sample",
+    "version": "1.0.0",
+    "author": "Lock",
+    "name": "Sample",
+    "description": "A sample of the version 1 format.",
+    "translations": {},
+    "program": "ping.exe",
+    "arguments": [
+      {
+        "group": false,
+        "tokens": [
+          "{{literal}}"
+        ]
+      },
+      {
+        "group": false,
+        "tokens": [
+          "a{{b"
+        ]
+      },
+      {
+        "group": false,
+        "tokens": [
+          "b}}a"
+        ]
+      },
+      {
+        "group": false,
+        "tokens": [
+          "{{{Host}}}"
+        ]
+      },
+      {
+        "group": false,
+        "tokens": [
+          "{{in:ghost}}"
+        ]
+      },
+      {
+        "group": false,
+        "tokens": [
+          "{{}}"
+        ]
+      }
+    ],
+    "inputs": [],
+    "output": "Text",
+    "outputEncoding": "Utf8",
+    "stderr": "Separate",
+    "csvSeparator": "Comma",
+    "successExitCodes": [
+      0
+    ],
+    "timeoutSeconds": 60,
+    "icon": null
+  },
+  "expansions": [
+    {
+      "values": {},
+      "host": "h",
+      "port": null,
+      "arguments": [
+        "{literal}",
+        "a{b",
+        "b}a",
+        "{h}",
+        "{in:ghost}",
+        "{}"
+      ]
+    }
+  ]
+}

@@ -32,6 +32,10 @@ public sealed partial class RecipeFieldViewModel : ObservableObject
     private string _label;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasHint))]
+    private string _hint;
+
+    [ObservableProperty]
     private string _text = string.Empty;
 
     [ObservableProperty]
@@ -56,6 +60,7 @@ public sealed partial class RecipeFieldViewModel : ObservableObject
 
         Input = input;
         _label = label;
+        _hint = input.Hint ?? string.Empty;
 
         if (input.Type == RecipeInputType.Choice)
         {
@@ -102,6 +107,9 @@ public sealed partial class RecipeFieldViewModel : ObservableObject
 
     /// <summary>The values a closed list offers; empty for any other field.</summary>
     public IReadOnlyList<string> Choices { get; } = [];
+
+    /// <summary>True when the field has a help text to show under it.</summary>
+    public bool HasHint => Hint.Length > 0;
 
     /// <summary>The name an assistive technology reads for the field.</summary>
     public string AutomationName => Label;

@@ -203,7 +203,7 @@ internal static class RecipeImportFiles
               "description": "{{description}}",
               "program": "{{program}}",
               "arguments": {{argumentsJson}},
-              "inputs": {{inputsJson}}{{OptionalProperty("labels", labelsJson)}}{{(extraProperties is null ? string.Empty : "," + extraProperties)}}
+              "inputs": {{inputsJson}}{{OptionalProperty("translations", labelsJson)}}{{(extraProperties is null ? string.Empty : "," + extraProperties)}}
             }
             """;
 

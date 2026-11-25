@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "id": "example.name-lookup",
+  "version": "1.0.0",
+  "author": "Example",
+  "name": "Name lookup",
+  "description": "Looks up a DNS record for a name, and can ask a DNS server of your choice.",
+  "translations": {
+    "fr": {
+      "name": "Recherche de nom",
+      "description": "Recherche un enregistrement DNS pour un nom, et peut interroger le serveur DNS de votre choix.",
+      "fieldLabels": {
+        "query": "Nom à rechercher",
+        "record": "Type d'enregistrement",
+        "server": "Serveur DNS (facultatif)",
+        "details": "Afficher les détails"
+      },
+      "fieldHints": {
+        "server": "Laissez vide pour utiliser le serveur par défaut."
+      }
+    }
+  },
+  "program": "nslookup.exe",
+  "arguments": [
+    "-type={in:record}",
+    "{in:details}",
+    "{in:query}",
+    ["{in:server}"]
+  ],
+  "inputs": [
+    { "name": "query", "type": "hostname", "label": "Name to look up", "required": true },
+    { "name": "record", "type": "choice", "label": "Record type", "choices": ["A", "AAAA", "MX", "TXT"], "default": "A" },
+    { "name": "server", "type": "hostname", "label": "DNS server (optional)", "hint": "Leave empty to use the default server." },
+    { "name": "details", "type": "bool", "label": "Show details", "default": false, "whenTrue": ["-debug"] }
+  ],
+  "output": "text",
+  "outputEncoding": "oem",
+  "stderr": "merge",
+  "successExitCodes": [0],
+  "timeoutSeconds": 20,
+  "icon": "search"
+}

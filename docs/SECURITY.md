@@ -708,13 +708,17 @@ pack is off by default.
   exactly as written in the file, one per line. Control and invisible
   characters, and every character outside printable ASCII in the program, the
   arguments and the defaults, are shown as `\uXXXX`. Every translation the file
-  carries (language, name, description and field labels) is listed too, because
-  the tool shows it instead of the English text when the interface is in that
-  language. For a replacement, each of the author, the name, the description,
-  the translations, the output and its encoding, the way standard error is kept,
-  the success exit codes and the timeout is said to be unchanged or changed, on
-  a line of its own. This model assumes the preview is read: the other rules
-  below are limits on what a file can ask for, not a judgment on what it is for.
+  carries (language, name, description, field labels and field hints) is listed
+  too, because the tool shows it instead of the English text when the interface
+  is in that language, and so is the hint of every field and the arguments a
+  switch adds when it is on and when it is off. For a replacement, each of the
+  author, the name, the description, the translations, the output and its
+  encoding (and the separator of a table), the way standard error is kept, the
+  success exit codes, the timeout and the icon is said to be unchanged or
+  changed, on a line of its own, and the line of the fields compares every
+  property of every field. This model assumes the preview is read: the other
+  rules below are limits on what a file can ask for, not a judgment on what it
+  is for.
 - **Structural rules.** The program must be a real `.exe` that Heimdall resolves
   itself (the operating system search order is never used), and its final
   location, once links are followed, must lie under the Windows folder, Program

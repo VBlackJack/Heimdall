@@ -112,7 +112,7 @@ public static class RecipeImportPreview
             "RecipeImportPreviewSession",
             YesNo(localizer, plan.SessionUse.UsesHost),
             YesNo(localizer, plan.SessionUse.UsesPort)));
-        text.AppendLine(localizer.Format("RecipeImportPreviewOutput", OutputWords(localizer, recipe.Output)));
+        text.AppendLine(DescribeOutput(localizer, recipe));
         text.AppendLine(localizer.Format("RecipeImportPreviewEncoding", localizer[KeyFor(recipe.OutputEncoding)]));
         text.AppendLine(localizer.Format("RecipeImportPreviewStderr", localizer[KeyFor(recipe.Stderr)]));
         text.AppendLine(localizer.Format(
@@ -120,9 +120,7 @@ public static class RecipeImportPreview
             string.Join(
                 localizer["RecipeImportPreviewListSeparator"],
                 recipe.SuccessExitCodes.Select(code => code.ToString(CultureInfo.InvariantCulture)))));
-        text.AppendLine(localizer.Format(
-            "RecipeImportPreviewIcon",
-            recipe.Icon is null ? localizer["RecipeImportPreviewNone"] : Exact(recipe.Icon)));
+        text.AppendLine(DescribeIcon(localizer, recipe.Icon));
         text.Append(localizer.FormatCount(
             recipe.TimeoutSeconds,
             "RecipeImportPreviewTimeoutOne",
@@ -163,7 +161,19 @@ public static class RecipeImportPreview
     {
         RecipeOutputEncoding.Utf8 => "RecipeImportEncodingUtf8",
         RecipeOutputEncoding.Oem => "RecipeImportEncodingOem",
+        RecipeOutputEncoding.Ansi => "RecipeImportEncodingAnsi",
+        RecipeOutputEncoding.Utf16Le => "RecipeImportEncodingUtf16Le",
         _ => throw new ArgumentOutOfRangeException(nameof(encoding), encoding, "An output encoding without a text."),
+    };
+
+    /// <summary>The key of the words that name the separator of a table read from CSV.</summary>
+    /// <param name="separator">The separator.</param>
+    public static string KeyFor(RecipeCsvSeparator separator) => separator switch
+    {
+        RecipeCsvSeparator.Comma => "RecipeImportCsvSeparatorComma",
+        RecipeCsvSeparator.Semicolon => "RecipeImportCsvSeparatorSemicolon",
+        RecipeCsvSeparator.Tab => "RecipeImportCsvSeparatorTab",
+        _ => throw new ArgumentOutOfRangeException(nameof(separator), separator, "A separator without a text."),
     };
 
     /// <summary>The key of the words that say what happens to standard error.</summary>
@@ -176,6 +186,23 @@ public static class RecipeImportPreview
     };
 
     private static string OutputWords(LocalizationManager localizer, RecipeOutputFormat format) => localizer[KeyFor(format)];
+
+    // A table read from CSV also says which character separates its cells: it decides how the output is cut.
+    private static string DescribeOutput(LocalizationManager localizer, Recipe recipe)
+        => recipe.Output == RecipeOutputFormat.Csv
+            ? localizer.Format("RecipeImportPreviewOutputSeparated", OutputWords(localizer, recipe.Output), localizer[KeyFor(recipe.CsvSeparator)])
+            : localizer.Format("RecipeImportPreviewOutput", OutputWords(localizer, recipe.Output));
+
+    // An icon key is any word of the right shape: one this version has no glyph for is said so, and the default glyph is shown.
+    private static string DescribeIcon(LocalizationManager localizer, string? icon)
+    {
+        if (icon is null)
+        {
+            return localizer.Format("RecipeImportPreviewIcon", localizer["RecipeImportPreviewNone"]);
+        }
+
+        return localizer.Format(RecipeIcons.IsKnown(icon) ? "RecipeImportPreviewIcon" : "RecipeImportPreviewIconUnknown", Exact(icon));
+    }
 
     private static string YesNo(LocalizationManager localizer, bool value) => localizer[value ? "BtnYes" : "BtnNo"];
 
@@ -218,7 +245,12 @@ public static class RecipeImportPreview
             AppendUnchangedOrChanged(localizer, text, string.Equals(old.Name, plan.Recipe.Name, StringComparison.Ordinal), "RecipeImportReplaceNameSame", "RecipeImportReplaceNameChanged");
             AppendUnchangedOrChanged(localizer, text, string.Equals(old.Description, plan.Recipe.Description, StringComparison.Ordinal), "RecipeImportReplaceDescriptionSame", "RecipeImportReplaceDescriptionChanged");
             AppendUnchangedOrChanged(localizer, text, SameTranslations(old, plan.Recipe), "RecipeImportReplaceTranslationsSame", "RecipeImportReplaceTranslationsChanged");
-            AppendUnchangedOrChanged(localizer, text, old.Output == plan.Recipe.Output && old.OutputEncoding == plan.Recipe.OutputEncoding, "RecipeImportReplaceOutputSame", "RecipeImportReplaceOutputChanged");
+            AppendUnchangedOrChanged(
+                localizer,
+                text,
+                old.Output == plan.Recipe.Output && old.OutputEncoding == plan.Recipe.OutputEncoding && old.CsvSeparator == plan.Recipe.CsvSeparator,
+                "RecipeImportReplaceOutputSame",
+                "RecipeImportReplaceOutputChanged");
             AppendUnchangedOrChanged(localizer, text, old.Stderr == plan.Recipe.Stderr, "RecipeImportReplaceStderrSame", "RecipeImportReplaceStderrChanged");
             AppendUnchangedOrChanged(localizer, text, old.SuccessExitCodes.SequenceEqual(plan.Recipe.SuccessExitCodes), "RecipeImportReplaceExitCodesSame", "RecipeImportReplaceExitCodesChanged");
             AppendUnchangedOrChanged(localizer, text, old.TimeoutSeconds == plan.Recipe.TimeoutSeconds, "RecipeImportReplaceTimeoutSame", "RecipeImportReplaceTimeoutChanged");
@@ -233,15 +265,19 @@ public static class RecipeImportPreview
 
     /// <summary>Whether two recipes carry the same translations, compared as parsed: every language, name, description and field label.</summary>
     private static bool SameTranslations(Recipe left, Recipe right)
-        => left.Labels.Count == right.Labels.Count
-            && left.Labels.All(pair =>
-                right.Labels.TryGetValue(pair.Key, out RecipeLabels? other)
+        => left.Translations.Count == right.Translations.Count
+            && left.Translations.All(pair =>
+                right.Translations.TryGetValue(pair.Key, out RecipeTranslation? other)
                 && string.Equals(pair.Value.Name, other.Name, StringComparison.Ordinal)
                 && string.Equals(pair.Value.Description, other.Description, StringComparison.Ordinal)
-                && pair.Value.Fields.Count == other.Fields.Count
-                && pair.Value.Fields.All(field =>
-                    other.Fields.TryGetValue(field.Key, out string? label)
-                    && string.Equals(field.Value, label, StringComparison.Ordinal)));
+                && SameTexts(pair.Value.FieldLabels, other.FieldLabels)
+                && SameTexts(pair.Value.FieldHints, other.FieldHints));
+
+    private static bool SameTexts(IReadOnlyDictionary<string, string> left, IReadOnlyDictionary<string, string> right)
+        => left.Count == right.Count
+            && left.All(entry =>
+                right.TryGetValue(entry.Key, out string? text)
+                && string.Equals(entry.Value, text, StringComparison.Ordinal));
 
     /// <summary>Whether two recipes pass the same arguments, compared as parsed (groups and tokens), not as bytes.</summary>
     private static bool SameArguments(Recipe left, Recipe right)
@@ -262,7 +298,11 @@ public static class RecipeImportPreview
                 && pair.First.Pattern == pair.Second.Pattern
                 && pair.First.MaxLength == pair.Second.MaxLength
                 && (pair.First.Choices ?? []).SequenceEqual(pair.Second.Choices ?? [], StringComparer.Ordinal)
-                && (pair.First.WhenTrue ?? []).SequenceEqual(pair.Second.WhenTrue ?? [], StringComparer.Ordinal));
+                && (pair.First.WhenTrue ?? []).SequenceEqual(pair.Second.WhenTrue ?? [], StringComparer.Ordinal)
+                && (pair.First.WhenFalse ?? []).SequenceEqual(pair.Second.WhenFalse ?? [], StringComparer.Ordinal)
+                && pair.First.Min == pair.Second.Min
+                && pair.First.Max == pair.Second.Max
+                && pair.First.Hint == pair.Second.Hint);
 
     private static void AppendArguments(LocalizationManager localizer, StringBuilder text, Recipe recipe)
     {
@@ -300,29 +340,34 @@ public static class RecipeImportPreview
     // interface is in that language: a label that was never read here could say anything.
     private static void AppendTranslations(LocalizationManager localizer, StringBuilder text, Recipe recipe)
     {
-        text.AppendLine(localizer["RecipeImportPreviewLabelsHeading"]);
-        if (recipe.Labels.Count == 0)
+        text.AppendLine(localizer["RecipeImportPreviewTranslationsHeading"]);
+        if (recipe.Translations.Count == 0)
         {
             text.AppendLine(Indent + localizer["RecipeImportPreviewNone"]);
             return;
         }
 
-        foreach ((string tag, RecipeLabels labels) in recipe.Labels.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+        foreach ((string tag, RecipeTranslation translation) in recipe.Translations.OrderBy(pair => pair.Key, StringComparer.Ordinal))
         {
-            text.AppendLine(localizer.Format("RecipeImportPreviewLabelsLanguage", Plain(tag)));
-            if (labels.Name is not null)
+            text.AppendLine(localizer.Format("RecipeImportPreviewTranslationsLanguage", Plain(tag)));
+            if (translation.Name is not null)
             {
-                text.AppendLine(localizer.Format("RecipeImportPreviewLabelsName", Plain(labels.Name)));
+                text.AppendLine(localizer.Format("RecipeImportPreviewTranslationsName", Plain(translation.Name)));
             }
 
-            if (labels.Description is not null)
+            if (translation.Description is not null)
             {
-                text.AppendLine(localizer.Format("RecipeImportPreviewLabelsDescription", Plain(labels.Description)));
+                text.AppendLine(localizer.Format("RecipeImportPreviewTranslationsDescription", Plain(translation.Description)));
             }
 
-            foreach ((string field, string label) in labels.Fields.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+            foreach ((string field, string label) in translation.FieldLabels.OrderBy(pair => pair.Key, StringComparer.Ordinal))
             {
-                text.AppendLine(localizer.Format("RecipeImportPreviewLabelsField", Exact(field), Plain(label)));
+                text.AppendLine(localizer.Format("RecipeImportPreviewTranslationsFieldLabel", Exact(field), Plain(label)));
+            }
+
+            foreach ((string field, string hint) in translation.FieldHints.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+            {
+                text.AppendLine(localizer.Format("RecipeImportPreviewTranslationsFieldHint", Exact(field), Plain(hint)));
             }
         }
     }
@@ -338,11 +383,16 @@ public static class RecipeImportPreview
 
         foreach (RecipeInput input in recipe.Inputs)
         {
-            List<string> details =
-            [
-                localizer.Format("RecipeImportPreviewInputType", localizer[KeyFor(input.Type)]),
-                localizer[input.Required ? "RecipeImportPreviewInputRequired" : "RecipeImportPreviewInputOptional"],
-            ];
+            List<string> details = [localizer.Format("RecipeImportPreviewInputType", localizer[KeyFor(input.Type)])];
+
+            // A switch is never required and never optional: it is on or off, so it says neither.
+            if (input.Type != RecipeInputType.Bool)
+            {
+                // Three words: a field that can be empty is optional; one with a default is never empty.
+                details.Add(localizer[input.Required
+                    ? "RecipeImportPreviewInputRequired"
+                    : input.IsOptional ? "RecipeImportPreviewInputOptional" : "RecipeImportPreviewInputAlwaysSent"]);
+            }
 
             if (!string.IsNullOrEmpty(input.Default))
             {
@@ -366,16 +416,44 @@ public static class RecipeImportPreview
                 details.Add(localizer.Format("RecipeImportPreviewInputMaxLength", maxLength.ToString(CultureInfo.CurrentCulture)));
             }
 
+            // The bounds are shown as written in the file.
+            if (input.Min is not null && input.Max is not null)
+            {
+                details.Add(localizer.Format("RecipeImportPreviewInputRange", Exact(input.Min), Exact(input.Max)));
+            }
+            else if (input.Min is not null)
+            {
+                details.Add(localizer.Format("RecipeImportPreviewInputMinimum", Exact(input.Min)));
+            }
+            else if (input.Max is not null)
+            {
+                details.Add(localizer.Format("RecipeImportPreviewInputMaximum", Exact(input.Max)));
+            }
+
             text.AppendLine(localizer.Format(
                 "RecipeImportPreviewInput",
                 Exact(input.Name),
                 Plain(input.Label),
                 string.Join(localizer["RecipeImportPreviewListSeparator"], details)));
 
+            if (!string.IsNullOrEmpty(input.Hint))
+            {
+                text.AppendLine(localizer.Format("RecipeImportPreviewInputHint", Plain(input.Hint)));
+            }
+
             if (input.WhenTrue is { Count: > 0 } whenTrue)
             {
                 text.AppendLine(localizer["RecipeImportPreviewWhenTrue"]);
                 foreach (string token in whenTrue)
+                {
+                    text.AppendLine(localizer.Format("RecipeImportPreviewWhenTrueArgument", Exact(token)));
+                }
+            }
+
+            if (input.WhenFalse is { Count: > 0 } whenFalse)
+            {
+                text.AppendLine(localizer["RecipeImportPreviewWhenFalse"]);
+                foreach (string token in whenFalse)
                 {
                     text.AppendLine(localizer.Format("RecipeImportPreviewWhenTrueArgument", Exact(token)));
                 }

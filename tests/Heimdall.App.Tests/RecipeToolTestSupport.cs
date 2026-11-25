@@ -262,7 +262,7 @@ internal static class RecipeBuilders
         RecipeOutputFormat output = RecipeOutputFormat.Text,
         RecipeStderrMode stderr = RecipeStderrMode.Separate,
         int timeoutSeconds = 30,
-        IReadOnlyDictionary<string, RecipeLabels>? labels = null)
+        IReadOnlyDictionary<string, RecipeTranslation>? labels = null)
         => new(
             SchemaVersion: 1,
             Id: id,
@@ -270,7 +270,7 @@ internal static class RecipeBuilders
             Author: author,
             Name: name,
             Description: "Probes the thing.",
-            Labels: labels ?? new Dictionary<string, RecipeLabels>(),
+            Translations: labels ?? new Dictionary<string, RecipeTranslation>(),
             Program: "ping.exe",
             Arguments: [.. arguments ?? [RecipeArgument.Bare("-n")]],
             Inputs: [.. inputs ?? []],

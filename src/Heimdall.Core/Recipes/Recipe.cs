@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+using System.Collections.Frozen;
+
 namespace Heimdall.Core.Recipes;
 
 /// <summary>The type of an input field of a recipe.</summary>
@@ -65,6 +67,25 @@ public enum RecipeOutputEncoding
 
     /// <summary>The OEM code page of the console.</summary>
     Oem,
+
+    /// <summary>The ANSI code page of the system (never the default encoding of the runtime).</summary>
+    Ansi,
+
+    /// <summary>UTF-16 little endian, with or without a leading byte order mark; big endian is not supported.</summary>
+    Utf16Le,
+}
+
+/// <summary>The character that separates the cells of a <c>csv</c> output.</summary>
+public enum RecipeCsvSeparator
+{
+    /// <summary>A comma, the default.</summary>
+    Comma,
+
+    /// <summary>A semicolon.</summary>
+    Semicolon,
+
+    /// <summary>A tab character.</summary>
+    Tab,
 }
 
 /// <summary>What happens to the standard error stream.</summary>
@@ -112,6 +133,18 @@ public sealed record RecipeInput(
     IReadOnlyList<string>? Choices,
     IReadOnlyList<string>? WhenTrue)
 {
+    /// <summary>For an <c>int</c> or <c>number</c> input, the lowest accepted value as written in the file; otherwise null.</summary>
+    public string? Min { get; init; }
+
+    /// <summary>For an <c>int</c> or <c>number</c> input, the highest accepted value as written in the file; otherwise null.</summary>
+    public string? Max { get; init; }
+
+    /// <summary>For a <c>bool</c> input, the tokens contributed when off; null when the file declared none.</summary>
+    public IReadOnlyList<string>? WhenFalse { get; init; }
+
+    /// <summary>A short help text shown under the field, or null.</summary>
+    public string? Hint { get; init; }
+
     /// <summary>
     /// True when the field can be empty at run time: not required and without a non-empty default.
     /// A group that uses such a field is dropped while it is empty.
@@ -122,11 +155,18 @@ public sealed record RecipeInput(
 /// <summary>The translated texts of one language of a recipe.</summary>
 /// <param name="Name">The translated name, or null.</param>
 /// <param name="Description">The translated description, or null.</param>
-/// <param name="Fields">Translated input labels keyed by input name.</param>
-public sealed record RecipeLabels(
+/// <param name="FieldLabels">Translated input labels keyed by input name.</param>
+public sealed record RecipeTranslation(
     string? Name,
     string? Description,
-    IReadOnlyDictionary<string, string> Fields);
+    IReadOnlyDictionary<string, string> FieldLabels)
+{
+    /// <summary>Translated input hints keyed by input name.</summary>
+    public IReadOnlyDictionary<string, string> FieldHints { get; init; } = EmptyHints;
+
+    private static readonly IReadOnlyDictionary<string, string> EmptyHints =
+        new Dictionary<string, string>(StringComparer.Ordinal).ToFrozenDictionary(StringComparer.Ordinal);
+}
 
 /// <summary>An immutable recipe: a tool described by data, run as one program with a list of arguments.</summary>
 /// <param name="SchemaVersion">The format version the file was written for.</param>
@@ -135,7 +175,7 @@ public sealed record RecipeLabels(
 /// <param name="Author">The author, display only and always shown as unverified.</param>
 /// <param name="Name">The English name.</param>
 /// <param name="Description">The English description.</param>
-/// <param name="Labels">Optional translations keyed by language tag.</param>
+/// <param name="Translations">Optional translations keyed by language tag.</param>
 /// <param name="Program">The program exactly as written in the file; resolving it is a later step.</param>
 /// <param name="Arguments">The argument entries in order.</param>
 /// <param name="Inputs">The input fields in order.</param>
@@ -144,7 +184,7 @@ public sealed record RecipeLabels(
 /// <param name="Stderr">What happens to standard error.</param>
 /// <param name="SuccessExitCodes">The exit codes that mean success.</param>
 /// <param name="TimeoutSeconds">The run timeout in seconds.</param>
-/// <param name="Icon">A key of <see cref="RecipeIcons.Keys"/>, or null for the default icon.</param>
+/// <param name="Icon">An icon key of the shape <see cref="RecipeIcons.IsKeyShape"/> accepts, or null for the default icon.</param>
 public sealed record Recipe(
     int SchemaVersion,
     string Id,
@@ -152,7 +192,7 @@ public sealed record Recipe(
     string Author,
     string Name,
     string Description,
-    IReadOnlyDictionary<string, RecipeLabels> Labels,
+    IReadOnlyDictionary<string, RecipeTranslation> Translations,
     string Program,
     IReadOnlyList<RecipeArgument> Arguments,
     IReadOnlyList<RecipeInput> Inputs,
@@ -163,6 +203,9 @@ public sealed record Recipe(
     int TimeoutSeconds,
     string? Icon)
 {
+    /// <summary>The separator of a <c>csv</c> output.</summary>
+    public RecipeCsvSeparator CsvSeparator { get; init; } = RecipeCsvSeparator.Comma;
+
     /// <summary>The input with the given name, or null.</summary>
     public RecipeInput? FindInput(string name)
     {
