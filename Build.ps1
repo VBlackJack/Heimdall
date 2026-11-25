@@ -116,6 +116,8 @@ $ProjectRoot = $PSScriptRoot
 # What the informational CI lanes (CIUnstable, RequiresDesktop) reported for the release
 # commit: printed as warnings and written into the release notes, never a gate.
 . (Join-Path $ProjectRoot 'scripts\InformationalLaneReport.ps1')
+# Refuses a staged build folder that carries files the application project excludes.
+. (Join-Path $ProjectRoot 'scripts\StagedPayloadGate.ps1')
 $AppProject = Join-Path $ProjectRoot 'src\Heimdall.App\Heimdall.App.csproj'
 $SolutionFile = Get-ChildItem -Path $ProjectRoot -Filter '*.slnx' | Select-Object -First 1
 $distDir = Join-Path $ProjectRoot "Dist\$($Mode.ToLower())"
@@ -453,8 +455,8 @@ function Remove-TreeRobust {
         Deletes a directory tree, including paths Remove-Item cannot reach.
     .DESCRIPTION
         Remove-Item -Recurse fails with "the directory is not empty" on trees whose
-        paths exceed MAX_PATH, and the bundled terminal assets carry node_modules
-        trees that do. The failure is quiet in its consequences rather than its
+        paths exceed MAX_PATH. The staged Assets folder once carried node_modules
+        trees that did, and a build folder left by that time still can. The failure is quiet in its consequences rather than its
         message: the stale folder survives, the next copy nests inside it, and the
         build after that fails harder. Mirroring an empty directory over the target
         works at any depth, so it is used first and Remove-Item only finishes the
@@ -554,12 +556,12 @@ function Publish-Variant {
         Copy-Item $wv2Loader $variantDir -Force
     }
 
-    # Copy terminal assets
-    $assetsSrc = Join-Path $ProjectRoot 'src\Heimdall.App\Assets'
-    $assetsDest = Join-Path $variantDir 'Assets'
-    if (Test-Path $assetsSrc) {
-        Copy-TreeContents -Source $assetsSrc -Destination $assetsDest
-    }
+    # The Assets folder is staged by dotnet publish above, from the Content items of the
+    # application project, and by nothing else. The project is what says which asset trees
+    # are product files; copying the folder of the working tree here used to put back the
+    # trees it excludes, node_modules included. The project's own glob still reads the
+    # working tree, so an untracked file inside a shipped tree ships: the gate below
+    # refuses excluded trees and node_modules folders, not every untracked file.
 
     # Bundle WebView2 runtime for SelfContained edition only.
     # Copy the runtime *contents* into a freshly recreated destination so the
@@ -570,6 +572,17 @@ function Publish-Variant {
         $wv2Dest = Join-Path $variantDir 'runtimes\webview2'
         Copy-TreeContents -Source $wv2Runtime -Destination $wv2Dest
         Write-Host "    + WebView2 Fixed Version Runtime bundled" -ForegroundColor DarkGray
+    }
+
+    # The ZIP below and both installers take everything in this folder: refuse it here if
+    # it holds an asset tree the project excludes, or a package install folder.
+    $payloadViolations = Get-StagedPayloadViolations -PayloadDirectory $variantDir `
+        -UnshippedAssetTrees (Get-UnshippedAssetTrees -ProjectFile $AppProject)
+    if ($payloadViolations.Count -gt 0) {
+        Write-Host "  [!] $variantFolder holds files that must not ship:" -ForegroundColor Red
+        foreach ($violation in $payloadViolations) { Write-Host "      $violation" -ForegroundColor Red }
+        Write-Host "      The application project excludes them; find the step that staged them." -ForegroundColor Yellow
+        exit 1
     }
 
     # Create archive in Release mode

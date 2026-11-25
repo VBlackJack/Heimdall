@@ -58,11 +58,14 @@ Type: filesandordirs; Name: "{app}\data\packs"
 ; The vendored asset trees (Assets\<tree>\VENDORED.json lists each as a complete directory)
 ; are replaced whole for the same reason: draw.io alone is about 2300 files, and a file a
 ; newer version dropped would otherwise stay on disk beside the new ones. One line per tree,
-; never a wildcard over Assets: Assets also holds files that are not vendored. The tree
-; Assets\milkdown-editor is the editor's source, not shipped, so it has no line here.
+; never a wildcard over Assets: Assets also holds files that are not vendored.
 ; InstallerStaleFileGuardTests keeps this list in step with the manifests.
 Type: filesandordirs; Name: "{app}\Assets\drawio"
 Type: filesandordirs; Name: "{app}\Assets\milkdown"
+; Assets\milkdown-editor is the editor's source and is not shipped. Versions up to
+; 2026.112201 installed it by mistake, with the node_modules folder of the build machine
+; (about 6600 files): this line removes what they left, and nothing puts it back.
+Type: filesandordirs; Name: "{app}\Assets\milkdown-editor"
 Type: filesandordirs; Name: "{app}\Assets\Terminal"
 Type: filesandordirs; Name: "{app}\Assets\Tools"
 Type: filesandordirs; Name: "{app}\Assets\vnc"
