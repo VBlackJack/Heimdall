@@ -227,8 +227,9 @@ public sealed class RecipeOutputDecodingTests : IDisposable
     [InlineData(RecipeOutputEncoding.Ansi)]
     public async Task ACodePageOutputKeepsEveryByte_NoMarkIsLookedFor(RecipeOutputEncoding encoding)
     {
-        // Under a single-byte code page the three bytes of a UTF-8 mark are three characters of text.
-        RecipeRunResult result = await RunAsync(MakeRecipe(encoding), [Concat(Utf8Mark, [0x61])]);
+        // Under a single-byte code page the three bytes of a UTF-8 mark are three characters of text. The code
+        // pages are given, so the test does not depend on the machine it runs on.
+        RecipeRunResult result = await RunWithCodePagesAsync(encoding, AnsiLatinCodePage, OemLatinCodePage, Concat(Utf8Mark, [0x61]));
 
         Assert.Equal(4, result.Output.Length);
         Assert.EndsWith("a", result.Output, StringComparison.Ordinal);

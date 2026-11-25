@@ -97,11 +97,16 @@ public sealed class RecipeExactDecimalTests
     }
 
     [Fact]
-    public void MinusZeroEqualsZeroAsABoundAndAsAValue()
+    public void AZeroWithAMinusSignIsNotAValueAndNotABound()
     {
-        Assert.True(Accepts(Number("0", "0"), "-0"));
-        Assert.True(Accepts(Number("-0", "-0.0"), "0.00"));
+        Assert.False(Accepts(Number(null, null), "-0"));
+        Assert.False(Accepts(Number(null, null), "-0.000"));
+        Assert.True(Accepts(Number("0", "0"), "0.00"));
         Assert.False(Accepts(Number("0", null), "-0.0000000000000000001"));
+
+        // A bound that is not valid is reported by the validator, and ignored by the value rule.
+        Assert.Contains(RecipeErrorCode.InvalidBound, RecipeTestData.Codes(RecipeTestData.Using(Number("-0", null))));
+        Assert.Contains(RecipeErrorCode.InvalidBound, RecipeTestData.Codes(RecipeTestData.Using(Number(null, "-0.0"))));
     }
 
     [Fact]

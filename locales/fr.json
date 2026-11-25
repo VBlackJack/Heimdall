@@ -6720,7 +6720,7 @@
   "RecipeErrorInvalidBound": "La borne \"{4}\" n'est pas valide pour son champ : \u00e9crivez un entier sur 32 bits pour un champ entier, ou un nombre d\u00e9cimal simple sinon (sans signe plus, sans z\u00e9ro initial, sans exposant).",
   "RecipeErrorMinAboveMax": "Le minimum {4} est sup\u00e9rieur au maximum {1}.",
   "RecipeErrorDefaultOutOfBounds": "La valeur par d\u00e9faut \"{4}\" du champ \"{1}\" est en dehors du minimum et du maximum de ce champ.",
-  "RecipeErrorRequiredWithDefault": "Le champ \"{1}\" est obligatoire et a une valeur par d\u00e9faut. Un champ qui a une valeur par d\u00e9faut n'est jamais laiss\u00e9 vide (l'effacer utilise la valeur par d\u00e9faut) : retirez \"required\".",
+  "RecipeErrorRequiredWithDefault": "Le champ \"{1}\" a une valeur par d\u00e9faut : \"required\" ne doit pas \u00eatre \u00e9crit, qu'il vaille true ou false. Un champ qui a une valeur par d\u00e9faut n'est jamais laiss\u00e9 vide (l'effacer utilise la valeur par d\u00e9faut).",
   "RecipeErrorOptionalInputInSwitchArguments": "Le champ facultatif \"{1}\" est utilis\u00e9 dans les arguments d'un champ oui/non. Rendez-le obligatoire ou donnez-lui une valeur par d\u00e9faut.",
   "RecipeErrorStderrMergeWithStructuredOutput": "L'erreur standard ne peut pas \u00eatre m\u00e9lang\u00e9e \u00e0 une sortie affich\u00e9e sous forme de tableau (CSV ou JSON). Gardez-la s\u00e9par\u00e9e.",
   "RecipeErrorCsvSeparatorWithoutCsvOutput": "La propri\u00e9t\u00e9 \"csvSeparator\" ne peut \u00eatre \u00e9crite que lorsque la sortie est csv.",

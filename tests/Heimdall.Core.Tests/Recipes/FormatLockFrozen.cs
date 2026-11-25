@@ -61,7 +61,6 @@ internal static class FormatLockFrozen
         "033-example-of-the-documentation-with-non-ascii-text",
         "034-non-ascii-display-text-written-as-escapes",
         "035-inputs-inside-switch-arguments",
-        "036-minus-zero-as-a-default-and-as-bounds",
         "037-int32-edges-as-bounds-and-defaults",
         "038-number-bounds-with-a-long-fraction",
     ];
@@ -129,5 +128,16 @@ internal static class FormatLockFrozen
         "058-when-false-token-whose-fixed-value-would-be-refused-at-run",
         "059-over-64-tokens-only-because-when-false-is-the-longer-list",
         "060-number-default-just-above-a-maximum-that-two-doubles-cannot-tell-apart",
+        "061-required-false-together-with-a-default",
+        "062-int-default-that-is-minus-zero",
+        "063-number-default-that-is-minus-zero-with-a-fraction",
+        "064-number-bound-that-is-minus-zero",
+        "065-int-bound-that-is-minus-zero",
+        "066-default-made-of-white-space",
+        "067-empty-when-true-list",
+        "068-switch-mixed-with-text-in-a-bare-token",
+        "069-number-default-longer-than-the-limit",
+        "070-number-bound-longer-than-the-limit",
+        "071-int-default-longer-than-the-limit",
     ];
 }

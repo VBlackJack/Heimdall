@@ -266,7 +266,9 @@ public static class RecipeValidator
                 return;
             }
 
-            // A field with a default is never omitted: when it is cleared, the default is used. Requiring it says nothing.
+            // A field with a default is never omitted: when it is cleared, the default is used. Requiring it says
+            // nothing (the file reader refuses even "required": false next to a default; a recipe built by hand is
+            // held to the same rule through the flag).
             if (input.Required && input.Default is not null)
                 Add(RecipeErrorCode.RequiredWithDefault, requiredPath, name: RecipeText.MakeSafe(input.Name));
         }
@@ -425,7 +427,7 @@ public static class RecipeValidator
 
             string defaultPath = RecipePath.Property(path, RecipePath.Default);
             string value = input.Default;
-            if (value.Length == 0)
+            if (string.IsNullOrWhiteSpace(value))
             {
                 Add(RecipeErrorCode.EmptyValue, defaultPath);
                 return;

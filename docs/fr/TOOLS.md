@@ -549,9 +549,9 @@ Chaque entrée de `inputs` est un objet doté de ces propriétés :
 | `name` | chaîne | oui | Une lettre, puis des lettres, des chiffres ou des tirets bas ; 32 caractères au plus ; unique dans la recette. C'est ce que désigne `{in:name}` |
 | `type` | chaîne | oui | `string`, `int`, `number`, `bool`, `hostname`, `ipaddress`, `path` ou `choice` |
 | `label` | chaîne | oui | 64 caractères au plus |
-| `required` | booléen | non | `false` par défaut. Refusé sur un champ `bool`, quelle que soit sa valeur, car un interrupteur n'est jamais vide. Refusé avec un `default` : un champ qui a une valeur par défaut n'est jamais laissé vide, car l'effacer fait utiliser la valeur par défaut, si bien que `required` ne dirait rien |
+| `required` | booléen | non | `false` par défaut. Refusé sur un champ `bool`, quelle que soit sa valeur, car un interrupteur n'est jamais vide. Refusé avec un `default`, quelle que soit sa valeur (`true` ou `false`) : un champ qui a une valeur par défaut n'est jamais laissé vide, car l'effacer fait utiliser la valeur par défaut, si bien que `required` ne dirait rien |
 | `default` | chaîne, nombre ou booléen | non | Une chaîne (tout type sauf `bool`), un nombre (`int` et `number` seulement, écrit comme un nombre JSON ou comme une chaîne, ce qui revient au même) ou `true` ou `false` (`bool` seulement). 512 caractères au plus. Soumise aux mêmes règles de texte fixe qu'un élément d'argument, valide pour le type de son champ, et comprise entre `min` et `max` quand il y en a |
-| `min`, `max` | nombre ou chaîne | `int` et `number` seulement | La plus petite et la plus grande valeur acceptées, chacune écrite comme une valeur par défaut et chacune facultative. Une borne d'`int` est un entier sur 32 bits et une borne de `number` un nombre décimal, dans les formes strictes ci-dessous. `min` supérieur à `max` est refusé. Une valeur hors de la plage est refusée à l'exécution, et une valeur par défaut hors de la plage à l'import. Un `number` est comparé exactement, comme un décimal : le signe, puis les chiffres entiers, puis les chiffres de la fraction, les zéros finaux de la fraction ne comptant pas et `-0` valant `0` (donc `1` et `1.0` sont égaux, et avec un `max` de `1` la valeur `1.0000000000000001` est refusée). Aucun arrondi en double n'intervient jamais, car le programme reçoit le texte tel qu'il a été saisi |
+| `min`, `max` | nombre ou chaîne | `int` et `number` seulement | La plus petite et la plus grande valeur acceptées, chacune écrite comme une valeur par défaut et chacune facultative. Une borne d'`int` est un entier sur 32 bits et une borne de `number` un nombre décimal, dans les formes strictes ci-dessous. `min` supérieur à `max` est refusé. Une valeur hors de la plage est refusée à l'exécution, et une valeur par défaut hors de la plage à l'import. Un `number` est comparé exactement, comme un décimal : le signe, puis les chiffres entiers, puis les chiffres de la fraction, les zéros finaux de la fraction ne comptant pas (donc `1` et `1.0` sont égaux, et avec un `max` de `1` la valeur `1.0000000000000001` est refusée). Aucun arrondi en double n'intervient jamais, car le programme reçoit le texte tel qu'il a été saisi |
 | `hint` | chaîne | non | Un texte d'aide affiché sous le champ et lu par les technologies d'assistance. 200 caractères au plus, sans caractère de contrôle, sans caractère de mise en forme invisible et sans saut de ligne |
 | `pattern` | chaîne | `string` seulement | Une expression régulière que la valeur entière doit satisfaire ; 256 caractères au plus. Une valeur pour laquelle la comparaison dure plus de 250 ms est refusée |
 | `maxLength` | entier | `string` seulement | De 1 à 1024. 256 en l'absence de valeur |
@@ -571,8 +571,8 @@ Ce que chaque type accepte à l'exécution :
 | Type | Accepte |
 |---|---|
 | `string` | Tout texte dans la limite de `maxLength` et conforme à `pattern` s'il y en a un |
-| `int` | Un entier sur 32 bits écrit `-?(0\|[1-9][0-9]*)` : un signe moins facultatif, puis `0` ou des chiffres sans zéro initial. Ni signe plus, ni exposant, ni espace |
-| `number` | Un nombre décimal fini écrit `-?(0\|[1-9][0-9]*)(\.[0-9]+)?` : la forme d'un entier, puis un point et au moins un chiffre, facultatifs. Ni signe plus, ni zéro initial, ni exposant, ni point seul, 64 caractères au plus |
+| `int` | Un entier sur 32 bits écrit `0` ou `-?[1-9][0-9]*` : `0`, ou des chiffres sans zéro initial avec un signe moins facultatif. Ni signe plus, ni exposant, ni espace, ni zéro avec un signe moins (`-0` est refusé) |
+| `number` | Un nombre décimal fini écrit `-?(0\|[1-9][0-9]*)(\.[0-9]+)?` : la forme d'un entier, puis un point et au moins un chiffre, facultatifs. Ni signe plus, ni zéro initial, ni exposant, ni point seul, ni zéro avec un signe moins (`-0`, `-0.0` et `-0.000` sont refusés ; `-0.5` est accepté), 64 caractères au plus. Écrivez une valeur par défaut ou une borne sous forme de chaîne (`"0.00001"`) : un outil qui remet en forme le JSON peut réécrire le nombre `0.00001` en `1e-5`, ce qui est refusé |
 | `bool` | Activé ou désactivé. Une valeur vide est désactivée |
 | `hostname` | Un nom d'hôte valide, sans espace avant ni après |
 | `ipaddress` | Une adresse IPv4 ou IPv6 (chiffres hexadécimaux, deux-points et queue pointée facultative), sans identifiant de zone (`%`), sans crochets et sans espace avant ni après |
@@ -613,7 +613,11 @@ l'utilisateur l'efface, la valeur par défaut est utilisée.
 Les éléments d'un interrupteur (`whenTrue` et `whenFalse`) n'ont pas de liste
 imbriquée autour d'eux qui puisse être omise : un champ utilisé là doit être
 obligatoire ou doté d'une valeur par défaut. Un champ facultatif sans valeur par
-défaut y est refusé.
+défaut y est refusé. Un champ obligatoire, ou `{Host}` ou `{Port}`, qui n'est
+utilisé que dans les éléments de la branche d'un interrupteur qui n'est pas
+active (par exemple dans `whenFalse` alors que l'interrupteur est activé) reste
+obligatoire à l'exécution : sa valeur, ou la session, doit être fournie quel que
+soit l'état de l'interrupteur.
 
 Un champ `bool` se place dans `arguments` comme un élément isolé entier
 (`"{in:details}"`) et se développe en éléments de son `whenTrue` quand il est
@@ -647,8 +651,9 @@ première partie de 2 à 8 lettres, puis des parties de 1 à 8 lettres ou chiffr
 `description`, `fieldLabels` et `fieldHints`, les deux dernières étant des tables
 qui associent un nom de champ à un libellé traduit et à une aide traduite.
 Heimdall utilise l'entrée dont la balise est la langue de l'interface, sinon la
-première entrée de même langue principale, sinon les textes anglais de la
-recette. L'outil ouvert montre le nom, la description, les libellés et les aides
+première entrée de même langue principale (la première balise dans l'ordre
+alphabétique, sans tenir compte de la casse : `fr-BE` vient avant `fr-CA`, quel
+que soit l'ordre dans le fichier), sinon les textes anglais de la recette. L'outil ouvert montre le nom, la description, les libellés et les aides
 des champs traduits (un champ sans aide traduite montre le `hint` écrit dans le
 champ) ; le titre de l'onglet dans la barre d'onglets, les listes d'outils, la
 recherche et les Paramètres montrent le nom écrit dans la recette. Une
@@ -753,8 +758,8 @@ connues.
 - Un marqueur est inconnu ou mal formé, ne nomme aucun champ, ou un champ
   facultatif se trouve seul dans un élément (placez-le dans une liste
   imbriquée) ; un interrupteur est mêlé à d'autre texte.
-- Le texte fixe (le programme, un élément, un élément de `whenTrue`, une valeur
-  par défaut, un choix) contient deux séparateurs de suite (une double barre
+- Le texte fixe (le programme, un élément, un élément de `whenTrue` ou de
+  `whenFalse`, une valeur par défaut, un choix) contient deux séparateurs de suite (une double barre
   oblique inverse, une double barre oblique, ou une barre oblique inverse à côté
   d'une barre oblique, dans un sens ou dans l'autre : un chemin réseau), `://`
   (une URL), le préfixe de chemin système (un séparateur, deux points

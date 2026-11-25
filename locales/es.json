@@ -6721,7 +6721,7 @@
   "RecipeErrorInvalidBound": "El l\u00edmite \"{4}\" no es v\u00e1lido para su campo: escriba un entero de 32 bits para un campo entero, o un n\u00famero decimal simple en los dem\u00e1s casos (sin signo m\u00e1s, sin cero inicial, sin exponente).",
   "RecipeErrorMinAboveMax": "El m\u00ednimo {4} es mayor que el m\u00e1ximo {1}.",
   "RecipeErrorDefaultOutOfBounds": "El valor predeterminado \"{4}\" del campo \"{1}\" est\u00e1 fuera del m\u00ednimo y del m\u00e1ximo de ese campo.",
-  "RecipeErrorRequiredWithDefault": "El campo \"{1}\" es obligatorio y tiene un valor predeterminado. Un campo con valor predeterminado nunca queda vac\u00edo (borrarlo usa el valor predeterminado): quite \"required\".",
+  "RecipeErrorRequiredWithDefault": "El campo \"{1}\" tiene un valor predeterminado: no se debe escribir \"required\", ni con true ni con false. Un campo con valor predeterminado nunca queda vac\u00edo (borrarlo usa el valor predeterminado).",
   "RecipeErrorOptionalInputInSwitchArguments": "El campo opcional \"{1}\" se usa en los argumentos de un campo s\u00ed/no. H\u00e1galo obligatorio o d\u00e9le un valor predeterminado.",
   "RecipeErrorStderrMergeWithStructuredOutput": "El error est\u00e1ndar no se puede mezclar con una salida que se muestra como tabla (CSV o JSON). Mant\u00e9ngalo separado.",
   "RecipeErrorCsvSeparatorWithoutCsvOutput": "La propiedad \"csvSeparator\" solo se puede escribir cuando la salida es csv.",

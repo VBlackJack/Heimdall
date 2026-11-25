@@ -289,7 +289,7 @@ internal sealed class RecipeMapper
         string name = RequiredString(view, RecipePath.Name, path);
         RecipeInputType type = RequiredEnum(view, RecipePath.Type, path, RecipeFormat.InputTypeNames, RecipeInputType.String);
         string label = RequiredString(view, RecipePath.Label, path);
-        bool required = ReadRequired(view, path, type);
+        bool required = ReadRequired(view, path, type, name);
         string? defaultValue = ReadDefault(view.Take(RecipePath.Default), RecipePath.Property(path, RecipePath.Default), type);
         string? pattern = OptionalString(view, RecipePath.Pattern, path);
         int? maxLength = OptionalNullableInt(view, RecipePath.MaxLength, path);
@@ -314,19 +314,29 @@ internal sealed class RecipeMapper
     /// Reads <c>required</c>. A <c>bool</c> input never takes it, whatever its value: only the mapper can see
     /// that the property was written, since a missing one and <c>false</c> look the same afterwards.
     /// </summary>
-    private bool ReadRequired(View view, string path, RecipeInputType type)
+    private bool ReadRequired(View view, string path, RecipeInputType type, string name)
     {
         JsonNode? node = view.Peek(RecipePath.Required);
         bool required = OptionalBool(view, RecipePath.Required, path);
-        if (node is null || type != RecipeInputType.Bool)
+        if (node is null)
             return required;
 
-        _errors.Add(new RecipeError(
-            RecipeErrorCode.PropertyNotAllowedForType,
-            node.Position,
-            RecipePath.Property(path, RecipePath.Required),
-            Fragment: RecipePath.Required));
-        return false;
+        string requiredPath = RecipePath.Property(path, RecipePath.Required);
+        if (type == RecipeInputType.Bool)
+        {
+            _errors.Add(new RecipeError(RecipeErrorCode.PropertyNotAllowedForType, node.Position, requiredPath, Fragment: RecipePath.Required));
+            return false;
+        }
+
+        // A field with a default is never left empty, so "required" says nothing, whether it is true or false:
+        // only the reader can see that the property was written next to a default.
+        if (view.Peek(RecipePath.Default) is not null)
+        {
+            _errors.Add(new RecipeError(RecipeErrorCode.RequiredWithDefault, node.Position, requiredPath, Name: RecipeText.MakeSafe(name)));
+            return false;
+        }
+
+        return required;
     }
 
     /// <summary>Reads a <c>min</c> or <c>max</c>: a JSON number or a string, kept exactly as written.</summary>

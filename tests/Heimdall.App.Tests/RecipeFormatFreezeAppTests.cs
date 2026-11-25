@@ -76,8 +76,8 @@ public sealed class RecipeFormatFreezeAppTests
 
     [Theory]
     [InlineData("en", "required", "optional", "always sent")]
-    [InlineData("fr", "required", "optional", "toujours envoy\u00e9")]
-    [InlineData("es", "required", "optional", "siempre enviado")]
+    [InlineData("fr", "obligatoire", "facultatif", "toujours envoy\u00e9")]
+    [InlineData("es", "obligatorio", "opcional", "siempre enviado")]
     public async Task ThreeKindsOfFieldHaveThreeWords(string locale, string required, string optional, string always)
     {
         byte[] bytes = RecipeImportFiles.Bytes(
@@ -89,17 +89,46 @@ public sealed class RecipeFormatFreezeAppTests
         string r = Assert.Single(lines, line => line.Contains("Label r", StringComparison.Ordinal));
         string o = Assert.Single(lines, line => line.Contains("Label o", StringComparison.Ordinal));
         string d = Assert.Single(lines, line => line.Contains("Label d", StringComparison.Ordinal));
-        string[] words = locale == "en" ? [required, optional, always] : [string.Empty, string.Empty, always];
-        Assert.Contains(words[2], d, StringComparison.Ordinal);
-        Assert.DoesNotContain(words[2], r, StringComparison.Ordinal);
-        Assert.DoesNotContain(words[2], o, StringComparison.Ordinal);
-        if (locale == "en")
+        string[] words = [required, optional, always];
+        Assert.Equal(3, words.Distinct(StringComparer.Ordinal).Count());
+
+        // Each field carries its own word and neither of the two others.
+        string[][] lineOf = [[r], [o], [d]];
+        for (int field = 0; field < 3; field++)
         {
-            Assert.Contains("required", r, StringComparison.Ordinal);
-            Assert.Contains("optional", o, StringComparison.Ordinal);
-            Assert.DoesNotContain("optional", d, StringComparison.Ordinal);
-            Assert.DoesNotContain("required", d, StringComparison.Ordinal);
+            for (int word = 0; word < 3; word++)
+            {
+                if (field == word)
+                {
+                    Assert.Contains(words[word], lineOf[field][0], StringComparison.Ordinal);
+                }
+                else
+                {
+                    Assert.DoesNotContain(words[word], lineOf[field][0], StringComparison.Ordinal);
+                }
+            }
         }
+    }
+
+    [Fact]
+    public void ForAFrenchInterfaceTheFirstTagInAlphabeticalOrderWinsWhateverTheOrderInTheFile()
+    {
+        static RecipeTranslation Named(string name) => new(name, null, new Dictionary<string, string>());
+        Recipe canadianFirst = RecipeBuilders.Recipe(labels: new Dictionary<string, RecipeTranslation>
+        {
+            ["fr-CA"] = Named("Canada"),
+            ["fr-BE"] = Named("Belgique"),
+        });
+        Recipe belgianFirst = RecipeBuilders.Recipe(labels: new Dictionary<string, RecipeTranslation>
+        {
+            ["fr-BE"] = Named("Belgique"),
+            ["fr-CA"] = Named("Canada"),
+        });
+
+        Assert.Equal("Belgique", RecipeToolText.Resolve(canadianFirst, "fr").Name);
+        Assert.Equal("Belgique", RecipeToolText.Resolve(belgianFirst, "fr").Name);
+        Assert.Equal("Belgique", RecipeToolText.Resolve(canadianFirst, "fr-FR").Name);
+        Assert.Equal("Canada", RecipeToolText.Resolve(canadianFirst, "fr-CA").Name);
     }
 
     [Theory]

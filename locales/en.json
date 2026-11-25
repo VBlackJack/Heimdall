@@ -6721,7 +6721,7 @@
   "RecipeErrorInvalidBound": "The bound \"{4}\" is not valid for its field: write a whole number within 32 bits for a whole-number field, or a plain decimal number otherwise (no plus sign, no leading zero, no exponent).",
   "RecipeErrorMinAboveMax": "The minimum {4} is above the maximum {1}.",
   "RecipeErrorDefaultOutOfBounds": "The default \"{4}\" of the field \"{1}\" is outside the minimum and maximum of that field.",
-  "RecipeErrorRequiredWithDefault": "The field \"{1}\" is required and has a default. A field with a default is never left empty (clearing it uses the default), so remove \"required\".",
+  "RecipeErrorRequiredWithDefault": "The field \"{1}\" has a default, so \"required\" must not be written, whether it is true or false. A field with a default is never left empty (clearing it uses the default).",
   "RecipeErrorOptionalInputInSwitchArguments": "The optional field \"{1}\" is used in the arguments of a yes/no field. Make it required or give it a default.",
   "RecipeErrorStderrMergeWithStructuredOutput": "Standard error cannot be mixed into an output that is shown as a table (CSV or JSON). Keep it separate.",
   "RecipeErrorCsvSeparatorWithoutCsvOutput": "The property \"csvSeparator\" can only be written when the output is csv.",

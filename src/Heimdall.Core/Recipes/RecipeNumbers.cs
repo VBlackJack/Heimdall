@@ -20,9 +20,10 @@ namespace Heimdall.Core.Recipes;
 
 /// <summary>
 /// The one strict form of the numbers of the format, for typed values, defaults, fixed values and
-/// bounds: an <c>int</c> is <c>-?(0|[1-9][0-9]*)</c> within 32 bits, a <c>number</c> is
+/// bounds: an <c>int</c> is <c>0</c> or <c>-?[1-9][0-9]*</c> within 32 bits, a <c>number</c> is
 /// <c>-?(0|[1-9][0-9]*)(\.[0-9]+)?</c> and finite. No leading plus, no leading zero, no exponent, no
-/// bare dot, no white space, no digit other than <c>0</c> to <c>9</c>.
+/// bare dot, no white space, no digit other than <c>0</c> to <c>9</c>, and no zero with a minus sign
+/// (<c>-0</c>, <c>-0.0</c>).
 /// </summary>
 internal static class RecipeNumbers
 {
@@ -30,12 +31,15 @@ internal static class RecipeNumbers
 
     private const char Dot = '.';
 
+    private const string NegativeZeroPrefix = "-0";
+
     /// <summary>True when the text has the strict integer form and fits in 32 bits.</summary>
     public static bool TryParseInt(string? text, out int value)
     {
         value = 0;
         return text is not null
             && text.Length <= RecipeLimits.MaxNumericValueLength
+            && !text.StartsWith(NegativeZeroPrefix, StringComparison.Ordinal)
             && ScanInteger(text, 0, out int end)
             && end == text.Length
             && int.TryParse(text, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out value);
@@ -54,14 +58,18 @@ internal static class RecipeNumbers
                 return false;
         }
 
+        // A zero with a minus sign is refused: "-0", "-0.0", "-0.000". A negative number that is not zero is not.
+        if (text[0] == Minus && text.All(c => c is Minus or '0' or Dot))
+            return false;
+
         return double.TryParse(text, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out value)
             && double.IsFinite(value);
     }
 
     /// <summary>
     /// Compares two texts that are both in the strict decimal form, exactly, as decimals: the sign, then the
-    /// integer digits, then the fraction digits. Trailing zeros of the fraction do not matter and <c>-0</c> equals
-    /// <c>0</c>. Returns a negative number, zero or a positive number as <paramref name="left"/> is below, equal to
+    /// integer digits, then the fraction digits. Trailing zeros of the fraction do not matter. A zero with a minus
+    /// sign is not a valid text, but is read as zero here. Returns a negative number, zero or a positive number as <paramref name="left"/> is below, equal to
     /// or above <paramref name="right"/>.
     /// </summary>
     public static int CompareDecimal(string left, string right)

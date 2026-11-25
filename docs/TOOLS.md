@@ -516,9 +516,9 @@ Each entry of `inputs` is an object with these properties:
 | `name` | string | yes | A letter, then letters, digits or underscores; at most 32 characters; unique in the recipe. It is what `{in:name}` refers to |
 | `type` | string | yes | `string`, `int`, `number`, `bool`, `hostname`, `ipaddress`, `path` or `choice` |
 | `label` | string | yes | At most 64 characters |
-| `required` | boolean | no | `false` by default. Refused on a `bool` field, whatever its value, since a switch is never empty. Refused together with a `default`: a field with a default is never left empty, because when the user clears it the default is used, so `required` would say nothing |
+| `required` | boolean | no | `false` by default. Refused on a `bool` field, whatever its value, since a switch is never empty. Refused together with a `default`, whatever its value (`true` or `false`): a field with a default is never left empty, because when the user clears it the default is used, so `required` would say nothing |
 | `default` | string, number or boolean | no | A string (any type except `bool`), a number (`int` and `number` only, written as a JSON number or as a string, which means the same) or `true` or `false` (`bool` only). At most 512 characters. Held to the same fixed-text rules as a token, and it must be valid for the type of its field, and inside `min` and `max` when there are some |
-| `min`, `max` | number or string | `int` and `number` only | The lowest and the highest accepted value, each written like a default and each optional. An `int` bound is a 32-bit integer and a `number` bound a decimal number, both in the strict forms below. `min` above `max` is refused. A value outside the range is refused at run time, and so is a default outside it at import. A `number` is compared exactly, as a decimal: the sign, then the integer digits, then the fraction digits, where trailing zeros of the fraction do not matter and `-0` equals `0` (so `1` and `1.0` are equal, and with a `max` of `1` the value `1.0000000000000001` is refused). No rounding to a double is ever involved, because the program receives the text as typed |
+| `min`, `max` | number or string | `int` and `number` only | The lowest and the highest accepted value, each written like a default and each optional. An `int` bound is a 32-bit integer and a `number` bound a decimal number, both in the strict forms below. `min` above `max` is refused. A value outside the range is refused at run time, and so is a default outside it at import. A `number` is compared exactly, as a decimal: the sign, then the integer digits, then the fraction digits, where trailing zeros of the fraction do not matter (so `1` and `1.0` are equal, and with a `max` of `1` the value `1.0000000000000001` is refused). No rounding to a double is ever involved, because the program receives the text as typed |
 | `hint` | string | no | A help text shown under the field and read by assistive technologies. At most 200 characters, with no control character, no invisible formatting character and no line break |
 | `pattern` | string | `string` only | A regular expression that the whole value must match; at most 256 characters. A value for which the match lasts more than 250 ms is refused |
 | `maxLength` | integer | `string` only | From 1 to 1024. 256 when absent |
@@ -538,8 +538,8 @@ What each type accepts at run time:
 | Type | Accepts |
 |---|---|
 | `string` | Any text within `maxLength` that matches `pattern` when there is one |
-| `int` | A 32-bit integer written `-?(0\|[1-9][0-9]*)`: an optional minus sign, then `0` or digits with no leading zero. No plus sign, no exponent, no space |
-| `number` | A finite decimal number written `-?(0\|[1-9][0-9]*)(\.[0-9]+)?`: the form of an integer, then an optional dot and at least one digit. No plus sign, no leading zero, no exponent, no bare dot, at most 64 characters |
+| `int` | A 32-bit integer written `0` or `-?[1-9][0-9]*`: `0`, or digits with no leading zero and an optional minus sign. No plus sign, no exponent, no space, and no zero with a minus sign (`-0` is refused) |
+| `number` | A finite decimal number written `-?(0\|[1-9][0-9]*)(\.[0-9]+)?`: the form of an integer, then an optional dot and at least one digit. No plus sign, no leading zero, no exponent, no bare dot, and no zero with a minus sign (`-0`, `-0.0` and `-0.000` are refused; `-0.5` is fine), at most 64 characters. Write a default or a bound as a string (`"0.00001"`): a tool that reformats JSON may rewrite the number `0.00001` as `1e-5`, which is refused |
 | `bool` | On or off. A blank value is off |
 | `hostname` | A valid host name, with no space before or after |
 | `ipaddress` | An IPv4 address or an IPv6 address (hexadecimal digits, colons and an optional dotted tail), with no zone id (`%`), no brackets and no space before or after |
@@ -576,7 +576,11 @@ the default is used.
 
 The tokens of a switch (`whenTrue` and `whenFalse`) have no nested list around
 them to be dropped, so a field used there must be required or carry a default.
-An optional field without a default is refused there.
+An optional field without a default is refused there. A required field, or
+`{Host}` or `{Port}`, that is used only in the tokens of the branch of a switch
+that is not active (for example in `whenFalse` while the switch is on) is still
+required at run time: its value, or the session, must be given whatever the
+state of the switch.
 
 A `bool` field is placed in `arguments` as a whole bare token (`"{in:details}"`)
 and expands to its `whenTrue` tokens when it is on and to its `whenFalse` tokens
@@ -605,8 +609,9 @@ to 8 letters, then parts of 1 to 8 letters or digits, 35 characters at most) to
 an object with the optional properties `name`, `description`, `fieldLabels` and
 `fieldHints`, the last two being maps from a field name to a translated label
 and to a translated hint. Heimdall uses the entry whose tag is the language of
-the interface, else the first entry with the same primary language, else the
-English texts of the recipe. The open tool shows the translated name,
+the interface, else the first entry with the same primary language (the first
+tag in alphabetical order, case-insensitive: `fr-BE` comes before `fr-CA`
+whatever the order in the file), else the English texts of the recipe. The open tool shows the translated name,
 description, field labels and field hints (a field without a translated hint
 shows the `hint` written in the field); the title of the tab in the strip, the
 tool lists, the search and Settings show the name written in the recipe. A
@@ -699,7 +704,8 @@ each with its line and column when it is known.
 - A placeholder is unknown or malformed, names no field, or an optional field
   stands alone in a token (put it in a nested list); a switch is mixed with
   other text.
-- The fixed text (the program, a token, a `whenTrue` token, a default, a choice)
+- The fixed text (the program, a token, a `whenTrue` or `whenFalse` token, a
+  default, a choice)
   holds two separators in a row (a double backslash, a double slash, or a
   backslash next to a slash in either order: a network path), `://` (a URL), the
   system path prefix (a separator, two question marks and a separator), a `%`

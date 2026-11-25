@@ -75,7 +75,7 @@ public sealed class RecipeFormatFreezeTests
 
     [Theory]
     [InlineData("0", true)]
-    [InlineData("-0", true)]
+    [InlineData("-0", false)]
     [InlineData("7", true)]
     [InlineData("-12", true)]
     [InlineData("2147483647", true)]
@@ -102,7 +102,10 @@ public sealed class RecipeFormatFreezeTests
 
     [Theory]
     [InlineData("0", true)]
-    [InlineData("-0", true)]
+    [InlineData("-0", false)]
+    [InlineData("-0.0", false)]
+    [InlineData("-0.000", false)]
+    [InlineData("-0.0001", true)]
     [InlineData("1.5", true)]
     [InlineData("-0.25", true)]
     [InlineData("10.50", true)]
@@ -273,7 +276,69 @@ public sealed class RecipeFormatFreezeTests
     {
         Valid($"[{Input("a", "string", ",\"default\":\"x\"")}]", "[\"{in:a}\"]");
         Valid($"[{Input("a", "string", ",\"required\":true")}]", "[\"{in:a}\"]");
-        Valid($"[{Input("a", "string", ",\"required\":false,\"default\":\"x\"")}]", "[\"{in:a}\"]");
+    }
+
+    [Theory]
+    [InlineData("true")]
+    [InlineData("false")]
+    public void RequiredNextToADefaultIsRefusedWhateverItsValue(string value)
+    {
+        IReadOnlyList<RecipeError> errors = Refused(
+            $"[{Input("a", "string", ",\"required\":" + value + ",\"default\":\"x\"")}]",
+            "[\"{in:a}\"]");
+
+        RecipeError error = Assert.Single(errors);
+        Assert.Equal(RecipeErrorCode.RequiredWithDefault, error.Code);
+        Assert.Equal("inputs[0].required", error.Path);
+        Assert.NotNull(error.Position);
+    }
+
+    [Fact]
+    public void ARecipeBuiltByHandWithTheFlagAndADefaultIsRefusedByTheValidator()
+    {
+        RecipeInput input = RecipeTestData.Input("a", RecipeInputType.String, required: true, defaultValue: "x");
+
+        Assert.Contains(RecipeErrorCode.RequiredWithDefault, RecipeTestData.Codes(RecipeTestData.Using(input)));
+    }
+
+    [Theory]
+    [InlineData("int", "\"-0\"")]
+    [InlineData("number", "\"-0.0\"")]
+    [InlineData("number", "\"-0.000\"")]
+    public void AZeroWithAMinusSignIsRefusedAsADefaultAndAsABound(string type, string written)
+    {
+        IReadOnlyList<RecipeError> asDefault = Refused($"[{Input("n", type, ",\"default\":" + written)}]", "[\"--n={in:n}\"]");
+        IReadOnlyList<RecipeError> asBound = Refused($"[{Input("n", type, ",\"max\":" + written)}]", "[[\"-n\", \"{in:n}\"]]");
+
+        Assert.Equal(RecipeErrorCode.InvalidDefault, Assert.Single(asDefault).Code);
+        Assert.Equal(RecipeErrorCode.InvalidBound, Assert.Single(asBound).Code);
+    }
+
+    [Theory]
+    [InlineData("\"-0.5\"")]
+    [InlineData("\"-0.0001\"")]
+    public void ANegativeNumberThatIsNotZeroIsStillAccepted(string written)
+    {
+        Valid($"[{Input("n", "number", ",\"default\":" + written)}]", "[\"--n={in:n}\"]");
+    }
+
+    [Theory]
+    [InlineData("\" \"")]
+    [InlineData("\"   \"")]
+    [InlineData("\"\"")]
+    public void ABlankDefaultIsRefusedAsEmpty(string written)
+    {
+        IReadOnlyList<RecipeError> errors = Refused($"[{Input("a", "string", ",\"default\":" + written)}]", "[[\"--a\", \"{in:a}\"]]");
+
+        Assert.Contains(errors, error => error.Code == RecipeErrorCode.EmptyValue && error.Path == "inputs[0].default");
+    }
+
+    [Fact]
+    public void ABlankDefaultBuiltByHandIsRefusedByTheValidator()
+    {
+        RecipeInput input = RecipeTestData.Input("a", RecipeInputType.String, defaultValue: "  ");
+
+        Assert.Contains(RecipeErrorCode.EmptyValue, RecipeTestData.Codes(RecipeTestData.Using(input)));
     }
 
     [Fact]
