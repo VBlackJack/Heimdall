@@ -28,8 +28,9 @@ internal static class RecipePath
     public const string Author = "author";
     public const string Name = "name";
     public const string Description = "description";
-    public const string Labels = "labels";
-    public const string Fields = "fields";
+    public const string Translations = "translations";
+    public const string FieldLabels = "fieldLabels";
+    public const string FieldHints = "fieldHints";
     public const string Program = "program";
     public const string Arguments = "arguments";
     public const string Inputs = "inputs";
@@ -39,6 +40,7 @@ internal static class RecipePath
     public const string SuccessExitCodes = "successExitCodes";
     public const string TimeoutSeconds = "timeoutSeconds";
     public const string Icon = "icon";
+    public const string CsvSeparator = "csvSeparator";
     public const string Type = "type";
     public const string Label = "label";
     public const string Required = "required";
@@ -47,6 +49,10 @@ internal static class RecipePath
     public const string MaxLength = "maxLength";
     public const string Choices = "choices";
     public const string WhenTrue = "whenTrue";
+    public const string WhenFalse = "whenFalse";
+    public const string Min = "min";
+    public const string Max = "max";
+    public const string Hint = "hint";
 
     public static string Property(string parent, string name)
     {

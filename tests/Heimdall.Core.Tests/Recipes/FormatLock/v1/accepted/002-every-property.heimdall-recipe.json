@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "id": "lock.every-property",
+  "version": "2.3.4-rc.1+build.7",
+  "author": "Lock Labs",
+  "name": "Every property",
+  "description": "Uses every property of the format once.",
+  "translations": {
+    "fr": {
+      "name": "Toutes les proprietes",
+      "description": "Utilise chaque propriete du format.",
+      "fieldLabels": { "count": "Nombre", "target": "Cible" },
+      "fieldHints": { "count": "Entre 1 et 9.", "target": "Un nom d'hote." }
+    }
+  },
+  "program": "ping.exe",
+  "arguments": [
+    "-n",
+    "{in:count}",
+    "{in:verbose}",
+    "{in:mode}",
+    ["--pattern", "{in:code}"],
+    ["--ratio", "{in:ratio}"],
+    ["--addr", "{in:addr}"],
+    ["--dir", "{in:dir}"],
+    "{in:target}",
+    ["-p", "{Port}"]
+  ],
+  "inputs": [
+    { "name": "target", "type": "hostname", "label": "Target", "required": true, "hint": "A host name." },
+    { "name": "count", "type": "int", "label": "Count", "default": 4, "min": 1, "max": 9, "hint": "Between 1 and 9." },
+    { "name": "verbose", "type": "bool", "label": "Verbose", "default": true, "whenTrue": ["-v", "-d"], "whenFalse": ["-q"], "hint": "More detail." },
+    { "name": "mode", "type": "choice", "label": "Mode", "choices": ["fast", "slow"], "default": "fast" },
+    { "name": "code", "type": "string", "label": "Code", "pattern": "[a-z]+", "maxLength": 20 },
+    { "name": "ratio", "type": "number", "label": "Ratio", "min": 0.5, "max": "2.5" },
+    { "name": "addr", "type": "ipaddress", "label": "Address" },
+    { "name": "dir", "type": "path", "label": "Folder" }
+  ],
+  "output": "csv",
+  "outputEncoding": "ansi",
+  "stderr": "separate",
+  "csvSeparator": "semicolon",
+  "successExitCodes": [0, 1],
+  "timeoutSeconds": 45,
+  "icon": "network"
+}

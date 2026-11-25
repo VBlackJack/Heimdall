@@ -36,7 +36,7 @@ public sealed class RecipeOnScreenSampleTests
           "program": "ping.exe",
           "arguments": ["-n", "1", "{in:target}"],
           "inputs": [
-            { "name": "target", "type": "string", "label": "Address to ping", "required": true, "default": "127.0.0.1" }
+            { "name": "target", "type": "string", "label": "Address to ping", "default": "127.0.0.1" }
           ],
           "output": "text",
           "outputEncoding": "oem",

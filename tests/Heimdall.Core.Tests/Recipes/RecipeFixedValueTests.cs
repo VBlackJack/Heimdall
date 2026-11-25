@@ -109,7 +109,7 @@ public sealed class RecipeFixedValueTests
     {
         RecipeParseResult result = Parse(
             "[\"{in:record}\"]",
-            "[{\"name\":\"record\",\"type\":\"choice\",\"label\":\"Record\",\"required\":true,\"choices\":[\"A\",\"AAAA\"],\"default\":\"A\"}]");
+            "[{\"name\":\"record\",\"type\":\"choice\",\"label\":\"Record\",\"choices\":[\"A\",\"AAAA\"],\"default\":\"A\"}]");
 
         Assert.True(result.Succeeded);
     }

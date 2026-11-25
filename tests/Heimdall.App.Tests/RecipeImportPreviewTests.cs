@@ -123,12 +123,12 @@ public sealed class RecipeImportPreviewTests
     {
         byte[] bytes = RecipeImportFiles.Bytes(
             argumentsJson: "[\"{in:count}\", \"{in:mode}\"]",
-            inputsJson: "[{\"name\":\"count\",\"type\":\"int\",\"label\":\"Count\",\"required\":true,\"default\":\"4\"},"
+            inputsJson: "[{\"name\":\"count\",\"type\":\"int\",\"label\":\"Count\",\"default\":\"4\"},"
                 + "{\"name\":\"mode\",\"type\":\"choice\",\"label\":\"Mode\",\"required\":true,\"choices\":[\"fast\",\"slow\"]}]");
 
         string text = RecipeImportPreview.Compose(await EnglishAsync(), PlanOf(bytes));
 
-        Assert.Contains("  count: Count (type: whole number, required, default: 4)", text, StringComparison.Ordinal);
+        Assert.Contains("  count: Count (type: whole number, optional, default: 4)", text, StringComparison.Ordinal);
         Assert.Contains("  mode: Mode (type: one value of a list, required, choices: fast, slow)", text, StringComparison.Ordinal);
     }
 
@@ -310,7 +310,7 @@ public sealed class RecipeImportPreviewTests
             PlanOf(
                 RecipeImportFiles.Bytes(
                     version: "1.1.0",
-                    argumentsJson: "[\"-n\", \"9\", \"{Host}\"]",
+                    argumentsJson: "[\"-n\", \"9\", \"{Host}\", [\"-w\", \"{in:w}\"]]",
                     inputsJson: "[{\"name\":\"w\",\"type\":\"int\",\"label\":\"W\",\"required\":false}]"),
                 existing: existing,
                 previous: old.Recipe));
@@ -353,12 +353,14 @@ public sealed class RecipeImportPreviewTests
 
     private const string TargetField = "[{\"name\":\"target\",\"type\":\"string\",\"label\":\"Target\",\"required\":false}]";
 
-    private const string TwoLanguages = "{\"fr\": {\"name\": \"Sonde\", \"description\": \"Sonde l'h\\u00f4te.\", \"fields\": {\"target\": \"Cible\"}}, \"es-MX\": {\"name\": \"Sonda\"}}";
+    private const string TargetArguments = "[\"-n\", [\"-t\", \"{in:target}\"]]";
+
+    private const string TwoLanguages = "{\"fr\": {\"name\": \"Sonde\", \"description\": \"Sonde l'h\\u00f4te.\", \"fieldLabels\": {\"target\": \"Cible\"}}, \"es-MX\": {\"name\": \"Sonda\"}}";
 
     [Fact]
     public async Task EveryTranslationIsListedAfterTheFieldsWithItsLanguageNameDescriptionAndFieldLabels()
     {
-        byte[] bytes = RecipeImportFiles.Bytes(inputsJson: TargetField, labelsJson: TwoLanguages);
+        byte[] bytes = RecipeImportFiles.Bytes(argumentsJson: TargetArguments, inputsJson: TargetField, labelsJson: TwoLanguages);
 
         string text = RecipeImportPreview.Compose(await EnglishAsync(), PlanOf(bytes));
         string[] lines = Lines(text);
@@ -418,11 +420,11 @@ public sealed class RecipeImportPreviewTests
     [Fact]
     public async Task AReplacementWithTheSameParsedRecipeSaysEveryPropertyIsUnchanged()
     {
-        byte[] before = RecipeImportFiles.Bytes(inputsJson: TargetField, labelsJson: TwoLanguages);
+        byte[] before = RecipeImportFiles.Bytes(argumentsJson: TargetArguments, inputsJson: TargetField, labelsJson: TwoLanguages);
         // Same recipe, other bytes: the translations are written in the other order.
         byte[] after = RecipeImportFiles.Bytes(
-            inputsJson: TargetField,
-            labelsJson: "{\"es-MX\": {\"name\": \"Sonda\"}, \"fr\": {\"fields\": {\"target\": \"Cible\"}, \"description\": \"Sonde l'h\\u00f4te.\", \"name\": \"Sonde\"}}");
+            argumentsJson: TargetArguments, inputsJson: TargetField,
+            labelsJson: "{\"es-MX\": {\"name\": \"Sonda\"}, \"fr\": {\"fieldLabels\": {\"target\": \"Cible\"}, \"description\": \"Sonde l'h\\u00f4te.\", \"name\": \"Sonde\"}}");
 
         Assert.Empty(await ChangedPropertiesAsync(before, after));
     }
@@ -442,18 +444,18 @@ public sealed class RecipeImportPreviewTests
     [Fact]
     public async Task AChangedTranslationIsTheOnlyLineThatSaysChanged()
     {
-        byte[] before = RecipeImportFiles.Bytes(inputsJson: TargetField, labelsJson: TwoLanguages);
+        byte[] before = RecipeImportFiles.Bytes(argumentsJson: TargetArguments, inputsJson: TargetField, labelsJson: TwoLanguages);
 
         Assert.Equal(
             ["Translations"],
-            await ChangedPropertiesAsync(before, RecipeImportFiles.Bytes(inputsJson: TargetField, labelsJson: "{\"fr\": {\"name\": \"Sonde\"}}")));
+            await ChangedPropertiesAsync(before, RecipeImportFiles.Bytes(argumentsJson: TargetArguments, inputsJson: TargetField, labelsJson: "{\"fr\": {\"name\": \"Sonde\"}}")));
         Assert.Equal(
             ["Translations"],
             await ChangedPropertiesAsync(
                 before,
                 RecipeImportFiles.Bytes(
-                    inputsJson: TargetField,
-                    labelsJson: "{\"fr\": {\"name\": \"Sonde\", \"description\": \"Sonde l'h\\u00f4te.\", \"fields\": {\"target\": \"But\"}}, \"es-MX\": {\"name\": \"Sonda\"}}")));
+                    argumentsJson: TargetArguments, inputsJson: TargetField,
+                    labelsJson: "{\"fr\": {\"name\": \"Sonde\", \"description\": \"Sonde l'h\\u00f4te.\", \"fieldLabels\": {\"target\": \"But\"}}, \"es-MX\": {\"name\": \"Sonda\"}}")));
         Assert.Equal(
             ["Translations"],
             await ChangedPropertiesAsync(RecipeImportFiles.Bytes(), RecipeImportFiles.Bytes(labelsJson: "{\"fr\": {\"name\": \"Sonde\"}}")));
@@ -491,7 +493,7 @@ public sealed class RecipeImportPreviewTests
     [Fact]
     public async Task TheNewPropertyLinesAndTheTranslationsAreWordedInTheThreeLanguages()
     {
-        byte[] bytes = RecipeImportFiles.Bytes(inputsJson: TargetField, labelsJson: TwoLanguages);
+        byte[] bytes = RecipeImportFiles.Bytes(argumentsJson: TargetArguments, inputsJson: TargetField, labelsJson: TwoLanguages);
         foreach (string locale in new[] { "fr", "es" })
         {
             LocalizationManager localizer = new();
@@ -500,7 +502,7 @@ public sealed class RecipeImportPreviewTests
             string text = RecipeImportPreview.Compose(localizer, PlanOf(bytes, existing: ExistingEntry, previous: PlanOf(RecipeImportFiles.Bytes()).Recipe));
 
             Assert.DoesNotContain("RecipeImportReplace", text, StringComparison.Ordinal);
-            Assert.DoesNotContain("RecipeImportPreviewLabels", text, StringComparison.Ordinal);
+            Assert.DoesNotContain("RecipeImportPreviewTranslations", text, StringComparison.Ordinal);
         }
     }
 }

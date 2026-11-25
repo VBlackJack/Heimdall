@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "id": "lock.sample",
+  "version": "1.0.0",
+  "author": "Lock",
+  "name": "Sample",
+  "description": "A sample of the version 1 format.",
+  "program": "ping.exe",
+  "arguments": ["--n={in:n}"],
+  "inputs": [
+    { "name": "n", "type": "int", "label": "Label n", "default": "05" }
+  ]
+}

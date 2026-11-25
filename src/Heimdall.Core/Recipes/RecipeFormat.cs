@@ -24,7 +24,10 @@ namespace Heimdall.Core.Recipes;
 /// </summary>
 public static class RecipeFormat
 {
-    /// <summary>The highest <c>schemaVersion</c> this build reads. Any addition to the format bumps it.</summary>
+    /// <summary>
+    /// The highest <c>schemaVersion</c> this build reads. Version 1 is frozen: every file valid today
+    /// keeps loading and keeps its meaning, so a change that would break one needs a new version.
+    /// </summary>
     public const int SupportedSchemaVersion = 1;
 
     /// <summary>The extension of a recipe file.</summary>
@@ -83,6 +86,17 @@ public static class RecipeFormat
         {
             ["utf8"] = RecipeOutputEncoding.Utf8,
             ["oem"] = RecipeOutputEncoding.Oem,
+            ["ansi"] = RecipeOutputEncoding.Ansi,
+            ["utf16le"] = RecipeOutputEncoding.Utf16Le,
+        }.ToFrozenDictionary(StringComparer.Ordinal);
+
+    /// <summary>The file names of the separators of a <c>csv</c> output.</summary>
+    internal static readonly FrozenDictionary<string, RecipeCsvSeparator> CsvSeparatorNames =
+        new Dictionary<string, RecipeCsvSeparator>(StringComparer.Ordinal)
+        {
+            ["comma"] = RecipeCsvSeparator.Comma,
+            ["semicolon"] = RecipeCsvSeparator.Semicolon,
+            ["tab"] = RecipeCsvSeparator.Tab,
         }.ToFrozenDictionary(StringComparer.Ordinal);
 
     /// <summary>The file names of the standard error modes.</summary>

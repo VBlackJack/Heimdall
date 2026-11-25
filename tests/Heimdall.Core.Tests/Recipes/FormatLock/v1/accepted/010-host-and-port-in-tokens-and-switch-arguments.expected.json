@@ -1,0 +1,164 @@
+{
+  "recipe": {
+    "schemaVersion": 1,
+    "id": "lock.sample",
+    "version": "1.0.0",
+    "author": "Lock",
+    "name": "Sample",
+    "description": "A sample of the version 1 format.",
+    "translations": {},
+    "program": "ping.exe",
+    "arguments": [
+      {
+        "group": false,
+        "tokens": [
+          "{Host}"
+        ]
+      },
+      {
+        "group": true,
+        "tokens": [
+          "-p",
+          "{Port}"
+        ]
+      },
+      {
+        "group": false,
+        "tokens": [
+          "--at={Host}:{Port}"
+        ]
+      },
+      {
+        "group": false,
+        "tokens": [
+          "{in:up}"
+        ]
+      }
+    ],
+    "inputs": [
+      {
+        "name": "up",
+        "type": "Bool",
+        "label": "Label up",
+        "required": false,
+        "default": null,
+        "pattern": null,
+        "maxLength": null,
+        "choices": null,
+        "whenTrue": [
+          "--host={Host}",
+          "--port={Port}"
+        ],
+        "whenFalse": [
+          "--peer={Host}:{Port}"
+        ],
+        "min": null,
+        "max": null,
+        "hint": null
+      }
+    ],
+    "output": "Text",
+    "outputEncoding": "Utf8",
+    "stderr": "Separate",
+    "csvSeparator": "Comma",
+    "successExitCodes": [
+      0
+    ],
+    "timeoutSeconds": 60,
+    "icon": null
+  },
+  "expansions": [
+    {
+      "values": {
+        "up": "true"
+      },
+      "host": "example.org",
+      "port": "443",
+      "arguments": [
+        "example.org",
+        "-p",
+        "443",
+        "--at=example.org:443",
+        "--host=example.org",
+        "--port=443"
+      ]
+    },
+    {
+      "values": {
+        "up": "false"
+      },
+      "host": "example.org",
+      "port": "443",
+      "arguments": [
+        "example.org",
+        "-p",
+        "443",
+        "--at=example.org:443",
+        "--peer=example.org:443"
+      ]
+    },
+    {
+      "values": {
+        "up": "false"
+      },
+      "host": "example.org",
+      "port": null,
+      "refusals": [
+        {
+          "reason": "SessionValueMissing",
+          "subject": "Port",
+          "path": "arguments[1][1]"
+        },
+        {
+          "reason": "SessionValueMissing",
+          "subject": "Port",
+          "path": "arguments[2]"
+        },
+        {
+          "reason": "SessionValueMissing",
+          "subject": "Port",
+          "path": "arguments[3]"
+        }
+      ]
+    },
+    {
+      "values": {
+        "up": "true"
+      },
+      "host": null,
+      "port": null,
+      "refusals": [
+        {
+          "reason": "SessionValueMissing",
+          "subject": "Host",
+          "path": "arguments[0]"
+        },
+        {
+          "reason": "SessionValueMissing",
+          "subject": "Port",
+          "path": "arguments[1][1]"
+        },
+        {
+          "reason": "SessionValueMissing",
+          "subject": "Host",
+          "path": "arguments[2]"
+        },
+        {
+          "reason": "SessionValueMissing",
+          "subject": "Port",
+          "path": "arguments[2]"
+        },
+        {
+          "reason": "SessionValueMissing",
+          "subject": "Host",
+          "path": "arguments[3]"
+        },
+        {
+          "reason": "SessionValueMissing",
+          "subject": "Port",
+          "path": "arguments[3]"
+        }
+      ]
+    }
+  ]
+}

@@ -22,20 +22,42 @@ namespace Heimdall.Core.Recipes;
 internal static class RecipeOutputEncodings
 {
     /// <summary>
-    /// UTF-8 without a byte order mark, or the OEM code page of the machine, which is the code page of
-    /// a console child (not the one of the user's culture). The OEM code pages live in the code-pages
-    /// provider on .NET; registering it again is harmless. When the code page cannot be obtained the
+    /// The encoding of a kind: UTF-8 without a byte order mark, UTF-16 little endian, or the OEM or
+    /// the ANSI code page of the machine. The OEM code page is the one of a console child (not the
+    /// one of the user's culture) and the ANSI one is the system code page, both read through a native
+    /// call and never through <see cref="Encoding.Default"/>. The code pages live in the code-pages
+    /// provider on .NET; registering it again is harmless. When a code page cannot be obtained the
     /// result is UTF-8, never an exception.
     /// </summary>
     public static Encoding Resolve(RecipeOutputEncoding kind)
+        => Resolve(kind, RecipeProgramNative.SystemAnsiCodePage(), RecipeProgramNative.OemCodePage());
+
+    /// <summary>The same as <see cref="Resolve(RecipeOutputEncoding)"/>, with the code pages given (0 or less means unknown).</summary>
+    /// <param name="kind">The kind.</param>
+    /// <param name="ansiCodePage">The system ANSI code page.</param>
+    /// <param name="oemCodePage">The OEM code page.</param>
+    public static Encoding Resolve(RecipeOutputEncoding kind, int ansiCodePage, int oemCodePage)
     {
         Encoding utf8 = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
-        if (kind == RecipeOutputEncoding.Utf8)
-            return utf8;
+        return kind switch
+        {
+            RecipeOutputEncoding.Utf8 => utf8,
+            RecipeOutputEncoding.Utf16Le => new UnicodeEncoding(bigEndian: false, byteOrderMark: false),
+            RecipeOutputEncoding.Oem => FromCodePage(oemCodePage, utf8),
+            RecipeOutputEncoding.Ansi => FromCodePage(ansiCodePage, utf8),
+            _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "An output encoding without a mapping."),
+        };
+    }
 
-        int codePage = RecipeProgramNative.OemCodePage();
+    /// <summary>True for the encodings whose output may start with one byte order mark, which is then dropped.</summary>
+    /// <param name="kind">The kind.</param>
+    public static bool StripsLeadingMark(RecipeOutputEncoding kind)
+        => kind is RecipeOutputEncoding.Utf8 or RecipeOutputEncoding.Utf16Le;
+
+    private static Encoding FromCodePage(int codePage, Encoding fallback)
+    {
         if (codePage <= 0)
-            return utf8;
+            return fallback;
 
         try
         {
@@ -44,7 +66,7 @@ internal static class RecipeOutputEncodings
         }
         catch (Exception ex) when (ex is ArgumentException or NotSupportedException)
         {
-            return utf8;
+            return fallback;
         }
     }
 }

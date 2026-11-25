@@ -1,0 +1,69 @@
+{
+  "recipe": {
+    "schemaVersion": 1,
+    "id": "lock.non-ascii",
+    "version": "1.0.0",
+    "author": "Lock",
+    "name": "Caf\u00e9 \u00e0 la cr\u00e8me \u65e5\u672c\u8a9e",
+    "description": "Une description avec des accents : \u00e9, \u00e8, \u00ea, \u00ef, \u00f4, \u00fb, \u00e7 et des signes : \u20ac \u2713",
+    "translations": {
+      "fr": {
+        "name": "\u00c9chantillon \u00e9tendu",
+        "description": null,
+        "fieldLabels": {
+          "a": "Texte \u00e0 saisir"
+        },
+        "fieldHints": {}
+      }
+    },
+    "program": "ping.exe",
+    "arguments": [
+      {
+        "group": true,
+        "tokens": [
+          "--a",
+          "{in:a}"
+        ]
+      }
+    ],
+    "inputs": [
+      {
+        "name": "a",
+        "type": "String",
+        "label": "Label a",
+        "required": false,
+        "default": null,
+        "pattern": null,
+        "maxLength": null,
+        "choices": null,
+        "whenTrue": null,
+        "whenFalse": null,
+        "min": null,
+        "max": null,
+        "hint": "Caf\u00e9 \u00e0 la cr\u00e8me, \u65e5\u672c\u8a9e, \u00fc\u00f1\u00ee"
+      }
+    ],
+    "output": "Text",
+    "outputEncoding": "Utf8",
+    "stderr": "Separate",
+    "csvSeparator": "Comma",
+    "successExitCodes": [
+      0
+    ],
+    "timeoutSeconds": 60,
+    "icon": null
+  },
+  "expansions": [
+    {
+      "values": {
+        "a": "x"
+      },
+      "host": null,
+      "port": null,
+      "arguments": [
+        "--a",
+        "x"
+      ]
+    }
+  ]
+}

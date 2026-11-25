@@ -200,7 +200,7 @@ public sealed class RecipeValidatorTests
     public void TheInputCount_IsCapped()
     {
         RecipeInput[] atCap = [.. Enumerable.Range(0, RecipeLimits.MaxInputs).Select(index => RecipeTestData.Input("i" + index, RecipeInputType.String))];
-        Assert.Empty(RecipeValidator.Validate(RecipeTestData.Minimal() with { Inputs = atCap }));
+        Assert.Empty(RecipeValidator.Validate(RecipeTestData.Using(atCap)));
 
         RecipeInput[] over = [.. atCap, RecipeTestData.Input("extra", RecipeInputType.String)];
         Assert.Contains(RecipeErrorCode.TooMany, RecipeTestData.Codes(RecipeTestData.Minimal() with { Inputs = over }));
@@ -221,7 +221,7 @@ public sealed class RecipeValidatorTests
         {
             Choices = [.. Enumerable.Range(0, RecipeLimits.MaxChoices).Select(index => "v" + index)],
         };
-        Assert.Empty(RecipeValidator.Validate(RecipeTestData.Minimal() with { Inputs = [atCap] }));
+        Assert.Empty(RecipeValidator.Validate(RecipeTestData.Using(atCap)));
 
         RecipeInput tooMany = atCap with { Choices = [.. atCap.Choices!, "extra"] };
         Assert.Contains(RecipeErrorCode.TooMany, RecipeTestData.Codes(RecipeTestData.Minimal() with { Inputs = [tooMany] }));
@@ -254,21 +254,21 @@ public sealed class RecipeValidatorTests
         Assert.Contains(RecipeErrorCode.ValueOutOfRange, RecipeTestData.Codes(RecipeTestData.Minimal() with { Inputs = [huge] }));
 
         RecipeInput max = RecipeTestData.Input("a", RecipeInputType.String) with { MaxLength = RecipeLimits.MaxStringValueLength };
-        Assert.Empty(RecipeValidator.Validate(RecipeTestData.Minimal() with { Inputs = [max] }));
+        Assert.Empty(RecipeValidator.Validate(RecipeTestData.Using(max)));
     }
 
     [Fact]
     public void TheNumberOfLanguages_AndTheirTexts_AreCapped()
     {
-        Dictionary<string, RecipeLabels> languages = Enumerable.Range(0, RecipeLimits.MaxLabelLanguages + 1)
-            .ToDictionary(index => "x" + (char)('a' + index), _ => new RecipeLabels("n", null, new Dictionary<string, string>()));
-        Assert.Contains(RecipeErrorCode.TooMany, RecipeTestData.Codes(RecipeTestData.Minimal() with { Labels = languages }));
+        Dictionary<string, RecipeTranslation> languages = Enumerable.Range(0, RecipeLimits.MaxTranslationLanguages + 1)
+            .ToDictionary(index => "x" + (char)('a' + index), _ => new RecipeTranslation("n", null, new Dictionary<string, string>()));
+        Assert.Contains(RecipeErrorCode.TooMany, RecipeTestData.Codes(RecipeTestData.Minimal() with { Translations = languages }));
 
-        Dictionary<string, RecipeLabels> longName = new() { ["fr"] = new RecipeLabels(new string('n', RecipeLimits.MaxNameLength + 1), null, new Dictionary<string, string>()) };
-        Assert.Contains(RecipeErrorCode.TooLong, RecipeTestData.Codes(RecipeTestData.Minimal() with { Labels = longName }));
+        Dictionary<string, RecipeTranslation> longName = new() { ["fr"] = new RecipeTranslation(new string('n', RecipeLimits.MaxNameLength + 1), null, new Dictionary<string, string>()) };
+        Assert.Contains(RecipeErrorCode.TooLong, RecipeTestData.Codes(RecipeTestData.Minimal() with { Translations = longName }));
 
-        Dictionary<string, RecipeLabels> longDescription = new() { ["fr"] = new RecipeLabels(null, new string('d', RecipeLimits.MaxDescriptionLength + 1), new Dictionary<string, string>()) };
-        Assert.Contains(RecipeErrorCode.TooLong, RecipeTestData.Codes(RecipeTestData.Minimal() with { Labels = longDescription }));
+        Dictionary<string, RecipeTranslation> longDescription = new() { ["fr"] = new RecipeTranslation(null, new string('d', RecipeLimits.MaxDescriptionLength + 1), new Dictionary<string, string>()) };
+        Assert.Contains(RecipeErrorCode.TooLong, RecipeTestData.Codes(RecipeTestData.Minimal() with { Translations = longDescription }));
     }
 
     [Theory]
@@ -282,19 +282,19 @@ public sealed class RecipeValidatorTests
     [InlineData("12", false)]
     public void ALanguageTagMustBeWellFormed(string tag, bool valid)
     {
-        Dictionary<string, RecipeLabels> labels = new() { [tag] = new RecipeLabels("n", null, new Dictionary<string, string>()) };
+        Dictionary<string, RecipeTranslation> labels = new() { [tag] = new RecipeTranslation("n", null, new Dictionary<string, string>()) };
 
-        Assert.Equal(valid, RecipeValidator.Validate(RecipeTestData.Minimal() with { Labels = labels }).Count == 0);
+        Assert.Equal(valid, RecipeValidator.Validate(RecipeTestData.Minimal() with { Translations = labels }).Count == 0);
     }
 
     [Fact]
     public void ALabelForAnInputThatDoesNotExist_IsRefused()
     {
-        Dictionary<string, RecipeLabels> labels = new() { ["fr"] = new RecipeLabels(null, null, new Dictionary<string, string> { ["ghost"] = "Fantome" }) };
+        Dictionary<string, RecipeTranslation> labels = new() { ["fr"] = new RecipeTranslation(null, null, new Dictionary<string, string> { ["ghost"] = "Fantome" }) };
 
-        RecipeError error = Assert.Single(RecipeValidator.Validate(RecipeTestData.Minimal() with { Labels = labels }));
+        RecipeError error = Assert.Single(RecipeValidator.Validate(RecipeTestData.Minimal() with { Translations = labels }));
 
-        Assert.Equal(RecipeErrorCode.UnknownLabelField, error.Code);
+        Assert.Equal(RecipeErrorCode.UnknownTranslationField, error.Code);
         Assert.Equal("ghost", error.Name);
     }
 
@@ -312,12 +312,15 @@ public sealed class RecipeValidatorTests
     }
 
     [Fact]
-    public void AnIcon_MustBeInTheClosedSet()
+    public void AnIcon_MustHaveTheShapeOfAKey_NotBeInAClosedSet()
     {
         Assert.All(RecipeIcons.Keys, key => Assert.Empty(RecipeValidator.Validate(RecipeTestData.Minimal() with { Icon = key })));
 
-        RecipeError error = Assert.Single(RecipeValidator.Validate(RecipeTestData.Minimal() with { Icon = "skull" }));
-        Assert.Equal(RecipeErrorCode.UnknownIcon, error.Code);
+        // Reversed by the format freeze: a key this version has no glyph for is accepted (it shows the default icon).
+        Assert.Empty(RecipeValidator.Validate(RecipeTestData.Minimal() with { Icon = "skull" }));
+
+        RecipeError error = Assert.Single(RecipeValidator.Validate(RecipeTestData.Minimal() with { Icon = "Skull" }));
+        Assert.Equal(RecipeErrorCode.InvalidIconKey, error.Code);
     }
 
     [Fact]
@@ -473,7 +476,7 @@ public sealed class RecipeValidatorTests
 
         RecipeError error = Assert.Single(RecipeValidator.Validate(RecipeTestData.Minimal() with { Inputs = [flag] }));
 
-        Assert.Equal(RecipeErrorCode.UnreferencedBoolInput, error.Code);
+        Assert.Equal(RecipeErrorCode.UnreferencedInput, error.Code);
         Assert.Equal("inputs[0]", error.Path);
     }
 
@@ -482,8 +485,8 @@ public sealed class RecipeValidatorTests
     {
         RecipeInput flag = RecipeTestData.Input("flag", RecipeInputType.Bool);
 
-        Assert.Contains(RecipeErrorCode.MissingWhenTrue, RecipeTestData.Codes(WithInput(flag, RecipeArgument.Bare("{in:flag}"))));
-        Assert.Contains(RecipeErrorCode.MissingWhenTrue, RecipeTestData.Codes(WithInput(flag with { WhenTrue = [] }, RecipeArgument.Bare("{in:flag}"))));
+        Assert.Contains(RecipeErrorCode.MissingSwitchArguments, RecipeTestData.Codes(WithInput(flag, RecipeArgument.Bare("{in:flag}"))));
+        Assert.Contains(RecipeErrorCode.MissingSwitchArguments, RecipeTestData.Codes(WithInput(flag with { WhenTrue = [] }, RecipeArgument.Bare("{in:flag}"))));
     }
 
     [Fact]
@@ -491,7 +494,7 @@ public sealed class RecipeValidatorTests
     {
         RecipeInput text = RecipeTestData.Input("a", RecipeInputType.String) with { WhenTrue = ["-v"] };
 
-        RecipeError error = Assert.Single(RecipeValidator.Validate(RecipeTestData.Minimal() with { Inputs = [text] }));
+        RecipeError error = Assert.Single(RecipeValidator.Validate(RecipeTestData.Using(text)));
 
         Assert.Equal(RecipeErrorCode.PropertyNotAllowedForType, error.Code);
         Assert.Equal("whenTrue", error.Fragment);
@@ -515,7 +518,7 @@ public sealed class RecipeValidatorTests
     {
         RecipeInput a = RecipeTestData.Input("a", RecipeInputType.String, required: true);
 
-        RecipeError error = Assert.Single(RecipeValidator.Validate(RecipeTestData.Minimal() with { Inputs = [a, a] }));
+        RecipeError error = Assert.Single(RecipeValidator.Validate(RecipeTestData.Using(a, a)));
 
         Assert.Equal(RecipeErrorCode.DuplicateInputName, error.Code);
         Assert.Equal("inputs[1].name", error.Path);
@@ -539,7 +542,7 @@ public sealed class RecipeValidatorTests
     {
         RecipeInput number = RecipeTestData.Input("n", RecipeInputType.Int) with { Pattern = "[0-9]+", MaxLength = 5 };
 
-        IReadOnlyList<RecipeError> errors = RecipeValidator.Validate(RecipeTestData.Minimal() with { Inputs = [number] });
+        IReadOnlyList<RecipeError> errors = RecipeValidator.Validate(RecipeTestData.Using(number));
 
         Assert.Equal(2, errors.Count);
         Assert.All(errors, error => Assert.Equal(RecipeErrorCode.PropertyNotAllowedForType, error.Code));
@@ -562,7 +565,7 @@ public sealed class RecipeValidatorTests
     {
         RecipeInput input = RecipeTestData.Input("a", RecipeInputType.String) with { Pattern = "[a-z]{1,8}(-[0-9]+)?" };
 
-        Assert.Empty(RecipeValidator.Validate(RecipeTestData.Minimal() with { Inputs = [input] }));
+        Assert.Empty(RecipeValidator.Validate(RecipeTestData.Using(input)));
     }
 
     [Fact]
@@ -576,11 +579,11 @@ public sealed class RecipeValidatorTests
         Assert.Contains(RecipeErrorCode.DuplicateChoice, RecipeTestData.Codes(RecipeTestData.Minimal() with { Inputs = [duplicated] }));
 
         RecipeInput badDefault = choice with { Choices = ["a", "b"], Default = "c" };
-        RecipeError error = Assert.Single(RecipeValidator.Validate(RecipeTestData.Minimal() with { Inputs = [badDefault] }));
+        RecipeError error = Assert.Single(RecipeValidator.Validate(RecipeTestData.Using(badDefault)));
         Assert.Equal(RecipeErrorCode.InvalidChoiceDefault, error.Code);
 
         RecipeInput good = choice with { Choices = ["a", "b"], Default = "b" };
-        Assert.Empty(RecipeValidator.Validate(RecipeTestData.Minimal() with { Inputs = [good] }));
+        Assert.Empty(RecipeValidator.Validate(RecipeTestData.Using(good)));
     }
 
     [Fact]
@@ -588,7 +591,7 @@ public sealed class RecipeValidatorTests
     {
         RecipeInput text = RecipeTestData.Input("a", RecipeInputType.String) with { Choices = ["x"] };
 
-        RecipeError error = Assert.Single(RecipeValidator.Validate(RecipeTestData.Minimal() with { Inputs = [text] }));
+        RecipeError error = Assert.Single(RecipeValidator.Validate(RecipeTestData.Using(text)));
 
         Assert.Equal(RecipeErrorCode.PropertyNotAllowedForType, error.Code);
         Assert.Equal("choices", error.Fragment);
@@ -611,7 +614,7 @@ public sealed class RecipeValidatorTests
         Recipe recipe = RecipeTestData.Minimal() with
         {
             Inputs = [input],
-            Arguments = type == RecipeInputType.Bool ? [RecipeArgument.Bare("{in:a}")] : [],
+            Arguments = type == RecipeInputType.Bool ? [RecipeArgument.Bare("{in:a}")] : [RecipeArgument.Group(["--a={in:a}"])],
         };
 
         IReadOnlyList<RecipeError> errors = RecipeValidator.Validate(recipe);
@@ -626,7 +629,7 @@ public sealed class RecipeValidatorTests
     {
         RecipeInput input = RecipeTestData.Input("n", RecipeInputType.Int, defaultValue: "-5");
 
-        Assert.Empty(RecipeValidator.Validate(RecipeTestData.Minimal() with { Inputs = [input] }));
+        Assert.Empty(RecipeValidator.Validate(RecipeTestData.Using(input)));
     }
 
     // ---- import refusals: network paths, URLs, environment variables, response files ----

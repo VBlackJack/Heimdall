@@ -1,0 +1,8 @@
+{
+  "errors": [
+    {
+      "code": "InvalidEnumValue",
+      "path": "outputEncoding"
+    }
+  ]
+}

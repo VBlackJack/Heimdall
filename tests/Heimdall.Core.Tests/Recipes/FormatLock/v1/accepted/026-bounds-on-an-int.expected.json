@@ -1,0 +1,118 @@
+{
+  "recipe": {
+    "schemaVersion": 1,
+    "id": "lock.sample",
+    "version": "1.0.0",
+    "author": "Lock",
+    "name": "Sample",
+    "description": "A sample of the version 1 format.",
+    "translations": {},
+    "program": "ping.exe",
+    "arguments": [
+      {
+        "group": false,
+        "tokens": [
+          "--n={in:n}"
+        ]
+      }
+    ],
+    "inputs": [
+      {
+        "name": "n",
+        "type": "Int",
+        "label": "Label n",
+        "required": false,
+        "default": "4",
+        "pattern": null,
+        "maxLength": null,
+        "choices": null,
+        "whenTrue": null,
+        "whenFalse": null,
+        "min": "1",
+        "max": "100",
+        "hint": null
+      }
+    ],
+    "output": "Text",
+    "outputEncoding": "Utf8",
+    "stderr": "Separate",
+    "csvSeparator": "Comma",
+    "successExitCodes": [
+      0
+    ],
+    "timeoutSeconds": 60,
+    "icon": null
+  },
+  "expansions": [
+    {
+      "values": {
+        "n": "1"
+      },
+      "host": null,
+      "port": null,
+      "arguments": [
+        "--n=1"
+      ]
+    },
+    {
+      "values": {
+        "n": "100"
+      },
+      "host": null,
+      "port": null,
+      "arguments": [
+        "--n=100"
+      ]
+    },
+    {
+      "values": {
+        "n": "0"
+      },
+      "host": null,
+      "port": null,
+      "refusals": [
+        {
+          "reason": "OutOfRange",
+          "subject": "n",
+          "path": "arguments[0]"
+        }
+      ]
+    },
+    {
+      "values": {
+        "n": "101"
+      },
+      "host": null,
+      "port": null,
+      "refusals": [
+        {
+          "reason": "OutOfRange",
+          "subject": "n",
+          "path": "arguments[0]"
+        }
+      ]
+    },
+    {
+      "values": {
+        "n": "-7"
+      },
+      "host": null,
+      "port": null,
+      "refusals": [
+        {
+          "reason": "OutOfRange",
+          "subject": "n",
+          "path": "arguments[0]"
+        }
+      ]
+    },
+    {
+      "values": {},
+      "host": null,
+      "port": null,
+      "arguments": [
+        "--n=4"
+      ]
+    }
+  ]
+}

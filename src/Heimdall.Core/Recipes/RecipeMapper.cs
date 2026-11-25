@@ -83,13 +83,14 @@ internal sealed class RecipeMapper
         string author = RequiredString(root, RecipePath.Author, string.Empty);
         string name = RequiredString(root, RecipePath.Name, string.Empty);
         string description = RequiredString(root, RecipePath.Description, string.Empty);
-        IReadOnlyDictionary<string, RecipeLabels> labels = ReadLabels(root.Take(RecipePath.Labels));
+        IReadOnlyDictionary<string, RecipeTranslation> translations = ReadTranslations(root.Take(RecipePath.Translations));
         string program = RequiredString(root, RecipePath.Program, string.Empty);
         IReadOnlyList<RecipeArgument> arguments = ReadArguments(root.Take(RecipePath.Arguments));
         IReadOnlyList<RecipeInput> inputs = ReadInputs(root.Take(RecipePath.Inputs));
         RecipeOutputFormat output = OptionalEnum(root, RecipePath.Output, RecipeFormat.OutputFormatNames, RecipeOutputFormat.Text);
         RecipeOutputEncoding encoding = OptionalEnum(root, RecipePath.OutputEncoding, RecipeFormat.OutputEncodingNames, RecipeOutputEncoding.Utf8);
         RecipeStderrMode stderr = OptionalEnum(root, RecipePath.Stderr, RecipeFormat.StderrModeNames, RecipeStderrMode.Separate);
+        RecipeCsvSeparator csvSeparator = ReadCsvSeparator(root, output);
         IReadOnlyList<int> exitCodes = ReadExitCodes(root.Take(RecipePath.SuccessExitCodes));
         int timeout = OptionalInt(root, RecipePath.TimeoutSeconds, RecipeLimits.DefaultTimeoutSeconds);
         string? icon = OptionalString(root, RecipePath.Icon);
@@ -106,7 +107,7 @@ internal sealed class RecipeMapper
             author,
             name,
             description,
-            labels,
+            translations,
             program,
             arguments,
             inputs,
@@ -115,25 +116,47 @@ internal sealed class RecipeMapper
             stderr,
             exitCodes,
             timeout,
-            icon);
+            icon)
+        {
+            CsvSeparator = csvSeparator,
+        };
     }
 
-    private IReadOnlyDictionary<string, RecipeLabels> ReadLabels(JsonNode? node)
+    /// <summary>
+    /// Reads <c>csvSeparator</c>. It is refused, even as the default <c>comma</c>, when the output is not
+    /// <c>csv</c>: only the mapper can see that the property was written.
+    /// </summary>
+    private RecipeCsvSeparator ReadCsvSeparator(View root, RecipeOutputFormat output)
     {
-        Dictionary<string, RecipeLabels> labels = new(StringComparer.Ordinal);
-        if (node is null)
-            return labels.ToFrozenDictionary(StringComparer.Ordinal);
+        JsonNode? node = root.Peek(RecipePath.CsvSeparator);
+        RecipeCsvSeparator separator = OptionalEnum(root, RecipePath.CsvSeparator, RecipeFormat.CsvSeparatorNames, RecipeCsvSeparator.Comma);
+        if (node is not null && output != RecipeOutputFormat.Csv)
+        {
+            _errors.Add(new RecipeError(
+                RecipeErrorCode.CsvSeparatorWithoutCsvOutput,
+                node.Position,
+                RecipePath.CsvSeparator));
+        }
 
-        Record(RecipePath.Labels, node);
+        return separator;
+    }
+
+    private IReadOnlyDictionary<string, RecipeTranslation> ReadTranslations(JsonNode? node)
+    {
+        Dictionary<string, RecipeTranslation> translations = new(StringComparer.Ordinal);
+        if (node is null)
+            return translations.ToFrozenDictionary(StringComparer.Ordinal);
+
+        Record(RecipePath.Translations, node);
         if (node.Kind != JsonKind.Object)
         {
-            Wrong(RecipePath.Labels, node);
-            return labels.ToFrozenDictionary(StringComparer.Ordinal);
+            Wrong(RecipePath.Translations, node);
+            return translations.ToFrozenDictionary(StringComparer.Ordinal);
         }
 
         foreach (JsonMember member in node.Members)
         {
-            string path = RecipePath.Property(RecipePath.Labels, member.Name);
+            string path = RecipePath.Property(RecipePath.Translations, member.Name);
             Record(path, member.Value);
             if (member.Value.Kind != JsonKind.Object)
             {
@@ -142,17 +165,24 @@ internal sealed class RecipeMapper
             }
 
             View view = new(member.Value);
-            string? labelName = OptionalString(view, RecipePath.Name, path);
-            string? labelDescription = OptionalString(view, RecipePath.Description, path);
-            Dictionary<string, string> fields = ReadFieldLabels(view.Take(RecipePath.Fields), RecipePath.Property(path, RecipePath.Fields));
+            string? translatedName = OptionalString(view, RecipePath.Name, path);
+            string? translatedDescription = OptionalString(view, RecipePath.Description, path);
+            Dictionary<string, string> fieldLabels = ReadTextMap(view.Take(RecipePath.FieldLabels), RecipePath.Property(path, RecipePath.FieldLabels));
+            Dictionary<string, string> fieldHints = ReadTextMap(view.Take(RecipePath.FieldHints), RecipePath.Property(path, RecipePath.FieldHints));
             RejectUnknown(view, path);
-            labels[member.Name] = new RecipeLabels(labelName, labelDescription, fields.ToFrozenDictionary(StringComparer.Ordinal));
+            translations[member.Name] = new RecipeTranslation(
+                translatedName,
+                translatedDescription,
+                fieldLabels.ToFrozenDictionary(StringComparer.Ordinal))
+            {
+                FieldHints = fieldHints.ToFrozenDictionary(StringComparer.Ordinal),
+            };
         }
 
-        return labels.ToFrozenDictionary(StringComparer.Ordinal);
+        return translations.ToFrozenDictionary(StringComparer.Ordinal);
     }
 
-    private Dictionary<string, string> ReadFieldLabels(JsonNode? node, string path)
+    private Dictionary<string, string> ReadTextMap(JsonNode? node, string path)
     {
         Dictionary<string, string> fields = new(StringComparer.Ordinal);
         if (node is null)
@@ -259,15 +289,60 @@ internal sealed class RecipeMapper
         string name = RequiredString(view, RecipePath.Name, path);
         RecipeInputType type = RequiredEnum(view, RecipePath.Type, path, RecipeFormat.InputTypeNames, RecipeInputType.String);
         string label = RequiredString(view, RecipePath.Label, path);
-        bool required = OptionalBool(view, RecipePath.Required, path);
+        bool required = ReadRequired(view, path, type);
         string? defaultValue = ReadDefault(view.Take(RecipePath.Default), RecipePath.Property(path, RecipePath.Default), type);
         string? pattern = OptionalString(view, RecipePath.Pattern, path);
         int? maxLength = OptionalNullableInt(view, RecipePath.MaxLength, path);
         IReadOnlyList<string>? choices = OptionalStringList(view, RecipePath.Choices, path);
         IReadOnlyList<string>? whenTrue = OptionalStringList(view, RecipePath.WhenTrue, path);
+        IReadOnlyList<string>? whenFalse = OptionalStringList(view, RecipePath.WhenFalse, path);
+        string? min = OptionalBound(view, RecipePath.Min, path);
+        string? max = OptionalBound(view, RecipePath.Max, path);
+        string? hint = OptionalString(view, RecipePath.Hint, path);
         RejectUnknown(view, path);
 
-        return new RecipeInput(name, type, label, required, defaultValue, pattern, maxLength, choices, whenTrue);
+        return new RecipeInput(name, type, label, required, defaultValue, pattern, maxLength, choices, whenTrue)
+        {
+            WhenFalse = whenFalse,
+            Min = min,
+            Max = max,
+            Hint = hint,
+        };
+    }
+
+    /// <summary>
+    /// Reads <c>required</c>. A <c>bool</c> input never takes it, whatever its value: only the mapper can see
+    /// that the property was written, since a missing one and <c>false</c> look the same afterwards.
+    /// </summary>
+    private bool ReadRequired(View view, string path, RecipeInputType type)
+    {
+        JsonNode? node = view.Peek(RecipePath.Required);
+        bool required = OptionalBool(view, RecipePath.Required, path);
+        if (node is null || type != RecipeInputType.Bool)
+            return required;
+
+        _errors.Add(new RecipeError(
+            RecipeErrorCode.PropertyNotAllowedForType,
+            node.Position,
+            RecipePath.Property(path, RecipePath.Required),
+            Fragment: RecipePath.Required));
+        return false;
+    }
+
+    /// <summary>Reads a <c>min</c> or <c>max</c>: a JSON number or a string, kept exactly as written.</summary>
+    private string? OptionalBound(View view, string name, string parent)
+    {
+        JsonNode? node = view.Take(name);
+        if (node is null)
+            return null;
+
+        string path = RecipePath.Property(parent, name);
+        Record(path, node);
+        if (node.Kind is JsonKind.String or JsonKind.Number)
+            return node.Text;
+
+        Wrong(path, node);
+        return null;
     }
 
     private string? ReadDefault(JsonNode? node, string path, RecipeInputType type)

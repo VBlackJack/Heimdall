@@ -517,9 +517,9 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
     {
         foreach (RecipeRefusal refusal in refusals)
         {
-            string words = RecipeRunText.Describe(Localizer, refusal.Reason);
             RecipeFieldViewModel? field = _fields.FirstOrDefault(
                 candidate => string.Equals(candidate.Name, refusal.Subject, StringComparison.Ordinal));
+            string words = RecipeRunText.Describe(Localizer, refusal.Reason, field?.Input);
 
             if (field is not null)
             {
@@ -595,7 +595,7 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
 
         TabularOutput? tabular = _recipe.Output switch
         {
-            RecipeOutputFormat.Csv => TabularOutput.FromCsv(result.Output),
+            RecipeOutputFormat.Csv => TabularOutput.FromCsv(result.Output, _recipe.CsvSeparator),
             RecipeOutputFormat.Json => TabularOutput.FromJson(result.Output),
             _ => null,
         };
@@ -636,6 +636,7 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
         foreach (RecipeFieldViewModel field in _fields)
         {
             field.Label = texts.FieldLabels.TryGetValue(field.Name, out string? label) ? label : field.Input.Label;
+            field.Hint = texts.FieldHints.TryGetValue(field.Name, out string? hint) ? hint : string.Empty;
         }
 
         SessionTargetText = DescribeSessionTarget();

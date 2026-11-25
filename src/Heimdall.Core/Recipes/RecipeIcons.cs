@@ -19,16 +19,17 @@ using System.Collections.Frozen;
 namespace Heimdall.Core.Recipes;
 
 /// <summary>
-/// The closed set of icon keys a recipe may name. A recipe never carries an icon of its own; the
-/// application maps each key to a built-in glyph. A later change extends <see cref="Keys"/>
-/// (and bumps the schema version, since it widens the accepted format).
+/// The icon keys of a recipe. A recipe never carries an icon of its own; the application maps a key
+/// to a built-in glyph. Any key of the right shape (see <see cref="IsKeyShape"/>) is accepted by the
+/// format, so a later version can add glyphs without changing what a file means: a key this version
+/// does not know shows <see cref="Default"/>.
 /// </summary>
 public static class RecipeIcons
 {
-    /// <summary>The key shown when a recipe names none.</summary>
+    /// <summary>The key shown when a recipe names none, or names one this version does not know.</summary>
     public const string Default = "tool";
 
-    /// <summary>Every accepted key.</summary>
+    /// <summary>The keys this version has a glyph for.</summary>
     public static readonly FrozenSet<string> Keys = new HashSet<string>(StringComparer.Ordinal)
     {
         Default,
@@ -40,4 +41,35 @@ public static class RecipeIcons
         "clock",
         "server",
     }.ToFrozenSet(StringComparer.Ordinal);
+
+    private const char Hyphen = '-';
+
+    /// <summary>
+    /// True when the key has the shape of an icon key: a lowercase letter, then lowercase letters,
+    /// digits and hyphens up to <see cref="RecipeLimits.MaxIconKeyLength"/> characters in all, not
+    /// ending with a hyphen and without two hyphens in a row.
+    /// </summary>
+    /// <param name="key">The key.</param>
+    public static bool IsKeyShape(string? key)
+    {
+        if (string.IsNullOrEmpty(key) || key.Length > RecipeLimits.MaxIconKeyLength)
+            return false;
+
+        if (key[0] is not (>= 'a' and <= 'z') || key[^1] == Hyphen)
+            return false;
+
+        for (int index = 1; index < key.Length; index++)
+        {
+            char c = key[index];
+            bool allowed = c is (>= 'a' and <= 'z') or (>= '0' and <= '9') or Hyphen;
+            if (!allowed || (c == Hyphen && key[index - 1] == Hyphen))
+                return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>True when this version has a glyph for the key.</summary>
+    /// <param name="key">The key.</param>
+    public static bool IsKnown(string? key) => key is not null && Keys.Contains(key);
 }

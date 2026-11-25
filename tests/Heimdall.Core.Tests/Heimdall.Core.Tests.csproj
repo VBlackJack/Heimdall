@@ -26,4 +26,8 @@
     <Compile Include="..\Shared\RefusedLoopbackPort.cs" Link="Shared\RefusedLoopbackPort.cs" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="Recipes\FormatLock\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

@@ -787,14 +787,17 @@ ces arguments, avec vos droits. Le pack Recettes est désactivé par défaut.
   ligne. Les caractères de contrôle et invisibles, et tout caractère hors de
   l'ASCII imprimable dans le programme, les arguments et les valeurs par défaut,
   sont montrés sous la forme `\uXXXX`. Chaque traduction que porte le fichier
-  (langue, nom, description et libellés des champs) est listée aussi, parce que
-  l'outil l'affiche à la place du texte anglais quand l'interface est dans cette
-  langue. Pour un remplacement, chacun de l'auteur, du nom, de la description,
-  des traductions, de la sortie et de son encodage, du mode de conservation de
-  l'erreur standard, des codes de sortie de succès et du délai est dit inchangé
-  ou modifié, sur une ligne à part. Ce modèle suppose que l'aperçu est lu : les
-  autres règles ci-dessous limitent ce qu'un fichier peut demander, elles ne
-  jugent pas de ce à quoi il sert.
+  (langue, nom, description, libellés et aides des champs) est listée aussi,
+  parce que l'outil l'affiche à la place du texte anglais quand l'interface est
+  dans cette langue, comme l'aide de chaque champ et les arguments qu'un
+  interrupteur ajoute quand il est activé et quand il est désactivé. Pour un
+  remplacement, chacun de l'auteur, du nom, de la description, des traductions,
+  de la sortie et de son encodage (et du séparateur d'un tableau), du mode de
+  conservation de l'erreur standard, des codes de sortie de succès, du délai et
+  de l'icône est dit inchangé ou modifié, sur une ligne à part, et la ligne des
+  champs compare chaque propriété de chaque champ. Ce modèle suppose que l'aperçu
+  est lu : les autres règles ci-dessous limitent ce qu'un fichier peut demander,
+  elles ne jugent pas de ce à quoi il sert.
 - **Des règles structurelles.** Le programme doit être un vrai `.exe` que Heimdall
   résout lui-même (l'ordre de recherche du système d'exploitation n'est jamais
   utilisé), et son emplacement final, une fois les liens suivis, doit se trouver

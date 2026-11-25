@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "lock.non-ascii",
+  "version": "1.0.0",
+  "author": "Lock",
+  "name": "Caf\u00e9 \u00e0 la cr\u00e8me \u65e5\u672c\u8a9e",
+  "description": "Une description avec des accents : \u00e9, \u00e8, \u00ea, \u00ef, \u00f4, \u00fb, \u00e7 et des signes : \u20ac \u2713",
+  "program": "ping.exe",
+  "arguments": [["--a", "{in:a}"]],
+  "inputs": [
+    { "name": "a", "type": "string", "label": "Label a", "hint": "Caf\u00e9 \u00e0 la cr\u00e8me, \u65e5\u672c\u8a9e, \u00fc\u00f1\u00ee" }
+  ],
+  "translations": { "fr": { "name": "\u00c9chantillon \u00e9tendu", "fieldLabels": { "a": "Texte \u00e0 saisir" } } }
+}

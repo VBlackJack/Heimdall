@@ -1,0 +1,135 @@
+{
+  "recipe": {
+    "schemaVersion": 1,
+    "id": "lock.sample",
+    "version": "1.0.0",
+    "author": "Lock",
+    "name": "Sample",
+    "description": "A sample of the version 1 format.",
+    "translations": {},
+    "program": "ping.exe",
+    "arguments": [
+      {
+        "group": false,
+        "tokens": [
+          "{in:flag}"
+        ]
+      }
+    ],
+    "inputs": [
+      {
+        "name": "level",
+        "type": "Int",
+        "label": "Label level",
+        "required": true,
+        "default": null,
+        "pattern": null,
+        "maxLength": null,
+        "choices": null,
+        "whenTrue": null,
+        "whenFalse": null,
+        "min": null,
+        "max": null,
+        "hint": null
+      },
+      {
+        "name": "tag",
+        "type": "String",
+        "label": "Label tag",
+        "required": false,
+        "default": "t",
+        "pattern": null,
+        "maxLength": null,
+        "choices": null,
+        "whenTrue": null,
+        "whenFalse": null,
+        "min": null,
+        "max": null,
+        "hint": null
+      },
+      {
+        "name": "flag",
+        "type": "Bool",
+        "label": "Label flag",
+        "required": false,
+        "default": null,
+        "pattern": null,
+        "maxLength": null,
+        "choices": null,
+        "whenTrue": [
+          "--level",
+          "{in:level}"
+        ],
+        "whenFalse": [
+          "--tag",
+          "{in:tag}"
+        ],
+        "min": null,
+        "max": null,
+        "hint": null
+      }
+    ],
+    "output": "Text",
+    "outputEncoding": "Utf8",
+    "stderr": "Separate",
+    "csvSeparator": "Comma",
+    "successExitCodes": [
+      0
+    ],
+    "timeoutSeconds": 60,
+    "icon": null
+  },
+  "expansions": [
+    {
+      "values": {
+        "flag": "true",
+        "level": "3"
+      },
+      "host": null,
+      "port": null,
+      "arguments": [
+        "--level",
+        "3"
+      ]
+    },
+    {
+      "values": {
+        "flag": "false",
+        "level": "3"
+      },
+      "host": null,
+      "port": null,
+      "arguments": [
+        "--tag",
+        "t"
+      ]
+    },
+    {
+      "values": {
+        "flag": "true"
+      },
+      "host": null,
+      "port": null,
+      "refusals": [
+        {
+          "reason": "RequiredMissing",
+          "subject": "level",
+          "path": "inputs[0]"
+        }
+      ]
+    },
+    {
+      "values": {
+        "flag": "false",
+        "level": "3",
+        "tag": "u"
+      },
+      "host": null,
+      "port": null,
+      "arguments": [
+        "--tag",
+        "u"
+      ]
+    }
+  ]
+}

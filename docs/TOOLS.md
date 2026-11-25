@@ -294,15 +294,20 @@ program text as written in the file; every argument, one per line between
 brackets, exactly as written in the file, with a nested list marked as one that
 is kept or dropped as a whole; the name, the author (marked unverified), the id,
 the version and the description; every field with its type, whether it is
-required, its default, its choices, its pattern and its maximum length, and the
-arguments a switch adds when it is on; every translation of the recipe (the
-language, the name, the description and the field labels), since the open tool
-shows it instead of the English text when the interface is in that language (the
-title of the tab in the strip, the tool lists, the search and Settings show the
-name written in the recipe); whether the recipe reads the host and the port of
-the selected session; how the output is shown, how it is decoded, what happens
-to standard error, the exit codes that count as success and the icon; and the
-timeout. A control or invisible character is written as `\uXXXX`. In the
+required (a switch is neither required nor optional), its default, its choices,
+its pattern, its maximum length, its range (`range: 1 to 100`, `minimum: 1` or
+`maximum: 100`) and its hint, and the arguments a switch adds when it is on and
+when it is off; every translation of the recipe (the language, the name, the
+description, the field labels and the field hints), since the open tool shows it
+instead of the English text when the interface is in that language (the title of
+the tab in the strip, the tool lists, the search and Settings show the name
+written in the recipe); whether the recipe reads the host and the port of the
+selected session; how the output is shown (for a table read from CSV, the
+character that separates its cells), how it is decoded, what happens to
+standard error, the exit codes that count as success and the icon (an icon key
+this version of Heimdall does not know is said so, and the default icon is
+shown); and the timeout. A control or invisible character is written as
+`\uXXXX`. In the
 program, the arguments and the defaults, every character outside printable ASCII
 is written as `\uXXXX` too, so a look-alike letter cannot pass for the ASCII
 one.
@@ -333,8 +338,9 @@ process launched in that very first instant can escape it); when Windows refuses
 the job, only a run that is stopped or times out kills the process tree. At most
 1 MiB of output is kept per stream (2 MiB in all when standard error is kept
 apart): the rest is read and discarded, and a line says the output was cut. The
-run ends at the timeout of the recipe, and also when the pack is turned off or
-becomes forbidden.
+cap counts bytes, not characters, so a UTF-16 output keeps half as many
+characters as a UTF-8 one of the same size. The run ends at the timeout of the
+recipe, and also when the pack is turned off or becomes forbidden.
 
 **Replacing or removing a recipe that has a tab open.** A tab keeps the recipe
 it was opened with. Once that recipe is replaced, or removed and imported
@@ -347,9 +353,12 @@ tab: it opens a new one.
 The preview is titled "Replace recipe" and states the old and the new version,
 and whether the arguments, the fields and the program changed. Each of the
 author, the name, the description, the translations, the output and its
-encoding, the way standard error is kept, the success exit codes and the timeout
-is also said on a line of its own, as "unchanged" or "changed", comparing the
-parsed recipes and not the bytes.
+encoding (and, for a table read from CSV, its separator), the way standard error
+is kept, the success exit codes, the timeout and the icon is also said on a line
+of its own, as "unchanged" or "changed", comparing the parsed recipes and not
+the bytes. The fields line compares every property of every field, the ranges,
+the hints and the two lists of a switch included, and the translations line
+compares the field labels and the field hints.
 
 **Export.** The export button of a recipe in the Settings list writes a copy of
 the file exactly as it was imported. It refuses when the stored file no longer
@@ -393,15 +402,18 @@ syntax error), so the example is followed by a table that explains it.
   "author": "Example",
   "name": "Name lookup",
   "description": "Looks up a DNS record for a name, and can ask a DNS server of your choice.",
-  "labels": {
+  "translations": {
     "fr": {
       "name": "Recherche de nom",
       "description": "Recherche un enregistrement DNS pour un nom, et peut interroger le serveur DNS de votre choix.",
-      "fields": {
+      "fieldLabels": {
         "query": "Nom à rechercher",
         "record": "Type d'enregistrement",
         "server": "Serveur DNS (facultatif)",
         "details": "Afficher les détails"
+      },
+      "fieldHints": {
+        "server": "Laissez vide pour utiliser le serveur par défaut."
       }
     }
   },
@@ -415,7 +427,7 @@ syntax error), so the example is followed by a table that explains it.
   "inputs": [
     { "name": "query", "type": "hostname", "label": "Name to look up", "required": true },
     { "name": "record", "type": "choice", "label": "Record type", "choices": ["A", "AAAA", "MX", "TXT"], "default": "A" },
-    { "name": "server", "type": "hostname", "label": "DNS server (optional)" },
+    { "name": "server", "type": "hostname", "label": "DNS server (optional)", "hint": "Leave empty to use the default server." },
     { "name": "details", "type": "bool", "label": "Show details", "default": false, "whenTrue": ["-debug"] }
   ],
   "output": "text",
@@ -431,16 +443,16 @@ syntax error), so the example is followed by a table that explains it.
 |---|---|
 | `schemaVersion`, `id`, `version`, `author` | The format version, the identity `author.name` that is never renamed, a semantic version, and the author, which is displayed and always marked unverified |
 | `name`, `description` | English texts, mandatory |
-| `labels` | Optional translations of the name, the description and the field labels, keyed by language tag |
+| `translations` | Optional translations of the name, the description, the field labels and the field hints, keyed by language tag |
 | `program` | A bare file name: Heimdall finds `nslookup.exe` itself, in Windows, Program Files or an allowed folder |
 | `"-type={in:record}"` | One argument made of fixed text and a field. The value of `record` is chosen from a closed list, so it can never be read as an option |
-| `"{in:details}"` | A switch placed alone as a whole token. When it is on, it adds the tokens of its `whenTrue` (here `-debug`); when it is off, it adds nothing |
+| `"{in:details}"` | A switch placed alone as a whole token. When it is on, it adds the tokens of its `whenTrue` (here `-debug`); when it is off, it adds the tokens of its `whenFalse`, here none because it has none |
 | `"{in:query}"` | A required field that fills one whole argument. A typed value that starts with `-`, `/` or `@` is refused here |
 | `["{in:server}"]` | A nested list. `server` is optional, so the whole list is left out when the field is empty |
-| `inputs` | The fields, in the order they are shown |
+| `inputs` | The fields, in the order they are shown. Every field is used by an argument; `hint` is a help text shown under the field |
 | `output`, `outputEncoding`, `stderr` | The output is shown as text, decoded with the OEM code page of the console, with standard error merged into it |
 | `successExitCodes`, `timeoutSeconds` | The exit codes that count as success, and the seconds after which the run is stopped |
-| `icon` | One of the built-in icon keys |
+| `icon` | An icon key: a word of lowercase letters, digits and single hyphens. `search` is one of the keys this version has a glyph for |
 
 #### Top-level properties
 
@@ -455,21 +467,40 @@ refused, and so is a property that appears twice in the same object.
 | `author` | string | yes | At most 64 characters. Displayed, always as unverified |
 | `name` | string | yes | At most 64 characters |
 | `description` | string | yes | At most 500 characters |
-| `labels` | object | no | Translations, see below. At most 16 languages |
+| `translations` | object | no | Translations, see below. At most 16 languages |
 | `program` | string | yes | A bare file name or a full path with a drive letter; at most 260 characters. See "Which program may run" |
 | `arguments` | array | no | The argument list, see below. At most 64 tokens in all |
 | `inputs` | array | no | The fields, see below. At most 16 |
 | `output` | string | no | `text` (default), `csv` or `json`. The last two are shown as a table |
-| `outputEncoding` | string | no | `utf8` (default) or `oem`, the OEM code page of the console, which most Windows console tools write in |
-| `stderr` | string | no | `separate` (default): kept apart and shown as error output. `merge`: mixed into the output |
-| `successExitCodes` | array of integers | no | `[0]` by default. 1 to 16 entries. An exit code outside the list is reported as a failure |
+| `outputEncoding` | string | no | How the bytes of the output become text: `utf8` (default), `oem` (the OEM code page of the console), `ansi` (the system ANSI code page) or `utf16le` (UTF-16 little endian). See "Output encodings" below |
+| `csvSeparator` | string | no | The character between two cells of a table read from CSV: `comma` (default), `semicolon` or `tab`. Refused unless `output` is `csv`, even when it says `comma` |
+| `stderr` | string | no | `separate` (default): kept apart and shown as error output. `merge`: mixed into the output. `merge` is refused together with `output` `csv` or `json`, since a table cannot be read from two streams mixed |
+| `successExitCodes` | array of integers | no | `[0]` by default. 1 to 16 entries, none twice. An exit code outside the list is reported as a failure |
 | `timeoutSeconds` | integer | no | 60 by default, from 1 to 600. The program is stopped when it elapses |
-| `icon` | string | no | `tool` (default), `terminal`, `network`, `search`, `document`, `shield`, `clock` or `server` |
+| `icon` | string | no | The key of the icon of the tool: a lowercase letter, then lowercase letters, digits and hyphens, at most 32 characters, not ending with a hyphen and with no two hyphens in a row. `tool` (default), `terminal`, `network`, `search`, `document`, `shield`, `clock` and `server` have a glyph in this version; any other key of that shape is accepted and shows the default icon |
 
-Every text that is shown (author, name, description, labels) must be non-empty
-and must not hold a control character, an invisible formatting character (such
-as the right-to-left override), a line or paragraph separator or an unpaired
-surrogate.
+Every text that is shown (author, name, description, labels, hints) must be
+non-empty and must not hold a control character, an invisible formatting
+character (such as the right-to-left override), a line or paragraph separator or
+an unpaired surrogate.
+
+#### Output encodings
+
+`outputEncoding` says how the bytes a program writes become text. Standard error
+is decoded with the same encoding as standard output. At most 1 MiB is kept per
+stream, and that cap counts bytes, not characters.
+
+| Value | Decodes as | Use it for |
+|---|---|---|
+| `utf8` | UTF-8. One leading byte order mark is dropped | Programs that write UTF-8 |
+| `oem` | The OEM code page of the console | Most console tools of Windows |
+| `ansi` | The system ANSI code page, read from Windows (never the default encoding of the runtime) | Programs that write the ANSI code page when their output is redirected. Measured on Windows 11: `certutil`, `sort` and `findstr` do |
+| `utf16le` | UTF-16 little endian. One leading byte order mark is dropped | Programs that write UTF-16, with or without a mark. Measured on Windows 11: `sfc` and `wsl` write it without a mark |
+
+A byte order mark is never used to guess an encoding, and UTF-16 big endian is
+not supported. For `utf8` and `utf16le`, exactly one leading U+FEFF is dropped
+from each stream; a second one, or one further on, is kept as text. When the
+code page of `oem` or `ansi` cannot be read, UTF-8 is used.
 
 #### Fields
 
@@ -480,23 +511,30 @@ Each entry of `inputs` is an object with these properties:
 | `name` | string | yes | A letter, then letters, digits or underscores; at most 32 characters; unique in the recipe. It is what `{in:name}` refers to |
 | `type` | string | yes | `string`, `int`, `number`, `bool`, `hostname`, `ipaddress`, `path` or `choice` |
 | `label` | string | yes | At most 64 characters |
-| `required` | boolean | no | `false` by default. A default counts as a supplied value |
-| `default` | string, number or boolean | no | A string (any type except `bool`), a number (`int` and `number` only) or `true` or `false` (`bool` only). At most 512 characters. Held to the same fixed-text rules as a token, and it must be valid for the type of its field |
+| `required` | boolean | no | `false` by default. Refused on a `bool` field, whatever its value, since a switch is never empty. Refused together with a `default`: a field with a default is never left empty, because when the user clears it the default is used, so `required` would say nothing |
+| `default` | string, number or boolean | no | A string (any type except `bool`), a number (`int` and `number` only, written as a JSON number or as a string, which means the same) or `true` or `false` (`bool` only). At most 512 characters. Held to the same fixed-text rules as a token, and it must be valid for the type of its field, and inside `min` and `max` when there are some |
+| `min`, `max` | number or string | `int` and `number` only | The lowest and the highest accepted value, each written like a default and each optional. An `int` bound is a 32-bit integer and a `number` bound a decimal number, both in the strict forms below. `min` above `max` is refused. A value outside the range is refused at run time, and so is a default outside it at import. A `number` is compared as a double-precision number, so two decimal texts that are the same double are equal |
+| `hint` | string | no | A help text shown under the field and read by assistive technologies. At most 200 characters, with no control character, no invisible formatting character and no line break |
 | `pattern` | string | `string` only | A regular expression that the whole value must match; at most 256 characters. A value for which the match lasts more than 250 ms is refused |
 | `maxLength` | integer | `string` only | From 1 to 1024. 256 when absent |
 | `choices` | array of strings | `choice` only, then mandatory | 1 to 64 values, each at most 128 characters, no duplicates |
-| `whenTrue` | array of strings | `bool` only, then mandatory | The tokens the switch adds when it is on. They follow the rules of argument tokens |
+| `whenTrue` | array of strings | `bool` only | The tokens the switch adds when it is on. They follow the rules of argument tokens |
+| `whenFalse` | array of strings | `bool` only | The tokens the switch adds when it is off, under the same rules |
 
-A property that is not allowed for the type of its field is refused. A `bool`
-field must be placed in `arguments` as a whole token, or the file is refused.
+A `bool` field needs `whenTrue`, `whenFalse` or both, and a list that is written
+must not be empty. A property that is not allowed for the type of its field is
+refused. A `bool` field must be placed in `arguments` as a whole token, and
+every other field must be used by an argument: in a token, in a nested list or in
+a `whenTrue` or `whenFalse` token of a switch. A field that nothing uses is
+refused.
 
 What each type accepts at run time:
 
 | Type | Accepts |
 |---|---|
 | `string` | Any text within `maxLength` that matches `pattern` when there is one |
-| `int` | A 32-bit integer, with an optional sign, at most 64 characters |
-| `number` | A finite decimal number written with a dot, an exponent allowed, at most 64 characters |
+| `int` | A 32-bit integer written `-?(0\|[1-9][0-9]*)`: an optional minus sign, then `0` or digits with no leading zero. No plus sign, no exponent, no space |
+| `number` | A finite decimal number written `-?(0\|[1-9][0-9]*)(\.[0-9]+)?`: the form of an integer, then an optional dot and at least one digit. No plus sign, no leading zero, no exponent, no bare dot, at most 64 characters |
 | `bool` | On or off. A blank value is off |
 | `hostname` | A valid host name, with no space before or after |
 | `ipaddress` | An IPv4 address or an IPv6 address (hexadecimal digits, colons and an optional dotted tail), with no zone id (`%`), no brackets and no space before or after |
@@ -527,37 +565,49 @@ A field is *optional* when it is not a switch, not required and has no
 non-empty default. An optional field cannot be used in a token on its own,
 because the argument list would be ambiguous when it is empty; put the token in
 a nested list instead. A nested list is dropped as a whole when any optional
-field it uses is empty. `whenTrue` tokens follow the same rule. A required
-field, or a field with a default, can be used anywhere.
+field it uses is empty. A required field, or a field with a default, can be used
+anywhere. A field with a default is never left empty: when the user clears it,
+the default is used.
+
+The tokens of a switch (`whenTrue` and `whenFalse`) have no nested list around
+them to be dropped, so a field used there must be required or carry a default.
+An optional field without a default is refused there.
 
 A `bool` field is placed in `arguments` as a whole bare token (`"{in:details}"`)
-and expands to its `whenTrue` tokens when it is on, to nothing when it is off.
-It cannot be mixed with other text in a token, nor placed in a nested list.
+and expands to its `whenTrue` tokens when it is on and to its `whenFalse` tokens
+when it is off, to nothing when the list of that state was not written. It
+cannot be mixed with other text in a token, nor placed in a nested list.
 
 At most 64 tokens in all, each at most 512 characters: one for each bare token
 and each nested-list member, and, for each place a switch stands, the number of
-its `whenTrue` tokens. The number in the error is the worst case and can exceed
-the number of tokens written in the file.
+tokens of its longer list (`whenTrue` or `whenFalse`). The tokens of the lists
+are not counted on their own. The number in the error is the worst case and can
+exceed the number of tokens written in the file.
 
 #### Session values
 
 `{Host}` and `{Port}` are the only values a recipe can read from a session, and
-they come from the session selected in the tree. When a recipe uses either and
-no session is selected, the tool says so and does not run: select a session,
-then open the tool again. The host goes through the strictest host name
-validation and the port must be a valid port number.
+they come from the session selected in the tree. They may stand in a token, in a
+nested list and in the tokens of a switch (`whenTrue` and `whenFalse`). When a
+recipe uses either and no session is selected, the tool says so and does not
+run: select a session, then open the tool again. The host goes through the
+strictest host name validation and the port must be a valid port number.
 
 #### Translations
 
-`labels` maps a language tag (such as `fr` or `fr-CA`: a first part of 2 to 8
-letters, then parts of 1 to 8 letters or digits, 35 characters at most) to an
-object with the optional properties `name`, `description` and `fields` (a map
-from a field name to its translated label). Heimdall uses the entry whose tag is
-the language of the interface, else the first entry with the same primary
-language, else the English texts of the recipe. The open tool shows the
-translated name, description and field labels; the title of the tab in the
-strip, the tool lists, the search and Settings show the name written in the
-recipe. A translation of a field that does not exist is refused.
+`translations` maps a language tag (such as `fr` or `fr-CA`: a first part of 2
+to 8 letters, then parts of 1 to 8 letters or digits, 35 characters at most) to
+an object with the optional properties `name`, `description`, `fieldLabels` and
+`fieldHints`, the last two being maps from a field name to a translated label
+and to a translated hint. Heimdall uses the entry whose tag is the language of
+the interface, else the first entry with the same primary language, else the
+English texts of the recipe. The open tool shows the translated name,
+description, field labels and field hints (a field without a translated hint
+shows the `hint` written in the field); the title of the tab in the strip, the
+tool lists, the search and Settings show the name written in the recipe. A
+translation of a field that does not exist is refused, in either map. Two tags
+that differ only by case (`fr` and `FR`) are refused. The names `labels` and
+`fields`, which an early draft of the format used, are unknown properties.
 
 #### Which program may run
 
@@ -609,11 +659,14 @@ as the script extensions `.bat`, `.cmd`, `.ps1`, `.vbs`, `.js`, `.wsf` and
 
 #### Schema version
 
-`schemaVersion` is `1`. Any addition to the format bumps it, so a file written
-for a newer format is never half-understood: a version higher than the one this
-build reads is refused, with a message that gives both numbers and asks you to
-update Heimdall. The list of icon keys is part of the format, and widening it
-bumps the version.
+`schemaVersion` is `1`, and version 1 is frozen: every version 1 file that is
+valid in the release that froze it keeps loading, with the same meaning, in
+every later release. Any addition to the format bumps the version, so a file
+written for a newer format is never half-understood: a version higher than the
+one this build reads is refused, with a message that gives both numbers and asks
+you to update Heimdall. The list of icon keys this version has a glyph for is
+not part of the format: any key of the right shape is valid, and a key a version
+does not know shows the default icon.
 
 ### What is refused
 
@@ -624,12 +677,20 @@ each with its line and column when it is known.
   deeper than 8 levels.
 - A property is unknown or appears twice; a mandatory property is missing; a
   value has the wrong type; a text, a list or a number is outside its limits.
-- The `id`, the `version`, a field name or a language tag is badly formed; two
-  fields share a name; a translation names a field that does not exist; the icon
-  is not in the list.
-- A property is used on a type that does not allow it, a `choice` has no list or
-  a default outside it, a `bool` has no `whenTrue` or is never placed in the
-  arguments, a pattern does not compile, a default is not valid for its type.
+- The `id`, the `version`, a field name, a language tag or the icon key is badly
+  formed; two fields share a name; two language tags differ only by case; an
+  exit code is listed twice; a translation names a field that does not exist.
+- A property is used on a type that does not allow it (`required` on a `bool`
+  included), a `choice` has no list or a default outside it, a `bool` has
+  neither `whenTrue` nor `whenFalse` or a list that is empty, a pattern does not
+  compile, a default is not valid for its type, a number is not written in its
+  strict form, a `min` or a `max` is not valid or the `min` is above the `max`,
+  a default is outside them.
+- A field is required and has a default; a field is used by no argument, or a
+  switch is never placed as a whole token; an optional field without a default
+  is used in the tokens of a switch.
+- Standard error is merged into an output shown as a table (`csv` or `json`);
+  `csvSeparator` is written although the output is not `csv`.
 - A placeholder is unknown or malformed, names no field, or an optional field
   stands alone in a token (put it in a nested list); a switch is mixed with
   other text.
@@ -659,7 +720,8 @@ interpreter or a proxy executable (by its file name or by the original name in
 its version resource). The message names the program and, when the cause is the
 folder, tells you to add the folder in Settings, save, and import again.
 
-**A typed value, at each run.** A required field that is empty; a value with a
+**A typed value, at each run.** A required field that is empty; a number outside
+the `min` and `max` of its field (the message names the bounds); a value with a
 control or invisible character, or a look-alike one; a value that starts with
 `-`, `/`, `@`, a backslash or a space where its placeholder starts the argument
 (a leading `-` is how a value gets read as an option, a leading `@` as a
@@ -681,6 +743,9 @@ recipe again to accept the new location.
 - `src/Heimdall.Core/Recipes/`: the format (`RecipeFormat`, `RecipeLimits`,
   `RecipeIcons`), the strict parser and validator, the value rule, the
   expander, the program resolver, the list of refused programs and the runner.
+- `tests/Heimdall.Core.Tests/Recipes/FormatLock/v1/`: the frozen samples of
+  version 1, accepted and refused, with the text each must still parse to and
+  the errors each must still give. A sample may be added and never edited.
 - `src/Heimdall.App/Services/RecipeStore.cs`: storage and loading.
 - `src/Heimdall.App/Services/RecipeImportService.cs` and
   `RecipeImportPreview.cs`: import, replacement and the preview text.

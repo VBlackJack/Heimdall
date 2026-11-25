@@ -174,10 +174,10 @@ public static class RecipeExpander
                 && parse.Segments[0].Kind == TemplateSegmentKind.Input
                 && _recipe.FindInput(parse.Segments[0].Text) is { Type: RecipeInputType.Bool } flag)
             {
-                // A switch placed in the argument list: its whenTrue tokens, or nothing.
-                if (string.Equals(_resolved[flag.Name], RecipeFormat.TrueText, StringComparison.Ordinal))
-                    ExpandTokens(flag.WhenTrue ?? [], path, indexed: false);
-
+                // A switch placed in the argument list: its whenTrue tokens when on, its whenFalse tokens when
+                // off, or nothing when the list of the state it is in was not written.
+                bool on = string.Equals(_resolved[flag.Name], RecipeFormat.TrueText, StringComparison.Ordinal);
+                ExpandTokens((on ? flag.WhenTrue : flag.WhenFalse) ?? [], path, indexed: false);
                 return;
             }
 

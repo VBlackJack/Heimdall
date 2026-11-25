@@ -73,11 +73,11 @@ internal static class RecipeTestData
           "author": "Acme Labs",
           "name": "Scan",
           "description": "Scans a target.",
-          "labels": {
+          "translations": {
             "fr": {
               "name": "Analyse",
               "description": "Analyse une cible.",
-              "fields": { "target": "Cible" }
+              "fieldLabels": { "target": "Cible" }
             }
           },
           "program": "C:\\Windows\\System32\\ping.exe",
@@ -87,7 +87,10 @@ internal static class RecipeTestData
             "--mode={in:mode}",
             ["--extra", "{in:extra}"],
             "{in:target}",
-            ["-p", "{Port}"]
+            ["-p", "{Port}"],
+            ["--dir", "{in:dir}"],
+            ["--ratio", "{in:ratio}"],
+            ["--addr", "{in:addr}"]
           ],
           "inputs": [
             { "name": "target", "type": "hostname", "label": "Target", "required": true },
@@ -99,7 +102,7 @@ internal static class RecipeTestData
             { "name": "ratio", "type": "number", "label": "Ratio" },
             { "name": "addr", "type": "ipaddress", "label": "Address" }
           ],
-          "output": "csv",
+          "output": "text",
           "outputEncoding": "oem",
           "stderr": "merge",
           "successExitCodes": [0, 1],
@@ -116,7 +119,7 @@ internal static class RecipeTestData
         Author: "Acme",
         Name: "Ping",
         Description: "Ping the selected host.",
-        Labels: new Dictionary<string, RecipeLabels>(),
+        Translations: new Dictionary<string, RecipeTranslation>(),
         Program: "ping.exe",
         Arguments: [RecipeArgument.Bare("{Host}")],
         Inputs: [],
@@ -130,6 +133,23 @@ internal static class RecipeTestData
     /// <summary>A valid input of the given type, to be modified with <c>with</c>.</summary>
     public static RecipeInput Input(string name, RecipeInputType type, bool required = false, string? defaultValue = null)
         => new(name, type, "Label " + name, required, defaultValue, null, null, null, null);
+
+    /// <summary>
+    /// A valid recipe whose inputs are all used: a switch is placed as a bare token, any other input
+    /// in a group of its own, so that no input is left unreferenced.
+    /// </summary>
+    public static Recipe Using(params RecipeInput[] inputs)
+    {
+        List<RecipeArgument> arguments = [.. Minimal().Arguments];
+        foreach (RecipeInput input in inputs)
+        {
+            arguments.Add(input.Type == RecipeInputType.Bool
+                ? RecipeArgument.Bare("{in:" + input.Name + "}")
+                : RecipeArgument.Group(["--" + input.Name + "={in:" + input.Name + "}"]));
+        }
+
+        return Minimal() with { Inputs = [.. inputs], Arguments = [.. arguments] };
+    }
 
     /// <summary>A recipe whose inputs and arguments are the given ones.</summary>
     public static Recipe With(IEnumerable<RecipeInput> inputs, params RecipeArgument[] arguments)

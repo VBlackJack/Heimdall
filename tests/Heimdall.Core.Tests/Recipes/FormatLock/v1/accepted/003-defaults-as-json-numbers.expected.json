@@ -1,0 +1,202 @@
+{
+  "recipe": {
+    "schemaVersion": 1,
+    "id": "lock.sample",
+    "version": "1.0.0",
+    "author": "Lock",
+    "name": "Sample",
+    "description": "A sample of the version 1 format.",
+    "translations": {},
+    "program": "ping.exe",
+    "arguments": [
+      {
+        "group": false,
+        "tokens": [
+          "--a={in:a}"
+        ]
+      },
+      {
+        "group": false,
+        "tokens": [
+          "--b={in:b}"
+        ]
+      },
+      {
+        "group": false,
+        "tokens": [
+          "--c={in:c}"
+        ]
+      },
+      {
+        "group": false,
+        "tokens": [
+          "--d={in:d}"
+        ]
+      },
+      {
+        "group": false,
+        "tokens": [
+          "--e={in:e}"
+        ]
+      },
+      {
+        "group": false,
+        "tokens": [
+          "--f={in:f}"
+        ]
+      }
+    ],
+    "inputs": [
+      {
+        "name": "a",
+        "type": "Int",
+        "label": "Label a",
+        "required": false,
+        "default": "5",
+        "pattern": null,
+        "maxLength": null,
+        "choices": null,
+        "whenTrue": null,
+        "whenFalse": null,
+        "min": null,
+        "max": null,
+        "hint": null
+      },
+      {
+        "name": "b",
+        "type": "Int",
+        "label": "Label b",
+        "required": false,
+        "default": "-3",
+        "pattern": null,
+        "maxLength": null,
+        "choices": null,
+        "whenTrue": null,
+        "whenFalse": null,
+        "min": null,
+        "max": null,
+        "hint": null
+      },
+      {
+        "name": "c",
+        "type": "Int",
+        "label": "Label c",
+        "required": false,
+        "default": "0",
+        "pattern": null,
+        "maxLength": null,
+        "choices": null,
+        "whenTrue": null,
+        "whenFalse": null,
+        "min": null,
+        "max": null,
+        "hint": null
+      },
+      {
+        "name": "d",
+        "type": "Number",
+        "label": "Label d",
+        "required": false,
+        "default": "1.50",
+        "pattern": null,
+        "maxLength": null,
+        "choices": null,
+        "whenTrue": null,
+        "whenFalse": null,
+        "min": null,
+        "max": null,
+        "hint": null
+      },
+      {
+        "name": "e",
+        "type": "Number",
+        "label": "Label e",
+        "required": false,
+        "default": "-0.25",
+        "pattern": null,
+        "maxLength": null,
+        "choices": null,
+        "whenTrue": null,
+        "whenFalse": null,
+        "min": null,
+        "max": null,
+        "hint": null
+      },
+      {
+        "name": "f",
+        "type": "Number",
+        "label": "Label f",
+        "required": false,
+        "default": "0",
+        "pattern": null,
+        "maxLength": null,
+        "choices": null,
+        "whenTrue": null,
+        "whenFalse": null,
+        "min": null,
+        "max": null,
+        "hint": null
+      }
+    ],
+    "output": "Text",
+    "outputEncoding": "Utf8",
+    "stderr": "Separate",
+    "csvSeparator": "Comma",
+    "successExitCodes": [
+      0
+    ],
+    "timeoutSeconds": 60,
+    "icon": null
+  },
+  "expansions": [
+    {
+      "values": {},
+      "host": null,
+      "port": null,
+      "arguments": [
+        "--a=5",
+        "--b=-3",
+        "--c=0",
+        "--d=1.50",
+        "--e=-0.25",
+        "--f=0"
+      ]
+    },
+    {
+      "values": {
+        "a": "7",
+        "d": "2.0"
+      },
+      "host": null,
+      "port": null,
+      "arguments": [
+        "--a=7",
+        "--b=-3",
+        "--c=0",
+        "--d=2.0",
+        "--e=-0.25",
+        "--f=0"
+      ]
+    },
+    {
+      "values": {
+        "a": "+7",
+        "d": "1e3"
+      },
+      "host": null,
+      "port": null,
+      "refusals": [
+        {
+          "reason": "NotAnInteger",
+          "subject": "a",
+          "path": "arguments[0]"
+        },
+        {
+          "reason": "NotANumber",
+          "subject": "d",
+          "path": "arguments[3]"
+        }
+      ]
+    }
+  ]
+}

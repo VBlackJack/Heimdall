@@ -289,7 +289,7 @@ public sealed class RecipeToolProgramCheckTests
         using RecipeViewModelHarness harness = await RecipeViewModelHarness.CreateAsync("fr");
         Recipe recipe = Recipe(
             name: "Probe",
-            labels: new Dictionary<string, RecipeLabels> { ["fr"] = new("Sonde", null, new Dictionary<string, string>()) });
+            labels: new Dictionary<string, RecipeTranslation> { ["fr"] = new("Sonde", null, new Dictionary<string, string>()) });
         RecipeToolViewModel viewModel = harness.Create(recipe);
         harness.Availability.State = ToolAvailabilityState.DisabledByUser;
 

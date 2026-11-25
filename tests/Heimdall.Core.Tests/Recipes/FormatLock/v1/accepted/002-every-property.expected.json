@@ -1,0 +1,317 @@
+{
+  "recipe": {
+    "schemaVersion": 1,
+    "id": "lock.every-property",
+    "version": "2.3.4-rc.1+build.7",
+    "author": "Lock Labs",
+    "name": "Every property",
+    "description": "Uses every property of the format once.",
+    "translations": {
+      "fr": {
+        "name": "Toutes les proprietes",
+        "description": "Utilise chaque propriete du format.",
+        "fieldLabels": {
+          "count": "Nombre",
+          "target": "Cible"
+        },
+        "fieldHints": {
+          "count": "Entre 1 et 9.",
+          "target": "Un nom d'hote."
+        }
+      }
+    },
+    "program": "ping.exe",
+    "arguments": [
+      {
+        "group": false,
+        "tokens": [
+          "-n"
+        ]
+      },
+      {
+        "group": false,
+        "tokens": [
+          "{in:count}"
+        ]
+      },
+      {
+        "group": false,
+        "tokens": [
+          "{in:verbose}"
+        ]
+      },
+      {
+        "group": false,
+        "tokens": [
+          "{in:mode}"
+        ]
+      },
+      {
+        "group": true,
+        "tokens": [
+          "--pattern",
+          "{in:code}"
+        ]
+      },
+      {
+        "group": true,
+        "tokens": [
+          "--ratio",
+          "{in:ratio}"
+        ]
+      },
+      {
+        "group": true,
+        "tokens": [
+          "--addr",
+          "{in:addr}"
+        ]
+      },
+      {
+        "group": true,
+        "tokens": [
+          "--dir",
+          "{in:dir}"
+        ]
+      },
+      {
+        "group": false,
+        "tokens": [
+          "{in:target}"
+        ]
+      },
+      {
+        "group": true,
+        "tokens": [
+          "-p",
+          "{Port}"
+        ]
+      }
+    ],
+    "inputs": [
+      {
+        "name": "target",
+        "type": "Hostname",
+        "label": "Target",
+        "required": true,
+        "default": null,
+        "pattern": null,
+        "maxLength": null,
+        "choices": null,
+        "whenTrue": null,
+        "whenFalse": null,
+        "min": null,
+        "max": null,
+        "hint": "A host name."
+      },
+      {
+        "name": "count",
+        "type": "Int",
+        "label": "Count",
+        "required": false,
+        "default": "4",
+        "pattern": null,
+        "maxLength": null,
+        "choices": null,
+        "whenTrue": null,
+        "whenFalse": null,
+        "min": "1",
+        "max": "9",
+        "hint": "Between 1 and 9."
+      },
+      {
+        "name": "verbose",
+        "type": "Bool",
+        "label": "Verbose",
+        "required": false,
+        "default": "true",
+        "pattern": null,
+        "maxLength": null,
+        "choices": null,
+        "whenTrue": [
+          "-v",
+          "-d"
+        ],
+        "whenFalse": [
+          "-q"
+        ],
+        "min": null,
+        "max": null,
+        "hint": "More detail."
+      },
+      {
+        "name": "mode",
+        "type": "Choice",
+        "label": "Mode",
+        "required": false,
+        "default": "fast",
+        "pattern": null,
+        "maxLength": null,
+        "choices": [
+          "fast",
+          "slow"
+        ],
+        "whenTrue": null,
+        "whenFalse": null,
+        "min": null,
+        "max": null,
+        "hint": null
+      },
+      {
+        "name": "code",
+        "type": "String",
+        "label": "Code",
+        "required": false,
+        "default": null,
+        "pattern": "[a-z]+",
+        "maxLength": 20,
+        "choices": null,
+        "whenTrue": null,
+        "whenFalse": null,
+        "min": null,
+        "max": null,
+        "hint": null
+      },
+      {
+        "name": "ratio",
+        "type": "Number",
+        "label": "Ratio",
+        "required": false,
+        "default": null,
+        "pattern": null,
+        "maxLength": null,
+        "choices": null,
+        "whenTrue": null,
+        "whenFalse": null,
+        "min": "0.5",
+        "max": "2.5",
+        "hint": null
+      },
+      {
+        "name": "addr",
+        "type": "IpAddress",
+        "label": "Address",
+        "required": false,
+        "default": null,
+        "pattern": null,
+        "maxLength": null,
+        "choices": null,
+        "whenTrue": null,
+        "whenFalse": null,
+        "min": null,
+        "max": null,
+        "hint": null
+      },
+      {
+        "name": "dir",
+        "type": "Path",
+        "label": "Folder",
+        "required": false,
+        "default": null,
+        "pattern": null,
+        "maxLength": null,
+        "choices": null,
+        "whenTrue": null,
+        "whenFalse": null,
+        "min": null,
+        "max": null,
+        "hint": null
+      }
+    ],
+    "output": "Csv",
+    "outputEncoding": "Ansi",
+    "stderr": "Separate",
+    "csvSeparator": "Semicolon",
+    "successExitCodes": [
+      0,
+      1
+    ],
+    "timeoutSeconds": 45,
+    "icon": "network"
+  },
+  "expansions": [
+    {
+      "values": {
+        "target": "server1"
+      },
+      "host": "h",
+      "port": "22",
+      "arguments": [
+        "-n",
+        "4",
+        "-v",
+        "-d",
+        "fast",
+        "server1",
+        "-p",
+        "22"
+      ]
+    },
+    {
+      "values": {
+        "addr": "192.0.2.1",
+        "code": "abc",
+        "count": "9",
+        "dir": "C:\\Tools",
+        "mode": "slow",
+        "ratio": "2.5",
+        "target": "server1",
+        "verbose": "false"
+      },
+      "host": "h",
+      "port": "22",
+      "arguments": [
+        "-n",
+        "9",
+        "-q",
+        "slow",
+        "--pattern",
+        "abc",
+        "--ratio",
+        "2.5",
+        "--addr",
+        "192.0.2.1",
+        "--dir",
+        "C:\\Tools",
+        "server1",
+        "-p",
+        "22"
+      ]
+    },
+    {
+      "values": {
+        "count": "10",
+        "ratio": "0.4",
+        "target": "server1"
+      },
+      "host": "h",
+      "port": "22",
+      "refusals": [
+        {
+          "reason": "OutOfRange",
+          "subject": "count",
+          "path": "arguments[1]"
+        },
+        {
+          "reason": "OutOfRange",
+          "subject": "ratio",
+          "path": "arguments[5][1]"
+        }
+      ]
+    },
+    {
+      "values": {
+        "target": "server1"
+      },
+      "host": null,
+      "port": null,
+      "refusals": [
+        {
+          "reason": "SessionValueMissing",
+          "subject": "Port",
+          "path": "arguments[9][1]"
+        }
+      ]
+    }
+  ]
+}

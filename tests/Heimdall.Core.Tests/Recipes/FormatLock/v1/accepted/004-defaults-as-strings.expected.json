@@ -1,0 +1,228 @@
+{
+  "recipe": {
+    "schemaVersion": 1,
+    "id": "lock.sample",
+    "version": "1.0.0",
+    "author": "Lock",
+    "name": "Sample",
+    "description": "A sample of the version 1 format.",
+    "translations": {},
+    "program": "ping.exe",
+    "arguments": [
+      {
+        "group": false,
+        "tokens": [
+          "--a={in:a}"
+        ]
+      },
+      {
+        "group": false,
+        "tokens": [
+          "--b={in:b}"
+        ]
+      },
+      {
+        "group": false,
+        "tokens": [
+          "--c={in:c}"
+        ]
+      },
+      {
+        "group": false,
+        "tokens": [
+          "--d={in:d}"
+        ]
+      },
+      {
+        "group": false,
+        "tokens": [
+          "--e={in:e}"
+        ]
+      },
+      {
+        "group": false,
+        "tokens": [
+          "--f={in:f}"
+        ]
+      },
+      {
+        "group": false,
+        "tokens": [
+          "--g={in:g}"
+        ]
+      }
+    ],
+    "inputs": [
+      {
+        "name": "a",
+        "type": "Int",
+        "label": "Label a",
+        "required": false,
+        "default": "5",
+        "pattern": null,
+        "maxLength": null,
+        "choices": null,
+        "whenTrue": null,
+        "whenFalse": null,
+        "min": null,
+        "max": null,
+        "hint": null
+      },
+      {
+        "name": "b",
+        "type": "Number",
+        "label": "Label b",
+        "required": false,
+        "default": "1.50",
+        "pattern": null,
+        "maxLength": null,
+        "choices": null,
+        "whenTrue": null,
+        "whenFalse": null,
+        "min": null,
+        "max": null,
+        "hint": null
+      },
+      {
+        "name": "c",
+        "type": "String",
+        "label": "Label c",
+        "required": false,
+        "default": "abc",
+        "pattern": null,
+        "maxLength": null,
+        "choices": null,
+        "whenTrue": null,
+        "whenFalse": null,
+        "min": null,
+        "max": null,
+        "hint": null
+      },
+      {
+        "name": "d",
+        "type": "Hostname",
+        "label": "Label d",
+        "required": false,
+        "default": "example.org",
+        "pattern": null,
+        "maxLength": null,
+        "choices": null,
+        "whenTrue": null,
+        "whenFalse": null,
+        "min": null,
+        "max": null,
+        "hint": null
+      },
+      {
+        "name": "e",
+        "type": "IpAddress",
+        "label": "Label e",
+        "required": false,
+        "default": "192.0.2.1",
+        "pattern": null,
+        "maxLength": null,
+        "choices": null,
+        "whenTrue": null,
+        "whenFalse": null,
+        "min": null,
+        "max": null,
+        "hint": null
+      },
+      {
+        "name": "f",
+        "type": "Path",
+        "label": "Label f",
+        "required": false,
+        "default": "C:\\Tools\\data",
+        "pattern": null,
+        "maxLength": null,
+        "choices": null,
+        "whenTrue": null,
+        "whenFalse": null,
+        "min": null,
+        "max": null,
+        "hint": null
+      },
+      {
+        "name": "g",
+        "type": "Choice",
+        "label": "Label g",
+        "required": false,
+        "default": "y",
+        "pattern": null,
+        "maxLength": null,
+        "choices": [
+          "x",
+          "y"
+        ],
+        "whenTrue": null,
+        "whenFalse": null,
+        "min": null,
+        "max": null,
+        "hint": null
+      }
+    ],
+    "output": "Text",
+    "outputEncoding": "Utf8",
+    "stderr": "Separate",
+    "csvSeparator": "Comma",
+    "successExitCodes": [
+      0
+    ],
+    "timeoutSeconds": 60,
+    "icon": null
+  },
+  "expansions": [
+    {
+      "values": {},
+      "host": null,
+      "port": null,
+      "arguments": [
+        "--a=5",
+        "--b=1.50",
+        "--c=abc",
+        "--d=example.org",
+        "--e=192.0.2.1",
+        "--f=C:\\Tools\\data",
+        "--g=y"
+      ]
+    },
+    {
+      "values": {
+        "a": "12",
+        "g": "x"
+      },
+      "host": null,
+      "port": null,
+      "arguments": [
+        "--a=12",
+        "--b=1.50",
+        "--c=abc",
+        "--d=example.org",
+        "--e=192.0.2.1",
+        "--f=C:\\Tools\\data",
+        "--g=x"
+      ]
+    },
+    {
+      "values": {
+        "a": "007",
+        "e": "999.1.1.1"
+      },
+      "host": null,
+      "port": null,
+      "refusals": [
+        {
+          "reason": "NotAnInteger",
+          "subject": "a",
+          "path": "arguments[0]"
+        },
+        {
+          "reason": "InvalidIpAddress",
+          "subject": "e",
+          "path": "arguments[4]"
+        }
+      ]
+    }
+  ]
+}

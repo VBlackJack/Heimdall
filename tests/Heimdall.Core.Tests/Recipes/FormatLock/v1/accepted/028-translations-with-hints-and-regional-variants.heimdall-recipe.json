@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "lock.sample",
+  "version": "1.0.0",
+  "author": "Lock",
+  "name": "Sample",
+  "description": "A sample of the version 1 format.",
+  "program": "ping.exe",
+  "arguments": [["--a", "{in:a}"]],
+  "inputs": [
+    { "name": "a", "type": "string", "label": "Label a", "hint": "Anything." }
+  ],
+  "translations": {
+    "fr": { "name": "Echantillon", "description": "Un echantillon.", "fieldLabels": { "a": "Un" }, "fieldHints": { "a": "N'importe quoi." } },
+    "fr-CA": { "fieldHints": { "a": "N'importe quoi, eh." } },
+    "es-MX": { "name": "Muestra" },
+    "zh-Hant-TW": { "fieldLabels": { "a": "A" } }
+  }
+}

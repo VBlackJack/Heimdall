@@ -24,7 +24,11 @@ namespace Heimdall.App.Services;
 /// <param name="Name">The name.</param>
 /// <param name="Description">The description.</param>
 /// <param name="FieldLabels">The label of each input, keyed by input name.</param>
-public sealed record RecipeTexts(string Name, string Description, IReadOnlyDictionary<string, string> FieldLabels);
+public sealed record RecipeTexts(string Name, string Description, IReadOnlyDictionary<string, string> FieldLabels)
+{
+    /// <summary>The hint of each input that has one, keyed by input name: the translation, else the hint written in the recipe.</summary>
+    public IReadOnlyDictionary<string, string> FieldHints { get; init; } = new Dictionary<string, string>(StringComparer.Ordinal);
+}
 
 /// <summary>
 /// What every surface says about a tool that comes from a recipe: the recipe's own name, the word
@@ -104,44 +108,58 @@ public static class RecipeToolText
     {
         ArgumentNullException.ThrowIfNull(recipe);
 
-        RecipeLabels? labels = PickLabels(recipe, language);
+        RecipeTranslation? translation = PickTranslation(recipe, language);
         Dictionary<string, string> fields = new(StringComparer.Ordinal);
+        Dictionary<string, string> hints = new(StringComparer.Ordinal);
         foreach (RecipeInput input in recipe.Inputs)
         {
-            fields[input.Name] = labels is not null
-                && labels.Fields.TryGetValue(input.Name, out string? translated)
+            fields[input.Name] = translation is not null
+                && translation.FieldLabels.TryGetValue(input.Name, out string? translated)
                 && !string.IsNullOrWhiteSpace(translated)
                     ? translated
                     : input.Label;
+
+            string? hint = translation is not null
+                && translation.FieldHints.TryGetValue(input.Name, out string? translatedHint)
+                && !string.IsNullOrWhiteSpace(translatedHint)
+                    ? translatedHint
+                    : input.Hint;
+            if (!string.IsNullOrWhiteSpace(hint))
+            {
+                hints[input.Name] = hint;
+            }
         }
 
         return new RecipeTexts(
-            !string.IsNullOrWhiteSpace(labels?.Name) ? labels.Name : recipe.Name,
-            !string.IsNullOrWhiteSpace(labels?.Description) ? labels.Description : recipe.Description,
-            fields);
+            !string.IsNullOrWhiteSpace(translation?.Name) ? translation.Name : recipe.Name,
+            !string.IsNullOrWhiteSpace(translation?.Description) ? translation.Description : recipe.Description,
+            fields)
+        {
+            FieldHints = hints,
+        };
     }
 
-    private static RecipeLabels? PickLabels(Recipe recipe, string language)
+    private static RecipeTranslation? PickTranslation(Recipe recipe, string language)
     {
-        if (recipe.Labels.Count == 0 || string.IsNullOrWhiteSpace(language))
+        if (recipe.Translations.Count == 0 || string.IsNullOrWhiteSpace(language))
         {
             return null;
         }
 
-        foreach ((string tag, RecipeLabels labels) in recipe.Labels)
+        foreach ((string tag, RecipeTranslation translation) in recipe.Translations)
         {
             if (string.Equals(tag, language, StringComparison.OrdinalIgnoreCase))
             {
-                return labels;
+                return translation;
             }
         }
 
         string primary = PrimarySubtag(language);
-        foreach (string tag in recipe.Labels.Keys.Order(StringComparer.OrdinalIgnoreCase))
+        foreach (string tag in recipe.Translations.Keys.Order(StringComparer.OrdinalIgnoreCase))
         {
             if (string.Equals(PrimarySubtag(tag), primary, StringComparison.OrdinalIgnoreCase))
             {
-                return recipe.Labels[tag];
+                return recipe.Translations[tag];
             }
         }
 
