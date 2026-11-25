@@ -817,6 +817,21 @@ pack is off by default.
   which can limit what an owner may do, is deliberately not honoured. It is a
   limit on the obvious case, not a guarantee that nobody else can change the
   file.
+- Only the system, the Administrators of the machine and the installer service
+  are trusted. A right to write, or an owner, that is any other account makes
+  the program refused, the administrators of a domain or a service account
+  included, even when an administrator set it up that way on purpose. A deny
+  entry of the permission list is not counted, and a conditional entry is read
+  as if its condition always held (measured on a test file). Both err on the
+  side of refusing.
+- The look-alike check asks how the ANSI code page of the machine would write
+  each character, and it always refuses the block of half-width and full-width
+  forms. On a machine whose ANSI code page uses two bytes for some characters
+  (Japanese, Chinese, Korean), it does not see a character whose second byte is
+  the byte of a backslash, which a program that reads its command line byte by
+  byte may take for one, and the half-width katakana and Hangul of that block
+  are refused on every machine. Nothing in this version adapts the rule to those
+  code pages.
 - The folder rule reads the text of the path, and then the path it leads to once
   links and mapped drives are followed: a mapped network drive, a link to a
   share and a link to a drive root are refused. A folder whose final form cannot

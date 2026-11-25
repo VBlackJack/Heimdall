@@ -916,6 +916,22 @@ ces arguments, avec vos droits. Le pack Recettes est désactivé par défaut.
   faire, n'est volontairement pas prise en compte. C'est une limite contre le
   cas évident, pas une garantie que personne d'autre ne peut modifier le
   fichier.
+- Seuls le système, les Administrateurs de la machine et le service
+  d'installation sont approuvés. Un droit d'écriture, ou un propriétaire, qui
+  est tout autre compte fait refuser le programme, administrateurs d'un domaine
+  et compte de service compris, même quand un administrateur l'a voulu ainsi.
+  Une entrée de refus de la liste des permissions n'est pas comptée, et une
+  entrée conditionnelle est lue comme si sa condition était toujours remplie
+  (mesuré sur un fichier de test). Les deux penchent du côté du refus.
+- Le contrôle des caractères qui ressemblent à d'autres demande comment la page
+  de codes ANSI de la machine écrirait chaque caractère, et il refuse toujours
+  le bloc des formes demi-chasse et pleine chasse. Sur une machine dont la page
+  de codes ANSI écrit certains caractères sur deux octets (japonais, chinois,
+  coréen), il ne voit pas un caractère dont le second octet est celui d'une
+  barre oblique inverse, qu'un programme qui lit sa ligne de commande octet par
+  octet peut prendre pour elle, et les katakana et le hangeul demi-chasse de ce
+  bloc sont refusés sur toutes les machines. Rien dans cette version n'adapte la
+  règle à ces pages de codes.
 - La règle des dossiers lit le texte du chemin, puis le chemin auquel il mène
   une fois les liens et les lecteurs réseau suivis : un lecteur réseau connecté,
   un lien vers un partage et un lien vers la racine d'un lecteur sont refusés.
