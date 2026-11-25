@@ -6652,6 +6652,7 @@
   "RecipeStatusTimedOutOne": "Tiempo agotado tras {0} segundo.",
   "RecipeStatusTimedOut": "Tiempo agotado tras {0} segundos.",
   "RecipeStatusCancelled": "Cancelada.",
+  "RecipeStatusStopping": "Deteniendo...",
   "RecipeStatusFailedToStart": "No se pudo iniciar el programa.",
   "RecipeStatusRefused": "Se rechaz\u00f3 la ejecuci\u00f3n: {0}",
   "RecipeStatusUnknown": "no se indic\u00f3 ning\u00fan motivo",

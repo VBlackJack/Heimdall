@@ -6651,6 +6651,7 @@
   "RecipeStatusTimedOutOne": "D\u00e9lai d\u00e9pass\u00e9 apr\u00e8s {0} seconde.",
   "RecipeStatusTimedOut": "D\u00e9lai d\u00e9pass\u00e9 apr\u00e8s {0} secondes.",
   "RecipeStatusCancelled": "Annul\u00e9e.",
+  "RecipeStatusStopping": "Arr\u00eat en cours...",
   "RecipeStatusFailedToStart": "Le programme n'a pas pu \u00eatre lanc\u00e9.",
   "RecipeStatusRefused": "L'ex\u00e9cution a \u00e9t\u00e9 refus\u00e9e : {0}",
   "RecipeStatusUnknown": "aucune raison n'a \u00e9t\u00e9 donn\u00e9e",

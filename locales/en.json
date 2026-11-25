@@ -6652,6 +6652,7 @@
   "RecipeStatusTimedOutOne": "Timed out after {0} second.",
   "RecipeStatusTimedOut": "Timed out after {0} seconds.",
   "RecipeStatusCancelled": "Cancelled.",
+  "RecipeStatusStopping": "Stopping...",
   "RecipeStatusFailedToStart": "The program could not be started.",
   "RecipeStatusRefused": "The run was refused: {0}",
   "RecipeStatusUnknown": "no reason was given",

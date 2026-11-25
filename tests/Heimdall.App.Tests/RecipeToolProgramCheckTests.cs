@@ -299,4 +299,101 @@ public sealed class RecipeToolProgramCheckTests
         Assert.Equal(harness.Localizer.Format(ToolUnavailableException.DisabledByUserMessageKey, "Sonde"), viewModel.GeneralError);
         Assert.DoesNotContain("Probe", viewModel.GeneralError, StringComparison.Ordinal);
     }
+
+    // ---- immediate feedback when Stop is pressed before the program starts -----------------------
+
+    [Fact]
+    public async Task StopDuringTheComparison_ShowsStoppingStatusAtOnce_BeforeTheComparisonReturns()
+    {
+        using RecipeViewModelHarness harness = await RecipeViewModelHarness.CreateAsync();
+        using Rig rig = await RigAsync(harness);
+        Task run = rig.ViewModel.RunCommand.ExecuteAsync(null);
+        await rig.Resolver.Started.WaitAsync(Bound);
+        Assert.Equal(string.Empty, rig.ViewModel.StatusText);
+
+        rig.ViewModel.StopCommand.Execute(null);
+
+        Assert.Equal(harness.Localizer["RecipeStatusStopping"], rig.ViewModel.StatusText);
+        Assert.True(rig.ViewModel.HasStatus);
+        Assert.False(rig.ViewModel.IsStatusFailure);
+        Assert.True(rig.ViewModel.IsRunning);
+
+        rig.Resolver.Release();
+        await run.WaitAsync(Bound);
+
+        Assert.Empty(harness.Runner.Calls);
+        Assert.Equal(harness.Localizer["RecipeStatusCancelled"], rig.ViewModel.StatusText);
+        Assert.True(rig.ViewModel.IsStatusFailure);
+        Assert.False(rig.ViewModel.IsRunning);
+    }
+
+    [Fact]
+    public async Task SwitchingLanguageWhileStoppingDuringTheComparison_RewordsTheStoppingStatus()
+    {
+        using RecipeViewModelHarness harness = await RecipeViewModelHarness.CreateAsync();
+        using Rig rig = await RigAsync(harness);
+        Task run = rig.ViewModel.RunCommand.ExecuteAsync(null);
+        await rig.Resolver.Started.WaitAsync(Bound);
+
+        rig.ViewModel.StopCommand.Execute(null);
+        await harness.Localizer.SwitchLocaleAsync("fr");
+
+        Assert.Equal(harness.Localizer["RecipeStatusStopping"], rig.ViewModel.StatusText);
+
+        rig.Resolver.Release();
+        await run.WaitAsync(Bound);
+
+        Assert.Equal(harness.Localizer["RecipeStatusCancelled"], rig.ViewModel.StatusText);
+    }
+
+    [Fact]
+    public async Task StopAfterTheProgramStarted_DoesNotShowThePreStartStoppingStatus()
+    {
+        using RecipeViewModelHarness harness = await RecipeViewModelHarness.CreateAsync();
+        using Rig rig = await RigAsync(harness);
+        rig.Resolver.Blocking = false;
+        TaskCompletionSource started = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        TaskCompletionSource<RecipeRunResult> release = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        harness.Runner.Script = _ =>
+        {
+            started.TrySetResult();
+            return release.Task;
+        };
+
+        Task run = rig.ViewModel.RunCommand.ExecuteAsync(null);
+        await started.Task.WaitAsync(Bound);
+
+        rig.ViewModel.StopCommand.Execute(null);
+
+        Assert.NotEqual(harness.Localizer["RecipeStatusStopping"], rig.ViewModel.StatusText);
+        Assert.Equal(string.Empty, rig.ViewModel.StatusText);
+
+        release.SetResult(FakeRecipeRunner.Result(RecipeRunStatus.Cancelled));
+        await run.WaitAsync(Bound);
+
+        Assert.Equal(harness.Localizer["RecipeStatusCancelled"], rig.ViewModel.StatusText);
+    }
+
+    [Fact]
+    public async Task AvailabilityChangedOffUiThreadDuringComparison_DoesNotChangeStatusTextBeforeComparisonReturns()
+    {
+        using RecipeViewModelHarness harness = await RecipeViewModelHarness.CreateAsync();
+        using Rig rig = await RigAsync(harness);
+        Task run = rig.ViewModel.RunCommand.ExecuteAsync(null);
+        await rig.Resolver.Started.WaitAsync(Bound);
+
+        await Task.Run(() =>
+        {
+            harness.Availability.State = ToolAvailabilityState.DisabledByUser;
+            harness.Availability.RaiseChanged();
+        });
+
+        Assert.Equal(string.Empty, rig.ViewModel.StatusText);
+
+        rig.Resolver.Release();
+        await run.WaitAsync(Bound);
+
+        Assert.Empty(harness.Runner.Calls);
+        Assert.Equal(harness.Localizer["RecipeStatusCancelled"], rig.ViewModel.StatusText);
+    }
 }
