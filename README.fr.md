@@ -60,6 +60,10 @@ C'est gratuit, open source, et cela tourne sur Windows 10 et 11.
   alors jamais.
 - **Des outils que vous iriez chercher ailleurs.** Ping, scanner de ports, inspecteur de
   certificats, générateurs d'empreintes et de mots de passe, et des dizaines d'autres, intégrés.
+- **Seulement les outils que vous voulez, et les vôtres.** Activez ou désactivez des groupes
+  d'outils entiers, et ajoutez les vôtres sous forme de petits fichiers de recette. Les recettes
+  sont désactivées par défaut et vous montrent exactement ce qu'elles lanceront avant que
+  quoi que ce soit soit conservé ; voir [le fonctionnement des recettes](docs/fr/TOOLS.md#recettes).
 - **Des sessions rangées comme vous travaillez.** Des dossiers en couleur, du glisser-déposer
   pour déplacer un dossier ou ranger les sessions à la main, des filtres par protocole, favori,
   état de connexion ou passerelle, et une arborescence qui s'ouvre là où vous l'avez laissée.

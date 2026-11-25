@@ -32,7 +32,8 @@ web et un shell local. Tout s'ouvre dans un onglet, au sein d'une seule fenêtre
 6. [Partager ce qu'une session a affiché](#partager-ce-quune-session-a-affiché)
 7. [Envoyer un journal quand vous avez besoin d'aide](#envoyer-un-journal-quand-vous-avez-besoin-daide)
 8. [Mettre à jour](#mettre-à-jour)
-9. [Les raccourcis qui valent la peine](#les-raccourcis-qui-valent-la-peine)
+9. [Choisir les outils qui apparaissent](#choisir-les-outils-qui-apparaissent)
+10. [Les raccourcis qui valent la peine](#les-raccourcis-qui-valent-la-peine)
 
 ---
 
@@ -456,6 +457,53 @@ Installer une mise à jour enregistre vos réglages non sauvegardés, l'état de
 la position de la fenêtre avant la sortie de Heimdall, exactement comme la fermeture de la fenêtre.
 Si une mise à jour ne s'est pas appliquée, la bannière le dit au démarrage suivant et le journal du
 relanceur se trouve dans le dossier de journaux indiqué dans le panneau À propos.
+
+---
+
+## Choisir les outils qui apparaissent
+
+Les outils intégrés de Heimdall sont regroupés en packs, et vous pouvez ajouter les vôtres sous
+forme de recettes.
+
+**Activer ou désactiver un pack.** Ouvrez **Paramètres** -> **Avancé** -> **Outils et
+intégrations** -> **Packs d'outils**. Chaque interrupteur montre le pack, une description d'une
+ligne et le nombre d'outils qu'il contient. Enregistrez les paramètres pour appliquer le
+changement. Un outil d'un pack désactivé disparaît de l'onglet Outils, de la barre latérale, de la
+palette de commandes et du sélecteur d'outils. Vos favoris et vos entrées d'outil enregistrées
+sont conservés et reviennent quand vous réactivez le pack ; en attendant, une entrée enregistrée
+est grisée, avec la raison. Les onglets déjà ouverts ne sont pas touchés. La Bibliothèque de
+commandes et Notes appartiennent à un pack qui ne se désactive pas. Si votre organisation interdit
+un pack, son interrupteur est sur arrêt et désactivé, avec une ligne qui le dit.
+
+**Ajouter un outil depuis un fichier de recette.** Une recette est un fichier texte qui décrit un
+outil : un programme déjà présent sur votre ordinateur, les champs à remplir et la façon
+d'afficher sa sortie.
+
+1. Activez le pack **Recettes**, comme ci-dessus. Il est désactivé par défaut.
+2. Ouvrez **Paramètres** -> **Avancé** -> **Outils et intégrations** -> **Recettes** et choisissez
+   **Importer une recette...**.
+3. Lisez l'aperçu. Il montre le programme qui sera lancé et chaque argument exactement comme écrit.
+   Rien n'est conservé avant votre confirmation : n'importez que des fichiers de personnes en qui
+   vous avez confiance.
+4. L'outil apparaît ensuite dans l'onglet Outils sous Recettes, avec la mention "Recette non
+   vérifiée de" suivie du nom de l'auteur. Cet auteur n'est que ce que le fichier affirme : les
+   recettes ne sont ni signées ni relues.
+
+Pour supprimer une recette, utilisez son bouton de suppression dans la même liste Recettes.
+L'outil disparaît, et tout ce qui est enregistré et l'utilise devient indisponible.
+
+**Quand une recette ne se charge pas ou ne s'exécute pas.** Un import refusé liste les problèmes,
+avec la ligne et la colonne quand elles sont connues ; corrigez le fichier et importez-le de
+nouveau. Une recette déjà importée qui ne se charge plus reste dans la liste **Recettes** des
+paramètres, avec une ligne qui dit pourquoi : fichier modifié, absent, illisible, ou refusé par
+cette version de Heimdall. Une exécution qui ne démarre pas affiche la raison près du champ ou dans
+la ligne d'état. Si le programme mène désormais à un autre fichier, est introuvable ou n'est plus
+autorisé, l'exécution est refusée et la recette doit être importée de nouveau. Un onglet ouvert
+avant le remplacement d'une recette vous demande de le fermer et de rouvrir l'outil. Les règles et
+tous les messages sont expliqués dans [TOOLS.md](TOOLS.md#recettes).
+
+Pour la liste complète des packs, voir [FEATURES.md](FEATURES.md#packs-doutils), et pour ce que les
+recettes protègent ou non, voir [SECURITY.md](SECURITY.md#recettes).
 
 ---
 
