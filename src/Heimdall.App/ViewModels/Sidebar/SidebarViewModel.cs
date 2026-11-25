@@ -149,8 +149,8 @@ public sealed partial class SidebarViewModel : ObservableObject, IDisposable
     /// Launches a sidebar tool: resolves the descriptor in
     /// <see cref="MainViewModel.ToolRegistry"/>, builds the inherited
     /// <see cref="ToolContext"/>, opens the tool tab via
-    /// <see cref="MainViewModel.OpenToolTabAsync"/> and tracks it as
-    /// recent. View-layer tab-strip navigation
+    /// <see cref="MainViewModel.OpenToolTabAsync"/>, which tracks it as
+    /// recent when the open succeeds. View-layer tab-strip navigation
     /// (<c>TabSessions.IsChecked = true</c>) stays in the host window.
     /// </summary>
     public async Task LaunchToolAsync(SidebarToolItemViewModel item)
@@ -169,7 +169,6 @@ public sealed partial class SidebarViewModel : ObservableObject, IDisposable
             var context = ToolsTabPopulationService.CreateInheritedToolContext(descriptor, _main);
             var title = ToolsTabPopulationService.ResolveToolTabTitle(descriptor, context, _main);
             await _main.OpenToolTabAsync(descriptor.Id, title, context).ConfigureAwait(true);
-            _main.TrackRecentTool(descriptor.Id);
         }
         catch (Exception ex)
         {

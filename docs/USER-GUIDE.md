@@ -31,7 +31,8 @@ local shell. Everything opens in a tab inside one window.
 6. [Sharing what a session printed](#sharing-what-a-session-printed)
 7. [Sending a log when you need help](#sending-a-log-when-you-need-help)
 8. [Updating](#updating)
-9. [Shortcuts worth knowing](#shortcuts-worth-knowing)
+9. [Choosing which tools appear](#choosing-which-tools-appear)
+10. [Shortcuts worth knowing](#shortcuts-worth-knowing)
 
 ---
 
@@ -421,6 +422,47 @@ under **Settings** -> **Updates** with a button that offers it again.
 Installing an update saves your unsaved settings, the tree's expand state and the window position
 before Heimdall exits, exactly as closing the window would. If an update did not apply, the banner
 says so at the next start and the relauncher's log is in the log folder shown in the About panel.
+
+---
+
+## Choosing which tools appear
+
+Heimdall's built-in tools are grouped into packs, and you can add tools of your own as recipes.
+
+**Turning a pack on or off.** Open **Settings** -> **Advanced** -> **Tools & integrations** ->
+**Tool packs**. Each switch shows the pack, a one-line description and how many tools it holds.
+Save the settings for the change to apply. A tool in a pack that is off disappears from the Tools
+tab, the sidebar, the command palette and the tool picker. Your favorites and saved tool entries
+are kept and come back when you turn the pack on again; until then a saved entry is shown dimmed,
+with the reason. Tabs that are already open are left alone. The Command Library and Notes belong to
+a pack that cannot be turned off. If your organization forbids a pack, its switch shows off and
+disabled, with a line saying so.
+
+**Adding a tool from a recipe file.** A recipe is a text file that describes a tool: a program
+already on your computer, the fields to fill in and how to show its output.
+
+1. Turn the **Recipes** pack on, as above. It is off by default.
+2. Open **Settings** -> **Advanced** -> **Tools & integrations** -> **Recipes** and choose
+   **Import a recipe...**.
+3. Read the preview. It shows the program that will run and every argument exactly as written.
+   Nothing is kept until you confirm, so import only files from people you trust.
+4. The tool then appears in the Tools tab under Recipes, marked "Unverified recipe by" and the
+   author's name. That author is only what the file claims: recipes are not signed or reviewed.
+
+To remove a recipe, use its remove button in the same Recipes list. The tool disappears, and
+anything saved that uses it becomes unavailable.
+
+**When a recipe will not load or run.** An import that is refused lists the problems, with the line
+and column when they are known; fix the file and import it again. A recipe already imported that no
+longer loads stays in the **Recipes** list of the settings, with a line that says why: the file
+changed, is missing, cannot be read, or is refused by this version of Heimdall. A run that does not
+start shows the reason next to the field or in the status line. If the program now leads to another
+file, can no longer be found or is no longer allowed, the run is refused and the recipe has to be
+imported again. A tab opened before a recipe was replaced asks you to close it and open the tool
+again. The rules and every message are explained in [TOOLS.md](TOOLS.md#recipes).
+
+For the full list of packs see [FEATURES.md](FEATURES.md#tool-packs), and for what recipes do and
+do not protect you from see [SECURITY.md](SECURITY.md#recipes).
 
 ---
 

@@ -46,6 +46,7 @@ public partial class ExternalToolWrapperView : UserControl, IToolView
     public ExternalToolWrapperView()
     {
         InitializeComponent();
+        TabularGridCopy.Attach(ResultsGrid);
         _viewState = new ToolAsyncStateController(
             null, LoadingBar, TxtError, null, null, TxtStatus,
             BtnRun, TxtArguments);
@@ -278,113 +279,27 @@ public partial class ExternalToolWrapperView : UserControl, IToolView
         }
     }
 
-    private void DisplayCsvOutput(string csvText)
-    {
-        if (string.IsNullOrWhiteSpace(csvText))
-        {
-            DisplayTextOutput(csvText);
-            return;
-        }
-
-        try
-        {
-            var table = ParseCsv(csvText);
-            if (table.Rows.Count == 0)
-            {
-                DisplayTextOutput(csvText);
-                return;
-            }
-
-            ResultsGrid.ItemsSource = table.DefaultView;
-            ResultsGrid.Visibility = Visibility.Visible;
-            TxtOutput.Visibility = Visibility.Collapsed;
-
-            TxtStatus.Text = DescribeRowCount(_localizer, table.Rows.Count);
-        }
-        catch
-        {
-            // Fallback to text if CSV parsing fails
-            DisplayTextOutput(csvText);
-        }
-    }
+    private void DisplayCsvOutput(string csvText) => DisplayTabularOutput(TabularOutput.FromCsv(csvText));
 
     /// <summary>
-    /// Parses JSON array output (NirSoft /sjson) into a DataTable for DataGrid display.
+    /// Shows JSON array output (NirSoft /sjson) in the DataGrid.
     /// Falls back to formatted text if parsing fails.
     /// </summary>
-    private void DisplayJsonOutput(string jsonText)
+    private void DisplayJsonOutput(string jsonText) => DisplayTabularOutput(TabularOutput.FromJson(jsonText));
+
+    private void DisplayTabularOutput(TabularOutput output)
     {
-        if (string.IsNullOrWhiteSpace(jsonText))
+        if (output.Table is not { } table)
         {
-            DisplayTextOutput(jsonText);
+            DisplayTextOutput(output.Text);
             return;
         }
 
-        try
-        {
-            using var doc = System.Text.Json.JsonDocument.Parse(jsonText);
-            if (doc.RootElement.ValueKind != System.Text.Json.JsonValueKind.Array)
-            {
-                // Pretty-print non-array JSON
-                var pretty = System.Text.Json.JsonSerializer.Serialize(
-                    doc.RootElement, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
-                DisplayTextOutput(pretty);
-                return;
-            }
+        ResultsGrid.ItemsSource = table.DefaultView;
+        ResultsGrid.Visibility = Visibility.Visible;
+        TxtOutput.Visibility = Visibility.Collapsed;
 
-            var table = new DataTable();
-            var firstRow = true;
-
-            foreach (var element in doc.RootElement.EnumerateArray())
-            {
-                if (element.ValueKind != System.Text.Json.JsonValueKind.Object) continue;
-
-                if (firstRow)
-                {
-                    foreach (var prop in element.EnumerateObject())
-                    {
-                        var colName = prop.Name;
-                        var uniqueName = colName;
-                        var suffix = 1;
-                        while (table.Columns.Contains(uniqueName))
-                            uniqueName = $"{colName}_{suffix++}";
-                        table.Columns.Add(uniqueName);
-                    }
-                    firstRow = false;
-                }
-
-                var row = table.NewRow();
-                foreach (var prop in element.EnumerateObject())
-                {
-                    // Match by property name, not position - handles missing/reordered fields
-                    if (table.Columns.Contains(prop.Name))
-                        row[prop.Name] = prop.Value.ToString();
-                    else if (!firstRow)
-                    {
-                        // Late-discovered column: add it and backfill with empty
-                        table.Columns.Add(prop.Name);
-                        row[prop.Name] = prop.Value.ToString();
-                    }
-                }
-                table.Rows.Add(row);
-            }
-
-            if (table.Rows.Count == 0)
-            {
-                DisplayTextOutput(jsonText);
-                return;
-            }
-
-            ResultsGrid.ItemsSource = table.DefaultView;
-            ResultsGrid.Visibility = Visibility.Visible;
-            TxtOutput.Visibility = Visibility.Collapsed;
-
-            TxtStatus.Text = DescribeRowCount(_localizer, table.Rows.Count);
-        }
-        catch
-        {
-            DisplayTextOutput(jsonText);
-        }
+        TxtStatus.Text = DescribeRowCount(_localizer, table.Rows.Count);
     }
 
     private void DisplayTextOutput(string text)
@@ -392,94 +307,6 @@ public partial class ExternalToolWrapperView : UserControl, IToolView
         TxtOutput.Text = text?.Trim() ?? string.Empty;
         TxtOutput.Visibility = Visibility.Visible;
         ResultsGrid.Visibility = Visibility.Collapsed;
-    }
-
-    /// <summary>
-    /// Simple RFC 4180-compatible CSV parser. Handles quoted fields with embedded
-    /// commas and double-quotes. First row = headers → DataTable column names.
-    /// </summary>
-    private static DataTable ParseCsv(string csv)
-    {
-        var table = new DataTable();
-        using var reader = new StringReader(csv);
-        var headerLine = reader.ReadLine();
-        if (headerLine is null) return table;
-
-        var headers = ParseCsvLine(headerLine);
-        foreach (var header in headers)
-        {
-            var colName = header.Trim();
-            // DataTable requires unique column names
-            var baseName = string.IsNullOrWhiteSpace(colName) ? "Column" : colName;
-            var uniqueName = baseName;
-            var suffix = 1;
-            while (table.Columns.Contains(uniqueName))
-                uniqueName = $"{baseName}_{suffix++}";
-            table.Columns.Add(uniqueName);
-        }
-
-        string? line;
-        while ((line = reader.ReadLine()) is not null)
-        {
-            if (string.IsNullOrWhiteSpace(line)) continue;
-            var fields = ParseCsvLine(line);
-            var row = table.NewRow();
-            for (var i = 0; i < Math.Min(fields.Count, table.Columns.Count); i++)
-                row[i] = fields[i];
-            table.Rows.Add(row);
-        }
-
-        return table;
-    }
-
-    private static List<string> ParseCsvLine(string line)
-    {
-        var fields = new List<string>();
-        var current = new StringBuilder();
-        var inQuotes = false;
-
-        for (var i = 0; i < line.Length; i++)
-        {
-            var c = line[i];
-            if (inQuotes)
-            {
-                if (c == '"')
-                {
-                    if (i + 1 < line.Length && line[i + 1] == '"')
-                    {
-                        current.Append('"');
-                        i++; // skip escaped quote
-                    }
-                    else
-                    {
-                        inQuotes = false;
-                    }
-                }
-                else
-                {
-                    current.Append(c);
-                }
-            }
-            else
-            {
-                if (c == '"')
-                {
-                    inQuotes = true;
-                }
-                else if (c == ',')
-                {
-                    fields.Add(current.ToString());
-                    current.Clear();
-                }
-                else
-                {
-                    current.Append(c);
-                }
-            }
-        }
-
-        fields.Add(current.ToString());
-        return fields;
     }
 
     private void OnCopyClick(object sender, RoutedEventArgs e)
@@ -503,27 +330,7 @@ public partial class ExternalToolWrapperView : UserControl, IToolView
     {
         if (ResultsGrid.ItemsSource is not DataView view) return string.Empty;
         var table = view.Table;
-        if (table is null) return string.Empty;
-
-        var sb = new StringBuilder();
-        // Headers
-        for (var i = 0; i < table.Columns.Count; i++)
-        {
-            if (i > 0) sb.Append('\t');
-            sb.Append(table.Columns[i].ColumnName);
-        }
-        sb.AppendLine();
-        // Rows
-        foreach (DataRow row in table.Rows)
-        {
-            for (var i = 0; i < table.Columns.Count; i++)
-            {
-                if (i > 0) sb.Append('\t');
-                sb.Append(row[i]);
-            }
-            sb.AppendLine();
-        }
-        return sb.ToString();
+        return table is null ? string.Empty : TabularOutput.ToTabSeparated(table);
     }
 
     private void SetRunningState(bool running)

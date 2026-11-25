@@ -1,0 +1,8 @@
+{
+  "errors": [
+    {
+      "code": "UnknownTranslationField",
+      "path": "translations.fr.fieldHints.ghost"
+    }
+  ]
+}

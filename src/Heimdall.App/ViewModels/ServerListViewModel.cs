@@ -372,6 +372,9 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
                     ? openedUtc
                     : null;
             }
+
+            // Same reasoning: a row built here starts knowing which tools may be used.
+            server.ToolStateResolver = _toolStateResolver;
         }
 
         // Generation entries deliberately outlive an index entry so a health

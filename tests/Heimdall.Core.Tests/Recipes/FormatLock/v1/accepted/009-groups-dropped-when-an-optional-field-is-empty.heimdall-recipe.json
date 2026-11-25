@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "lock.sample",
+  "version": "1.0.0",
+  "author": "Lock",
+  "name": "Sample",
+  "description": "A sample of the version 1 format.",
+  "program": "ping.exe",
+  "arguments": ["-x", ["--a", "{in:a}"], ["--ab", "{in:a}", "{in:b}"], ["--c", "{in:c}"], "-y"],
+  "inputs": [
+    { "name": "a", "type": "string", "label": "Label a" },
+    { "name": "b", "type": "string", "label": "Label b" },
+    { "name": "c", "type": "int", "label": "Label c", "default": 3 }
+  ]
+}

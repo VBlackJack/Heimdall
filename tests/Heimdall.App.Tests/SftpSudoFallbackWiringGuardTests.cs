@@ -62,6 +62,7 @@ public sealed class SftpSudoFallbackWiringGuardTests
 
         EmbeddedSessionManager manager = new(
             null!, null!, null!, null!, null!, null!, null!, null!, null!, null!,
+            AlwaysAvailableToolAvailability.Instance,
             sftpSudoFallbackProvider: provider);
 
         FieldInfo? field = typeof(EmbeddedSessionManager).GetField(

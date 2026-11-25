@@ -1,0 +1,12 @@
+{
+  "errors": [
+    {
+      "code": "PropertyNotAllowedForType",
+      "path": "inputs[0].min"
+    },
+    {
+      "code": "PropertyNotAllowedForType",
+      "path": "inputs[0].max"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "errors": [
+    {
+      "code": "BoolInputInTokenText",
+      "path": "arguments[0][1]"
+    },
+    {
+      "code": "UnreferencedInput",
+      "path": "inputs[0]"
+    }
+  ]
+}

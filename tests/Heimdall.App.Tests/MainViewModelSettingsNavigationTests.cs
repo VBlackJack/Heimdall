@@ -874,7 +874,8 @@ public sealed class MainViewModelSettingsNavigationTests : IDisposable
                 embeddedSessionManager,
                 connectionService,
                 toolRegistry,
-                dialog, new PaneCloseArbiter());
+                dialog, new PaneCloseArbiter(),
+                AlwaysAvailableToolAvailability.Instance);
             ConnectionViewModel connection = new(
                 localizer,
                 dialog,
@@ -941,7 +942,8 @@ public sealed class MainViewModelSettingsNavigationTests : IDisposable
                     hostKeyStore,
                     RejectingHostKeyVerifier.Instance,
                     config),
-                new MaskedCopyTestSupport.RecordingClipboard());
+                new MaskedCopyTestSupport.RecordingClipboard(),
+                AlwaysAvailableToolAvailability.Instance);
 
             return new TestHarness(
                 rootPath,

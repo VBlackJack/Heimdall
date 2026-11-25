@@ -834,6 +834,39 @@ The registry eliminates three formerly-duplicated lists (menu definitions, palet
 2. One `Entry()` line in `ToolRegistry`
 3. i18n keys in both locale files
 
+### Tool Packs and Availability
+
+Every built-in descriptor names a `ToolPack` (`Core`, `Essentials`, `NetworkDiagnostics`, `Administration`, `Audit`) in its trailing `Pack` member. A sixth pack, `Recipes`, holds no built-in descriptor: `ToolRegistry.RegisterRecipeTools` builds one descriptor per imported recipe with `Pack: ToolPack.Recipes`, and `RecipeToolRegistrar` calls it with the stored recipes while that pack is on and not forbidden, and with none to take them out. Detected external tools and test probes leave it null and are always available. The pack is data on the descriptor: the registry still holds the full catalogue (`All`, `GetById`), so a saved entry of a hidden tool keeps its name and icon.
+
+`IToolAvailability` (`Heimdall.App.Services`, a singleton) is the one decision on whether a tool may be used. `GetState(toolId)` returns `Available`, `DisabledByUser`, `ForbiddenByPolicy` or `Unknown`:
+- an id that is not in the registry is `Unknown`; a tool with no pack, or in `Core`, is `Available`
+- the machine policy (`ToolPackPolicy`) beats the user's `AppSettings.DisabledToolPacks`
+- `Core` and pack names this build does not know are ignored when a hand-edited settings file lists them
+- the set of enabled packs is computed once and again on each settings change; `Changed` is raised only when that set differs, on the thread that published the change (a pool thread), so a subscriber that touches the UI marshals itself
+
+The decision is enforced at three points, each before any side effect:
+1. `MainViewModel.OpenToolTabAsync` refuses first, before it reuses an open tab, names the reason in the status bar and returns a `ToolOpenOutcome`. It records the recent tool itself, on a successful open or focus.
+2. `SplitService.SplitSessionWithTool` refuses right after the descriptor lookup, before any pane is built.
+3. `EmbeddedSessionManager.CreateToolControl` throws `ToolUnavailableException` and builds no UI. It is a backstop that is not expected to fire.
+
+The listing surfaces (the Tools tab, the sidebar tree, the command palette and the tool picker) share one projection, `ToolAvailabilityExtensions.ListedTools` and `IsListed`, which keeps the tools whose state is `Available`. Cross-tool menu items ask the same service through `ToolContext` and are offered only when their target is available. The cached Tools tab and sidebar tree are invalidated when `Changed` fires. The Settings panel edits the stored list as `DisabledToolPacks` and applies it on Save like any other setting.
+
+### Recipes
+
+A recipe is a JSON file that describes a tool and runs a program already on the machine. The format is in [TOOLS.md](TOOLS.md#recipes) and the threat model in [SECURITY.md](SECURITY.md#recipes); this section only says where the code is.
+
+**Reading a file.** `CappedFileReader` reads one open handle and stops at `RecipeLimits.MaxFileBytes` (64 KiB). `RecipeParser.Parse` is strict: `RecipeJsonTree` builds the tree (depth cap, duplicate properties refused), the internal `RecipeMapper` maps it to a `Recipe` and refuses unknown properties and wrong types, and `RecipeValidator` applies the semantic rules, including the look-alike character rule through `IRecipeCharacterConverter`. Bad input never throws: the outcome is a `RecipeParseResult` holding at most `RecipeLimits.MaxReportedErrors` `RecipeError` values, each with a line and column when known.
+
+**Importing.** `RecipeImportService.PrepareFile` and `Prepare` read, parse and resolve the program (`IRecipeProgramLocator`), and return a `RecipeImportOutcome` that holds either a `RecipeImportPlan` or the failure with its errors; `RecipeImportPreview` renders what the user must read, including the replacement summary when the id is already imported. Nothing is written before `Commit`, which calls `IRecipeStore.Add` or `Replace`. `RecipeStore` keeps one file per recipe and an index recording, per recipe, the SHA-256 of the imported bytes and the resolved program path; a file with no index entry or a different hash is skipped and reported as a `RecipeLoadIssue`.
+
+**Becoming a tool.** `RecipeToolRegistrar` loads the store and calls `ToolRegistry.RegisterRecipeTools` at start, when the pack is turned on, and after `Reload`; it removes the tools when the pack is turned off or forbidden. `RecipeToolViewFactory` builds the view only when a tool is opened. `IToolAvailability` gates the tool like any other. A tab keeps the recipe it was opened with: `RecipeToolViewModel.CheckStale` compares it with the store and latches `IsStale` when the recipe is gone, its bytes differ or its program now resolves to another path, which disables Run.
+
+**Running.** `RecipeExpander` turns the tokens and the typed values into the argument list, each typed value passing `RecipeValueRule`. `RecipeProgramResolver.CompareWithStored` resolves the program again and compares it with the stored path; for a program under the Windows folder or Program Files it walks from the file up to that root and reads the owner and permissions of each item (`RecipeAccessPolicy`). `RecipeRunner` starts the process directly, with no shell, inside a `RecipeJob` (a Windows job object, which may be unavailable), reads each stream up to its cap and decodes it with `RecipeOutputEncodings`. `RecipeWorkFolders` creates a fresh empty folder per run, deletes it afterwards and cleans stale ones at start.
+
+**Threading of a run.** In `RecipeToolViewModel.RunAsync` the program comparison runs in `Task.Run`, off the UI thread, and its answer is applied back on it. Starting the runner and publishing its task happen under `_runnerGate`, the same lock `Dispose` takes to read that task: a disposed view never starts a runner, and one that is starting is waited for.
+
+**Where the format is pinned.** `tests/Heimdall.Core.Tests/Recipes/FormatLock/v1/` holds the accepted and refused samples (a recipe and its expected file each) and `MANIFEST.sha256`; `RecipeFormatLockTests` checks them against the sample names frozen in `FormatLockFrozen`. A sample is never edited, removed or renamed.
+
 ### IToolView Interface
 
 ```csharp

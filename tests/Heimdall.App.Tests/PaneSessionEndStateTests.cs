@@ -305,7 +305,8 @@ public sealed class PaneSessionEndStateTests
             null!,
             null!,
             null!,
-            null!);
+            null!,
+            AlwaysAvailableToolAvailability.Instance);
     }
 
     /// <summary>Runs the dispatcher until every operation queued so far, and those they queue, has run.</summary>

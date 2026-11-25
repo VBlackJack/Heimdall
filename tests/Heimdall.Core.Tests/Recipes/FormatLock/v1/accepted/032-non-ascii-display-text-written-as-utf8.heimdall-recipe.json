@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "lock.non-ascii",
+  "version": "1.0.0",
+  "author": "Lock",
+  "name": "Café à la crème 日本語",
+  "description": "Une description avec des accents : é, è, ê, ï, ô, û, ç et des signes : € ✓",
+  "program": "ping.exe",
+  "arguments": [["--a", "{in:a}"]],
+  "inputs": [
+    { "name": "a", "type": "string", "label": "Label a", "hint": "Café à la crème, 日本語, üñî" }
+  ],
+  "translations": { "fr": { "name": "Échantillon étendu", "fieldLabels": { "a": "Texte à saisir" } } }
+}

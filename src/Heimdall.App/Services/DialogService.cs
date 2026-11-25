@@ -89,6 +89,21 @@ public interface IDialogService
         => ShowConfirmAsync(title, message, severity, confirmLabel, declineLabel);
 
     /// <summary>
+    /// The labeled confirmation in a large dialog, for a long message such as a preview that has to be
+    /// read before it is accepted. A default implementation shows the ordinary labeled confirmation, so
+    /// existing implementations need no change.
+    /// </summary>
+    /// <param name="confirmLabel">Label for the answer that performs the act.</param>
+    /// <param name="declineLabel">Label for the answer that does nothing, and takes Enter.</param>
+    Task<bool> ShowLargeConfirmAsync(
+        string title,
+        string message,
+        string severity,
+        string confirmLabel,
+        string declineLabel)
+        => ShowConfirmAsync(title, message, severity, confirmLabel, declineLabel);
+
+    /// <summary>
     /// Shows a three-choice dialog (Save / Discard / Cancel).
     /// </summary>
     /// <returns>True = Save, false = Discard, null = Cancel.</returns>

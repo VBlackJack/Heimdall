@@ -724,6 +724,250 @@ Les ouvertures d'éditeur externe sont sérialisées et liées à la durée de v
 propriétaire. Sa fermeture annule les téléchargements en cours ; l'enregistrement,
 la création du surveillant et le lancement de l'éditeur ne reprennent pas après sa destruction.
 
+### Politique de machine des packs d'outils
+
+Les outils intégrés sont regroupés en packs (voir la colonne Pack de [TOOLS.md](TOOLS.md)). Une
+organisation peut interdire un pack facultatif sur une machine avec une valeur DWORD par pack,
+sous la même clé que le plafond SFTP, `HKLM\Software\Policies\Heimdall` :
+
+| Valeur | Pack |
+|---|---|
+| `ToolPackEssentials` | Essentiels |
+| `ToolPackNetworkDiagnostics` | Diagnostic réseau |
+| `ToolPackAdministration` | Administration |
+| `ToolPackAudit` | Audit et reconnaissance |
+| `ToolPackRecipes` | Recettes |
+
+- `0` interdit le pack. `1` signifie aucune restriction. Tout autre nombre, et une valeur
+  absente, signifient aucune politique pour ce pack ; `2` est réservé à un futur "forcé
+  activé" et est traité aujourd'hui comme aucune restriction. Le pack Noyau n'a pas de valeur :
+  il ne peut jamais être interdit.
+- Un pack interdit l'emporte sur le choix de l'utilisateur. Ses outils sont masqués et refusés,
+  et son interrupteur dans `Paramètres > Avancé > Outils et intégrations > Packs d'outils`
+  est sur arrêt et désactivé, avec une ligne qui dit que le pack est défini par la politique de
+  l'organisation. Le choix de l'utilisateur reste dans le fichier de paramètres : lever la
+  politique le lui rend.
+- Seule la ruche par machine est lue, parce que la ruche par utilisateur est modifiable par
+  l'utilisateur que la politique contraint. Deux lecteurs existent, le service de disponibilité
+  des outils et celui du lanceur de privilèges ; chacun lit les valeurs une seule fois, la
+  première fois qu'il en a besoin : une modification demande un redémarrage.
+- Seule une valeur `REG_DWORD` égale à `0` interdit un pack. Tout autre type ou valeur, et une
+  clé illisible, signifient aucune politique.
+- Le lanceur de privilèges refuse aussi de lancer tant que le pack Audit est interdit, qu'il
+  ait été atteint depuis l'outil ou démarré avec une ligne de commande construite à la main.
+
+C'est une commodité pour les administrateurs, **pas une frontière de sécurité** : les outils
+restent dans le binaire et sur le disque, et un administrateur local peut modifier la politique.
+Elle n'atteint pas non plus tout ce qui ressemble aux outils d'un pack. Limites connues :
+
+- L'outil des services Windows s'élève par `runas` pour démarrer, arrêter et redémarrer des
+  services. Il appartient au pack Administration, pas à Audit : interdire Audit ne supprime donc
+  pas ce chemin d'élévation.
+- Le menu contextuel des serveurs envoie lui-même des paquets Wake-on-LAN, avec ou sans l'outil
+  Wake-on-LAN.
+- Les outils externes détectés, comme Sysinternals PsExec, sont hors des packs.
+- Plusieurs outils de diagnostic réseau (ping, recherche DNS, WHOIS, en-têtes HTTP, traceroute
+  et inspecteur de certificats) peuvent exécuter leur sonde sur une passerelle SSH choisie par
+  l'utilisateur, ce qui exécute des commandes sur un hôte distant. Cela ne concerne pas
+  seulement le pack Audit.
+
+### Recettes
+
+Une recette (voir [TOOLS.md](TOOLS.md#recettes)) est un fichier texte, écrit par
+quelqu'un d'autre, qui demande à Heimdall de lancer un programme déjà présent
+sur l'ordinateur avec une liste d'arguments donnée. En importer une est une
+décision de confiance : à partir de là, lancer l'outil démarre ce programme avec
+ces arguments, avec vos droits. Le pack Recettes est désactivé par défaut.
+
+**Ce qui vous protège.**
+
+- **L'aperçu d'import est la vraie barrière.** Avant que quoi que ce soit soit
+  écrit, Heimdall montre le programme sous la forme du chemin complet qu'il a
+  résolu, puis chaque argument exactement comme écrit dans le fichier, un par
+  ligne. Les caractères de contrôle et invisibles, et tout caractère hors de
+  l'ASCII imprimable dans le programme, les arguments et les valeurs par défaut,
+  sont montrés sous la forme `\uXXXX`. Chaque traduction que porte le fichier
+  (langue, nom, description, libellés et aides des champs) est listée aussi,
+  parce que l'outil l'affiche à la place du texte anglais quand l'interface est
+  dans cette langue, comme l'aide de chaque champ et les arguments qu'un
+  interrupteur ajoute quand il est activé et quand il est désactivé. Pour un
+  remplacement, chacun de l'auteur, du nom, de la description, des traductions,
+  de la sortie et de son encodage (et du séparateur d'un tableau), du mode de
+  conservation de l'erreur standard, des codes de sortie de succès, du délai et
+  de l'icône est dit inchangé ou modifié, sur une ligne à part, et la ligne des
+  champs compare chaque propriété de chaque champ. Ce modèle suppose que l'aperçu
+  est lu : les autres règles ci-dessous limitent ce qu'un fichier peut demander,
+  elles ne jugent pas de ce à quoi il sert.
+- **Des règles structurelles.** Le programme doit être un vrai `.exe` que Heimdall
+  résout lui-même (l'ordre de recherche du système d'exploitation n'est jamais
+  utilisé), et son emplacement final, une fois les liens suivis, doit se trouver
+  sous le dossier Windows, Program Files, Program Files (x86) ou un dossier que
+  vous avez ajouté. Il n'est jamais lancé par un interpréteur de commandes : la
+  liste d'arguments est transmise telle quelle, un élément valant un argument,
+  sans guillemets, découpage ni jonction. Aucune variable d'environnement n'est
+  développée. Un texte fixe qui contient un chemin réseau (deux séparateurs de
+  suite, sous l'une ou l'autre forme et en toute combinaison : une barre oblique
+  inverse à côté d'une barre oblique compte), une URL, le préfixe de chemin
+  système (un séparateur, deux points d'interrogation et un séparateur), un `%`,
+  un `@` initial ou un caractère qui ressemble à un caractère ordinaire est
+  refusé à l'import. Un choix ou une valeur par défaut est soumis à l'import à la
+  règle que rencontre une valeur saisie à l'exécution (voir plus bas) : celui qui
+  serait toujours refusé est donc refusé avec le fichier. La racine d'un lecteur
+  ne peut pas être ajoutée comme dossier autorisé. Une valeur saisie est soumise
+  à une règle commune (aucun caractère de contrôle, aucun caractère qui
+  ressemble à un caractère ordinaire, aucune espace, aucun `-`, `/`, `@` ou
+  barre oblique inverse initial à l'endroit où elle ouvre un argument, aucun
+  chemin réseau ou de périphérique dans un champ `path`) et à la validation de
+  son type.
+- **Les racines autorisées sont vérifiées, pas approuvées en entier.** Un
+  programme sous le dossier Windows, Program Files ou Program Files (x86) est
+  refusé quand un utilisateur qui n'est pas administrateur peut modifier son
+  fichier ou un dossier au-dessus (jusqu'à cette racine), par ses permissions ou
+  parce qu'il en est propriétaire (un propriétaire autre que le système, les
+  administrateurs ou le service d'installation), ou quand ces permissions ou ce
+  propriétaire ne peuvent pas être lus. Un dossier que vous avez ajouté est
+  approuvé en entier et n'est pas vérifié, mais seulement pour ce qui se trouve
+  hors de Windows et de Program Files : ajouter un dossier qui en couvre une
+  partie ne désactive pas la vérification. Un dossier qui mène à la racine d'un
+  lecteur ou à un emplacement réseau (un lecteur réseau connecté, un lien vers
+  un partage) est refusé à l'ajout, et sa forme finale n'est jamais approuvée
+  quand un programme s'exécute.
+- **Les caractères qui ressemblent à d'autres.** Un caractère que Windows
+  transformerait en caractère ASCII ordinaire pour un programme qui lit sa ligne
+  de commande dans la page de codes ANSI de la machine (un trait d'union pleine
+  chasse, un guillemet typographique, une espace insécable) est refusé dans le
+  texte fixe et dans les valeurs saisies. La règle suit la page de codes ANSI de
+  la machine, celle dans laquelle un programme lit sa ligne de commande :
+  certaines majuscules accentuées et certaines ligatures peuvent donc être
+  refusées dans un argument sur certaines machines, et acceptées sur d'autres.
+- **Un garde-fou, en seconde ligne seulement.** Une liste de noms
+  d'interpréteurs de commandes, d'interpréteurs de scripts et d'exécutables
+  relais (`cmd`, `powershell`, `python`, `rundll32` et les autres de la liste de
+  [TOOLS.md](TOOLS.md#recettes)) est vérifiée sur le nom de fichier et sur le nom
+  de fichier d'origine de la ressource de version. Il arrête l'erreur évidente.
+  Ce n'est pas une frontière (voir plus bas).
+- **Les octets que vous avez acceptés.** Le SHA-256 du fichier importé est
+  enregistré. Un fichier de recette modifié ensuite, ou déposé à la main dans le
+  dossier, n'est pas chargé.
+- **Le programme que vous avez accepté.** Le chemin auquel le programme s'est
+  résolu à l'import est enregistré et comparé avant chaque exécution. Si le nom
+  mène désormais à un autre fichier, ou à rien, l'exécution ne démarre pas et la
+  recette doit être importée à nouveau.
+- **Un dossier de travail neuf.** Chaque exécution reçoit un dossier de travail
+  neuf et vide, supprimé ensuite. Il est créé sous un dossier Heimdall de votre
+  dossier temporaire, et non dans le dossier de données : un programme ne démarre
+  donc pas à côté des paramètres de Heimdall.
+- **Des exécutions bornées.** Au plus 1 Mio de sortie est conservé par flux
+  (2 Mio en tout quand l'erreur standard est gardée à part), et une exécution est
+  arrêtée au délai de la recette (60 secondes par défaut, 600 au plus). Une
+  exécution en cours est aussi arrêtée quand le pack est désactivé ou devient
+  interdit.
+- **Les processus que le programme a lancés.** Le programme est placé dans un
+  objet de travail (job) Windows juste après son démarrage, et le job arrête les
+  processus qu'il a lancés quand l'exécution prend fin. Un processus que le
+  programme a lancé dans ce tout premier instant peut échapper au job. Si Windows refuse de le créer (par exemple quand
+  Heimdall tourne lui-même dans un job qui interdit l'imbrication), seule une
+  exécution interrompue (arrêtée ou ayant dépassé le délai) arrête l'arbre de
+  processus.
+- **Un onglet ouvert ne peut pas lancer une ancienne recette.** Un onglet garde la
+  recette avec laquelle il a été ouvert. Une fois la recette remplacée, ou
+  supprimée puis importée à nouveau, l'onglet le dit dans son en-tête et refuse
+  de s'exécuter, et ouvrir l'outil ouvre un nouvel onglet au lieu de remettre
+  celui-ci au premier plan.
+- **Le pack reste désactivé tant qu'il n'a pas été choisi.** Le pack Recettes
+  compte comme désactivé tant que l'étape unique n'a pas été exécutée ou que vous
+  n'avez pas activé l'interrupteur et enregistré : une étape qui a échoué ou a été
+  sautée (un fichier de paramètres écrit par une version plus récente n'est
+  jamais modifié) ne le laisse donc pas activé. Un fichier de paramètres importé
+  depuis les Paramètres ne l'active pas non plus : un fichier écrit par une
+  version antérieure le laisse tel quel, et seul un fichier écrit par cette
+  version où le pack était activé l'active, avec une ligne à part dans la
+  confirmation ("Active le pack Recettes").
+- **La politique.** Une organisation peut interdire le pack (voir plus bas).
+
+**Ce qui ne vous protège pas.**
+
+- Ces règles ne rendent pas une recette sûre. Un programme légitime peut faire du
+  mal par ses propres arguments : celui qui supprime, écrit, lit ou envoie ce
+  qu'on lui dit de supprimer, d'écrire, de lire ou d'envoyer le fait. Un
+  programme lancé par une recette a les droits et l'environnement de Heimdall, et
+  un dossier de travail vide ne l'empêche pas d'utiliser n'importe quel autre
+  dossier. Rien ici n'est un bac à sable.
+- Une recette peut nommer tout fichier que l'utilisateur peut atteindre, y compris
+  par un chemin relatif avec `..`. Rien ne confine un programme à son dossier
+  d'exécution.
+- Le garde-fou est une liste de noms. Une copie d'un interpréteur sous un autre
+  nom, avec un nom de fichier d'origine neutre dans sa ressource de version, le
+  franchit, tout comme un programme anodin par son nom mais qui lance d'autres
+  programmes ou charge des modules complémentaires.
+- Il existe une fenêtre entre la vérification du programme et son lancement : un
+  fichier remplacé pendant cet intervalle n'est pas détecté. La comparaison
+  faite avant chaque exécution compare des chemins : un programme remplacé sur
+  place, au même chemin, n'est donc pas détecté non plus. Un dossier que vous
+  ajoutez à la liste n'est approuvé en entier que pour les programmes situés
+  hors de Windows et de Program Files : n'importe quel `.exe` qu'il contient à
+  cet endroit peut être nommé par une recette, alors qu'un programme sous
+  Windows ou Program Files est toujours vérifié, quels que soient les dossiers
+  ajoutés.
+- La vérification des permissions des dossiers Windows et Program Files lit les
+  règles de permission et le propriétaire du fichier et de chaque dossier
+  au-dessus. Un propriétaire non approuvé est refusé quelles que soient les
+  règles : une entrée OWNER RIGHTS, qui peut limiter ce qu'un propriétaire peut
+  faire, n'est volontairement pas prise en compte. C'est une limite contre le
+  cas évident, pas une garantie que personne d'autre ne peut modifier le
+  fichier.
+- Seuls le système, les Administrateurs de la machine et le service
+  d'installation sont approuvés. Un droit d'écriture, ou un propriétaire, qui
+  est tout autre compte fait refuser le programme, administrateurs d'un domaine
+  et compte de service compris, même quand un administrateur l'a voulu ainsi.
+  Une entrée de refus de la liste des permissions n'est pas comptée, et une
+  entrée conditionnelle est lue comme si sa condition était toujours remplie
+  (mesuré sur un fichier de test). Les deux penchent du côté du refus.
+- Le contrôle des caractères qui ressemblent à d'autres demande comment la page
+  de codes ANSI de la machine écrirait chaque caractère, et il refuse toujours
+  le bloc des formes demi-chasse et pleine chasse. Sur une machine dont la page
+  de codes ANSI écrit certains caractères sur deux octets (japonais, chinois,
+  coréen), il ne voit pas un caractère dont le second octet est celui d'une
+  barre oblique inverse, qu'un programme qui lit sa ligne de commande octet par
+  octet peut prendre pour elle, et les katakana et le hangeul demi-chasse de ce
+  bloc sont refusés sur toutes les machines. Rien dans cette version n'adapte la
+  règle à ces pages de codes.
+- La règle des dossiers lit le texte du chemin, puis le chemin auquel il mène
+  une fois les liens et les lecteurs réseau suivis : un lecteur réseau connecté,
+  un lien vers un partage et un lien vers la racine d'un lecteur sont refusés.
+  Un dossier dont la forme finale ne peut pas être résolue (il est absent, son
+  lecteur est absent) est accepté tel qu'il est écrit, et ce vers quoi il mène
+  est vérifié à nouveau quand un programme s'exécute.
+- Le comportement avec certaines formes de chemin inhabituelles (noms courts
+  8.3, lecteurs substitués) n'a pas été vérifié par un vrai test, et rien n'est
+  promis à son sujet. Le fait que l'arrêt d'une exécution arrête aussi les
+  processus que le programme a lancés a été vérifié par un seul vrai test avec un
+  programme standard, et rien n'est promis au-delà.
+- Un tableau affiché par un outil est neutralisé quand il est copié, qu'il
+  s'agisse de la sortie d'une recette en CSV ou en JSON ou du tableau d'un outil
+  externe : une cellule qui commence par `=`, `+`, `-`, `@` ou un guillemet
+  double reçoit une apostrophe initiale, pour qu'un tableur ne la lise pas comme
+  une formule, et une tabulation ou un saut de ligne dans une cellule devient
+  une espace. Une valeur qui commence par `-` ou `+` (un nombre négatif, un
+  décalage horaire, un numéro de téléphone) est donc copiée avec une apostrophe
+  initiale et se colle comme du texte. La sortie en texte brut est copiée telle
+  quelle.
+- Une recette n'est ni signée ni relue par le projet. L'auteur est un texte que
+  le fichier affirme, et Heimdall l'affiche comme non vérifié. Un catalogue
+  communautaire ne fait pas partie de cette version : une recette vient de qui
+  vous donne le fichier.
+
+**Politique de machine.** La valeur `ToolPackRecipes`, une `REG_DWORD` sous
+`HKLM\Software\Policies\Heimdall` (la clé des autres valeurs de pack, voir
+[Politique de machine des packs d'outils](#politique-de-machine-des-packs-doutils)),
+mise à `0`, interdit le pack. L'interrupteur du pack est alors sur arrêt et
+désactivé, avec une ligne qui dit que le pack est défini par la politique de
+l'organisation ; les outils de recette ne sont pas listés et sont refusés
+quand on tente de les lancer ; le bouton **Importer une recette...** est
+désactivé et un import est refusé. Les fichiers de recette déjà sur le disque
+restent où ils sont. Comme pour les autres packs, c'est une commodité pour les
+administrateurs, pas une frontière de sécurité.
+
 ### Garanties de validation des remontées distantes
 
 Chaque écriture distante commence par une remontée vers un chemin temporaire
@@ -1346,7 +1590,7 @@ remplacer la destination.
   bloquante (la suite moins les cas marqués `CIUnstable` ou `RequiresDesktop`,
   qui tournent dans deux autres lanes signalant leurs échecs sans faire rougir
   l'exécution), la parité des locales JSON (chaque catalogue porte exactement
-  le jeu de clés anglais, actuellement 6 400+ clés) et une analyse informative
+  le jeu de clés anglais, actuellement 6 700+ clés) et une analyse informative
   `dotnet list package --vulnerable`.
 - Analyse des dépendances pour revue manuelle : `dotnet list Heimdall.slnx
   package --vulnerable --include-transitive`. La CI émet des avertissements mais

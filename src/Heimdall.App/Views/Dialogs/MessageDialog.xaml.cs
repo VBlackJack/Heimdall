@@ -15,6 +15,7 @@
  */
 
 using System.Windows;
+using Heimdall.App.Localization;
 using Heimdall.App.Theming;
 
 namespace Heimdall.App.Views.Dialogs;
@@ -31,6 +32,14 @@ public partial class MessageDialog : Window
     /// <summary>Resource key of the plain button style.</summary>
     internal const string PlainButtonStyleKey = "SecondaryButtonStyle";
 
+    /// <summary>Width of the large layout, in device-independent pixels, before it is clamped to the work area.</summary>
+    internal const double LargeWidth = 720;
+
+    /// <summary>Share of the work area height the large layout may take at most.</summary>
+    internal const double LargeMaxHeightShare = 0.8;
+
+    private const string AppNameLocaleKey = "AppName";
+
     public bool Result { get; private set; }
 
     /// <summary>
@@ -44,13 +53,60 @@ public partial class MessageDialog : Window
         WindowThemeHelper.ApplyCurrentTheme(this);
     }
 
+    /// <summary>The width of the large layout inside a work area: wide, but never wider than the area.</summary>
+    /// <param name="workAreaWidth">The width of the work area, in device-independent pixels.</param>
+    internal static double LargeWidthWithin(double workAreaWidth) => Math.Min(LargeWidth, workAreaWidth);
+
+    /// <summary>The maximum height of the large layout inside a work area: a share of it, so never above it.</summary>
+    /// <param name="workAreaHeight">The height of the work area, in device-independent pixels.</param>
+    internal static double LargeMaxHeightWithin(double workAreaHeight) => workAreaHeight * LargeMaxHeightShare;
+
+    /// <summary>
+    /// Opts this dialog into the large layout, for a long message such as a preview: wider and taller
+    /// than the default, within the given work area. The message stays scrollable and the buttons visible.
+    /// </summary>
+    /// <param name="workArea">The work area of the screen the dialog opens on, in device-independent pixels.</param>
+    internal void UseLargeLayout(Rect workArea)
+    {
+        Width = LargeWidthWithin(workArea.Width);
+        MaxHeight = LargeMaxHeightWithin(workArea.Height);
+    }
+
+    /// <summary>The work area of the screen the owner is on, or of the primary screen without an owner.</summary>
+    /// <param name="owner">The owner window, or null.</param>
+    internal static Rect WorkAreaOf(Window? owner)
+    {
+        System.IntPtr handle = owner is null ? System.IntPtr.Zero : new System.Windows.Interop.WindowInteropHelper(owner).Handle;
+        if (owner is null || handle == System.IntPtr.Zero)
+        {
+            return SystemParameters.WorkArea;
+        }
+
+        System.Drawing.Rectangle area = System.Windows.Forms.Screen.FromHandle(handle).WorkingArea;
+        System.Windows.DpiScale dpi = System.Windows.Media.VisualTreeHelper.GetDpi(owner);
+        return new Rect(area.X / dpi.DpiScaleX, area.Y / dpi.DpiScaleY, area.Width / dpi.DpiScaleX, area.Height / dpi.DpiScaleY);
+    }
+
+    /// <summary>
+    /// Sets the window title and the in-window header from <paramref name="title"/>, falling back
+    /// to the localized application name for the window title when the caller passes a blank one.
+    /// </summary>
+    /// <param name="title">The caller-supplied title.</param>
+    internal void ApplyTitle(string? title)
+    {
+        TitleText.Text = title ?? string.Empty;
+        Title = string.IsNullOrWhiteSpace(title)
+            ? LocalizationSource.Instance[AppNameLocaleKey]
+            : title.Trim();
+    }
+
     /// <summary>
     /// Shows a themed information or error message with a single OK button.
     /// </summary>
     public static void ShowMessage(Window? owner, string title, string message, string severity = "info", string primaryLabel = "OK")
     {
         var dialog = new MessageDialog { Owner = owner };
-        dialog.TitleText.Text = title;
+        dialog.ApplyTitle(title);
         dialog.MessageText.Text = message;
         dialog.BtnPrimary.Content = primaryLabel;
         System.Windows.Automation.AutomationProperties.SetName(dialog.BtnPrimary, primaryLabel);
@@ -166,11 +222,17 @@ public partial class MessageDialog : Window
         string primaryLabel = "Yes",
         string secondaryLabel = "No",
         bool topmost = false,
-        bool primaryIsDefault = true)
+        bool primaryIsDefault = true,
+        bool large = false)
     {
         var dialog = new MessageDialog { Owner = owner };
         dialog.Topmost = topmost;
-        dialog.TitleText.Text = title;
+        if (large)
+        {
+            dialog.UseLargeLayout(WorkAreaOf(owner));
+        }
+
+        dialog.ApplyTitle(title);
         dialog.MessageText.Text = message;
         ConfigureConfirmButtons(dialog, primaryLabel, secondaryLabel, primaryIsDefault);
 
@@ -243,7 +305,7 @@ public partial class MessageDialog : Window
         string tertiaryLabel = "Cancel")
     {
         var dialog = new MessageDialog { Owner = owner };
-        dialog.TitleText.Text = title;
+        dialog.ApplyTitle(title);
         dialog.MessageText.Text = message;
         dialog.BtnPrimary.Content = primaryLabel;
         dialog.BtnSecondary.Content = secondaryLabel;
@@ -286,7 +348,7 @@ public partial class MessageDialog : Window
         ArgumentNullException.ThrowIfNull(choices);
 
         var dialog = new MessageDialog { Owner = owner };
-        dialog.TitleText.Text = title;
+        dialog.ApplyTitle(title);
         dialog.MessageText.Text = message;
         dialog.ConfigureChoiceButtons(choices, defaultIndex, cancelLabel);
         ApplySeverityStyle(dialog, "info");

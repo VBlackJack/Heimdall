@@ -102,6 +102,34 @@ public sealed class WpfDialogService(
     }
 
     /// <inheritdoc/>
+    public Task<bool> ShowLargeConfirmAsync(
+        string title,
+        string message,
+        string severity,
+        string confirmLabel,
+        string declineLabel)
+    {
+        // Declines while shutting down, like the labeled confirmation it widens.
+        if (IsApplicationShuttingDown())
+        {
+            return Task.FromResult(false);
+        }
+
+        bool result = Views.Dialogs.MessageDialog.ShowConfirm(
+            GetOwnerWindow(),
+            title,
+            message,
+            severity,
+            confirmLabel,
+            declineLabel,
+            topmost: false,
+            primaryIsDefault: false,
+            large: true);
+
+        return Task.FromResult(result);
+    }
+
+    /// <inheritdoc/>
     public Task<bool?> ShowSaveDiscardCancelAsync(string title, string message)
     {
         if (IsApplicationShuttingDown())

@@ -36,6 +36,7 @@ using Heimdall.App.ViewModels.Tunnels;
 using Heimdall.Core.Certificates;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
+using Heimdall.Core.Recipes;
 using Heimdall.Core.Security;
 using Heimdall.Core.Security.Vault;
 using Heimdall.Core.SessionHealth;
@@ -483,6 +484,10 @@ public partial class App : System.Windows.Application
                 localization,
                 _serviceProvider.GetRequiredService<IDialogService>());
 
+            // One time, for an install that predates the Recipes pack: list it among the packs
+            // that are off. Before anything asks which packs are enabled.
+            await RunToolPackMigrationAsync(configManager);
+
             // Scan for external tools (NirSoft, Sysinternals) on a background thread.
             // Fire-and-forget: results land in ToolRegistry via Dispatcher callback.
             _ = Task.Run(() => ScanExternalTools(settings));
@@ -492,6 +497,10 @@ public partial class App : System.Windows.Application
             // dialog are picked up automatically; it also re-arms its timer when
             // the user changes the interval in Settings via SettingsChanged.
             _serviceProvider.GetRequiredService<SessionHealthMonitor>().Start(settings);
+
+            // Read the imported recipes before the main window exists, so what was skipped is in
+            // the log from the first start. The recipe tools themselves are not registered yet.
+            LoadImportedRecipes();
 
             // Close splash before showing main window
             splash.Close();
@@ -783,6 +792,52 @@ public partial class App : System.Windows.Application
         }
     }
 
+    private static async Task RunToolPackMigrationAsync(IConfigManager configManager)
+    {
+        try
+        {
+            if (await ToolPackMigration.RunAsync(configManager))
+            {
+                Core.Logging.FileLogger.Info("[App] The Recipes pack was listed among the packs that are off");
+            }
+        }
+        catch (Exception ex)
+        {
+            // A failed step leaves the marker unset, so it runs again at the next start.
+            Core.Logging.FileLogger.Error("[App] The tool pack migration failed", ex);
+        }
+    }
+
+    /// <summary>
+    /// Starts the registrar of the recipe tools: it loads the imported recipes and registers their
+    /// tools while the Recipes pack is on and not forbidden, logging every file it skips by code and
+    /// file name only. Does nothing while the pack is off, which is the default, so a user who never
+    /// turned it on has nothing read from disk. It then follows the pack for the rest of the run.
+    /// </summary>
+    private void LoadImportedRecipes()
+    {
+        if (_serviceProvider is null) return;
+
+        try
+        {
+            _serviceProvider.GetRequiredService<RecipeToolRegistrar>().Start();
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Error("[App] Recipes could not be loaded", ex);
+        }
+    }
+
+    /// <summary>Stops the registrar from following the Recipes pack.</summary>
+    private void ReleaseRecipeTools()
+    {
+        try
+        {
+            _serviceProvider?.GetService<RecipeToolRegistrar>()?.Dispose();
+        }
+        catch (Exception ex) { Core.Logging.FileLogger.Warn($"[App] recipe tools cleanup ({ex.GetType().Name})"); }
+    }
+
     private void ConfigureServices(IServiceCollection services, string dataRoot)
     {
         // Core services
@@ -831,6 +886,62 @@ public partial class App : System.Windows.Application
         services.AddSingleton<IX11ServerManager>(sp => sp.GetRequiredService<X11ServerManager>());
         services.AddSingleton<ExternalToolProviderService>();
         services.AddSingleton<ToolRegistry>();
+
+        // The organisation veto on optional tool packs, read once from the machine policy key, and
+        // the single decision on whether a tool may be used (registry pack, user setting, policy).
+        services.AddSingleton<ToolPackPolicy>(_ => new ToolPackPolicy());
+        services.AddSingleton<IToolAvailability, ToolAvailability>();
+
+        // The imported recipes, under the data directory like the other writable state, so a
+        // --data-dir instance shares nothing with the user's own.
+        services.AddSingleton<IRecipeStore>(
+            _ => new RecipeStore(_dataRoot ?? ApplicationDataPathResolver.Resolve()));
+        services.AddSingleton<IRecipeWorkFolders>(
+            _ => new RecipeWorkFolders(RecipeWorkFolders.DefaultRoot(_dataRoot ?? ApplicationDataPathResolver.Resolve())));
+
+        // Registers the tool of each imported recipe while the Recipes pack is on. Each recipe view
+        // reads the folders the user allowed in Settings at the moment a run starts.
+        services.AddSingleton<RecipeToolRegistrar>(sp =>
+        {
+            ConfigManager configManager = sp.GetRequiredService<ConfigManager>();
+            IToolAvailability availability = sp.GetRequiredService<IToolAvailability>();
+            IRecipeWorkFolders workFolders = sp.GetRequiredService<IRecipeWorkFolders>();
+            RecipeToolViewFactory viewFactory = new(new RecipeToolServices(
+                new RecipeRunner(),
+                new RecipeProgramResolver(),
+                workFolders,
+                availability,
+                () => (IReadOnlyList<string>?)configManager.CurrentSettings?.RecipeProgramFolders ?? [],
+                sp.GetRequiredService<IRecipeStore>()));
+            return new RecipeToolRegistrar(
+                sp.GetRequiredService<ToolRegistry>(),
+                availability,
+                sp.GetRequiredService<IRecipeStore>(),
+                viewFactory.Create,
+                workFolders);
+        });
+
+        // Importing, replacing, exporting and removing recipes from Settings. The pickers are a seam so
+        // that no test opens a real dialog; a change reloads the recipe tools, so the Tools tab, the
+        // sidebar and the palette follow without a restart.
+        services.AddSingleton<IRecipeFileDialogs>(
+            sp => new Win32RecipeFileDialogs(sp.GetRequiredService<LocalizationManager>()));
+        services.AddSingleton<RecipeImportService>(sp => new RecipeImportService(
+            sp.GetRequiredService<IRecipeStore>(),
+            new RecipeProgramResolver(),
+            sp.GetRequiredService<IToolAvailability>()));
+        services.AddTransient<RecipeSettingsViewModel>(sp =>
+        {
+            RecipeToolRegistrar registrar = sp.GetRequiredService<RecipeToolRegistrar>();
+            return new RecipeSettingsViewModel(
+                sp.GetRequiredService<IRecipeStore>(),
+                sp.GetRequiredService<RecipeImportService>(),
+                sp.GetRequiredService<IConfigManager>(),
+                sp.GetRequiredService<IDialogService>(),
+                sp.GetRequiredService<LocalizationManager>(),
+                sp.GetRequiredService<IRecipeFileDialogs>(),
+                registrar.Reload);
+        });
 
         // The single place the real preset location is resolved. Neither the storage nor the
         // view model can reach it any more: their parameterless constructors are gone.
@@ -1799,6 +1910,7 @@ public partial class App : System.Windows.Application
         // reads their order.
         ReleaseRdpArtifacts();
         ReleaseTunnels();
+        ReleaseRecipeTools();
         StopScheduler();
         StopX11Server();
         ReleaseSleepPrevention();

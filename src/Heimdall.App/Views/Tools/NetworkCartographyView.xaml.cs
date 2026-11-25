@@ -43,6 +43,7 @@ public partial class NetworkCartographyView : UserControl, IToolView
     private List<(string FileName, DateTime Timestamp, string Subnet)> _historyList = [];
     private GatewayRouteSelector? _routeSelector;
     private Action<string, string, ToolContext?>? _openToolAction;
+    private Func<string, bool>? _isToolAvailable;
     private Action<SessionLaunchRequest>? _openSessionAction;
     private Action<SessionLaunchRequest, string?>? _addServerAction;
     private Action<bool>? _setBusy;
@@ -99,6 +100,13 @@ public partial class NetworkCartographyView : UserControl, IToolView
         _localizer = localizer;
         if (_localizer is not null) _localizer.LocaleChanged += OnLocaleChanged;
         _openToolAction = ToolContextMenuHelper.GetOpenToolAction(context);
+        _isToolAvailable = context?.IsToolAvailable;
+
+        // The diagram editor is a tool of its own: with it unavailable the button is not offered,
+        // while the draw.io file export beside it stays.
+        BtnEditDiagram.Visibility = ToolContextMenuHelper.IsToolOffered(_isToolAvailable, "DIAGRAM")
+            ? Visibility.Visible
+            : Visibility.Collapsed;
         _openSessionAction = ToolContextMenuHelper.GetOpenSessionAction(context);
         _addServerAction = ToolContextMenuHelper.GetAddServerAction(context);
         _setBusy = context?.SetBusyAction;
@@ -729,7 +737,7 @@ public partial class NetworkCartographyView : UserControl, IToolView
         {
             var hostItems = ToolContextMenuHelper.BuildHostActions(
                 row.IpAddress, row.Hostname, row.OpenPorts, _localizer, _openToolAction,
-                _openSessionAction, _addServerAction);
+                _openSessionAction, _addServerAction, _isToolAvailable);
             foreach (var item in hostItems)
             {
                 menu.Items.Add(item);

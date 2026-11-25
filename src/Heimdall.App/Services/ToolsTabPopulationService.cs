@@ -70,7 +70,9 @@ public sealed class ToolsTabPopulationService
     /// </summary>
     public ObservableCollection<SidebarToolCategoryViewModel> BuildSidebarToolsData(MainViewModel vm)
     {
-        var grouped = _toolRegistry.All
+        var listed = vm.ToolAvailability.ListedTools(_toolRegistry.All).ToList();
+        var grouped = listed
+            .Where(d => !d.IsRecipe)
             .GroupBy(d => d.Category)
             .OrderBy(g => g.Key);
 
@@ -87,6 +89,21 @@ public sealed class ToolsTabPopulationService
                     .OrderBy(tool => tool.Name, StringComparer.OrdinalIgnoreCase));
 
             categories.Add(CreateSidebarCategory(vm, categoryKey, categoryName, brushKey, tools));
+        }
+
+        // The tools that come from recipes are a group of their own, as on the Tools tab.
+        var recipeTools = new ObservableCollection<SidebarToolItemViewModel>(
+            listed.Where(d => d.IsRecipe)
+                .Select(descriptor => CreateSidebarToolItem(vm, descriptor))
+                .OrderBy(tool => tool.Name, StringComparer.OrdinalIgnoreCase));
+        if (recipeTools.Count > 0)
+        {
+            categories.Add(CreateSidebarCategory(
+                vm,
+                RecipeToolText.GroupHeadingKey,
+                vm.Localize(RecipeToolText.GroupHeadingKey),
+                GetCategoryBrushKey(ToolCategory.External),
+                recipeTools));
         }
 
         return categories;
@@ -121,23 +138,36 @@ public sealed class ToolsTabPopulationService
     public SidebarToolItemViewModel CreateSidebarToolItem(MainViewModel vm, ToolDescriptor descriptor)
     {
         ArgumentNullException.ThrowIfNull(vm);
-        ArgumentNullException.ThrowIfNull(descriptor);
+        return CreateSidebarToolItem(descriptor, vm.Localize);
+    }
 
-        var name = descriptor.ResolveLabel(vm.Localize);
+    /// <summary>The sidebar leaf of a descriptor, built from the one thing it reads of the window's view model.</summary>
+    internal static SidebarToolItemViewModel CreateSidebarToolItem(ToolDescriptor descriptor, Func<string, string> localize)
+    {
+        ArgumentNullException.ThrowIfNull(descriptor);
+        ArgumentNullException.ThrowIfNull(localize);
+
+        var name = descriptor.ResolveLabel(localize);
         var aliases = string.Join(' ', descriptor.CommandPrefixes);
+        var provenance = RecipeToolText.ProvenanceOf(descriptor, localize);
         return new SidebarToolItemViewModel
         {
             Id = descriptor.Id,
             Name = name,
+            Provenance = provenance,
+            FullText = provenance is null ? null : RecipeToolText.TabTitle(descriptor, localize),
+            AccessibleText = provenance is null ? null : RecipeToolText.AccessibleName(descriptor, localize),
             BrushKey = GetCategoryBrushKey(descriptor.Category),
             IconGeometryKey = descriptor.IconResourceKey,
-            Searchable = $"{name} {aliases}".ToLowerInvariant()
+            Searchable = (provenance is null ? $"{name} {aliases}" : $"{name} {aliases} {provenance}").ToLowerInvariant()
         };
     }
 
     /// <summary>
     /// Resolves a tool descriptor by ID and builds the corresponding sidebar leaf.
-    /// Returns <c>null</c> when the tool no longer exists in the registry.
+    /// Returns <c>null</c> when the tool no longer exists in the registry or is not
+    /// available (its pack is turned off or forbidden): a stored favorite id of such a
+    /// tool stays stored but is not shown.
     /// </summary>
     public SidebarToolItemViewModel? CreateSidebarToolItem(MainViewModel vm, string toolId)
     {
@@ -146,7 +176,9 @@ public sealed class ToolsTabPopulationService
 
         var descriptor = _toolRegistry.All.FirstOrDefault(
             d => string.Equals(d.Id, toolId, StringComparison.OrdinalIgnoreCase));
-        return descriptor is null ? null : CreateSidebarToolItem(vm, descriptor);
+        return descriptor is null || !vm.ToolAvailability.IsListed(descriptor)
+            ? null
+            : CreateSidebarToolItem(vm, descriptor);
     }
 
     private static SidebarToolCategoryViewModel CreateSidebarCategory(
@@ -243,22 +275,21 @@ public sealed class ToolsTabPopulationService
         var hasFilter = !string.IsNullOrEmpty(filter);
         var matchingToolCount = 0;
 
+        // Every section below reads this projection: a tool of a turned-off or forbidden pack is
+        // not shown, while its favorite or recent id stays stored for when the pack comes back.
+        var listedTools = vm.ToolAvailability.ListedTools(_toolRegistry.All).ToList();
+
         // ── Favorites section ──
         if (!hasFilter)
         {
-            var favIds = vm.FavoriteToolIds;
-            if (favIds.Count > 0)
+            var favTools = ResolveListedTools(listedTools, vm.FavoriteToolIds);
+            if (favTools.Count > 0)
             {
                 AddToolsTabSectionHeader(target, vm.Localize("ToolsFavoritesHeader"), "WarningTextBrush");
                 var favPanel = new WrapPanel { Margin = new Thickness(0, 0, 0, 16) };
-                foreach (var favId in favIds)
+                foreach (var desc in favTools)
                 {
-                    var desc = _toolRegistry.All.FirstOrDefault(
-                        d => string.Equals(d.Id, favId, StringComparison.OrdinalIgnoreCase));
-                    if (desc is not null)
-                    {
-                        favPanel.Children.Add(CreateToolsTabCard(desc, vm, onCardClick, onPinClick));
-                    }
+                    favPanel.Children.Add(CreateToolsTabCard(desc, vm, onCardClick, onPinClick));
                 }
                 target.Children.Add(favPanel);
             }
@@ -276,19 +307,14 @@ public sealed class ToolsTabPopulationService
             }
 
             // ── Recent section ──
-            var recentIds = vm.RecentToolIds;
-            if (recentIds.Count > 0)
+            var recentTools = ResolveListedTools(listedTools, vm.RecentToolIds);
+            if (recentTools.Count > 0)
             {
                 AddToolsTabSectionHeader(target, vm.Localize("ToolsRecentHeader"), "AccentTextBrush");
                 var recentPanel = new WrapPanel { Margin = new Thickness(0, 0, 0, 16) };
-                foreach (var rid in recentIds)
+                foreach (var desc in recentTools)
                 {
-                    var desc = _toolRegistry.All.FirstOrDefault(
-                        d => string.Equals(d.Id, rid, StringComparison.OrdinalIgnoreCase));
-                    if (desc is not null)
-                    {
-                        recentPanel.Children.Add(CreateToolsTabCard(desc, vm, onCardClick, onPinClick));
-                    }
+                    recentPanel.Children.Add(CreateToolsTabCard(desc, vm, onCardClick, onPinClick));
                 }
                 target.Children.Add(recentPanel);
             }
@@ -301,13 +327,14 @@ public sealed class ToolsTabPopulationService
         }
 
         string? lastCategory = null;
-        var sorted = _toolRegistry.All
+        var sorted = listedTools
             .OrderBy(d => d.Category)
             .ThenBy(d => d.ResolveLabel(vm.Localize), StringComparer.OrdinalIgnoreCase);
 
         WrapPanel? currentWrap = null;
 
         var externalDescriptors = new List<ToolDescriptor>();
+        var recipeDescriptors = new List<ToolDescriptor>();
 
         foreach (var descriptor in sorted)
         {
@@ -316,7 +343,9 @@ public sealed class ToolsTabPopulationService
                 var label = descriptor.ResolveLabel(vm.Localize);
                 var aliases = string.Join(" ", descriptor.CommandPrefixes);
                 var descKey = descriptor.DescriptionKey ?? $"ToolDesc{descriptor.Id}";
-                var descText = vm.Localize(descKey);
+                var descText = descriptor.IsRecipe
+                    ? $"{descriptor.RecipeDescription} {descriptor.RecipeAuthor}"
+                    : vm.Localize(descKey);
                 var searchable = $"{label} {aliases} {descText}";
                 if (!searchable.Contains(filter, StringComparison.OrdinalIgnoreCase))
                 {
@@ -325,6 +354,13 @@ public sealed class ToolsTabPopulationService
             }
 
             matchingToolCount++;
+
+            // A recipe tool is listed under its own heading, never among the detected external tools.
+            if (descriptor.IsRecipe)
+            {
+                recipeDescriptors.Add(descriptor);
+                continue;
+            }
 
             if (descriptor.Category == ToolCategory.External)
             {
@@ -355,6 +391,21 @@ public sealed class ToolsTabPopulationService
         if (externalDescriptors.Count > 0)
         {
             RenderToolsTabExternalCategory(target, vm, externalDescriptors, onCardClick, onPinClick);
+        }
+
+        if (recipeDescriptors.Count > 0)
+        {
+            // Headed by the name of the pack, which is the localized word for what these tools are.
+            AddToolsTabCategoryHeader(
+                target,
+                vm.Localize(RecipeToolText.GroupHeadingKey),
+                GetCategoryBrushKey(ToolCategory.External));
+            var recipeWrap = new WrapPanel { Margin = new Thickness(0, 0, 0, 8) };
+            foreach (var descriptor in recipeDescriptors)
+            {
+                recipeWrap.Children.Add(CreateToolsTabCard(descriptor, vm, onCardClick, onPinClick));
+            }
+            target.Children.Add(recipeWrap);
         }
 
         if (hasFilter && matchingToolCount == 0)
@@ -389,7 +440,29 @@ public sealed class ToolsTabPopulationService
             target.Children.Add(emptyState);
         }
 
-        return hasFilter ? matchingToolCount : _toolRegistry.All.Count;
+        return hasFilter ? matchingToolCount : listedTools.Count;
+    }
+
+    /// <summary>
+    /// Maps stored tool ids to their descriptors in order, keeping only those in the listed
+    /// projection. Ids of unknown or unavailable tools are skipped, not removed from storage.
+    /// </summary>
+    internal static List<ToolDescriptor> ResolveListedTools(
+        IReadOnlyList<ToolDescriptor> listedTools,
+        IEnumerable<string> toolIds)
+    {
+        var resolved = new List<ToolDescriptor>();
+        foreach (var toolId in toolIds)
+        {
+            var desc = listedTools.FirstOrDefault(
+                d => string.Equals(d.Id, toolId, StringComparison.OrdinalIgnoreCase));
+            if (desc is not null)
+            {
+                resolved.Add(desc);
+            }
+        }
+
+        return resolved;
     }
 
     private void RenderToolsTabExternalCategory(
@@ -505,6 +578,18 @@ public sealed class ToolsTabPopulationService
         MainViewModel vm,
         Action<ToolDescriptor> onCardClick,
         Action<string> onPinClick)
+        => CreateToolsTabCard(descriptor, vm.Localize, vm.FavoriteToolIds, onCardClick, onPinClick);
+
+    /// <summary>
+    /// The card of <see cref="CreateToolsTabCard(ToolDescriptor, MainViewModel, Action{ToolDescriptor}, Action{string})"/>
+    /// built from what it reads of the window's view model, so that it can be built without one.
+    /// </summary>
+    internal FrameworkElement CreateToolsTabCard(
+        ToolDescriptor descriptor,
+        Func<string, string> localize,
+        IEnumerable<string> favoriteToolIds,
+        Action<ToolDescriptor> onCardClick,
+        Action<string> onPinClick)
     {
         var categoryBrushKey = GetCategoryBrushKey(descriptor.Category);
         const string DefaultBorderKey = "BorderBrush";
@@ -530,26 +615,39 @@ public sealed class ToolsTabPopulationService
 
         var nameBlock = new TextBlock
         {
-            Text = descriptor.ResolveLabel(vm.Localize),
+            Text = descriptor.ResolveLabel(localize),
             FontSize = (double)Application.Current.FindResource("FontSizeBody"),
             FontWeight = FontWeights.SemiBold,
             TextTrimming = TextTrimming.CharacterEllipsis
         };
         nameBlock.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimaryBrush");
 
-        var descKey = descriptor.DescriptionKey ?? $"ToolDesc{descriptor.Id}";
-        var descText = vm.Localize(descKey);
         var descBlock = new TextBlock
         {
-            Text = descText != descKey ? descText : "",
+            Text = ResolveCardDescription(descriptor, localize),
             FontSize = (double)Application.Current.FindResource("FontSizeSmallCaption"),
             TextTrimming = TextTrimming.CharacterEllipsis,
             TextWrapping = TextWrapping.NoWrap
         };
         descBlock.SetResourceReference(TextBlock.ForegroundProperty, "TextSecondaryBrush");
 
+        // A tool that comes from a recipe says so on its card: the word "Recipe" and its author,
+        // marked as unverified, written as text beside the recipe's own name.
+        TextBlock? provenanceBlock = null;
+        if (RecipeToolText.ProvenanceOf(descriptor, localize) is { } provenance)
+        {
+            provenanceBlock = new TextBlock
+            {
+                Text = provenance,
+                FontSize = (double)Application.Current.FindResource("FontSizeSmallCaption"),
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                TextWrapping = TextWrapping.NoWrap
+            };
+            provenanceBlock.SetResourceReference(TextBlock.ForegroundProperty, "WarningTextBrush");
+        }
+
         // Pin/Unpin button
-        var isFav = vm.FavoriteToolIds.Contains(descriptor.Id, StringComparer.OrdinalIgnoreCase);
+        var isFav = favoriteToolIds.Contains(descriptor.Id, StringComparer.OrdinalIgnoreCase);
         var pinBtn = new Button
         {
             Content = isFav ? "\uE735" : "\uE734",
@@ -560,13 +658,13 @@ public sealed class ToolsTabPopulationService
             VerticalAlignment = VerticalAlignment.Top,
             Margin = new Thickness(4, 0, 0, 0),
             Tag = descriptor.Id,
-            ToolTip = isFav ? vm.Localize("ToolsUnpinTooltip") : vm.Localize("ToolsPinTooltip")
+            ToolTip = isFav ? localize("ToolsUnpinTooltip") : localize("ToolsPinTooltip")
         };
         pinBtn.SetResourceReference(Control.FontFamilyProperty, "FontFamilyIcons");
         pinBtn.SetResourceReference(Control.ForegroundProperty,
             isFav ? "WarningTextBrush" : "TextSecondaryBrush");
         AutomationProperties.SetName(pinBtn,
-            isFav ? vm.Localize("A11yUnpinTool") : vm.Localize("A11yPinTool"));
+            isFav ? localize("A11yUnpinTool") : localize("A11yPinTool"));
         pinBtn.Click += (_, e) =>
         {
             e.Handled = true;
@@ -575,6 +673,11 @@ public sealed class ToolsTabPopulationService
 
         var textStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         textStack.Children.Add(nameBlock);
+        if (provenanceBlock is not null)
+        {
+            textStack.Children.Add(provenanceBlock);
+        }
+
         if (!string.IsNullOrEmpty(descBlock.Text))
         {
             textStack.Children.Add(descBlock);
@@ -628,10 +731,10 @@ public sealed class ToolsTabPopulationService
             HorizontalContentAlignment = HorizontalAlignment.Stretch,
             VerticalContentAlignment = VerticalAlignment.Stretch,
             Cursor = System.Windows.Input.Cursors.Hand,
-            ToolTip = descBlock.Text.Length > 0 ? descBlock.Text : null,
+            ToolTip = ResolveCardToolTip(descriptor, localize),
             Template = btnTemplate
         };
-        AutomationProperties.SetName(launchButton, descriptor.ResolveLabel(vm.Localize));
+        AutomationProperties.SetName(launchButton, RecipeToolText.AccessibleName(descriptor, localize));
         launchButton.Click += (_, _) => onCardClick(descriptor);
 
         var cardBorder = new Border
@@ -729,6 +832,17 @@ public sealed class ToolsTabPopulationService
     /// </summary>
     public static ToolContext? CreateInheritedToolContext(ToolDescriptor descriptor, MainViewModel vm)
     {
+        // A recipe tool inherits the selected session like a network tool does, and its port too:
+        // a recipe may use {Port}, and it is told which session it will run against.
+        if (descriptor.IsRecipe)
+        {
+            var recipeHost = GetInheritedToolTargetHost(vm);
+            var recipePort = vm.ServerList.SelectedServer?.RemotePort;
+            return recipeHost is null
+                ? null
+                : new ToolContext(TargetHost: recipeHost, TargetPort: recipePort > 0 ? recipePort : null);
+        }
+
         if (!descriptor.IsNetworkTool)
         {
             return null;
@@ -739,12 +853,49 @@ public sealed class ToolsTabPopulationService
     }
 
     /// <summary>
+    /// The description a card shows. A recipe's description is text written in the recipe file and is
+    /// shown as it is, never looked up as a locale key; any other tool's description is looked up and
+    /// is empty when its locale defines none.
+    /// </summary>
+    internal static string ResolveCardDescription(ToolDescriptor descriptor, Func<string, string> localize)
+    {
+        if (descriptor.IsRecipe)
+        {
+            return descriptor.RecipeDescription ?? string.Empty;
+        }
+
+        var descKey = descriptor.DescriptionKey ?? $"ToolDesc{descriptor.Id}";
+        var descText = localize(descKey);
+        return descText != descKey ? descText : string.Empty;
+    }
+
+    /// <summary>
+    /// The tooltip of a card: the description, and for a recipe the provenance first, so the author
+    /// is named wherever the card is read, followed by the description when there is one.
+    /// </summary>
+    internal static string? ResolveCardToolTip(ToolDescriptor descriptor, Func<string, string> localize)
+    {
+        string description = ResolveCardDescription(descriptor, localize);
+        if (RecipeToolText.ProvenanceOf(descriptor, localize) is not { } provenance)
+        {
+            return description.Length > 0 ? description : null;
+        }
+
+        return description.Length > 0 ? provenance + Environment.NewLine + description : provenance;
+    }
+
+    /// <summary>
     /// Resolves the tab title for a tool: uses the "with argument" localised
     /// variant when a host is inherited and the descriptor provides one,
     /// otherwise falls back to the plain label.
     /// </summary>
     public static string ResolveToolTabTitle(ToolDescriptor descriptor, ToolContext? context, MainViewModel vm)
     {
+        if (descriptor.IsRecipe)
+        {
+            return RecipeToolText.TabTitle(descriptor, vm.Localize);
+        }
+
         if (context?.TargetHost is not null && descriptor.LabelWithArgKey is not null)
         {
             return string.Format(vm.Localize(descriptor.LabelWithArgKey), context.TargetHost);

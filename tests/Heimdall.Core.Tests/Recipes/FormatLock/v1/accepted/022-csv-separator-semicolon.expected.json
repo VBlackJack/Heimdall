@@ -1,0 +1,40 @@
+{
+  "recipe": {
+    "schemaVersion": 1,
+    "id": "lock.sample",
+    "version": "1.0.0",
+    "author": "Lock",
+    "name": "Sample",
+    "description": "A sample of the version 1 format.",
+    "translations": {},
+    "program": "ping.exe",
+    "arguments": [
+      {
+        "group": false,
+        "tokens": [
+          "{Host}"
+        ]
+      }
+    ],
+    "inputs": [],
+    "output": "Csv",
+    "outputEncoding": "Utf8",
+    "stderr": "Separate",
+    "csvSeparator": "Semicolon",
+    "successExitCodes": [
+      0
+    ],
+    "timeoutSeconds": 60,
+    "icon": null
+  },
+  "expansions": [
+    {
+      "values": {},
+      "host": "h",
+      "port": null,
+      "arguments": [
+        "h"
+      ]
+    }
+  ]
+}

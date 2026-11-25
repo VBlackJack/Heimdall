@@ -931,7 +931,7 @@
                                             Background="Transparent"
                                             ToolTip="{Binding RowTooltipText}"
                                             ToolTipService.InitialShowDelay="{StaticResource SessionTreeRowToolTipDelay}">
-                                        <Grid>
+                                        <Grid x:Name="ServerRowContent">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto"/>
                                                 <ColumnDefinition Width="Auto"/>
@@ -1119,6 +1119,12 @@
                                         <DataTrigger Binding="{Binding IsSelected, FallbackValue=False}" Value="True">
                                             <Setter TargetName="ServerSelectionChrome" Property="Background" Value="{DynamicResource TreeRowSelectedBrush}"/>
                                             <Setter TargetName="ServerSelectionChrome" Property="BorderBrush" Value="{DynamicResource AccentBorderBrush}"/>
+                                        </DataTrigger>
+                                        <!-- A saved tool entry whose pack is off or forbidden: the content is dimmed, not the
+                                             chrome, so the selection edge stays. The row tooltip and the spoken name carry
+                                             the reason; the dimming is for the eye only. -->
+                                        <DataTrigger Binding="{Binding IsToolUnavailable}" Value="True">
+                                            <Setter TargetName="ServerRowContent" Property="Opacity" Value="{StaticResource OpacityDisabled}"/>
                                         </DataTrigger>
                                     </DataTemplate.Triggers>
                                 </DataTemplate>
@@ -1529,7 +1535,7 @@
                                             <StackPanel Orientation="Horizontal"
                                                         Margin="0,1"
                                                         Cursor="Hand"
-                                                        ToolTip="{Binding Name}">
+                                                        ToolTip="{Binding ToolTipText}">
                                                 <Path Width="14" Height="14"
                                                       Stretch="Uniform"
                                                       VerticalAlignment="Center"
@@ -1548,6 +1554,14 @@
                                                            VerticalAlignment="Center"
                                                            TextTrimming="CharacterEllipsis"
                                                            AutomationProperties.Name="{Binding Name}"/>
+                                                <!-- A tool that comes from a recipe: "Recipe by ... (unverified)", as text -->
+                                                <TextBlock Text="{Binding Provenance}"
+                                                           Margin="{StaticResource MarginInlineControl}"
+                                                           Foreground="{DynamicResource WarningTextBrush}"
+                                                           FontSize="{StaticResource FontSizeSmallCaption}"
+                                                           VerticalAlignment="Center"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           Visibility="{Binding HasProvenance, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                             </StackPanel>
                                         </DataTemplate>
                                     </TreeView.Resources>
@@ -2290,9 +2304,19 @@
                                            Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,12,0,0"
                                            FontSize="{StaticResource FontSizeBodyLarge}" TextWrapping="Wrap"/>
 
+                                <!-- Why the selected tool cannot be opened: its pack is turned off or forbidden. -->
+                                <TextBlock x:Name="Mw_ToolDetailUnavailable"
+                                           Text="{Binding ServerList.ToolDetailUnavailableReason}"
+                                           Visibility="{Binding ServerList.ToolDetailIsUnavailable, Converter={StaticResource BoolToVisibilityConverter}}"
+                                           Foreground="{DynamicResource WarningTextBrush}" Margin="0,12,0,0"
+                                           FontSize="{StaticResource FontSizeBodyLarge}" TextWrapping="Wrap"/>
+
+                                <!-- An unavailable tool cannot be opened: the button is disabled and the warning line
+                                     above carries the reason. The command's own CanExecute still applies on top. -->
                                 <Button x:Name="Mw_ToolDetailOpenBtn" Content="{loc:Translate DetailBtnOpenInTab}"
                                         Command="{Binding ServerList.ConnectCommand}"
                                         CommandParameter="{Binding ServerList.SelectedServer}"
+                                        IsEnabled="{Binding ServerList.ToolDetailIsUnavailable, Converter={StaticResource InvertBoolConverter}, FallbackValue=True}"
                                         Style="{DynamicResource PrimaryButtonStyle}"
                                         Width="140" HorizontalAlignment="Left"
                                         Margin="0,20,0,0"
@@ -5736,6 +5760,97 @@
                                         </Grid.ColumnDefinitions>
                                     <StackPanel>
 
+                                <!-- Tool packs -->
+                                <Border x:Name="Mw_SettingsToolPacksCard" Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
+                                    <StackPanel>
+                                        <TextBlock x:Name="Mw_SettingsToolPacksTitle" Text="{loc:Translate SettingsSectionToolPacks}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,4"/>
+                                        <TextBlock x:Name="Mw_SettingsToolPacksDesc" Text="{loc:Translate SettingsToolPacksIntro}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap" Margin="0,0,0,12"/>
+                                        <ItemsControl x:Name="Mw_SettingsToolPackList" ItemsSource="{Binding Settings.ToolPackSwitches}" IsTabStop="False">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel Margin="0,0,0,12">
+                                                        <CheckBox IsChecked="{Binding IsEnabled}" IsEnabled="{Binding IsEditable}" Content="{Binding Label}" Foreground="{DynamicResource TextPrimaryBrush}"
+                                                                  AutomationProperties.HelpText="{Binding Description}"/>
+                                                        <StackPanel Margin="24,2,0,0">
+                                                            <TextBlock Text="{Binding Description}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap"/>
+                                                            <TextBlock Text="{Binding CountText}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,2,0,0"/>
+                                                            <TextBlock Text="{Binding WarningText}" Visibility="{Binding HasWarning, Converter={StaticResource BoolToVisibilityConverter}}" Foreground="{DynamicResource WarningTextBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                                            <TextBlock Text="{Binding PolicyText}" Visibility="{Binding HasPolicyText, Converter={StaticResource BoolToVisibilityConverter}}" Foreground="{DynamicResource WarningTextBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[DisabledToolPacks]}"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Recipes: import, replace, export and remove recipe files -->
+                                <Border x:Name="Mw_SettingsRecipesCard" behaviors:LoadWhenShownBehavior.Command="{Binding Settings.Recipes.EnsureLoadedCommand}" Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
+                                    <StackPanel>
+                                        <TextBlock x:Name="Mw_SettingsRecipesTitle" Text="{loc:Translate SettingsSectionRecipes}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,4"/>
+                                        <TextBlock x:Name="Mw_SettingsRecipesDesc" Text="{loc:Translate SettingsRecipesIntro}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap" Margin="0,0,0,12"/>
+                                        <TextBlock x:Name="Mw_SettingsRecipesPolicy" Text="{Binding Settings.Recipes.PolicyText}" Visibility="{Binding Settings.Recipes.HasPolicyText, Converter={StaticResource BoolToVisibilityConverter}}" Foreground="{DynamicResource WarningTextBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                                        <Button x:Name="Mw_SettingsRecipeImportButton" Content="{loc:Translate SettingsRecipeImportButton}" Command="{Binding Settings.Recipes.ImportCommand}" HorizontalAlignment="Left" Style="{DynamicResource SecondaryButtonStyle}" Padding="8,3" FontSize="{StaticResource FontSizeCaption}"/>
+                                        <TextBlock x:Name="Mw_SettingsRecipeListEmpty" Text="{loc:Translate SettingsRecipeListEmpty}" Visibility="{Binding Settings.Recipes.IsEmpty, Converter={StaticResource BoolToVisibilityConverter}}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,8,0,0"/>
+                                        <ItemsControl x:Name="Mw_SettingsRecipeList" ItemsSource="{Binding Settings.Recipes.Items}" IsTabStop="False" Margin="0,4,0,0">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="0,8,0,0">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <StackPanel>
+                                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" TextWrapping="Wrap"/>
+                                                            <TextBlock Text="{Binding ProvenanceText}" Visibility="{Binding IsAvailable, Converter={StaticResource BoolToVisibilityConverter}}" Foreground="{DynamicResource WarningTextBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap"/>
+                                                            <TextBlock Text="{Binding VersionText}" Visibility="{Binding IsAvailable, Converter={StaticResource BoolToVisibilityConverter}}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap"/>
+                                                            <TextBlock Text="{Binding ProgramText}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap"/>
+                                                            <TextBlock Text="{Binding UnavailableText}" Visibility="{Binding HasUnavailableText, Converter={StaticResource BoolToVisibilityConverter}}" Foreground="{DynamicResource WarningTextBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap"/>
+                                                        </StackPanel>
+                                                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top" Margin="8,0,0,0">
+                                                            <Button Content="{loc:Translate BtnExport}" Command="{Binding ExportCommand}" AutomationProperties.Name="{Binding ExportAccessibleName}" Style="{DynamicResource SecondaryButtonStyle}" Padding="8,3" FontSize="{StaticResource FontSizeCaption}"/>
+                                                            <Button Content="{loc:Translate BtnRemove}" Command="{Binding RemoveCommand}" AutomationProperties.Name="{Binding RemoveAccessibleName}" Style="{DynamicResource SecondaryButtonStyle}" Padding="8,3" FontSize="{StaticResource FontSizeCaption}" Margin="4,0,0,0"/>
+                                                        </StackPanel>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Folders recipes may run programs from -->
+                                <Border x:Name="Mw_SettingsRecipeFoldersCard" Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
+                                    <StackPanel>
+                                        <TextBlock x:Name="Mw_SettingsRecipeFoldersTitle" Text="{loc:Translate SettingsLabelRecipeProgramFolders}" FontSize="{StaticResource FontSizeSubtitle}" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" Margin="0,0,0,4"/>
+                                        <TextBlock x:Name="Mw_SettingsRecipeFoldersDesc" Text="{loc:Translate SettingsRecipeFoldersIntro}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeBody}" TextWrapping="Wrap" Margin="0,0,0,12"/>
+                                        <TextBlock x:Name="Mw_SettingsRecipeFolderListEmpty" Text="{loc:Translate SettingsRecipeFolderListEmpty}" Visibility="{Binding Settings.IsRecipeProgramFoldersEmpty, Converter={StaticResource BoolToVisibilityConverter}}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,8"/>
+                                        <StackPanel x:Name="Mw_SettingsRecipeFolderEditor">
+                                            <ItemsControl x:Name="Mw_SettingsRecipeFolderList" ItemsSource="{Binding Settings.RecipeProgramFolders}" IsTabStop="False">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Grid Margin="0,0,0,6">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="*"/>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                            </Grid.ColumnDefinitions>
+                                                            <TextBlock Text="{Binding}" Foreground="{DynamicResource TextPrimaryBrush}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                                                            <Button Grid.Column="1" Content="{loc:Translate BtnRemove}"
+                                                                    Command="{Binding DataContext.Settings.RemoveRecipeProgramFolderCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                                    CommandParameter="{Binding}" AutomationProperties.HelpText="{Binding}"
+                                                                    Style="{DynamicResource SecondaryButtonStyle}" Padding="8,3" FontSize="{StaticResource FontSizeCaption}" Margin="8,0,0,0"/>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                            <Button x:Name="Mw_SettingsRecipeFolderAdd" Content="{loc:Translate SettingsRecipeFolderAdd}" Command="{Binding Settings.AddRecipeProgramFolderCommand}" HorizontalAlignment="Left" Style="{DynamicResource SecondaryButtonStyle}" Padding="8,3" FontSize="{StaticResource FontSizeCaption}" Margin="0,4,0,0"/>
+                                            <TextBlock x:Name="Mw_SettingsRecipeFolderStatus" Text="{Binding Settings.RecipeProgramFolderStatus, NotifyOnTargetUpdated=True}" Visibility="{Binding Settings.HasRecipeProgramFolderStatus, Converter={StaticResource BoolToVisibilityConverter}}" Foreground="{DynamicResource WarningTextBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,6,0,0" AutomationProperties.LiveSetting="Polite" behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"/>
+                                            <TextBlock x:Name="Mw_SettingsRecipeFolderNotice" Text="{Binding Settings.RecipeProgramFolderNotice, NotifyOnTargetUpdated=True}" Visibility="{Binding Settings.HasRecipeProgramFolderNotice, Converter={StaticResource BoolToVisibilityConverter}}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,6,0,0" AutomationProperties.LiveSetting="Polite" behaviors:LiveRegionBehavior.AnnounceOnTargetUpdated="True"/>
+                                        </StackPanel>
+                                        <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[RecipeProgramFolders]}"/>
+                                    </StackPanel>
+                                </Border>
+
                                 <!-- External Editor -->
                                 <Border Padding="{StaticResource SpacingLg}" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="{StaticResource CornerRadiusLg}" Margin="0,0,0,16">
                                     <StackPanel>
@@ -6591,7 +6706,7 @@
                         </ListBox.GroupStyle>
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <DockPanel Margin="10,6">
+                                <DockPanel x:Name="PaletteRowContent" Margin="10,6">
                                     <Border DockPanel.Dock="Left"
                                             Width="3"
                                             CornerRadius="1.5"
@@ -6676,6 +6791,14 @@
                                         </StackPanel>
                                     </StackPanel>
                                 </DockPanel>
+                                <DataTemplate.Triggers>
+                                    <!-- A saved tool entry whose pack is off or forbidden is dimmed as in the tree: the
+                                         row content only, so selection, hover and focus chrome stay. The fallback is
+                                         purely defensive. -->
+                                    <DataTrigger Binding="{Binding IsToolUnavailable, FallbackValue=False}" Value="True">
+                                        <Setter TargetName="PaletteRowContent" Property="Opacity" Value="{StaticResource OpacityDisabled}"/>
+                                    </DataTrigger>
+                                </DataTemplate.Triggers>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                         <ListBox.ItemContainerStyle>

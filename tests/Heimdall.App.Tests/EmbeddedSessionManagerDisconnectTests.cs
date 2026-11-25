@@ -126,7 +126,8 @@ public sealed class EmbeddedSessionManagerDisconnectTests
                     null!,
                     new ToolRegistry(),
                     null!,
-                    new PaneCloseArbiter());
+                    new PaneCloseArbiter(),
+                    AlwaysAvailableToolAvailability.Instance);
 
                 // The process exits: its handler reads the port and enters the release.
                 Thread exitThread = new Thread(() => terminalSession.RaiseProcessExited(0));
@@ -375,7 +376,7 @@ public sealed class EmbeddedSessionManagerDisconnectTests
     }
 
     private static EmbeddedSessionManager CreateManager()
-        => new EmbeddedSessionManager(null!, null!, null!, null!, null!, null!, null!, null!, null!, null!);
+        => new EmbeddedSessionManager(null!, null!, null!, null!, null!, null!, null!, null!, null!, null!, AlwaysAvailableToolAvailability.Instance);
 
     private static App CreateApplication()
     {
@@ -415,7 +416,8 @@ public sealed class EmbeddedSessionManagerDisconnectTests
             null!,
             null!,
             null!,
-            null!);
+            null!,
+            AlwaysAvailableToolAvailability.Instance);
     }
 
     private static void SeedWinRmHandedOffState(

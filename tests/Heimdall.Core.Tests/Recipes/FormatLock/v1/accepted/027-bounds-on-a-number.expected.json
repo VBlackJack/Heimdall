@@ -1,0 +1,114 @@
+{
+  "recipe": {
+    "schemaVersion": 1,
+    "id": "lock.sample",
+    "version": "1.0.0",
+    "author": "Lock",
+    "name": "Sample",
+    "description": "A sample of the version 1 format.",
+    "translations": {},
+    "program": "ping.exe",
+    "arguments": [
+      {
+        "group": false,
+        "tokens": [
+          "--r={in:r}"
+        ]
+      }
+    ],
+    "inputs": [
+      {
+        "name": "r",
+        "type": "Number",
+        "label": "Label r",
+        "required": false,
+        "default": "0.2",
+        "pattern": null,
+        "maxLength": null,
+        "choices": null,
+        "whenTrue": null,
+        "whenFalse": null,
+        "min": "0.1",
+        "max": "0.3",
+        "hint": null
+      }
+    ],
+    "output": "Text",
+    "outputEncoding": "Utf8",
+    "stderr": "Separate",
+    "csvSeparator": "Comma",
+    "successExitCodes": [
+      0
+    ],
+    "timeoutSeconds": 60,
+    "icon": null
+  },
+  "expansions": [
+    {
+      "values": {
+        "r": "0.1"
+      },
+      "host": null,
+      "port": null,
+      "arguments": [
+        "--r=0.1"
+      ]
+    },
+    {
+      "values": {
+        "r": "0.10000000000000001"
+      },
+      "host": null,
+      "port": null,
+      "arguments": [
+        "--r=0.10000000000000001"
+      ]
+    },
+    {
+      "values": {
+        "r": "0.3"
+      },
+      "host": null,
+      "port": null,
+      "arguments": [
+        "--r=0.3"
+      ]
+    },
+    {
+      "values": {
+        "r": "0.30000000000000004"
+      },
+      "host": null,
+      "port": null,
+      "refusals": [
+        {
+          "reason": "OutOfRange",
+          "subject": "r",
+          "path": "arguments[0]"
+        }
+      ]
+    },
+    {
+      "values": {
+        "r": "0.09"
+      },
+      "host": null,
+      "port": null,
+      "refusals": [
+        {
+          "reason": "OutOfRange",
+          "subject": "r",
+          "path": "arguments[0]"
+        }
+      ]
+    },
+    {
+      "values": {},
+      "host": null,
+      "port": null,
+      "arguments": [
+        "--r=0.2"
+      ]
+    }
+  ]
+}

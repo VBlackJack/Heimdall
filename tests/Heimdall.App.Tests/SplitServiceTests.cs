@@ -76,7 +76,8 @@ public sealed class SplitServiceTests : IDisposable
             sessionManager: new FakeEmbeddedSessionManager(),
             connectionService: null!,
             _toolRegistry,
-            dialogService: null!, new PaneCloseArbiter());
+            dialogService: null!, new PaneCloseArbiter(),
+            AlwaysAvailableToolAvailability.Instance);
     }
 
     public void Dispose()
@@ -2170,6 +2171,7 @@ public sealed class SplitServiceTests : IDisposable
             _toolRegistry,
             dialogService: null!,
             closeArbiter: new PaneCloseArbiter(),
+            toolAvailability: AlwaysAvailableToolAvailability.Instance,
             profileLookup);
 
     [Fact]

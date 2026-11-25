@@ -1,0 +1,88 @@
+{
+  "recipe": {
+    "schemaVersion": 1,
+    "id": "lock.sample",
+    "version": "1.0.0",
+    "author": "Lock",
+    "name": "Sample",
+    "description": "A sample of the version 1 format.",
+    "translations": {},
+    "program": "ping.exe",
+    "arguments": [
+      {
+        "group": false,
+        "tokens": [
+          "{in:flag}"
+        ]
+      }
+    ],
+    "inputs": [
+      {
+        "name": "flag",
+        "type": "Bool",
+        "label": "Label flag",
+        "required": false,
+        "default": null,
+        "pattern": null,
+        "maxLength": null,
+        "choices": null,
+        "whenTrue": [
+          "--x"
+        ],
+        "whenFalse": [
+          "--no-x",
+          "-q"
+        ],
+        "min": null,
+        "max": null,
+        "hint": null
+      }
+    ],
+    "output": "Text",
+    "outputEncoding": "Utf8",
+    "stderr": "Separate",
+    "csvSeparator": "Comma",
+    "successExitCodes": [
+      0
+    ],
+    "timeoutSeconds": 60,
+    "icon": null
+  },
+  "expansions": [
+    {
+      "values": {
+        "flag": "true"
+      },
+      "host": null,
+      "port": null,
+      "arguments": [
+        "--x"
+      ]
+    },
+    {
+      "values": {
+        "flag": "false"
+      },
+      "host": null,
+      "port": null,
+      "arguments": [
+        "--no-x",
+        "-q"
+      ]
+    },
+    {
+      "values": {
+        "flag": "maybe"
+      },
+      "host": null,
+      "port": null,
+      "refusals": [
+        {
+          "reason": "NotABoolean",
+          "subject": "flag",
+          "path": "inputs[0]"
+        }
+      ]
+    }
+  ]
+}

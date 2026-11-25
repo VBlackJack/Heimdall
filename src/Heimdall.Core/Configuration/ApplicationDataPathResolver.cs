@@ -118,6 +118,13 @@ public static class ApplicationDataPathResolver
         return Path.Combine(dataRoot, AppConstants.HostsBackupsDirectoryName);
     }
 
+    /// <summary>Resolves the folder of the imported recipe files and their index.</summary>
+    public static string GetRecipesDirectory(string dataRoot)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(dataRoot);
+        return Path.Combine(dataRoot, AppConstants.RecipesDirectoryName);
+    }
+
     /// <summary>Resolves the restrictive staging root for application updates.</summary>
     public static string GetUpdatesDirectory(string dataRoot)
     {

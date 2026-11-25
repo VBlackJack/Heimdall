@@ -649,6 +649,219 @@ External-editor opens are serialized and linked to their owner's lifetime. Closi
 the owner cancels pending downloads; registration, watcher creation and editor launch
 cannot resume after disposal.
 
+### Tool packs machine policy
+
+The built-in tools are grouped in packs (see the Pack column of [TOOLS.md](TOOLS.md)). An
+organisation can forbid an optional pack on a machine with one DWORD value per pack, under the
+same key as the SFTP cap, `HKLM\Software\Policies\Heimdall`:
+
+| Value | Pack |
+|---|---|
+| `ToolPackEssentials` | Essentials |
+| `ToolPackNetworkDiagnostics` | Network diagnostics |
+| `ToolPackAdministration` | Administration |
+| `ToolPackAudit` | Audit and reconnaissance |
+| `ToolPackRecipes` | Recipes |
+
+- `0` forbids the pack. `1` means no restriction. Any other number, and an absent value,
+  means no policy for that pack; `2` is reserved for a later "forced on" and is treated as
+  no restriction today. The Core pack has no value: it can never be forbidden.
+- A forbidden pack beats the user's choice. Its tools are hidden and refused, and its switch in
+  `Settings > Advanced > Tools & integrations > Tool packs` shows off and disabled, with a line
+  saying the pack is set by the organisation's policy. The user's own choice stays in the
+  settings file, so lifting the policy gives it back.
+- Only the per-machine hive is read, because the per-user hive is writable by the user the
+  policy constrains. Two readers exist, the tool availability service and the privilege
+  launcher's own; each reads the values once, the first time it needs them, so a change needs a
+  restart.
+- Only a `REG_DWORD` equal to `0` forbids a pack. Any other type or value, and a key that cannot
+  be read, means no policy.
+- The privilege launcher also refuses to launch while the Audit pack is forbidden, whether it
+  was reached from the tool or started with a hand-built command line.
+
+This is a convenience for administrators, **not a security boundary**: the tools stay in the
+binary and on disk, and a local administrator can change the policy. It also does not reach
+everything that resembles a pack's tools. Known limits:
+
+- The Windows services tool elevates through `runas` to start, stop and restart services. It
+  belongs to the Administration pack, not to Audit, so forbidding Audit does not remove that
+  elevation path.
+- The server context menu sends Wake-on-LAN packets on its own, with or without the Wake-on-LAN
+  tool.
+- Detected external tools, such as Sysinternals PsExec, are outside the packs.
+- Several network diagnostics tools (ping, DNS lookup, WHOIS, HTTP headers, traceroute and the
+  certificate inspector) can run their probe on an SSH gateway the user picks, which runs
+  commands on a remote host. This is not specific to the Audit pack.
+
+### Recipes
+
+A recipe (see [TOOLS.md](TOOLS.md#recipes)) is a text file, written by someone
+else, that tells Heimdall to run a program already on the computer with a given
+list of arguments. Importing one is a trust decision: from then on, running the
+tool starts that program with those arguments, with your rights. The Recipes
+pack is off by default.
+
+**What protects you.**
+
+- **The import preview is the real barrier.** Before anything is written,
+  Heimdall shows the program as the full path it resolved, then every argument
+  exactly as written in the file, one per line. Control and invisible
+  characters, and every character outside printable ASCII in the program, the
+  arguments and the defaults, are shown as `\uXXXX`. Every translation the file
+  carries (language, name, description, field labels and field hints) is listed
+  too, because the tool shows it instead of the English text when the interface
+  is in that language, and so is the hint of every field and the arguments a
+  switch adds when it is on and when it is off. For a replacement, each of the
+  author, the name, the description, the translations, the output and its
+  encoding (and the separator of a table), the way standard error is kept, the
+  success exit codes, the timeout and the icon is said to be unchanged or
+  changed, on a line of its own, and the line of the fields compares every
+  property of every field. This model assumes the preview is read: the other
+  rules below are limits on what a file can ask for, not a judgment on what it
+  is for.
+- **Structural rules.** The program must be a real `.exe` that Heimdall resolves
+  itself (the operating system search order is never used), and its final
+  location, once links are followed, must lie under the Windows folder, Program
+  Files, Program Files (x86) or a folder you added. It is never started through a
+  shell: the argument list is passed as is, one token being one argument, with
+  no quoting, splitting or joining. No environment variable is expanded. Fixed
+  text that holds a network path (two separators in a row, in either form and in
+  any mix, so a backslash next to a slash counts), a URL, the system path prefix
+  (a separator, two question marks and a separator), a `%`, a leading `@` or a
+  character that looks like a plain one is refused at import. A choice or a
+  default is held at import to the rule a typed value meets at run time (see
+  below), so one that would always be refused is refused with the file. A drive
+  root cannot be added as an allowed folder. A typed value is held to a common
+  rule (no control character, no look-alike character, no leading space, `-`,
+  `/`, `@` or backslash where it starts an argument, no network or device path in
+  a `path` field) and to the validation of its type.
+- **Allowed roots are checked, not trusted as a whole.** A program under the
+  Windows folder, Program Files or Program Files (x86) is refused when a user
+  who is not an administrator can change its file or a folder above it (up to
+  that root), through its permissions or by owning it (an owner other than the
+  system, the administrators or the installer service), or when those
+  permissions or that owner cannot be read. A folder you added is trusted as a
+  whole and is not checked, but only for what lies outside Windows and Program
+  Files: adding a folder that covers part of them does not switch the check off.
+  A folder that leads to the root of a drive or to a network location (a mapped
+  network drive, a link to a share) is refused when you add it, and its final
+  form is never trusted when a program runs.
+- **Look-alike characters.** A character that Windows would turn into a plain
+  ASCII one for a program that reads its command line in the ANSI code page of
+  the machine (a full-width hyphen, a typographic quote, a no-break space) is
+  refused in the fixed text and in typed values. The rule follows the ANSI code
+  page of the machine, the one a program reads its command line in, so some
+  accented capitals and ligatures can be refused in an argument on some machines
+  and accepted on others.
+- **A seat belt, as a second line only.** A list of names of shells,
+  interpreters and proxy executables (`cmd`, `powershell`, `python`, `rundll32`
+  and the others listed in [TOOLS.md](TOOLS.md#recipes)) is checked on the file
+  name and on the original file name in the version resource. It stops the
+  obvious mistake. It is not a boundary (see below).
+- **The bytes you accepted.** The SHA-256 of the imported file is recorded. A
+  recipe file that was changed afterwards, or dropped into the folder by hand,
+  is not loaded.
+- **The program you accepted.** The path the program resolved to at import is
+  recorded and compared before each run. If the name now leads to another file,
+  or to nothing, the run does not start and the recipe has to be imported again.
+- **A fresh working folder.** Each run gets a new, empty working folder, removed
+  afterwards. It is created under a Heimdall folder in your temporary folder, not
+  in the data folder, so a program does not start next to the settings of Heimdall.
+- **Bounded runs.** At most 1 MiB of output is kept per stream (2 MiB in all when
+  standard error is kept apart), and a run is stopped at the timeout of the
+  recipe (60 seconds by default, 600 at most). A run under way is also stopped
+  when the pack is turned off or becomes forbidden.
+- **The processes the program started.** The program is placed in a Windows job
+  object right after it starts, and the job ends the processes it started when
+  the run ends. A process the program launched in that very first instant can
+  escape the job. If Windows
+  refuses to create it (for example when Heimdall itself runs inside a job that
+  forbids nesting), only a run that is interrupted (stopped or timed out) kills
+  the process tree.
+- **An open tab cannot run an old recipe.** A tab keeps the recipe it was opened
+  with. Once the recipe is replaced, or removed and imported again, the tab says
+  so in its header and refuses to run, and opening the tool opens a new tab
+  instead of focusing that one.
+- **The pack stays off until it was chosen.** The Recipes pack counts as off until
+  the one-time step has run or you turned the switch on and saved, so a step that
+  failed or was skipped (a settings file written by a newer Heimdall is never
+  written to) does not leave it on. A settings file imported from Settings does
+  not turn it on either: a file written by an earlier version leaves it as it
+  is, and only a file written by this version where the pack was on turns it
+  on, with a line of its own in the confirmation ("Turns the Recipes pack on").
+- **The policy.** An organisation can forbid the pack (see below).
+
+**What does not protect you.**
+
+- These rules do not make a recipe safe. A legitimate program can do harm through
+  its own arguments: one that deletes, writes, reads or sends what it is told
+  to, does so. A program started by a recipe has the rights and the environment
+  of Heimdall, and an empty working folder does not keep it from using any other
+  folder. Nothing here is a sandbox.
+- A recipe can name any file the user can reach, including through a relative
+  path with `..`. Nothing confines a program to its run folder.
+- The seat belt is a list of names. A copy of an interpreter under another name,
+  with a neutral original file name in its version resource, passes it, and so
+  does a program that is harmless by name but runs other programs or loads
+  plug-ins.
+- There is a window between the check of the program and its start: a file
+  replaced in that interval is not detected. The comparison made before each run
+  is a comparison of paths, so a program replaced in place, at the same path, is
+  not detected either. A folder you add to the list is trusted as a whole only
+  for programs that lie outside Windows and Program Files: any `.exe` under it
+  there can be named by a recipe, while a program under Windows or Program Files
+  is always checked, whatever folders you added.
+- The permission check of the Windows and Program Files folders reads the
+  permission rules and the owner of the file and of each folder above it. An
+  untrusted owner is refused whatever the rules say: an OWNER RIGHTS entry,
+  which can limit what an owner may do, is deliberately not honoured. It is a
+  limit on the obvious case, not a guarantee that nobody else can change the
+  file.
+- Only the system, the Administrators of the machine and the installer service
+  are trusted. A right to write, or an owner, that is any other account makes
+  the program refused, the administrators of a domain or a service account
+  included, even when an administrator set it up that way on purpose. A deny
+  entry of the permission list is not counted, and a conditional entry is read
+  as if its condition always held (measured on a test file). Both err on the
+  side of refusing.
+- The look-alike check asks how the ANSI code page of the machine would write
+  each character, and it always refuses the block of half-width and full-width
+  forms. On a machine whose ANSI code page uses two bytes for some characters
+  (Japanese, Chinese, Korean), it does not see a character whose second byte is
+  the byte of a backslash, which a program that reads its command line byte by
+  byte may take for one, and the half-width katakana and Hangul of that block
+  are refused on every machine. Nothing in this version adapts the rule to those
+  code pages.
+- The folder rule reads the text of the path, and then the path it leads to once
+  links and mapped drives are followed: a mapped network drive, a link to a
+  share and a link to a drive root are refused. A folder whose final form cannot
+  be resolved (it is missing, its drive is absent) is accepted as written, and
+  what it leads to is checked again when a program runs.
+- Behavior with some unusual path forms (short 8.3 names, substituted drives) has
+  not been verified by a real test, and nothing is promised about it. That ending
+  a run also ends the processes the program started was verified by one real
+  test with a stock program, and nothing is promised beyond it.
+- A table shown by a tool is neutralized when it is copied, whether it is the
+  output of a recipe as CSV or JSON or the table of an external tool: a cell
+  that starts with `=`, `+`, `-`, `@` or a double quote gets a leading
+  apostrophe, so a spreadsheet does not read it as a formula, and a tab or a
+  line break inside a cell becomes a space. A value that starts with `-` or `+`
+  (a negative number, a time offset, a phone number) is therefore copied with a
+  leading apostrophe and pastes as text. Plain text output is copied as it is.
+- A recipe is not signed and not reviewed by the project. The author is a text
+  the file claims, and Heimdall shows it as unverified. A community catalogue is
+  not part of this version: a recipe comes from whoever gives you the file.
+
+**Machine policy.** The value `ToolPackRecipes`, a `REG_DWORD` under
+`HKLM\Software\Policies\Heimdall` (the key of the other pack values, see
+[Tool packs machine policy](#tool-packs-machine-policy)), set to `0`, forbids
+the pack. The pack's switch then shows off and disabled with a line saying it is
+set by the organisation's policy; recipe tools are not listed and are refused
+when something tries to run them; the **Import a recipe...** button is disabled
+and an import is refused. The recipe files already on disk stay where they are.
+As for the other packs, this is a convenience for administrators, not a security
+boundary.
+
 ### Remote upload commit guarantees
 
 Every remote write uploads to a unique temporary path next to the destination
@@ -1210,7 +1423,7 @@ caller refuses: there is no fallback to a primitive that could replace the desti
   `dotnet format --verify-no-changes`, the blocking test lane (the suite minus
   the cases marked `CIUnstable` or `RequiresDesktop`, which run in two further
   lanes that report their failures without turning the run red), JSON locale
-  parity (every catalogue holds exactly the English key set, currently 6,400+
+  parity (every catalogue holds exactly the English key set, currently 6,700+
   keys each), and an informational `dotnet list package --vulnerable` scan.
 - Dependency scan for manual review: `dotnet list Heimdall.slnx package
   --vulnerable --include-transitive`. CI emits warnings but does not gate on

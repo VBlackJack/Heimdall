@@ -1,0 +1,181 @@
+/*
+ * Copyright 2026 Julien Bombled
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+using Heimdall.Core.Recipes;
+
+namespace Heimdall.Core.Tests.Recipes;
+
+/// <summary>
+/// A machine whose code pages are described by the test: it turns exactly the characters it was told
+/// about into an ASCII one, and keeps every other character as itself. A test that does not care
+/// about the code page of the machine it runs on passes <see cref="Plain"/>.
+/// </summary>
+internal sealed class FakeCharacterConverter : IRecipeCharacterConverter
+{
+    private readonly HashSet<string> _becomesAscii = new(StringComparer.Ordinal);
+
+    /// <summary>A machine that keeps every character as itself.</summary>
+    public static FakeCharacterConverter Plain => new();
+
+    /// <summary>Every character this converter was asked about, in order.</summary>
+    public List<string> Asked { get; } = [];
+
+    /// <summary>Makes a character become an ASCII one.</summary>
+    public FakeCharacterConverter Fold(string character)
+    {
+        _becomesAscii.Add(character);
+        return this;
+    }
+
+    public bool BecomesAscii(string character)
+    {
+        Asked.Add(character);
+        return _becomesAscii.Contains(character);
+    }
+}
+
+/// <summary>Shared builders for the recipe tests.</summary>
+internal static class RecipeTestData
+{
+    /// <summary>The smallest valid recipe file.</summary>
+    public const string MinimalJson = """
+        {
+          "schemaVersion": 1,
+          "id": "acme.ping",
+          "version": "1.0.0",
+          "author": "Acme",
+          "name": "Ping",
+          "description": "Ping the selected host.",
+          "program": "ping.exe",
+          "arguments": ["{Host}"]
+        }
+        """;
+
+    /// <summary>A recipe file that uses every property of the format.</summary>
+    public const string FullJson = """
+        {
+          "schemaVersion": 1,
+          "id": "acme.scan",
+          "version": "1.2.3-beta.1+build.5",
+          "author": "Acme Labs",
+          "name": "Scan",
+          "description": "Scans a target.",
+          "translations": {
+            "fr": {
+              "name": "Analyse",
+              "description": "Analyse une cible.",
+              "fieldLabels": { "target": "Cible" },
+              "fieldHints": { "target": "Un nom d'hote." }
+            }
+          },
+          "program": "C:\\Windows\\System32\\ping.exe",
+          "arguments": [
+            ["-n", "{in:count}"],
+            "{in:verbose}",
+            "--mode={in:mode}",
+            ["--extra", "{in:extra}"],
+            "{in:target}",
+            ["-p", "{Port}"],
+            ["--dir", "{in:dir}"],
+            ["--ratio", "{in:ratio}"],
+            ["--addr", "{in:addr}"]
+          ],
+          "inputs": [
+            { "name": "target", "type": "hostname", "label": "Target", "required": true, "hint": "A host name." },
+            { "name": "count", "type": "int", "label": "Count", "default": 4, "min": 1, "max": "9" },
+            { "name": "verbose", "type": "bool", "label": "Verbose", "default": false, "whenTrue": ["-v", "-d"], "whenFalse": ["-q"] },
+            { "name": "mode", "type": "choice", "label": "Mode", "choices": ["fast", "slow"], "default": "fast" },
+            { "name": "extra", "type": "string", "label": "Extra", "pattern": "[a-z]+", "maxLength": 20 },
+            { "name": "dir", "type": "path", "label": "Folder" },
+            { "name": "ratio", "type": "number", "label": "Ratio", "min": "0.5", "max": 2.5 },
+            { "name": "addr", "type": "ipaddress", "label": "Address" }
+          ],
+          "output": "csv",
+          "outputEncoding": "ansi",
+          "stderr": "separate",
+          "csvSeparator": "semicolon",
+          "successExitCodes": [0, 1],
+          "timeoutSeconds": 30,
+          "icon": "network"
+        }
+        """;
+
+    /// <summary>A valid recipe built directly, to be modified with <c>with</c> in a test.</summary>
+    public static Recipe Minimal() => new(
+        SchemaVersion: 1,
+        Id: "acme.ping",
+        Version: "1.0.0",
+        Author: "Acme",
+        Name: "Ping",
+        Description: "Ping the selected host.",
+        Translations: new Dictionary<string, RecipeTranslation>(),
+        Program: "ping.exe",
+        Arguments: [RecipeArgument.Bare("{Host}")],
+        Inputs: [],
+        Output: RecipeOutputFormat.Text,
+        OutputEncoding: RecipeOutputEncoding.Utf8,
+        Stderr: RecipeStderrMode.Separate,
+        SuccessExitCodes: [0],
+        TimeoutSeconds: 60,
+        Icon: null);
+
+    /// <summary>A valid input of the given type, to be modified with <c>with</c>.</summary>
+    public static RecipeInput Input(string name, RecipeInputType type, bool required = false, string? defaultValue = null)
+        => new(name, type, "Label " + name, required, defaultValue, null, null, null, null);
+
+    /// <summary>
+    /// A valid recipe whose inputs are all used: a switch is placed as a bare token, any other input
+    /// in a group of its own, so that no input is left unreferenced.
+    /// </summary>
+    public static Recipe Using(params RecipeInput[] inputs)
+    {
+        List<RecipeArgument> arguments = [.. Minimal().Arguments];
+        foreach (RecipeInput input in inputs)
+        {
+            arguments.Add(input.Type == RecipeInputType.Bool
+                ? RecipeArgument.Bare("{in:" + input.Name + "}")
+                : RecipeArgument.Group(["--" + input.Name + "={in:" + input.Name + "}"]));
+        }
+
+        return Minimal() with { Inputs = [.. inputs], Arguments = [.. arguments] };
+    }
+
+    /// <summary>A recipe whose inputs and arguments are the given ones.</summary>
+    public static Recipe With(IEnumerable<RecipeInput> inputs, params RecipeArgument[] arguments)
+        => Minimal() with { Inputs = [.. inputs], Arguments = [.. arguments] };
+
+    /// <summary>Parses a file that must be valid.</summary>
+    public static Recipe ParseValid(string json)
+    {
+        RecipeParseResult result = RecipeParser.Parse(json);
+        Assert.True(result.Succeeded, "Unexpected errors: " + string.Join(", ", result.Errors.Select(error => error.Code + "@" + error.Path)));
+        return result.Recipe!;
+    }
+
+    /// <summary>The error codes of a file that must be refused.</summary>
+    public static IReadOnlyList<RecipeError> ParseInvalid(string json)
+    {
+        RecipeParseResult result = RecipeParser.Parse(json);
+        Assert.False(result.Succeeded);
+        Assert.Null(result.Recipe);
+        Assert.NotEmpty(result.Errors);
+        return result.Errors;
+    }
+
+    /// <summary>The codes found in a recipe.</summary>
+    public static IReadOnlyList<RecipeErrorCode> Codes(Recipe recipe)
+        => [.. RecipeValidator.Validate(recipe).Select(error => error.Code)];
+}

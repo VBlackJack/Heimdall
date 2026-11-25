@@ -1,0 +1,165 @@
+{
+  "recipe": {
+    "schemaVersion": 1,
+    "id": "lock.sample",
+    "version": "1.0.0",
+    "author": "Lock",
+    "name": "Sample",
+    "description": "A sample of the version 1 format.",
+    "translations": {},
+    "program": "ping.exe",
+    "arguments": [
+      {
+        "group": false,
+        "tokens": [
+          "-x"
+        ]
+      },
+      {
+        "group": true,
+        "tokens": [
+          "--a",
+          "{in:a}"
+        ]
+      },
+      {
+        "group": true,
+        "tokens": [
+          "--ab",
+          "{in:a}",
+          "{in:b}"
+        ]
+      },
+      {
+        "group": true,
+        "tokens": [
+          "--c",
+          "{in:c}"
+        ]
+      },
+      {
+        "group": false,
+        "tokens": [
+          "-y"
+        ]
+      }
+    ],
+    "inputs": [
+      {
+        "name": "a",
+        "type": "String",
+        "label": "Label a",
+        "required": false,
+        "default": null,
+        "pattern": null,
+        "maxLength": null,
+        "choices": null,
+        "whenTrue": null,
+        "whenFalse": null,
+        "min": null,
+        "max": null,
+        "hint": null
+      },
+      {
+        "name": "b",
+        "type": "String",
+        "label": "Label b",
+        "required": false,
+        "default": null,
+        "pattern": null,
+        "maxLength": null,
+        "choices": null,
+        "whenTrue": null,
+        "whenFalse": null,
+        "min": null,
+        "max": null,
+        "hint": null
+      },
+      {
+        "name": "c",
+        "type": "Int",
+        "label": "Label c",
+        "required": false,
+        "default": "3",
+        "pattern": null,
+        "maxLength": null,
+        "choices": null,
+        "whenTrue": null,
+        "whenFalse": null,
+        "min": null,
+        "max": null,
+        "hint": null
+      }
+    ],
+    "output": "Text",
+    "outputEncoding": "Utf8",
+    "stderr": "Separate",
+    "csvSeparator": "Comma",
+    "successExitCodes": [
+      0
+    ],
+    "timeoutSeconds": 60,
+    "icon": null
+  },
+  "expansions": [
+    {
+      "values": {},
+      "host": null,
+      "port": null,
+      "arguments": [
+        "-x",
+        "--c",
+        "3",
+        "-y"
+      ]
+    },
+    {
+      "values": {
+        "a": "one"
+      },
+      "host": null,
+      "port": null,
+      "arguments": [
+        "-x",
+        "--a",
+        "one",
+        "--c",
+        "3",
+        "-y"
+      ]
+    },
+    {
+      "values": {
+        "a": "one",
+        "b": "two"
+      },
+      "host": null,
+      "port": null,
+      "arguments": [
+        "-x",
+        "--a",
+        "one",
+        "--ab",
+        "one",
+        "two",
+        "--c",
+        "3",
+        "-y"
+      ]
+    },
+    {
+      "values": {
+        "a": "  ",
+        "c": "9"
+      },
+      "host": null,
+      "port": null,
+      "arguments": [
+        "-x",
+        "--c",
+        "9",
+        "-y"
+      ]
+    }
+  ]
+}

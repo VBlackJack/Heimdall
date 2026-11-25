@@ -74,7 +74,7 @@ public sealed class EmbeddedSessionManagerSftpSudoSettingTests : IDisposable
     // Only the configuration manager matters here; the other dependencies stay null so a new
     // dependency of this path surfaces as a failure instead of being silently tolerated.
     private static EmbeddedSessionManager CreateManager(ConfigManager config)
-        => new(null!, null!, null!, null!, null!, null!, null!, null!, null!, config);
+        => new(null!, null!, null!, null!, null!, null!, null!, null!, null!, config, AlwaysAvailableToolAvailability.Instance);
 
     public void Dispose()
     {

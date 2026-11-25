@@ -22,6 +22,7 @@ using System.Runtime.Versioning;
 using System.Text;
 using System.Text.Json;
 using Heimdall.Core.Logging;
+using Heimdall.Core.Models;
 using Microsoft.Win32.SafeHandles;
 
 namespace Heimdall.Core.Security;
@@ -44,10 +45,22 @@ public enum PrivilegeLevel
 /// <summary>
 /// Result of a privilege-launched process.
 /// </summary>
-public sealed record PrivilegeLaunchResult(bool Success, int ProcessId, string? ErrorMessage = null)
+/// <param name="Success">True when the process was started.</param>
+/// <param name="ProcessId">The started process id, or 0.</param>
+/// <param name="ErrorMessage">An English diagnostic for a failure; callers show their own localized text.</param>
+/// <param name="RefusedByPolicy">True when the organisation policy forbade the launch, so nothing was attempted.</param>
+public sealed record PrivilegeLaunchResult(
+    bool Success,
+    int ProcessId,
+    string? ErrorMessage = null,
+    bool RefusedByPolicy = false)
 {
     public static PrivilegeLaunchResult Failed(string message) => new(false, 0, message);
     public static PrivilegeLaunchResult Ok(int pid) => new(true, pid);
+
+    /// <summary>The organisation policy forbids the Audit pack, so no launch was attempted.</summary>
+    public static PrivilegeLaunchResult ForbiddenByPolicy() =>
+        new(false, 0, "Privilege launch refused: the organization policy forbids the Audit tool pack.", RefusedByPolicy: true);
 }
 
 /// <summary>
@@ -86,6 +99,23 @@ public static class PrivilegeLauncher
     private const string PrivLaunchArg = "--privlaunch";
     private const string PayloadArg = "--payload";
 
+    /// <summary>Exit code of the elevated child: success.</summary>
+    internal const int ExitCodeSuccess = 0;
+
+    /// <summary>Exit code of the elevated child: the request was refused by one of the checks.</summary>
+    internal const int ExitCodeRefused = 1;
+
+    /// <summary>Exit code of the elevated child: the request was valid but the launch itself failed.</summary>
+    internal const int ExitCodeLaunchFailed = 2;
+
+    /// <summary>Exit code of the elevated child: the organisation policy forbids the Audit pack.</summary>
+    internal const int ExitCodeForbiddenByPolicy = 3;
+
+    /// <summary>The pack whose policy veto governs every privilege launch.</summary>
+    internal const ToolPack GovernedPack = ToolPack.Audit;
+
+    private static readonly ToolPackPolicy MachinePolicy = new();
+
     private sealed class PrivilegeLaunchPayloadDto
     {
         public string? Exe { get; init; }
@@ -105,6 +135,7 @@ public static class PrivilegeLauncher
         PayloadInvalid,
         NotElevated,
         LaunchFailed,
+        ForbiddenByPolicy,
     }
 
     // ── Win32 structures ──────────────────────────────────────────────
@@ -286,7 +317,27 @@ public static class PrivilegeLauncher
         string executablePath,
         IReadOnlyList<string>? arguments,
         PrivilegeLevel level)
+        => Launch(executablePath, arguments, level, MachinePolicy);
+
+    /// <summary>
+    /// Same as the public entry point, with the organisation policy supplied by the caller so
+    /// tests do not depend on the machine registry. The veto is the first thing checked, before
+    /// any of the three elevation paths.
+    /// </summary>
+    internal static PrivilegeLaunchResult Launch(
+        string executablePath,
+        IReadOnlyList<string>? arguments,
+        PrivilegeLevel level,
+        ToolPackPolicy policy)
     {
+        ArgumentNullException.ThrowIfNull(policy);
+
+        if (policy.IsForbidden(GovernedPack))
+        {
+            FileLogger.Warn("[PrivilegeLauncher] Launch refused: the organization policy forbids the Audit tool pack.");
+            return PrivilegeLaunchResult.ForbiddenByPolicy();
+        }
+
         PrivilegeLaunchPayload payload = new(
             executablePath,
             arguments?.ToArray() ?? []);
@@ -330,28 +381,49 @@ public static class PrivilegeLauncher
     /// Returns null if args don't match; otherwise returns an exit code (0=success).
     /// </summary>
     public static int? HandlePrivilegeLaunchArgs(string[] args)
-        => HandlePrivilegeLaunchArgs(args, IsCurrentProcessElevated, out _);
+        => HandlePrivilegeLaunchArgs(args, IsCurrentProcessElevated, MachinePolicy, out _);
 
     /// <summary>
     /// Same as the public entry point, with the elevation check supplied by the caller and the
-    /// reason for a refusal reported, so tests can name the check that refused.
+    /// reason for a refusal reported, so tests can name the check that refused. No organisation
+    /// policy applies here: this overload is the seam of the tests of the other checks.
     /// </summary>
     internal static int? HandlePrivilegeLaunchArgs(
         string[] args,
         Func<bool> isElevated,
         out PrivilegeLaunchRefusal refusal)
+        => HandlePrivilegeLaunchArgs(args, isElevated, new ToolPackPolicy(static _ => null), out refusal);
+
+    /// <summary>
+    /// Same as the other internal overload, with the organisation policy supplied by the caller.
+    /// The veto is checked as soon as the request is recognised as a privilege launch, before
+    /// any other check and before any token work.
+    /// </summary>
+    internal static int? HandlePrivilegeLaunchArgs(
+        string[] args,
+        Func<bool> isElevated,
+        ToolPackPolicy policy,
+        out PrivilegeLaunchRefusal refusal)
     {
         ArgumentNullException.ThrowIfNull(isElevated);
+        ArgumentNullException.ThrowIfNull(policy);
 
         refusal = PrivilegeLaunchRefusal.None;
         if (args.Length == 0 || !string.Equals(args[0], PrivLaunchArg, StringComparison.OrdinalIgnoreCase))
             return null;
 
+        if (policy.IsForbidden(GovernedPack))
+        {
+            FileLogger.Warn("[PrivilegeLauncher] Rejected self-elevation request: the organization policy forbids the Audit tool pack.");
+            refusal = PrivilegeLaunchRefusal.ForbiddenByPolicy;
+            return ExitCodeForbiddenByPolicy;
+        }
+
         if (args.Length != 4 || !string.Equals(args[2], PayloadArg, StringComparison.Ordinal))
         {
             FileLogger.Warn("[PrivilegeLauncher] Rejected malformed self-elevation command line.");
             refusal = PrivilegeLaunchRefusal.MalformedCommandLine;
-            return 1;
+            return ExitCodeRefused;
         }
 
         string levelStr = args[1];
@@ -359,14 +431,14 @@ public static class PrivilegeLauncher
         {
             FileLogger.Warn($"[PrivilegeLauncher] Rejected self-elevation request with invalid level '{levelStr}'.");
             refusal = PrivilegeLaunchRefusal.InvalidLevel;
-            return 1;
+            return ExitCodeRefused;
         }
 
         if (level == PrivilegeLevel.CurrentUserElevated)
         {
             FileLogger.Warn("[PrivilegeLauncher] Rejected self-elevation request for unsupported CurrentUserElevated level.");
             refusal = PrivilegeLaunchRefusal.UnsupportedLevel;
-            return 1;
+            return ExitCodeRefused;
         }
 
         PrivilegeLaunchPayload payload;
@@ -378,14 +450,14 @@ public static class PrivilegeLauncher
         {
             FileLogger.Warn($"[PrivilegeLauncher] Rejected self-elevation payload decode: {ex.Message}");
             refusal = PrivilegeLaunchRefusal.PayloadUndecodable;
-            return 1;
+            return ExitCodeRefused;
         }
 
         if (!TryValidateLaunchPayload(payload, out string validationError, level))
         {
             FileLogger.Warn($"[PrivilegeLauncher] Rejected self-elevation payload validation: {validationError}");
             refusal = PrivilegeLaunchRefusal.PayloadInvalid;
-            return 1;
+            return ExitCodeRefused;
         }
 
         if (!isElevated())
@@ -393,7 +465,7 @@ public static class PrivilegeLauncher
             FileLogger.Warn(
                 "[PrivilegeLauncher] Rejected self-elevation token work: process is not elevated.");
             refusal = PrivilegeLaunchRefusal.NotElevated;
-            return 1;
+            return ExitCodeRefused;
         }
 
         // We are now elevated - do the actual token work
@@ -415,7 +487,7 @@ public static class PrivilegeLauncher
         if (!result.Success)
             refusal = PrivilegeLaunchRefusal.LaunchFailed;
 
-        return result.Success ? 0 : 2;
+        return result.Success ? ExitCodeSuccess : ExitCodeLaunchFailed;
     }
 
     // ── Elevated (UAC) ────────────────────────────────────────────────
@@ -486,7 +558,10 @@ public static class PrivilegeLauncher
             int exitCode = process.HasExited ? process.ExitCode : -1;
             process.Dispose();
 
-            return exitCode == 0
+            if (exitCode == ExitCodeForbiddenByPolicy)
+                return PrivilegeLaunchResult.ForbiddenByPolicy();
+
+            return exitCode == ExitCodeSuccess
                 ? PrivilegeLaunchResult.Ok(0)
                 : PrivilegeLaunchResult.Failed("Elevated launch failed (child exit code: " + exitCode + ").");
         }

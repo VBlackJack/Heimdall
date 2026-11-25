@@ -1,0 +1,8 @@
+{
+  "errors": [
+    {
+      "code": "FixedValueStartsWithOptionCharacter",
+      "path": "inputs[1].whenFalse[0]"
+    }
+  ]
+}

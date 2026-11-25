@@ -56,6 +56,9 @@ It is free, open source, and runs on Windows 10 and 11.
   can supply the passwords instead, so Heimdall never stores them at all.
 - **Tools you would otherwise go hunting for.** Ping, port scanner, certificate inspector, hash
   and password generators, and dozens more, built in.
+- **Only the tools you want, and tools of your own.** Turn whole groups of tools on or off, and
+  add your own as small recipe files. Recipes are off by default and show you exactly what they
+  will run before anything is kept; see [how recipes work](docs/TOOLS.md#recipes).
 - **Sessions organised the way you work.** Folders with colours, drag and drop to move a folder
   or to arrange sessions by hand, filters by protocol, favourite, connected state or gateway, and
   a tree that opens where you left it. Remove active filters individually, act on several

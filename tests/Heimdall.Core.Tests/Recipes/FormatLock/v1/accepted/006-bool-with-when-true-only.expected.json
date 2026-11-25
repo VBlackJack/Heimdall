@@ -1,0 +1,96 @@
+{
+  "recipe": {
+    "schemaVersion": 1,
+    "id": "lock.sample",
+    "version": "1.0.0",
+    "author": "Lock",
+    "name": "Sample",
+    "description": "A sample of the version 1 format.",
+    "translations": {},
+    "program": "ping.exe",
+    "arguments": [
+      {
+        "group": false,
+        "tokens": [
+          "-a"
+        ]
+      },
+      {
+        "group": false,
+        "tokens": [
+          "{in:flag}"
+        ]
+      },
+      {
+        "group": false,
+        "tokens": [
+          "-z"
+        ]
+      }
+    ],
+    "inputs": [
+      {
+        "name": "flag",
+        "type": "Bool",
+        "label": "Label flag",
+        "required": false,
+        "default": null,
+        "pattern": null,
+        "maxLength": null,
+        "choices": null,
+        "whenTrue": [
+          "-v",
+          "-d"
+        ],
+        "whenFalse": null,
+        "min": null,
+        "max": null,
+        "hint": null
+      }
+    ],
+    "output": "Text",
+    "outputEncoding": "Utf8",
+    "stderr": "Separate",
+    "csvSeparator": "Comma",
+    "successExitCodes": [
+      0
+    ],
+    "timeoutSeconds": 60,
+    "icon": null
+  },
+  "expansions": [
+    {
+      "values": {
+        "flag": "true"
+      },
+      "host": null,
+      "port": null,
+      "arguments": [
+        "-a",
+        "-v",
+        "-d",
+        "-z"
+      ]
+    },
+    {
+      "values": {
+        "flag": "false"
+      },
+      "host": null,
+      "port": null,
+      "arguments": [
+        "-a",
+        "-z"
+      ]
+    },
+    {
+      "values": {},
+      "host": null,
+      "port": null,
+      "arguments": [
+        "-a",
+        "-z"
+      ]
+    }
+  ]
+}

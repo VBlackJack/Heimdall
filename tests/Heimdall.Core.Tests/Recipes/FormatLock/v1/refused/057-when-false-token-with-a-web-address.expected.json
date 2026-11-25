@@ -1,0 +1,8 @@
+{
+  "errors": [
+    {
+      "code": "ForbiddenUrl",
+      "path": "inputs[0].whenFalse[0]"
+    }
+  ]
+}

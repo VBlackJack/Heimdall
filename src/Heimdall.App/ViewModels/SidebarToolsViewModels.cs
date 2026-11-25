@@ -72,6 +72,24 @@ public sealed partial class SidebarToolItemViewModel : ObservableObject, IAccess
     /// <summary>Localized tool display name.</summary>
     public required string Name { get; init; }
 
+    /// <summary>
+    /// For a tool that comes from a recipe, the word "Recipe" and its author marked as unverified,
+    /// as text; null for any other tool.
+    /// </summary>
+    public string? Provenance { get; init; }
+
+    /// <summary>True when the row shows a provenance beside the name.</summary>
+    public bool HasProvenance => Provenance is not null;
+
+    /// <summary>The name and the provenance in one line, for the tooltip of a recipe tool; null for any other tool.</summary>
+    public string? FullText { get; init; }
+
+    /// <summary>The name and the provenance as an assistive technology reads them; null for any other tool.</summary>
+    public string? AccessibleText { get; init; }
+
+    /// <summary>The tooltip of the row.</summary>
+    public string ToolTipText => FullText ?? Name;
+
     /// <summary>Theme resource key of the category brush (used to tint the icon).</summary>
     public required string BrushKey { get; init; }
 
@@ -96,8 +114,8 @@ public sealed partial class SidebarToolItemViewModel : ObservableObject, IAccess
     /// </summary>
     public bool IsExpanded { get; set; }
 
-    /// <summary>The tool's name, which the tree container announces.</summary>
-    public string AccessibleName => Name;
+    /// <summary>The tool's name, which the tree container announces; a recipe tool adds its provenance.</summary>
+    public string AccessibleName => AccessibleText ?? Name;
 
     /// <inheritdoc/>
     public string? AccessibleHelpText => null;

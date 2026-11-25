@@ -38,8 +38,9 @@ internal static class SettingsImportPreview
     /// Settings that decide what runs on this computer: commands, executables, where code is
     /// fetched from, and the shared session files read at every start (a session file names hosts
     /// and the commands typed into them, and a network path is opened with the user's Windows
-    /// sign-in). A settings file is shared between people, and these are the lines an author with
-    /// bad intent would hide among harmless ones.
+    /// sign-in), and the list of switched-off tool packs, which is how the scanning and enumeration
+    /// tools are turned on. A settings file is shared between people, and these are the lines an
+    /// author with bad intent would hide among harmless ones.
     /// </summary>
     internal static readonly IReadOnlySet<string> SensitiveKeys = new HashSet<string>(StringComparer.Ordinal)
     {
@@ -63,6 +64,9 @@ internal static class SettingsImportPreview
         "NanaRunPath",
         "CmdLibGitSyncUrl",
         "SharedSessionSources",
+        "DisabledToolPacks",
+        "RecipeProgramFolders",
+        SettingsTransfer.RecipesPackTurnedOnKey,
     };
 
     private const string ListSeparator = ", ";
@@ -85,11 +89,15 @@ internal static class SettingsImportPreview
         string lines = string.Join(
             Environment.NewLine,
             others.Take(MaxLines).Select(change => DescribeChange(localizer, change)));
+
+        // The notice that the file turns the Recipes pack on is a line of its own, not a setting: the
+        // count in the header is the number of settings.
+        int settingCount = changes.Count(change => change.Key != SettingsTransfer.RecipesPackTurnedOnKey);
         string text = localizer.FormatCount(
-            changes.Count,
+            settingCount,
             "SettingsImportPreviewOne",
             "SettingsImportPreview",
-            changes.Count,
+            settingCount,
             lines);
 
         int rest = others.Count - MaxLines;
@@ -127,6 +135,11 @@ internal static class SettingsImportPreview
         ArgumentNullException.ThrowIfNull(localizer);
         ArgumentNullException.ThrowIfNull(change);
 
+        if (change.Key == SettingsTransfer.RecipesPackTurnedOnKey)
+        {
+            return localizer["SettingsImportPreviewRecipesOn"];
+        }
+
         string name = SettingsLabelCatalog.TryGetPlace(change.Key, out SettingsPanelPlace? place) && place is not null
             ? DescribePlace(localizer, place)
             : change.Key;
@@ -153,6 +166,8 @@ internal static class SettingsImportPreview
                     ? source => DescribeSharedSource(localizer, source)
                     : tool => DescribeTool(localizer, tool);
                 return string.Join(ListSeparator, array.Select(item => describe((JsonObject)item!)));
+            case JsonArray names when names.Count > 0 && names.All(IsString):
+                return string.Join(ListSeparator, names.Select(item => item!.GetValue<string>()));
             case JsonValue scalar when scalar.GetValueKind() == JsonValueKind.String
                 && !string.IsNullOrEmpty(scalar.GetValue<string>()):
                 return scalar.GetValue<string>();

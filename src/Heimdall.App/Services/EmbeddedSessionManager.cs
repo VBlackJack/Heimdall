@@ -48,6 +48,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
     private readonly HostKeyStore _hostKeyStore;
     private readonly ConnectionStateMachine _connectionSm;
     private readonly ToolRegistry _toolRegistry;
+    private readonly IToolAvailability _toolAvailability;
     private readonly ITunnelService _tunnelService;
     private readonly ISessionLogService _sessionLogService;
     private readonly ISessionEventLog _sessionEventLog;
@@ -191,6 +192,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
         ISessionEventLog sessionEventLog,
         ISessionOperationLog sessionOperationLog,
         ConfigManager configManager,
+        IToolAvailability toolAvailability,
         WebCertificateTrust? webCertificateTrust = null,
         WebZoomMemory? webZoomMemory = null,
         SharedCredentialApplier? sharedCredentials = null,
@@ -205,6 +207,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
         _hostKeyStore = hostKeyStore;
         _connectionSm = connectionSm;
         _toolRegistry = toolRegistry;
+        _toolAvailability = toolAvailability;
         _tunnelService = tunnelService;
         _sessionLogService = sessionLogService;
         _sessionEventLog = sessionEventLog;
@@ -1716,15 +1719,26 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
             };
         }
 
+        // Backstop: the entry points refuse a switched-off or forbidden tool before they get here,
+        // so this builds no view and touches no application resource.
+        ToolAvailabilityState availability = _toolAvailability.GetState(toolId);
+        if (ToolUnavailableException.IsRefusal(availability))
+        {
+            throw new ToolUnavailableException(toolId, availability);
+        }
+
         var view = _toolRegistry.CreateView(toolId);
 
         // The gateways a tool lists and dials follow the settings from here on, through one
         // inventory shared by every tool tab. The snapshot list below is kept as the seed for a
         // context built without the inventory.
         _gatewayInventory ??= new ConfigGatewayInventory(_configManager, () => _configManager.CurrentSettings);
+        // Views ask the availability service, through this predicate, before offering an action
+        // that opens another tool.
         context = (context ?? new ToolContext()) with
         {
-            GatewayInventory = _gatewayInventory
+            GatewayInventory = _gatewayInventory,
+            IsToolAvailable = relatedToolId => _toolAvailability.IsListed(relatedToolId)
         };
 
         // Enrich context with SSH gateways so tools can offer "Route via" tunnel support

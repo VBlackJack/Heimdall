@@ -1,0 +1,8 @@
+{
+  "errors": [
+    {
+      "code": "MissingSwitchArguments",
+      "path": "inputs[0].whenFalse"
+    }
+  ]
+}

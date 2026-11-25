@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "id": "lock.sample",
+  "version": "1.0.0",
+  "author": "Lock",
+  "name": "Sample",
+  "description": "A sample of the version 1 format.",
+  "program": "ping.exe",
+  "arguments": ["--a={in:a}", "--b={in:b}", "--c={in:c}", "--d={in:d}", "--e={in:e}", "--f={in:f}"],
+  "inputs": [
+    { "name": "a", "type": "int", "label": "Label a", "default": 5 },
+    { "name": "b", "type": "int", "label": "Label b", "default": -3 },
+    { "name": "c", "type": "int", "label": "Label c", "default": 0 },
+    { "name": "d", "type": "number", "label": "Label d", "default": 1.50 },
+    { "name": "e", "type": "number", "label": "Label e", "default": -0.25 },
+    { "name": "f", "type": "number", "label": "Label f", "default": 0 }
+  ]
+}

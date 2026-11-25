@@ -44,7 +44,8 @@ public sealed class MainWindowDetailPaneBindingGuardTests
         "Mw_ToolDetailName.Text =",
         "Mw_ToolDetailCategory.Text =",
         "Mw_ToolDetailDescription.Text =",
-        "Mw_ToolDetailOpenBtn.Content ="
+        "Mw_ToolDetailOpenBtn.Content =",
+        "Mw_ToolDetailOpenBtn.IsEnabled ="
     ];
 
     [Fact]
@@ -89,6 +90,51 @@ public sealed class MainWindowDetailPaneBindingGuardTests
 
         Assert.True(element is not null, $"{elementName} is no longer a named element in MainWindow.xaml.");
         Assert.Equal(expectedText, (string?)element.Attribute("Text"));
+    }
+
+    [Fact]
+    public void ToolDetailOpenButtonIsDisabledWhileTheToolIsUnavailableAndKeepsItsCommand()
+    {
+        XDocument markup = XDocument.Load(Path.Combine(FindRepoRoot(), "src", "Heimdall.App", "MainWindow.xaml"));
+        XName name = XNamespace.Get("http://schemas.microsoft.com/winfx/2006/xaml") + "Name";
+        XElement? button = markup.Descendants()
+            .FirstOrDefault(candidate => (string?)candidate.Attribute(name) == "Mw_ToolDetailOpenBtn");
+
+        Assert.True(button is not null, "Mw_ToolDetailOpenBtn is no longer a named element in MainWindow.xaml.");
+        Assert.Equal(
+            "{Binding ServerList.ToolDetailIsUnavailable, Converter={StaticResource InvertBoolConverter}, FallbackValue=True}",
+            (string?)button.Attribute("IsEnabled"));
+        Assert.Equal("{Binding ServerList.ConnectCommand}", (string?)button.Attribute("Command"));
+    }
+
+    [Fact]
+    public void PaletteRowDimsItsContentOnlyWhenTheEntryIsToolUnavailable()
+    {
+        XDocument markup = XDocument.Load(Path.Combine(FindRepoRoot(), "src", "Heimdall.App", "MainWindow.xaml"));
+        XNamespace presentation = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
+        XName name = XNamespace.Get("http://schemas.microsoft.com/winfx/2006/xaml") + "Name";
+        XElement? list = markup.Descendants()
+            .FirstOrDefault(candidate => (string?)candidate.Attribute(name) == "PaletteResultsList");
+        Assert.True(list is not null, "PaletteResultsList is no longer a named element in MainWindow.xaml.");
+
+        XElement? template = list.Element(presentation + "ListBox.ItemTemplate")?.Element(presentation + "DataTemplate");
+        Assert.True(template is not null, "PaletteResultsList lost its item template.");
+
+        XElement? root = template.Elements().FirstOrDefault(child => child.Name != presentation + "DataTemplate.Triggers");
+        Assert.True(root is not null);
+        Assert.Equal("PaletteRowContent", (string?)root.Attribute(name));
+
+        XElement? trigger = template.Element(presentation + "DataTemplate.Triggers")?
+            .Elements(presentation + "DataTrigger")
+            .FirstOrDefault(candidate => (string?)candidate.Attribute("Binding") == "{Binding IsToolUnavailable, FallbackValue=False}");
+        Assert.True(trigger is not null, "The palette item template has no IsToolUnavailable trigger.");
+        Assert.Equal("True", (string?)trigger.Attribute("Value"));
+
+        XElement? setter = trigger.Elements(presentation + "Setter").SingleOrDefault();
+        Assert.True(setter is not null, "The trigger must hold a single setter.");
+        Assert.Equal("PaletteRowContent", (string?)setter.Attribute("TargetName"));
+        Assert.Equal("Opacity", (string?)setter.Attribute("Property"));
+        Assert.Equal("{StaticResource OpacityDisabled}", (string?)setter.Attribute("Value"));
     }
 
     private static string FindRepoRoot()

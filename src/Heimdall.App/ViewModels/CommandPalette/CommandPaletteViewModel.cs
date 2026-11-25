@@ -586,8 +586,8 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
     /// <summary>
     /// Opens a tool tab from a palette item whose Id starts with
     /// <c>"tool-"</c>. Extracts the tool ID and optional argument from the
-    /// encoded Id, tracks the tool as recently used, and opens it via
-    /// <see cref="MainViewModel.OpenToolTabAsync"/>.
+    /// encoded Id and opens it via <see cref="MainViewModel.OpenToolTabAsync"/>,
+    /// which records the tool as recently used when the open succeeds.
     /// </summary>
     private async Task OpenToolFromPaletteAsync(ServerItemViewModel item)
     {
@@ -598,7 +598,6 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
         var argument = pipeIndex >= 0 ? payload[(pipeIndex + 1)..] : null;
 
         var context = !string.IsNullOrEmpty(argument) ? new ToolContext(Argument: argument) : null;
-        _main.TrackRecentTool(toolId.ToUpperInvariant());
         await _main.OpenToolTabAsync(toolId, item.DisplayName, context);
     }
 
@@ -621,7 +620,7 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
 
     /// <summary>
     /// Splits the given session with a built-in tool pane and tracks the
-    /// tool as recently used. Delegates the actual split to
+    /// tool as recently used when the split succeeded. Delegates the actual split to
     /// <see cref="SplitService.SplitSessionWithTool"/>.
     /// </summary>
     private void SplitSessionWithTool(
@@ -630,7 +629,11 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
         SplitOrientation orientation,
         string? paneId = null)
     {
-        _main.Split.SplitSessionWithTool(session, paletteToolPayload, orientation, paneId);
+        if (!_main.Split.SplitSessionWithTool(session, paletteToolPayload, orientation, paneId))
+        {
+            return;
+        }
+
         // Parse tool ID for recent tracking
         var pipeIndex = paletteToolPayload.IndexOf('|');
         var toolId = pipeIndex >= 0 ? paletteToolPayload[..pipeIndex] : paletteToolPayload;
