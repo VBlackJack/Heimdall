@@ -151,6 +151,28 @@ public partial class SettingsViewModel
     private string[] BuiltInRecipeRoots()
         => [RecipeFolderMachine.WindowsDirectory, RecipeFolderMachine.ProgramFilesDirectory, RecipeFolderMachine.ProgramFilesX86Directory];
 
+    /// <summary>
+    /// Rewords the tool pack switches and the recipe list on the UI thread. The localizer raises the
+    /// language change on whatever thread finished loading the language file, and the recipe list is
+    /// rebuilt in a collection the view is bound to, which only the UI thread may change. The switch
+    /// is reported once every handler returned, so the work is done before this returns.
+    /// </summary>
+    private void RefreshPackAndRecipeTextsOnUiThread()
+    {
+        if (_toolPackUiDispatcher is null)
+        {
+            RefreshToolPackTexts();
+            RefreshRecipeTexts();
+            return;
+        }
+
+        _toolPackUiDispatcher.Invoke(() =>
+        {
+            RefreshToolPackTexts();
+            RefreshRecipeTexts();
+        });
+    }
+
     /// <summary>Rewords the recipe list after the interface language changed; it does not read the folder if the list was never shown.</summary>
     private void RefreshRecipeTexts()
     {

@@ -912,7 +912,8 @@ public partial class App : System.Windows.Application
                 workFolders,
                 availability,
                 () => (IReadOnlyList<string>?)configManager.CurrentSettings?.RecipeProgramFolders ?? [],
-                sp.GetRequiredService<IRecipeStore>()));
+                sp.GetRequiredService<IRecipeStore>(),
+                sp.GetRequiredService<IUiDispatcher>()));
             return new RecipeToolRegistrar(
                 sp.GetRequiredService<ToolRegistry>(),
                 availability,
@@ -940,7 +941,8 @@ public partial class App : System.Windows.Application
                 sp.GetRequiredService<IDialogService>(),
                 sp.GetRequiredService<LocalizationManager>(),
                 sp.GetRequiredService<IRecipeFileDialogs>(),
-                registrar.Reload);
+                registrar.Reload,
+                sp.GetRequiredService<IUiDispatcher>());
         });
 
         // The single place the real preset location is resolved. Neither the storage nor the

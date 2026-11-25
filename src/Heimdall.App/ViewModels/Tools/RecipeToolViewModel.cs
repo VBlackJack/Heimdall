@@ -34,13 +34,15 @@ namespace Heimdall.App.ViewModels.Tools;
 /// <param name="Availability">Says whether the tool may be used right now.</param>
 /// <param name="AllowedFolders">Reads the folders the user allowed in Settings, each time a run starts.</param>
 /// <param name="Versions">Says whether the recipe the view was built from is still the one that is imported.</param>
+/// <param name="UiDispatcher">Runs the rewording of the view on the UI thread when a language change arrives on another one; null runs it where it is raised.</param>
 public sealed record RecipeToolServices(
     IRecipeRunner Runner,
     IRecipeProgramResolver Resolver,
     IRecipeWorkFolders WorkFolders,
     IToolAvailability Availability,
     Func<IReadOnlyList<string>> AllowedFolders,
-    IRecipeVersions Versions);
+    IRecipeVersions Versions,
+    IUiDispatcher? UiDispatcher = null);
 
 /// <summary>
 /// The recipe tool: input fields built from the recipe, the session target it reads, one run at a
@@ -676,7 +678,18 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
         }
     }
 
-    private void OnLocaleChanged(string locale) => RefreshTexts();
+    private void OnLocaleChanged(string locale)
+    {
+        // The localizer raises the change on the thread that finished loading the language file, and
+        // the texts are bound, so they are set on the UI thread.
+        if (_services.UiDispatcher is null)
+        {
+            RefreshTexts();
+            return;
+        }
+
+        _services.UiDispatcher.Invoke(RefreshTexts);
+    }
 
     private void RefreshTexts()
     {
