@@ -31,6 +31,7 @@ public sealed class ImportedRecipeItemViewModel : ObservableObject
 {
     private readonly LocalizationManager _localizer;
     private readonly string _author;
+    private readonly RecipeLoadIssueCode? _loadIssue;
     private string _provenanceText = string.Empty;
     private string _versionText = string.Empty;
     private string _programText = string.Empty;
@@ -55,6 +56,7 @@ public sealed class ImportedRecipeItemViewModel : ObservableObject
             RecipeText.Escape(loaded.Recipe.Author, escapeNonAscii: false),
             RecipeText.Escape(loaded.Recipe.Version, escapeNonAscii: false),
             isAvailable: true,
+            loadIssue: null,
             export,
             remove)
     {
@@ -70,7 +72,32 @@ public sealed class ImportedRecipeItemViewModel : ObservableObject
         LocalizationManager localizer,
         Func<ImportedRecipeItemViewModel, Task> export,
         Func<ImportedRecipeItemViewModel, Task> remove)
-        : this(entry, localizer, RecipeText.Escape(entry.Id, escapeNonAscii: false), string.Empty, string.Empty, isAvailable: false, export, remove)
+        : this(entry, loadIssue: null, localizer, export, remove)
+    {
+    }
+
+    /// <summary>Creates the row of an index entry whose file did not load for a known reason.</summary>
+    /// <param name="entry">The index entry.</param>
+    /// <param name="loadIssue">Why the file did not load, or null when none was reported.</param>
+    /// <param name="localizer">The localizer of the current language.</param>
+    /// <param name="export">What Export does for this row.</param>
+    /// <param name="remove">What Remove does for this row.</param>
+    public ImportedRecipeItemViewModel(
+        RecipeStoreEntry entry,
+        RecipeLoadIssueCode? loadIssue,
+        LocalizationManager localizer,
+        Func<ImportedRecipeItemViewModel, Task> export,
+        Func<ImportedRecipeItemViewModel, Task> remove)
+        : this(
+            entry,
+            localizer,
+            RecipeText.Escape(entry.Id, escapeNonAscii: false),
+            string.Empty,
+            string.Empty,
+            isAvailable: false,
+            loadIssue,
+            export,
+            remove)
     {
     }
 
@@ -81,6 +108,7 @@ public sealed class ImportedRecipeItemViewModel : ObservableObject
         string author,
         string version,
         bool isAvailable,
+        RecipeLoadIssueCode? loadIssue,
         Func<ImportedRecipeItemViewModel, Task> export,
         Func<ImportedRecipeItemViewModel, Task> remove)
     {
@@ -88,6 +116,7 @@ public sealed class ImportedRecipeItemViewModel : ObservableObject
         Id = entry.Id;
         Name = name;
         _author = author;
+        _loadIssue = loadIssue;
         Version = version;
         ProgramPath = RecipeText.Escape(entry.ResolvedProgramPath, escapeNonAscii: true);
         IsAvailable = isAvailable;
@@ -168,7 +197,7 @@ public sealed class ImportedRecipeItemViewModel : ObservableObject
         ProvenanceText = IsAvailable ? RecipeToolText.Provenance(_author, _localizer.GetString) : string.Empty;
         VersionText = IsAvailable ? _localizer.Format("SettingsRecipeItemVersion", Version) : string.Empty;
         ProgramText = _localizer.Format("SettingsRecipeItemProgram", ProgramPath);
-        UnavailableText = IsAvailable ? string.Empty : _localizer["SettingsRecipeItemUnavailable"];
+        UnavailableText = IsAvailable ? string.Empty : _localizer[RecipeImportText.KeyForLoadIssue(_loadIssue)];
         ExportAccessibleName = _localizer.Format("A11yRecipeExport", Name);
         RemoveAccessibleName = _localizer.Format("A11yRecipeRemove", Name);
     }

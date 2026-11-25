@@ -64,6 +64,8 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
     private Task? _runnerTask;
     private string? _workFolder;
     private RecipeRunResult? _lastResult;
+    private bool _programStarted;
+    private bool _stoppingBeforeStart;
 
     // Held while the runner is started and its task published, and while Dispose reads that task: Dispose can
     // run on another thread than the run once the comparison has left the UI thread, and must never read the
@@ -333,6 +335,9 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
                 _runnerTask = runnerTask;
             }
 
+            _programStarted = true;
+            _stoppingBeforeStart = false;
+
             RecipeRunResult result = await runnerTask.ConfigureAwait(true);
             if (!_disposed)
             {
@@ -353,6 +358,8 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
             ReleaseRun(folder);
             if (!_disposed)
             {
+                _programStarted = false;
+                _stoppingBeforeStart = false;
                 SetFieldsLocked(false);
                 IsRunning = false;
             }
@@ -360,7 +367,15 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
     }
 
     [RelayCommand(CanExecute = nameof(CanStop))]
-    private void Stop() => CancelRun();
+    private void Stop()
+    {
+        CancelRun();
+        if (!_disposed && IsRunning && !_programStarted)
+        {
+            _stoppingBeforeStart = true;
+            StatusText = T("RecipeStatusStopping");
+        }
+    }
 
     private bool CanRun() => !_disposed && !IsRunning && !IsStale;
 
@@ -599,6 +614,8 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
     private void ClearResult()
     {
         _lastResult = null;
+        _programStarted = false;
+        _stoppingBeforeStart = false;
         GeneralError = string.Empty;
         StatusText = string.Empty;
         IsStatusFailure = false;
@@ -617,6 +634,7 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
     private void Present(RecipeRunResult result)
     {
         _lastResult = result;
+        _stoppingBeforeStart = false;
         FileLogger.Info($"[Recipes] Run of '{_recipe.Id}' ended: {result.Status}");
         if (result.JobUnavailable)
         {
@@ -679,6 +697,10 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
         if (_lastResult is { } result)
         {
             StatusText = RecipeRunText.Describe(localizer, result, _recipe.TimeoutSeconds);
+        }
+        else if (_stoppingBeforeStart)
+        {
+            StatusText = T("RecipeStatusStopping");
         }
     }
 

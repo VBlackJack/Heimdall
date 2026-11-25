@@ -15,6 +15,7 @@
  */
 
 using System.Windows;
+using Heimdall.App.Localization;
 using Heimdall.App.Theming;
 
 namespace Heimdall.App.Views.Dialogs;
@@ -36,6 +37,8 @@ public partial class MessageDialog : Window
 
     /// <summary>Share of the work area height the large layout may take at most.</summary>
     internal const double LargeMaxHeightShare = 0.8;
+
+    private const string AppNameLocaleKey = "AppName";
 
     public bool Result { get; private set; }
 
@@ -85,12 +88,25 @@ public partial class MessageDialog : Window
     }
 
     /// <summary>
+    /// Sets the window title and the in-window header from <paramref name="title"/>, falling back
+    /// to the localized application name for the window title when the caller passes a blank one.
+    /// </summary>
+    /// <param name="title">The caller-supplied title.</param>
+    internal void ApplyTitle(string? title)
+    {
+        TitleText.Text = title ?? string.Empty;
+        Title = string.IsNullOrWhiteSpace(title)
+            ? LocalizationSource.Instance[AppNameLocaleKey]
+            : title.Trim();
+    }
+
+    /// <summary>
     /// Shows a themed information or error message with a single OK button.
     /// </summary>
     public static void ShowMessage(Window? owner, string title, string message, string severity = "info", string primaryLabel = "OK")
     {
         var dialog = new MessageDialog { Owner = owner };
-        dialog.TitleText.Text = title;
+        dialog.ApplyTitle(title);
         dialog.MessageText.Text = message;
         dialog.BtnPrimary.Content = primaryLabel;
         System.Windows.Automation.AutomationProperties.SetName(dialog.BtnPrimary, primaryLabel);
@@ -216,7 +232,7 @@ public partial class MessageDialog : Window
             dialog.UseLargeLayout(WorkAreaOf(owner));
         }
 
-        dialog.TitleText.Text = title;
+        dialog.ApplyTitle(title);
         dialog.MessageText.Text = message;
         ConfigureConfirmButtons(dialog, primaryLabel, secondaryLabel, primaryIsDefault);
 
@@ -289,7 +305,7 @@ public partial class MessageDialog : Window
         string tertiaryLabel = "Cancel")
     {
         var dialog = new MessageDialog { Owner = owner };
-        dialog.TitleText.Text = title;
+        dialog.ApplyTitle(title);
         dialog.MessageText.Text = message;
         dialog.BtnPrimary.Content = primaryLabel;
         dialog.BtnSecondary.Content = secondaryLabel;
@@ -332,7 +348,7 @@ public partial class MessageDialog : Window
         ArgumentNullException.ThrowIfNull(choices);
 
         var dialog = new MessageDialog { Owner = owner };
-        dialog.TitleText.Text = title;
+        dialog.ApplyTitle(title);
         dialog.MessageText.Text = message;
         dialog.ConfigureChoiceButtons(choices, defaultIndex, cancelLabel);
         ApplySeverityStyle(dialog, "info");

@@ -51,6 +51,20 @@ public static class RecipeImportText
     /// <summary>The most problems listed in one refusal; the rest are counted.</summary>
     public const int MaxListedProblems = 10;
 
+    /// <summary>The key of the generic line shown when an imported recipe did not load and no specific issue was recorded.</summary>
+    public const string UnavailableFallbackKey = "SettingsRecipeItemNotLoaded";
+
+    /// <summary>The key of why an imported recipe in Settings did not load.</summary>
+    /// <param name="code">The load issue reported by the store, or null when none was recorded for the entry.</param>
+    public static string KeyForLoadIssue(RecipeLoadIssueCode? code) => code switch
+    {
+        RecipeLoadIssueCode.HashMismatch => "SettingsRecipeItemUnavailable",
+        RecipeLoadIssueCode.Invalid => "SettingsRecipeItemInvalid",
+        RecipeLoadIssueCode.FileMissing => "SettingsRecipeItemFileMissing",
+        RecipeLoadIssueCode.Unreadable => "SettingsRecipeItemUnreadable",
+        _ => UnavailableFallbackKey,
+    };
+
     /// <summary>The key of the text of a recipe error.</summary>
     /// <param name="code">The error code.</param>
     public static string KeyFor(RecipeErrorCode code) => code switch
