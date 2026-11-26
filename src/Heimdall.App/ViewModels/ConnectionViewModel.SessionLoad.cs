@@ -39,6 +39,9 @@ public partial class ConnectionViewModel
     /// <summary>The threshold last reported; 0 until a session has been opened against one.</summary>
     private int _sessionLoadThreshold;
 
+    /// <summary>The open-session count the notice text was last built from.</summary>
+    private int _sessionLoadNoticeOpenCount;
+
     /// <summary>Set when the user hid the notice; cleared once the count is back under the threshold.</summary>
     private bool _sessionLoadNoticeDismissed;
 
@@ -73,10 +76,26 @@ public partial class ConnectionViewModel
         }
 
         int open = CountEmbeddedConnections(AllOpenSessions) + 1;
+        _sessionLoadNoticeOpenCount = open;
         SessionLoadNoticeText = _localizer.Format(SessionLoadNoticeKey, open, threshold);
         if (!_sessionLoadNoticeDismissed)
         {
             IsSessionLoadNoticeShown = true;
+        }
+    }
+
+    /// <summary>Rewords the notice from the counts it was built from, once a notice has been built.</summary>
+    private void RefreshSessionLoadNoticeText()
+    {
+        if (_sessionLoadNoticeOpenCount <= 0)
+        {
+            return;
+        }
+
+        string text = _localizer.Format(SessionLoadNoticeKey, _sessionLoadNoticeOpenCount, _sessionLoadThreshold);
+        if (!string.Equals(text, SessionLoadNoticeText, StringComparison.Ordinal))
+        {
+            SessionLoadNoticeText = text;
         }
     }
 
