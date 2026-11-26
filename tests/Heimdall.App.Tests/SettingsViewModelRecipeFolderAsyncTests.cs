@@ -192,6 +192,57 @@ public sealed partial class SettingsViewModelTests
     }
 
     [Fact]
+    public async Task ALanguageSwitchDuringTheWaitRewordsTheCheckingText()
+    {
+        (SettingsViewModel viewModel, GatedFolderMachine machine, LocalizationManager localizer) = await GatedFolderPanelAsync();
+        machine.Gate.Reset();
+        string english = localizer["RecipeFolderChecking"];
+
+        Task<bool> pending = viewModel.TryAddRecipeProgramFolderAsync(@"D:\Tools");
+        Assert.True(machine.Entered.Wait(AsyncFolderWait));
+        Assert.Equal(english, viewModel.RecipeProgramFolderChecking);
+
+        await localizer.SwitchLocaleAsync("fr");
+
+        string french = localizer["RecipeFolderChecking"];
+        Assert.NotEqual(english, french);
+        Assert.Equal(french, viewModel.RecipeProgramFolderChecking);
+
+        machine.Gate.Set();
+        Assert.True(await pending);
+        Assert.False(viewModel.HasRecipeProgramFolderChecking);
+    }
+
+    [Fact]
+    public async Task ALanguageSwitchWithNoCheckRunningLeavesTheCheckingTextEmpty()
+    {
+        (SettingsViewModel viewModel, _, LocalizationManager localizer) = await GatedFolderPanelAsync();
+
+        await localizer.SwitchLocaleAsync("fr");
+
+        Assert.False(viewModel.HasRecipeProgramFolderChecking);
+        Assert.Equal(string.Empty, viewModel.RecipeProgramFolderChecking);
+    }
+
+    [Fact]
+    public async Task AnOldRefusalIsClearedWhenANewCheckStarts()
+    {
+        (SettingsViewModel viewModel, GatedFolderMachine machine, _) = await GatedFolderPanelAsync();
+        Assert.False(await viewModel.TryAddRecipeProgramFolderAsync(@"\\server\share\tools"));
+        Assert.True(viewModel.HasRecipeProgramFolderStatus);
+        machine.Gate.Reset();
+
+        Task<bool> pending = viewModel.TryAddRecipeProgramFolderAsync(@"D:\Tools");
+        Assert.True(machine.Entered.Wait(AsyncFolderWait));
+
+        Assert.True(viewModel.HasRecipeProgramFolderChecking);
+        Assert.False(viewModel.HasRecipeProgramFolderStatus);
+
+        machine.Gate.Set();
+        Assert.True(await pending);
+    }
+
+    [Fact]
     public async Task AResolveThatThrowsReachesTheCallerLikeTheSyncPathDoesAddsNothingAndClearsTheCheckingText()
     {
         (SettingsViewModel viewModel, GatedFolderMachine machine, _) = await GatedFolderPanelAsync();

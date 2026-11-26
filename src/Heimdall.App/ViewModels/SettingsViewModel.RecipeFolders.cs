@@ -147,6 +147,9 @@ public partial class SettingsViewModel
 
         string normalized = RecipeFolderRule.Normalize(folder);
         IRecipeMachine machine = RecipeFolderMachine;
+
+        // A refusal left by an earlier attempt must not stay on screen next to the checking text.
+        RecipeProgramFolderStatus = string.Empty;
         RecipeProgramFolderChecking = _localizer["RecipeFolderChecking"];
         try
         {
@@ -250,6 +253,13 @@ public partial class SettingsViewModel
     {
         // The notice was worded when it was shown; a language change takes it away rather than leave it stale.
         RecipeProgramFolderNotice = string.Empty;
+
+        // A folder check still running keeps its text in the language it was started in unless it is reworded here.
+        if (HasRecipeProgramFolderChecking)
+        {
+            RecipeProgramFolderChecking = _localizer["RecipeFolderChecking"];
+        }
+
         Recipes?.RefreshIfLoaded();
     }
 }
