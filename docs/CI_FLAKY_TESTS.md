@@ -173,7 +173,7 @@ Five distinct root causes share the same symptom (`TaskCanceledException`,
 
 ## Currently tagged `CIUnstable`
 
-There are 22 `[Trait("Category", "CIUnstable")]` sites in the solution: 19 on
+There are 23 `[Trait("Category", "CIUnstable")]` sites in the solution: 20 on
 individual test methods and 3 on whole classes. Every site is listed below.
 
 | Test | File | Categories |
@@ -190,6 +190,7 @@ individual test methods and 3 on whole classes. Every site is listed below.
 | `UpdateRelaunchScriptExecutionTests.Execute_InstallerSucceeds_RunsInstallerAndRelaunches` | `tests/Heimdall.App.Tests/Services/UpdateRelaunchScriptExecutionTests.cs` | `CIUnstable` |
 | `UpdateRelaunchScriptExecutionTests.Execute_StagingDirectoryNotEmpty_IsRemovedAndTheHostExitsCleanly` | `tests/Heimdall.App.Tests/Services/UpdateRelaunchScriptExecutionTests.cs` | `CIUnstable` |
 | `UpdateRelaunchScriptExecutionTests.Execute_ApplicationStillRunning_RefusesToInstallAndRecordsTheStage` | `tests/Heimdall.App.Tests/Services/UpdateRelaunchScriptExecutionTests.cs` | `CIUnstable` |
+| `UpdateRelaunchScriptExecutionTests.Execute_ReusedProcessId_IsTreatedAsExited` | `tests/Heimdall.App.Tests/Services/UpdateRelaunchScriptExecutionTests.cs` | `CIUnstable` |
 | `UpdateRelaunchScriptExecutionTests.Bootstrap_RunsTheEmittedScript_ThroughTheProductionArguments` | `tests/Heimdall.App.Tests/Services/UpdateRelaunchScriptExecutionTests.cs` | `CIUnstable` |
 | `UpdateRelaunchScriptExecutionTests.Bootstrap_ScriptChangedAfterHashing_RefusesAndStillRelaunches` | `tests/Heimdall.App.Tests/Services/UpdateRelaunchScriptExecutionTests.cs` | `CIUnstable` |
 | `UpdateRelaunchScriptExecutionTests.Bootstrap_ScriptThatDoesNotParse_StillRelaunches` | `tests/Heimdall.App.Tests/Services/UpdateRelaunchScriptExecutionTests.cs` | `CIUnstable` |

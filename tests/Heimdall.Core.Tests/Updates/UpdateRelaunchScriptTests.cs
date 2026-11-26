@@ -26,7 +26,11 @@ public sealed class UpdateRelaunchScriptTests
 
     private const string FailureRecordPath = @"C:\Temp\updates\update-failure.json";
 
+    /// <summary>A plausible positive FILETIME, with no separators in its invariant form.</summary>
+    private const long SampleStartTimeUtc = 133_800_000_000_000_000L;
+
     private static UpdateRelaunchSpec SampleSpec(
+        long processStartTimeUtc = SampleStartTimeUtc,
         bool requiresElevation = false,
         string? logPath = null,
         string installerPath = @"C:\Temp\HeimdallSetup.exe",
@@ -39,6 +43,7 @@ public sealed class UpdateRelaunchScriptTests
             ExpectedInstallerSha256: InstallerSha256,
             TargetExecutablePath: targetExecutablePath,
             ProcessId: 4242,
+            ProcessStartTimeUtc: processStartTimeUtc,
             ScriptPath: scriptPath,
             StagingDirectory: @"C:\Temp\update-stage",
             RequiresElevation: requiresElevation,
@@ -221,8 +226,8 @@ public sealed class UpdateRelaunchScriptTests
     {
         string script = UpdateRelaunchScript.Build(SampleSpec());
 
-        int waitIndex = script.IndexOf("Wait-Process -Id 4242", StringComparison.Ordinal);
-        int probeIndex = script.IndexOf("Get-Process -Id 4242 -ErrorAction SilentlyContinue", StringComparison.Ordinal);
+        int waitIndex = script.IndexOf("Get-Process -Id 4242 -ErrorAction Stop", StringComparison.Ordinal);
+        int probeIndex = script.IndexOf(".WaitForExit(", StringComparison.Ordinal);
         int stageIndex = script.IndexOf(
             $"$updateStage = '{UpdateOutcomeStage.ApplicationStillRunning}'", StringComparison.Ordinal);
         int signatureIndex = script.IndexOf("Get-AuthenticodeSignature", StringComparison.Ordinal);
@@ -240,6 +245,102 @@ public sealed class UpdateRelaunchScriptTests
         Assert.Contains(
             $"if ($updateStage -ne '{UpdateOutcomeStage.ApplicationStillRunning}') {{",
             script[finallyIndex..relaunchIndex]);
+    }
+
+    /// <summary>The start time is a bare invariant integer, with no quoting and no separators.</summary>
+    [Fact]
+    public void Build_EmitsTheStartTimeAsAnInvariantInteger()
+    {
+        string script = UpdateRelaunchScript.Build(SampleSpec());
+
+        Assert.Contains(
+            $"$app.StartTime.ToFileTimeUtc() - {SampleStartTimeUtc}) -gt "
+            + UpdateRelaunchScript.StartTimeToleranceFileTimeTicks,
+            script,
+            StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Handle first: without it StartTime and the wait each reopen the process by id,
+    /// which reopens the race between them.
+    /// </summary>
+    [Fact]
+    public void Build_ReadsTheHandleBeforeTheStartTimeAndTheWait()
+    {
+        string script = UpdateRelaunchScript.Build(SampleSpec());
+
+        int handleIndex = script.IndexOf("$null = $app.Handle", StringComparison.Ordinal);
+        int startTimeIndex = script.IndexOf("$app.StartTime", StringComparison.Ordinal);
+        int waitIndex = script.IndexOf("$app.WaitForExit(", StringComparison.Ordinal);
+
+        Assert.True(handleIndex >= 0, "the handle is never read");
+        Assert.True(handleIndex < startTimeIndex, "the handle must be opened before StartTime is read");
+        Assert.True(startTimeIndex < waitIndex, "the identity check must precede the wait");
+    }
+
+    [Fact]
+    public void Build_HasNoIdOnlyWaitOrSecondProbe()
+    {
+        string script = UpdateRelaunchScript.Build(SampleSpec());
+
+        Assert.DoesNotContain("Wait-Process", script, StringComparison.Ordinal);
+        Assert.Equal(1, CountOccurrences(script, "Get-Process -Id"));
+    }
+
+    /// <summary>A process that cannot be opened or read is not the application.</summary>
+    [Fact]
+    public void Build_AFailureToOpenOrReadTheProcess_MeansItIsNotTheApplication()
+    {
+        string script = UpdateRelaunchScript.Build(SampleSpec());
+
+        int tryIndex = script.IndexOf("Get-Process -Id", StringComparison.Ordinal);
+        int catchIndex = script.IndexOf("    } catch {", tryIndex, StringComparison.Ordinal);
+        int waitIndex = script.IndexOf("$app.WaitForExit(", StringComparison.Ordinal);
+
+        Assert.True(catchIndex > tryIndex && catchIndex < waitIndex, "the catch sits between the reads and the wait");
+        Assert.Contains("$app = $null", script[catchIndex..waitIndex], StringComparison.Ordinal);
+        Assert.Contains(
+            "belongs to another process, treated as exited",
+            script[tryIndex..catchIndex],
+            StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(0L)]
+    [InlineData(-1L)]
+    [InlineData(long.MinValue)]
+    public void Build_RejectsAStartTimeThatIsNotPositive(long startTime)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => UpdateRelaunchScript.Build(SampleSpec(processStartTimeUtc: startTime)));
+    }
+
+    [Fact]
+    public void Build_RejectsAWaitTimeoutWhoseMillisecondsWouldNotFitAnInt()
+    {
+        UpdateRelaunchSpec spec = SampleSpec() with
+        {
+            WaitTimeoutSeconds = UpdateRelaunchScript.MaxWaitTimeoutSeconds + 1,
+        };
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => UpdateRelaunchScript.Build(spec));
+        Assert.Contains(
+            $".WaitForExit({UpdateRelaunchScript.MaxWaitTimeoutSeconds * UpdateRelaunchScript.MillisecondsPerSecond})",
+            UpdateRelaunchScript.Build(spec with { WaitTimeoutSeconds = UpdateRelaunchScript.MaxWaitTimeoutSeconds }),
+            StringComparison.Ordinal);
+    }
+
+    private static int CountOccurrences(string text, string value)
+    {
+        int count = 0;
+        int index = 0;
+        while ((index = text.IndexOf(value, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += value.Length;
+        }
+
+        return count;
     }
 
     /// <summary>
@@ -276,7 +377,7 @@ public sealed class UpdateRelaunchScriptTests
         int transcriptIndex = script.IndexOf("Start-Transcript", StringComparison.Ordinal);
         int tryIndex = script.LastIndexOf("try {", transcriptIndex, StringComparison.Ordinal);
         int catchIndex = script.IndexOf("} catch {", transcriptIndex, StringComparison.Ordinal);
-        int waitIndex = script.IndexOf("Wait-Process", StringComparison.Ordinal);
+        int waitIndex = script.IndexOf("Get-Process -Id", StringComparison.Ordinal);
 
         Assert.True(tryIndex >= 0 && tryIndex < transcriptIndex, "Start-Transcript is not inside a try");
         Assert.True(
@@ -317,7 +418,9 @@ public sealed class UpdateRelaunchScriptTests
         var script = UpdateRelaunchScript.Build(spec);
 
         Assert.Contains("-Id 4242", script);
-        Assert.Contains($"-Timeout {UpdateRelaunchScript.DefaultWaitTimeoutSeconds}", script);
+        Assert.Contains(
+            $".WaitForExit({UpdateRelaunchScript.DefaultWaitTimeoutSeconds * UpdateRelaunchScript.MillisecondsPerSecond})",
+            script);
         Assert.Contains($"'{spec.InstallerPath}'", script);
         Assert.Contains($"'{spec.TargetExecutablePath}'", script);
         Assert.Contains($"'{spec.ScriptPath}'", script);

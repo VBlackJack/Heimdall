@@ -75,6 +75,15 @@ internal sealed class SystemUpdateInstallerHost : IUpdateInstallerHost
 
     public int ProcessId => Environment.ProcessId;
 
+    public long ProcessStartTimeUtc
+    {
+        get
+        {
+            using Process current = Process.GetCurrentProcess();
+            return current.StartTime.ToFileTimeUtc();
+        }
+    }
+
     public string CreateScriptPath(string stagingDirectory)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(stagingDirectory);
