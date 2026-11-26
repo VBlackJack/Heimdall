@@ -69,6 +69,9 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
     private bool _programStarted;
     private bool _stoppingBeforeStart;
 
+    // How the message of the last refused run is worded, so a language change can word it again.
+    private Func<string>? _generalErrorWording;
+
     // Held while the runner is started and its task published, and while Dispose reads that task: Dispose can
     // run on another thread than the run once the comparison has left the UI thread, and must never read the
     // task of a runner that has already begun. Never held across a wait or an await.
@@ -303,7 +306,7 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
             // The latched flag, not the store again: one read of the store per run.
             if (IsStale)
             {
-                GeneralError = T("RecipeStaleMessage");
+                SetGeneralError(() => T("RecipeStaleMessage"));
                 return;
             }
 
@@ -352,7 +355,7 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
             FileLogger.Warn($"[Recipes] A run of '{_recipe.Id}' failed unexpectedly ({ex.GetType().Name})");
             if (!_disposed)
             {
-                GeneralError = T("RecipeRunUnexpected");
+                SetGeneralError(() => T("RecipeRunUnexpected"));
             }
         }
         finally
@@ -508,7 +511,7 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
     {
         if (CheckStale())
         {
-            GeneralError = T("RecipeStaleMessage");
+            SetGeneralError(() => T("RecipeStaleMessage"));
             return false;
         }
 
@@ -525,9 +528,9 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
             return true;
         }
 
-        GeneralError = ToolUnavailableException.IsRefusal(state)
+        SetGeneralError(() => ToolUnavailableException.IsRefusal(state)
             ? T(ToolUnavailableException.MessageKeyFor(state), Title)
-            : T("RecipeRunToolRemoved");
+            : T("RecipeRunToolRemoved"));
         return false;
     }
 
@@ -536,7 +539,7 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
         bool missing = (_sessionUse.UsesHost && _sessionHost is null) || (_sessionUse.UsesPort && _sessionPort is null);
         if (missing)
         {
-            GeneralError = T("RecipeRunNoSession");
+            SetGeneralError(() => T("RecipeRunNoSession"));
         }
 
         return !missing;
@@ -547,7 +550,7 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
         Dictionary<string, string?> values = new(StringComparer.Ordinal);
         foreach (RecipeFieldViewModel field in _fields)
         {
-            field.Error = string.Empty;
+            field.ClearError();
             values[field.Name] = field.Value;
         }
 
@@ -571,19 +574,19 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
         {
             RecipeFieldViewModel? field = _fields.FirstOrDefault(
                 candidate => string.Equals(candidate.Name, refusal.Subject, StringComparison.Ordinal));
-            string words = RecipeRunText.Describe(Localizer, refusal.Reason, field?.Input);
+            string Words() => RecipeRunText.Describe(Localizer, refusal.Reason, field?.Input);
 
             if (field is not null)
             {
                 if (!field.HasError)
                 {
-                    field.Error = words;
+                    field.SetError(Words);
                 }
             }
             else if (!HasGeneralError)
             {
                 bool session = refusal.Subject is RecipeFormat.HostPlaceholder or RecipeFormat.PortPlaceholder;
-                GeneralError = T(session ? "RecipeRunSessionValueRefused" : "RecipeRunValuesRefused", words);
+                SetGeneralError(() => T(session ? "RecipeRunSessionValueRefused" : "RecipeRunValuesRefused", Words()));
             }
         }
     }
@@ -595,7 +598,7 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
             return true;
         }
 
-        GeneralError = RecipeRunText.Describe(Localizer, comparison, _storedProgramPath);
+        SetGeneralError(() => RecipeRunText.Describe(Localizer, comparison, _storedProgramPath));
         return false;
     }
 
@@ -608,7 +611,7 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             FileLogger.Warn($"[Recipes] The working folder of '{_recipe.Id}' could not be created ({ex.GetType().Name})");
-            GeneralError = T("RecipeRunWorkFolderFailed");
+            SetGeneralError(() => T("RecipeRunWorkFolderFailed"));
             return null;
         }
     }
@@ -618,7 +621,7 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
         _lastResult = null;
         _programStarted = false;
         _stoppingBeforeStart = false;
-        GeneralError = string.Empty;
+        ClearGeneralError();
         StatusText = string.Empty;
         IsStatusFailure = false;
         TruncationText = string.Empty;
@@ -629,7 +632,7 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
         CopyText = string.Empty;
         foreach (RecipeFieldViewModel field in _fields)
         {
-            field.Error = string.Empty;
+            field.ClearError();
         }
     }
 
@@ -645,7 +648,7 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
 
         StatusText = RecipeRunText.Describe(Localizer, result, _recipe.TimeoutSeconds);
         IsStatusFailure = !result.IsSuccess;
-        TruncationText = result.Truncated ? T("RecipeOutputTruncated") : string.Empty;
+        TruncationText = DescribeTruncation(result);
         ErrorOutputText = result.ErrorOutput.TrimEnd();
 
         TabularOutput? tabular = _recipe.Output switch
@@ -659,7 +662,7 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
         {
             OutputTable = table;
             OutputText = string.Empty;
-            RowCountText = Localizer.FormatCount(table.Rows.Count, "RecipeOutputRowsOne", "RecipeOutputRows", table.Rows.Count);
+            RowCountText = DescribeRowCount(table);
             CopyText = TabularOutput.ToTabSeparated(table);
             return;
         }
@@ -691,8 +694,32 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
         _services.UiDispatcher.Invoke(RefreshTexts);
     }
 
+    private void SetGeneralError(Func<string> wording)
+    {
+        _generalErrorWording = wording;
+        GeneralError = wording();
+    }
+
+    private void ClearGeneralError()
+    {
+        _generalErrorWording = null;
+        GeneralError = string.Empty;
+    }
+
+    private string DescribeRowCount(DataTable table)
+        => Localizer.FormatCount(table.Rows.Count, "RecipeOutputRowsOne", "RecipeOutputRows", table.Rows.Count);
+
+    private string DescribeTruncation(RecipeRunResult result)
+        => result.Truncated ? T("RecipeOutputTruncated") : string.Empty;
+
     private void RefreshTexts()
     {
+        // A change queued on the dispatcher can run after the tab was closed.
+        if (_disposed)
+        {
+            return;
+        }
+
         LocalizationManager localizer = Localizer;
         RecipeTexts texts = RecipeToolText.Resolve(_recipe, localizer.CurrentLocale);
 
@@ -705,11 +732,27 @@ public sealed partial class RecipeToolViewModel : ObservableObject, IDisposable
             field.Hint = texts.FieldHints.TryGetValue(field.Name, out string? hint) ? hint : string.Empty;
         }
 
+        if (_generalErrorWording is { } generalError)
+        {
+            GeneralError = generalError();
+        }
+
+        foreach (RecipeFieldViewModel field in _fields)
+        {
+            field.RefreshErrorText();
+        }
+
         SessionTargetText = DescribeSessionTarget();
         OnPropertyChanged(nameof(StaleText));
+        if (OutputTable is { } table)
+        {
+            RowCountText = DescribeRowCount(table);
+        }
+
         if (_lastResult is { } result)
         {
             StatusText = RecipeRunText.Describe(localizer, result, _recipe.TimeoutSeconds);
+            TruncationText = DescribeTruncation(result);
         }
         else if (_stoppingBeforeStart)
         {

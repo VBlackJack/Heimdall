@@ -28,6 +28,9 @@ public sealed partial class RecipeFieldViewModel : ObservableObject
 {
     private const string EmptyChoice = "";
 
+    // How the current error is worded, so a language change can word it again without validating again.
+    private Func<string>? _errorWording;
+
     [ObservableProperty]
     private string _label;
 
@@ -127,9 +130,35 @@ public sealed partial class RecipeFieldViewModel : ObservableObject
 
     partial void OnLabelChanged(string value) => OnPropertyChanged(nameof(AutomationName));
 
-    partial void OnTextChanged(string value) => Error = string.Empty;
+    /// <summary>Shows the reason the value was refused, and keeps how it is worded so a language change can reword it.</summary>
+    /// <param name="wording">Builds the text in the current language.</param>
+    public void SetError(Func<string> wording)
+    {
+        ArgumentNullException.ThrowIfNull(wording);
 
-    partial void OnIsCheckedChanged(bool value) => Error = string.Empty;
+        _errorWording = wording;
+        Error = wording();
+    }
 
-    partial void OnSelectedChoiceChanged(string? value) => Error = string.Empty;
+    /// <summary>Removes the error and forgets how it was worded.</summary>
+    public void ClearError()
+    {
+        _errorWording = null;
+        Error = string.Empty;
+    }
+
+    /// <summary>Words the error again in the current language; nothing happens while there is no error.</summary>
+    public void RefreshErrorText()
+    {
+        if (HasError && _errorWording is { } wording)
+        {
+            Error = wording();
+        }
+    }
+
+    partial void OnTextChanged(string value) => ClearError();
+
+    partial void OnIsCheckedChanged(bool value) => ClearError();
+
+    partial void OnSelectedChoiceChanged(string? value) => ClearError();
 }
