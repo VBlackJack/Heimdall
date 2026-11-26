@@ -521,8 +521,10 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         // Wire cross-tool navigation so tools can open other tool tabs
         // These opens never recorded a recent tool (a tool opening another tool, a command captured
         // from a terminal), and still do not.
+        // Every caller passes the plain label of the tool it opens, so the tab is worded again from
+        // the descriptor after a language switch.
         _embeddedSessionManager.OpenToolCallback = (toolId, title, ctx) =>
-            OpenToolTabAsync(toolId, title, ctx, recordRecent: false);
+            OpenToolTabAsync(toolId, title, ctx, recordRecent: false, titleWording: ToolLabelWording(toolId));
 
         // Wire the session opener so a tool can connect to a host it discovered.
         _embeddedSessionManager.OpenSessionCallback = ConnectAdHocSessionAsync;
@@ -856,6 +858,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         string statusText = StatusText;
 
         RefreshToolPaneWording();
+        Connection.RefreshLocalizedText();
 
         if (statusKey is not null)
         {
@@ -1560,6 +1563,16 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
 
         TrackRecentToolWhen(recordRecent, toolId);
         return ToolOpenOutcome.Opened;
+    }
+
+    /// <summary>
+    /// A wording that says the plain label of the tool <paramref name="toolId"/> in the current
+    /// language, or null for a tool the registry does not know.
+    /// </summary>
+    private Func<string>? ToolLabelWording(string toolId)
+    {
+        ToolDescriptor? descriptor = ToolRegistry.GetById(toolId);
+        return descriptor is null ? null : () => RecipeToolText.TabTitle(descriptor, _localizer.GetString);
     }
 
     /// <summary>

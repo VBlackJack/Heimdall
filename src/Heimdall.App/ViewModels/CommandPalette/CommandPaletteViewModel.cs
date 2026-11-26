@@ -598,7 +598,16 @@ public sealed partial class CommandPaletteViewModel : ObservableObject
         var argument = pipeIndex >= 0 ? payload[(pipeIndex + 1)..] : null;
 
         var context = !string.IsNullOrEmpty(argument) ? new ToolContext(Argument: argument) : null;
-        await _main.OpenToolTabAsync(toolId, item.DisplayName, context);
+
+        // The item's name is a tool label (plain, or with the typed argument), never a name the
+        // user gave: the tab is worded again from the descriptor after a language switch.
+        ToolDescriptor? descriptor = _toolRegistry.GetById(toolId);
+        Func<string>? titleWording = descriptor is null
+            ? null
+            : () => !string.IsNullOrEmpty(argument) && descriptor.LabelWithArgKey is not null
+                ? _localizer.Format(descriptor.LabelWithArgKey, argument)
+                : RecipeToolText.TabTitle(descriptor, _localizer.GetString);
+        await _main.OpenToolTabAsync(toolId, item.DisplayName, context, titleWording: titleWording);
     }
 
     /// <summary>

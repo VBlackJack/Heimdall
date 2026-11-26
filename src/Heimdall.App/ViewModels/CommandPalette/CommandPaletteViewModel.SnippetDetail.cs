@@ -503,7 +503,11 @@ public sealed partial class CommandPaletteViewModel
         CloseSnippetDetail();
         IsOpen = false;
 
-        await _main.OpenToolTabAsync(ToolRegistry.CommandLibraryToolId, title, context);
+        await _main.OpenToolTabAsync(
+            ToolRegistry.CommandLibraryToolId,
+            title,
+            context,
+            titleWording: () => _localizer["PaletteToolCmdLib"]);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────

@@ -3093,7 +3093,8 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             await vm.OpenToolTabAsync(
                 descriptor.Id,
                 ToolsTabPopulationService.ResolveToolTabTitle(descriptor, context, vm),
-                context);
+                context,
+                titleWording: () => ToolsTabPopulationService.ResolveToolTabTitle(descriptor, context, vm));
         }
         catch (Exception ex)
         {
