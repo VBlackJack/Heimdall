@@ -12,6 +12,73 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-11-26: Language switch fixes, import preview hardening, folder move undo rank (v2026.112601)
+
+Merged as #901 to #904. The user-facing summary is in the release notes.
+
+### Recipe leftovers (#901)
+
+- `RecipeToolViewModel` and `RecipeFieldViewModel` keep errors as a wording (a function, not a finished string), so
+  a language switch rewords the row count, the truncation line, the general error and the field errors. An edit
+  that clears a field error also forgets its wording; a queued rewording after the tab closed does nothing.
+- `SidebarViewModel.RefreshLocalization()` rebuilds the tool list (category headings and tool rows) on a switch;
+  expansion state, favorites and a typed filter are kept.
+- `SettingsImportPreview` passes imported and current string values (single values, lists, tool name and program,
+  shared source name and path) through `UntrustedText.MakeVisible`, so a line break or a bidi control cannot fake a
+  line in the confirmation. A value is still cut at 60 characters and an escape is never split.
+- `SettingsViewModel.RecipeFolders`: the final path of an added program folder is resolved off the UI thread; the
+  button is disabled meanwhile and a neutral line shows (new key `RecipeFolderChecking` in en, fr, es). The folder
+  is checked again against the current list afterwards, nothing is added if the panel was closed, and there is no
+  timeout that could accept a folder as written. Nine existing folder tests now await the async command.
+- Not reproduced: the unsaved-changes prompt after a language switch and Save, twice, also with the Recipes card
+  shown first. Most likely caused by the exception #899 fixed.
+
+### Texts that kept the old language (#902)
+
+- `ConnectionViewModel.RefreshLocalizedText()` rewords tab accessible names, group labels and the session load
+  notice; the shell calls it on every switch. The close button name used to lag one switch behind.
+- `SessionPaneModel` carries how a tool tab title and its ready status are worded. On a switch a pane is reworded
+  only while it still shows the last text that wording produced, so a renamed tab or a status written since is
+  kept. The wording is an explicit opt-in: a title that is user data never gets one. Split and floating panes are
+  covered. One failing pane wording is logged and skipped.
+- The main status bar "<tool>: Ready..." line is reworded; a status a feature wrote itself is kept. The settings
+  search is run again after a switch, so the count and the position hint match.
+- Known, unchanged: free-text statuses a feature writes itself stay in the old language.
+
+### Language change on the UI thread (#903)
+
+- Cause: `LocalizationManager.SwitchLocaleAsync` raised `LocaleChanged` on the pool thread that finished reading the
+  language file; views writing their controls from the event threw, the exception stopped the later subscribers,
+  and the settings panel treated it as a failed switch ("Language not changed").
+- The load is now awaited without `ConfigureAwait(false)`, so the event is raised on the caller's context (the
+  dispatcher in the app, inline without a context). The file is still read off the UI thread.
+- Each subscriber runs on its own: one that throws is logged (target, type, method) and the others still run. Only a
+  load or precondition failure still fails the switch, before the string table is swapped. The existing
+  per-subscriber dispatcher marshalling is kept.
+- `WpfTestHost.SwitchLocale` would now deadlock when blocking inside the dispatcher: it pumps a nested frame on the
+  dispatcher thread and uses `InvokeAsync` from other threads. One markup test runs its switch through
+  `Task.Run`, assertions unchanged.
+- Not changed: the swap of the string table and the current locale is still not atomic for a reader on another
+  thread; this predates the change.
+
+### Folder move undo keeps the manual rank (#904)
+
+- Moving a folder still drops its rank, as the existing tests pin. The dropped entry and the sibling entry that
+  followed it are now captured inside the settings merge, under the settings lock (`FolderOrdering`).
+- After the reverse migration succeeds, undo inserts the folder before that sibling; if the sibling is gone, after
+  the last ranked sibling; if the old level has no ranks left, nothing is restored, so the folder never outranks
+  siblings that became alphabetical. A refused undo restores nothing. Sort A-Z and rename undo are unchanged.
+- The two settings writes of an undo are separate: a failure between them leaves the previous behaviour (unranked).
+
+### Verification
+
+- Build with no warning, format check clean. `Heimdall.App.Tests`: 14513 passed at the last PR.
+  `Heimdall.App.UiTests`: 344 passed, 3 skipped as before (last run in #903). `Heimdall.Core.Tests` green except
+  `HttpHealthProbeTests.AnUnknownName_IsADnsFailure`, which depends on the DNS of the machine.
+- Seen on screen with a test data folder: #901 recipe tab and sidebar reworded, a program folder added through the
+  async path; #902 and #903 Hash Generator tab, status bar and settings search reworded, no failure dialog.
+  Not seen on screen: the import preview with a control character (#901) and the folder move undo (#904).
+
 ## 2026-11-25: Tool packs, recipes, and packages without the Notes editor source (v2026.112501)
 
 Merged as #887 to #899. The user-facing summary and the upgrade notes are in the release notes.
