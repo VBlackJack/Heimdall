@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using Heimdall.App.ViewModels;
 using Heimdall.Core.Configuration;
 
 namespace Heimdall.App.Services;
@@ -36,7 +37,8 @@ public sealed record FolderMoveResult(
     FolderMoveStatus Status,
     string? NewPath = null,
     List<ServerProfileDto>? Servers = null,
-    AppSettings? Settings = null);
+    AppSettings? Settings = null,
+    MovedFolderRank? DroppedRank = null);
 
 /// <summary>
 /// Re-parents a folder, carrying its sub-folders, its sessions and its path-keyed settings.
@@ -82,14 +84,15 @@ public sealed class FolderMoveService
             return new FolderMoveResult(FolderMoveStatus.NoChange, plan.NewPath);
         }
 
-        (List<ServerProfileDto> migratedServers, AppSettings migratedSettings) =
+        (List<ServerProfileDto> migratedServers, AppSettings migratedSettings, MovedFolderRank? droppedRank) =
             await FolderRenameService.MigrateAsync(_configManager, plan).ConfigureAwait(false);
 
         return new FolderMoveResult(
             FolderMoveStatus.Moved,
             plan.NewPath,
             migratedServers,
-            migratedSettings);
+            migratedSettings,
+            droppedRank);
     }
 
     private static FolderMoveStatus MapValidationError(FolderMoveValidationError error)

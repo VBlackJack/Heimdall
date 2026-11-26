@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using Heimdall.App.ViewModels;
 using Heimdall.Core.Configuration;
 
 namespace Heimdall.App.Services;
@@ -75,7 +76,7 @@ public sealed class FolderRenameService
             return new FolderRenameResult(FolderRenameStatus.NoChange, plan.NewPath);
         }
 
-        (List<ServerProfileDto> migratedServers, AppSettings migratedSettings) =
+        (List<ServerProfileDto> migratedServers, AppSettings migratedSettings, _) =
             await MigrateAsync(_configManager, plan).ConfigureAwait(false);
 
         return new FolderRenameResult(
@@ -93,7 +94,7 @@ public sealed class FolderRenameService
     /// Shared by the rename and the move: both are the same migration under a different new
     /// path, and one copy of the three-step write is one place for its ordering to be right.
     /// </remarks>
-    internal static async Task<(List<ServerProfileDto> Servers, AppSettings Settings)> MigrateAsync(
+    internal static async Task<(List<ServerProfileDto> Servers, AppSettings Settings, MovedFolderRank? DroppedRank)> MigrateAsync(
         IConfigManager configManager,
         FolderRenamePlan plan)
     {
@@ -120,11 +121,12 @@ public sealed class FolderRenameService
                 return inventory;
             }).ConfigureAwait(false);
 
-        await configManager.MergeSettingAsync(current => FinalizeSettings(current, plan))
+        MovedFolderRank? droppedRank = null;
+        await configManager.MergeSettingAsync(current => droppedRank = FinalizeSettings(current, plan))
             .ConfigureAwait(false);
 
         AppSettings migratedSettings = await configManager.LoadSettingsAsync().ConfigureAwait(false);
-        return (migratedServers, migratedSettings);
+        return (migratedServers, migratedSettings, droppedRank);
     }
 
     /// <summary>Every path a folder operation must not collide with.</summary>
@@ -184,10 +186,11 @@ public sealed class FolderRenameService
         }
     }
 
-    private static void FinalizeSettings(AppSettings settings, FolderRenamePlan plan)
+    private static MovedFolderRank? FinalizeSettings(AppSettings settings, FolderRenamePlan plan)
     {
         settings.EmptyGroups = RewritePathList(settings.EmptyGroups, plan);
         settings.TreeExpandedNodes = RewritePathList(settings.TreeExpandedNodes, plan);
+        MovedFolderRank? droppedRank = DroppedRankOf(settings.FolderOrder, plan);
         settings.FolderOrder = RewriteFolderOrder(settings.FolderOrder, plan);
 
         Dictionary<string, GroupDefaultsDto> finalizedDefaults = new(StringComparer.Ordinal);
@@ -210,6 +213,33 @@ public sealed class FolderRenameService
         }
 
         settings.GroupDefaults = finalizedDefaults;
+        return droppedRank;
+    }
+
+    /// <summary>
+    /// The rank <see cref="RewriteFolderOrder"/> drops for a move under another parent: the
+    /// folder's own entry and the sibling that followed it, or null when nothing is dropped.
+    /// </summary>
+    private static MovedFolderRank? DroppedRankOf(IEnumerable<string> order, FolderRenamePlan plan)
+    {
+        string oldParent = FolderPath.ParentOf(plan.OldPath);
+        if (string.Equals(oldParent, FolderPath.ParentOf(plan.NewPath), StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        List<string> siblings = FolderOrdering.ChildEntries(order, oldParent);
+        int index = siblings.FindIndex(entry =>
+            string.Equals(entry, plan.OldPath, StringComparison.OrdinalIgnoreCase));
+        if (index < 0)
+        {
+            return null;
+        }
+
+        return new MovedFolderRank(
+            plan.OldPath,
+            oldParent,
+            index + 1 < siblings.Count ? siblings[index + 1] : null);
     }
 
     /// <summary>
