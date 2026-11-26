@@ -49,7 +49,11 @@ public sealed partial class ToolsTabViewModel
         {
             var context = ToolsTabPopulationService.CreateInheritedToolContext(descriptor, _main);
             var title = ToolsTabPopulationService.ResolveToolTabTitle(descriptor, context, _main);
-            await _main.OpenToolTabAsync(descriptor.Id, title, context).ConfigureAwait(true);
+            await _main.OpenToolTabAsync(
+                descriptor.Id,
+                title,
+                context,
+                titleWording: () => ToolsTabPopulationService.ResolveToolTabTitle(descriptor, context, _main)).ConfigureAwait(true);
         }
         catch (Exception ex)
         {

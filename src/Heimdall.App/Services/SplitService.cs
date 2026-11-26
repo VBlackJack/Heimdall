@@ -407,6 +407,9 @@ public sealed class SplitService : ISplitService
             Status = _localizer["StatusReady"],
         };
 
+        newPane.UseTitleWording(() => RecipeToolText.TabTitle(descriptor, _localizer.GetString));
+        newPane.UseStatusWording(() => _localizer["StatusReady"]);
+
         newPane.HostControl = _sessionManager.CreateToolControl(
             session, toolId, context, null);
 
