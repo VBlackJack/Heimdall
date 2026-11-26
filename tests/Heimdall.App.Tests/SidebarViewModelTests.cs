@@ -29,6 +29,10 @@ namespace Heimdall.App.Tests;
 
 public sealed class SidebarViewModelTests
 {
+    private const string FrenchLocale = "fr";
+    private const string FavoritesKey = "ToolsFavoritesHeader";
+    private const string NoMatchFilter = "zzzz-no-such-tool";
+
     [Fact]
     public void OnFavoritesChanged_OnUiThread_RunsInline()
     {
@@ -111,6 +115,100 @@ public sealed class SidebarViewModelTests
 
         Assert.Equal(EnglishLocalizer.Create()["ErrorSaveSettings"], main.StatusText);
         viewModel.Dispose();
+    }
+
+    // The tree is built with its words. After a language switch the host calls
+    // RefreshLocalization, and the headings and the rows must read in the new language.
+    [Fact]
+    public async Task AfterALanguageSwitch_TheCategoryHeadingAndTheToolNameAreInTheNewLanguage()
+    {
+        using var harness = SessionCoordinatorPreMountTests.TestHarness.Create();
+        var viewModel = harness.Main.Sidebar;
+        var localizer = harness.Main.GetLocalizer();
+        viewModel.SetActiveTab(true);
+        var before = viewModel.ToolsCategories.First(category => category.Tools.Count > 0 && category.CategoryKey != FavoritesKey);
+        var toolId = before.Tools[0].Id;
+        var englishHeading = before.CategoryName;
+        var englishName = before.Tools[0].Name;
+
+        await localizer.SwitchLocaleAsync(FrenchLocale);
+        viewModel.RefreshLocalization();
+
+        var after = viewModel.ToolsCategories.First(category => category.CategoryKey == before.CategoryKey);
+        Assert.Equal(localizer[before.CategoryKey], after.CategoryName);
+        Assert.NotEqual(englishHeading, after.CategoryName);
+        var tool = after.Tools.First(item => item.Id == toolId);
+        Assert.Equal(harness.Main.ToolRegistry.All.First(d => d.Id == toolId).ResolveLabel(key => localizer[key]), tool.Name);
+        Assert.NotEqual(englishName, tool.Name);
+    }
+
+    [Fact]
+    public async Task AfterALanguageSwitch_ACollapsedCategoryStaysCollapsed()
+    {
+        using var harness = SessionCoordinatorPreMountTests.TestHarness.Create();
+        var viewModel = harness.Main.Sidebar;
+        viewModel.SetActiveTab(true);
+        var key = viewModel.ToolsCategories.First(category => category.CategoryKey != FavoritesKey).CategoryKey;
+        var settings = new AppSettings();
+        settings.SidebarExpandedCategories[key] = false;
+        typeof(MainViewModel)
+            .GetField("_currentSettings", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(harness.Main, settings);
+        viewModel.RefreshLocalization();
+        Assert.False(viewModel.ToolsCategories.First(category => category.CategoryKey == key).IsExpanded);
+
+        await harness.Main.GetLocalizer().SwitchLocaleAsync(FrenchLocale);
+        viewModel.RefreshLocalization();
+
+        var rebuilt = viewModel.ToolsCategories.First(category => category.CategoryKey == key);
+        Assert.False(rebuilt.IsExpanded);
+        Assert.Equal(harness.Main.GetLocalizer()[key], rebuilt.CategoryName);
+    }
+
+    [Fact]
+    public async Task AfterALanguageSwitch_ATypedFilterIsAppliedToTheNewWords()
+    {
+        using var harness = SessionCoordinatorPreMountTests.TestHarness.Create();
+        var viewModel = harness.Main.Sidebar;
+        var localizer = harness.Main.GetLocalizer();
+        viewModel.SetActiveTab(true);
+        var english = harness.Main.ToolRegistry.All
+            .Where(d => !d.IsRecipe && d.ExternalProviderName is null)
+            .ToDictionary(d => d.Id, d => d.ResolveLabel(key => localizer[key]), StringComparer.OrdinalIgnoreCase);
+
+        await localizer.SwitchLocaleAsync(FrenchLocale);
+        var changed = harness.Main.ToolRegistry.All
+            .Where(d => !d.IsRecipe && d.ExternalProviderName is null)
+            .Select(d => (d.Id, French: d.ResolveLabel(key => localizer[key])))
+            .First(pair => !string.Equals(english[pair.Id], pair.French, StringComparison.OrdinalIgnoreCase)
+                           && !pair.French.Contains(english[pair.Id], StringComparison.OrdinalIgnoreCase));
+        viewModel.FilterText = changed.French;
+
+        viewModel.RefreshLocalization();
+
+        var rows = viewModel.ToolsCategories.SelectMany(category => category.Tools).ToList();
+        Assert.Contains(rows, item => item.Id == changed.Id && item.IsVisible);
+        Assert.Contains(rows, item => !item.IsVisible);
+        Assert.False(viewModel.HasNoResults);
+    }
+
+    [Fact]
+    public async Task AfterALanguageSwitch_TheNoResultsHintIsInTheNewLanguage()
+    {
+        using var harness = SessionCoordinatorPreMountTests.TestHarness.Create();
+        var viewModel = harness.Main.Sidebar;
+        var localizer = harness.Main.GetLocalizer();
+        viewModel.SetActiveTab(true);
+        viewModel.FilterText = NoMatchFilter;
+        Assert.True(viewModel.HasNoResults);
+        var englishHint = viewModel.NoResultsText;
+
+        await localizer.SwitchLocaleAsync(FrenchLocale);
+        viewModel.RefreshLocalization();
+
+        Assert.Equal(localizer["ToolsNoResults"], viewModel.NoResultsText);
+        Assert.NotEqual(englishHint, viewModel.NoResultsText);
+        Assert.True(viewModel.HasNoResults);
     }
 
     private static (SidebarViewModel ViewModel, MainViewModel Main) CreatePersistingViewModel(

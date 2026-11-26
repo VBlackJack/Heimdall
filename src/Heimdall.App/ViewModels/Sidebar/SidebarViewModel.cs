@@ -193,6 +193,19 @@ public sealed partial class SidebarViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
+    /// Rewords the Tools tree after a language change. Category headings and tool rows are
+    /// built once with their text, so the cached tree is marked stale and rebuilt (at once when
+    /// the Tools tab is showing, otherwise on the next switch to it). Expansion is read back
+    /// from the persisted state by the rebuild, and the filter is re-applied so the "no
+    /// results" hint follows the language too.
+    /// </summary>
+    public void RefreshLocalization()
+    {
+        OnExternalToolsChanged();
+        InvalidateFilter();
+    }
+
+    /// <summary>
     /// Re-runs the active filter against the cached
     /// <see cref="ToolsCategories"/>, updating
     /// <see cref="HasNoResults"/> and <see cref="NoResultsText"/>.

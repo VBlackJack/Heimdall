@@ -445,6 +445,9 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         // The banner status is set imperatively, like its settings twin, which the locale
         // handler clears; the banner remembers its key and re-formats instead.
         vm.Update.RefreshLocalization();
+
+        // The tools tree is built with its words, so it is rebuilt in the new language.
+        vm.Sidebar.RefreshLocalization();
     }
 
     /// <summary>
