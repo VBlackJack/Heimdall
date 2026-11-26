@@ -55,6 +55,14 @@ public partial class SettingsViewModel
     [NotifyPropertyChangedFor(nameof(HasRecipeProgramFolderNotice))]
     private string _recipeProgramFolderNotice = string.Empty;
 
+    /// <summary>
+    /// The neutral text shown while a folder is being resolved off the UI thread; empty otherwise. It is not
+    /// a refusal, so it has a text of its own and does not borrow the warning colour of the status.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasRecipeProgramFolderChecking))]
+    private string _recipeProgramFolderChecking = string.Empty;
+
     /// <summary>What the folder checks ask of the machine: the roots a folder may touch. Replaceable for tests.</summary>
     internal IRecipeMachine RecipeFolderMachine { get; set; } = RecipeMachine.Instance;
 
@@ -69,6 +77,9 @@ public partial class SettingsViewModel
 
     /// <summary>True when <see cref="RecipeProgramFolderNotice"/> has something to say.</summary>
     public bool HasRecipeProgramFolderNotice => !string.IsNullOrEmpty(RecipeProgramFolderNotice);
+
+    /// <summary>True while a folder is being checked: <see cref="RecipeProgramFolderChecking"/> has something to say.</summary>
+    public bool HasRecipeProgramFolderChecking => !string.IsNullOrEmpty(RecipeProgramFolderChecking);
 
     /// <summary>True when <see cref="RecipeProgramFolderStatus"/> has something to say.</summary>
     public bool HasRecipeProgramFolderStatus => !string.IsNullOrEmpty(RecipeProgramFolderStatus);
@@ -85,9 +96,9 @@ public partial class SettingsViewModel
 
     partial void OnRecipeProgramFolderStatusChanged(string value) => OnPropertyChanged(nameof(HasRecipeProgramFolderStatus));
 
-    /// <summary>Asks for a folder and adds it when it passes the rule.</summary>
+    /// <summary>Asks for a folder and adds it when it passes the rule; the folder is checked off the UI thread.</summary>
     [RelayCommand]
-    private void AddRecipeProgramFolder()
+    private async Task AddRecipeProgramFolderAsync()
     {
         string? picked = _recipeFileDialogs?.PickProgramFolder();
         if (picked is null)
@@ -95,7 +106,7 @@ public partial class SettingsViewModel
             return;
         }
 
-        TryAddRecipeProgramFolder(picked);
+        await TryAddRecipeProgramFolderAsync(picked);
     }
 
     /// <summary>
@@ -106,11 +117,8 @@ public partial class SettingsViewModel
     /// <returns>True when the folder was added.</returns>
     internal bool TryAddRecipeProgramFolder(string folder)
     {
-        RecipeProgramFolderNotice = string.Empty;
-        RecipeFolderRefusal refusal = RecipeFolderRule.Check(folder, RecipeProgramFolders);
-        if (refusal != RecipeFolderRefusal.None)
+        if (!PassesFirstRecipeFolderCheck(folder))
         {
-            RecipeProgramFolderStatus = RecipeImportText.Describe(_localizer, refusal, RecipeFolderRule.MaxFolders);
             return false;
         }
 
@@ -119,6 +127,73 @@ public partial class SettingsViewModel
         // Where the folder really leads: a mapped network drive or a link can be written as a local path.
         // A folder that cannot be resolved (missing, drive absent) is accepted as written.
         string? finalForm = RecipeFolderMachine.ResolveFinalPath(normalized);
+        return ApplyRecipeProgramFolder(folder, normalized, finalForm);
+    }
+
+    /// <summary>
+    /// Same as <see cref="TryAddRecipeProgramFolder"/>, but resolves where the folder leads on a worker thread,
+    /// so a drive that does not answer cannot freeze the window. There is no timeout: a folder that is not
+    /// resolved yet is never accepted as written. If the resolve throws, the exception reaches the caller as
+    /// it does on the synchronous path, and nothing is added.
+    /// </summary>
+    /// <param name="folder">The folder the user chose.</param>
+    /// <returns>True when the folder was added.</returns>
+    internal async Task<bool> TryAddRecipeProgramFolderAsync(string folder)
+    {
+        if (!PassesFirstRecipeFolderCheck(folder))
+        {
+            return false;
+        }
+
+        string normalized = RecipeFolderRule.Normalize(folder);
+        IRecipeMachine machine = RecipeFolderMachine;
+
+        // A refusal left by an earlier attempt must not stay on screen next to the checking text.
+        RecipeProgramFolderStatus = string.Empty;
+        RecipeProgramFolderChecking = _localizer["RecipeFolderChecking"];
+        try
+        {
+            string? finalForm = await Task.Run(() => machine.ResolveFinalPath(normalized)).ConfigureAwait(true);
+            if (_disposed)
+            {
+                return false;
+            }
+
+            return ApplyRecipeProgramFolder(folder, normalized, finalForm);
+        }
+        finally
+        {
+            RecipeProgramFolderChecking = string.Empty;
+        }
+    }
+
+    /// <summary>Clears the notice and checks the folder against the rule and the current list; sets the status when refused.</summary>
+    private bool PassesFirstRecipeFolderCheck(string folder)
+    {
+        RecipeProgramFolderNotice = string.Empty;
+        RecipeFolderRefusal refusal = RecipeFolderRule.Check(folder, RecipeProgramFolders);
+        if (refusal != RecipeFolderRefusal.None)
+        {
+            RecipeProgramFolderStatus = RecipeImportText.Describe(_localizer, refusal, RecipeFolderRule.MaxFolders);
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Checks the folder again against the current list (it may have changed while the folder was resolved),
+    /// then checks where it leads and adds it.
+    /// </summary>
+    private bool ApplyRecipeProgramFolder(string folder, string normalized, string? finalForm)
+    {
+        RecipeFolderRefusal refusal = RecipeFolderRule.Check(folder, RecipeProgramFolders);
+        if (refusal != RecipeFolderRefusal.None)
+        {
+            RecipeProgramFolderStatus = RecipeImportText.Describe(_localizer, refusal, RecipeFolderRule.MaxFolders);
+            return false;
+        }
+
         RecipeFolderRefusal leads = RecipeFolderRule.CheckFinalForm(finalForm);
         if (leads != RecipeFolderRefusal.None)
         {
@@ -178,6 +253,13 @@ public partial class SettingsViewModel
     {
         // The notice was worded when it was shown; a language change takes it away rather than leave it stale.
         RecipeProgramFolderNotice = string.Empty;
+
+        // A folder check still running keeps its text in the language it was started in unless it is reworded here.
+        if (HasRecipeProgramFolderChecking)
+        {
+            RecipeProgramFolderChecking = _localizer["RecipeFolderChecking"];
+        }
+
         Recipes?.RefreshIfLoaded();
     }
 }

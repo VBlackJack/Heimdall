@@ -17,6 +17,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Heimdall.Core.Localization;
+using Heimdall.Core.Utilities;
 
 namespace Heimdall.App.ViewModels.Settings;
 
@@ -167,10 +168,10 @@ internal static class SettingsImportPreview
                     : tool => DescribeTool(localizer, tool);
                 return string.Join(ListSeparator, array.Select(item => describe((JsonObject)item!)));
             case JsonArray names when names.Count > 0 && names.All(IsString):
-                return string.Join(ListSeparator, names.Select(item => item!.GetValue<string>()));
+                return string.Join(ListSeparator, names.Select(item => Visible(item!.GetValue<string>())));
             case JsonValue scalar when scalar.GetValueKind() == JsonValueKind.String
                 && !string.IsNullOrEmpty(scalar.GetValue<string>()):
-                return scalar.GetValue<string>();
+                return Visible(scalar.GetValue<string>());
             default:
                 return DescribeValue(localizer, value);
         }
@@ -178,8 +179,8 @@ internal static class SettingsImportPreview
 
     private static string DescribeTool(LocalizationManager localizer, JsonObject tool)
     {
-        string name = ReadString(tool, "Name");
-        string executable = ReadString(tool, "ExecutablePath");
+        string name = Visible(ReadString(tool, "Name"));
+        string executable = Visible(ReadString(tool, "ExecutablePath"));
         bool elevated = tool["RunAsAdministrator"]?.GetValueKind() == JsonValueKind.True;
         return localizer.Format(elevated ? "SettingsImportValueToolAdmin" : "SettingsImportValueTool", name, executable);
     }
@@ -187,8 +188,8 @@ internal static class SettingsImportPreview
     /// <summary>A shared session source: its name and the file it reads, and whether it is off.</summary>
     private static string DescribeSharedSource(LocalizationManager localizer, JsonObject source)
     {
-        string name = ReadString(source, "Name");
-        string path = ReadString(source, "Path");
+        string name = Visible(ReadString(source, "Name"));
+        string path = Visible(ReadString(source, "Path"));
         bool disabled = source["Enabled"]?.GetValueKind() == JsonValueKind.False;
         return localizer.Format(
             disabled ? "SettingsImportValueSharedSourceDisabled" : "SettingsImportValueSharedSource",
@@ -237,6 +238,25 @@ internal static class SettingsImportPreview
 
     private static bool IsString(JsonNode? item) => item?.GetValueKind() == JsonValueKind.String;
 
-    private static string Shorten(string text) =>
-        text.Length <= MaxValueLength ? text : text[..(MaxValueLength - Ellipsis.Length)] + Ellipsis;
+    /// <summary>A value written out whole, with every control and formatting character made visible.</summary>
+    private static string Visible(string text) => UntrustedText.MakeVisible(text, UntrustedText.NoLengthLimit);
+
+    /// <summary>
+    /// A value as the preview shows it: control characters made visible, then cut to
+    /// <see cref="MaxValueLength"/> characters.
+    /// </summary>
+    /// <remarks>
+    /// The escaping always runs on the raw text, and a list is joined raw before it is escaped:
+    /// the separator is plain ASCII, so the result equals the items escaped one by one, and the
+    /// cut is made by the escaper itself, which never splits an escape. The first pass keeps
+    /// <see cref="MaxValueLength"/> characters of the value and appends the marker, so it can run
+    /// three characters over; when it does, a second pass keeps room for the marker.
+    /// </remarks>
+    private static string Shorten(string text)
+    {
+        string visible = UntrustedText.MakeVisible(text, MaxValueLength);
+        return visible.Length <= MaxValueLength
+            ? visible
+            : UntrustedText.MakeVisible(text, MaxValueLength - Ellipsis.Length);
+    }
 }

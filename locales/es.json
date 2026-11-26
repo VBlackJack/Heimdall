@@ -6921,5 +6921,6 @@
   "RecipeImportPreviewIconUnknown": "Icono: {0} (desconocido para esta versi\u00f3n de Heimdall; se muestra el icono predeterminado)",
   "RecipeImportReplaceIconSame": "Icono: sin cambios",
   "RecipeImportReplaceIconChanged": "Icono: modificado",
-  "RecipeFolderRefusalLeadsToUnallowedLocation": "Esta carpeta lleva a una ubicaci\u00f3n que no se puede permitir: la ruta a la que lleva es demasiado larga, o no es una ruta ordinaria de carpeta local."
+  "RecipeFolderRefusalLeadsToUnallowedLocation": "Esta carpeta lleva a una ubicaci\u00f3n que no se puede permitir: la ruta a la que lleva es demasiado larga, o no es una ruta ordinaria de carpeta local.",
+  "RecipeFolderChecking": "Comprobando la carpeta..."
 }
