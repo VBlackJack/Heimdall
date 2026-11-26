@@ -50,7 +50,8 @@ public sealed class TreeOrganizationHistory(IConfigManager config)
     public async Task<T> ExecuteAsync<T>(Func<Task<T>> operation,
         Func<T, FolderRenamePlan?>? reverseFolder = null,
         IReadOnlyCollection<string>? serverIds = null,
-        Func<T, FolderOrderRestore?>? restoreFolderOrder = null)
+        Func<T, FolderOrderRestore?>? restoreFolderOrder = null,
+        Func<T, MovedFolderRank?>? restoreMovedRank = null)
     {
         await _gate.WaitAsync();
         try
@@ -73,11 +74,14 @@ public sealed class TreeOrganizationHistory(IConfigManager config)
                     orderRestore = null;
                 }
 
+                MovedFolderRank? movedRank = restoreMovedRank?.Invoke(result);
+
                 if (reverse is not null || changed.Count > 0 || orderRestore is not null)
                 {
                     _entry = new(changed, after, reverse,
                         reverse is null ? "" : MetadataFingerprint(await config.LoadSettingsAsync()),
-                        orderRestore);
+                        orderRestore,
+                        movedRank);
                     RecordedCount++;
                 }
             }
@@ -108,6 +112,15 @@ public sealed class TreeOrganizationHistory(IConfigManager config)
                     return false;
 
                 await FolderRenameService.MigrateAsync(config, reverse);
+
+                // Only after the reverse migration succeeded: a move dropped the folder's own
+                // rank, so it is put back among the siblings it left.
+                if (entry.MovedRank is { } movedRank)
+                {
+                    await config.MergeSettingAsync(settings =>
+                        settings.FolderOrder = FolderOrdering.WithEntryRestored(settings.FolderOrder, movedRank));
+                }
+
                 return true;
             }
 
@@ -180,5 +193,6 @@ public sealed class TreeOrganizationHistory(IConfigManager config)
         public static Row From(ServerProfileDto dto) => new(dto.DisplayName, dto.Group, dto.SortOrder);
     }
     private sealed record UndoEntry(Dictionary<string, Row> Before, Dictionary<string, Row> After,
-        FolderRenamePlan? ReverseFolder, string Metadata, FolderOrderRestore? OrderRestore = null);
+        FolderRenamePlan? ReverseFolder, string Metadata, FolderOrderRestore? OrderRestore = null,
+        MovedFolderRank? MovedRank = null);
 }

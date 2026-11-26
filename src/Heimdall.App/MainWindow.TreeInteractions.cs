@@ -2432,7 +2432,8 @@ public partial class MainWindow
                 TreeOrganizationChange.FolderMove,
                 () => new FolderMoveService(vm.ConfigManager).MoveAsync(oldPath, targetParentPath),
                 result => result.Status == FolderMoveStatus.Moved
-                    ? new FolderRenamePlan(result.NewPath!, oldPath) : null);
+                    ? new FolderRenamePlan(result.NewPath!, oldPath) : null,
+                restoreMovedRank: r => r.DroppedRank);
 
             switch (result.Status)
             {

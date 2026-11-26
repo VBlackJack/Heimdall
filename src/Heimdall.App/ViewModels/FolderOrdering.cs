@@ -19,6 +19,14 @@ using Heimdall.Core.Configuration;
 namespace Heimdall.App.ViewModels;
 
 /// <summary>
+/// The manual rank a folder move dropped, so an undo can put the folder back in its place.
+/// </summary>
+/// <param name="Path">The folder's path before the move.</param>
+/// <param name="ParentPath">The folder the move left (empty for the top level).</param>
+/// <param name="NextSibling">The entry that followed it among that parent's entries, or null if it was last.</param>
+public sealed record MovedFolderRank(string Path, string ParentPath, string? NextSibling);
+
+/// <summary>
 /// How the manual order of local folders ranks a folder among its siblings.
 /// </summary>
 /// <remarks>
@@ -168,6 +176,49 @@ public static class FolderOrdering
             {
                 result.Add(entry);
             }
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// The stored order with a moved folder's dropped entry put back among its old siblings, for
+    /// an undo of the move.
+    /// </summary>
+    /// <remarks>
+    /// The entry goes just before the sibling that followed it, or after the last sibling entry
+    /// when that one is gone. A level with no entry left stays unranked when a next sibling was
+    /// recorded, since a lone entry would rank the folder above siblings that are alphabetical
+    /// now. An entry already listed is left alone.
+    /// </remarks>
+    public static List<string> WithEntryRestored(IEnumerable<string>? stored, MovedFolderRank rank)
+    {
+        ArgumentNullException.ThrowIfNull(rank);
+        List<string> result = [.. stored ?? []];
+        if (IndexOf(result, rank.Path) >= 0)
+        {
+            return result;
+        }
+
+        List<string> siblings = ChildEntries(result, rank.ParentPath);
+        if (siblings.Count == 0)
+        {
+            if (rank.NextSibling is null)
+            {
+                result.Add(rank.Path);
+            }
+
+            return result;
+        }
+
+        int next = rank.NextSibling is null ? -1 : IndexOf(result, rank.NextSibling);
+        if (next >= 0 && siblings.Contains(result[next], StringComparer.OrdinalIgnoreCase))
+        {
+            result.Insert(next, rank.Path);
+        }
+        else
+        {
+            result.Insert(IndexOf(result, siblings[^1]) + 1, rank.Path);
         }
 
         return result;

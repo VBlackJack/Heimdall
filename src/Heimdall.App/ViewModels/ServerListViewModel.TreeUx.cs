@@ -199,17 +199,19 @@ public partial class ServerListViewModel
     /// <param name="reverseFolder">How to reverse a folder path change, when it is one.</param>
     /// <param name="serverIds">The sessions whose organization fields the change may touch.</param>
     /// <param name="restoreFolderOrder">The folder order entries the change removed, to put back on undo.</param>
+    /// <param name="restoreMovedRank">The rank a folder move dropped, to put back on undo.</param>
     public async Task<T> WithOrganizationUndoAsync<T>(
         TreeOrganizationChange change,
         Func<Task<T>> operation,
         Func<T, FolderRenamePlan?>? reverseFolder = null,
         IReadOnlyCollection<string>? serverIds = null,
-        Func<T, FolderOrderRestore?>? restoreFolderOrder = null)
+        Func<T, FolderOrderRestore?>? restoreFolderOrder = null,
+        Func<T, MovedFolderRank?>? restoreMovedRank = null)
     {
         int recordedBefore = OrganizationHistory.RecordedCount;
         try
         {
-            return await OrganizationHistory.ExecuteAsync(operation, reverseFolder, serverIds, restoreFolderOrder);
+            return await OrganizationHistory.ExecuteAsync(operation, reverseFolder, serverIds, restoreFolderOrder, restoreMovedRank);
         }
         finally
         {

@@ -66,6 +66,60 @@ public sealed class FolderOrderingTests
     }
 
     [Fact]
+    public void WithEntryRestored_ForAnEntryAlreadyListed_ChangesNothing()
+    {
+        List<string> order = FolderOrdering.WithEntryRestored(
+            ["P/B", "p/linux", "P/A"], new MovedFolderRank("P/Linux", "P", "P/A"));
+
+        Assert.Equal(["P/B", "p/linux", "P/A"], order);
+    }
+
+    [Fact]
+    public void WithEntryRestored_WhenTheLevelHasNoEntriesLeftButHadANextSibling_ChangesNothing()
+    {
+        List<string> order = FolderOrdering.WithEntryRestored(
+            ["Other"], new MovedFolderRank("P/Linux", "P", "P/A"));
+
+        Assert.Equal(["Other"], order);
+    }
+
+    [Fact]
+    public void WithEntryRestored_WhenTheNextSiblingIsStillListed_InsertsRightBeforeIt()
+    {
+        List<string> order = FolderOrdering.WithEntryRestored(
+            ["P/B", "Other", "P/A", "P/C"], new MovedFolderRank("P/Linux", "P", "P/A"));
+
+        Assert.Equal(["P/B", "Other", "P/Linux", "P/A", "P/C"], order);
+    }
+
+    [Fact]
+    public void WithEntryRestored_WhenTheNextSiblingIsGone_InsertsAfterTheLastEntryOfTheLevel()
+    {
+        List<string> order = FolderOrdering.WithEntryRestored(
+            ["P/B", "P/C", "Other"], new MovedFolderRank("P/Linux", "P", "P/Gone"));
+
+        Assert.Equal(["P/B", "P/C", "P/Linux", "Other"], order);
+    }
+
+    [Fact]
+    public void WithEntryRestored_WhenItWasLastAndTheLevelHasEntries_InsertsAfterTheLastEntryOfTheLevel()
+    {
+        List<string> order = FolderOrdering.WithEntryRestored(
+            ["P/B", "Other", "P/C"], new MovedFolderRank("P/Linux", "P", null));
+
+        Assert.Equal(["P/B", "Other", "P/C", "P/Linux"], order);
+    }
+
+    [Fact]
+    public void WithEntryRestored_WithNoNextSiblingAndNoEntriesOnTheLevel_Appends()
+    {
+        List<string> order = FolderOrdering.WithEntryRestored(
+            ["Other"], new MovedFolderRank("P/Linux", "P", null));
+
+        Assert.Equal(["Other", "P/Linux"], order);
+    }
+
+    [Fact]
     public void Nudge_KeepsOtherGroupsEntriesAndDropsStaleOnes()
     {
         List<string>? order = FolderOrdering.Nudge(
