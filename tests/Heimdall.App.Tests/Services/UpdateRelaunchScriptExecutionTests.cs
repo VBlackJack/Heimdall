@@ -19,6 +19,7 @@ using System.Globalization;
 using System.IO;
 using System.Reflection;
 using System.Reflection.PortableExecutable;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -27,6 +28,7 @@ using Heimdall.App.Services;
 using Heimdall.App.Tests.Views.EmbeddedRdp;
 using Heimdall.Core.Security;
 using Heimdall.Core.Updates;
+using Microsoft.Win32.SafeHandles;
 
 namespace Heimdall.App.Tests.Services;
 
@@ -212,6 +214,78 @@ public sealed class UpdateRelaunchScriptExecutionTests
 
         Assert.Equal(Subsystem.WindowsGui, headers.PEHeader!.Subsystem);
     }
+
+    /// <summary>
+    /// The id the script waits on keeps naming the exited stand-in until the sandbox is
+    /// disposed, so no other process can be given it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Asked with no clock involved. While a handle to the process object is open the id can
+    /// be opened and the process reports an exit code; were the handle released, the id would
+    /// be free or reused by a live process, as on CI run 45848223717 (2026-11-26).
+    /// <see cref="Process.GetProcessById(int)"/> is no oracle here: it throws for an exited
+    /// process whether or not a handle is held.
+    /// </para>
+    /// <para>
+    /// The operating-system check alone cannot kill the mutant that drops the hold, measured
+    /// on 2026-11-26: with the stand-in's own handle closed, the id stayed openable for about
+    /// 600 ms more, because something else on the machine briefly holds the process object.
+    /// So the test also pins the hold itself: the sandbox keeps exactly one open handle for
+    /// the id it returned, and closes it on disposal.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void CreateSpec_KeepsTheWaitedIdBoundToTheExitedStandIn_UntilTheSandboxIsDisposed()
+    {
+        using var sandbox = new UpdateScriptSandbox();
+
+        UpdateRelaunchSpec spec = sandbox.CreateSpec();
+
+        IReadOnlyList<SafeProcessHandle> held = sandbox.ExitedStandInHandles;
+        SafeProcessHandle standIn = Assert.Single(held);
+        Assert.False(standIn.IsClosed, "the exited stand-in's handle was released before disposal");
+
+        IntPtr handle = OpenProcess(ProcessQueryLimitedInformation, false, spec.ProcessId);
+        try
+        {
+            Assert.NotEqual(IntPtr.Zero, handle);
+            Assert.True(
+                GetExitCodeProcess(handle, out uint exitCode),
+                "the exit code of the waited process could not be read");
+            Assert.NotEqual(StillActive, exitCode);
+        }
+        finally
+        {
+            if (handle != IntPtr.Zero)
+            {
+                CloseHandle(handle);
+            }
+        }
+
+        sandbox.Dispose();
+        Assert.True(standIn.IsClosed, "disposing the sandbox must release the hold on the stand-in");
+    }
+
+    /// <summary>Right to ask only whether a process exists and how it ended.</summary>
+    private const uint ProcessQueryLimitedInformation = 0x1000;
+
+    /// <summary>The exit code GetExitCodeProcess reports for a process that has not ended.</summary>
+    private const uint StillActive = 259;
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr OpenProcess(
+        uint desiredAccess,
+        [MarshalAs(UnmanagedType.Bool)] bool inheritHandle,
+        int processId);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetExitCodeProcess(IntPtr process, out uint exitCode);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool CloseHandle(IntPtr handle);
 
     [Theory]
     [MemberData(nameof(PowerShellHosts))]
@@ -1387,6 +1461,37 @@ public sealed class UpdateRelaunchScriptExecutionTests
     {
         private ScriptRun? _lastRun;
 
+        /// <summary>
+        /// The exited stand-ins whose ids were handed to the script, kept open until the sandbox
+        /// is disposed.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// Windows never reuses a process id while a handle to the process object is open. The
+        /// stand-in used to be disposed right after it exited, which released the last handle and
+        /// freed the id; the next process created on the machine could then be given it, likely
+        /// the PowerShell host started just after, or its console host. The script waits on that
+        /// id, then probes it, and found a live process: on CI run 45848223717 (attempt 2,
+        /// 2026-11-26, pwsh 7 host) <c>Execute_HashMismatch_RefusesAtTheMandatoryGate</c>
+        /// recorded <c>ApplicationStillRunning</c> for that reason.
+        /// </para>
+        /// <para>
+        /// Measured locally on 2026-11-26: an exited process whose handle the parent still holds
+        /// is not returned by <c>Get-Process -Id</c>, and <c>Wait-Process -Id</c> returns in about
+        /// 200 to 300 ms, under both pwsh 7 and Windows PowerShell 5.1. So holding the handle keeps
+        /// the production semantics (an exited application) and removes the reuse window. A list,
+        /// because <see cref="CreateSpec"/> can be called several times per sandbox.
+        /// </para>
+        /// </remarks>
+        private readonly List<Process> _exitedStandIns = [];
+
+        /// <summary>
+        /// The operating-system handles held on the exited stand-ins, for a test to observe
+        /// without a clock: they are open until the sandbox is disposed and closed after it.
+        /// </summary>
+        internal IReadOnlyList<SafeProcessHandle> ExitedStandInHandles =>
+            _exitedStandIns.Select(process => process.SafeHandle).ToList();
+
         internal UpdateScriptSandbox()
         {
             Root = Path.Combine(
@@ -1570,9 +1675,12 @@ public sealed class UpdateRelaunchScriptExecutionTests
             };
             psi.Environment.Remove(MarkerEnvironmentVariable);
 
-            using Process process = Process.Start(psi)
+            Process process = Process.Start(psi)
                 ?? throw new InvalidOperationException("failed to start the waited stand-in");
             process.WaitForExit();
+
+            // Held, not disposed: see _exitedStandIns.
+            _exitedStandIns.Add(process);
             return process.Id;
         }
 
@@ -1881,6 +1989,7 @@ public sealed class UpdateRelaunchScriptExecutionTests
 
         public void Dispose()
         {
+            ReleaseExitedStandIns();
             WaitForStandInsToExit();
 
             try
@@ -1899,6 +2008,31 @@ public sealed class UpdateRelaunchScriptExecutionTests
             {
                 // Same.
             }
+        }
+
+        /// <summary>
+        /// Releases the handles held on the exited stand-ins, which frees their ids.
+        /// </summary>
+        /// <remarks>
+        /// Never throws, for the reason recorded on <see cref="WaitForStandInsToExit"/>: each
+        /// disposal has its own guard so one failure cannot skip the others or the cleanup that
+        /// follows.
+        /// </remarks>
+        private void ReleaseExitedStandIns()
+        {
+            foreach (Process process in _exitedStandIns)
+            {
+                try
+                {
+                    process.Dispose();
+                }
+                catch (Exception)
+                {
+                    // Nothing useful can be done with a handle that refuses to close.
+                }
+            }
+
+            _exitedStandIns.Clear();
         }
 
         /// <summary>
