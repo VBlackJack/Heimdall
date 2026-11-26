@@ -38,7 +38,10 @@ public sealed class LocalizationManager : ICountLocalizer
 
     /// <summary>
     /// Raised after the locale has been switched. Subscribers should
-    /// re-apply localized strings to their UI elements.
+    /// re-apply localized strings to their UI elements. It is raised on the
+    /// context <see cref="SwitchLocaleAsync"/> was called from (the dispatcher in the
+    /// app, inline when there is none). A subscriber that throws is logged and does
+    /// not stop the others, nor does it fail the switch.
     /// </summary>
     public event Action<string>? LocaleChanged;
 
@@ -177,6 +180,9 @@ public sealed class LocalizationManager : ICountLocalizer
 
     /// <summary>
     /// Switches to a different locale at runtime, reloading strings from disk.
+    /// <see cref="LocaleChanged"/> is raised on the context this method was called from.
+    /// A failing subscriber is logged and does not stop the others nor fail the switch;
+    /// load failures still throw, before the string table is swapped.
     /// </summary>
     /// <param name="locale">The new locale identifier.</param>
     /// <exception cref="InvalidOperationException">Thrown if no locales path has been configured via <see cref="LoadAsync"/>.</exception>
@@ -188,8 +194,35 @@ public sealed class LocalizationManager : ICountLocalizer
                 "Cannot switch locale before initial load. Call LoadAsync first.");
         }
 
-        await LoadAsync(_localesPath, locale).ConfigureAwait(false);
-        LocaleChanged?.Invoke(locale);
+        // No ConfigureAwait(false): the raise must resume on the caller's context so that
+        // subscribers can touch UI elements. LoadAsync keeps its own off-context file read.
+        await LoadAsync(_localesPath, locale);
+        RaiseLocaleChanged(locale);
+    }
+
+    private void RaiseLocaleChanged(string locale)
+    {
+        var handlers = LocaleChanged;
+        if (handlers is null)
+        {
+            return;
+        }
+
+        foreach (var invocation in handlers.GetInvocationList())
+        {
+            var handler = (Action<string>)invocation;
+            try
+            {
+                handler(locale);
+            }
+            catch (Exception ex)
+            {
+                FileLogger.Error(
+                    $"LocaleChanged handler failed (target {handler.Target?.GetType().FullName}, "
+                    + $"method {handler.Method.DeclaringType?.FullName}.{handler.Method.Name}) for locale '{locale}'",
+                    ex);
+            }
+        }
     }
 
     /// <summary>

@@ -4608,10 +4608,12 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         }
         catch (Exception ex)
         {
-            // The string table is swapped only once the new file has parsed, so what is on
-            // screen is still coherent - it is simply not what the box now says. Leaving the
-            // pick standing would offer to persist a locale that cannot be loaded, and the next
-            // launch reads that value before there is any panel to correct it from.
+            // Only load or precondition failures reach this catch: the string table is swapped
+            // only once the new file has parsed, so what is on screen is still coherent - it is
+            // simply not what the box now says. A subscriber that fails is logged by the
+            // localizer, not reported here. Leaving the pick standing would offer to persist a
+            // locale that cannot be loaded, and the next launch reads that value before there
+            // is any panel to correct it from.
             FileLogger.Error($"Applying locale '{locale}' failed.", ex);
             RestoreLanguageSelection();
             if (announceFailure)

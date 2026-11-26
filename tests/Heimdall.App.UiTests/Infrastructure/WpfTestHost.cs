@@ -223,18 +223,47 @@ public static class WpfTestHost
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(locale);
         EnsureStarted();
-        Invoke(() =>
+        var needsSwitch = Invoke(() =>
         {
             LocalizationSource.Instance.Initialize(_localizer!);
+            return !string.Equals(_localizer!.CurrentLocale, locale, StringComparison.OrdinalIgnoreCase);
+        });
 
-            if (string.Equals(_localizer!.CurrentLocale, locale, StringComparison.OrdinalIgnoreCase))
+        if (!needsSwitch)
+        {
+            return;
+        }
+
+        // The switch continues on the dispatcher, so the dispatcher must not be blocked while
+        // waiting. From another thread, run it through the dispatcher and block the caller; from
+        // the dispatcher thread itself, pump a nested frame until the switch completes.
+        if (_dispatcher!.CheckAccess())
+        {
+            var switchTask = _localizer!.SwitchLocaleAsync(locale);
+            var frame = new DispatcherFrame();
+            _ = switchTask.ContinueWith(
+                _ => frame.Continue = false,
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
+            if (!switchTask.IsCompleted)
             {
-                return;
+                Dispatcher.PushFrame(frame);
+                if (!switchTask.IsCompleted)
+                {
+                    throw new InvalidOperationException(
+                        "The dispatcher frame exited before the locale switch completed.");
+                }
             }
 
-            _localizer.SwitchLocaleAsync(locale).GetAwaiter().GetResult();
-            LocalizationSource.Instance.Initialize(_localizer);
-        });
+            switchTask.GetAwaiter().GetResult();
+        }
+        else
+        {
+            _dispatcher.InvokeAsync(() => _localizer!.SwitchLocaleAsync(locale)).Task.Unwrap().GetAwaiter().GetResult();
+        }
+
+        Invoke(() => LocalizationSource.Instance.Initialize(_localizer!));
     }
 
     public static string Translate(string key)

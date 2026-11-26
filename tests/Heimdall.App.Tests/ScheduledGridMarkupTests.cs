@@ -119,7 +119,8 @@ public sealed class ScheduledGridMarkupTests
             var column = (DataGridColumn)grid.FindName(ScheduleColumnName);
             Assert.Equal("Daily at 07:45", ((TextBlock)column.GetCellContent(task)).Text);
 
-            localizer.SwitchLocaleAsync("fr").GetAwaiter().GetResult();
+            // Off the STA thread so a captured context can never be waited on by its own continuation.
+            Task.Run(() => localizer.SwitchLocaleAsync("fr")).GetAwaiter().GetResult();
 
             // The binding engine applies the change through the dispatcher.
             Dispatcher.CurrentDispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
