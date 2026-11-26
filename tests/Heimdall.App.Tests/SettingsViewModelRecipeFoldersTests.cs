@@ -56,7 +56,7 @@ public sealed partial class SettingsViewModelTests
         (SettingsViewModel viewModel, FakeRecipeFileDialogs files, _) = await RecipeFolderPanelAsync();
         files.FolderPath = @"D:\Tools\";
 
-        viewModel.AddRecipeProgramFolderCommand.Execute(null);
+        await viewModel.AddRecipeProgramFolderCommand.ExecuteAsync(null);
 
         Assert.Equal([@"D:\Tools"], viewModel.RecipeProgramFolders);
         Assert.True(viewModel.HasRecipeProgramFolders);
@@ -75,7 +75,7 @@ public sealed partial class SettingsViewModelTests
         (SettingsViewModel viewModel, FakeRecipeFileDialogs files, _) = await RecipeFolderPanelAsync();
         files.FolderPath = picked;
 
-        viewModel.AddRecipeProgramFolderCommand.Execute(null);
+        await viewModel.AddRecipeProgramFolderCommand.ExecuteAsync(null);
 
         Assert.Empty(viewModel.RecipeProgramFolders);
         Assert.True(viewModel.HasRecipeProgramFolderStatus);
@@ -88,7 +88,7 @@ public sealed partial class SettingsViewModelTests
         (SettingsViewModel viewModel, FakeRecipeFileDialogs files, _) = await RecipeFolderPanelAsync();
         files.FolderPath = null;
 
-        viewModel.AddRecipeProgramFolderCommand.Execute(null);
+        await viewModel.AddRecipeProgramFolderCommand.ExecuteAsync(null);
 
         Assert.Empty(viewModel.RecipeProgramFolders);
         Assert.False(viewModel.HasRecipeProgramFolderStatus);
@@ -101,7 +101,7 @@ public sealed partial class SettingsViewModelTests
             new AppSettings { RecipeProgramFolders = [@"D:\Tools"] });
         files.FolderPath = @"d:\tools";
 
-        viewModel.AddRecipeProgramFolderCommand.Execute(null);
+        await viewModel.AddRecipeProgramFolderCommand.ExecuteAsync(null);
 
         Assert.Equal([@"D:\Tools"], viewModel.RecipeProgramFolders);
         Assert.Contains("already in the list", viewModel.RecipeProgramFolderStatus, StringComparison.Ordinal);
@@ -112,11 +112,11 @@ public sealed partial class SettingsViewModelTests
     {
         (SettingsViewModel viewModel, FakeRecipeFileDialogs files, _) = await RecipeFolderPanelAsync();
         files.FolderPath = @"\\server\share";
-        viewModel.AddRecipeProgramFolderCommand.Execute(null);
+        await viewModel.AddRecipeProgramFolderCommand.ExecuteAsync(null);
         Assert.True(viewModel.HasRecipeProgramFolderStatus);
 
         files.FolderPath = @"D:\Tools";
-        viewModel.AddRecipeProgramFolderCommand.Execute(null);
+        await viewModel.AddRecipeProgramFolderCommand.ExecuteAsync(null);
 
         Assert.False(viewModel.HasRecipeProgramFolderStatus);
     }
@@ -129,7 +129,7 @@ public sealed partial class SettingsViewModelTests
         Assert.Equal([@"D:\One"], viewModel.RecipeProgramFolders);
 
         files.FolderPath = @"E:\Two";
-        viewModel.AddRecipeProgramFolderCommand.Execute(null);
+        await viewModel.AddRecipeProgramFolderCommand.ExecuteAsync(null);
         await viewModel.SaveCommand.ExecuteAsync(null);
 
         Assert.Equal([@"D:\One", @"E:\Two"], Assert.IsType<AppSettings>(config.SavedSettings).RecipeProgramFolders);
@@ -142,7 +142,7 @@ public sealed partial class SettingsViewModelTests
         viewModel.IsDirty = false;
         files.FolderPath = @"D:\Tools";
 
-        viewModel.AddRecipeProgramFolderCommand.Execute(null);
+        await viewModel.AddRecipeProgramFolderCommand.ExecuteAsync(null);
         Assert.True(viewModel.IsDirty);
 
         viewModel.RemoveRecipeProgramFolderCommand.Execute(@"D:\Tools");
@@ -156,7 +156,7 @@ public sealed partial class SettingsViewModelTests
         Assert.False(viewModel.Defaults[nameof(SettingsViewModel.RecipeProgramFolders)].IsModified);
 
         files.FolderPath = @"D:\Tools";
-        viewModel.AddRecipeProgramFolderCommand.Execute(null);
+        await viewModel.AddRecipeProgramFolderCommand.ExecuteAsync(null);
         Assert.True(viewModel.Defaults[nameof(SettingsViewModel.RecipeProgramFolders)].IsModified);
 
         viewModel.ResetSettingToDefault(nameof(SettingsViewModel.RecipeProgramFolders));

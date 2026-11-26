@@ -6921,5 +6921,6 @@
   "RecipeImportPreviewIconUnknown": "Icon: {0} (unknown to this version of Heimdall; the default icon is shown)",
   "RecipeImportReplaceIconSame": "Icon: unchanged",
   "RecipeImportReplaceIconChanged": "Icon: changed",
-  "RecipeFolderRefusalLeadsToUnallowedLocation": "This folder leads to a location that cannot be allowed: the path it leads to is too long, or is not an ordinary local folder path."
+  "RecipeFolderRefusalLeadsToUnallowedLocation": "This folder leads to a location that cannot be allowed: the path it leads to is too long, or is not an ordinary local folder path.",
+  "RecipeFolderChecking": "Checking the folder..."
 }
