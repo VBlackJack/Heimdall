@@ -1438,6 +1438,11 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     /// </summary>
     private void RerunSettingsSearchAfterLocaleChange()
     {
+        if (!IsLoaded)
+        {
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(Mw_SettingsSearchBox.Text))
         {
             return;

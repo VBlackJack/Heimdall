@@ -245,4 +245,30 @@ public sealed partial class SessionCoordinatorPreMountTests
         Assert.All(toolPanes, p => Assert.Equal(localizer["StatusReady"], p.Status));
         Assert.Equal("web-01", tab.Title);
     }
+
+    [Fact]
+    public async Task ToolTab_WhoseTitleWordingThrows_DoesNotStopTheOtherTabsNorTheStatusRefresh()
+    {
+        using TestHarness harness = TestHarness.Create();
+        MainViewModel main = harness.Main;
+        LocalizationManager localizer = main.GetLocalizer();
+        ToolDescriptor ping = SwitchPingDescriptor(main);
+        bool armed = false;
+        await main.OpenToolTabAsync(SwitchPingToolId, SwitchPingLabel(main), null, titleWording: () => armed
+            ? throw new InvalidOperationException("broken wording")
+            : ping.ResolveLabel(localizer.GetString));
+        SessionTabViewModel broken = Assert.Single(main.Connection.ActiveSessions);
+        string brokenTitle = broken.Title;
+        await main.OpenToolTabAsync(SwitchPingToolId, SwitchPingLabel(main), null, titleWording: () => ping.ResolveLabel(localizer.GetString));
+        SessionTabViewModel healthy = main.Connection.ActiveSessions.Single(t => !ReferenceEquals(t, broken));
+        main.Connection.ActiveSession = healthy;
+        armed = true;
+
+        await localizer.SwitchLocaleAsync(SwitchFrenchLocale);
+
+        Assert.Equal(brokenTitle, broken.Title);
+        Assert.Equal(ping.ResolveLabel(localizer.GetString), healthy.Title);
+        Assert.Equal(localizer["StatusReady"], healthy.Status);
+        Assert.Equal(localizer.Format("StatusSessionState", healthy.Title, healthy.Status), main.StatusText);
+    }
 }

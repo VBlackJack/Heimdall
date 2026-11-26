@@ -894,31 +894,39 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
             SessionPaneModel primary = tab.PrimaryPane;
             foreach (SessionPaneModel pane in SplitTreeHelper.EnumerateLeaves(tab.RootContent).ToList())
             {
-                bool isPrimary = ReferenceEquals(pane, primary);
-
-                if (pane.ReworkedTitle() is { } title)
+                try
                 {
-                    // The tab's own setter tells the header and the floating window.
-                    if (isPrimary)
+                    bool isPrimary = ReferenceEquals(pane, primary);
+
+                    if (pane.ReworkedTitle() is { } title)
                     {
-                        tab.Title = title;
+                        // The tab's own setter tells the header and the floating window.
+                        if (isPrimary)
+                        {
+                            tab.Title = title;
+                        }
+                        else
+                        {
+                            pane.Title = title;
+                        }
                     }
-                    else
+
+                    if (pane.ReworkedStatus() is { } status)
                     {
-                        pane.Title = title;
+                        if (isPrimary)
+                        {
+                            tab.Status = status;
+                        }
+                        else
+                        {
+                            pane.Status = status;
+                        }
                     }
                 }
-
-                if (pane.ReworkedStatus() is { } status)
+                catch (Exception ex)
                 {
-                    if (isPrimary)
-                    {
-                        tab.Status = status;
-                    }
-                    else
-                    {
-                        pane.Status = status;
-                    }
+                    // One broken wording must not stop the other panes or the rest of the refresh.
+                    Core.Logging.FileLogger.Warn($"Failed to reword a tool pane after a language change: {ex.Message}");
                 }
             }
         }
