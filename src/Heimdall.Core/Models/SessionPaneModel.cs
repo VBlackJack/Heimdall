@@ -102,6 +102,73 @@ public partial class SessionPaneModel : ObservableObject, ISplitContent
     [ObservableProperty]
     private string _status = "";
 
+    /// <summary>
+    /// How the title of a tool pane is worded again after a language change. Null for every pane
+    /// that is not a tool: a server name or a name the user typed must never be reworded. Transient,
+    /// never persisted.
+    /// </summary>
+    public Func<string>? TitleWording { get; set; }
+
+    /// <summary>
+    /// How the status of a tool pane is worded again after a language change. Null for every pane
+    /// that is not a tool. Transient, never persisted.
+    /// </summary>
+    public Func<string>? StatusWording { get; set; }
+
+    /// <summary>The title the wording produced last; a later, different title was set by someone else and is left alone.</summary>
+    public string? LastTitleWording { get; private set; }
+
+    /// <summary>The status the wording produced last; a later, different status was set by someone else and is left alone.</summary>
+    public string? LastStatusWording { get; private set; }
+
+    /// <summary>Registers the wording of the title, which the pane carries now.</summary>
+    public void UseTitleWording(Func<string> wording)
+    {
+        ArgumentNullException.ThrowIfNull(wording);
+        TitleWording = wording;
+        LastTitleWording = Title;
+    }
+
+    /// <summary>Registers the wording of the status, which the pane carries now.</summary>
+    public void UseStatusWording(Func<string> wording)
+    {
+        ArgumentNullException.ThrowIfNull(wording);
+        StatusWording = wording;
+        LastStatusWording = Status;
+    }
+
+    /// <summary>
+    /// The title this pane should carry after a language change, or null when it has no wording,
+    /// its title is no longer the one the wording produced, or nothing changed.
+    /// </summary>
+    public string? ReworkedTitle()
+    {
+        if (TitleWording is null || !string.Equals(Title, LastTitleWording, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        string next = TitleWording();
+        LastTitleWording = next;
+        return string.Equals(next, Title, StringComparison.Ordinal) ? null : next;
+    }
+
+    /// <summary>
+    /// The status this pane should carry after a language change, or null when it has no wording,
+    /// its status is no longer the one the wording produced, or nothing changed.
+    /// </summary>
+    public string? ReworkedStatus()
+    {
+        if (StatusWording is null || !string.Equals(Status, LastStatusWording, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        string next = StatusWording();
+        LastStatusWording = next;
+        return string.Equals(next, Status, StringComparison.Ordinal) ? null : next;
+    }
+
     [ObservableProperty]
     private string _tunnelRoute = "";
 

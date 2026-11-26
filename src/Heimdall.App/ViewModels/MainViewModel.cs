@@ -521,8 +521,10 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         // Wire cross-tool navigation so tools can open other tool tabs
         // These opens never recorded a recent tool (a tool opening another tool, a command captured
         // from a terminal), and still do not.
+        // Every caller passes the plain label of the tool it opens, so the tab is worded again from
+        // the descriptor after a language switch.
         _embeddedSessionManager.OpenToolCallback = (toolId, title, ctx) =>
-            OpenToolTabAsync(toolId, title, ctx, recordRecent: false);
+            OpenToolTabAsync(toolId, title, ctx, recordRecent: false, titleWording: ToolLabelWording(toolId));
 
         // Wire the session opener so a tool can connect to a host it discovered.
         _embeddedSessionManager.OpenSessionCallback = ConnectAdHocSessionAsync;
@@ -849,14 +851,27 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
 
     private void RefreshLocalizedShellState()
     {
+        // Read before the panes are reworded: rewording the displayed tab's title or status re-derives
+        // the status bar from the session, which would wipe an application status (a refusal, "saving").
         string? statusKey = _localizedApplicationStatusKey;
+        bool sessionDerived = _statusTextIsSessionDerived;
+        string statusText = StatusText;
+
+        RefreshToolPaneWording();
+        Connection.RefreshLocalizedText();
+
         if (statusKey is not null)
         {
             SetLocalizedApplicationStatus(statusKey);
         }
-        else if (_statusTextIsSessionDerived)
+        else if (sessionDerived)
         {
             RefreshSessionStatusText();
+        }
+        else if (!string.Equals(StatusText, statusText, StringComparison.Ordinal))
+        {
+            // A sentence some feature wrote itself: the rewording must not replace it.
+            StatusText = statusText;
         }
 
         OnPropertyChanged(nameof(DropToMergeText));
@@ -865,6 +880,56 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         OnPropertyChanged(nameof(DetailActionHintsText));
         WindowTitle = _localizer.Format("WindowTitle", ServerCount);
         Session.RefreshLocalizedText();
+    }
+
+    /// <summary>
+    /// Words the title and the ready status of every tool pane again, in every tab and every
+    /// detached window. A pane whose title or status was written by anyone else since is left alone,
+    /// and a name the user typed for the tab still wins through its display title.
+    /// </summary>
+    private void RefreshToolPaneWording()
+    {
+        foreach (SessionTabViewModel tab in Connection.AllOpenSessions.ToList())
+        {
+            SessionPaneModel primary = tab.PrimaryPane;
+            foreach (SessionPaneModel pane in SplitTreeHelper.EnumerateLeaves(tab.RootContent).ToList())
+            {
+                try
+                {
+                    bool isPrimary = ReferenceEquals(pane, primary);
+
+                    if (pane.ReworkedTitle() is { } title)
+                    {
+                        // The tab's own setter tells the header and the floating window.
+                        if (isPrimary)
+                        {
+                            tab.Title = title;
+                        }
+                        else
+                        {
+                            pane.Title = title;
+                        }
+                    }
+
+                    if (pane.ReworkedStatus() is { } status)
+                    {
+                        if (isPrimary)
+                        {
+                            tab.Status = status;
+                        }
+                        else
+                        {
+                            pane.Status = status;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // One broken wording must not stop the other panes or the rest of the refresh.
+                    Core.Logging.FileLogger.Warn($"Failed to reword a tool pane after a language change: {ex.Message}");
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -1408,8 +1473,9 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
     /// is false, so no caller records it itself. A tool whose open fails is never recorded.
     /// </remarks>
     /// <param name="recordRecent">Whether a successful open or focus counts as a recent use; the routes that never recorded pass false.</param>
+    /// <param name="titleWording">How the title is worded again after a language change; null when the title is a name the user or the inventory gave, which a language change must not touch.</param>
     /// <returns>What happened to the request; <see cref="ToolOpenOutcome.Refused"/> is not an error.</returns>
-    internal async Task<ToolOpenOutcome> OpenToolTabAsync(string toolId, string title, ToolContext? context, bool recordRecent = true)
+    internal async Task<ToolOpenOutcome> OpenToolTabAsync(string toolId, string title, ToolContext? context, bool recordRecent = true, Func<string>? titleWording = null)
     {
         await Task.CompletedTask;
 
@@ -1474,6 +1540,18 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
         var sessionId = $"tool-{toolId.ToLowerInvariant()}-{Guid.NewGuid():N}";
 
         var tab = Connection.AddSession(sessionId, title, connectionType);
+
+        // A recipe tab always carries the descriptor's own wording; any other tab is reworded only
+        // when its route said how, never by guessing from what the title happens to equal.
+        ToolDescriptor? opened = ToolRegistry.GetById(toolId);
+        Func<string>? wording = opened is { IsRecipe: true }
+            ? () => RecipeToolText.TabTitle(opened, _localizer.GetString)
+            : titleWording;
+        if (wording is not null)
+        {
+            tab.PrimaryPane.UseTitleWording(wording);
+        }
+
         try
         {
             tab.HostControl = _embeddedSessionManager.CreateToolControl(
@@ -1481,6 +1559,7 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
             // Deliberately free text rather than a state token: a tool pane is not a session, and
             // the connected-session census must not count it as one.
             tab.Status = _localizer["StatusReady"];
+            tab.PrimaryPane.UseStatusWording(() => _localizer["StatusReady"]);
         }
         catch (Exception ex)
         {
@@ -1492,6 +1571,16 @@ public partial class MainViewModel : ObservableObject, IDisposable, ITunnelsHost
 
         TrackRecentToolWhen(recordRecent, toolId);
         return ToolOpenOutcome.Opened;
+    }
+
+    /// <summary>
+    /// A wording that says the plain label of the tool <paramref name="toolId"/> in the current
+    /// language, or null for a tool the registry does not know.
+    /// </summary>
+    private Func<string>? ToolLabelWording(string toolId)
+    {
+        ToolDescriptor? descriptor = ToolRegistry.GetById(toolId);
+        return descriptor is null ? null : () => RecipeToolText.TabTitle(descriptor, _localizer.GetString);
     }
 
     /// <summary>

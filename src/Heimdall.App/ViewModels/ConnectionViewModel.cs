@@ -223,6 +223,23 @@ public partial class ConnectionViewModel : ObservableObject
     }
 
     /// <summary>
+    /// Rewords every stored localized string the strip holds after a language change: the tab and
+    /// close-button names, the folder group labels and chip names, and the open-sessions notice.
+    /// Runs on the calling thread, which must be the UI thread. User-given titles are untouched.
+    /// </summary>
+    public void RefreshLocalizedText()
+    {
+        RefreshAccessibleNames();
+        foreach (SessionTabViewModel session in ActiveSessions)
+        {
+            AssignTabGroup(session);
+        }
+
+        RefreshTabGroupFlags();
+        RefreshSessionLoadNoticeText();
+    }
+
+    /// <summary>
     /// Names a tab and its close button from the disambiguated title. A tab that needs a look
     /// says why after its name, so a screen reader hears the dropped session among the healthy
     /// ones; the close button names the tab it closes, since every tab has one.

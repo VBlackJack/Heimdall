@@ -394,6 +394,10 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
                     vm.Settings.UpdateStatusText = string.Empty;
                 }
             });
+
+            // XAML {loc:Translate} texts are worded again at DataBind priority, after the call above:
+            // the search runs once they have settled, so it filters the new language's texts.
+            Dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, new Action(RerunSettingsSearchAfterLocaleChange));
         };
         viewModel.GetLocalizer().LocaleChanged += _localeChangedHandler;
 
@@ -1397,6 +1401,16 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
 
     private void OnSettingsSearchTextChanged(object sender, TextChangedEventArgs e)
     {
+        RunSettingsSearch();
+    }
+
+    /// <summary>
+    /// Runs the query in the search box again over the settings texts as they read now, resets the
+    /// walk, and words the hint. Typing runs it, and so does a language switch: the matches were
+    /// filtered with the previous language's texts, so their count and the Enter walk went stale.
+    /// </summary>
+    private void RunSettingsSearch()
+    {
         string query = Mw_SettingsSearchBox.Text?.Trim() ?? string.Empty;
         bool hasText = !string.IsNullOrEmpty(query);
         Mw_SettingsSearchClear.Visibility = hasText ? Visibility.Visible : Visibility.Collapsed;
@@ -1409,20 +1423,58 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             return;
         }
 
-        _settingsSearchMatches = GetSettingsSearchIndex()
-            .Where((SettingsSearchEntry entry) =>
-                SettingsSearchMatches(GetSettingsSearchEntryText(entry), query)
-                && IsSettingsSearchEntryReachable(entry.Target))
-            .ToList();
+        _settingsSearchMatches = FilterSettingsSearchEntries(GetSettingsSearchIndex(), query, IsSettingsSearchEntryReachable);
 
         if (DataContext is MainViewModel vm)
         {
-            Mw_SettingsSearchHintText.Text = _settingsSearchMatches.Count == 0
-                ? vm.Localize("SettingsSearchNoResults")
-                : string.Format(vm.Localize("SettingsSearchResultCount"), _settingsSearchMatches.Count);
+            Mw_SettingsSearchHintText.Text = BuildSettingsSearchCountHint(vm.Localize, _settingsSearchMatches.Count);
             Mw_SettingsSearchHint.Visibility = Visibility.Visible;
         }
     }
+
+    /// <summary>
+    /// Re-runs the search after a language switch, once the XAML texts have been worded again; does
+    /// nothing while the box is empty.
+    /// </summary>
+    private void RerunSettingsSearchAfterLocaleChange()
+    {
+        if (!IsLoaded)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(Mw_SettingsSearchBox.Text))
+        {
+            return;
+        }
+
+        RunSettingsSearch();
+    }
+
+    /// <summary>The entries whose current text holds the query and whose target can be reached.</summary>
+    internal static List<SettingsSearchEntry> FilterSettingsSearchEntries(
+        IEnumerable<SettingsSearchEntry> index,
+        string query,
+        Func<FrameworkElement, bool> isReachable)
+        => index
+            .Where((SettingsSearchEntry entry) =>
+                SettingsSearchMatches(GetSettingsSearchEntryText(entry), query)
+                && isReachable(entry.Target))
+            .ToList();
+
+    /// <summary>The hint under the search box before the walk starts: how many matches there are.</summary>
+    internal static string BuildSettingsSearchCountHint(Func<string, string> localize, int matchCount)
+        => matchCount == 0
+            ? localize("SettingsSearchNoResults")
+            : string.Format(localize("SettingsSearchResultCount"), matchCount);
+
+    /// <summary>The hint under the search box while the walk is on a match.</summary>
+    internal static string BuildSettingsSearchPositionHint(Func<string, string> localize, int position, int matchCount)
+        => string.Format(
+            System.Globalization.CultureInfo.CurrentCulture,
+            localize("SettingsSearchResultPosition"),
+            position,
+            matchCount);
 
     /// <summary>
     /// A keyboard gesture the settings search box answers.
@@ -1526,9 +1578,8 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         RevealSettingsElement(jumpTarget);
         if (DataContext is MainViewModel searchVm)
         {
-            Mw_SettingsSearchHintText.Text = string.Format(
-                System.Globalization.CultureInfo.CurrentCulture,
-                searchVm.Localize("SettingsSearchResultPosition"),
+            Mw_SettingsSearchHintText.Text = BuildSettingsSearchPositionHint(
+                searchVm.Localize,
                 _settingsSearchMatchIndex + 1,
                 _settingsSearchMatches.Count);
         }
@@ -3093,7 +3144,8 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             await vm.OpenToolTabAsync(
                 descriptor.Id,
                 ToolsTabPopulationService.ResolveToolTabTitle(descriptor, context, vm),
-                context);
+                context,
+                titleWording: () => ToolsTabPopulationService.ResolveToolTabTitle(descriptor, context, vm));
         }
         catch (Exception ex)
         {
