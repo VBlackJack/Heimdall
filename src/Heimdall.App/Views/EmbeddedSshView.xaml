@@ -472,7 +472,33 @@
                                    FontSize="{StaticResource FontSizeCaption}"
                                    Foreground="{DynamicResource TextPrimaryBrush}"
                                    HorizontalAlignment="Right"
-                                   Margin="0,2,0,0"/>
+                                   Margin="0,2,0,12"/>
+
+                        <!-- Uptime -->
+                        <StackPanel x:Name="HealthUptimeSection" Visibility="Collapsed" Margin="0,0,0,10">
+                            <TextBlock x:Name="HealthUptimeLabel"
+                                       FontSize="{StaticResource FontSizeCaption}"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Margin="0,0,0,2"/>
+                            <TextBlock x:Name="HealthUptimeText"
+                                       FontSize="{StaticResource FontSizeCaption}"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+
+                        <!-- Load Average -->
+                        <StackPanel x:Name="HealthLoadSection" Visibility="Collapsed">
+                            <TextBlock x:Name="HealthLoadLabel"
+                                       FontSize="{StaticResource FontSizeCaption}"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Margin="0,0,0,2"/>
+                            <TextBlock x:Name="HealthLoadText"
+                                       FontSize="{StaticResource FontSizeCaption}"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
                     </StackPanel>
                 </ScrollViewer>
             </Border>

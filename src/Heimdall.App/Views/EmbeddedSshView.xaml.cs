@@ -1047,6 +1047,8 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
                 RamDetailText.Text = unsupported;
                 DiskProgressBar.Value = 0;
                 DiskDetailText.Text = unsupported;
+                HealthUptimeSection.Visibility = Visibility.Collapsed;
+                HealthLoadSection.Visibility = Visibility.Collapsed;
                 return;
             }
 
@@ -1073,6 +1075,26 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
                 L("HealthPanelDiskFormat"),
                 data.DiskUsed,
                 data.DiskTotal);
+
+            if (!string.IsNullOrWhiteSpace(data.Uptime))
+            {
+                HealthUptimeText.Text = data.Uptime;
+                HealthUptimeSection.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                HealthUptimeSection.Visibility = Visibility.Collapsed;
+            }
+
+            if (!string.IsNullOrWhiteSpace(data.LoadAverage))
+            {
+                HealthLoadText.Text = data.LoadAverage;
+                HealthLoadSection.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                HealthLoadSection.Visibility = Visibility.Collapsed;
+            }
         });
     }
 
@@ -1088,6 +1110,8 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         HealthCpuLabel.Text = L("HealthPanelCpu");
         HealthRamLabel.Text = L("HealthPanelRam");
         HealthDiskLabel.Text = L("HealthPanelDisk");
+        HealthUptimeLabel.Text = L("HealthPanelUptime");
+        HealthLoadLabel.Text = L("HealthPanelLoad");
     }
 
     private void OnReconnectClick(object sender, RoutedEventArgs e)

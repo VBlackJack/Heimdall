@@ -25,8 +25,23 @@ using Heimdall.Core.Security;
 namespace Heimdall.App.ViewModels.Dialogs;
 
 /// <summary>
-/// ViewModel for creating an ad-hoc SSH local-forward tunnel from the
-/// Tunnel Manager.
+/// Port forwarding mode for an ad-hoc SSH tunnel.
+/// </summary>
+public enum TunnelForwardMode
+{
+    Local,
+    DynamicSocks5,
+    Remote
+}
+
+/// <summary>
+/// Display option pairing a <see cref="TunnelForwardMode"/> with its localized label.
+/// </summary>
+public sealed record TunnelForwardModeOption(TunnelForwardMode Mode, string DisplayName);
+
+/// <summary>
+/// ViewModel for creating an ad-hoc SSH tunnel (Local -L, Dynamic SOCKS5 -D, or Remote -R)
+/// from the Tunnel Manager.
 /// </summary>
 public sealed partial class NewTunnelDialogViewModel : ObservableObject
 {
@@ -50,16 +65,63 @@ public sealed partial class NewTunnelDialogViewModel : ObservableObject
         SelectedGateway = gateways.FirstOrDefault();
         HasGateways = gateways.Count > 0;
         HasNoGateways = !HasGateways;
+
+        ForwardModes =
+        [
+            new TunnelForwardModeOption(TunnelForwardMode.Local, _localizer["NewTunnelModeLocal"]),
+            new TunnelForwardModeOption(TunnelForwardMode.DynamicSocks5, _localizer["NewTunnelModeDynamicSocks5"]),
+            new TunnelForwardModeOption(TunnelForwardMode.Remote, _localizer["NewTunnelModeRemote"])
+        ];
+        _selectedModeOption = ForwardModes[0];
         RefreshValidation();
     }
 
     public IReadOnlyList<SshGatewayDto> Gateways { get; }
+
+    public IReadOnlyList<TunnelForwardModeOption> ForwardModes { get; }
 
     public bool HasGateways { get; }
 
     public bool HasNoGateways { get; }
 
     public bool HasValidationMessage => !string.IsNullOrWhiteSpace(ValidationMessage);
+
+    public TunnelForwardMode ForwardMode
+    {
+        get => SelectedModeOption.Mode;
+        set
+        {
+            var match = ForwardModes.FirstOrDefault(o => o.Mode == value);
+            if (match is not null)
+            {
+                SelectedModeOption = match;
+            }
+        }
+    }
+
+    public bool ShowRemoteHostField => ForwardMode == TunnelForwardMode.Local;
+
+    public bool ShowRemotePortField => ForwardMode is TunnelForwardMode.Local or TunnelForwardMode.Remote;
+
+    public string RemotePortLabelText => ForwardMode == TunnelForwardMode.Remote
+        ? _localizer["NewTunnelRemoteBindPortLabel"]
+        : _localizer["NewTunnelRemotePortLabel"];
+
+    public string LocalPortLabelText => ForwardMode switch
+    {
+        TunnelForwardMode.DynamicSocks5 => _localizer["NewTunnelSocksPortLabel"],
+        TunnelForwardMode.Remote => _localizer["NewTunnelRemoteLocalPortLabel"],
+        _ => _localizer["NewTunnelLocalPortLabel"]
+    };
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmCommand))]
+    [NotifyPropertyChangedFor(nameof(ForwardMode))]
+    [NotifyPropertyChangedFor(nameof(ShowRemoteHostField))]
+    [NotifyPropertyChangedFor(nameof(ShowRemotePortField))]
+    [NotifyPropertyChangedFor(nameof(RemotePortLabelText))]
+    [NotifyPropertyChangedFor(nameof(LocalPortLabelText))]
+    private TunnelForwardModeOption _selectedModeOption;
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(ConfirmCommand))]
@@ -77,9 +139,6 @@ public sealed partial class NewTunnelDialogViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(ConfirmCommand))]
     private int _localPort = 9090;
 
-    // The port boxes bind to text. Bound to the numbers directly, a value that did not parse
-    // ("abc", "22a") never reached the view model: it kept the last good port, raised no
-    // validation message, and the tunnel opened to a port the box no longer showed.
     [ObservableProperty]
     private string _remotePortText = "22";
 
@@ -95,6 +154,8 @@ public sealed partial class NewTunnelDialogViewModel : ObservableObject
     public bool? Decision { get; private set; }
 
     public event EventHandler? CloseRequested;
+
+    partial void OnSelectedModeOptionChanged(TunnelForwardModeOption value) => RefreshValidation();
 
     partial void OnSelectedGatewayChanged(SshGatewayDto? value) => RefreshValidation();
 
@@ -124,14 +185,11 @@ public sealed partial class NewTunnelDialogViewModel : ObservableObject
 
     partial void OnLocalPortTextChanged(string value) => LocalPort = ParsePort(value);
 
-    // Anything that is not a plain number reads as port 0, which the range check refuses.
     private static int ParsePort(string? text) =>
         int.TryParse(text?.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out int port)
             ? port
             : 0;
 
-    // A host name or an address, nothing else: "host:22" or a name with a space in it used to
-    // pass and only failed once the tunnel was dialled.
     private static bool IsValidRemoteHost(string host)
     {
         string trimmed = host.Trim();
@@ -195,40 +253,46 @@ public sealed partial class NewTunnelDialogViewModel : ObservableObject
             return _localizer["NewTunnelValidationGateway"];
         }
 
-        if (string.IsNullOrWhiteSpace(RemoteHost))
+        if (ForwardMode == TunnelForwardMode.Local)
         {
-            return _localizer["NewTunnelValidationRemoteHost"];
+            if (string.IsNullOrWhiteSpace(RemoteHost))
+            {
+                return _localizer["NewTunnelValidationRemoteHost"];
+            }
+
+            if (!IsValidRemoteHost(RemoteHost))
+            {
+                return _localizer["NewTunnelValidationRemoteHostInvalid"];
+            }
         }
 
-        if (!IsValidRemoteHost(RemoteHost))
-        {
-            return _localizer["NewTunnelValidationRemoteHostInvalid"];
-        }
-
-        if (RemotePort is < 1 or > 65535)
+        if (ForwardMode is TunnelForwardMode.Local or TunnelForwardMode.Remote
+            && RemotePort is < 1 or > 65535)
         {
             return string.Format(
-                System.Globalization.CultureInfo.CurrentCulture,
+                CultureInfo.CurrentCulture,
                 _localizer["NewTunnelValidationRemotePort"],
                 1,
                 65535);
         }
 
-        if (LocalPort is < 1024 or > 65535)
+        int minLocalPort = ForwardMode == TunnelForwardMode.Remote ? 1 : 1024;
+        if (LocalPort < minLocalPort || LocalPort > 65535)
         {
             return string.Format(
-                System.Globalization.CultureInfo.CurrentCulture,
+                CultureInfo.CurrentCulture,
                 _localizer["NewTunnelValidationLocalPort"],
-                1024,
+                minLocalPort,
                 65535);
         }
 
-        if (_activeLocalPorts.Contains(LocalPort))
+        int trackedPort = ForwardMode == TunnelForwardMode.Remote ? RemotePort : LocalPort;
+        if (_activeLocalPorts.Contains(trackedPort))
         {
             return string.Format(
-                System.Globalization.CultureInfo.CurrentCulture,
+                CultureInfo.CurrentCulture,
                 _localizer["NewTunnelValidationLocalPortInUse"],
-                LocalPort);
+                trackedPort);
         }
 
         return null;

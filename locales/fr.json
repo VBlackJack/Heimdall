@@ -4207,6 +4207,17 @@
   "ToolSshKeyGenDeploySuccess": "Cl\u00e9 publique install\u00e9e sur {0}.",
   "ToolSshKeyGenDeployAlreadyInstalled": "La cl\u00e9 publique est d\u00e9j\u00e0 install\u00e9e sur {0}.",
   "ToolSshKeyGenDeployFailed": "\u00c9chec du d\u00e9ploiement de la cl\u00e9 publique : {0}",
+  "HealthPanelUptime": "Disponibilit\u00e9",
+  "HealthPanelLoad": "Charge moy.",
+  "NewTunnelModeLabel": "Mode de redirection",
+  "NewTunnelModeLocal": "Redirection locale (-L)",
+  "NewTunnelModeDynamicSocks5": "Proxy SOCKS5 (-D)",
+  "NewTunnelModeRemote": "Distante / Inverse (-R)",
+  "NewTunnelSocksPortLabel": "Port local SOCKS5",
+  "NewTunnelRemoteBindPortLabel": "Port d'\u00e9coute distant",
+  "NewTunnelRemoteLocalPortLabel": "Port cible local",
+  "StatusManualSocksTunnelOpened": "Proxy SOCKS5 ouvert sur 127.0.0.1:{0}",
+  "StatusManualRemoteTunnelOpened": "Tunnel inverse ouvert : distant:{0} -> 127.0.0.1:{1}",
 
   "PaletteToolSshAudit": "Auditeur de cl\u00e9 SSH",
 

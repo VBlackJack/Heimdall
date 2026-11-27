@@ -31,8 +31,8 @@ public sealed class TunnelSession : IDisposable
     /// <summary>The SSH client connection to the gateway.</summary>
     public SshClient Client { get; }
 
-    /// <summary>The local port forward bound to this session.</summary>
-    public ForwardedPortLocal ForwardedPort { get; }
+    /// <summary>The local port forward bound to this session, or null for standalone SOCKS5/remote tunnels.</summary>
+    public ForwardedPortLocal? ForwardedPort { get; }
 
     /// <summary>Optional SOCKS5 dynamic proxy port bound to this session.</summary>
     public ForwardedPortDynamic? DynamicPort { get; set; }
@@ -59,13 +59,13 @@ public sealed class TunnelSession : IDisposable
 
     public TunnelSession(
         SshClient client,
-        ForwardedPortLocal forwardedPort,
+        ForwardedPortLocal? forwardedPort,
         TunnelInfo info,
         IReadOnlyList<SshClient>? intermediateClients = null,
         IReadOnlyList<ForwardedPortLocal>? intermediatePorts = null)
     {
         Client = client ?? throw new ArgumentNullException(nameof(client));
-        ForwardedPort = forwardedPort ?? throw new ArgumentNullException(nameof(forwardedPort));
+        ForwardedPort = forwardedPort;
         Info = info ?? throw new ArgumentNullException(nameof(info));
         IntermediateClients = intermediateClients ?? Array.Empty<SshClient>();
         IntermediatePorts = intermediatePorts ?? Array.Empty<ForwardedPortLocal>();
@@ -78,8 +78,11 @@ public sealed class TunnelSession : IDisposable
             return;
         }
 
-        // Stop and dispose the final forwarded port
-        StopPortSafe(ForwardedPort);
+        // Stop and dispose the final forwarded port when present
+        if (ForwardedPort is not null)
+        {
+            StopPortSafe(ForwardedPort);
+        }
 
         // Stop and dispose the optional SOCKS5 dynamic proxy
         // Bare catch: Dispose() must never throw (IDisposable contract)

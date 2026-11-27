@@ -32,7 +32,11 @@ public sealed record ServerHealthData(
     string DiskUsed,
     string DiskTotal,
     int DiskPercent,
-    bool IsSupported);
+    bool IsSupported,
+    string? Uptime = null,
+    string? LoadAverage = null,
+    long SwapTotalMb = 0,
+    long SwapUsedMb = 0);
 
 internal interface IHealthCommandRunner
 {
@@ -47,9 +51,6 @@ internal sealed class SshHealthCommandRunner(SshClient client) : IHealthCommandR
         cancellationToken.ThrowIfCancellationRequested();
 
         using var sshCommand = client.CreateCommand(command);
-        // SSH.NET exposes this path through legacy APM. Cancellation calls CancelAsync,
-        // but command-channel cleanup remains owned by SSH.NET until this can move to
-        // a native RunCommandAsync flow in the target SSH.NET version.
         var asyncResult = sshCommand.BeginExecute();
         using var cancellationRegistration = cancellationToken.Register(static state =>
         {
@@ -77,32 +78,73 @@ internal sealed class SshHealthCommandRunner(SshClient client) : IHealthCommandR
 }
 
 /// <summary>
-/// Polls an SSH server for CPU, RAM, and disk usage at a fixed 15-second interval.
-/// Uses the existing <see cref="SshClient"/> from an active shell session to run
-/// lightweight monitoring commands on a multiplexed channel.
+/// Polls an SSH server for CPU, RAM, swap, disk usage, uptime, and load average at a fixed
+/// 15-second interval using a single multiplexed <c>LC_ALL=C</c> command channel.
+/// Supports GNU/Linux as well as BusyBox/Alpine (<c>/proc/meminfo</c>, <c>/proc/uptime</c>,
+/// <c>/proc/loadavg</c>, and POSIX <c>df -Ph</c>).
 /// </summary>
 public sealed class ServerHealthMonitor : IDisposable
 {
     private const int PollIntervalSeconds = 15;
-    private const string CpuCommandText = "top -b -n 1 | head -5";
-    private const string MemoryCommandText = "free -m | grep Mem";
-    private const string DiskCommandText = "df -h / | tail -1";
+    private static readonly TimeSpan RegexTimeout = TimeSpan.FromMilliseconds(100);
+
+    internal const string MarkerCpu = "__H_CPU__";
+    internal const string MarkerMem = "__H_MEM__";
+    internal const string MarkerDisk = "__H_DISK__";
+    internal const string MarkerUptime = "__H_UPTIME__";
+    internal const string MarkerLoad = "__H_LOAD__";
+
+    internal const string CombinedHealthCommandText =
+        "LC_ALL=C sh -c '"
+        + "printf \"" + MarkerCpu + "\\n\"; (top -b -n 1 2>/dev/null | head -5); "
+        + "printf \"" + MarkerMem + "\\n\"; (free -m 2>/dev/null | grep -E \"^(Mem|Swap):\" || grep -E \"^(MemTotal|MemFree|MemAvailable|SwapTotal|SwapFree):\" /proc/meminfo 2>/dev/null); "
+        + "printf \"" + MarkerDisk + "\\n\"; (df -Ph / 2>/dev/null | tail -1); "
+        + "printf \"" + MarkerUptime + "\\n\"; (uptime -p 2>/dev/null || cat /proc/uptime 2>/dev/null); "
+        + "printf \"" + MarkerLoad + "\\n\"; (cat /proc/loadavg 2>/dev/null)'";
+
+    private const string CpuCommandText = "LC_ALL=C top -b -n 1 | head -5";
+    private const string MemoryCommandText = "LC_ALL=C free -m | grep Mem";
+    private const string DiskCommandText = "LC_ALL=C df -Ph / | tail -1";
 
     private static readonly Regex CpuIdleRegex = new(
         @"%?Cpu.*?:\s.*?(\d+[\.,]\d+)\s*id",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        RegexOptions.Compiled | RegexOptions.IgnoreCase,
+        RegexTimeout);
 
     private static readonly Regex CpuUsageRegex = new(
         @"%?Cpu.*?:\s*(\d+[\.,]\d+)\s*us",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        RegexOptions.Compiled | RegexOptions.IgnoreCase,
+        RegexTimeout);
+
+    private static readonly Regex BusyBoxCpuIdleRegex = new(
+        @"CPU:.*?\s(\d+)%\s*idle",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase,
+        RegexTimeout);
 
     private static readonly Regex MemRegex = new(
         @"Mem:\s+(\d+)\s+(\d+)\s+(\d+)",
-        RegexOptions.Compiled);
+        RegexOptions.Compiled,
+        RegexTimeout);
+
+    private static readonly Regex SwapRegex = new(
+        @"Swap:\s+(\d+)\s+(\d+)",
+        RegexOptions.Compiled,
+        RegexTimeout);
+
+    private static readonly Regex ProcMemFieldRegex = new(
+        @"^(MemTotal|MemFree|MemAvailable|SwapTotal|SwapFree):\s+(\d+)\s+kB",
+        RegexOptions.Compiled | RegexOptions.Multiline,
+        RegexTimeout);
 
     private static readonly Regex DiskRegex = new(
         @"(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\d+)%",
-        RegexOptions.Compiled);
+        RegexOptions.Compiled,
+        RegexTimeout);
+
+    private static readonly Regex LoadAvgRegex = new(
+        @"(\d+\.\d+)\s+(\d+\.\d+)\s+(\d+\.\d+)",
+        RegexOptions.Compiled,
+        RegexTimeout);
 
     private CancellationTokenSource? _cts;
     private Task? _pollTask;
@@ -127,16 +169,11 @@ public sealed class ServerHealthMonitor : IDisposable
     /// <summary>
     /// Starts polling the remote server for health metrics.
     /// </summary>
-    /// <param name="client">An already-connected SSH client.</param>
-    /// <param name="cancellationToken">External cancellation support.</param>
     public Task StartAsync(SshClient client, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(client);
         ObjectDisposedException.ThrowIf(_disposed, this);
 
-        // Serialize Start vs concurrent Stop/Dispose so the _cts/_pollTask
-        // pair is always observed in a consistent state. The lock only
-        // guards state mutation; the poll task itself runs unblocked.
         lock (_stateLock)
         {
             if (_cts is not null)
@@ -151,12 +188,9 @@ public sealed class ServerHealthMonitor : IDisposable
         return Task.CompletedTask;
     }
 
-    /// <summary>Stops the polling loop.</summary>
+    /// <summary>Stops the polling loop asynchronously.</summary>
     public async Task StopAsync()
     {
-        // Snapshot the cts/task pair under lock and clear the fields. The
-        // await happens outside the lock so Start callers do not block on
-        // a slow poll-task drain.
         CancellationTokenSource? cts;
         Task? pollTask;
         lock (_stateLock)
@@ -195,7 +229,9 @@ public sealed class ServerHealthMonitor : IDisposable
         }
     }
 
-    /// <summary>Stops the polling loop synchronously (best-effort for Dispose).</summary>
+    /// <summary>
+    /// Stops the polling loop without blocking the calling thread (safe to call from WPF UI thread).
+    /// </summary>
     public void Stop()
     {
         CancellationTokenSource? cts;
@@ -216,16 +252,28 @@ public sealed class ServerHealthMonitor : IDisposable
         try
         {
             cts.Cancel();
-            pollTask?.Wait(TimeSpan.FromMilliseconds(500));
         }
-        catch (AggregateException)
+        catch (ObjectDisposedException)
         {
-            // Expected from task cancellation
+            return;
         }
-        finally
+
+        if (pollTask is null || pollTask.IsCompleted)
         {
             cts.Dispose();
+            return;
         }
+
+        _ = pollTask.ContinueWith(
+            static (_, state) =>
+            {
+                try { ((CancellationTokenSource)state!).Dispose(); }
+                catch (ObjectDisposedException) { }
+            },
+            cts,
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
     }
 
     public void Dispose()
@@ -266,9 +314,6 @@ public sealed class ServerHealthMonitor : IDisposable
             }
             catch (ObjectDisposedException)
             {
-                // The shell session disposed its client on disconnect. There is
-                // nothing left to poll, and asking a disposed client again every
-                // interval would only log the same throw for ever.
                 FileLogger.Warn("ServerHealthMonitor: SSH client disposed, stopping poll loop");
                 break;
             }
@@ -293,52 +338,66 @@ public sealed class ServerHealthMonitor : IDisposable
         IHealthCommandRunner commandRunner,
         CancellationToken cancellationToken)
     {
+        var combined = await RunHealthCommandAsync(
+                commandRunner,
+                CombinedHealthCommandText,
+                "combined",
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        if (!string.IsNullOrWhiteSpace(combined)
+            && combined.Contains(MarkerCpu, StringComparison.Ordinal))
+        {
+            return ParseCombinedOutput(combined);
+        }
+
+        // Fallback for non-POSIX shells or stub runners that answer individual commands.
+        var cpuTask = RunHealthCommandAsync(commandRunner, CpuCommandText, "CPU", cancellationToken);
+        var memoryTask = RunHealthCommandAsync(commandRunner, MemoryCommandText, "RAM", cancellationToken);
+        var diskTask = RunHealthCommandAsync(commandRunner, DiskCommandText, "disk", cancellationToken);
+
+        var results = await Task.WhenAll(cpuTask, memoryTask, diskTask).ConfigureAwait(false);
+        return BuildHealthData(results[0], results[1], results[2], uptimeOutput: null, loadOutput: null);
+    }
+
+    internal static ServerHealthData ParseCombinedOutput(string combinedOutput)
+    {
+        var cpuSection = ExtractSection(combinedOutput, MarkerCpu, MarkerMem);
+        var memSection = ExtractSection(combinedOutput, MarkerMem, MarkerDisk);
+        var diskSection = ExtractSection(combinedOutput, MarkerDisk, MarkerUptime);
+        var uptimeSection = ExtractSection(combinedOutput, MarkerUptime, MarkerLoad);
+        var loadSection = ExtractSection(combinedOutput, MarkerLoad, nextMarker: null);
+
+        return BuildHealthData(cpuSection, memSection, diskSection, uptimeSection, loadSection);
+    }
+
+    private static ServerHealthData BuildHealthData(
+        string cpuResult,
+        string memResult,
+        string diskResult,
+        string? uptimeOutput,
+        string? loadOutput)
+    {
         double cpuPercent = 0;
         long memTotal = 0, memUsed = 0, memFree = 0;
+        long swapTotal = 0, swapUsed = 0;
         string diskUsed = "?", diskTotal = "?";
         int diskPercent = 0;
 
-        var cpuTask = RunHealthCommandAsync(
-            commandRunner,
-            CpuCommandText,
-            "CPU",
-            cancellationToken);
-        var memoryTask = RunHealthCommandAsync(
-            commandRunner,
-            MemoryCommandText,
-            "RAM",
-            cancellationToken);
-        var diskTask = RunHealthCommandAsync(
-            commandRunner,
-            DiskCommandText,
-            "disk",
-            cancellationToken);
-
-        var results = await Task.WhenAll(cpuTask, memoryTask, diskTask).ConfigureAwait(false);
-        var cpuResult = results[0];
-        var memResult = results[1];
-        var diskResult = results[2];
         bool cpuHasOutput = !string.IsNullOrWhiteSpace(cpuResult);
         bool memoryHasOutput = !string.IsNullOrWhiteSpace(memResult);
         bool diskHasOutput = !string.IsNullOrWhiteSpace(diskResult);
-        bool cpuParsed = false;
-        bool memoryParsed = false;
-        bool diskParsed = false;
-
-        if (cpuHasOutput)
-        {
-            cpuParsed = TryParseCpuUsage(cpuResult, out cpuPercent);
-        }
+        bool cpuParsed = cpuHasOutput && TryParseCpuUsage(cpuResult, out cpuPercent);
+        bool memoryParsed = memoryHasOutput && TryParseMemory(memResult, out memTotal, out memUsed, out memFree);
+        bool diskParsed = diskHasOutput && TryParseDisk(diskResult, out diskUsed, out diskTotal, out diskPercent);
 
         if (memoryHasOutput)
         {
-            memoryParsed = TryParseMemory(memResult, out memTotal, out memUsed, out memFree);
+            _ = TryParseSwap(memResult, out swapTotal, out swapUsed);
         }
 
-        if (diskHasOutput)
-        {
-            diskParsed = TryParseDisk(diskResult, out diskUsed, out diskTotal, out diskPercent);
-        }
+        string? uptime = TryParseUptime(uptimeOutput);
+        string? loadAverage = TryParseLoadAverage(loadOutput);
 
         bool hasAnyOutput = cpuHasOutput || memoryHasOutput || diskHasOutput;
         bool hasParseFailure =
@@ -357,7 +416,31 @@ public sealed class ServerHealthMonitor : IDisposable
             diskUsed,
             diskTotal,
             diskPercent,
-            isSupported);
+            isSupported,
+            uptime,
+            loadAverage,
+            swapTotal,
+            swapUsed);
+    }
+
+    private static string ExtractSection(string content, string startMarker, string? nextMarker)
+    {
+        var startIdx = content.IndexOf(startMarker, StringComparison.Ordinal);
+        if (startIdx < 0)
+        {
+            return string.Empty;
+        }
+
+        startIdx += startMarker.Length;
+        if (nextMarker is null)
+        {
+            return content[startIdx..].Trim();
+        }
+
+        var endIdx = content.IndexOf(nextMarker, startIdx, StringComparison.Ordinal);
+        return endIdx < 0
+            ? content[startIdx..].Trim()
+            : content[startIdx..endIdx].Trim();
     }
 
     private static async Task<string> RunHealthCommandAsync(
@@ -390,29 +473,47 @@ public sealed class ServerHealthMonitor : IDisposable
 
     internal static bool TryParseCpuUsage(string topOutput, out double cpuUsage)
     {
-        // Try to extract idle percentage and compute usage = 100 - idle
         cpuUsage = 0;
-        var idleMatch = CpuIdleRegex.Match(topOutput);
-        if (idleMatch.Success)
+        if (string.IsNullOrWhiteSpace(topOutput))
         {
-            var idleStr = idleMatch.Groups[1].Value.Replace(',', '.');
-            if (double.TryParse(idleStr, NumberStyles.Float, CultureInfo.InvariantCulture, out var idle))
-            {
-                cpuUsage = Math.Round(Math.Max(0, 100.0 - idle), 1);
-                return true;
-            }
+            return false;
         }
 
-        // Fallback: extract user percentage directly
-        var usMatch = CpuUsageRegex.Match(topOutput);
-        if (usMatch.Success)
+        try
         {
-            var usStr = usMatch.Groups[1].Value.Replace(',', '.');
-            if (double.TryParse(usStr, NumberStyles.Float, CultureInfo.InvariantCulture, out var us))
+            var idleMatch = CpuIdleRegex.Match(topOutput);
+            if (idleMatch.Success)
             {
-                cpuUsage = Math.Round(us, 1);
+                var idleStr = idleMatch.Groups[1].Value.Replace(',', '.');
+                if (double.TryParse(idleStr, NumberStyles.Float, CultureInfo.InvariantCulture, out var idle))
+                {
+                    cpuUsage = Math.Round(Math.Max(0, 100.0 - idle), 1);
+                    return true;
+                }
+            }
+
+            var busyBoxIdle = BusyBoxCpuIdleRegex.Match(topOutput);
+            if (busyBoxIdle.Success
+                && double.TryParse(busyBoxIdle.Groups[1].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var bbIdle))
+            {
+                cpuUsage = Math.Round(Math.Max(0, 100.0 - bbIdle), 1);
                 return true;
             }
+
+            var usMatch = CpuUsageRegex.Match(topOutput);
+            if (usMatch.Success)
+            {
+                var usStr = usMatch.Groups[1].Value.Replace(',', '.');
+                if (double.TryParse(usStr, NumberStyles.Float, CultureInfo.InvariantCulture, out var us))
+                {
+                    cpuUsage = Math.Round(us, 1);
+                    return true;
+                }
+            }
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            return false;
         }
 
         return false;
@@ -428,12 +529,99 @@ public sealed class ServerHealthMonitor : IDisposable
         total = 0;
         used = 0;
         free = 0;
+        if (string.IsNullOrWhiteSpace(freeOutput))
+        {
+            return false;
+        }
 
-        var match = MemRegex.Match(freeOutput);
-        return match.Success
-            && long.TryParse(match.Groups[1].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out total)
-            && long.TryParse(match.Groups[2].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out used)
-            && long.TryParse(match.Groups[3].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out free);
+        try
+        {
+            var match = MemRegex.Match(freeOutput);
+            if (match.Success
+                && long.TryParse(match.Groups[1].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out total)
+                && long.TryParse(match.Groups[2].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out used)
+                && long.TryParse(match.Groups[3].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out free))
+            {
+                return true;
+            }
+
+            // BusyBox / Alpine fallback: /proc/meminfo values in kB.
+            var fields = new Dictionary<string, long>(StringComparer.Ordinal);
+            foreach (Match m in ProcMemFieldRegex.Matches(freeOutput))
+            {
+                if (long.TryParse(m.Groups[2].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var kb))
+                {
+                    fields[m.Groups[1].Value] = kb;
+                }
+            }
+
+            if (fields.TryGetValue("MemTotal", out var totalKb) && totalKb > 0)
+            {
+                var availOrFreeKb = fields.TryGetValue("MemAvailable", out var availKb)
+                    ? availKb
+                    : fields.GetValueOrDefault("MemFree", 0);
+                total = totalKb / 1024;
+                free = availOrFreeKb / 1024;
+                used = Math.Max(0, total - free);
+                return true;
+            }
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            return false;
+        }
+
+        return false;
+    }
+
+    internal static bool TryParseSwap(string memOutput, out long totalMb, out long usedMb)
+    {
+        totalMb = 0;
+        usedMb = 0;
+        if (string.IsNullOrWhiteSpace(memOutput))
+        {
+            return false;
+        }
+
+        try
+        {
+            var match = SwapRegex.Match(memOutput);
+            if (match.Success
+                && long.TryParse(match.Groups[1].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out totalMb)
+                && long.TryParse(match.Groups[2].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out usedMb))
+            {
+                return true;
+            }
+
+            long swapTotalKb = -1;
+            long swapFreeKb = -1;
+            foreach (Match m in ProcMemFieldRegex.Matches(memOutput))
+            {
+                if (m.Groups[1].Value == "SwapTotal"
+                    && long.TryParse(m.Groups[2].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var t))
+                {
+                    swapTotalKb = t;
+                }
+                else if (m.Groups[1].Value == "SwapFree"
+                    && long.TryParse(m.Groups[2].Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var f))
+                {
+                    swapFreeKb = f;
+                }
+            }
+
+            if (swapTotalKb >= 0 && swapFreeKb >= 0)
+            {
+                totalMb = swapTotalKb / 1024;
+                usedMb = Math.Max(0, (swapTotalKb - swapFreeKb) / 1024);
+                return true;
+            }
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            return false;
+        }
+
+        return false;
     }
 
     internal static void ParseDisk(string dfOutput, out string used, out string total, out int percent)
@@ -446,19 +634,86 @@ public sealed class ServerHealthMonitor : IDisposable
         used = "?";
         total = "?";
         percent = 0;
-
-        var match = DiskRegex.Match(dfOutput);
-        if (!match.Success)
+        if (string.IsNullOrWhiteSpace(dfOutput))
         {
             return false;
         }
 
-        total = match.Groups[2].Value;
-        used = match.Groups[3].Value;
-        return int.TryParse(
-            match.Groups[5].Value,
-            NumberStyles.Integer,
-            CultureInfo.InvariantCulture,
-            out percent);
+        try
+        {
+            var match = DiskRegex.Match(dfOutput);
+            if (!match.Success)
+            {
+                return false;
+            }
+
+            total = match.Groups[2].Value;
+            used = match.Groups[3].Value;
+            return int.TryParse(
+                match.Groups[5].Value,
+                NumberStyles.Integer,
+                CultureInfo.InvariantCulture,
+                out percent);
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            return false;
+        }
+    }
+
+    internal static string? TryParseUptime(string? uptimeOutput)
+    {
+        if (string.IsNullOrWhiteSpace(uptimeOutput))
+        {
+            return null;
+        }
+
+        var firstLine = uptimeOutput.Split('\n')[0].Trim();
+        if (firstLine.StartsWith("up ", StringComparison.OrdinalIgnoreCase))
+        {
+            return firstLine[3..].Trim();
+        }
+
+        // /proc/uptime format: "<seconds>.<centis> <idle>"
+        var firstToken = firstLine.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+        if (firstToken is not null
+            && double.TryParse(firstToken, NumberStyles.Float, CultureInfo.InvariantCulture, out var totalSeconds)
+            && totalSeconds >= 0)
+        {
+            var span = TimeSpan.FromSeconds(totalSeconds);
+            if (span.Days > 0)
+            {
+                return string.Format(CultureInfo.InvariantCulture, "{0}d {1}h {2}m", span.Days, span.Hours, span.Minutes);
+            }
+
+            if (span.Hours > 0)
+            {
+                return string.Format(CultureInfo.InvariantCulture, "{0}h {1}m", span.Hours, span.Minutes);
+            }
+
+            return string.Format(CultureInfo.InvariantCulture, "{0}m", span.Minutes);
+        }
+
+        return null;
+    }
+
+    internal static string? TryParseLoadAverage(string? loadOutput)
+    {
+        if (string.IsNullOrWhiteSpace(loadOutput))
+        {
+            return null;
+        }
+
+        try
+        {
+            var match = LoadAvgRegex.Match(loadOutput);
+            return match.Success
+                ? $"{match.Groups[1].Value}, {match.Groups[2].Value}, {match.Groups[3].Value}"
+                : null;
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            return null;
+        }
     }
 }

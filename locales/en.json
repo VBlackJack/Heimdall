@@ -4208,6 +4208,17 @@
   "ToolSshKeyGenDeploySuccess": "Public key installed on {0}.",
   "ToolSshKeyGenDeployAlreadyInstalled": "Public key is already installed on {0}.",
   "ToolSshKeyGenDeployFailed": "Public key deployment failed: {0}",
+  "HealthPanelUptime": "Uptime",
+  "HealthPanelLoad": "Load Avg",
+  "NewTunnelModeLabel": "Forwarding mode",
+  "NewTunnelModeLocal": "Local forward (-L)",
+  "NewTunnelModeDynamicSocks5": "SOCKS5 proxy (-D)",
+  "NewTunnelModeRemote": "Remote / Reverse (-R)",
+  "NewTunnelSocksPortLabel": "SOCKS5 local port",
+  "NewTunnelRemoteBindPortLabel": "Remote bind port",
+  "NewTunnelRemoteLocalPortLabel": "Local target port",
+  "StatusManualSocksTunnelOpened": "SOCKS5 proxy opened on 127.0.0.1:{0}",
+  "StatusManualRemoteTunnelOpened": "Reverse tunnel opened: remote:{0} -> 127.0.0.1:{1}",
 
   "PaletteToolSshAudit": "SSH Key Auditor",
 

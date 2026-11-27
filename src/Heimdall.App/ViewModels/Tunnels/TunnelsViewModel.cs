@@ -470,12 +470,24 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
                 return;
             }
 
-            _host.StatusText = string.Format(
-                System.Globalization.CultureInfo.CurrentCulture,
-                _localizer["StatusManualTunnelOpened"],
-                vm.LocalPort,
-                vm.RemoteHost.Trim(),
-                vm.RemotePort);
+            _host.StatusText = vm.ForwardMode switch
+            {
+                TunnelForwardMode.DynamicSocks5 => string.Format(
+                    System.Globalization.CultureInfo.CurrentCulture,
+                    _localizer["StatusManualSocksTunnelOpened"],
+                    vm.LocalPort),
+                TunnelForwardMode.Remote => string.Format(
+                    System.Globalization.CultureInfo.CurrentCulture,
+                    _localizer["StatusManualRemoteTunnelOpened"],
+                    vm.RemotePort,
+                    vm.LocalPort),
+                _ => string.Format(
+                    System.Globalization.CultureInfo.CurrentCulture,
+                    _localizer["StatusManualTunnelOpened"],
+                    vm.LocalPort,
+                    vm.RemoteHost.Trim(),
+                    vm.RemotePort)
+            };
         }
         catch (Exception ex)
         {
@@ -575,7 +587,12 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
                 preflight.Result.FailureCode);
         }
 
-        var remoteHost = vm.RemoteHost.Trim();
+        var remoteHost = vm.ForwardMode == TunnelForwardMode.Local ? vm.RemoteHost.Trim() : string.Empty;
+        var remotePort = vm.ForwardMode == TunnelForwardMode.Local ? vm.RemotePort : 0;
+        var localPort = vm.ForwardMode == TunnelForwardMode.Remote ? vm.RemotePort : vm.LocalPort;
+        var socksProxyPort = vm.ForwardMode == TunnelForwardMode.DynamicSocks5 ? vm.LocalPort : 0;
+        var remoteBindPort = vm.ForwardMode == TunnelForwardMode.Remote ? vm.RemotePort : 0;
+        var remoteLocalPort = vm.ForwardMode == TunnelForwardMode.Remote ? vm.LocalPort : 0;
         var label = string.IsNullOrWhiteSpace(vm.Label) ? null : vm.Label.Trim();
 
         // The chain this dial is about to make, named as the certificate question names it.
@@ -601,12 +618,15 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
             result = await _tunnelManager.OpenTunnelAsync(
                     chain[0],
                     remoteHost,
-                    vm.RemotePort,
-                    vm.LocalPort,
+                    remotePort,
+                    localPort,
                     hostKeyStore: _hostKeyStore,
                     verifier: _hostKeyVerifier,
                     cancellationToken: ct,
                     keepAliveIntervalSeconds: settings.SshKeepAliveIntervalSeconds,
+                    socksProxyPort: socksProxyPort,
+                    remoteBindPort: remoteBindPort,
+                    remoteLocalPort: remoteLocalPort,
                     label: label,
                     gatewayRoute: gatewayRoute)
                 .ConfigureAwait(false);
@@ -616,11 +636,14 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
             result = await _tunnelManager.OpenChainedTunnelAsync(
                     chain,
                     remoteHost,
-                    vm.RemotePort,
-                    vm.LocalPort,
+                    remotePort,
+                    localPort,
                     hostKeyStore: _hostKeyStore,
                     verifier: _hostKeyVerifier,
                     cancellationToken: ct,
+                    socksProxyPort: socksProxyPort,
+                    remoteBindPort: remoteBindPort,
+                    remoteLocalPort: remoteLocalPort,
                     label: label,
                     gatewayRoute: gatewayRoute,
                     keepAliveIntervalSeconds: settings.SshKeepAliveIntervalSeconds)

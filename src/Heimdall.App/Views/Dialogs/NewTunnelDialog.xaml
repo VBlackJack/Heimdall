@@ -85,6 +85,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
                 <TextBlock Grid.Row="0" Grid.Column="0"
@@ -121,34 +122,49 @@
                 </ComboBox>
 
                 <TextBlock Grid.Row="1" Grid.Column="0"
-                           Text="{loc:Translate NewTunnelRemoteHostLabel}"
+                           Text="{loc:Translate NewTunnelModeLabel}"
                            Style="{StaticResource FormLabelStyle}"/>
-                <TextBox Grid.Row="1" Grid.Column="1"
-                         Text="{Binding RemoteHost, UpdateSourceTrigger=PropertyChanged}"
-                         Style="{StaticResource FormTextBoxStyle}"
-                         AutomationProperties.Name="{loc:Translate NewTunnelRemoteHostLabel}"/>
+                <ComboBox x:Name="ModeComboBox"
+                          Grid.Row="1" Grid.Column="1"
+                          ItemsSource="{Binding ForwardModes}"
+                          SelectedItem="{Binding SelectedModeOption}"
+                          DisplayMemberPath="DisplayName"
+                          Margin="0,0,0,8"
+                          AutomationProperties.Name="{loc:Translate NewTunnelModeLabel}"/>
 
                 <TextBlock Grid.Row="2" Grid.Column="0"
-                           Text="{loc:Translate NewTunnelRemotePortLabel}"
-                           Style="{StaticResource FormLabelStyle}"/>
+                           Text="{loc:Translate NewTunnelRemoteHostLabel}"
+                           Style="{StaticResource FormLabelStyle}"
+                           Visibility="{Binding ShowRemoteHostField, Converter={StaticResource BoolToVisibilityConverter}}"/>
                 <TextBox Grid.Row="2" Grid.Column="1"
-                         Text="{Binding RemotePortText, UpdateSourceTrigger=PropertyChanged}"
+                         Text="{Binding RemoteHost, UpdateSourceTrigger=PropertyChanged}"
                          Style="{StaticResource FormTextBoxStyle}"
-                         AutomationProperties.Name="{loc:Translate NewTunnelRemotePortLabel}"/>
+                         Visibility="{Binding ShowRemoteHostField, Converter={StaticResource BoolToVisibilityConverter}}"
+                         AutomationProperties.Name="{loc:Translate NewTunnelRemoteHostLabel}"/>
 
                 <TextBlock Grid.Row="3" Grid.Column="0"
-                           Text="{loc:Translate NewTunnelLocalPortLabel}"
-                           Style="{StaticResource FormLabelStyle}"/>
+                           Text="{Binding RemotePortLabelText}"
+                           Style="{StaticResource FormLabelStyle}"
+                           Visibility="{Binding ShowRemotePortField, Converter={StaticResource BoolToVisibilityConverter}}"/>
                 <TextBox Grid.Row="3" Grid.Column="1"
-                         Text="{Binding LocalPortText, UpdateSourceTrigger=PropertyChanged}"
+                         Text="{Binding RemotePortText, UpdateSourceTrigger=PropertyChanged}"
                          Style="{StaticResource FormTextBoxStyle}"
-                         AutomationProperties.Name="{loc:Translate NewTunnelLocalPortLabel}"/>
+                         Visibility="{Binding ShowRemotePortField, Converter={StaticResource BoolToVisibilityConverter}}"
+                         AutomationProperties.Name="{Binding RemotePortLabelText}"/>
 
                 <TextBlock Grid.Row="4" Grid.Column="0"
+                           Text="{Binding LocalPortLabelText}"
+                           Style="{StaticResource FormLabelStyle}"/>
+                <TextBox Grid.Row="4" Grid.Column="1"
+                         Text="{Binding LocalPortText, UpdateSourceTrigger=PropertyChanged}"
+                         Style="{StaticResource FormTextBoxStyle}"
+                         AutomationProperties.Name="{Binding LocalPortLabelText}"/>
+
+                <TextBlock Grid.Row="5" Grid.Column="0"
                            Text="{loc:Translate NewTunnelLabelLabel}"
                            Style="{StaticResource FormLabelStyle}"
                            Margin="0,0,12,0"/>
-                <TextBox Grid.Row="4" Grid.Column="1"
+                <TextBox Grid.Row="5" Grid.Column="1"
                          Text="{Binding Label, UpdateSourceTrigger=PropertyChanged}"
                          Style="{StaticResource DialogFormTextBoxStyle}"
                          AutomationProperties.Name="{loc:Translate NewTunnelLabelLabel}"/>

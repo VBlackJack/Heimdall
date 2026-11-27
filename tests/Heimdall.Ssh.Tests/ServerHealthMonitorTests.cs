@@ -196,6 +196,78 @@ public sealed class ServerHealthMonitorTests
         Assert.Equal(0, runner.CallCount);
     }
 
+    [Fact]
+    public async Task CollectHealthDataAsync_CombinedSingleExecOutput_ParsesCpuMemSwapDiskUptimeAndLoad()
+    {
+        int calls = 0;
+        var runner = new StaticHealthCommandRunner(_ =>
+        {
+            calls++;
+            return string.Join(
+                '\n',
+                ServerHealthMonitor.MarkerCpu,
+                "%Cpu(s):  5,2 us,  1,8 sy,  0,0 ni, 92,5 id,  0,5 wa",
+                ServerHealthMonitor.MarkerMem,
+                "Mem:          16384        4096       12288",
+                "Swap:          2048         512        1536",
+                ServerHealthMonitor.MarkerDisk,
+                "/dev/mapper/vg0-root 500G 125G 375G 25% /",
+                ServerHealthMonitor.MarkerUptime,
+                "up 3 days, 4 hours, 12 minutes",
+                ServerHealthMonitor.MarkerLoad,
+                "0.42 0.31 0.25 1/234 5678");
+        });
+
+        var data = await ServerHealthMonitor.CollectHealthDataAsync(runner, CancellationToken.None);
+
+        Assert.Equal(1, calls);
+        Assert.NotNull(data);
+        Assert.True(data!.IsSupported);
+        Assert.Equal(7.5, data.CpuPercent, 1);
+        Assert.Equal(16384, data.MemTotalMb);
+        Assert.Equal(4096, data.MemUsedMb);
+        Assert.Equal(2048, data.SwapTotalMb);
+        Assert.Equal(512, data.SwapUsedMb);
+        Assert.Equal("125G", data.DiskUsed);
+        Assert.Equal("500G", data.DiskTotal);
+        Assert.Equal(25, data.DiskPercent);
+        Assert.Equal("3 days, 4 hours, 12 minutes", data.Uptime);
+        Assert.Equal("0.42, 0.31, 0.25", data.LoadAverage);
+    }
+
+    [Fact]
+    public async Task CollectHealthDataAsync_BusyBoxAndProcMeminfoOutput_ReturnsSupportedState()
+    {
+        var runner = new StaticHealthCommandRunner(_ => string.Join(
+            '\n',
+            ServerHealthMonitor.MarkerCpu,
+            "CPU:  12% usr   3% sys   0% nic  85% idle   0% io",
+            ServerHealthMonitor.MarkerMem,
+            "MemTotal:        4194304 kB",
+            "MemFree:         1048576 kB",
+            "MemAvailable:    2097152 kB",
+            "SwapTotal:       1048576 kB",
+            "SwapFree:         524288 kB",
+            ServerHealthMonitor.MarkerDisk,
+            "/dev/vda1 40.0G 10.0G 30.0G 25% /",
+            ServerHealthMonitor.MarkerUptime,
+            "90061.42 180000.00",
+            ServerHealthMonitor.MarkerLoad,
+            "1.05 0.80 0.65 2/99 42"));
+
+        var data = await ServerHealthMonitor.CollectHealthDataAsync(runner, CancellationToken.None);
+
+        Assert.NotNull(data);
+        Assert.True(data!.IsSupported);
+        Assert.Equal(15.0, data.CpuPercent, 1);
+        Assert.Equal(4096, data.MemTotalMb);
+        Assert.Equal(2048, data.MemUsedMb);
+        Assert.Equal(1024, data.SwapTotalMb);
+        Assert.Equal(512, data.SwapUsedMb);
+        Assert.Equal("1d 1h 1m", data.Uptime);
+        Assert.Equal("1.05, 0.80, 0.65", data.LoadAverage);
+    }
+
     /// <summary>
     /// Bound for a poll loop that has nothing left to poll to exit on its own,
     /// with no cancellation. A loop that instead sleeps for its next interval

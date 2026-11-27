@@ -134,6 +134,35 @@ public sealed class NewTunnelDialogViewModelTests
         Assert.True(vm.ConfirmCommand.CanExecute(null), vm.ValidationMessage);
     }
 
+    [Fact]
+    public void DynamicSocks5Mode_DoesNotRequireRemoteHostOrPort()
+    {
+        var vm = new NewTunnelDialogViewModel([CreateGateway()], new LocalizationManager())
+        {
+            ForwardMode = TunnelForwardMode.DynamicSocks5,
+            LocalPort = 1080
+        };
+
+        Assert.False(vm.ShowRemoteHostField);
+        Assert.False(vm.ShowRemotePortField);
+        Assert.True(vm.ConfirmCommand.CanExecute(null), vm.ValidationMessage);
+    }
+
+    [Fact]
+    public void RemoteReverseMode_RequiresRemoteBindPortAndLocalTargetPortWithoutRemoteHost()
+    {
+        var vm = new NewTunnelDialogViewModel([CreateGateway()], new LocalizationManager())
+        {
+            ForwardMode = TunnelForwardMode.Remote,
+            RemotePort = 8080,
+            LocalPort = 3000
+        };
+
+        Assert.False(vm.ShowRemoteHostField);
+        Assert.True(vm.ShowRemotePortField);
+        Assert.True(vm.ConfirmCommand.CanExecute(null), vm.ValidationMessage);
+    }
+
     private static SshGatewayDto CreateGateway()
     {
         return new SshGatewayDto

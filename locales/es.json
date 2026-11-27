@@ -4208,6 +4208,17 @@
   "ToolSshKeyGenDeploySuccess": "Clave p\u00fablica instalada en {0}.",
   "ToolSshKeyGenDeployAlreadyInstalled": "La clave p\u00fablica ya est\u00e1 instalada en {0}.",
   "ToolSshKeyGenDeployFailed": "Error al desplegar la clave p\u00fablica: {0}",
+  "HealthPanelUptime": "Tiempo activo",
+  "HealthPanelLoad": "Carga prom.",
+  "NewTunnelModeLabel": "Modo de reenv\u00edo",
+  "NewTunnelModeLocal": "Reenv\u00edo local (-L)",
+  "NewTunnelModeDynamicSocks5": "Proxy SOCKS5 (-D)",
+  "NewTunnelModeRemote": "Remoto / Inverso (-R)",
+  "NewTunnelSocksPortLabel": "Puerto local SOCKS5",
+  "NewTunnelRemoteBindPortLabel": "Puerto remoto",
+  "NewTunnelRemoteLocalPortLabel": "Puerto destino local",
+  "StatusManualSocksTunnelOpened": "Proxy SOCKS5 abierto en 127.0.0.1:{0}",
+  "StatusManualRemoteTunnelOpened": "T\u00fanel inverso abierto: remoto:{0} -> 127.0.0.1:{1}",
 
   "PaletteToolSshAudit": "Auditor de claves SSH",
 

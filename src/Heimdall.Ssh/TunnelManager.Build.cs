@@ -88,31 +88,47 @@ public sealed partial class TunnelManager
             ?? throw new InvalidOperationException("Final SSH client must be connected before wiring forwarded ports.");
 
         localBindHost = LoopbackBinding.NormalizeHost(localBindHost);
-        context.FinalPort = new ForwardedPortLocal(localBindHost, (uint)localPort, remoteHost, (uint)remotePort);
-        context.FinalPort.Exception += (_, args) =>
-        {
-            int reportedLocalPort = ResolveStartedLocalPortOrDefault(context.FinalPort, localPort);
-            Core.Logging.FileLogger.Error(
-                $"SSH forwarded port {reportedLocalPort} -> {remoteHost}:{remotePort} "
-                + $"exception: {args.Exception.Message}");
-            RaiseForwardedPortFailed(new TunnelForwardedPortFailure(
-                reportedLocalPort,
-                remoteHost,
-                remotePort,
-                args.Exception.Message,
-                DateTimeOffset.UtcNow));
-        };
+        bool hasLocalForward = !string.IsNullOrWhiteSpace(remoteHost) && remotePort > 0;
+        int boundLocalPort;
 
-        int boundLocalPort = _startLocalForward(
-            finalClient,
-            context.FinalPort,
-            localPort,
-            DescribeLocalPort(localPort));
+        if (hasLocalForward)
+        {
+            context.FinalPort = new ForwardedPortLocal(localBindHost, (uint)localPort, remoteHost, (uint)remotePort);
+            context.FinalPort.Exception += (_, args) =>
+            {
+                int reportedLocalPort = ResolveStartedLocalPortOrDefault(context.FinalPort, localPort);
+                Core.Logging.FileLogger.Error(
+                    $"SSH forwarded port {reportedLocalPort} -> {remoteHost}:{remotePort} "
+                    + $"exception: {args.Exception.Message}");
+                RaiseForwardedPortFailed(new TunnelForwardedPortFailure(
+                    reportedLocalPort,
+                    remoteHost,
+                    remotePort,
+                    args.Exception.Message,
+                    DateTimeOffset.UtcNow));
+            };
+
+            boundLocalPort = _startLocalForward(
+                finalClient,
+                context.FinalPort,
+                localPort,
+                DescribeLocalPort(localPort));
+        }
+        else if (socksProxyPort > 0 || remoteBindPort > 0)
+        {
+            boundLocalPort = socksProxyPort > 0
+                ? socksProxyPort
+                : (localPort > 0 ? localPort : remoteBindPort);
+        }
+        else
+        {
+            throw new ArgumentException("Either a local forward target, a SOCKS5 port, or a remote bind port is required.");
+        }
 
         var logSuffix = isChained ? " (chained tunnel)" : string.Empty;
         if (socksProxyPort > 0)
         {
-            context.DynamicPort = new ForwardedPortDynamic(LoopbackBinding.DefaultHost, (uint)socksProxyPort);
+            context.DynamicPort = new ForwardedPortDynamic(localBindHost, (uint)socksProxyPort);
 
             // Only the main forward reported its failures; a SOCKS or reverse forward that failed
             // at run time did so without a trace.
@@ -121,7 +137,7 @@ public sealed partial class TunnelManager
             finalClient.AddForwardedPort(context.DynamicPort);
             StartForwardedPortWithRetry(context.DynamicPort, $"SOCKS5 port {socksProxyPort}");
             Core.Logging.FileLogger.Info(
-                $"SOCKS5 proxy started on {LoopbackBinding.DefaultHost}:{socksProxyPort}{logSuffix}");
+                $"SOCKS5 proxy started on {localBindHost}:{socksProxyPort}{logSuffix}");
         }
 
         if (remoteBindPort > 0)
@@ -472,9 +488,14 @@ public sealed partial class TunnelManager
 
         public TunnelSession CreateSession(TunnelInfo info)
         {
+            if (FinalPort is null && DynamicPort is null && RemotePortForward is null)
+            {
+                throw new InvalidOperationException("No forwarded port was created for the tunnel session.");
+            }
+
             return new TunnelSession(
                 FinalClient ?? throw new InvalidOperationException("Final SSH client was not created."),
-                FinalPort ?? throw new InvalidOperationException("Final forwarded port was not created."),
+                FinalPort,
                 info,
                 IntermediateClients,
                 IntermediatePorts)
