@@ -89,6 +89,9 @@ public sealed class HostKeyTrustService(HostKeyStore store) : IHostKeyTrustServi
             .ToList();
     }
 
+    public IReadOnlyList<(string HostPort, HostKeyEntry Entry, bool IsAdditional)> GetAllAlgorithmEntries()
+        => _store.GetAllAlgorithmEntries();
+
     public HostKeyVerifyResult Verify(
         string host,
         int port,
@@ -299,6 +302,41 @@ public sealed class HostKeyTrustService(HostKeyStore store) : IHostKeyTrustServi
         }
 
         EntryRemoved?.Invoke(hostPort);
+        return true;
+    }
+
+    public bool RemoveAlgorithm(string host, int port, string algorithm)
+    {
+        ArgumentNullException.ThrowIfNull(host);
+
+        var hostPort = HostKeyFormats.MakeKey(host, port);
+        if (!string.IsNullOrWhiteSpace(algorithm)
+            && _store.RemoveAdditionalAlgorithm(host, port, algorithm))
+        {
+            EntryRemoved?.Invoke(hostPort);
+            return true;
+        }
+
+        var existing = _store.GetEntry(host, port);
+        if (existing is null)
+        {
+            return false;
+        }
+
+        if (!_store.RemovePrimaryOrPromote(host, port, out var promoted))
+        {
+            return false;
+        }
+
+        if (promoted is not null)
+        {
+            EntryReplaced?.Invoke(hostPort, existing, promoted);
+        }
+        else
+        {
+            EntryRemoved?.Invoke(hostPort);
+        }
+
         return true;
     }
 

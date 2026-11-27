@@ -21,12 +21,26 @@ using Renci.SshNet;
 namespace Heimdall.Ssh;
 
 /// <summary>
+/// Machine-readable error classification for <see cref="SshPublicKeyDeployResult"/>.
+/// </summary>
+public enum SshPublicKeyDeployErrorCode
+{
+    None,
+    InvalidPublicKey,
+    RemoteCommandFailed,
+    ConfirmationMissing,
+    Exception
+}
+
+/// <summary>
 /// Outcome of deploying an SSH public key to a remote server's <c>~/.ssh/authorized_keys</c>.
 /// </summary>
 public sealed record SshPublicKeyDeployResult(
     bool Success,
     bool AlreadyInstalled,
-    string? ErrorMessage = null);
+    string? ErrorMessage = null,
+    SshPublicKeyDeployErrorCode ErrorCode = SshPublicKeyDeployErrorCode.None,
+    int? ExitStatus = null);
 
 /// <summary>
 /// Deploys an OpenSSH public key line to a remote POSIX host's <c>~/.ssh/authorized_keys</c>
@@ -129,7 +143,11 @@ public static class SshPublicKeyDeployer
 
         if (!TryValidatePublicKeyLine(publicKeyLine, out var normalizedLine))
         {
-            return new SshPublicKeyDeployResult(false, false, "Invalid OpenSSH public key line.");
+            return new SshPublicKeyDeployResult(
+                false,
+                false,
+                "Invalid OpenSSH public key line.",
+                SshPublicKeyDeployErrorCode.InvalidPublicKey);
         }
 
         try
@@ -169,7 +187,12 @@ public static class SshPublicKeyDeployer
                 var err = string.IsNullOrWhiteSpace(cmd.Error)
                     ? $"Remote command exited with status {cmd.ExitStatus}."
                     : cmd.Error.Trim();
-                return new SshPublicKeyDeployResult(false, false, err);
+                return new SshPublicKeyDeployResult(
+                    false,
+                    false,
+                    err,
+                    SshPublicKeyDeployErrorCode.RemoteCommandFailed,
+                    cmd.ExitStatus);
             }
 
             if (output.Contains(MarkerExists, StringComparison.Ordinal))
@@ -182,7 +205,11 @@ public static class SshPublicKeyDeployer
                 return new SshPublicKeyDeployResult(true, AlreadyInstalled: false);
             }
 
-            return new SshPublicKeyDeployResult(false, false, "Remote host did not confirm key installation.");
+            return new SshPublicKeyDeployResult(
+                false,
+                false,
+                "Remote host did not confirm key installation.",
+                SshPublicKeyDeployErrorCode.ConfirmationMissing);
         }
         catch (OperationCanceledException)
         {
@@ -190,7 +217,11 @@ public static class SshPublicKeyDeployer
         }
         catch (Exception ex)
         {
-            return new SshPublicKeyDeployResult(false, false, ex.Message);
+            return new SshPublicKeyDeployResult(
+                false,
+                false,
+                ex.Message,
+                SshPublicKeyDeployErrorCode.Exception);
         }
     }
 }

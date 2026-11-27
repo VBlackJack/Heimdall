@@ -15,6 +15,7 @@
  */
 
 using System.ComponentModel;
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -25,6 +26,7 @@ using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
 using Heimdall.Core.Security;
+using Heimdall.Ssh;
 using Heimdall.Ssh.Agents;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Win32;
@@ -89,6 +91,7 @@ public partial class SshKeyAuditView : UserControl, IToolView
         InputLabel.Text = L("ToolSshAuditInput");
         BtnBrowse.Content = L("ToolSshAuditBtnBrowse");
         BtnLoadFromAgent.Content = L("ToolSshAuditBtnLoadAgent");
+        BtnDeployKey.Content = L("ToolSshKeyGenBtnDeploy");
         EmptyState.Text = L("ToolSshAuditEmptyState");
         ParseError.Text = L("ToolSshAuditParseError");
         BtnCopyFingerprint.Content = L("ToolSshAuditBtnCopy");
@@ -104,6 +107,7 @@ public partial class SshKeyAuditView : UserControl, IToolView
         System.Windows.Automation.AutomationProperties.SetName(BtnHelp, L("ToolHelpTooltip"));
         System.Windows.Automation.AutomationProperties.SetName(BtnBrowse, L("ToolSshAuditBtnBrowse"));
         System.Windows.Automation.AutomationProperties.SetName(BtnLoadFromAgent, L("ToolSshAuditBtnLoadAgent"));
+        System.Windows.Automation.AutomationProperties.SetName(BtnDeployKey, L("ToolSshKeyGenBtnDeploy"));
         System.Windows.Automation.AutomationProperties.SetName(BtnCopyFingerprint, L("ToolSshAuditBtnCopy"));
         System.Windows.Automation.AutomationProperties.SetName(KeyInput, L("ToolSshAuditInput"));
         System.Windows.Automation.AutomationProperties.SetName(DetailFingerprintValue, L("ToolSshAuditFingerprint"));
@@ -143,7 +147,54 @@ public partial class SshKeyAuditView : UserControl, IToolView
                 {
                     UpdateResultDisplay();
                 }
+
+                UpdateDeployButtonVisibility();
                 break;
+        }
+    }
+
+    private void UpdateDeployButtonVisibility()
+    {
+        bool canDeploy = _vm.ShowResults
+            && !_vm.IsPrivateKey
+            && SshPublicKeyDeployer.TryValidatePublicKeyLine(_vm.KeyText, out _);
+        BtnDeployKey.Visibility = canDeploy ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private async void OnDeployKeyClick(object sender, RoutedEventArgs e)
+    {
+        if (_localizer is null || !SshPublicKeyDeployer.TryValidatePublicKeyLine(_vm.KeyText, out var publicKeyLine))
+        {
+            return;
+        }
+
+        BtnDeployKey.IsEnabled = false;
+        try
+        {
+            var services = (Application.Current as App)?.Services;
+            await SshPublicKeyDeployUiHelper.DeployInteractivelyAsync(
+                    services,
+                    publicKeyLine,
+                    _localizer,
+                    status =>
+                    {
+                        _vm.FileErrorMessage = status;
+                        _vm.ShowFileError = !string.IsNullOrWhiteSpace(status);
+                    })
+                .ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"SSH public key deployment failed: {ex.Message}");
+            _vm.FileErrorMessage = string.Format(
+                CultureInfo.CurrentCulture,
+                L("ToolSshKeyGenDeployFailed"),
+                ex.Message);
+            _vm.ShowFileError = true;
+        }
+        finally
+        {
+            BtnDeployKey.IsEnabled = true;
         }
     }
 

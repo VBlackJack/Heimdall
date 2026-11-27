@@ -16,10 +16,12 @@
 
 using System.Collections.ObjectModel;
 using System.ComponentModel.DataAnnotations;
+using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
+using Heimdall.Ssh.Agents;
 
 namespace Heimdall.App.ViewModels.Dialogs;
 
@@ -73,6 +75,109 @@ public partial class GatewayDialogViewModel : ObservableValidator
 
     [ObservableProperty]
     private string _keyPath = "";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasChosenSshAgentKey))]
+    private string? _sshAgentKeyFingerprint;
+
+    private IReadOnlyList<SshAgentKeyInfo> _loadedAgentKeys = [];
+    private IReadOnlyList<SshAgentKeyChoice> _sshAgentKeyChoices = [];
+    private SshAgentKeyChoice? _selectedSshAgentKeyChoice;
+    private bool _isRebuildingSshAgentKeyChoices;
+
+    /// <summary>Whether a specific SSH agent key fingerprint is pinned for this gateway.</summary>
+    public bool HasChosenSshAgentKey => !string.IsNullOrWhiteSpace(SshAgentKeyFingerprint);
+
+    /// <summary>Choices displayed in the gateway SSH agent key picker.</summary>
+    public IReadOnlyList<SshAgentKeyChoice> SshAgentKeyChoices => _sshAgentKeyChoices;
+
+    /// <summary>Currently selected SSH agent key choice.</summary>
+    public SshAgentKeyChoice? SelectedSshAgentKeyChoice
+    {
+        get => _selectedSshAgentKeyChoice;
+        set
+        {
+            if (_isRebuildingSshAgentKeyChoices || ReferenceEquals(value, _selectedSshAgentKeyChoice))
+            {
+                return;
+            }
+
+            if (value is null)
+            {
+                OnPropertyChanged(nameof(SelectedSshAgentKeyChoice));
+                return;
+            }
+
+            _selectedSshAgentKeyChoice = value;
+            OnPropertyChanged();
+            SshAgentKeyFingerprint = value.Fingerprint;
+            if (!_isInitializing)
+            {
+                IsDirty = true;
+                InvalidateDiagnosticResult();
+            }
+        }
+    }
+
+    partial void OnSshAgentKeyFingerprintChanged(string? value)
+    {
+        if (_selectedSshAgentKeyChoice is not null && _selectedSshAgentKeyChoice.Fingerprint == value)
+        {
+            return;
+        }
+
+        RebuildSshAgentKeyChoices();
+    }
+
+    /// <summary>Updates the available agent keys shown in the picker without discarding a saved fingerprint.</summary>
+    public void SetLoadedAgentKeys(IReadOnlyList<SshAgentKeyInfo> loadedKeys)
+    {
+        _loadedAgentKeys = loadedKeys ?? [];
+        RebuildSshAgentKeyChoices();
+    }
+
+    /// <summary>Rebuilds the agent key choices from the loaded keys and the saved fingerprint.</summary>
+    public void RebuildSshAgentKeyChoices()
+    {
+        _isRebuildingSshAgentKeyChoices = true;
+        try
+        {
+            string L(string key) => Localizer?[key] ?? key;
+
+            List<SshAgentKeyChoice> choices = [new(null, L("ServerDialogSshAgentKeyAny"))];
+            foreach (var key in _loadedAgentKeys)
+            {
+                choices.Add(new SshAgentKeyChoice(
+                    key.Fingerprint,
+                    string.Format(
+                        CultureInfo.CurrentCulture,
+                        L("ServerDialogSshAgentKeyItem"),
+                        string.IsNullOrWhiteSpace(key.Comment) ? L("ServerDialogSshAgentKeyNoComment") : key.Comment,
+                        key.KeyType,
+                        key.Fingerprint)));
+            }
+
+            string? saved = HasChosenSshAgentKey ? SshAgentKeyFingerprint : null;
+            SshAgentKeyChoice? selected = choices.FirstOrDefault(
+                c => string.Equals(c.Fingerprint, saved, StringComparison.Ordinal));
+            if (selected is null && saved is not null)
+            {
+                selected = new SshAgentKeyChoice(
+                    saved,
+                    string.Format(CultureInfo.CurrentCulture, L("ServerDialogSshAgentKeyNotLoaded"), saved));
+                choices.Add(selected);
+            }
+
+            _selectedSshAgentKeyChoice = selected ?? choices[0];
+            _sshAgentKeyChoices = choices;
+            OnPropertyChanged(nameof(SshAgentKeyChoices));
+            OnPropertyChanged(nameof(SelectedSshAgentKeyChoice));
+        }
+        finally
+        {
+            _isRebuildingSshAgentKeyChoices = false;
+        }
+    }
 
     [ObservableProperty]
     private string _password = "";
@@ -378,6 +483,9 @@ public partial class GatewayDialogViewModel : ObservableValidator
             Port = Port,
             User = User,
             KeyPath = keyPath,
+            SshAgentKeyFingerprint = string.IsNullOrWhiteSpace(SshAgentKeyFingerprint)
+                ? null
+                : SshAgentKeyFingerprint,
             SshPasswordEncrypted = string.IsNullOrEmpty(Password)
                 ? ExistingSshPasswordEncrypted
                 : Heimdall.Core.Security.CredentialProtector.Protect(Password),
@@ -433,6 +541,7 @@ public partial class GatewayDialogViewModel : ObservableValidator
         vm.Port = dto.Port;
         vm.User = dto.User;
         vm.KeyPath = dto.KeyPath ?? "";
+        vm.SshAgentKeyFingerprint = dto.SshAgentKeyFingerprint;
         vm.SelectedParentGatewayId = dto.ParentGatewayId ?? "";
         vm.HostKeyFingerprint = dto.HostKeyFingerprint ?? "";
         vm.ExistingSshPasswordEncrypted = dto.SshPasswordEncrypted;

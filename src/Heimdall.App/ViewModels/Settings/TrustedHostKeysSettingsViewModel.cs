@@ -128,7 +128,7 @@ public sealed partial class TrustedHostKeysSettingsViewModel : ObservableObject,
     public void Refresh()
     {
         _allRows.Clear();
-        foreach (var (hostPort, entry) in _trustService.GetAllEntries())
+        foreach (var (hostPort, entry, _) in _trustService.GetAllAlgorithmEntries())
         {
             _allRows.Add(CreateRow(hostPort, entry));
         }
@@ -198,8 +198,9 @@ public sealed partial class TrustedHostKeysSettingsViewModel : ObservableObject,
             return;
         }
 
-        if (_trustService.Remove(host, port))
+        if (_trustService.RemoveAlgorithm(host, port, row.Algorithm))
         {
+            RefreshHostRows(row.HostPort);
             StatusMessage = _localizer.Format("ToastRemoveConfirmed", row.HostPort);
         }
     }
@@ -338,25 +339,22 @@ public sealed partial class TrustedHostKeysSettingsViewModel : ObservableObject,
             _localizer["LblTrustedHostKeyPublicKeyNotAvailable"]);
     }
 
-    private void UpsertRow(string hostPort, HostKeyEntry entry)
-    {
-        var existingIndex = _allRows.FindIndex(row => string.Equals(row.HostPort, hostPort, StringComparison.Ordinal));
-        var row = CreateRow(hostPort, entry);
-        if (existingIndex >= 0)
-        {
-            _allRows[existingIndex] = row;
-        }
-        else
-        {
-            _allRows.Add(row);
-        }
-
-        ApplyFilterAndSort();
-    }
-
     private void RemoveRow(string hostPort)
     {
+        RefreshHostRows(hostPort);
+    }
+
+    private void RefreshHostRows(string hostPort)
+    {
         _allRows.RemoveAll(row => string.Equals(row.HostPort, hostPort, StringComparison.Ordinal));
+        foreach (var (entryHostPort, entry, _) in _trustService.GetAllAlgorithmEntries())
+        {
+            if (string.Equals(entryHostPort, hostPort, StringComparison.Ordinal))
+            {
+                _allRows.Add(CreateRow(entryHostPort, entry));
+            }
+        }
+
         ApplyFilterAndSort();
     }
 
@@ -385,13 +383,13 @@ public sealed partial class TrustedHostKeysSettingsViewModel : ObservableObject,
             : value.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
 
     private void OnEntryTrusted(string hostPort, HostKeyEntry entry)
-        => _dispatcher.Invoke(() => UpsertRow(hostPort, entry));
+        => _dispatcher.Invoke(() => RefreshHostRows(hostPort));
 
     private void OnEntryRemoved(string hostPort)
         => _dispatcher.Invoke(() => RemoveRow(hostPort));
 
     private void OnEntryReplaced(string hostPort, HostKeyEntry oldEntry, HostKeyEntry newEntry)
-        => _dispatcher.Invoke(() => UpsertRow(hostPort, newEntry));
+        => _dispatcher.Invoke(() => RefreshHostRows(hostPort));
 
     private void OnLocaleChanged(string locale)
         => _dispatcher.Invoke(RefreshLocalizedRows);

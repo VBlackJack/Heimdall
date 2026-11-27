@@ -24,6 +24,12 @@ public interface IHostKeyTrustService
 
     IReadOnlyList<(string HostPort, HostKeyEntry Entry)> GetAllEntries();
 
+    /// <summary>
+    /// Returns all trusted entries including additional algorithms stored for the same host and port.
+    /// </summary>
+    IReadOnlyList<(string HostPort, HostKeyEntry Entry, bool IsAdditional)> GetAllAlgorithmEntries()
+        => GetAllEntries().Select(static item => (item.HostPort, item.Entry, false)).ToList();
+
     HostKeyVerifyResult Verify(string host, int port, string presentedFingerprint, string algorithm);
 
     void Trust(string host, int port, string fingerprint, string algorithm, HostKeySource source, string? publicKeyBase64 = null);
@@ -33,6 +39,12 @@ public interface IHostKeyTrustService
     void Import(string host, int port, string fingerprint, string algorithm, DateTimeOffset importedAt, string? publicKeyBase64 = null);
 
     bool Remove(string host, int port);
+
+    /// <summary>
+    /// Removes a specific algorithm entry for <c>(host, port)</c>, preserving other algorithms
+    /// trusted for the same host when present.
+    /// </summary>
+    bool RemoveAlgorithm(string host, int port, string algorithm) => Remove(host, port);
 
     event Action<string, HostKeyEntry>? EntryTrusted;
 

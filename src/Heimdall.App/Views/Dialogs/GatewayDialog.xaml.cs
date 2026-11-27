@@ -21,6 +21,7 @@ using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Logging;
 using Heimdall.Core.Ssh;
+using Heimdall.Ssh.Agents;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Win32;
 
@@ -57,6 +58,8 @@ public partial class GatewayDialog : Window
                 LblPort.Text = vm.Localizer["GatewayDialogLabelPort"];
                 LblUsername.Text = vm.Localizer["GatewayDialogLabelUsername"];
                 LblKeyPath.Text = vm.Localizer["GatewayDialogLabelKeyPath"];
+                LblAgentKey.Text = vm.Localizer["GatewayDialogLabelAgentKey"];
+                vm.RebuildSshAgentKeyChoices();
                 // LblPassword is bound to GatewayPasswordLabel on the ViewModel.
                 LblKeyPassphrase.Text = vm.Localizer["GatewayDialogLabelPassphrase"];
                 LblParentGateway.Text = vm.Localizer["GatewayDialogLabelParentGateway"];
@@ -72,6 +75,7 @@ public partial class GatewayDialog : Window
                 System.Windows.Automation.AutomationProperties.SetName(TxtPort, vm.Localizer["GatewayDialogLabelPort"]);
                 System.Windows.Automation.AutomationProperties.SetName(TxtUsername, vm.Localizer["GatewayDialogLabelUsername"]);
                 System.Windows.Automation.AutomationProperties.SetName(TxtKeyPath, vm.Localizer["GatewayDialogLabelKeyPath"]);
+                System.Windows.Automation.AutomationProperties.SetName(CmbAgentKey, vm.Localizer["GatewayDialogLabelAgentKey"]);
                 System.Windows.Automation.AutomationProperties.SetName(PasswordBox, vm.GatewayPasswordLabel);
                 System.Windows.Automation.AutomationProperties.SetName(KeyPassphraseBox, vm.Localizer["GatewayDialogLabelPassphrase"]);
                 System.Windows.Automation.AutomationProperties.SetName(CmbParentGateway, vm.Localizer["GatewayDialogLabelParentGateway"]);
@@ -100,12 +104,41 @@ public partial class GatewayDialog : Window
             IConfigManager config = services.GetRequiredService<IConfigManager>();
             AppSettings settings = await config.LoadSettingsAsync();
             GatewayDiagnosticService.Configure(vm, settings, services.GetRequiredService<IHostKeyTrustService>());
+            await LoadAgentKeysAsync(vm, settings.SshAgentPreference).ConfigureAwait(true);
         }
         catch (Exception ex)
         {
             FileLogger.Warn($"Gateway diagnostic initialization failed: {ex.GetType().Name}");
             vm.DiagnosticStatus = vm.Localizer?["GatewayDiagnosticUnavailable"] ?? "GatewayDiagnosticUnavailable";
         }
+    }
+
+    private async void OnRefreshAgentKeysClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not GatewayDialogViewModel vm) return;
+        var preference = SshAgentPreference.AutoOpenSshFirst;
+        try
+        {
+            var config = (Application.Current as App)?.Services?.GetService<IConfigManager>();
+            if (config is not null)
+            {
+                var settings = await config.LoadSettingsAsync().ConfigureAwait(true);
+                preference = settings.SshAgentPreference;
+            }
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Warn($"Gateway agent key preference load failed: {ex.GetType().Name}");
+        }
+
+        await LoadAgentKeysAsync(vm, preference).ConfigureAwait(true);
+    }
+
+    private static async Task LoadAgentKeysAsync(GatewayDialogViewModel vm, SshAgentPreference preference)
+    {
+        var keys = await Task.Run(() =>
+            SshAgentInspector.ListLoadedKeys(SshAgentRegistry.CreateDefault(preference))).ConfigureAwait(true);
+        vm.SetLoadedAgentKeys(keys);
     }
 
     private void OnTestRouteClick(object sender, RoutedEventArgs e)

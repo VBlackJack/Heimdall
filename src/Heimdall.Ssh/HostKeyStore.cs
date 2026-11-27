@@ -305,6 +305,80 @@ public sealed class HostKeyStore
         return list;
     }
 
+    /// <summary>
+    /// Removes a single additional algorithm entry for <c>(host, port, algorithm)</c>.
+    /// </summary>
+    public bool RemoveAdditionalAlgorithm(string host, int port, string algorithm)
+    {
+        ArgumentNullException.ThrowIfNull(host);
+        if (string.IsNullOrWhiteSpace(algorithm))
+        {
+            return false;
+        }
+
+        var canonicalAlgorithm = KnownHostsParser.CanonicalizeKeyType(algorithm);
+        var compositeKey = MakeAlgorithmKey(HostKeyFormats.MakeKey(host, port), canonicalAlgorithm);
+        return _additionalAlgorithmKeys.TryRemove(compositeKey, out _);
+    }
+
+    /// <summary>
+    /// Returns every trusted entry across all hosts, including both primary and additional
+    /// algorithm entries.
+    /// </summary>
+    public IReadOnlyList<(string HostPort, HostKeyEntry Entry, bool IsAdditional)> GetAllAlgorithmEntries()
+    {
+        var results = new List<(string HostPort, HostKeyEntry Entry, bool IsAdditional)>(_trustedKeys.Count + _additionalAlgorithmKeys.Count);
+        foreach (var kvp in _trustedKeys)
+        {
+            results.Add((kvp.Key, kvp.Value, false));
+        }
+
+        foreach (var kvp in _additionalAlgorithmKeys)
+        {
+            var separatorIndex = kvp.Key.LastIndexOf('|');
+            if (separatorIndex > 0)
+            {
+                results.Add((kvp.Key[..separatorIndex], kvp.Value, true));
+            }
+        }
+
+        return results;
+    }
+
+    /// <summary>
+    /// Removes only the primary entry for <c>(host, port)</c>, promoting the first additional
+    /// algorithm entry to primary when one exists.
+    /// </summary>
+    internal bool RemovePrimaryOrPromote(string host, int port, out HostKeyEntry? promotedPrimary)
+    {
+        ArgumentNullException.ThrowIfNull(host);
+        promotedPrimary = null;
+
+        var hostPort = HostKeyFormats.MakeKey(host, port);
+        _sessionTrustedKeys.TryRemove(hostPort, out _);
+
+        var prefix = hostPort + "|";
+        KeyValuePair<string, HostKeyEntry>? firstAdditional = null;
+        foreach (var kvp in _additionalAlgorithmKeys)
+        {
+            if (kvp.Key.StartsWith(prefix, StringComparison.Ordinal))
+            {
+                firstAdditional = kvp;
+                break;
+            }
+        }
+
+        if (firstAdditional is { } next && _additionalAlgorithmKeys.TryRemove(next.Key, out var promoted))
+        {
+            _trustedKeys[hostPort] = promoted;
+            promotedPrimary = promoted;
+            HostKeyEvent?.Invoke(hostPort, promoted.Fingerprint, true);
+            return true;
+        }
+
+        return _trustedKeys.TryRemove(hostPort, out _);
+    }
+
     private void RemoveAdditionalAlgorithms(string hostPortKey)
     {
         var prefix = hostPortKey + "|";

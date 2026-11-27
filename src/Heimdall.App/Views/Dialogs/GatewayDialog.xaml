@@ -97,6 +97,33 @@
                             Click="OnBrowseKeyClick"/>
                 </Grid>
 
+                <TextBlock x:Name="LblAgentKey" Style="{StaticResource DialogLabelStyle}" Margin="0,12,0,4"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <ComboBox Grid.Column="0"
+                              x:Name="CmbAgentKey"
+                              ItemsSource="{Binding SshAgentKeyChoices}"
+                              SelectedItem="{Binding SelectedSshAgentKeyChoice}"
+                              DisplayMemberPath="DisplayText"
+                              AutomationProperties.Name="{Binding Text, ElementName=LblAgentKey}"
+                              Style="{StaticResource DialogFormComboBoxStyle}"/>
+                    <Button Grid.Column="1"
+                            x:Name="BtnRefreshAgentKeys"
+                            Content="{loc:Translate GatewayDialogRefreshAgentKeys}"
+                            AutomationProperties.Name="{loc:Translate GatewayDialogRefreshAgentKeys}"
+                            Style="{DynamicResource SecondaryButtonStyle}"
+                            Margin="4,0,0,0"
+                            Click="OnRefreshAgentKeysClick"/>
+                </Grid>
+                <TextBlock Text="{loc:Translate ServerDialogSshAgentKeyHint}"
+                           Style="{StaticResource DialogHintTextStyle}"
+                           Margin="0,4,0,0"
+                           TextWrapping="Wrap"
+                           Visibility="{Binding HasChosenSshAgentKey, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
                 <TextBlock x:Name="LblPassword" Text="{Binding GatewayPasswordLabel}" Style="{StaticResource DialogLabelStyle}" Margin="0,12,0,4"/>
                 <PasswordBox x:Name="PasswordBox"
                              AutomationProperties.Name="{Binding Text, ElementName=LblPassword}"

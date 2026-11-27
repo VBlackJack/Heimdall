@@ -312,103 +312,20 @@ public partial class SshKeyGeneratorView : UserControl, IToolView
         }
 
         var services = (Application.Current as App)?.Services;
-        var configManager = services?.GetService<IConfigManager>();
-        var dialogService = services?.GetService<IDialogService>();
-        var hostKeyStore = services?.GetService<HostKeyStore>();
-        var hostKeyVerifier = services?.GetService<IHostKeyVerifier>();
-
-        if (configManager is null || dialogService is null || hostKeyStore is null || hostKeyVerifier is null)
+        if (_localizer is null)
         {
-            ShowValidation(L("ToolSshKeyGenDeployNoServers"));
             return;
         }
 
         BtnDeployPublicKey.IsEnabled = false;
         try
         {
-            var servers = await configManager.LoadServersAsync().ConfigureAwait(true);
-            var settings = await configManager.LoadSettingsAsync().ConfigureAwait(true);
-            var directSshServers = servers
-                .Where(s => string.Equals(s.ConnectionType, "SSH", StringComparison.OrdinalIgnoreCase)
-                    && !string.IsNullOrWhiteSpace(s.RemoteServer)
-                    && (s.UseDirectConnection || string.IsNullOrWhiteSpace(s.SshGatewayId)))
-                .ToList();
-
-            if (directSshServers.Count == 0)
-            {
-                ShowValidation(L("ToolSshKeyGenDeployNoServers"));
-                return;
-            }
-
-            var choices = directSshServers
-                .Select(s => $"{s.DisplayName} ({s.RemoteServer}:{s.SshPort})")
-                .ToList();
-
-            var selected = await dialogService.ShowChoiceAsync(
-                L("ToolSshKeyGenDeployTitle"),
-                L("ToolSshKeyGenDeploySelectServer"),
-                choices,
-                defaultIndex: 0,
-                cancelLabel: L("BtnCancel"));
-
-            if (selected is not int index || index < 0 || index >= directSshServers.Count)
-            {
-                return;
-            }
-
-            var target = directSshServers[index];
-            var password = ConnectionHelpers.DecryptPassword(target.SshPasswordEncrypted);
-            var keyPassphrase = ConnectionHelpers.DecryptPassword(target.SshKeyPassphraseEncrypted);
-
-            ShowValidation(string.Format(
-                CultureInfo.CurrentCulture,
-                L("ToolSshKeyGenDeployInProgress"),
-                target.DisplayName));
-
-            var connParams = new SshConnectionParams
-            {
-                Host = target.RemoteServer,
-                Port = target.SshPort,
-                Username = target.SshUsername ?? string.Empty,
-                KeyPath = string.IsNullOrWhiteSpace(target.SshKeyPath) ? null : target.SshKeyPath,
-                Password = password,
-                KeyPassphrase = keyPassphrase,
-                SshAgentPreference = settings.SshAgentPreference,
-                AgentKeyFingerprint = target.SshAgentKeyFingerprint,
-                UseLegacyPasswordAsKeyPassphrase = target.UsesLegacySshCredentialMapping,
-                LegacyCredentialName = target.DisplayName,
-                AuthenticationTimeout = TimeSpan.FromMinutes(2),
-                KeyboardInteractiveResponder = request => dialogService.ShowPasswordInputAsync(
-                    L(SshLocalizationKeys.InteractivePromptTitle),
-                    string.Format(
-                        CultureInfo.CurrentCulture,
-                        L(SshLocalizationKeys.InteractivePromptMessage),
-                        target.RemoteServer,
-                        target.SshUsername ?? string.Empty,
-                        ServerPromptText.Sanitize(request))).GetAwaiter().GetResult()
-            };
-
-            var result = await SshPublicKeyDeployer.DeployAsync(
-                    connParams,
+            await SshPublicKeyDeployUiHelper.DeployInteractivelyAsync(
+                    services,
                     _publicKeyOpenSsh,
-                    hostKeyStore,
-                    hostKeyVerifier)
+                    _localizer,
+                    ShowValidation)
                 .ConfigureAwait(true);
-
-            if (result.Success)
-            {
-                var key = result.AlreadyInstalled
-                    ? "ToolSshKeyGenDeployAlreadyInstalled"
-                    : "ToolSshKeyGenDeploySuccess";
-                ShowValidation(string.Format(CultureInfo.CurrentCulture, L(key), target.DisplayName));
-            }
-            else
-            {
-                ShowValidation(string.Format(
-                    CultureInfo.CurrentCulture,
-                    L("ToolSshKeyGenDeployFailed"),
-                    result.ErrorMessage ?? string.Empty));
-            }
         }
         catch (Exception ex)
         {
