@@ -305,6 +305,198 @@ public sealed class ReusableHostPoolTests
         Assert.Equal(0, pool.Trim());
     }
 
+    // A control released while its asynchronous disconnect is still in flight cannot have its
+    // password overwritten yet; resetting it at once is what used to dispose every session.
+    [Fact]
+    public void Release_OfAnUnsettledHost_IsNeitherResetNorDisposed()
+    {
+        using var pool = SettlingPool(new ManualClock());
+        FakeHost host = pool.Acquire();
+        host.IsDisconnectSettled = false;
+
+        pool.Release(host);
+
+        Assert.Equal(0, host.ResetCount);
+        Assert.False(host.IsDisposed);
+        Assert.Equal(1, pool.SettleCount);
+        Assert.Equal(0, pool.IdleCount);
+    }
+
+    [Fact]
+    public void ProcessSettling_AfterTheHostSettles_ResetsItOnceAndPoolsIt()
+    {
+        using var pool = SettlingPool(new ManualClock());
+        FakeHost host = pool.Acquire();
+        host.IsDisconnectSettled = false;
+        pool.Release(host);
+        host.IsDisconnectSettled = true;
+
+        int resolved = pool.ProcessSettling();
+
+        Assert.Equal(1, resolved);
+        Assert.Equal(1, host.ResetCount);
+        Assert.False(host.IsDisposed);
+        Assert.Equal(0, pool.SettleCount);
+        Assert.Equal(1, pool.IdleCount);
+    }
+
+    [Fact]
+    public void ProcessSettling_AtTheTimeout_DisposesTheHostWithoutResettingIt()
+    {
+        ManualClock clock = new();
+        using var pool = SettlingPool(clock);
+        FakeHost host = pool.Acquire();
+        host.IsDisconnectSettled = false;
+        pool.Release(host);
+        clock.Advance(SettleTimeout);
+
+        pool.ProcessSettling();
+
+        Assert.True(host.IsDisposed);
+        Assert.Equal(0, host.ResetCount);
+        Assert.Equal(0, pool.SettleCount);
+        Assert.Equal(0, pool.IdleCount);
+    }
+
+    [Fact]
+    public void ProcessSettling_JustBeforeTheTimeout_KeepsWaiting()
+    {
+        ManualClock clock = new();
+        using var pool = SettlingPool(clock);
+        FakeHost host = pool.Acquire();
+        host.IsDisconnectSettled = false;
+        pool.Release(host);
+        clock.Advance(SettleTimeout - TimeSpan.FromMilliseconds(1));
+
+        int resolved = pool.ProcessSettling();
+
+        Assert.Equal(0, resolved);
+        Assert.False(host.IsDisposed);
+        Assert.Equal(1, pool.SettleCount);
+    }
+
+    [Fact]
+    public void ProcessSettling_DisposesAHostThatBecameUnusable()
+    {
+        using var pool = SettlingPool(new ManualClock());
+        FakeHost host = pool.Acquire();
+        host.IsDisconnectSettled = false;
+        pool.Release(host);
+        host.IsReusable = false;
+
+        pool.ProcessSettling();
+
+        Assert.True(host.IsDisposed);
+        Assert.Equal(0, host.ResetCount);
+        Assert.Equal(0, pool.SettleCount);
+    }
+
+    // Unusable wins over settled: a host that is both must be disposed, never reset.
+    [Fact]
+    public void ProcessSettling_SettledButUnusable_IsDisposedAndNeverReset()
+    {
+        using var pool = SettlingPool(new ManualClock());
+        FakeHost host = pool.Acquire();
+        host.IsDisconnectSettled = false;
+        pool.Release(host);
+        host.IsDisconnectSettled = true;
+        host.IsReusable = false;
+
+        pool.ProcessSettling();
+
+        Assert.True(host.IsDisposed);
+        Assert.Equal(0, host.ResetCount);
+        Assert.Equal(0, pool.SettleCount);
+        Assert.Equal(0, pool.IdleCount);
+    }
+
+    [Fact]
+    public void IsDisconnectSettledThrowing_ReadsAsNotSettled()
+    {
+        using var pool = SettlingPool(new ManualClock());
+        FakeHost host = pool.Acquire();
+        host.IsDisconnectSettledThrows = true;
+
+        pool.Release(host);
+        pool.ProcessSettling();
+
+        Assert.Equal(1, pool.SettleCount);
+        Assert.Equal(0, host.ResetCount);
+        Assert.False(host.IsDisposed);
+    }
+
+    [Fact]
+    public void Acquire_NeverHandsOutASettlingHost()
+    {
+        using var pool = SettlingPool(new ManualClock());
+        FakeHost settling = pool.Acquire();
+        settling.IsDisconnectSettled = false;
+        pool.Release(settling);
+
+        FakeHost other = pool.Acquire();
+
+        Assert.NotSame(settling, other);
+        Assert.Equal(2, pool.CreationCount);
+        Assert.Equal(1, pool.SettleCount);
+    }
+
+    [Fact]
+    public void Dispose_DisposesSettlingHosts()
+    {
+        var pool = SettlingPool(new ManualClock());
+        FakeHost host = pool.Acquire();
+        host.IsDisconnectSettled = false;
+        pool.Release(host);
+
+        pool.Dispose();
+
+        Assert.True(host.IsDisposed);
+        Assert.Equal(0, pool.SettleCount);
+    }
+
+    [Fact]
+    public void Trim_LeavesSettlingHostsAlone()
+    {
+        ManualClock clock = new();
+        using var pool = new ReusableHostPool<FakeHost>(
+            () => new FakeHost(), () => 1, () => TimeSpan.FromMinutes(1), clock, null, TimeSpan.FromHours(1));
+        FakeHost waiting = pool.Acquire();
+        waiting.IsDisconnectSettled = false;
+        pool.Release(waiting);
+        clock.Advance(TimeSpan.FromMinutes(5));
+
+        int disposed = pool.Trim();
+
+        Assert.Equal(0, disposed);
+        Assert.False(waiting.IsDisposed);
+        Assert.Equal(1, pool.SettleCount);
+    }
+
+    [Fact]
+    public void ProcessSettling_WhenThePoolIsNowFull_DisposesTheSettledHost()
+    {
+        using var pool = new ReusableHostPool<FakeHost>(
+            () => new FakeHost(), () => 1, () => TimeSpan.Zero, new ManualClock(), null, SettleTimeout);
+        FakeHost settling = pool.Acquire();
+        FakeHost filler = pool.Acquire();
+        settling.IsDisconnectSettled = false;
+        pool.Release(settling);
+        pool.Release(filler);
+        settling.IsDisconnectSettled = true;
+
+        pool.ProcessSettling();
+
+        Assert.True(settling.IsDisposed);
+        Assert.Equal(0, settling.ResetCount);
+        Assert.False(filler.IsDisposed);
+        Assert.Equal(1, pool.IdleCount);
+    }
+
+    private static readonly TimeSpan SettleTimeout = TimeSpan.FromSeconds(10);
+
+    private static ReusableHostPool<FakeHost> SettlingPool(ManualClock clock)
+        => new(() => new FakeHost(), () => 2, () => TimeSpan.Zero, clock, null, SettleTimeout);
+
     private sealed class ManualClock : TimeProvider
     {
         private DateTimeOffset _now = new(2026, 9, 5, 12, 0, 0, TimeSpan.Zero);
@@ -317,6 +509,18 @@ public sealed class ReusableHostPoolTests
     private sealed class FakeHost : IReusableHost
     {
         public bool IsReusable { get; set; } = true;
+
+        public bool IsDisconnectSettledThrows { get; set; }
+
+        public bool IsDisconnectSettled
+        {
+            get => IsDisconnectSettledThrows
+                ? throw new InvalidOperationException("state unavailable")
+                : _isDisconnectSettled;
+            set => _isDisconnectSettled = value;
+        }
+
+        private bool _isDisconnectSettled = true;
 
         public bool ResetResult { get; set; } = true;
 

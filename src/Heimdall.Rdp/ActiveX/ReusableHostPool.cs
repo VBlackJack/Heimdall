@@ -55,14 +55,26 @@ public sealed class ReusableHostPool<T> : IDisposable
     /// </summary>
     public static readonly TimeSpan DefaultIdleExpiry = TimeSpan.FromMinutes(5);
 
+    /// <summary>
+    /// How long a released host may wait for its disconnect to settle. The asynchronous mstscax
+    /// disconnect normally completes well within this; a control that has not disconnected by
+    /// then is disposed exactly as it was before the wait existed, so the bound only limits
+    /// how long a connected control lingers.
+    /// </summary>
+    public static readonly TimeSpan DefaultDisconnectSettleTimeout = TimeSpan.FromSeconds(10);
+
     private readonly Func<T> _factory;
     private readonly Func<int> _capacity;
     private readonly Func<TimeSpan> _idleExpiry;
     private readonly TimeProvider _timeProvider;
     private readonly Action<string>? _log;
+    private readonly TimeSpan _settleTimeout;
 
     /// <summary>Idle hosts, oldest release first. Acquire takes from the end.</summary>
     private readonly List<IdleHost> _idle = new();
+
+    /// <summary>Released hosts still disconnecting, oldest first. Never handed out.</summary>
+    private readonly List<SettlingHost> _settling = new();
     private bool _disposed;
 
     /// <summary>Creates a pool of fixed capacity whose idle hosts never expire.</summary>
@@ -85,12 +97,17 @@ public sealed class ReusableHostPool<T> : IDisposable
     /// </param>
     /// <param name="timeProvider">The clock idle time is measured by; the system clock by default.</param>
     /// <param name="log">Where the pool says what it did.</param>
+    /// <param name="disconnectSettleTimeout">
+    /// How long a released host may wait for its disconnect to settle;
+    /// <see cref="DefaultDisconnectSettleTimeout"/> when omitted.
+    /// </param>
     public ReusableHostPool(
         Func<T> factory,
         Func<int> capacity,
         Func<TimeSpan> idleExpiry,
         TimeProvider? timeProvider = null,
-        Action<string>? log = null)
+        Action<string>? log = null,
+        TimeSpan? disconnectSettleTimeout = null)
     {
         ArgumentNullException.ThrowIfNull(factory);
         ArgumentNullException.ThrowIfNull(capacity);
@@ -101,10 +118,14 @@ public sealed class ReusableHostPool<T> : IDisposable
         _idleExpiry = idleExpiry;
         _timeProvider = timeProvider ?? TimeProvider.System;
         _log = log;
+        _settleTimeout = disconnectSettleTimeout ?? DefaultDisconnectSettleTimeout;
     }
 
     /// <summary>Idle hosts currently held. Exposed so the pool's behaviour can be asserted.</summary>
     public int IdleCount => _idle.Count;
+
+    /// <summary>Released hosts still waiting for their disconnect to settle.</summary>
+    public int SettleCount => _settling.Count;
 
     /// <summary>Hosts handed out since construction that came from the pool rather than the factory.</summary>
     public int ReuseCount { get; private set; }
@@ -177,6 +198,94 @@ public sealed class ReusableHostPool<T> : IDisposable
             return;
         }
 
+        if (!SafeIsDisconnectSettled(host))
+        {
+            _settling.Add(new SettlingHost(host, _timeProvider.GetUtcNow()));
+            _log?.Invoke($"ReusableHostPool: host waiting for its disconnect to settle, settling={_settling.Count}");
+            return;
+        }
+
+        ResetAndPool(host);
+    }
+
+    /// <summary>
+    /// Settles the hosts released while their disconnect was still in flight: a host that has
+    /// settled goes through the normal release path, one that became unusable or has waited
+    /// past the timeout is disposed, and the rest keep waiting.
+    /// </summary>
+    /// <returns>The number of hosts that left the settling list, pooled or disposed.</returns>
+    /// <remarks>Oldest first. The caller's timer decides when to ask.</remarks>
+    public int ProcessSettling()
+    {
+        if (_disposed || _settling.Count == 0)
+        {
+            return 0;
+        }
+
+        int resolved = 0;
+        DateTimeOffset now = _timeProvider.GetUtcNow();
+        int index = 0;
+        while (index < _settling.Count)
+        {
+            SettlingHost entry = _settling[index];
+            if (!entry.Host.IsReusable)
+            {
+                _settling.RemoveAt(index);
+                DisposeQuietly(entry.Host, "it became unusable while its disconnect settled");
+                resolved++;
+            }
+            else if (SafeIsDisconnectSettled(entry.Host))
+            {
+                _settling.RemoveAt(index);
+                _log?.Invoke($"ReusableHostPool: host disconnect settled after {(now - entry.ReleasedAt).TotalMilliseconds:0} ms");
+                CompleteRelease(entry.Host);
+                resolved++;
+            }
+            else if (now - entry.ReleasedAt >= _settleTimeout)
+            {
+                _settling.RemoveAt(index);
+                DisposeQuietly(entry.Host, $"its disconnect did not settle within {_settleTimeout.TotalSeconds:0} s");
+                resolved++;
+            }
+            else
+            {
+                index++;
+            }
+        }
+
+        return resolved;
+    }
+
+    /// <summary>
+    /// The release path from the capacity check onwards, shared by an immediate release and
+    /// by a host whose disconnect has settled since.
+    /// </summary>
+    private void CompleteRelease(T host)
+    {
+        if (_idle.Count >= Capacity)
+        {
+            DisposeQuietly(host, "the pool is full");
+            return;
+        }
+
+        ResetAndPool(host);
+    }
+
+    /// <summary>A host that throws while reporting its state has not settled.</summary>
+    private bool SafeIsDisconnectSettled(T host)
+    {
+        try
+        {
+            return host.IsDisconnectSettled;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    private void ResetAndPool(T host)
+    {
         bool reset;
         try
         {
@@ -256,6 +365,13 @@ public sealed class ReusableHostPool<T> : IDisposable
             _idle.RemoveAt(_idle.Count - 1);
             DisposeQuietly(last.Host, "the pool is shutting down");
         }
+
+        while (_settling.Count > 0)
+        {
+            SettlingHost last = _settling[^1];
+            _settling.RemoveAt(_settling.Count - 1);
+            DisposeQuietly(last.Host, "the pool is shutting down");
+        }
     }
 
     private void DisposeQuietly(T host, string because)
@@ -273,4 +389,7 @@ public sealed class ReusableHostPool<T> : IDisposable
 
     /// <summary>One idle host and the instant it was released.</summary>
     private readonly record struct IdleHost(T Host, DateTimeOffset ReleasedAt);
+
+    /// <summary>One released host still disconnecting and the instant it was released.</summary>
+    private readonly record struct SettlingHost(T Host, DateTimeOffset ReleasedAt);
 }

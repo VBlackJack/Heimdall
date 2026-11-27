@@ -231,7 +231,47 @@ public static class RdpPasswordReset
         return RdpPasswordResetResult.Succeeded(normalizedConnectedState);
     }
 
-    private static object? ReadConnectedState(object activeXInstance)
+    /// <summary>
+    /// Whether the control reports, right now, that it holds no live connection. Shares the
+    /// reading and the documented disconnected value with <see cref="TryReset"/> so the two
+    /// can never disagree about what "disconnected" means.
+    /// </summary>
+    /// <param name="activeXInstance">Raw COM instance, or <see langword="null"/> when unavailable.</param>
+    /// <returns>
+    /// True only for a <see cref="short"/> equal to the documented disconnected value. Fails
+    /// closed: a null instance, a read failure or any other type is false. Never throws.
+    /// </returns>
+    internal static bool IsDisconnected(object? activeXInstance)
+    {
+        return IsDisconnectedCore(activeXInstance, ReadConnectedState);
+    }
+
+    /// <summary>Test seam for <see cref="IsDisconnected"/>: the read is injected.</summary>
+    internal static bool IsDisconnectedCore(object? activeXInstance, Func<object, object?> readConnectedState)
+    {
+        ArgumentNullException.ThrowIfNull(readConnectedState);
+
+        if (activeXInstance is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            return readConnectedState(activeXInstance) is short connectedState
+                && Convert.ToInt32(connectedState) == DisconnectedConnectedState;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Reads the COM <c>Connected</c> property. Internal so the host can include the value it
+    /// saw in a diagnostic without a second copy of the reflection call.
+    /// </summary>
+    internal static object? ReadConnectedState(object activeXInstance)
     {
         return activeXInstance.GetType().InvokeMember(
             ConnectedPropertyName,

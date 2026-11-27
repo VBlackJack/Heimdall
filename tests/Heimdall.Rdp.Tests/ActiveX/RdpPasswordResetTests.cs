@@ -171,4 +171,41 @@ public sealed class RdpPasswordResetTests
         Assert.Equal(unchecked((int)0x80004005), result.HResult);
         Assert.Equal(0, result.ConnectedState);
     }
+
+    // The settle check shares the reading and the disconnected value with the reset, and
+    // fails closed on anything else.
+    [Fact]
+    public void IsDisconnectedCore_ShortZero_IsTrue()
+    {
+        Assert.True(RdpPasswordReset.IsDisconnectedCore(ActiveXInstance, _ => (short)0));
+    }
+
+    [Theory]
+    [InlineData((short)1)]
+    [InlineData((short)2)]
+    public void IsDisconnectedCore_NonZeroState_IsFalse(short state)
+    {
+        Assert.False(RdpPasswordReset.IsDisconnectedCore(ActiveXInstance, _ => state));
+    }
+
+    [Fact]
+    public void IsDisconnectedCore_BoxedInt32Zero_IsFalse()
+    {
+        Assert.False(RdpPasswordReset.IsDisconnectedCore(ActiveXInstance, _ => 0));
+    }
+
+    [Fact]
+    public void IsDisconnectedCore_NullStateOrNullInstance_IsFalse()
+    {
+        Assert.False(RdpPasswordReset.IsDisconnectedCore(ActiveXInstance, _ => null));
+        Assert.False(RdpPasswordReset.IsDisconnectedCore(null, _ => (short)0));
+    }
+
+    [Fact]
+    public void IsDisconnectedCore_ReadThrows_IsFalseAndDoesNotThrow()
+    {
+        Assert.False(RdpPasswordReset.IsDisconnectedCore(
+            ActiveXInstance,
+            _ => throw new COMException("unavailable", unchecked((int)0x80010108))));
+    }
 }

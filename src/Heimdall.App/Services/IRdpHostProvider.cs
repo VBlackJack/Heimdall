@@ -81,8 +81,17 @@ public sealed class PooledRdpHostProvider : IRdpHostProvider, IDisposable
     /// <summary>How often the idle controls are checked against the expiry.</summary>
     internal static readonly TimeSpan TrimInterval = TimeSpan.FromSeconds(30);
 
+    /// <summary>
+    /// How often released controls are checked for a finished disconnect. Short, because the
+    /// disconnect normally completes within a second and a control waiting for it is a
+    /// connected one still holding its resources; cheap, because it reads one COM property
+    /// per waiting control and only runs while any is waiting.
+    /// </summary>
+    internal static readonly TimeSpan SettleInterval = TimeSpan.FromMilliseconds(250);
+
     private readonly ReusableHostPool<RdpActiveXHost> _pool;
     private DispatcherTimer? _trimTimer;
+    private DispatcherTimer? _settleTimer;
     private bool _disposed;
 
     /// <summary>Creates a provider of fixed capacity whose idle controls never expire.</summary>
@@ -117,6 +126,9 @@ public sealed class PooledRdpHostProvider : IRdpHostProvider, IDisposable
     /// <summary>Controls sitting idle right now.</summary>
     public int IdleCount => _pool.IdleCount;
 
+    /// <summary>Released controls still waiting for their disconnect to settle.</summary>
+    public int SettleCount => _pool.SettleCount;
+
     /// <summary>The number of idle controls kept, as the settings say right now.</summary>
     public int Capacity => _pool.Capacity;
 
@@ -147,10 +159,35 @@ public sealed class PooledRdpHostProvider : IRdpHostProvider, IDisposable
     public void Release(RdpActiveXHost host)
     {
         _pool.Release(host);
+        if (_pool.SettleCount > 0)
+        {
+            EnsureSettleTimer();
+        }
+
         if (_pool.IdleCount > 0)
         {
             EnsureTrimTimer();
         }
+    }
+
+    /// <summary>
+    /// Moves the released controls whose disconnect has finished into the pool, and disposes
+    /// those that never will. Stops the settle timer once nothing is waiting.
+    /// </summary>
+    public int ProcessSettling()
+    {
+        int resolved = _pool.ProcessSettling();
+        if (_pool.IdleCount > 0)
+        {
+            EnsureTrimTimer();
+        }
+
+        if (_pool.SettleCount == 0)
+        {
+            StopSettleTimer();
+        }
+
+        return resolved;
     }
 
     /// <summary>Disposes the idle controls that have expired, and reports how many.</summary>
@@ -180,7 +217,34 @@ public sealed class PooledRdpHostProvider : IRdpHostProvider, IDisposable
 
         _disposed = true;
         StopTrimTimer();
+        StopSettleTimer();
         _pool.Dispose();
+    }
+
+    private void EnsureSettleTimer()
+    {
+        if (_settleTimer is not null || _disposed)
+        {
+            return;
+        }
+
+        _settleTimer = new DispatcherTimer(
+            SettleInterval,
+            DispatcherPriority.Background,
+            (_, _) => ProcessSettling(),
+            Dispatcher.CurrentDispatcher);
+        _settleTimer.Start();
+    }
+
+    private void StopSettleTimer()
+    {
+        if (_settleTimer is null)
+        {
+            return;
+        }
+
+        _settleTimer.Stop();
+        _settleTimer = null;
     }
 
     private void EnsureTrimTimer()
