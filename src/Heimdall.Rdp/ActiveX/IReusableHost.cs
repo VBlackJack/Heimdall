@@ -42,4 +42,10 @@ public interface IReusableHost : IDisposable
     /// </summary>
     /// <returns>True when the host may be reused; false when it must be disposed instead.</returns>
     bool ResetForReuse();
+
+    /// <summary>
+    /// A one-line description of what keeps the disconnect from settling (window handle,
+    /// parent, raw connected value), for the pool's log. Should not throw.
+    /// </summary>
+    string DescribeSettleState();
 }

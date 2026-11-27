@@ -69,6 +69,7 @@ public sealed class ReusableHostPool<T> : IDisposable
     private readonly TimeProvider _timeProvider;
     private readonly Action<string>? _log;
     private readonly TimeSpan _settleTimeout;
+    private readonly IHostParking<T>? _parking;
 
     /// <summary>Idle hosts, oldest release first. Acquire takes from the end.</summary>
     private readonly List<IdleHost> _idle = new();
@@ -101,13 +102,18 @@ public sealed class ReusableHostPool<T> : IDisposable
     /// How long a released host may wait for its disconnect to settle;
     /// <see cref="DefaultDisconnectSettleTimeout"/> when omitted.
     /// </param>
+    /// <param name="parking">
+    /// Where a released host waits, with a live window, while its disconnect settles; none by
+    /// default. The pool never disposes it: its owner does.
+    /// </param>
     public ReusableHostPool(
         Func<T> factory,
         Func<int> capacity,
         Func<TimeSpan> idleExpiry,
         TimeProvider? timeProvider = null,
         Action<string>? log = null,
-        TimeSpan? disconnectSettleTimeout = null)
+        TimeSpan? disconnectSettleTimeout = null,
+        IHostParking<T>? parking = null)
     {
         ArgumentNullException.ThrowIfNull(factory);
         ArgumentNullException.ThrowIfNull(capacity);
@@ -119,6 +125,7 @@ public sealed class ReusableHostPool<T> : IDisposable
         _timeProvider = timeProvider ?? TimeProvider.System;
         _log = log;
         _settleTimeout = disconnectSettleTimeout ?? DefaultDisconnectSettleTimeout;
+        _parking = parking;
     }
 
     /// <summary>Idle hosts currently held. Exposed so the pool's behaviour can be asserted.</summary>
@@ -192,20 +199,32 @@ public sealed class ReusableHostPool<T> : IDisposable
             return;
         }
 
-        if (_idle.Count >= Capacity)
-        {
-            DisposeQuietly(host, "the pool is full");
-            return;
-        }
-
         if (!SafeIsDisconnectSettled(host))
         {
+            // A settling host is a connected control still holding its resources, so it counts
+            // against the capacity with the idle ones at the moment it starts settling: a storm
+            // of closes must not park more controls than the pool would ever keep. Only the
+            // entry checks this; a settled host re-checks the idle count alone, so the live
+            // total can briefly exceed the capacity, by at most the hosts already settling.
+            if (_idle.Count + _settling.Count >= Capacity)
+            {
+                DisposeQuietly(host, "the pool is full");
+                return;
+            }
+
+            if (!TryPark(host))
+            {
+                DisposeQuietly(host, "it could not be parked while its disconnect settled");
+                return;
+            }
+
             _settling.Add(new SettlingHost(host, _timeProvider.GetUtcNow()));
-            _log?.Invoke($"ReusableHostPool: host waiting for its disconnect to settle, settling={_settling.Count}");
+            _log?.Invoke(
+                $"ReusableHostPool: host waiting for its disconnect to settle, settling={_settling.Count} {SafeDescribe(host)}");
             return;
         }
 
-        ResetAndPool(host);
+        CompleteRelease(host);
     }
 
     /// <summary>
@@ -231,19 +250,31 @@ public sealed class ReusableHostPool<T> : IDisposable
             if (!entry.Host.IsReusable)
             {
                 _settling.RemoveAt(index);
+                TryUnpark(entry.Host);
                 DisposeQuietly(entry.Host, "it became unusable while its disconnect settled");
                 resolved++;
             }
             else if (SafeIsDisconnectSettled(entry.Host))
             {
                 _settling.RemoveAt(index);
-                _log?.Invoke($"ReusableHostPool: host disconnect settled after {(now - entry.ReleasedAt).TotalMilliseconds:0} ms");
-                CompleteRelease(entry.Host);
+                _log?.Invoke(
+                    $"ReusableHostPool: host disconnect settled after {(now - entry.ReleasedAt).TotalMilliseconds:0} ms {SafeDescribe(entry.Host)}");
+                if (TryUnpark(entry.Host))
+                {
+                    CompleteRelease(entry.Host);
+                }
+                else
+                {
+                    DisposeQuietly(entry.Host, "it could not be unparked");
+                }
+
                 resolved++;
             }
             else if (now - entry.ReleasedAt >= _settleTimeout)
             {
                 _settling.RemoveAt(index);
+                _log?.Invoke($"ReusableHostPool: host disconnect timed out {SafeDescribe(entry.Host)}");
+                TryUnpark(entry.Host);
                 DisposeQuietly(entry.Host, $"its disconnect did not settle within {_settleTimeout.TotalSeconds:0} s");
                 resolved++;
             }
@@ -269,6 +300,66 @@ public sealed class ReusableHostPool<T> : IDisposable
         }
 
         ResetAndPool(host);
+    }
+
+    /// <summary>
+    /// Parks a host that starts settling. Fails closed: a parking that throws is logged and
+    /// reported as failed, so the caller disposes the host instead of leaving it windowless.
+    /// </summary>
+    private bool TryPark(T host)
+    {
+        if (_parking is null)
+        {
+            return true;
+        }
+
+        try
+        {
+            _parking.Park(host);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _log?.Invoke($"ReusableHostPool: parking a host failed: {ex.GetType().Name}: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Takes a host out of the parking window on the way out of the settling list. A failure
+    /// is logged and reported as false: a host that is still in the parking window is never
+    /// reset or pooled, so the caller disposes it (fail closed).
+    /// </summary>
+    private bool TryUnpark(T host)
+    {
+        if (_parking is null)
+        {
+            return true;
+        }
+
+        try
+        {
+            _parking.Unpark(host);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _log?.Invoke($"ReusableHostPool: unparking a host failed: {ex.GetType().Name}: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>The host's own account of its settle state, or a marker when it cannot give one.</summary>
+    private static string SafeDescribe(T host)
+    {
+        try
+        {
+            return host.DescribeSettleState();
+        }
+        catch (Exception ex)
+        {
+            return $"describe failed: {ex.GetType().Name}";
+        }
     }
 
     /// <summary>A host that throws while reporting its state has not settled.</summary>
@@ -370,6 +461,7 @@ public sealed class ReusableHostPool<T> : IDisposable
         {
             SettlingHost last = _settling[^1];
             _settling.RemoveAt(_settling.Count - 1);
+            TryUnpark(last.Host);
             DisposeQuietly(last.Host, "the pool is shutting down");
         }
     }

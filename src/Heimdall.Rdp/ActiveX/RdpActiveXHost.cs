@@ -270,6 +270,20 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost, IRdpDis
     }
 
     /// <summary>
+    /// Logs the moment the window goes, with the connected value at that point: a disconnect
+    /// that never settles is explained by whether the window outlived it.
+    /// </summary>
+    protected override void OnHandleDestroyed(EventArgs e)
+    {
+        base.OnHandleDestroyed(e);
+
+        // During Dispose the COM read could re-populate the cached instance, so it is skipped.
+        string connected = _disposed ? "skipped (disposed)" : DescribeRawConnectedState();
+        Core.Logging.FileLogger.Info(
+            $"RdpActiveXHost.OnHandleDestroyed: disposed={_disposed} connected={connected}");
+    }
+
+    /// <summary>
     /// Returns the raw ActiveX COM object obtained via <see cref="AxHost.GetOcx"/>.
     /// </summary>
     public object? GetActiveXInstance()
@@ -518,6 +532,9 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost, IRdpDis
             catch (Exception ex)
             {
                 LastError = ex.Message;
+                Core.Logging.FileLogger.Warn(
+                    $"RdpActiveXHost.Disconnect failed: type={ex.GetType().FullName} "
+                    + $"hr=0x{ex.HResult.ToString("X8", CultureInfo.InvariantCulture)} handleCreated={IsHandleCreated}");
             }
         }
     }
@@ -2323,6 +2340,46 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost, IRdpDis
             Core.Logging.FileLogger.Warn(
                 $"RdpActiveXHost.ResetForReuse failed, control will not be reused: {ex.Message}");
             return false;
+        }
+    }
+
+    /// <inheritdoc />
+    public string DescribeSettleState()
+    {
+        try
+        {
+            string parent = Parent?.GetType().Name ?? "none";
+            return $"handleCreated={IsHandleCreated} parent={parent} disposed={_disposed} connected={DescribeRawConnectedState()}";
+        }
+        catch (Exception ex)
+        {
+            return $"describe failed: {ex.GetType().Name}";
+        }
+    }
+
+    /// <summary>
+    /// The raw COM <c>Connected</c> value, or why it could not be read, for a diagnostic.
+    /// Never throws.
+    /// </summary>
+    private string DescribeRawConnectedState()
+    {
+        try
+        {
+            object? ocx = GetActiveXInstance();
+            if (ocx is null)
+            {
+                return "no instance";
+            }
+
+            object? raw = RdpPasswordReset.ReadConnectedState(ocx);
+            return raw is null
+                ? "null"
+                : Convert.ToString(raw, CultureInfo.InvariantCulture) ?? "null";
+        }
+        catch (Exception ex)
+        {
+            Exception cause = ex.InnerException ?? ex;
+            return $"read failed: {cause.GetType().Name} hr=0x{cause.HResult.ToString("X8", CultureInfo.InvariantCulture)}";
         }
     }
 
