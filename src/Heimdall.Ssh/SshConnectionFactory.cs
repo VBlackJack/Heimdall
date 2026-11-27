@@ -592,6 +592,36 @@ public static class SshConnectionFactory
         ArgumentNullException.ThrowIfNull(hostKeyStore);
         ArgumentNullException.ThrowIfNull(verifier);
 
+        if (hostKeyStore.IsRevoked(verificationHost, verificationPort, presentation.Fingerprint))
+        {
+            throw new HostKeyRejectedException(
+                verificationHost,
+                verificationPort,
+                presentation.Algorithm,
+                presentation.Fingerprint,
+                storedFingerprint: null);
+        }
+
+        var certStatus = OpenSshCertificateVerifier.VerifyHostCertificate(
+            presentation.HostKey,
+            verificationHost,
+            verificationPort,
+            hostKeyStore);
+        if (certStatus == HostCertificateVerificationStatus.Revoked)
+        {
+            throw new HostKeyRejectedException(
+                verificationHost,
+                verificationPort,
+                presentation.Algorithm,
+                presentation.Fingerprint,
+                storedFingerprint: null);
+        }
+
+        if (certStatus == HostCertificateVerificationStatus.TrustedByCertAuthority)
+        {
+            return new PinnedFingerprintVerifier(verificationHost, verificationPort, presentation.Fingerprint);
+        }
+
         var trustService = new HostKeyTrustService(hostKeyStore);
         var result = trustService.Verify(
             verificationHost,

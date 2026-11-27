@@ -98,6 +98,96 @@ public static class KnownHostsParser
     }
 
     /// <summary>
+    /// Extracts <c>@cert-authority</c> and <c>@revoked</c> policy rules from a <c>known_hosts</c> document.
+    /// </summary>
+    public static KnownHostsPolicyEntries ParsePolicyEntries(string content)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+
+        var certAuthorities = new List<KnownHostsCertAuthorityEntry>();
+        var revokedKeys = new List<KnownHostsRevokedEntry>();
+
+        using var reader = new StringReader(content);
+        string? rawLine;
+        var lineNumber = 0;
+        while ((rawLine = reader.ReadLine()) is not null)
+        {
+            lineNumber++;
+            if (rawLine.Length > MaxLineLength)
+            {
+                continue;
+            }
+
+            var trimmed = rawLine.TrimStart();
+            if (string.IsNullOrWhiteSpace(trimmed) || trimmed.StartsWith('#'))
+            {
+                continue;
+            }
+
+            var isCa = trimmed.StartsWith("@cert-authority ", StringComparison.Ordinal)
+                || trimmed.StartsWith("@cert-authority\t", StringComparison.Ordinal);
+            var isRevoked = !isCa && (trimmed.StartsWith("@revoked ", StringComparison.Ordinal)
+                || trimmed.StartsWith("@revoked\t", StringComparison.Ordinal));
+            if (!isCa && !isRevoked)
+            {
+                continue;
+            }
+
+            var fields = trimmed.Split((char[]?)null, 5, StringSplitOptions.RemoveEmptyEntries);
+            if (fields.Length < 4)
+            {
+                continue;
+            }
+
+            var hostPatterns = fields[1];
+            var keyType = fields[2];
+            var base64 = fields[3];
+
+            if (!SupportedKeyTypes.Contains(keyType))
+            {
+                continue;
+            }
+
+            byte[] keyBlob;
+            try
+            {
+                keyBlob = Convert.FromBase64String(base64);
+            }
+            catch (FormatException)
+            {
+                continue;
+            }
+
+            if (keyBlob.Length < 16)
+            {
+                continue;
+            }
+
+            var fingerprint = HostKeyFormats.ComputeSha256Fingerprint(keyBlob);
+            var canonicalType = CanonicalizeKeyType(keyType);
+            if (isCa)
+            {
+                certAuthorities.Add(new KnownHostsCertAuthorityEntry(
+                    hostPatterns,
+                    canonicalType,
+                    fingerprint,
+                    keyBlob,
+                    lineNumber));
+            }
+            else
+            {
+                revokedKeys.Add(new KnownHostsRevokedEntry(
+                    hostPatterns,
+                    canonicalType,
+                    fingerprint,
+                    lineNumber));
+            }
+        }
+
+        return new KnownHostsPolicyEntries(certAuthorities, revokedKeys);
+    }
+
+    /// <summary>
     /// Stream-parse known_hosts from a <see cref="TextReader"/>, line by line.
     /// Use this overload when reading from a file to avoid allocating the
     /// whole content as a managed string.

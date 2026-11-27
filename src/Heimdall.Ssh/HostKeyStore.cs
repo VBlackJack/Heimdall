@@ -32,6 +32,8 @@ public sealed class HostKeyStore
     private readonly ConcurrentDictionary<string, HostKeyEntry> _trustedKeys = new();
     private readonly ConcurrentDictionary<string, HostKeyEntry> _sessionTrustedKeys = new();
     private readonly ConcurrentDictionary<string, HostKeyEntry> _additionalAlgorithmKeys = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, (string HostPatterns, string Fingerprint)> _certAuthorities = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, (string HostPatterns, string Fingerprint)> _revokedKeys = new(StringComparer.Ordinal);
 
     /// <summary>
     /// Raised whenever a host key is explicitly trusted.
@@ -389,6 +391,79 @@ public sealed class HostKeyStore
                 _additionalAlgorithmKeys.TryRemove(key, out _);
             }
         }
+    }
+
+    /// <summary>Registers a trusted OpenSSH <c>@cert-authority</c> rule.</summary>
+    public void AddCertAuthority(string hostPatterns, string caFingerprint)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(hostPatterns);
+        ArgumentException.ThrowIfNullOrWhiteSpace(caFingerprint);
+        _certAuthorities[$"{hostPatterns}|{caFingerprint}"] = (hostPatterns, caFingerprint);
+    }
+
+    /// <summary>Registers an OpenSSH <c>@revoked</c> host key or CA rule.</summary>
+    public void AddRevokedKey(string hostPatterns, string fingerprint)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(hostPatterns);
+        ArgumentException.ThrowIfNullOrWhiteSpace(fingerprint);
+        _revokedKeys[$"{hostPatterns}|{fingerprint}"] = (hostPatterns, fingerprint);
+    }
+
+    /// <summary>Loads <c>@cert-authority</c> and <c>@revoked</c> rules from an OpenSSH <c>known_hosts</c> document.</summary>
+    public KnownHostsPolicyEntries LoadPolicyFromKnownHosts(string knownHostsContent)
+    {
+        var policy = KnownHostsParser.ParsePolicyEntries(knownHostsContent);
+        foreach (var ca in policy.CertAuthorities)
+        {
+            AddCertAuthority(ca.HostPatterns, ca.CaFingerprint);
+        }
+
+        foreach (var revoked in policy.RevokedKeys)
+        {
+            AddRevokedKey(revoked.HostPatterns, revoked.Fingerprint);
+        }
+
+        return policy;
+    }
+
+    /// <summary>Returns true if <paramref name="caFingerprint"/> is trusted as a CA for <paramref name="host"/>:<paramref name="port"/>.</summary>
+    public bool IsTrustedCertAuthority(string host, int port, string caFingerprint)
+    {
+        if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(caFingerprint))
+        {
+            return false;
+        }
+
+        foreach (var (_, rule) in _certAuthorities)
+        {
+            if (ConstantTimeEquals(rule.Fingerprint, caFingerprint)
+                && OpenSshHostPatternMatcher.Matches(rule.HostPatterns, host, port))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>Returns true if <paramref name="fingerprint"/> is explicitly revoked for <paramref name="host"/>:<paramref name="port"/>.</summary>
+    public bool IsRevoked(string host, int port, string fingerprint)
+    {
+        if (string.IsNullOrWhiteSpace(host) || string.IsNullOrWhiteSpace(fingerprint))
+        {
+            return false;
+        }
+
+        foreach (var (_, rule) in _revokedKeys)
+        {
+            if (ConstantTimeEquals(rule.Fingerprint, fingerprint)
+                && OpenSshHostPatternMatcher.Matches(rule.HostPatterns, host, port))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static string MakeAlgorithmKey(string hostPortKey, string canonicalAlgorithm) =>

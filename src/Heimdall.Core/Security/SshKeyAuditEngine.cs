@@ -120,6 +120,11 @@ public static class SshKeyAuditEngine
 
         var firstLine = keyText.Split('\n')[0].TrimEnd('\r').Trim();
 
+        if (Ssh.OpenSshCertificateParser.TryParsePublicLine(firstLine, out var cert) && cert is not null)
+        {
+            return BuildCertificateAuditResult(cert, localize);
+        }
+
         if (firstLine.StartsWith(OpenSshRsaPrefix + " ", StringComparison.Ordinal) ||
             firstLine.StartsWith(OpenSshDsaPrefix + " ", StringComparison.Ordinal) ||
             firstLine.StartsWith(OpenSshEd25519Prefix + " ", StringComparison.Ordinal) ||
@@ -192,6 +197,84 @@ public static class SshKeyAuditEngine
         }
 
         return ParseOpenSshBlob(blob, parts[0], isPrivate: false, isEncrypted: false, "OpenSSH", localize);
+    }
+
+    private static SshKeyAuditResult BuildCertificateAuditResult(
+        Ssh.OpenSshCertificateInfo cert,
+        Func<string, string>? localize)
+    {
+        string algorithm = cert.UnderlyingKeyType switch
+        {
+            "ssh-ed25519" => "Ed25519",
+            "ssh-rsa" => "RSA",
+            _ when cert.UnderlyingKeyType.StartsWith("ecdsa-", StringComparison.Ordinal) => "ECDSA",
+            _ => cert.UnderlyingKeyType
+        };
+
+        var findings = new List<SshKeyAuditFinding>();
+        var now = DateTimeOffset.UtcNow;
+        var rating = SecurityRating.Strong;
+
+        if (!cert.IsValidAt(now))
+        {
+            rating = SecurityRating.Weak;
+            findings.Add(new SshKeyAuditFinding
+            {
+                Severity = FindingSeverity.Fail,
+                Text = L(localize, "ToolSshAuditFindingCertExpired")
+            });
+        }
+        else if (cert.HasUnboundedValidity)
+        {
+            rating = SecurityRating.Acceptable;
+            findings.Add(new SshKeyAuditFinding
+            {
+                Severity = FindingSeverity.Warning,
+                Text = L(localize, "ToolSshAuditFindingCertUnbounded")
+            });
+        }
+        else
+        {
+            findings.Add(new SshKeyAuditFinding
+            {
+                Severity = FindingSeverity.Pass,
+                Text = L(localize, "ToolSshAuditFindingCertValid")
+            });
+        }
+
+        if (algorithm == "RSA" && cert.KeySize < MinRsaKeySize)
+        {
+            rating = SecurityRating.Weak;
+            findings.Add(new SshKeyAuditFinding
+            {
+                Severity = FindingSeverity.Fail,
+                Text = string.Format(L(localize, "ToolSshAuditFindingRsaWeak"), cert.KeySize)
+            });
+        }
+        else
+        {
+            findings.Add(new SshKeyAuditFinding
+            {
+                Severity = FindingSeverity.Pass,
+                Text = $"CA: {cert.SignatureKeyFingerprint} | Key ID: {cert.KeyId} | Principals: {(cert.ValidPrincipals.Count == 0 ? "*" : string.Join(", ", cert.ValidPrincipals))}"
+            });
+        }
+
+        var format = cert.Type == Ssh.OpenSshCertificateType.Host
+            ? "OpenSSH Certificate (Host)"
+            : "OpenSSH Certificate (User)";
+
+        return new SshKeyAuditResult
+        {
+            Algorithm = algorithm,
+            KeySize = cert.KeySize,
+            Fingerprint = cert.CertificateFingerprint,
+            Format = format,
+            IsPrivateKey = false,
+            IsEncrypted = false,
+            Rating = rating,
+            Findings = findings
+        };
     }
 
     private static SshKeyAuditResult? ParseOpenSshBlob(

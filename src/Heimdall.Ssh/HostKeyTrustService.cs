@@ -101,6 +101,15 @@ public sealed class HostKeyTrustService(HostKeyStore store) : IHostKeyTrustServi
         ArgumentNullException.ThrowIfNull(host);
         ArgumentNullException.ThrowIfNull(presentedFingerprint);
 
+        if (_store.IsRevoked(host, port, presentedFingerprint))
+        {
+            return new HostKeyVerifyResult(
+                Trusted: false,
+                FirstUse: false,
+                presentedFingerprint,
+                StoredFingerprint: null);
+        }
+
         var sessionEntry = _store.GetSessionEntry(host, port);
         if (sessionEntry is not null
             && HostKeyStore.ConstantTimeEquals(sessionEntry.Fingerprint, presentedFingerprint))
