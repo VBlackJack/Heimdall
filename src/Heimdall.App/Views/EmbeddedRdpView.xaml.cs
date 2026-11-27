@@ -932,9 +932,40 @@ public partial class EmbeddedRdpView
     void IRdpDisconnectTeardownTarget.ClearHostChild()
     {
         bool before = _rdpHost?.IsHandleCreated ?? false;
+        MoveFocusOutOfHost();
         FormsHost.Child = null;
         Core.Logging.FileLogger.Info(
             $"EmbeddedRdpView.ClearHostChild: host handleCreated before={before} after={_rdpHost?.IsHandleCreated ?? false}");
+    }
+
+    /// <summary>
+    /// Hands the Win32 focus to the window hosting this view when the RDP control holds it.
+    /// A focused control reparented out of the main window takes the focus along and activates
+    /// WinForms' parking window, so the discarded control would keep the keystrokes.
+    /// </summary>
+    private void MoveFocusOutOfHost()
+    {
+        IntPtr hostHandle = _rdpHost is { IsHandleCreated: true } host ? host.Handle : IntPtr.Zero;
+        IntPtr focusHandle = WindowNative.GetFocus();
+        if (!RdpHostFocusPolicy.IsFocusInsideHost(focusHandle, hostHandle, WindowNative.IsChild))
+        {
+            return;
+        }
+
+        Window? owner = Window.GetWindow(this);
+        IntPtr ownerHandle = owner is null
+            ? IntPtr.Zero
+            : new System.Windows.Interop.WindowInteropHelper(owner).Handle;
+        if (ownerHandle == IntPtr.Zero)
+        {
+            Core.Logging.FileLogger.Info(
+                $"EmbeddedRdpView.ClearHostChild: focus 0x{focusHandle.ToInt64():X} is inside the host but no owner window is available");
+            return;
+        }
+
+        IntPtr previous = WindowNative.SetFocus(ownerHandle);
+        Core.Logging.FileLogger.Info(
+            $"EmbeddedRdpView.ClearHostChild: moved focus out of host (was 0x{focusHandle.ToInt64():X}) to owner 0x{ownerHandle.ToInt64():X}, previous=0x{previous.ToInt64():X}, now=0x{WindowNative.GetFocus().ToInt64():X}");
     }
 
     void IRdpDisconnectTeardownTarget.Disconnect()

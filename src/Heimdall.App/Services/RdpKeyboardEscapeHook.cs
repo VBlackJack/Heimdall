@@ -314,7 +314,7 @@ internal static class RdpKeyboardEscapeHook
 
             foreach (IntPtr focusedHwnd in focusedHandles)
             {
-                if (focusedHwnd == hostHandle || IsChild(hostHandle, focusedHwnd))
+                if (focusedHwnd == hostHandle || WindowNative.IsChild(hostHandle, focusedHwnd))
                 {
                     return view;
                 }
@@ -327,7 +327,7 @@ internal static class RdpKeyboardEscapeHook
     private static List<IntPtr> GetFocusedWindowHandles()
     {
         List<IntPtr> handles = new();
-        IntPtr threadFocus = GetFocus();
+        IntPtr threadFocus = WindowNative.GetFocus();
         if (threadFocus != IntPtr.Zero)
         {
             handles.Add(threadFocus);
@@ -407,14 +407,7 @@ internal static class RdpKeyboardEscapeHook
     private static extern uint GetCurrentThreadId();
 
     [DllImport("user32.dll")]
-    private static extern IntPtr GetFocus();
-
-    [DllImport("user32.dll")]
     private static extern short GetKeyState(int nVirtKey);
-
-    [DllImport("user32.dll")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    private static extern bool IsChild(IntPtr hWndParent, IntPtr hWnd);
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]

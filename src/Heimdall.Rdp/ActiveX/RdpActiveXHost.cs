@@ -207,6 +207,11 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost, IRdpDis
     public bool IsReusable { get; private set; } = true;
 
     /// <summary>
+    /// Remembers whether the OCX <c>Disconnect()</c> already returned since the last connect.
+    /// </summary>
+    private readonly DisconnectIssueTracker _disconnectTracker = new();
+
+    /// <summary>
     /// True when the control holds no live connection, which is the only state in which
     /// <c>put_ClearTextPassword</c> can overwrite the secret. Teardown calls the asynchronous
     /// <c>Disconnect()</c> and releases the control at once, so the pool waits on this before
@@ -496,6 +501,7 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost, IRdpDis
 
         try
         {
+            _disconnectTracker.OnConnectStarted();
             ResolveAndApplyPendingDisplayContext();
 
             // Apply all pending settings before connecting
@@ -528,6 +534,7 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost, IRdpDis
             try
             {
                 ((dynamic)ocx).Disconnect();
+                _disconnectTracker.OnDisconnectReturned();
             }
             catch (Exception ex)
             {
@@ -537,6 +544,23 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost, IRdpDis
                     + $"hr=0x{ex.HResult.ToString("X8", CultureInfo.InvariantCulture)} handleCreated={IsHandleCreated}");
             }
         }
+    }
+
+    /// <summary>
+    /// Issues a disconnect only when none has been issued since the last connect. The
+    /// control refuses a repeated <c>Disconnect()</c> while the first is still settling, so
+    /// the decision is taken from what this host already did rather than from the HRESULT.
+    /// </summary>
+    public void EnsureDisconnectIssued()
+    {
+        if (!_disconnectTracker.ShouldIssueDisconnect)
+        {
+            Core.Logging.FileLogger.Info(
+                "RdpActiveXHost.EnsureDisconnectIssued: skipped, a disconnect was already issued");
+            return;
+        }
+
+        Disconnect();
     }
 
     /// <inheritdoc />
@@ -2331,6 +2355,7 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost, IRdpDis
                 return false;
             }
 
+            _disconnectTracker.OnResetForReuse();
             Core.Logging.FileLogger.Info("RdpActiveXHost.ResetForReuse: control returned to a reusable state");
             return true;
         }

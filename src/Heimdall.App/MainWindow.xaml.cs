@@ -55,9 +55,6 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
     [DllImport("user32.dll")]
     private static extern IntPtr SetActiveWindow(IntPtr hWnd);
 
-    [DllImport("user32.dll")]
-    private static extern IntPtr SetFocus(IntPtr hWnd);
-
     /// <summary>
     /// Centralized tool registry - injected from the ViewModel. Replaces the former
     /// static <c>ToolTypeDefinitions</c> and <c>NetworkTools</c> arrays.
@@ -3961,7 +3958,7 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
         {
             _ = SetForegroundWindow(source.Handle);
             _ = SetActiveWindow(source.Handle);
-            _ = SetFocus(source.Handle);
+            _ = WindowNative.SetFocus(source.Handle);
         }
 
         _foregroundWatchService.Start();
