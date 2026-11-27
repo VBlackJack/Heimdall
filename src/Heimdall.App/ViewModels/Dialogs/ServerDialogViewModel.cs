@@ -1487,6 +1487,15 @@ public partial class ServerDialogViewModel : ObservableValidator
     [ObservableProperty]
     private string _webExternalArguments = "";
 
+    [ObservableProperty]
+    private string _webSignInUsernameSelector = "";
+
+    [ObservableProperty]
+    private string _webSignInPasswordSelector = "";
+
+    [ObservableProperty]
+    private string _webSignInSubmitSelector = "";
+
     public string? ExistingWebPasswordEncrypted { get; set; }
 
     /// <summary>Whether a password for the HTTP challenge is stored for this profile.</summary>
@@ -2883,6 +2892,15 @@ public partial class ServerDialogViewModel : ObservableValidator
             WebOpenExternally = WebOpenExternally,
             WebExternalProgram = string.IsNullOrWhiteSpace(WebExternalProgram) ? null : WebExternalProgram.Trim(),
             WebExternalArguments = string.IsNullOrWhiteSpace(WebExternalArguments) ? null : WebExternalArguments,
+            WebSignInUsernameSelector = string.IsNullOrWhiteSpace(WebSignInUsernameSelector)
+                ? null
+                : WebSignInUsernameSelector.Trim(),
+            WebSignInPasswordSelector = string.IsNullOrWhiteSpace(WebSignInPasswordSelector)
+                ? null
+                : WebSignInPasswordSelector.Trim(),
+            WebSignInSubmitSelector = string.IsNullOrWhiteSpace(WebSignInSubmitSelector)
+                ? null
+                : WebSignInSubmitSelector.Trim(),
             RdpUsername = string.IsNullOrWhiteSpace(RdpUsername) ? null : RdpUsername,
             // Trimmed, because the value is forwarded verbatim as a separate MSTSCAX property
             // and " CORP " is not CORP to the far end. Nothing else normalises it on the way out.
@@ -3106,6 +3124,9 @@ public partial class ServerDialogViewModel : ObservableValidator
         vm.WebOpenExternally = dto.WebOpenExternally;
         vm.WebExternalProgram = dto.WebExternalProgram ?? "";
         vm.WebExternalArguments = dto.WebExternalArguments ?? "";
+        vm.WebSignInUsernameSelector = dto.WebSignInUsernameSelector ?? "";
+        vm.WebSignInPasswordSelector = dto.WebSignInPasswordSelector ?? "";
+        vm.WebSignInSubmitSelector = dto.WebSignInSubmitSelector ?? "";
         vm.RdpUsername = dto.RdpUsername ?? "";
         vm.RdpDomain = dto.RdpDomain ?? "";
         vm.ExistingRdpPasswordEncrypted = dto.RdpPasswordEncrypted;
