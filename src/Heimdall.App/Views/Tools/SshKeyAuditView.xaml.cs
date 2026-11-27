@@ -92,6 +92,7 @@ public partial class SshKeyAuditView : UserControl, IToolView
         BtnBrowse.Content = L("ToolSshAuditBtnBrowse");
         BtnLoadFromAgent.Content = L("ToolSshAuditBtnLoadAgent");
         BtnRemoveFromAgent.Content = L("ToolSshAuditBtnRemoveAgent");
+        BtnClearAgent.Content = L("ToolSshAuditBtnClearAgent");
         BtnDeployKey.Content = L("ToolSshKeyGenBtnDeploy");
         EmptyState.Text = L("ToolSshAuditEmptyState");
         ParseError.Text = L("ToolSshAuditParseError");
@@ -109,6 +110,7 @@ public partial class SshKeyAuditView : UserControl, IToolView
         System.Windows.Automation.AutomationProperties.SetName(BtnBrowse, L("ToolSshAuditBtnBrowse"));
         System.Windows.Automation.AutomationProperties.SetName(BtnLoadFromAgent, L("ToolSshAuditBtnLoadAgent"));
         System.Windows.Automation.AutomationProperties.SetName(BtnRemoveFromAgent, L("ToolSshAuditBtnRemoveAgent"));
+        System.Windows.Automation.AutomationProperties.SetName(BtnClearAgent, L("ToolSshAuditBtnClearAgent"));
         System.Windows.Automation.AutomationProperties.SetName(BtnDeployKey, L("ToolSshKeyGenBtnDeploy"));
         System.Windows.Automation.AutomationProperties.SetName(BtnCopyFingerprint, L("ToolSshAuditBtnCopy"));
         System.Windows.Automation.AutomationProperties.SetName(KeyInput, L("ToolSshAuditInput"));
@@ -387,11 +389,58 @@ public partial class SshKeyAuditView : UserControl, IToolView
         }
     }
 
+    private async void OnClearAgentClick(object sender, RoutedEventArgs e)
+    {
+        var services = (Application.Current as App)?.Services;
+        var configManager = services?.GetService<IConfigManager>();
+        var dialogService = services?.GetService<IDialogService>();
+
+        BtnClearAgent.IsEnabled = false;
+        try
+        {
+            if (dialogService is not null)
+            {
+                var confirmed = await dialogService.ShowConfirmAsync(
+                    L("ToolSshAuditAgentClearConfirmTitle"),
+                    L("ToolSshAuditAgentClearConfirmMessage"),
+                    "warning").ConfigureAwait(true);
+
+                if (!confirmed)
+                {
+                    return;
+                }
+            }
+
+            var preference = await ResolveAgentPreferenceAsync(configManager).ConfigureAwait(true);
+            var result = await Task.Run(() => SshAgentManager.RemoveAllKeys(
+                SshAgentRegistry.CreateDefault(preference))).ConfigureAwait(true);
+
+            _vm.FileErrorMessage = result.Success
+                ? L("ToolSshAgentClearSuccess")
+                : string.Format(CultureInfo.CurrentCulture, L("ToolSshAgentClearFailed"), FormatAgentOperationError(result));
+            _vm.ShowFileError = true;
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"SSH agent clear failed: {ex.Message}");
+            _vm.FileErrorMessage = string.Format(
+                CultureInfo.CurrentCulture,
+                L("ToolSshAgentClearFailed"),
+                ex.Message);
+            _vm.ShowFileError = true;
+        }
+        finally
+        {
+            BtnClearAgent.IsEnabled = true;
+        }
+    }
+
     private string FormatAgentOperationError(SshAgentOperationResult result)
     {
         return result.ErrorCode switch
         {
             SshAgentOperationErrorCode.NoWritableAgent => L("ToolSshAgentErrNoWritableAgent"),
+            SshAgentOperationErrorCode.LifetimeNotSupported => L("ToolSshAgentErrLifetimeNotSupported"),
             SshAgentOperationErrorCode.KeyRefused => L("ToolSshAgentErrKeyRefused"),
             SshAgentOperationErrorCode.RemoveRefused => L("ToolSshAgentErrRemoveRefused"),
             SshAgentOperationErrorCode.KeyNotFound => L("ToolSshAgentErrKeyNotFound"),

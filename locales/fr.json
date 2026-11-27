@@ -7008,5 +7008,11 @@
   "ValidationSshLocalForwardInvalid": "R\u00e8gle de redirection locale invalide : \"{0}\". Format attendu : portLocal:hoteDistant:portDistant.",
   "TrustedHostKeysPolicySummary": "Politiques known_hosts actives : {0} @cert-authority, {1} @revoked",
   "TrustedHostKeysPolicyCaHeading": "Autorit\u00e9s @cert-authority de confiance :",
-  "TrustedHostKeysPolicyRevokedHeading": "Cl\u00e9s @revoked r\u00e9voqu\u00e9es :"
+  "TrustedHostKeysPolicyRevokedHeading": "Cl\u00e9s @revoked r\u00e9voqu\u00e9es :",
+  "ToolSshAgentErrLifetimeNotSupported": "Cet agent SSH ne prend pas en charge la dur\u00e9e de vie temporaire (TTL). R\u00e9essayez avec la dur\u00e9e de session.",
+  "ToolSshAuditBtnClearAgent": "Vider l'agent",
+  "ToolSshAuditAgentClearConfirmTitle": "Vider l'agent SSH",
+  "ToolSshAuditAgentClearConfirmMessage": "Retirer toutes les cl\u00e9s actuellement charg\u00e9es dans l'agent SSH actif ?",
+  "ToolSshAgentClearSuccess": "Toutes les cl\u00e9s ont \u00e9t\u00e9 retir\u00e9es de l'agent SSH actif.",
+  "ToolSshAgentClearFailed": "Impossible de vider l'agent SSH : {0}"
 }

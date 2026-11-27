@@ -165,6 +165,33 @@ public sealed class SshAgentManagerTests
         Assert.Empty(agentB.Keys);
     }
 
+    [Fact]
+    public void SshAgentManager_AddKey_ReturnsLifetimeNotSupportedWhenAgentRejectsConstrainedAdd()
+    {
+        var agent = new NoTtlFakeMutableAgent();
+        var registry = new SshAgentRegistry([agent]);
+        var pair = SshKeyPairGenerator.Generate(SshKeyAlgorithm.Ed25519, "ttl@host", "", SshPrivateKeyFormat.OpenSsh);
+
+        var timed = SshAgentManager.AddKey(registry, pair.PrivateKey, null, "ttl@host", lifetimeSeconds: 3600);
+        Assert.False(timed.Success);
+        Assert.Equal(SshAgentOperationErrorCode.LifetimeNotSupported, timed.ErrorCode);
+
+        var sessionOnly = SshAgentManager.AddKey(registry, pair.PrivateKey, null, "ttl@host", lifetimeSeconds: null);
+        Assert.True(sessionOnly.Success);
+    }
+
+    private sealed class NoTtlFakeMutableAgent : IMutableSshAgent
+    {
+        public string Name => "Pageant";
+        public bool SupportsLifetimeConstraint => false;
+        public bool IsAvailable() => true;
+        public IReadOnlyList<ISshAgentKey> GetIdentities() => [];
+        public bool AddIdentity(byte[] addIdentityWireMessage)
+            => addIdentityWireMessage.Length > 4 && addIdentityWireMessage[4] == OpenSshAgentProtocol.SshAgentcAddIdentity;
+        public bool RemoveIdentity(byte[] publicKeyBlob) => false;
+        public bool RemoveAllIdentities() => true;
+    }
+
     private sealed class NamedFakeMutableAgent(string name) : IMutableSshAgent
     {
         public List<FakeAgentKey> Keys { get; } = [];

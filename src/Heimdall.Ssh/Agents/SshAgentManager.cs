@@ -24,6 +24,9 @@ namespace Heimdall.Ssh.Agents;
 /// </summary>
 public interface IMutableSshAgent : ISshAgent
 {
+    /// <summary>Whether the agent supports <c>SSH2_AGENTC_ADD_ID_CONSTRAINED</c> lifetime TTL constraints.</summary>
+    bool SupportsLifetimeConstraint => true;
+
     bool AddIdentity(byte[] addIdentityWireMessage);
 
     bool RemoveIdentity(byte[] publicKeyBlob);
@@ -37,6 +40,7 @@ public enum SshAgentOperationErrorCode
     None,
     NoWritableAgent,
     KeyRefused,
+    LifetimeNotSupported,
     RemoveRefused,
     KeyNotFound,
     Exception
@@ -84,9 +88,15 @@ public static class SshAgentManager
                 lifetimeSeconds);
 
             var added = targetAgent.AddIdentity(message);
-            return added
-                ? new SshAgentOperationResult(true, targetAgent.Name)
-                : new SshAgentOperationResult(false, targetAgent.Name, null, SshAgentOperationErrorCode.KeyRefused);
+            if (added)
+            {
+                return new SshAgentOperationResult(true, targetAgent.Name);
+            }
+
+            var refusalCode = lifetimeSeconds is > 0 && !targetAgent.SupportsLifetimeConstraint
+                ? SshAgentOperationErrorCode.LifetimeNotSupported
+                : SshAgentOperationErrorCode.KeyRefused;
+            return new SshAgentOperationResult(false, targetAgent.Name, null, refusalCode);
         }
         catch (Exception ex)
         {

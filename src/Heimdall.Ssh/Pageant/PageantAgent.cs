@@ -29,6 +29,8 @@ public sealed class PageantAgent : IMutableSshAgent
 
     public string Name => AgentName;
 
+    public bool SupportsLifetimeConstraint => false;
+
     public bool IsAvailable() => PageantClient.IsAvailable();
 
     public IReadOnlyList<ISshAgentKey> GetIdentities()

@@ -98,6 +98,11 @@
                                     Style="{DynamicResource SecondaryButtonStyle}"
                                     Padding="{StaticResource PaddingButtonCopy}" Margin="{StaticResource MarginInlineControl}"
                                     VerticalAlignment="Top"/>
+                            <Button x:Name="BtnClearAgent" DockPanel.Dock="Right"
+                                    Click="OnClearAgentClick"
+                                    Style="{DynamicResource SecondaryButtonStyle}"
+                                    Padding="{StaticResource PaddingButtonCopy}" Margin="{StaticResource MarginInlineControl}"
+                                    VerticalAlignment="Top"/>
                             <Button x:Name="BtnDeployKey" DockPanel.Dock="Right"
                                     Click="OnDeployKeyClick"
                                     Style="{DynamicResource SecondaryButtonStyle}"

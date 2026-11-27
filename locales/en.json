@@ -7009,5 +7009,11 @@
   "ValidationSshLocalForwardInvalid": "Invalid local port forward rule: \"{0}\". Expected localPort:remoteHost:remotePort.",
   "TrustedHostKeysPolicySummary": "Active known_hosts policies: {0} @cert-authority, {1} @revoked",
   "TrustedHostKeysPolicyCaHeading": "Trusted @cert-authority CAs:",
-  "TrustedHostKeysPolicyRevokedHeading": "Explicitly @revoked keys:"
+  "TrustedHostKeysPolicyRevokedHeading": "Explicitly @revoked keys:",
+  "ToolSshAgentErrLifetimeNotSupported": "This SSH agent does not support timed key lifetimes (TTL). Retry using Session lifetime.",
+  "ToolSshAuditBtnClearAgent": "Clear Agent",
+  "ToolSshAuditAgentClearConfirmTitle": "Clear SSH agent",
+  "ToolSshAuditAgentClearConfirmMessage": "Remove all currently loaded keys from the active SSH agent?",
+  "ToolSshAgentClearSuccess": "All keys removed from the active SSH agent.",
+  "ToolSshAgentClearFailed": "Could not clear SSH agent: {0}"
 }

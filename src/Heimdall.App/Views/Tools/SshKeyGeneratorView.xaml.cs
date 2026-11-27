@@ -440,6 +440,7 @@ public partial class SshKeyGeneratorView : UserControl, IToolView
         return result.ErrorCode switch
         {
             SshAgentOperationErrorCode.NoWritableAgent => L("ToolSshAgentErrNoWritableAgent"),
+            SshAgentOperationErrorCode.LifetimeNotSupported => L("ToolSshAgentErrLifetimeNotSupported"),
             SshAgentOperationErrorCode.KeyRefused => L("ToolSshAgentErrKeyRefused"),
             SshAgentOperationErrorCode.RemoveRefused => L("ToolSshAgentErrRemoveRefused"),
             SshAgentOperationErrorCode.KeyNotFound => L("ToolSshAgentErrKeyNotFound"),
