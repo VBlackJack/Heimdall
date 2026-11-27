@@ -4009,6 +4009,13 @@
                                             <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[TerminalScrollbackLines]}"/>
                                         </StackPanel>
                                         <StackPanel Margin="{StaticResource SettingsFieldGap}">
+                                            <CheckBox x:Name="Mw_SettingsTerminalHighlights"
+                                                      Content="{loc:Translate SettingsLabelTerminalHighlights}"
+                                                      IsChecked="{Binding Settings.TerminalHighlightsEnabled}"
+                                                      AutomationProperties.Name="{loc:Translate SettingsLabelTerminalHighlights}"/>
+                                            <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[TerminalHighlightsEnabled]}"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="{StaticResource SettingsFieldGap}">
                                             <TextBlock x:Name="Mw_SettingsTerminalColorSchemeLabel" Text="{loc:Translate SettingsLabelTerminalColorScheme}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                             <ComboBox x:Name="Mw_ColorSchemeCombo" SelectedValue="{Binding Settings.TerminalColorScheme}" SelectedValuePath="Tag" Width="200" HorizontalAlignment="Left"
                                                       AutomationProperties.LabeledBy="{x:Reference Mw_SettingsTerminalColorSchemeLabel}">

@@ -101,6 +101,9 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     /// <summary>Outbound message: sets the xterm.js convertEol option at runtime.</summary>
     private const string MsgSetConvertEol = "set-convert-eol:";
 
+    /// <summary>Outbound message: toggles real-time regex log highlighting at runtime.</summary>
+    private const string MsgSetHighlights = "set-highlights:";
+
     /// <summary>
     /// Outbound message: the box the page lays itself out in while its surface is hidden
     /// (<c>viewport:W,H</c>), or an empty payload once the surface is shown. See
@@ -274,6 +277,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
     private readonly TerminalBufferReadCoordinator _bufferReads = new();
     private bool _healthPanelVisible;
+    private bool _highlightsEnabled;
     private bool _disposed;
     private IDisposable? _lockdown;
     private bool _webViewInitializationStarted;
@@ -916,6 +920,17 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     private void OnSplitClick(object sender, RoutedEventArgs e)
     {
         SplitRequested?.Invoke();
+    }
+
+    private void OnHighlightsToggleClick(object sender, RoutedEventArgs e)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _highlightsEnabled = !_highlightsEnabled;
+        PostTerminalMessage(MsgSetHighlights + (_highlightsEnabled ? "true" : "false"));
     }
 
     private async Task InitializeWebView2Async()
@@ -2277,6 +2292,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         ReconnectButton.ToolTip = L("TooltipReconnectSession");
         SplitButton.ToolTip = L("TooltipSplitSession");
         HealthToggleButton.ToolTip = L("TooltipToggleHealthMonitoring");
+        HighlightsToggleButton.ToolTip = L("TooltipToggleTerminalHighlights");
         ElevateButton.ToolTip = L("TooltipElevateToRoot");
 
         // Accessibility: automation names for toolbar buttons
@@ -2284,6 +2300,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         System.Windows.Automation.AutomationProperties.SetName(ReconnectButton, L("A11yReconnectSession"));
         System.Windows.Automation.AutomationProperties.SetName(SplitButton, L("A11ySplitSession"));
         System.Windows.Automation.AutomationProperties.SetName(HealthToggleButton, L("A11yToggleHealthMonitoring"));
+        System.Windows.Automation.AutomationProperties.SetName(HighlightsToggleButton, L("A11yToggleTerminalHighlights"));
         System.Windows.Automation.AutomationProperties.SetName(ElevateButton, L("A11yElevateToRoot"));
         System.Windows.Automation.AutomationProperties.SetName(OverlayReconnectButton, L("A11yReconnectSession"));
         System.Windows.Automation.AutomationProperties.SetName(OverlayCloseButton, L("A11yCloseOverlay"));
@@ -2767,6 +2784,11 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         html = html.Replace(
             "/*{{TERMINAL_SCROLLBACK}}*/",
             safeScrollbackLines.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            StringComparison.Ordinal);
+        _highlightsEnabled = TerminalSettings?.TerminalHighlightsEnabled ?? false;
+        html = html.Replace(
+            "/*{{TERMINAL_HIGHLIGHTS}}*/",
+            _highlightsEnabled ? "true" : "false",
             StringComparison.Ordinal);
         html = html.Replace("/*{{TERMINAL_THEME}}*/", themeJson, StringComparison.Ordinal);
         html = html.Replace("/*{{TERMINAL_CONVERT_EOL}}*/", convertEol, StringComparison.Ordinal);

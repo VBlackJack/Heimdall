@@ -224,6 +224,7 @@ public sealed class AppSettings
     public int TerminalFontSize { get; set; } = DefaultTerminalFontSize;
     [SettingRange(MinTerminalScrollbackLines, MaxTerminalScrollbackLines)]
     public int TerminalScrollbackLines { get; set; } = DefaultTerminalScrollbackLines;
+    public bool TerminalHighlightsEnabled { get; set; }
     public string TerminalColorScheme { get; set; } = DefaultTerminalColorScheme;
     public string PowerShellExecutionPolicy { get; set; } = "Default";
 

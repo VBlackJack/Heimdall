@@ -379,6 +379,9 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private string _terminalColorScheme = "Dracula";
 
     [ObservableProperty]
+    private bool _terminalHighlightsEnabled;
+
+    [ObservableProperty]
     private string _powerShellExecutionPolicy = "Default";
 
     // --- SSH & SFTP ---
@@ -1897,6 +1900,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             TerminalFontFamily = settings.TerminalFontFamily;
             TerminalFontSize = settings.TerminalFontSize;
             TerminalScrollbackLines = settings.TerminalScrollbackLines;
+            TerminalHighlightsEnabled = settings.TerminalHighlightsEnabled;
             TerminalColorScheme = settings.TerminalColorScheme;
             PowerShellExecutionPolicy = settings.PowerShellExecutionPolicy;
 
@@ -2389,6 +2393,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         settings.TerminalFontFamily = TerminalFontFamily;
         settings.TerminalFontSize = TerminalFontSize;
         settings.TerminalScrollbackLines = TerminalScrollbackLines;
+        settings.TerminalHighlightsEnabled = TerminalHighlightsEnabled;
         settings.TerminalColorScheme = TerminalColorScheme;
         settings.PowerShellExecutionPolicy = PowerShellExecutionPolicy;
 

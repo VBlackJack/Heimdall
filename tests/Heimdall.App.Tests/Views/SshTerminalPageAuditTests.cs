@@ -144,6 +144,14 @@ public sealed class SshTerminalPageAuditTests
     }
 
     [Fact]
+    public void Page_HighlightsAreConfiguredViaPlaceholder_AndSkipAlternateScreen()
+    {
+        Html.Should().Contain("/*{{TERMINAL_HIGHLIGHTS}}*/");
+        Html.Should().Contain("'set-highlights:'");
+        Html.Should().Contain("term.buffer.active.type !== 'normal'");
+    }
+
+    [Fact]
     public void SessionTab_BellNotification_SetsOnlyWhenInactive_AndClearsOnActivation()
     {
         var tab = new Heimdall.App.ViewModels.SessionTabViewModel

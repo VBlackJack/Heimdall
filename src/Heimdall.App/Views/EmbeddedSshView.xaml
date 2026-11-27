@@ -120,6 +120,15 @@
                             Style="{DynamicResource GhostButtonStyle}"
                             Padding="6,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0"/>
 
+                    <Button x:Name="HighlightsToggleButton"
+                            Content="&#xE7E6;"
+                            FontFamily="{StaticResource FontFamilyIcons}"
+                            Click="OnHighlightsToggleClick"
+                            ToolTip="{loc:Translate TooltipToggleTerminalHighlights}"
+                            AutomationProperties.Name="{loc:Translate A11yToggleTerminalHighlights}"
+                            Style="{DynamicResource GhostButtonStyle}"
+                            Padding="6,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0"/>
+
                     <Button x:Name="HealthToggleButton"
                             Content="&#xE9D9;"
                             FontFamily="{StaticResource FontFamilyIcons}"

@@ -55,6 +55,7 @@ internal static class SettingsLabelCatalog
         [nameof(AppSettings.TerminalFontFamily)] = new("SettingsLabelTerminalFont", "SettingsTabTerminal", "SettingsSectionTerminal"),
         [nameof(AppSettings.TerminalFontSize)] = new("SettingsLabelTerminalFontSize", "SettingsTabTerminal", "SettingsSectionTerminal"),
         [nameof(AppSettings.TerminalScrollbackLines)] = new("SettingsLabelTerminalScrollback", "SettingsTabTerminal", "SettingsSectionTerminal"),
+        [nameof(AppSettings.TerminalHighlightsEnabled)] = new("SettingsLabelTerminalHighlights", "SettingsTabTerminal", "SettingsSectionTerminal"),
         [nameof(AppSettings.PlinkPath)] = new("SettingsLabelPlinkPath", "SettingsTabSshSftp", "SettingsSshSubTabConnection"),
         [nameof(AppSettings.PuttyPath)] = new("SettingsLabelPuttyPath", "SettingsTabSshSftp", "SettingsSshSubTabConnection"),
         [nameof(AppSettings.SshAgentPreference)] = new("SettingsSshAgentPreferenceLabel", "SettingsTabSshSftp", "SettingsSshSubTabConnection"),
