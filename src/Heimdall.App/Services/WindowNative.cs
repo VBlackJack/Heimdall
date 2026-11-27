@@ -80,4 +80,17 @@ internal static class WindowNative
     /// <summary>Writes a 32-bit value into the window information.</summary>
     [DllImport("user32.dll", EntryPoint = "SetWindowLongW")]
     public static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+
+    /// <summary>Retrieves the window that has the keyboard focus on the calling thread.</summary>
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetFocus();
+
+    /// <summary>Tells whether a window is a child or descendant of another window.</summary>
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool IsChild(IntPtr hWndParent, IntPtr hWnd);
+
+    /// <summary>Gives the keyboard focus to a window of the calling thread.</summary>
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern IntPtr SetFocus(IntPtr hWnd);
 }
