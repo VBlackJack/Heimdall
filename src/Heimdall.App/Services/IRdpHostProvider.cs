@@ -317,9 +317,11 @@ public sealed class PooledRdpHostProvider : IRdpHostProvider, IDisposable
             // forced instead: the disconnect needs a live window to complete in.
             _ = host.Handle;
 
-            // The first Disconnect() ran while the control had no window; repeating it is
-            // idempotent and now has one to complete in.
-            host.Disconnect();
+            // The view's teardown normally issued the disconnect already, and the control
+            // refuses a repeat while it settles, so the repeat only runs when no disconnect
+            // was issued yet (the first call failed or never ran); it then has a window to
+            // complete in.
+            host.EnsureDisconnectIssued();
         }
 
         public void Unpark(RdpActiveXHost host)
