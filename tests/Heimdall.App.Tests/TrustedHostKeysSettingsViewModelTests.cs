@@ -267,6 +267,25 @@ public sealed class TrustedHostKeysSettingsViewModelTests
         Assert.NotEqual(HostKeySource.ImportedKnownHosts.ToString(), row.SourceDisplay);
     }
 
+    [Fact]
+    public async Task SecurityPolicies_ExposeCertAuthoritiesAndRevokedCountsAndTooltip()
+    {
+        var fixture = await VmFixture.CreateAsync();
+        Assert.False(fixture.ViewModel.HasSecurityPolicies);
+
+        fixture.Store.AddCertAuthority("*.corp.example.com", "SHA256:caFingerprint1");
+        fixture.Store.AddRevokedKey("bad.example.com", "SHA256:revokedFp1");
+        fixture.ViewModel.Refresh();
+
+        Assert.True(fixture.ViewModel.HasSecurityPolicies);
+        Assert.Equal(1, fixture.ViewModel.CertAuthorityCount);
+        Assert.Equal(1, fixture.ViewModel.RevokedKeyCount);
+        Assert.Contains("1 @cert-authority", fixture.ViewModel.PolicySummaryText, StringComparison.Ordinal);
+        Assert.Contains("1 @revoked", fixture.ViewModel.PolicySummaryText, StringComparison.Ordinal);
+        Assert.Contains("*.corp.example.com", fixture.ViewModel.PolicyDetailsTooltip, StringComparison.Ordinal);
+        Assert.Contains("bad.example.com", fixture.ViewModel.PolicyDetailsTooltip, StringComparison.Ordinal);
+    }
+
     private static HostKeyEntry Entry(
         string fingerprint,
         int daysAgo,

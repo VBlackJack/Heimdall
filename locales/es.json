@@ -7006,5 +7006,8 @@
   "ServerDialogSshLocalForwardsLabel": "Reenv\u00edos de puertos locales SSH directos (-L)",
   "ServerDialogSshLocalForwardsHint": "Una regla por l\u00ednea: puertoLocal:hostRemoto:puertoRemoto (p. ej. 8080:127.0.0.1:80 o [::1]:8443:db.internal:5432).",
   "A11yServerSshLocalForwards": "Reenv\u00edos de puertos locales SSH directos, una regla por l\u00ednea",
-  "ValidationSshLocalForwardInvalid": "Regla de reenv\u00edo local no v\u00e1lida: \"{0}\". Formato esperado: puertoLocal:hostRemoto:puertoRemoto."
+  "ValidationSshLocalForwardInvalid": "Regla de reenv\u00edo local no v\u00e1lida: \"{0}\". Formato esperado: puertoLocal:hostRemoto:puertoRemoto.",
+  "TrustedHostKeysPolicySummary": "Pol\u00edticas known_hosts activas: {0} @cert-authority, {1} @revoked",
+  "TrustedHostKeysPolicyCaHeading": "Autoridades @cert-authority de confianza:",
+  "TrustedHostKeysPolicyRevokedHeading": "Claves @revoked revocadas:"
 }

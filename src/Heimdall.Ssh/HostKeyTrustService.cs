@@ -371,6 +371,12 @@ public sealed class HostKeyTrustService(HostKeyStore store) : IHostKeyTrustServi
     public KnownHostsPolicyEntries LoadPolicyFromKnownHosts(string knownHostsContent)
         => _store.LoadPolicyFromKnownHosts(knownHostsContent);
 
+    public IReadOnlyList<(string HostPatterns, string Fingerprint)> GetCertAuthorities()
+        => _store.GetCertAuthorities();
+
+    public IReadOnlyList<(string HostPatterns, string Fingerprint)> GetRevokedKeys()
+        => _store.GetRevokedKeys();
+
     private static string NormalizeAlgorithm(string? candidate, string? fallback = null)
     {
         if (!string.IsNullOrWhiteSpace(candidate) && !string.Equals(candidate, "unknown", StringComparison.OrdinalIgnoreCase))

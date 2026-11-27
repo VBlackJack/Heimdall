@@ -426,6 +426,20 @@ public sealed class HostKeyStore
         return policy;
     }
 
+    /// <summary>Returns all active <c>@cert-authority</c> rules.</summary>
+    public IReadOnlyList<(string HostPatterns, string Fingerprint)> GetCertAuthorities()
+        => _certAuthorities.Values
+            .OrderBy(static r => r.HostPatterns, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(static r => r.Fingerprint, StringComparer.Ordinal)
+            .ToList();
+
+    /// <summary>Returns all active <c>@revoked</c> rules.</summary>
+    public IReadOnlyList<(string HostPatterns, string Fingerprint)> GetRevokedKeys()
+        => _revokedKeys.Values
+            .OrderBy(static r => r.HostPatterns, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(static r => r.Fingerprint, StringComparer.Ordinal)
+            .ToList();
+
     /// <summary>Returns true if <paramref name="caFingerprint"/> is trusted as a CA for <paramref name="host"/>:<paramref name="port"/>.</summary>
     public bool IsTrustedCertAuthority(string host, int port, string caFingerprint)
     {

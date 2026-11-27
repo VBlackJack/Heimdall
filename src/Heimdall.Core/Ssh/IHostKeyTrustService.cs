@@ -51,6 +51,12 @@ public interface IHostKeyTrustService
     /// </summary>
     KnownHostsPolicyEntries LoadPolicyFromKnownHosts(string knownHostsContent) => new([], []);
 
+    /// <summary>Returns all active <c>@cert-authority</c> rules.</summary>
+    IReadOnlyList<(string HostPatterns, string Fingerprint)> GetCertAuthorities() => [];
+
+    /// <summary>Returns all active <c>@revoked</c> rules.</summary>
+    IReadOnlyList<(string HostPatterns, string Fingerprint)> GetRevokedKeys() => [];
+
     event Action<string, HostKeyEntry>? EntryTrusted;
 
     event Action<string>? EntryRemoved;

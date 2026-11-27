@@ -7005,5 +7005,8 @@
   "ServerDialogSshLocalForwardsLabel": "Redirections de ports locaux SSH directes (-L)",
   "ServerDialogSshLocalForwardsHint": "Une r\u00e8gle par ligne : portLocal:hoteDistant:portDistant (ex. 8080:127.0.0.1:80 ou [::1]:8443:db.internal:5432).",
   "A11yServerSshLocalForwards": "Redirections de ports locaux SSH directes, une r\u00e8gle par ligne",
-  "ValidationSshLocalForwardInvalid": "R\u00e8gle de redirection locale invalide : \"{0}\". Format attendu : portLocal:hoteDistant:portDistant."
+  "ValidationSshLocalForwardInvalid": "R\u00e8gle de redirection locale invalide : \"{0}\". Format attendu : portLocal:hoteDistant:portDistant.",
+  "TrustedHostKeysPolicySummary": "Politiques known_hosts actives : {0} @cert-authority, {1} @revoked",
+  "TrustedHostKeysPolicyCaHeading": "Autorit\u00e9s @cert-authority de confiance :",
+  "TrustedHostKeysPolicyRevokedHeading": "Cl\u00e9s @revoked r\u00e9voqu\u00e9es :"
 }

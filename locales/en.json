@@ -7006,5 +7006,8 @@
   "ServerDialogSshLocalForwardsLabel": "Direct SSH local port forwards (-L)",
   "ServerDialogSshLocalForwardsHint": "One rule per line: localPort:remoteHost:remotePort (e.g. 8080:127.0.0.1:80 or [::1]:8443:db.internal:5432).",
   "A11yServerSshLocalForwards": "Direct SSH local port forwards, one rule per line",
-  "ValidationSshLocalForwardInvalid": "Invalid local port forward rule: \"{0}\". Expected localPort:remoteHost:remotePort."
+  "ValidationSshLocalForwardInvalid": "Invalid local port forward rule: \"{0}\". Expected localPort:remoteHost:remotePort.",
+  "TrustedHostKeysPolicySummary": "Active known_hosts policies: {0} @cert-authority, {1} @revoked",
+  "TrustedHostKeysPolicyCaHeading": "Trusted @cert-authority CAs:",
+  "TrustedHostKeysPolicyRevokedHeading": "Explicitly @revoked keys:"
 }

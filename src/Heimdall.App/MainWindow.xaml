@@ -4364,6 +4364,28 @@
                                                   AutomationProperties.HelpText="{loc:Translate SettingsSyncKnownHostsAtStartupHint}"/>
                                         <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[SyncKnownHostsAtStartup]}"/>
                                         <TextBlock Text="{loc:Translate SettingsSyncKnownHostsAtStartupHint}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="20,4,0,12" TextWrapping="Wrap"/>
+                                        <Border Background="{DynamicResource SurfaceBrush}"
+                                                BorderBrush="{DynamicResource BorderBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="{StaticResource CornerRadiusSm}"
+                                                Padding="10,6"
+                                                Margin="0,0,0,8"
+                                                ToolTip="{Binding Settings.TrustedHostKeys.PolicyDetailsTooltip}"
+                                                Visibility="{Binding Settings.TrustedHostKeys.HasSecurityPolicies, Converter={StaticResource BoolToVisibilityConverter}}">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock FontFamily="{StaticResource FontFamilyIcons}"
+                                                           Text="&#xE72E;"
+                                                           FontSize="{StaticResource IconSizeSmall}"
+                                                           Foreground="{DynamicResource AccentBrush}"
+                                                           VerticalAlignment="Center"/>
+                                                <TextBlock Text="{Binding Settings.TrustedHostKeys.PolicySummaryText}"
+                                                           FontSize="{StaticResource FontSizeCaption}"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                           Margin="8,0,0,0"
+                                                           VerticalAlignment="Center"
+                                                           TextWrapping="Wrap"/>
+                                            </StackPanel>
+                                        </Border>
                                         <TextBox Text="{Binding Settings.TrustedHostKeys.SearchText, UpdateSourceTrigger=PropertyChanged}"
                                                  Style="{StaticResource WatermarkTextBoxStyle}"
                                                  Tag="{loc:Translate HintTrustedHostKeysSearch}"

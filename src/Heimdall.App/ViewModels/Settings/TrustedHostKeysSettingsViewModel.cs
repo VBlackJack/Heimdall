@@ -62,6 +62,20 @@ public sealed partial class TrustedHostKeysSettingsViewModel : ObservableObject,
     [NotifyPropertyChangedFor(nameof(HasStatusMessage))]
     private string _statusMessage = string.Empty;
 
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSecurityPolicies))]
+    private int _certAuthorityCount;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSecurityPolicies))]
+    private int _revokedKeyCount;
+
+    [ObservableProperty]
+    private string _policySummaryText = string.Empty;
+
+    [ObservableProperty]
+    private string _policyDetailsTooltip = string.Empty;
+
     public TrustedHostKeysSettingsViewModel(
         IHostKeyTrustService trustService,
         KnownHostsImporter knownHostsImporter,
@@ -120,6 +134,8 @@ public sealed partial class TrustedHostKeysSettingsViewModel : ObservableObject,
 
     public bool HasStatusMessage => !string.IsNullOrWhiteSpace(StatusMessage);
 
+    public bool HasSecurityPolicies => CertAuthorityCount > 0 || RevokedKeyCount > 0;
+
     public string DefaultKnownHostsPath => KnownHostsImporter.GetDefaultKnownHostsPath();
 
     partial void OnSearchTextChanged(string value) => ApplyFilterAndSort();
@@ -133,6 +149,7 @@ public sealed partial class TrustedHostKeysSettingsViewModel : ObservableObject,
             _allRows.Add(CreateRow(hostPort, entry));
         }
 
+        RefreshPolicySummary();
         ApplyFilterAndSort();
         StatusMessage = string.Empty;
     }
@@ -256,6 +273,7 @@ public sealed partial class TrustedHostKeysSettingsViewModel : ObservableObject,
             }
         }
 
+        RefreshPolicySummary();
         StatusMessage = report.Conflicts.Count == 0
             ? _localizer.Format("ToastImportSummary", report.Imported, report.Matched)
             : _localizer.Format("ToastImportConflictSummary", kept, replaced, report.Imported);
@@ -366,7 +384,46 @@ public sealed partial class TrustedHostKeysSettingsViewModel : ObservableObject,
             _allRows[index] = CreateRow(row.HostPort, row.Entry);
         }
 
+        RefreshPolicySummary();
         ApplyFilterAndSort();
+    }
+
+    private void RefreshPolicySummary()
+    {
+        var cas = _trustService.GetCertAuthorities();
+        var revoked = _trustService.GetRevokedKeys();
+        CertAuthorityCount = cas.Count;
+        RevokedKeyCount = revoked.Count;
+
+        if (!HasSecurityPolicies)
+        {
+            PolicySummaryText = string.Empty;
+            PolicyDetailsTooltip = string.Empty;
+            return;
+        }
+
+        PolicySummaryText = _localizer.Format("TrustedHostKeysPolicySummary", cas.Count, revoked.Count);
+
+        var lines = new List<string>();
+        if (cas.Count > 0)
+        {
+            lines.Add(_localizer["TrustedHostKeysPolicyCaHeading"]);
+            foreach (var (pattern, fp) in cas.Take(10))
+            {
+                lines.Add($"  {pattern} ({fp})");
+            }
+        }
+
+        if (revoked.Count > 0)
+        {
+            lines.Add(_localizer["TrustedHostKeysPolicyRevokedHeading"]);
+            foreach (var (pattern, fp) in revoked.Take(10))
+            {
+                lines.Add($"  {pattern} ({fp})");
+            }
+        }
+
+        PolicyDetailsTooltip = string.Join(Environment.NewLine, lines);
     }
 
     private string LocalizeSource(HostKeySource source) => source switch
