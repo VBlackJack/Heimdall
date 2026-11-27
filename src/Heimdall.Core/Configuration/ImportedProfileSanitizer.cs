@@ -137,6 +137,9 @@ public static class ImportedProfileSanitizer
     {
         ArgumentNullException.ThrowIfNull(gateway);
 
+        // Agent key fingerprints are machine-local; an imported gateway must not pick a local agent key.
+        gateway.SshAgentKeyFingerprint = null;
+
         string? keyPath = gateway.KeyPath;
         if (!ImportedPathPolicy.IsNetworkOrDevicePath(keyPath))
         {

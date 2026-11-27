@@ -88,6 +88,11 @@
                                     Style="{DynamicResource SecondaryButtonStyle}"
                                     Padding="{StaticResource PaddingButtonCopy}" Margin="{StaticResource MarginInlineControl}"
                                     VerticalAlignment="Top"/>
+                            <Button x:Name="BtnLoadFromAgent" DockPanel.Dock="Right"
+                                    Click="OnLoadFromAgentClick"
+                                    Style="{DynamicResource SecondaryButtonStyle}"
+                                    Padding="{StaticResource PaddingButtonCopy}" Margin="{StaticResource MarginInlineControl}"
+                                    VerticalAlignment="Top"/>
                             <TextBlock x:Name="InputLabel"
                                        Foreground="{DynamicResource TextSecondaryBrush}"
                                        FontSize="{StaticResource FontSizeCaption}"

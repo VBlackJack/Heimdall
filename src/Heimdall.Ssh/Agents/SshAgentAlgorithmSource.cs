@@ -63,11 +63,11 @@ internal sealed class SshAgentAlgorithmSource : IPrivateKeySource
 
     private readonly IReadOnlyCollection<HostAlgorithm> _algorithms;
 
-    public SshAgentAlgorithmSource(SshAgentAttempt attempt)
+    public SshAgentAlgorithmSource(SshAgentAttempt attempt, Action<ISshAgentKey>? onSigned = null)
     {
         ArgumentNullException.ThrowIfNull(attempt.Key);
         ArgumentException.ThrowIfNullOrEmpty(attempt.Algorithm);
-        _algorithms = [new SshAgentHostAlgorithm(attempt.Algorithm, attempt.Key, attempt.SignFlags)];
+        _algorithms = [new SshAgentHostAlgorithm(attempt.Algorithm, attempt.Key, attempt.SignFlags, onSigned)];
     }
 
     public IReadOnlyCollection<HostAlgorithm> HostKeyAlgorithms => _algorithms;
@@ -103,10 +103,12 @@ internal sealed class SshAgentAlgorithmSource : IPrivateKeySource
     }
 
     /// <summary>Builds one source per attempt, in <see cref="Order"/> order.</summary>
-    internal static IPrivateKeySource[] BuildSources(IReadOnlyList<ISshAgentKey> keys)
+    internal static IPrivateKeySource[] BuildSources(
+        IReadOnlyList<ISshAgentKey> keys,
+        Action<ISshAgentKey>? onSigned = null)
     {
         return Order(keys)
-            .Select(attempt => (IPrivateKeySource)new SshAgentAlgorithmSource(attempt))
+            .Select(attempt => (IPrivateKeySource)new SshAgentAlgorithmSource(attempt, onSigned))
             .ToArray();
     }
 

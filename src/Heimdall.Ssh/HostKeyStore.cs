@@ -31,6 +31,7 @@ public sealed class HostKeyStore
     private const string UnknownAlgorithm = "unknown";
     private readonly ConcurrentDictionary<string, HostKeyEntry> _trustedKeys = new();
     private readonly ConcurrentDictionary<string, HostKeyEntry> _sessionTrustedKeys = new();
+    private readonly ConcurrentDictionary<string, HostKeyEntry> _additionalAlgorithmKeys = new(StringComparer.Ordinal);
 
     /// <summary>
     /// Raised whenever a host key is explicitly trusted.
@@ -227,8 +228,97 @@ public sealed class HostKeyStore
         ArgumentNullException.ThrowIfNull(host);
         var key = HostKeyFormats.MakeKey(host, port);
         _sessionTrustedKeys.TryRemove(key, out _);
+        RemoveAdditionalAlgorithms(key);
         return _trustedKeys.TryRemove(key, out _);
     }
+
+    /// <summary>
+    /// Registers an additional trusted host key for a different algorithm on the same
+    /// <c>(host, port)</c> (for servers that serve both RSA and Ed25519 keys) without
+    /// replacing the primary entry.
+    /// </summary>
+    public void TrustAdditionalAlgorithm(
+        string host,
+        int port,
+        string fingerprint,
+        string algorithm,
+        HostKeySource source,
+        string? publicKeyBase64 = null)
+    {
+        ArgumentNullException.ThrowIfNull(host);
+        ArgumentNullException.ThrowIfNull(fingerprint);
+        ArgumentException.ThrowIfNullOrWhiteSpace(algorithm);
+
+        var canonicalAlgorithm = KnownHostsParser.CanonicalizeKeyType(algorithm);
+        var compositeKey = MakeAlgorithmKey(HostKeyFormats.MakeKey(host, port), canonicalAlgorithm);
+        var now = DateTimeOffset.UtcNow;
+        _additionalAlgorithmKeys[compositeKey] = new HostKeyEntry(
+            fingerprint,
+            now,
+            now,
+            canonicalAlgorithm,
+            source)
+        { PublicKeyBase64 = publicKeyBase64 };
+    }
+
+    /// <summary>
+    /// Returns an additional algorithm-specific trusted entry for <c>(host, port, algorithm)</c>,
+    /// or null if none is stored.
+    /// </summary>
+    public HostKeyEntry? GetAdditionalEntry(string host, int port, string algorithm)
+    {
+        ArgumentNullException.ThrowIfNull(host);
+        if (string.IsNullOrWhiteSpace(algorithm))
+        {
+            return null;
+        }
+
+        var canonicalAlgorithm = KnownHostsParser.CanonicalizeKeyType(algorithm);
+        var compositeKey = MakeAlgorithmKey(HostKeyFormats.MakeKey(host, port), canonicalAlgorithm);
+        return _additionalAlgorithmKeys.TryGetValue(compositeKey, out var entry) ? entry : null;
+    }
+
+    /// <summary>
+    /// Returns all trusted entries (primary plus any additional algorithms) stored for
+    /// <c>(host, port)</c>.
+    /// </summary>
+    public IReadOnlyList<HostKeyEntry> GetEntries(string host, int port)
+    {
+        ArgumentNullException.ThrowIfNull(host);
+
+        var list = new List<HostKeyEntry>();
+        var hostPort = HostKeyFormats.MakeKey(host, port);
+        if (_trustedKeys.TryGetValue(hostPort, out var primary))
+        {
+            list.Add(primary);
+        }
+
+        var prefix = hostPort + "|";
+        foreach (var kvp in _additionalAlgorithmKeys)
+        {
+            if (kvp.Key.StartsWith(prefix, StringComparison.Ordinal))
+            {
+                list.Add(kvp.Value);
+            }
+        }
+
+        return list;
+    }
+
+    private void RemoveAdditionalAlgorithms(string hostPortKey)
+    {
+        var prefix = hostPortKey + "|";
+        foreach (var key in _additionalAlgorithmKeys.Keys)
+        {
+            if (key.StartsWith(prefix, StringComparison.Ordinal))
+            {
+                _additionalAlgorithmKeys.TryRemove(key, out _);
+            }
+        }
+    }
+
+    private static string MakeAlgorithmKey(string hostPortKey, string canonicalAlgorithm) =>
+        $"{hostPortKey}|{canonicalAlgorithm}";
 
     /// <summary>
     /// Remove a trusted entry by its stored key, which for a hashed known_hosts

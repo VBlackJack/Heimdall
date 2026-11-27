@@ -383,6 +383,7 @@ public sealed partial class TunnelManager
             Password = nextGateway.Password,
             KeyPassphrase = nextGateway.KeyPassphrase,
             SshAgentPreference = nextGateway.SshAgentPreference,
+            AgentKeyFingerprint = nextGateway.AgentKeyFingerprint,
             UseLegacyPasswordAsKeyPassphrase = nextGateway.UseLegacyPasswordAsKeyPassphrase,
             LegacyCredentialName = nextGateway.LegacyCredentialName,
             AgentForwarding = nextGateway.AgentForwarding,

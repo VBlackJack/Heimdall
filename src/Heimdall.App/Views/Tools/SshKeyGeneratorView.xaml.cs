@@ -19,10 +19,14 @@ using System.IO;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using Heimdall.App.Localization;
 using Heimdall.App.Services;
+using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
+using Heimdall.Core.Ssh;
 using Heimdall.Ssh;
+using Microsoft.Extensions.DependencyInjection;
 using SaveFileDialog = Microsoft.Win32.SaveFileDialog;
 
 namespace Heimdall.App.Views.Tools;
@@ -105,6 +109,7 @@ public partial class SshKeyGeneratorView : UserControl, IToolView
         PublicKeyLabel.Text = L("ToolSshKeyGenPublicKey");
         BtnCopyPublicKey.Content = L("ToolSshKeyGenBtnCopy");
         BtnSavePublicKey.Content = L("ToolSshKeyGenBtnSave");
+        BtnDeployPublicKey.Content = L("ToolSshKeyGenBtnDeploy");
         PrivateKeyLabel.Text = L("ToolSshKeyGenPrivateKey");
         BtnCopyPrivateKey.Content = L("ToolSshKeyGenBtnCopy");
         BtnShowPrivateKey.Content = _privateKeyVisible
@@ -129,6 +134,7 @@ public partial class SshKeyGeneratorView : UserControl, IToolView
         System.Windows.Automation.AutomationProperties.SetName(BtnCopyPublicKey, L("ToolSshKeyGenBtnCopy"));
         System.Windows.Automation.AutomationProperties.SetName(BtnCopyPrivateKey, L("ToolSshKeyGenBtnCopy"));
         System.Windows.Automation.AutomationProperties.SetName(BtnSavePublicKey, L("ToolSshKeyGenBtnSave"));
+        System.Windows.Automation.AutomationProperties.SetName(BtnDeployPublicKey, L("ToolSshKeyGenBtnDeploy"));
         System.Windows.Automation.AutomationProperties.SetName(BtnSavePrivateKey, L("ToolSshKeyGenBtnSave"));
         System.Windows.Automation.AutomationProperties.SetName(BtnShowPrivateKey, L("ToolSshKeyGenBtnShow"));
         System.Windows.Automation.AutomationProperties.SetName(AlgorithmCombo, L("ToolSshKeyGenAlgorithm"));
@@ -295,6 +301,126 @@ public partial class SshKeyGeneratorView : UserControl, IToolView
         if (dialog.ShowDialog() == true)
         {
             TrySaveKey(() => Heimdall.Core.Security.SshKeyFileWriter.WritePrivateKey(dialog.FileName, _privateKey));
+        }
+    }
+
+    private async void OnDeployPublicKeyClick(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(_publicKeyOpenSsh))
+        {
+            return;
+        }
+
+        var services = (Application.Current as App)?.Services;
+        var configManager = services?.GetService<IConfigManager>();
+        var dialogService = services?.GetService<IDialogService>();
+        var hostKeyStore = services?.GetService<HostKeyStore>();
+        var hostKeyVerifier = services?.GetService<IHostKeyVerifier>();
+
+        if (configManager is null || dialogService is null || hostKeyStore is null || hostKeyVerifier is null)
+        {
+            ShowValidation(L("ToolSshKeyGenDeployNoServers"));
+            return;
+        }
+
+        BtnDeployPublicKey.IsEnabled = false;
+        try
+        {
+            var servers = await configManager.LoadServersAsync().ConfigureAwait(true);
+            var settings = await configManager.LoadSettingsAsync().ConfigureAwait(true);
+            var directSshServers = servers
+                .Where(s => string.Equals(s.ConnectionType, "SSH", StringComparison.OrdinalIgnoreCase)
+                    && !string.IsNullOrWhiteSpace(s.RemoteServer)
+                    && (s.UseDirectConnection || string.IsNullOrWhiteSpace(s.SshGatewayId)))
+                .ToList();
+
+            if (directSshServers.Count == 0)
+            {
+                ShowValidation(L("ToolSshKeyGenDeployNoServers"));
+                return;
+            }
+
+            var choices = directSshServers
+                .Select(s => $"{s.DisplayName} ({s.RemoteServer}:{s.SshPort})")
+                .ToList();
+
+            var selected = await dialogService.ShowChoiceAsync(
+                L("ToolSshKeyGenDeployTitle"),
+                L("ToolSshKeyGenDeploySelectServer"),
+                choices,
+                defaultIndex: 0,
+                cancelLabel: L("BtnCancel"));
+
+            if (selected is not int index || index < 0 || index >= directSshServers.Count)
+            {
+                return;
+            }
+
+            var target = directSshServers[index];
+            var password = ConnectionHelpers.DecryptPassword(target.SshPasswordEncrypted);
+            var keyPassphrase = ConnectionHelpers.DecryptPassword(target.SshKeyPassphraseEncrypted);
+
+            ShowValidation(string.Format(
+                CultureInfo.CurrentCulture,
+                L("ToolSshKeyGenDeployInProgress"),
+                target.DisplayName));
+
+            var connParams = new SshConnectionParams
+            {
+                Host = target.RemoteServer,
+                Port = target.SshPort,
+                Username = target.SshUsername ?? string.Empty,
+                KeyPath = string.IsNullOrWhiteSpace(target.SshKeyPath) ? null : target.SshKeyPath,
+                Password = password,
+                KeyPassphrase = keyPassphrase,
+                SshAgentPreference = settings.SshAgentPreference,
+                AgentKeyFingerprint = target.SshAgentKeyFingerprint,
+                UseLegacyPasswordAsKeyPassphrase = target.UsesLegacySshCredentialMapping,
+                LegacyCredentialName = target.DisplayName,
+                AuthenticationTimeout = TimeSpan.FromMinutes(2),
+                KeyboardInteractiveResponder = request => dialogService.ShowPasswordInputAsync(
+                    L(SshLocalizationKeys.InteractivePromptTitle),
+                    string.Format(
+                        CultureInfo.CurrentCulture,
+                        L(SshLocalizationKeys.InteractivePromptMessage),
+                        target.RemoteServer,
+                        target.SshUsername ?? string.Empty,
+                        ServerPromptText.Sanitize(request))).GetAwaiter().GetResult()
+            };
+
+            var result = await SshPublicKeyDeployer.DeployAsync(
+                    connParams,
+                    _publicKeyOpenSsh,
+                    hostKeyStore,
+                    hostKeyVerifier)
+                .ConfigureAwait(true);
+
+            if (result.Success)
+            {
+                var key = result.AlreadyInstalled
+                    ? "ToolSshKeyGenDeployAlreadyInstalled"
+                    : "ToolSshKeyGenDeploySuccess";
+                ShowValidation(string.Format(CultureInfo.CurrentCulture, L(key), target.DisplayName));
+            }
+            else
+            {
+                ShowValidation(string.Format(
+                    CultureInfo.CurrentCulture,
+                    L("ToolSshKeyGenDeployFailed"),
+                    result.ErrorMessage ?? string.Empty));
+            }
+        }
+        catch (Exception ex)
+        {
+            Heimdall.Core.Logging.FileLogger.Warn($"SSH public key deployment failed: {ex.Message}");
+            ShowValidation(string.Format(
+                CultureInfo.CurrentCulture,
+                L("ToolSshKeyGenDeployFailed"),
+                ex.Message));
+        }
+        finally
+        {
+            BtnDeployPublicKey.IsEnabled = true;
         }
     }
 

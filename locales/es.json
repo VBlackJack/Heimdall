@@ -4196,6 +4196,18 @@
   "ToolSshKeyGenPrivOpenSshFilter": "Clave privada OpenSSH (*.*)|*.*|Clave privada PEM (*.pem)|*.pem",
   "ToolSshKeyGenGenerateFailed": "Error al generar la clave: {0}",
   "ToolSshConfigGenerateAllEmpty": "No hay servidores SSH ni pasarelas configurados en Heimdall.",
+  "ToolSshAuditBtnLoadAgent": "Desde agente SSH",
+  "ToolSshAuditAgentTitle": "Claves del agente SSH",
+  "ToolSshAuditAgentPrompt": "Seleccione una clave cargada para auditar:",
+  "ToolSshAuditAgentEmpty": "No hay claves cargadas actualmente en ning\u00fan agente SSH accesible.",
+  "ToolSshKeyGenBtnDeploy": "Desplegar en servidor",
+  "ToolSshKeyGenDeployTitle": "Desplegar clave p\u00fablica SSH",
+  "ToolSshKeyGenDeploySelectServer": "Elija un servidor SSH para instalar esta clave p\u00fablica en ~/.ssh/authorized_keys:",
+  "ToolSshKeyGenDeployNoServers": "No hay servidores SSH directos configurados en Heimdall.",
+  "ToolSshKeyGenDeployInProgress": "Desplegando clave p\u00fablica en {0}...",
+  "ToolSshKeyGenDeploySuccess": "Clave p\u00fablica instalada en {0}.",
+  "ToolSshKeyGenDeployAlreadyInstalled": "La clave p\u00fablica ya est\u00e1 instalada en {0}.",
+  "ToolSshKeyGenDeployFailed": "Error al desplegar la clave p\u00fablica: {0}",
 
   "PaletteToolSshAudit": "Auditor de claves SSH",
 

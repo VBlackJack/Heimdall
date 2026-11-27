@@ -84,6 +84,8 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
     private readonly IHostKeyVerifier _hostKeyVerifier;
     private readonly IConfigManager _configManager;
     private readonly Func<SshAgentPreference, SshAgentRegistry> _agentRegistryFactory;
+    private readonly IDialogService? _dialogService;
+    private static readonly TimeSpan InteractiveGatewayAuthTimeout = TimeSpan.FromMinutes(2);
     private readonly PropertyChangedEventHandler _connectionPropertyChangedHandler;
     private readonly NotifyCollectionChangedEventHandler _activeSessionsCollectionChangedHandler;
     private readonly PropertyChangedEventHandler _tabPropertyChangedHandler;
@@ -134,7 +136,8 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
         HostKeyStore hostKeyStore,
         IHostKeyVerifier hostKeyVerifier,
         IConfigManager configManager,
-        Func<SshAgentPreference, SshAgentRegistry>? agentRegistryFactory = null)
+        Func<SshAgentPreference, SshAgentRegistry>? agentRegistryFactory = null,
+        IDialogService? dialogService = null)
     {
         _host = host;
         _localizer = localizer;
@@ -144,6 +147,7 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
         _hostKeyVerifier = hostKeyVerifier;
         _configManager = configManager;
         _agentRegistryFactory = agentRegistryFactory ?? SshAgentRegistry.CreateDefault;
+        _dialogService = dialogService;
         _settingsSnapshot = host.CurrentSettings;
         _connectionPropertyChangedHandler = OnConnectionPropertyChanged;
         _activeSessionsCollectionChangedHandler = OnActiveSessionsCollectionChanged;
@@ -506,6 +510,43 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
                 settings.SshGateways,
                 ConnectionHelpers.DecryptPassword,
                 sshAgentPreference: settings.SshAgentPreference);
+            if (_dialogService is not null)
+            {
+                chain = chain.Select(hop => new SshConnectionParams
+                {
+                    Host = hop.Host,
+                    Port = hop.Port,
+                    LogicalHost = hop.LogicalHost,
+                    LogicalPort = hop.LogicalPort,
+                    Username = hop.Username,
+                    KeyPath = hop.KeyPath,
+                    Password = hop.Password,
+                    KeyPassphrase = hop.KeyPassphrase,
+                    UseLegacyPasswordAsKeyPassphrase = hop.UseLegacyPasswordAsKeyPassphrase,
+                    LegacyCredentialName = hop.LegacyCredentialName,
+                    SshAgentPreference = hop.SshAgentPreference,
+                    AgentKeyFingerprint = hop.AgentKeyFingerprint,
+                    AgentForwarding = hop.AgentForwarding,
+                    Compression = hop.Compression,
+                    X11Forwarding = hop.X11Forwarding,
+                    ConnectTimeout = hop.ConnectTimeout,
+                    AuthenticationTimeout = InteractiveGatewayAuthTimeout,
+                    KeepAliveIntervalSeconds = hop.KeepAliveIntervalSeconds,
+                    KeyboardInteractive = hop.KeyboardInteractive,
+                    KeyboardInteractiveResponder = request =>
+                    {
+                        ct.ThrowIfCancellationRequested();
+                        return _dialogService.ShowPasswordInputAsync(
+                            _localizer[SshLocalizationKeys.InteractivePromptTitle],
+                            string.Format(
+                                _localizer[SshLocalizationKeys.InteractivePromptMessage],
+                                hop.HostKeyVerificationHost,
+                                hop.Username,
+                                ServerPromptText.Sanitize(request)),
+                            ct).GetAwaiter().GetResult();
+                    }
+                }).ToList();
+            }
         }
         catch (Exception ex)
         {

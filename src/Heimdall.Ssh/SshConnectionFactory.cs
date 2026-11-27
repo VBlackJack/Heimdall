@@ -755,7 +755,9 @@ public static class SshConnectionFactory
                     SshAgentAlgorithmSource.BuildSources([chosenAgentKey]))
                 : TryCreateAgentAuth(
                     connectionParams.Username,
-                    agentRegistry);
+                    agentRegistry,
+                    connectionParams.HostKeyVerificationHost,
+                    connectionParams.HostKeyVerificationPort);
             if (agentMethod is not null)
             {
                 methods.Add(agentMethod);
@@ -1072,7 +1074,9 @@ public static class SshConnectionFactory
     /// </summary>
     private static AuthenticationMethod? TryCreateAgentAuth(
         string username,
-        SshAgentRegistry agentRegistry)
+        SshAgentRegistry agentRegistry,
+        string? targetHost = null,
+        int targetPort = 0)
     {
         ArgumentNullException.ThrowIfNull(agentRegistry);
 
@@ -1088,12 +1092,24 @@ public static class SshConnectionFactory
                     continue;
                 }
 
+                if (!string.IsNullOrWhiteSpace(targetHost) && targetPort > 0)
+                {
+                    keys = SshAgentKeyMemory.Default.Prioritize(targetHost, targetPort, keys);
+                }
+
                 Heimdall.Core.Logging.FileLogger.Info(
                     $"SSH agent {agent.Name}: using {keys.Count} key(s): {string.Join(", ", keys.Select(k => k.KeyType))}");
 
+                Action<ISshAgentKey>? onSigned = !string.IsNullOrWhiteSpace(targetHost) && targetPort > 0
+                    ? signedKey => SshAgentKeyMemory.Default.Remember(
+                        targetHost,
+                        targetPort,
+                        SshAgentKeyFingerprints.Compute(signedKey.PublicKeyBlob))
+                    : null;
+
                 // Algorithm-major order: a refused key costs one attempt per pass, not
                 // three in a row, so a server that counts attempts reaches the later keys.
-                var keySources = SshAgentAlgorithmSource.BuildSources(keys);
+                var keySources = SshAgentAlgorithmSource.BuildSources(keys, onSigned);
 
                 return new PrivateKeyAuthenticationMethod(username, keySources);
             }

@@ -27,6 +27,7 @@ namespace Heimdall.Core.Configuration;
 public sealed class SshGatewayDto
 {
     private string? _sshKeyPassphraseEncrypted;
+    private string? _sshAgentKeyFingerprint;
 
     /// <summary>
     /// Fields this build does not know, kept so that saving does not delete them.
@@ -69,6 +70,16 @@ public sealed class SshGatewayDto
     public bool IsDefault { get; set; }
     public string? ParentGatewayId { get; set; }
     public string? HostKeyFingerprint { get; set; }
+
+    /// <summary>
+    /// Optional SSH agent key fingerprint pinned for this gateway (<c>SHA256:...</c>).
+    /// Machine-local: stripped on export and import.
+    /// </summary>
+    public string? SshAgentKeyFingerprint
+    {
+        get => _sshAgentKeyFingerprint;
+        set => _sshAgentKeyFingerprint = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
 
     /// <summary>
     /// Returns a complete copy of this gateway, including whether it declared a passphrase field.

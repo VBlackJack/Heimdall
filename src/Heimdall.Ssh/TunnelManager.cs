@@ -343,13 +343,17 @@ public sealed partial class TunnelManager : IDisposable
             context.FinalClient.ErrorOccurred += (_, args) =>
                 Core.Logging.FileLogger.Error($"SSH tunnel error on port {reportedLocalPort}: {args.Exception.Message}");
 
-            await _connectSshClient(
+            await SshConnectionFactory.ConnectWithTransportBoundAsync(
                     context.FinalClient,
-                    gatewayParams.Host,
-                    gatewayParams.Port,
-                    pinnedVerifier,
-                    openToken,
-                    "Client disconnect on cancel suppressed")
+                    gatewayParams,
+                    ct => _connectSshClient(
+                        context.FinalClient,
+                        gatewayParams.Host,
+                        gatewayParams.Port,
+                        pinnedVerifier,
+                        ct,
+                        "Client disconnect on cancel suppressed"),
+                    openToken)
                 .ConfigureAwait(false);
 
             openToken.ThrowIfCancellationRequested();
@@ -495,13 +499,17 @@ public sealed partial class TunnelManager : IDisposable
             context.IntermediateClients.Add(rootClient);
             rootClient.KeepAliveInterval = TimeSpan.FromSeconds(keepAliveIntervalSeconds);
 
-            await _connectSshClient(
+            await SshConnectionFactory.ConnectWithTransportBoundAsync(
                     rootClient,
-                    gatewayChain[0].Host,
-                    gatewayChain[0].Port,
-                    rootPinnedVerifier,
-                    openToken,
-                    "Root client disconnect on cancel suppressed")
+                    gatewayChain[0],
+                    ct => _connectSshClient(
+                        rootClient,
+                        gatewayChain[0].Host,
+                        gatewayChain[0].Port,
+                        rootPinnedVerifier,
+                        ct,
+                        "Root client disconnect on cancel suppressed"),
+                    openToken)
                 .ConfigureAwait(false);
 
             SshClient currentClient = rootClient;
@@ -557,13 +565,17 @@ public sealed partial class TunnelManager : IDisposable
                 }
 
                 hopClient.KeepAliveInterval = TimeSpan.FromSeconds(keepAliveIntervalSeconds);
-                await _connectSshClient(
+                await SshConnectionFactory.ConnectWithTransportBoundAsync(
                         hopClient,
-                        nextGateway.Host,
-                        nextGateway.Port,
-                        hopPinnedVerifier,
-                        openToken,
-                        "Hop client disconnect on cancel suppressed")
+                        hopParams,
+                        ct => _connectSshClient(
+                            hopClient,
+                            nextGateway.Host,
+                            nextGateway.Port,
+                            hopPinnedVerifier,
+                            ct,
+                            "Hop client disconnect on cancel suppressed"),
+                        openToken)
                     .ConfigureAwait(false);
             }
 

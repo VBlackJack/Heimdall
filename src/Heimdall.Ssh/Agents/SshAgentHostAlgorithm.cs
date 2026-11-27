@@ -26,15 +26,18 @@ internal sealed class SshAgentHostAlgorithm : HostAlgorithm
 {
     private readonly ISshAgentKey _key;
     private readonly SshAgentSignFlags _signFlags;
+    private readonly Action<ISshAgentKey>? _onSigned;
 
     public SshAgentHostAlgorithm(
         string algorithmName,
         ISshAgentKey key,
-        SshAgentSignFlags signFlags = SshAgentSignFlags.None)
+        SshAgentSignFlags signFlags = SshAgentSignFlags.None,
+        Action<ISshAgentKey>? onSigned = null)
         : base(algorithmName)
     {
         _key = key ?? throw new ArgumentNullException(nameof(key));
         _signFlags = signFlags;
+        _onSigned = onSigned;
     }
 
     public override byte[] Data => _key.PublicKeyBlob;
@@ -42,7 +45,9 @@ internal sealed class SshAgentHostAlgorithm : HostAlgorithm
     public override byte[] Sign(byte[] data)
     {
         ArgumentNullException.ThrowIfNull(data);
-        return _key.Sign(data, _signFlags);
+        var signature = _key.Sign(data, _signFlags);
+        _onSigned?.Invoke(_key);
+        return signature;
     }
 
     public override bool VerifySignature(byte[] data, byte[] signature) => false;

@@ -4196,6 +4196,18 @@
   "ToolSshKeyGenPrivOpenSshFilter": "OpenSSH Private Key (*.*)|*.*|PEM Private Key (*.pem)|*.pem",
   "ToolSshKeyGenGenerateFailed": "Key generation failed: {0}",
   "ToolSshConfigGenerateAllEmpty": "No SSH servers or gateways are configured in Heimdall.",
+  "ToolSshAuditBtnLoadAgent": "From SSH Agent",
+  "ToolSshAuditAgentTitle": "SSH Agent Keys",
+  "ToolSshAuditAgentPrompt": "Select a loaded key to audit:",
+  "ToolSshAuditAgentEmpty": "No keys are currently loaded in any reachable SSH agent.",
+  "ToolSshKeyGenBtnDeploy": "Deploy to Server",
+  "ToolSshKeyGenDeployTitle": "Deploy SSH Public Key",
+  "ToolSshKeyGenDeploySelectServer": "Choose an SSH server to install this public key into ~/.ssh/authorized_keys:",
+  "ToolSshKeyGenDeployNoServers": "No direct SSH servers are configured in Heimdall.",
+  "ToolSshKeyGenDeployInProgress": "Deploying public key to {0}...",
+  "ToolSshKeyGenDeploySuccess": "Public key installed on {0}.",
+  "ToolSshKeyGenDeployAlreadyInstalled": "Public key is already installed on {0}.",
+  "ToolSshKeyGenDeployFailed": "Public key deployment failed: {0}",
 
   "PaletteToolSshAudit": "SSH Key Auditor",
 

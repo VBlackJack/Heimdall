@@ -177,6 +177,7 @@ public static class GatewayChainResolver
             Password = password,
             KeyPassphrase = keyPassphrase,
             SshAgentPreference = sshAgentPreference,
+            AgentKeyFingerprint = gateway.SshAgentKeyFingerprint,
             UseLegacyPasswordAsKeyPassphrase = gateway.UsesLegacySshCredentialMapping,
             LegacyCredentialName = gateway.Name
         };

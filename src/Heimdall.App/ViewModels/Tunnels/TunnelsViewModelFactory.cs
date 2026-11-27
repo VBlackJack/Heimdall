@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using Heimdall.App.Services;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Ssh;
@@ -38,6 +39,7 @@ public sealed class TunnelsViewModelFactory : ITunnelsViewModelFactory
     private readonly HostKeyStore _hostKeyStore;
     private readonly IHostKeyVerifier _hostKeyVerifier;
     private readonly IConfigManager _configManager;
+    private readonly IDialogService? _dialogService;
 
     public TunnelsViewModelFactory(
         LocalizationManager localizer,
@@ -45,7 +47,8 @@ public sealed class TunnelsViewModelFactory : ITunnelsViewModelFactory
         ConnectionStateMachine connectionSm,
         HostKeyStore hostKeyStore,
         IHostKeyVerifier hostKeyVerifier,
-        IConfigManager configManager)
+        IConfigManager configManager,
+        IDialogService? dialogService = null)
     {
         ArgumentNullException.ThrowIfNull(localizer);
         ArgumentNullException.ThrowIfNull(tunnelManager);
@@ -60,6 +63,7 @@ public sealed class TunnelsViewModelFactory : ITunnelsViewModelFactory
         _hostKeyStore = hostKeyStore;
         _hostKeyVerifier = hostKeyVerifier;
         _configManager = configManager;
+        _dialogService = dialogService;
     }
 
     /// <inheritdoc />
@@ -91,6 +95,7 @@ public sealed class TunnelsViewModelFactory : ITunnelsViewModelFactory
             _connectionSm,
             _hostKeyStore,
             _hostKeyVerifier,
-            _configManager);
+            _configManager,
+            dialogService: _dialogService);
     }
 }

@@ -86,7 +86,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                             typeInfo,
                             [
                                 JsonNamingPolicy.CamelCase.ConvertName(nameof(SshGatewayDto.SshPasswordEncrypted)),
-                                JsonNamingPolicy.CamelCase.ConvertName(nameof(SshGatewayDto.SshKeyPassphraseEncrypted))
+                                JsonNamingPolicy.CamelCase.ConvertName(nameof(SshGatewayDto.SshKeyPassphraseEncrypted)),
+                                JsonNamingPolicy.CamelCase.ConvertName(nameof(SshGatewayDto.SshAgentKeyFingerprint))
                             ]);
                     }
                 }

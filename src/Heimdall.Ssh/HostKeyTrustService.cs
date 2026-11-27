@@ -130,6 +130,24 @@ public sealed class HostKeyTrustService(HostKeyStore store) : IHostKeyTrustServi
         var match = HostKeyStore.ConstantTimeEquals(existing.Fingerprint, presentedFingerprint);
         if (!match)
         {
+            var additional = _store.GetAdditionalEntry(host, port, algorithm);
+            if (additional is not null
+                && HostKeyStore.ConstantTimeEquals(additional.Fingerprint, presentedFingerprint))
+            {
+                _store.TrustAdditionalAlgorithm(
+                    host,
+                    port,
+                    additional.Fingerprint,
+                    NormalizeAlgorithm(algorithm, additional.Algorithm),
+                    additional.Source,
+                    additional.PublicKeyBase64);
+                return new HostKeyVerifyResult(
+                    Trusted: true,
+                    FirstUse: false,
+                    presentedFingerprint,
+                    additional.Fingerprint);
+            }
+
             return new HostKeyVerifyResult(
                 Trusted: false,
                 FirstUse: false,

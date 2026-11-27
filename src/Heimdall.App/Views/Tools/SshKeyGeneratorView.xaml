@@ -200,6 +200,11 @@
                                 Style="{DynamicResource SecondaryButtonStyle}"
                                 Padding="{StaticResource PaddingButtonCopy}" Margin="{StaticResource MarginInlineStart}"
                                 VerticalAlignment="Center"/>
+                        <Button x:Name="BtnDeployPublicKey"
+                                Click="OnDeployPublicKeyClick"
+                                Style="{DynamicResource SecondaryButtonStyle}"
+                                Padding="{StaticResource PaddingButtonCopy}" Margin="{StaticResource MarginInlineStart}"
+                                VerticalAlignment="Center"/>
                     </StackPanel>
                     <TextBox x:Name="PublicKeyOutput"
                              IsReadOnly="True"

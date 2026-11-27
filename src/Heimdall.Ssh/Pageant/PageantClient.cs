@@ -123,9 +123,27 @@ public sealed class PageantClient : IPageantClient
 
     /// <summary>
     /// Known legitimate Pageant host process names (case-insensitive).
+    /// Includes GnuPG <c>gpg-agent</c> (Pageant emulation mode) and WSL2/OpenSSH bridge agents.
     /// </summary>
     private static readonly string[] TrustedPageantProcessNames =
-        ["pageant", "putty", "plink", "pscp", "psftp", "kitty", "winscp", "keepassxc-proxy", "keepassxc"];
+    [
+        "pageant",
+        "putty",
+        "plink",
+        "pscp",
+        "psftp",
+        "kitty",
+        "winscp",
+        "keepassxc-proxy",
+        "keepassxc",
+        "gpg-agent",
+        "wsl2-ssh-pageant",
+        "ssh-pageant"
+    ];
+
+    internal static bool IsTrustedProcessName(string? processName) =>
+        !string.IsNullOrWhiteSpace(processName)
+        && TrustedPageantProcessNames.Contains(processName, StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// Sends a message to Pageant via shared memory IPC and returns the response.
@@ -150,7 +168,7 @@ public sealed class PageantClient : IPageantClient
             {
                 using var proc = System.Diagnostics.Process.GetProcessById(pageantPid);
                 var processName = proc.ProcessName;
-                if (!TrustedPageantProcessNames.Contains(processName, StringComparer.OrdinalIgnoreCase))
+                if (!IsTrustedProcessName(processName))
                 {
                     throw new InvalidOperationException(
                         $"Pageant window owned by untrusted process '{processName}' (PID {pageantPid}). " +

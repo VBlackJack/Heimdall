@@ -47,6 +47,9 @@ public sealed class TunnelService : ITunnelService
     private readonly Func<SshAgentPreference, SshAgentRegistry> _agentRegistryFactory;
     private readonly TunnelFailureLogCoalescer _failureLogCoalescer;
     private readonly TunnelFailureLogWriter _failureLogWriter;
+    private readonly IDialogService? _dialogService;
+
+    private static readonly TimeSpan InteractiveGatewayAuthTimeout = TimeSpan.FromMinutes(2);
 
     private AppSettings? _currentSettings;
     private readonly RecentForwardedPortFailureTracker _forwardedPortFailures = new();
@@ -58,7 +61,8 @@ public sealed class TunnelService : ITunnelService
         IHostKeyTrustService hostKeyTrustService,
         ConnectionStateMachine connectionSm,
         LocalizationManager localizer,
-        IHostKeyVerifier hostKeyVerifier)
+        IHostKeyVerifier hostKeyVerifier,
+        IDialogService? dialogService = null)
         : this(
             tunnelManager,
             hostKeyStore,
@@ -67,7 +71,8 @@ public sealed class TunnelService : ITunnelService
             localizer,
             hostKeyVerifier,
             new DefaultPlinkHostKeyProbe(),
-            TimeProvider.System)
+            TimeProvider.System,
+            dialogService: dialogService)
     {
     }
 
@@ -82,7 +87,8 @@ public sealed class TunnelService : ITunnelService
         TimeProvider? timeProvider = null,
         Func<SshAgentPreference, SshAgentRegistry>? agentRegistryFactory = null,
         TunnelFailureLogCoalescer? failureLogCoalescer = null,
-        TunnelFailureLogWriter? failureLogWriter = null)
+        TunnelFailureLogWriter? failureLogWriter = null,
+        IDialogService? dialogService = null)
     {
         _tunnelManager = tunnelManager;
         _hostKeyStore = hostKeyStore;
@@ -95,6 +101,7 @@ public sealed class TunnelService : ITunnelService
         _agentRegistryFactory = agentRegistryFactory ?? SshAgentRegistry.CreateDefault;
         _failureLogCoalescer = failureLogCoalescer ?? new TunnelFailureLogCoalescer();
         _failureLogWriter = failureLogWriter ?? WriteTunnelFailureToFileLog;
+        _dialogService = dialogService;
 
         // TunnelService and TunnelManager are both DI singletons living for the
         // application lifetime, so this subscription needs no explicit teardown.
@@ -214,10 +221,12 @@ public sealed class TunnelService : ITunnelService
         try
         {
             chainDtos = GatewayChainResolver.ResolveChainDtos(gatewayId, settings.SshGateways);
-            chain = GatewayChainResolver.ToConnectionParams(
-                chainDtos,
-                ConnectionHelpers.DecryptPassword,
-                settings.SshAgentPreference);
+            chain = AttachInteractiveAuth(
+                GatewayChainResolver.ToConnectionParams(
+                    chainDtos,
+                    ConnectionHelpers.DecryptPassword,
+                    settings.SshAgentPreference),
+                ct);
             gatewayChainKey = BuildGatewayChainKey(chainDtos, settings.SshAgentPreference);
         }
         catch (GatewayChainException chainEx)
@@ -993,6 +1002,7 @@ public sealed class TunnelService : ITunnelService
             // Null and empty have different legacy credential mapping semantics.
             WriteLengthPrefixedString(payload, gateway.SshKeyPassphraseEncrypted is null ? "legacy" : "explicit");
             WriteLengthPrefixedString(payload, gateway.SshKeyPassphraseEncrypted ?? string.Empty);
+            WriteLengthPrefixedString(payload, gateway.SshAgentKeyFingerprint ?? string.Empty);
         }
 
         byte[] hash = SHA256.HashData(payload.ToArray());
@@ -1038,4 +1048,48 @@ public sealed class TunnelService : ITunnelService
             : _localizer[decision.FailureMessageKey];
     }
 
+    private List<SshConnectionParams> AttachInteractiveAuth(
+        List<SshConnectionParams> chain,
+        CancellationToken ct)
+    {
+        if (_dialogService is null)
+        {
+            return chain;
+        }
+
+        return chain.Select(hop => new SshConnectionParams
+        {
+            Host = hop.Host,
+            Port = hop.Port,
+            LogicalHost = hop.LogicalHost,
+            LogicalPort = hop.LogicalPort,
+            Username = hop.Username,
+            KeyPath = hop.KeyPath,
+            Password = hop.Password,
+            KeyPassphrase = hop.KeyPassphrase,
+            UseLegacyPasswordAsKeyPassphrase = hop.UseLegacyPasswordAsKeyPassphrase,
+            LegacyCredentialName = hop.LegacyCredentialName,
+            SshAgentPreference = hop.SshAgentPreference,
+            AgentKeyFingerprint = hop.AgentKeyFingerprint,
+            AgentForwarding = hop.AgentForwarding,
+            Compression = hop.Compression,
+            X11Forwarding = hop.X11Forwarding,
+            ConnectTimeout = hop.ConnectTimeout,
+            AuthenticationTimeout = InteractiveGatewayAuthTimeout,
+            KeepAliveIntervalSeconds = hop.KeepAliveIntervalSeconds,
+            KeyboardInteractive = hop.KeyboardInteractive,
+            KeyboardInteractiveResponder = request =>
+            {
+                ct.ThrowIfCancellationRequested();
+                return _dialogService.ShowPasswordInputAsync(
+                    _localizer[SshLocalizationKeys.InteractivePromptTitle],
+                    string.Format(
+                        _localizer[SshLocalizationKeys.InteractivePromptMessage],
+                        hop.HostKeyVerificationHost,
+                        hop.Username,
+                        ServerPromptText.Sanitize(request)),
+                    ct).GetAwaiter().GetResult();
+            }
+        }).ToList();
+    }
 }

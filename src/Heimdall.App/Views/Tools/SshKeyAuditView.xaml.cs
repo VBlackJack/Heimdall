@@ -21,9 +21,11 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using Heimdall.App.Services;
 using Heimdall.App.ViewModels.Tools;
+using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
 using Heimdall.Core.Security;
+using Heimdall.Ssh.Agents;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Win32;
 
@@ -86,6 +88,7 @@ public partial class SshKeyAuditView : UserControl, IToolView
         HeaderTitle.Text = L("ToolSshAuditTitle");
         InputLabel.Text = L("ToolSshAuditInput");
         BtnBrowse.Content = L("ToolSshAuditBtnBrowse");
+        BtnLoadFromAgent.Content = L("ToolSshAuditBtnLoadAgent");
         EmptyState.Text = L("ToolSshAuditEmptyState");
         ParseError.Text = L("ToolSshAuditParseError");
         BtnCopyFingerprint.Content = L("ToolSshAuditBtnCopy");
@@ -100,6 +103,7 @@ public partial class SshKeyAuditView : UserControl, IToolView
 
         System.Windows.Automation.AutomationProperties.SetName(BtnHelp, L("ToolHelpTooltip"));
         System.Windows.Automation.AutomationProperties.SetName(BtnBrowse, L("ToolSshAuditBtnBrowse"));
+        System.Windows.Automation.AutomationProperties.SetName(BtnLoadFromAgent, L("ToolSshAuditBtnLoadAgent"));
         System.Windows.Automation.AutomationProperties.SetName(BtnCopyFingerprint, L("ToolSshAuditBtnCopy"));
         System.Windows.Automation.AutomationProperties.SetName(KeyInput, L("ToolSshAuditInput"));
         System.Windows.Automation.AutomationProperties.SetName(DetailFingerprintValue, L("ToolSshAuditFingerprint"));
@@ -201,6 +205,64 @@ public partial class SshKeyAuditView : UserControl, IToolView
         // The view model reports an oversized or unreadable file through
         // FileErrorMessage; the view used to drop those cases without a word.
         _vm.LoadKeyFile(dialog.FileName);
+    }
+
+    private async void OnLoadFromAgentClick(object sender, RoutedEventArgs e)
+    {
+        var services = (Application.Current as App)?.Services;
+        var configManager = services?.GetService<IConfigManager>();
+        var dialogService = services?.GetService<IDialogService>();
+
+        var preference = Core.Ssh.SshAgentPreference.AutoOpenSshFirst;
+        if (configManager is not null)
+        {
+            try
+            {
+                var settings = await configManager.LoadSettingsAsync().ConfigureAwait(true);
+                preference = settings.SshAgentPreference;
+            }
+            catch (Exception ex)
+            {
+                Core.Logging.FileLogger.Warn($"SSH agent inspector: settings load failed: {ex.Message}");
+            }
+        }
+
+        var loadedKeys = await Task.Run(() =>
+            SshAgentInspector.ListLoadedKeys(SshAgentRegistry.CreateDefault(preference)));
+
+        if (loadedKeys.Count == 0)
+        {
+            _vm.FileErrorMessage = L("ToolSshAuditAgentEmpty");
+            _vm.ShowFileError = true;
+            return;
+        }
+
+        _vm.FileErrorMessage = string.Empty;
+        _vm.ShowFileError = false;
+
+        if (loadedKeys.Count == 1 || dialogService is null)
+        {
+            _vm.KeyText = loadedKeys[0].PublicKeyOpenSsh;
+            return;
+        }
+
+        var choices = loadedKeys
+            .Select(k => string.IsNullOrWhiteSpace(k.Comment)
+                ? $"{k.AgentName}: {k.KeyType} ({k.Fingerprint})"
+                : $"{k.AgentName}: {k.KeyType} - {k.Comment} ({k.Fingerprint})")
+            .ToList();
+
+        var selectedIndex = await dialogService.ShowChoiceAsync(
+            L("ToolSshAuditAgentTitle"),
+            L("ToolSshAuditAgentPrompt"),
+            choices,
+            defaultIndex: 0,
+            cancelLabel: L("BtnCancel"));
+
+        if (selectedIndex is int index && index >= 0 && index < loadedKeys.Count)
+        {
+            _vm.KeyText = loadedKeys[index].PublicKeyOpenSsh;
+        }
     }
 
     private void OnHelpClick(object sender, RoutedEventArgs e)
