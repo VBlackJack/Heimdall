@@ -83,4 +83,22 @@ public sealed class SshHandlerPlinkDisposeReleaseTests
 
         Assert.Equal(["password-file"], deletions);
     }
+
+    [Fact]
+    public void SizeSessionReleaseArmedWithDisposed_DeletesExactlyOnceOnDispose()
+    {
+        List<string> deletions = [];
+        using Heimdall.Terminal.PipeModeSession session = new();
+        PlinkSizeSessionReleaseHandle handle = PlinkSizeSession.ArmRelease(
+            session,
+            "HeimdallPtySize-test",
+            deletions.Add,
+            firstByteProvesConsumption: true);
+        session.Disposed += handle.Release;
+
+        session.Dispose();
+        handle.Release();
+
+        Assert.Equal(["HeimdallPtySize-test"], deletions);
+    }
 }

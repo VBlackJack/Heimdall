@@ -178,27 +178,42 @@ public sealed class SshHandlerInitialTerminalSizeTests
         string? arguments = null;
         IReadOnlyList<PuttyRegistryValue>? atLaunch = null;
 
-        ConnectionResult result = await ConnectViaPlinkAsync(
-            registry,
-            (_, _, args, _, _, _) =>
-            {
-                arguments = args;
-                string name = registry.Written.Single();
-                atLaunch = registry.ReadSession(name);
-                return Task.CompletedTask;
-            });
+        ConnectionResult? result = null;
+        try
+        {
+            result = await ConnectViaPlinkAsync(
+                registry,
+                (_, _, args, _, _, _) =>
+                {
+                    arguments = args;
+                    string name = registry.Written.Single();
+                    atLaunch = registry.ReadSession(name);
+                    return Task.CompletedTask;
+                },
+                disposeSession: false);
 
-        result.Success.Should().BeTrue(result.ErrorMessage);
-        string sessionName = registry.Written.Should().ContainSingle().Subject;
-        arguments.Should().StartWith($"-load {sessionName} ");
-        atLaunch.Should().ContainEquivalentOf(
-            new PuttyRegistryValue(PlinkSizeSession.TermWidthValueName, ReportedColumns, Microsoft.Win32.RegistryValueKind.DWord));
-        atLaunch.Should().ContainEquivalentOf(
-            new PuttyRegistryValue(PlinkSizeSession.TermHeightValueName, ReportedRows, Microsoft.Win32.RegistryValueKind.DWord));
+            result.Success.Should().BeTrue(result.ErrorMessage);
+            string sessionName = registry.Written.Should().ContainSingle().Subject;
+            arguments.Should().StartWith($"-load {sessionName} ");
+            atLaunch.Should().ContainEquivalentOf(
+                new PuttyRegistryValue(PlinkSizeSession.TermWidthValueName, ReportedColumns, Microsoft.Win32.RegistryValueKind.DWord));
+            atLaunch.Should().ContainEquivalentOf(
+                new PuttyRegistryValue(PlinkSizeSession.TermHeightValueName, ReportedRows, Microsoft.Win32.RegistryValueKind.DWord));
 
-        // Not released by the launch itself: the process has not read it yet. The release on first
-        // output or exit is pinned against the handle in PlinkSizeSessionTests.
-        registry.Deleted.Should().BeEmpty();
+            // Not released by the launch itself: the process has not read it yet. The release on first
+            // output or exit is pinned against the handle in PlinkSizeSessionTests.
+            registry.Deleted.Should().BeEmpty();
+
+            // Disposing the session releases the temporary size session so closing a tab before
+            // first output never leaves an orphaned registry key behind.
+            DisposeSession(result);
+            result = null;
+            registry.Deleted.Should().Equal(sessionName);
+        }
+        finally
+        {
+            DisposeSession(result);
+        }
     }
 
     [Fact]
@@ -514,7 +529,8 @@ public sealed class SshHandlerInitialTerminalSizeTests
         string? sharedKeyPath = null,
         Func<string, TimeSpan, CancellationToken, Task<TerminalSizeLookup>>? resolve = null,
         int? waitMs = null,
-        List<string>? sizeLog = null)
+        List<string>? sizeLog = null,
+        bool disposeSession = true)
     {
         string plinkPath = Path.GetTempFileName();
         string keyPath = sharedKeyPath ?? Path.GetTempFileName();
@@ -558,7 +574,10 @@ public sealed class SshHandlerInitialTerminalSizeTests
         }
         finally
         {
-            DisposeSession(result);
+            if (disposeSession)
+            {
+                DisposeSession(result);
+            }
             File.Delete(plinkPath);
             if (sharedKeyPath is null)
             {

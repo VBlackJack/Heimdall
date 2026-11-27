@@ -216,7 +216,8 @@ internal static class PlinkHostKeyDecider
                 port,
                 presentation.Fingerprint,
                 presentation.Algorithm,
-                HostKeySource.UserConfirmed);
+                HostKeySource.UserConfirmed,
+                presentation.PublicKeyBase64);
             return Proceed(presentation.Fingerprint, storedFingerprint, presentation.Fingerprint);
         }
 
@@ -226,7 +227,8 @@ internal static class PlinkHostKeyDecider
                 host,
                 port,
                 presentation.Fingerprint,
-                presentation.Algorithm);
+                presentation.Algorithm,
+                presentation.PublicKeyBase64);
             return Proceed(presentation.Fingerprint, storedFingerprint, presentation.Fingerprint);
         }
 

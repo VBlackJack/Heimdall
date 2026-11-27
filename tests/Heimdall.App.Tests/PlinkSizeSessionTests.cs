@@ -88,6 +88,24 @@ public sealed class PlinkSizeSessionTests
     }
 
     [Fact]
+    public void TryCreate_NeverInheritsAgentFwdOrCompressionFromDefaultSettings()
+    {
+        InMemoryPuttySessionRegistry registry = new();
+        registry.Seed(
+            PlinkSizeSessionNaming.DefaultSettingsSessionName,
+            new PuttyRegistryValue(PlinkSizeSession.AgentFwdValueName, 1, RegistryValueKind.DWord),
+            new PuttyRegistryValue(PlinkSizeSession.CompressionValueName, 1, RegistryValueKind.DWord),
+            new PuttyRegistryValue("ProxyHost", "proxy.example.test", RegistryValueKind.String));
+
+        string? name = PlinkSizeSession.TryCreate(registry, Columns, Rows, _ => { });
+
+        IReadOnlyList<PuttyRegistryValue> written = registry.ReadSession(name!)!;
+        written.Should().NotContain(v => string.Equals(v.Name, PlinkSizeSession.AgentFwdValueName, StringComparison.OrdinalIgnoreCase));
+        written.Should().NotContain(v => string.Equals(v.Name, PlinkSizeSession.CompressionValueName, StringComparison.OrdinalIgnoreCase));
+        written.Should().ContainEquivalentOf(new PuttyRegistryValue("ProxyHost", "proxy.example.test", RegistryValueKind.String));
+    }
+
+    [Fact]
     public void TryCreate_WithoutDefaultSettings_WritesOnlyTheSize()
     {
         InMemoryPuttySessionRegistry registry = new();

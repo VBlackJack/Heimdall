@@ -21,9 +21,12 @@ using Heimdall.Core.Security;
 namespace Heimdall.App.Services;
 
 /// <summary>
-/// Parsed host key presentation extracted from a <c>plink -batch -v</c> probe.
+/// Parsed host key presentation extracted from a pre-authentication host key probe.
 /// </summary>
-internal sealed record PlinkHostKeyPresentation(string Algorithm, string Fingerprint);
+internal sealed record PlinkHostKeyPresentation(
+    string Algorithm,
+    string Fingerprint,
+    string? PublicKeyBase64 = null);
 
 /// <summary>
 /// Shared plink host key probing helper used by embedded SSH and tunnel fallbacks.
@@ -64,9 +67,8 @@ internal static class PlinkHostKeyProbe
             var userPrefix = string.IsNullOrWhiteSpace(username) ? string.Empty : $"{username}@";
             var probeTarget = $"{userPrefix}{host}";
             var probeParts = BuildProbeArguments(port, probeTarget);
-            var probeArgs = string.Join(' ', probeParts);
 
-            Core.Logging.FileLogger.Info($"Host key probe: {plinkPath} {probeArgs}");
+            Core.Logging.FileLogger.Info($"Host key probe: {plinkPath} for {host}:{port}");
 
             var psi = new ProcessStartInfo
             {

@@ -53,6 +53,12 @@ internal static class PlinkSizeSession
     /// <summary>PuTTY's configuration value naming the host; never written to a size session.</summary>
     internal const string HostNameValueName = "HostName";
 
+    /// <summary>PuTTY's agent forwarding value; never inherited from Default Settings so the profile flag stays authoritative.</summary>
+    internal const string AgentFwdValueName = "AgentFwd";
+
+    /// <summary>PuTTY's compression value; never inherited from Default Settings so the profile flag stays authoritative.</summary>
+    internal const string CompressionValueName = "Compression";
+
     /// <summary>
     /// Creates a size session for <paramref name="columns"/> x <paramref name="rows"/> and returns
     /// its name, or <see langword="null"/> when the registry refused any step.
@@ -150,7 +156,9 @@ internal static class PlinkSizeSession
     private static bool IsOverriddenOrForbidden(string valueName) =>
         string.Equals(valueName, HostNameValueName, StringComparison.OrdinalIgnoreCase)
         || string.Equals(valueName, TermWidthValueName, StringComparison.OrdinalIgnoreCase)
-        || string.Equals(valueName, TermHeightValueName, StringComparison.OrdinalIgnoreCase);
+        || string.Equals(valueName, TermHeightValueName, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(valueName, AgentFwdValueName, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(valueName, CompressionValueName, StringComparison.OrdinalIgnoreCase);
 }
 
 /// <summary>

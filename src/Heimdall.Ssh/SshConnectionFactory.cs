@@ -815,7 +815,7 @@ public static class SshConnectionFactory
             && !string.IsNullOrWhiteSpace(connectionParams.KeyPath))
         {
             var name = string.IsNullOrWhiteSpace(connectionParams.LegacyCredentialName)
-                ? $"{connectionParams.Username}@{connectionParams.Host}:{connectionParams.Port}"
+                ? $"{connectionParams.Host}:{connectionParams.Port}"
                 : connectionParams.LegacyCredentialName;
             Core.Logging.FileLogger.Info(
                 $"Legacy credential mapping for server {name} - configure KeyPassphrase explicitly.");

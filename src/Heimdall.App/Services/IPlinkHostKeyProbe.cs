@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+using Heimdall.Ssh;
+
 namespace Heimdall.App.Services;
 
 internal interface IPlinkHostKeyProbe
@@ -29,7 +31,7 @@ internal interface IPlinkHostKeyProbe
 
 internal sealed class DefaultPlinkHostKeyProbe : IPlinkHostKeyProbe
 {
-    public Task<PlinkHostKeyPresentation?> ProbeAsync(
+    public async Task<PlinkHostKeyPresentation?> ProbeAsync(
         string plinkPath,
         string host,
         int port,
@@ -37,12 +39,47 @@ internal sealed class DefaultPlinkHostKeyProbe : IPlinkHostKeyProbe
         int timeoutMs,
         CancellationToken ct)
     {
-        return PlinkHostKeyProbe.ProbeAsync(
-            plinkPath,
-            host,
-            port,
-            username,
-            timeoutMs,
-            ct);
+        // Prefer an in-process SSH.NET pre-authentication probe first: it never invokes
+        // GSSAPI/Kerberos before host-key trust is confirmed and captures the raw public key
+        // blob so known_hosts export works for accepted keys. Fall back to the Plink probe only
+        // when SSH.NET cannot negotiate the server's key exchange or host-key algorithms.
+        try
+        {
+            var probeParams = new SshConnectionParams
+            {
+                Host = host,
+                Port = port,
+                Username = string.Empty,
+                ConnectTimeout = TimeSpan.FromMilliseconds(Math.Max(1000, timeoutMs))
+            };
+            var presentation = await SshConnectionFactory.ProbeHostKeyAsync(
+                    probeParams,
+                    host,
+                    port,
+                    ct)
+                .ConfigureAwait(false);
+            return new PlinkHostKeyPresentation(
+                presentation.Algorithm,
+                presentation.Fingerprint,
+                Convert.ToBase64String(presentation.HostKey));
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Debug(
+                $"SSH.NET host key probe fell back to Plink for {host}:{port}: {ex.Message}");
+        }
+
+        return await PlinkHostKeyProbe.ProbeAsync(
+                plinkPath,
+                host,
+                port,
+                username,
+                timeoutMs,
+                ct)
+            .ConfigureAwait(false);
     }
 }

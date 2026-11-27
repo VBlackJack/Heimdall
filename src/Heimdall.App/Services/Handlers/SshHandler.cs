@@ -789,26 +789,33 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                 hostKeyArg);
             Core.Logging.FileLogger.Info($"Launching PuTTY: {puttyPath} for {targetHost}:{targetPort}");
 
-            System.Diagnostics.Process? process = System.Diagnostics.Process.Start(psi);
-
-            Core.Logging.FileLogger.Info(
-                $"Launched putty.exe PID={process?.Id ?? 0} for {server.DisplayName} ({targetHost}:{targetPort})");
-            _connectionSm.TryTransition(server.Id, ConnectionState.Connected);
-            if (process is not null)
+            System.Diagnostics.Process startedProcess = new()
             {
-                System.Diagnostics.Process startedProcess = process;
-                startedProcess.Exited += (_, _) =>
-                {
-                    try
-                    {
-                        lease.Release();
-                    }
-                    catch (Exception ex)
-                    {
-                        Core.Logging.FileLogger.Warn(
-                            $"Tunnel release on putty.exe exit failed: {ex.Message}");
-                    }
+                StartInfo = psi,
+                EnableRaisingEvents = true
+            };
+            TaskCompletionSource exitSignal = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            int exitedHandled = 0;
 
+            void HandleExternalExit()
+            {
+                if (Interlocked.Exchange(ref exitedHandled, 1) != 0)
+                {
+                    return;
+                }
+
+                try
+                {
+                    lease.Release();
+                }
+                catch (Exception ex)
+                {
+                    Core.Logging.FileLogger.Warn(
+                        $"Tunnel release on putty.exe exit failed: {ex.Message}");
+                }
+                finally
+                {
+                    exitSignal.TrySetResult();
                     try
                     {
                         startedProcess.Dispose();
@@ -818,12 +825,26 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                         Core.Logging.FileLogger.Warn(
                             $"putty.exe Process.Dispose failed: {ex.Message}");
                     }
-                };
-                startedProcess.EnableRaisingEvents = true;
-                lease.Transfer();
+                }
             }
 
-            return new ConnectionResult(true, null, null);
+            startedProcess.Exited += (_, _) => HandleExternalExit();
+            if (!startedProcess.Start())
+            {
+                startedProcess.Dispose();
+                throw new InvalidOperationException("Failed to start putty.exe.");
+            }
+
+            Core.Logging.FileLogger.Info(
+                $"Launched putty.exe PID={startedProcess.Id} for {server.DisplayName} ({targetHost}:{targetPort})");
+            _connectionSm.TryTransition(server.Id, ConnectionState.Connected);
+            lease.Transfer();
+            if (startedProcess.HasExited)
+            {
+                HandleExternalExit();
+            }
+
+            return new ConnectionResult(true, null, null, ExternalClientExited: exitSignal.Task);
         }
         catch (Exception ex)
         {
@@ -1354,7 +1375,8 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
             }
 
             // Same single release path and the same proof as the password file: -load is read
-            // in the command-line pass, so the first byte shows the session was loaded.
+            // in the command-line pass, so the first byte shows the session was loaded. Also
+            // release on Disposed so closing a tab before output never leaves a registry key behind.
             if (sizeSessionName is not null)
             {
                 sizeSessionRelease = PlinkSizeSession.ArmRelease(
@@ -1362,6 +1384,8 @@ internal sealed class SshHandler : IProtocolHandler, IDisposable
                     sizeSessionName,
                     name => PlinkSizeSession.Delete(_puttySessionRegistry, name),
                     firstByteProvesConsumption);
+                PlinkSizeSessionReleaseHandle sizeHandle = sizeSessionRelease;
+                terminalSession.Disposed += sizeHandle.Release;
             }
 
             // The public key file is written last, once the other releases are armed. It is

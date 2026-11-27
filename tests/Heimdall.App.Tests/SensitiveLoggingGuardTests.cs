@@ -33,6 +33,21 @@ public sealed class SensitiveLoggingGuardTests
     private const string RdpHandlerPath = @"src\Heimdall.App\Services\Handlers\RdpHandler.cs";
     private const string RdpPasswordResetPath = @"src\Heimdall.Rdp\ActiveX\RdpPasswordReset.cs";
 
+    // SSH connect/probe/tunnel paths: must never log usernames, passwords, passphrases, or raw
+    // probe argument lists containing user@host targets.
+    private static readonly string[] SshSensitiveLoggingPaths =
+    {
+        @"src\Heimdall.Ssh\SshConnectionFactory.cs",
+        @"src\Heimdall.Ssh\Plink\PlinkTunnelRunner.cs",
+        @"src\Heimdall.App\Services\PlinkHostKeyProbe.cs",
+        @"src\Heimdall.App\Services\Handlers\SshHandler.cs",
+        @"src\Heimdall.App\Services\TunnelService.cs",
+    };
+
+    private static readonly Regex SshForbiddenLogExpressionRegex = new(
+        @"\.(?:Username|SshUsername|Password|SshPasswordEncrypted|KeyPassphrase|SshKeyPassphraseEncrypted)\b|\bprobeArgs\b|\bprobeTarget\b",
+        RegexOptions.Compiled);
+
     private const string DisconnectedCallback = "private void OnRdpDisconnected(int reason)";
     private const string FatalErrorCallback = "private void OnRdpFatalError(int errorCode)";
 
@@ -120,6 +135,34 @@ public sealed class SensitiveLoggingGuardTests
         { EmbeddedRdpViewPath, "Embedded RDP credential autofill failed:" },
         { EmbeddedRdpViewPath, "EmbeddedRDP password reset not applied:" },
     };
+
+    [Fact]
+    public void SshLogs_DoNotInterpolateUsernamesOrCredentialFields()
+    {
+        List<string> violations = [];
+
+        foreach (string relativePath in SshSensitiveLoggingPaths)
+        {
+            string source = ReadSource(relativePath);
+            foreach (Match loggerCall in LoggerCallRegex.Matches(source))
+            {
+                Match forbidden = SshForbiddenLogExpressionRegex.Match(loggerCall.Groups["arguments"].Value);
+                if (!forbidden.Success)
+                {
+                    continue;
+                }
+
+                int line = GetLineNumber(source, loggerCall.Index);
+                violations.Add($"  {relativePath}:{line} - {forbidden.Value}");
+            }
+        }
+
+        Assert.True(
+            violations.Count == 0,
+            "Sensitive SSH expressions reached FileLogger calls:"
+            + Environment.NewLine
+            + string.Join(Environment.NewLine, violations));
+    }
 
     [Fact]
     public void CitrixLogs_DoNotReceiveRawStoreFrontUrls()
