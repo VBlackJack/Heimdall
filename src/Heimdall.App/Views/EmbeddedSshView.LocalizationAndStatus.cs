@@ -298,7 +298,7 @@ public partial class EmbeddedSshView
 
         HighlightsToggleButton.SetResourceReference(
             System.Windows.Controls.Control.ForegroundProperty,
-            _highlightsEnabled ? "AccentBrush" : "TextSecondaryBrush");
+            _highlightsEnabled ? "AccentTextBrush" : "TextSecondaryBrush");
         HighlightsToggleButton.ToolTip = _highlightsEnabled
             ? L("TooltipToggleTerminalHighlightsOn")
             : L("TooltipToggleTerminalHighlightsOff");

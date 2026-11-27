@@ -2135,11 +2135,8 @@
                                                      AutomationProperties.Name="{loc:Translate A11yServerSshLocalForwards}"
                                                      Style="{StaticResource DialogFormTextBoxStyle}"/>
                                             <TextBlock Text="{Binding SshLocalForwardsError}"
-                                                       Foreground="{DynamicResource ErrorTextBrush}"
-                                                       FontSize="{StaticResource FontSizeSmallCaption}"
-                                                       TextWrapping="Wrap"
-                                                       Margin="0,4,0,0"
-                                                       Visibility="{Binding SshLocalForwardsError, Converter={StaticResource NullOrEmptyToCollapsedConverter}}"/>
+                                                       Style="{StaticResource FieldValidationErrorStyle}"
+                                                       Visibility="{Binding SshLocalForwardsError, Converter={StaticResource NullToVisibilityConverter}}"/>
                                         </StackPanel>
                                         <StackPanel Margin="0,14,0,0">
                                             <StackPanel.Style>

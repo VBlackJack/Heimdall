@@ -4381,7 +4381,7 @@
                                                            FontFamily="{StaticResource FontFamilyIcons}"
                                                            Text="&#xE72E;"
                                                            FontSize="{StaticResource IconSizeSmall}"
-                                                           Foreground="{DynamicResource AccentBrush}"
+                                                           Foreground="{DynamicResource AccentTextBrush}"
                                                            VerticalAlignment="Center"/>
                                                 <TextBlock Grid.Column="1"
                                                            Text="{Binding Settings.TrustedHostKeys.PolicySummaryText}"
