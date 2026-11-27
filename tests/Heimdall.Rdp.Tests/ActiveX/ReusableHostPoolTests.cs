@@ -305,6 +305,403 @@ public sealed class ReusableHostPoolTests
         Assert.Equal(0, pool.Trim());
     }
 
+    // A control released while its asynchronous disconnect is still in flight cannot have its
+    // password overwritten yet; resetting it at once is what used to dispose every session.
+    [Fact]
+    public void Release_OfAnUnsettledHost_IsNeitherResetNorDisposed()
+    {
+        using var pool = SettlingPool(new ManualClock());
+        FakeHost host = pool.Acquire();
+        host.IsDisconnectSettled = false;
+
+        pool.Release(host);
+
+        Assert.Equal(0, host.ResetCount);
+        Assert.False(host.IsDisposed);
+        Assert.Equal(1, pool.SettleCount);
+        Assert.Equal(0, pool.IdleCount);
+    }
+
+    [Fact]
+    public void ProcessSettling_AfterTheHostSettles_ResetsItOnceAndPoolsIt()
+    {
+        using var pool = SettlingPool(new ManualClock());
+        FakeHost host = pool.Acquire();
+        host.IsDisconnectSettled = false;
+        pool.Release(host);
+        host.IsDisconnectSettled = true;
+
+        int resolved = pool.ProcessSettling();
+
+        Assert.Equal(1, resolved);
+        Assert.Equal(1, host.ResetCount);
+        Assert.False(host.IsDisposed);
+        Assert.Equal(0, pool.SettleCount);
+        Assert.Equal(1, pool.IdleCount);
+    }
+
+    [Fact]
+    public void ProcessSettling_AtTheTimeout_DisposesTheHostWithoutResettingIt()
+    {
+        ManualClock clock = new();
+        using var pool = SettlingPool(clock);
+        FakeHost host = pool.Acquire();
+        host.IsDisconnectSettled = false;
+        pool.Release(host);
+        clock.Advance(SettleTimeout);
+
+        pool.ProcessSettling();
+
+        Assert.True(host.IsDisposed);
+        Assert.Equal(0, host.ResetCount);
+        Assert.Equal(0, pool.SettleCount);
+        Assert.Equal(0, pool.IdleCount);
+    }
+
+    [Fact]
+    public void ProcessSettling_JustBeforeTheTimeout_KeepsWaiting()
+    {
+        ManualClock clock = new();
+        using var pool = SettlingPool(clock);
+        FakeHost host = pool.Acquire();
+        host.IsDisconnectSettled = false;
+        pool.Release(host);
+        clock.Advance(SettleTimeout - TimeSpan.FromMilliseconds(1));
+
+        int resolved = pool.ProcessSettling();
+
+        Assert.Equal(0, resolved);
+        Assert.False(host.IsDisposed);
+        Assert.Equal(1, pool.SettleCount);
+    }
+
+    [Fact]
+    public void ProcessSettling_DisposesAHostThatBecameUnusable()
+    {
+        using var pool = SettlingPool(new ManualClock());
+        FakeHost host = pool.Acquire();
+        host.IsDisconnectSettled = false;
+        pool.Release(host);
+        host.IsReusable = false;
+
+        pool.ProcessSettling();
+
+        Assert.True(host.IsDisposed);
+        Assert.Equal(0, host.ResetCount);
+        Assert.Equal(0, pool.SettleCount);
+    }
+
+    // Unusable wins over settled: a host that is both must be disposed, never reset.
+    [Fact]
+    public void ProcessSettling_SettledButUnusable_IsDisposedAndNeverReset()
+    {
+        using var pool = SettlingPool(new ManualClock());
+        FakeHost host = pool.Acquire();
+        host.IsDisconnectSettled = false;
+        pool.Release(host);
+        host.IsDisconnectSettled = true;
+        host.IsReusable = false;
+
+        pool.ProcessSettling();
+
+        Assert.True(host.IsDisposed);
+        Assert.Equal(0, host.ResetCount);
+        Assert.Equal(0, pool.SettleCount);
+        Assert.Equal(0, pool.IdleCount);
+    }
+
+    [Fact]
+    public void IsDisconnectSettledThrowing_ReadsAsNotSettled()
+    {
+        using var pool = SettlingPool(new ManualClock());
+        FakeHost host = pool.Acquire();
+        host.IsDisconnectSettledThrows = true;
+
+        pool.Release(host);
+        pool.ProcessSettling();
+
+        Assert.Equal(1, pool.SettleCount);
+        Assert.Equal(0, host.ResetCount);
+        Assert.False(host.IsDisposed);
+    }
+
+    [Fact]
+    public void Acquire_NeverHandsOutASettlingHost()
+    {
+        using var pool = SettlingPool(new ManualClock());
+        FakeHost settling = pool.Acquire();
+        settling.IsDisconnectSettled = false;
+        pool.Release(settling);
+
+        FakeHost other = pool.Acquire();
+
+        Assert.NotSame(settling, other);
+        Assert.Equal(2, pool.CreationCount);
+        Assert.Equal(1, pool.SettleCount);
+    }
+
+    [Fact]
+    public void Dispose_DisposesSettlingHosts()
+    {
+        var pool = SettlingPool(new ManualClock());
+        FakeHost host = pool.Acquire();
+        host.IsDisconnectSettled = false;
+        pool.Release(host);
+
+        pool.Dispose();
+
+        Assert.True(host.IsDisposed);
+        Assert.Equal(0, pool.SettleCount);
+    }
+
+    [Fact]
+    public void Trim_LeavesSettlingHostsAlone()
+    {
+        ManualClock clock = new();
+        using var pool = new ReusableHostPool<FakeHost>(
+            () => new FakeHost(), () => 1, () => TimeSpan.FromMinutes(1), clock, null, TimeSpan.FromHours(1));
+        FakeHost waiting = pool.Acquire();
+        waiting.IsDisconnectSettled = false;
+        pool.Release(waiting);
+        clock.Advance(TimeSpan.FromMinutes(5));
+
+        int disposed = pool.Trim();
+
+        Assert.Equal(0, disposed);
+        Assert.False(waiting.IsDisposed);
+        Assert.Equal(1, pool.SettleCount);
+    }
+
+    [Fact]
+    public void ProcessSettling_WhenThePoolIsNowFull_DisposesTheSettledHost()
+    {
+        using var pool = new ReusableHostPool<FakeHost>(
+            () => new FakeHost(), () => 1, () => TimeSpan.Zero, new ManualClock(), null, SettleTimeout);
+        FakeHost settling = pool.Acquire();
+        FakeHost filler = pool.Acquire();
+        settling.IsDisconnectSettled = false;
+        pool.Release(settling);
+        pool.Release(filler);
+        settling.IsDisconnectSettled = true;
+
+        pool.ProcessSettling();
+
+        Assert.True(settling.IsDisposed);
+        Assert.Equal(0, settling.ResetCount);
+        Assert.False(filler.IsDisposed);
+        Assert.Equal(1, pool.IdleCount);
+    }
+
+    // Parking: a released host gets a live window while it settles, and gives it back on every
+    // way out, before it is reset or disposed.
+    [Fact]
+    public void Release_OfAnUnsettledHost_ParksItOnce()
+    {
+        var parking = new FakeParking();
+        using var pool = ParkingPool(new ManualClock(), parking);
+        FakeHost host = pool.Acquire();
+        host.IsDisconnectSettled = false;
+
+        pool.Release(host);
+
+        Assert.Equal(new[] { "park" }, parking.Calls);
+        Assert.Equal(1, pool.SettleCount);
+    }
+
+    [Fact]
+    public void Release_OfASettledHost_NeverParksIt()
+    {
+        var parking = new FakeParking();
+        using var pool = ParkingPool(new ManualClock(), parking);
+
+        pool.Release(pool.Acquire());
+
+        Assert.Empty(parking.Calls);
+    }
+
+    [Fact]
+    public void ProcessSettling_WhenSettled_UnparksBeforeTheReset()
+    {
+        var parking = new FakeParking();
+        using var pool = ParkingPool(new ManualClock(), parking);
+        FakeHost host = pool.Acquire();
+        parking.Attach(host);
+        host.IsDisconnectSettled = false;
+        pool.Release(host);
+        host.IsDisconnectSettled = true;
+
+        pool.ProcessSettling();
+
+        Assert.Equal(new[] { "park", "unpark", "reset" }, parking.Calls);
+        Assert.Equal(1, pool.IdleCount);
+    }
+
+    [Fact]
+    public void ProcessSettling_WhenUnusable_UnparksBeforeTheDisposal()
+    {
+        var parking = new FakeParking();
+        using var pool = ParkingPool(new ManualClock(), parking);
+        FakeHost host = pool.Acquire();
+        parking.Attach(host);
+        host.IsDisconnectSettled = false;
+        pool.Release(host);
+        host.IsReusable = false;
+
+        pool.ProcessSettling();
+
+        Assert.Equal(new[] { "park", "unpark", "dispose" }, parking.Calls);
+    }
+
+    [Fact]
+    public void ProcessSettling_AtTheTimeout_UnparksBeforeTheDisposal()
+    {
+        var parking = new FakeParking();
+        ManualClock clock = new();
+        using var pool = ParkingPool(clock, parking);
+        FakeHost host = pool.Acquire();
+        parking.Attach(host);
+        host.IsDisconnectSettled = false;
+        pool.Release(host);
+        clock.Advance(SettleTimeout);
+
+        pool.ProcessSettling();
+
+        Assert.Equal(new[] { "park", "unpark", "dispose" }, parking.Calls);
+    }
+
+    [Fact]
+    public void Dispose_UnparksSettlingHostsBeforeDisposingThem()
+    {
+        var parking = new FakeParking();
+        var pool = ParkingPool(new ManualClock(), parking);
+        FakeHost host = pool.Acquire();
+        parking.Attach(host);
+        host.IsDisconnectSettled = false;
+        pool.Release(host);
+
+        pool.Dispose();
+
+        Assert.Equal(new[] { "park", "unpark", "dispose" }, parking.Calls);
+    }
+
+    [Fact]
+    public void Release_WhenParkingThrows_DisposesTheHostAndDoesNotSettleIt()
+    {
+        var parking = new FakeParking { ParkThrows = true };
+        using var pool = ParkingPool(new ManualClock(), parking);
+        FakeHost host = pool.Acquire();
+        host.IsDisconnectSettled = false;
+
+        pool.Release(host);
+
+        Assert.True(host.IsDisposed);
+        Assert.Equal(0, pool.SettleCount);
+        Assert.Equal(0, pool.IdleCount);
+        Assert.DoesNotContain("unpark", parking.Calls);
+    }
+
+    [Fact]
+    public void ProcessSettling_WhenUnparkingThrows_DisposesTheHostWithoutResettingIt()
+    {
+        var parking = new FakeParking { UnparkThrows = true };
+        using var pool = ParkingPool(new ManualClock(), parking);
+        FakeHost host = pool.Acquire();
+        host.IsDisconnectSettled = false;
+        pool.Release(host);
+        host.IsDisconnectSettled = true;
+
+        int resolved = pool.ProcessSettling();
+
+        Assert.Equal(1, resolved);
+        Assert.Equal(0, host.ResetCount);
+        Assert.True(host.IsDisposed);
+        Assert.Equal(0, pool.IdleCount);
+        Assert.Equal(0, pool.SettleCount);
+    }
+
+    [Fact]
+    public void Release_CountsSettlingHostsAgainstTheCapacity()
+    {
+        var parking = new FakeParking();
+        using var pool = ParkingPool(new ManualClock(), parking);
+        FakeHost[] hosts = { pool.Acquire(), pool.Acquire(), pool.Acquire() };
+        foreach (FakeHost host in hosts)
+        {
+            host.IsDisconnectSettled = false;
+        }
+
+        foreach (FakeHost host in hosts)
+        {
+            pool.Release(host);
+        }
+
+        Assert.Equal(2, pool.SettleCount);
+        Assert.False(hosts[0].IsDisposed);
+        Assert.False(hosts[1].IsDisposed);
+        Assert.True(hosts[2].IsDisposed);
+        Assert.Equal(2, parking.Calls.Count(c => c == "park"));
+    }
+
+    [Fact]
+    public void Release_CountsIdleAndSettlingTogetherAgainstTheCapacity()
+    {
+        using var pool = ParkingPool(new ManualClock(), new FakeParking());
+        FakeHost idle = pool.Acquire();
+        FakeHost first = pool.Acquire();
+        FakeHost second = pool.Acquire();
+        pool.Release(idle);
+        first.IsDisconnectSettled = false;
+        second.IsDisconnectSettled = false;
+        pool.Release(first);
+        pool.Release(second);
+
+        Assert.Equal(1, pool.IdleCount);
+        Assert.Equal(1, pool.SettleCount);
+        Assert.True(second.IsDisposed);
+    }
+
+    private static readonly TimeSpan SettleTimeout = TimeSpan.FromSeconds(10);
+
+    private static ReusableHostPool<FakeHost> ParkingPool(ManualClock clock, FakeParking parking)
+        => new(() => new FakeHost(), () => 2, () => TimeSpan.Zero, clock, null, SettleTimeout, parking);
+
+    /// <summary>Records parking calls, and the host's reset and disposal when attached, in one order.</summary>
+    private sealed class FakeParking : IHostParking<FakeHost>
+    {
+        public List<string> Calls { get; } = new();
+
+        public bool ParkThrows { get; set; }
+
+        public bool UnparkThrows { get; set; }
+
+        public void Attach(FakeHost host) => host.Journal = Calls;
+
+        public void Park(FakeHost host)
+        {
+            Calls.Add("park");
+            if (ParkThrows)
+            {
+                throw new InvalidOperationException("park failed");
+            }
+        }
+
+        public void Unpark(FakeHost host)
+        {
+            Calls.Add("unpark");
+            if (UnparkThrows)
+            {
+                throw new InvalidOperationException("unpark failed");
+            }
+        }
+
+        public void Dispose()
+        {
+        }
+    }
+
+    private static ReusableHostPool<FakeHost> SettlingPool(ManualClock clock)
+        => new(() => new FakeHost(), () => 2, () => TimeSpan.Zero, clock, null, SettleTimeout);
+
     private sealed class ManualClock : TimeProvider
     {
         private DateTimeOffset _now = new(2026, 9, 5, 12, 0, 0, TimeSpan.Zero);
@@ -318,6 +715,23 @@ public sealed class ReusableHostPoolTests
     {
         public bool IsReusable { get; set; } = true;
 
+        public bool IsDisconnectSettledThrows { get; set; }
+
+        public bool IsDisconnectSettled
+        {
+            get => IsDisconnectSettledThrows
+                ? throw new InvalidOperationException("state unavailable")
+                : _isDisconnectSettled;
+            set => _isDisconnectSettled = value;
+        }
+
+        private bool _isDisconnectSettled = true;
+
+        /// <summary>When set, reset and disposal are appended here, to assert their order against parking.</summary>
+        public List<string>? Journal { get; set; }
+
+        public string DescribeSettleState() => "fake-state";
+
         public bool ResetResult { get; set; } = true;
 
         public bool ResetThrows { get; set; }
@@ -329,6 +743,7 @@ public sealed class ReusableHostPoolTests
         public bool ResetForReuse()
         {
             ResetCount++;
+            Journal?.Add("reset");
             if (ResetThrows)
             {
                 throw new InvalidOperationException("reset failed");
@@ -337,6 +752,10 @@ public sealed class ReusableHostPoolTests
             return ResetResult;
         }
 
-        public void Dispose() => IsDisposed = true;
+        public void Dispose()
+        {
+            IsDisposed = true;
+            Journal?.Add("dispose");
+        }
     }
 }

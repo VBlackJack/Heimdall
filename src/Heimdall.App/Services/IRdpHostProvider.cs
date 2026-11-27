@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.Windows.Forms;
 using System.Windows.Threading;
 using Heimdall.Core.Configuration;
 using Heimdall.Rdp.ActiveX;
@@ -81,8 +82,18 @@ public sealed class PooledRdpHostProvider : IRdpHostProvider, IDisposable
     /// <summary>How often the idle controls are checked against the expiry.</summary>
     internal static readonly TimeSpan TrimInterval = TimeSpan.FromSeconds(30);
 
+    /// <summary>
+    /// How often released controls are checked for a finished disconnect. Short, because the
+    /// disconnect normally completes within a second and a control waiting for it is a
+    /// connected one still holding its resources; cheap, because it reads one COM property
+    /// per waiting control and only runs while any is waiting.
+    /// </summary>
+    internal static readonly TimeSpan SettleInterval = TimeSpan.FromMilliseconds(250);
+
     private readonly ReusableHostPool<RdpActiveXHost> _pool;
+    private readonly HiddenFormHostParking _parking = new();
     private DispatcherTimer? _trimTimer;
+    private DispatcherTimer? _settleTimer;
     private bool _disposed;
 
     /// <summary>Creates a provider of fixed capacity whose idle controls never expire.</summary>
@@ -105,7 +116,9 @@ public sealed class PooledRdpHostProvider : IRdpHostProvider, IDisposable
             capacity,
             idleExpiry,
             timeProvider,
-            Core.Logging.FileLogger.Info);
+            Core.Logging.FileLogger.Info,
+            disconnectSettleTimeout: null,
+            parking: _parking);
     }
 
     /// <summary>Controls handed out that came from the pool. Exposed for diagnostics.</summary>
@@ -116,6 +129,9 @@ public sealed class PooledRdpHostProvider : IRdpHostProvider, IDisposable
 
     /// <summary>Controls sitting idle right now.</summary>
     public int IdleCount => _pool.IdleCount;
+
+    /// <summary>Released controls still waiting for their disconnect to settle.</summary>
+    public int SettleCount => _pool.SettleCount;
 
     /// <summary>The number of idle controls kept, as the settings say right now.</summary>
     public int Capacity => _pool.Capacity;
@@ -147,10 +163,35 @@ public sealed class PooledRdpHostProvider : IRdpHostProvider, IDisposable
     public void Release(RdpActiveXHost host)
     {
         _pool.Release(host);
+        if (_pool.SettleCount > 0)
+        {
+            EnsureSettleTimer();
+        }
+
         if (_pool.IdleCount > 0)
         {
             EnsureTrimTimer();
         }
+    }
+
+    /// <summary>
+    /// Moves the released controls whose disconnect has finished into the pool, and disposes
+    /// those that never will. Stops the settle timer once nothing is waiting.
+    /// </summary>
+    public int ProcessSettling()
+    {
+        int resolved = _pool.ProcessSettling();
+        if (_pool.IdleCount > 0)
+        {
+            EnsureTrimTimer();
+        }
+
+        if (_pool.SettleCount == 0)
+        {
+            StopSettleTimer();
+        }
+
+        return resolved;
     }
 
     /// <summary>Disposes the idle controls that have expired, and reports how many.</summary>
@@ -180,7 +221,35 @@ public sealed class PooledRdpHostProvider : IRdpHostProvider, IDisposable
 
         _disposed = true;
         StopTrimTimer();
+        StopSettleTimer();
         _pool.Dispose();
+        _parking.Dispose();
+    }
+
+    private void EnsureSettleTimer()
+    {
+        if (_settleTimer is not null || _disposed)
+        {
+            return;
+        }
+
+        _settleTimer = new DispatcherTimer(
+            SettleInterval,
+            DispatcherPriority.Background,
+            (_, _) => ProcessSettling(),
+            Dispatcher.CurrentDispatcher);
+        _settleTimer.Start();
+    }
+
+    private void StopSettleTimer()
+    {
+        if (_settleTimer is null)
+        {
+            return;
+        }
+
+        _settleTimer.Stop();
+        _settleTimer = null;
     }
 
     private void EnsureTrimTimer()
@@ -207,5 +276,106 @@ public sealed class PooledRdpHostProvider : IRdpHostProvider, IDisposable
 
         _trimTimer.Stop();
         _trimTimer = null;
+    }
+
+    /// <summary>
+    /// Parks a released control in a hidden top-level window while its disconnect settles.
+    /// </summary>
+    /// <remarks>
+    /// The view takes the control out of its window before the asynchronous disconnect has
+    /// finished, which deactivates it in place, and mstscax cannot complete a disconnect
+    /// without a window. The form is never shown: it exists only so the control has a parent
+    /// with a live handle. One form serves every parked control, created on first use.
+    /// </remarks>
+    private sealed class HiddenFormHostParking : IHostParking<RdpActiveXHost>
+    {
+        /// <summary>
+        /// Where the parking form sits: far outside any monitor layout, so even a stray show
+        /// could not be seen.
+        /// </summary>
+        private const int OffScreenCoordinate = -32000;
+
+        /// <summary>Size of the parking form; small, as nothing is ever drawn in it.</summary>
+        private const int FormSide = 64;
+
+        /// <summary>
+        /// Size given to a parked control. Non-zero on purpose: a 0x0 parent could make the
+        /// control renegotiate its display size.
+        /// </summary>
+        private static readonly System.Drawing.Size ParkedControlSize = new(1024, 768);
+
+        private HiddenForm? _form;
+
+        public void Park(RdpActiveXHost host)
+        {
+            ArgumentNullException.ThrowIfNull(host);
+
+            Form form = EnsureForm();
+            host.Size = ParkedControlSize;
+            form.Controls.Add(host);
+            // CreateControl() is a no-op on a parent that was never shown, so the handle is
+            // forced instead: the disconnect needs a live window to complete in.
+            _ = host.Handle;
+
+            // The first Disconnect() ran while the control had no window; repeating it is
+            // idempotent and now has one to complete in.
+            host.Disconnect();
+        }
+
+        public void Unpark(RdpActiveXHost host)
+        {
+            ArgumentNullException.ThrowIfNull(host);
+
+            if (_form is not null && ReferenceEquals(host.Parent, _form))
+            {
+                _form.Controls.Remove(host);
+            }
+        }
+
+        public void Dispose()
+        {
+            _form?.Dispose();
+            _form = null;
+        }
+
+        private Form EnsureForm()
+        {
+            if (_form is null)
+            {
+                _form = new HiddenForm
+                {
+                    FormBorderStyle = FormBorderStyle.None,
+                    ShowInTaskbar = false,
+                    StartPosition = FormStartPosition.Manual,
+                    Location = new System.Drawing.Point(OffScreenCoordinate, OffScreenCoordinate),
+                    Size = new System.Drawing.Size(FormSide, FormSide),
+                };
+
+                // Forces the native window into existence without showing it.
+                _ = _form.Handle;
+            }
+
+            return _form;
+        }
+
+        /// <summary>A form that never takes focus and stays out of Alt+Tab.</summary>
+        private sealed class HiddenForm : Form
+        {
+            /// <summary>Extended style: a tool window, not listed in Alt+Tab.</summary>
+            private const int WsExToolWindow = 0x00000080;
+
+            /// <summary>Extended style: never becomes the active window.</summary>
+            private const int WsExNoActivate = 0x08000000;
+
+            protected override CreateParams CreateParams
+            {
+                get
+                {
+                    CreateParams parameters = base.CreateParams;
+                    parameters.ExStyle |= WsExToolWindow | WsExNoActivate;
+                    return parameters;
+                }
+            }
+        }
     }
 }

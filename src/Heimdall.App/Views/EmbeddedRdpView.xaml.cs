@@ -931,7 +931,10 @@ public partial class EmbeddedRdpView
 
     void IRdpDisconnectTeardownTarget.ClearHostChild()
     {
+        bool before = _rdpHost?.IsHandleCreated ?? false;
         FormsHost.Child = null;
+        Core.Logging.FileLogger.Info(
+            $"EmbeddedRdpView.ClearHostChild: host handleCreated before={before} after={_rdpHost?.IsHandleCreated ?? false}");
     }
 
     void IRdpDisconnectTeardownTarget.Disconnect()

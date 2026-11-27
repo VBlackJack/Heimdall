@@ -31,8 +31,21 @@ public interface IReusableHost : IDisposable
     bool IsReusable { get; }
 
     /// <summary>
+    /// True when the host holds no live connection, so a reset can succeed. The pool waits
+    /// for it before resetting: a control whose disconnect is still in flight refuses to have
+    /// its password overwritten. Should not throw; the pool treats a throw as not settled. When in doubt, false.
+    /// </summary>
+    bool IsDisconnectSettled { get; }
+
+    /// <summary>
     /// Returns the host to the state a new one would be in.
     /// </summary>
     /// <returns>True when the host may be reused; false when it must be disposed instead.</returns>
     bool ResetForReuse();
+
+    /// <summary>
+    /// A one-line description of what keeps the disconnect from settling (window handle,
+    /// parent, raw connected value), for the pool's log. Should not throw.
+    /// </summary>
+    string DescribeSettleState();
 }

@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.Globalization;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -205,6 +206,37 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost, IRdpDis
     /// </summary>
     public bool IsReusable { get; private set; } = true;
 
+    /// <summary>
+    /// True when the control holds no live connection, which is the only state in which
+    /// <c>put_ClearTextPassword</c> can overwrite the secret. Teardown calls the asynchronous
+    /// <c>Disconnect()</c> and releases the control at once, so the pool waits on this before
+    /// it resets. Read from the COM <c>Connected</c> property, never from the managed flag.
+    /// Fails closed: any doubt reads as false, and it never throws. The one exception is a
+    /// control with no ActiveX instance, which reads as true: no instance means no connect was
+    /// ever issued, and <c>ClearRemoteCredential</c> treats it the same way (there is no secret
+    /// on the other side to overwrite), so a reset cannot fail on a live connection.
+    /// </summary>
+    public bool IsDisconnectSettled
+    {
+        get
+        {
+            if (_disposed)
+            {
+                return false;
+            }
+
+            try
+            {
+                object? ocx = GetActiveXInstance();
+                return ocx is null || RdpPasswordReset.IsDisconnected(ocx);
+            }
+            catch (Exception)
+            {
+                return false;
+            }
+        }
+    }
+
     /// <summary>The ActiveX CLSID used to instantiate this control.</summary>
     public string ActiveXClsid => _activeXClsid;
 
@@ -235,6 +267,20 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost, IRdpDis
     {
         base.OnHandleCreated(e);
         StripScrollbarStylesRecursive();
+    }
+
+    /// <summary>
+    /// Logs the moment the window goes, with the connected value at that point: a disconnect
+    /// that never settles is explained by whether the window outlived it.
+    /// </summary>
+    protected override void OnHandleDestroyed(EventArgs e)
+    {
+        base.OnHandleDestroyed(e);
+
+        // During Dispose the COM read could re-populate the cached instance, so it is skipped.
+        string connected = _disposed ? "skipped (disposed)" : DescribeRawConnectedState();
+        Core.Logging.FileLogger.Info(
+            $"RdpActiveXHost.OnHandleDestroyed: disposed={_disposed} connected={connected}");
     }
 
     /// <summary>
@@ -486,6 +532,9 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost, IRdpDis
             catch (Exception ex)
             {
                 LastError = ex.Message;
+                Core.Logging.FileLogger.Warn(
+                    $"RdpActiveXHost.Disconnect failed: type={ex.GetType().FullName} "
+                    + $"hr=0x{ex.HResult.ToString("X8", CultureInfo.InvariantCulture)} handleCreated={IsHandleCreated}");
             }
         }
     }
@@ -679,7 +728,8 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost, IRdpDis
         catch (Exception ex)
         {
             LastError = ex.Message;
-            Core.Logging.FileLogger.Warn($"RdpActiveXHost.SetClearTextPassword: success=False error={ex.Message}");
+            Core.Logging.FileLogger.Warn(
+                $"RdpActiveXHost.SetClearTextPassword: success=False error={ex.Message} hr=0x{ex.HResult.ToString("X8", CultureInfo.InvariantCulture)}");
             return false;
         }
     }
@@ -688,8 +738,10 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost, IRdpDis
     // change falls back to Reconnect(width, height) on clients without
     // UpdateSessionDisplaySettings, and that reconnect authenticates again from what the control
     // holds; a control cleared at OnConnected would prompt instead. The secret is reset by
-    // RdpPasswordReset once the control reports itself disconnected, and overwritten before the
-    // control is handed to another session.
+    // RdpPasswordReset where a view calls it once the control reports itself disconnected. At
+    // teardown the event sink is detached first, so that path never runs: the pool waits for the
+    // asynchronous COM disconnect to settle (IsDisconnectSettled), then overwrites the password
+    // before the control is handed to another session.
 
     #region Internal event raisers (called by MsTscAxEventSink)
 
@@ -2274,7 +2326,8 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost, IRdpDis
             {
                 IsReusable = false;
                 Core.Logging.FileLogger.Warn(
-                    "RdpActiveXHost.ResetForReuse: the control's password could not be overwritten, it will not be reused");
+                    "RdpActiveXHost.ResetForReuse: the control's password could not be overwritten, "
+                    + $"it will not be reused (comConnectedState={DescribeComConnectedState()})");
                 return false;
             }
 
@@ -2287,6 +2340,70 @@ public sealed class RdpActiveXHost : AxHost, IRdpSession, IReusableHost, IRdpDis
             Core.Logging.FileLogger.Warn(
                 $"RdpActiveXHost.ResetForReuse failed, control will not be reused: {ex.Message}");
             return false;
+        }
+    }
+
+    /// <inheritdoc />
+    public string DescribeSettleState()
+    {
+        try
+        {
+            string parent = Parent?.GetType().Name ?? "none";
+            return $"handleCreated={IsHandleCreated} parent={parent} disposed={_disposed} connected={DescribeRawConnectedState()}";
+        }
+        catch (Exception ex)
+        {
+            return $"describe failed: {ex.GetType().Name}";
+        }
+    }
+
+    /// <summary>
+    /// The raw COM <c>Connected</c> value, or why it could not be read, for a diagnostic.
+    /// Never throws.
+    /// </summary>
+    private string DescribeRawConnectedState()
+    {
+        try
+        {
+            object? ocx = GetActiveXInstance();
+            if (ocx is null)
+            {
+                return "no instance";
+            }
+
+            object? raw = RdpPasswordReset.ReadConnectedState(ocx);
+            return raw is null
+                ? "null"
+                : Convert.ToString(raw, CultureInfo.InvariantCulture) ?? "null";
+        }
+        catch (Exception ex)
+        {
+            Exception cause = ex.InnerException ?? ex;
+            return $"read failed: {cause.GetType().Name} hr=0x{cause.HResult.ToString("X8", CultureInfo.InvariantCulture)}";
+        }
+    }
+
+    /// <summary>
+    /// The COM <c>Connected</c> value for a diagnostic, or "n/a" when it cannot be read. Never throws.
+    /// </summary>
+    private string DescribeComConnectedState()
+    {
+        try
+        {
+            object? ocx = GetActiveXInstance();
+            if (ocx is null)
+            {
+                return "n/a";
+            }
+
+            object? raw = RdpPasswordReset.ReadConnectedState(ocx);
+            return raw is null
+                ? "n/a"
+                : Convert.ToString(raw, CultureInfo.InvariantCulture) ?? "n/a";
+        }
+        catch (Exception)
+        {
+            return "n/a";
         }
     }
 
