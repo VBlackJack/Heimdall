@@ -41,6 +41,7 @@ public sealed class SensitiveLoggingGuardTests
         @"src\Heimdall.Ssh\Plink\PlinkTunnelRunner.cs",
         @"src\Heimdall.App\Services\PlinkHostKeyProbe.cs",
         @"src\Heimdall.App\Services\Handlers\SshHandler.cs",
+        @"src\Heimdall.App\Services\Handlers\SshHandler.PlinkHelpers.cs",
         @"src\Heimdall.App\Services\TunnelService.cs",
     };
 
