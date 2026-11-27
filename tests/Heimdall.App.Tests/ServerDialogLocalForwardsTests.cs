@@ -65,5 +65,28 @@ public sealed class ServerDialogLocalForwardsTests
         Assert.NotNull(vm.SshLocalForwardsError);
         Assert.Equal(nameof(ServerDialogViewModel.SshLocalForwardsText), vm.FirstInvalidField);
         Assert.NotNull(vm.ValidationError);
+
+        // Editing SshLocalForwardsText clears the inline error and updates summary.
+        vm.SshLocalForwardsText = "8080:127.0.0.1:80";
+        Assert.Null(vm.SshLocalForwardsError);
+        Assert.Null(vm.ValidationError);
+    }
+
+    [Fact]
+    public void NonSshProfile_PreservesSeedLocalForwardsWithoutWiping()
+    {
+        var dto = new ServerProfileDto
+        {
+            DisplayName = "RDP Host",
+            ConnectionType = "RDP",
+            RemoteServer = "rdp.internal",
+            SshLocalForwards = ["/var/run/custom.sock:127.0.0.1:8080"]
+        };
+
+        var vm = ServerDialogViewModel.FromDto(dto);
+        Assert.False(vm.IsDirty);
+
+        var updated = vm.ToDto();
+        Assert.Equal(["/var/run/custom.sock:127.0.0.1:8080"], updated.SshLocalForwards);
     }
 }

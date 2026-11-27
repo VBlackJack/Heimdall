@@ -323,26 +323,37 @@ public partial class EmbeddedSshView
         SessionInfoButton.SetResourceReference(
             System.Windows.Controls.Control.ForegroundProperty,
             diag.HasWeakCrypto ? "WarningTextBrush" : "TextSecondaryBrush");
-        SessionInfoButton.ToolTip = FormatSessionCryptoInfoSummary(diag);
+        SessionInfoButton.ToolTip = L("TooltipSessionCryptoInfo")
+            + Environment.NewLine
+            + FormatSessionCryptoInfoSummary(diag);
     }
 
     private string FormatSessionCryptoInfoSummary(SshSessionDiagnostics diag)
     {
+        var cipherDisplay = FormatDirectionalAlgorithm(diag.ClientToServerEncryption, diag.ServerToClientEncryption);
+        var macDisplay = FormatDirectionalAlgorithm(diag.ClientToServerMac, diag.ServerToClientMac);
+        var compressionDisplay = FormatDirectionalAlgorithm(diag.ClientToServerCompression, diag.ServerToClientCompression);
+
         var summary = string.Format(
             System.Globalization.CultureInfo.CurrentCulture,
             L("SessionCryptoInfoSummary"),
             diag.ServerVersion,
             diag.KeyExchangeAlgorithm,
             diag.HostKeyAlgorithm,
-            diag.ClientToServerEncryption,
-            diag.ClientToServerMac,
-            diag.ClientToServerCompression,
+            cipherDisplay,
+            macDisplay,
+            compressionDisplay,
             diag.ActiveForwardedPorts);
 
         return diag.HasWeakCrypto
             ? summary + Environment.NewLine + L("SessionCryptoInfoWeakWarning")
             : summary;
     }
+
+    private static string FormatDirectionalAlgorithm(string clientToServer, string serverToClient)
+        => string.Equals(clientToServer, serverToClient, StringComparison.OrdinalIgnoreCase)
+            ? clientToServer
+            : $"{clientToServer} / {serverToClient}";
 
     private void OnSessionInfoClick(object sender, RoutedEventArgs e)
     {

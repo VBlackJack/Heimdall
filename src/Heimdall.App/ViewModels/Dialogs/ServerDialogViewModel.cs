@@ -670,6 +670,15 @@ public partial class ServerDialogViewModel : ObservableValidator
     [ObservableProperty]
     private string? _sshLocalForwardsError;
 
+    partial void OnSshLocalForwardsTextChanged(string value)
+    {
+        if (SshLocalForwardsError is not null)
+        {
+            SshLocalForwardsError = null;
+            RefreshValidationSummary();
+        }
+    }
+
     /// <summary>
     /// The one agent key this session offers, as a fingerprint; null means any key. The single
     /// source of truth: the list below only displays it, and a refresh of that list never writes it.
@@ -1837,6 +1846,7 @@ public partial class ServerDialogViewModel : ObservableValidator
         nameof(RdpFixedHeightError),
         nameof(RdpResizeEnableDelayMsError),
         nameof(RdpGatewayError),
+        nameof(SshLocalForwardsError),
         nameof(GeneralTabErrorCount),
         nameof(NetworkTabErrorCount),
         nameof(OptionsTabErrorCount),
@@ -2318,6 +2328,7 @@ public partial class ServerDialogViewModel : ObservableValidator
         RdpFixedHeightError = null;
         RdpResizeEnableDelayMsError = null;
         RdpGatewayError = null;
+        SshLocalForwardsError = null;
         GeneralTabErrorCount = 0;
         NetworkTabErrorCount = 0;
         OptionsTabErrorCount = 0;
@@ -2329,7 +2340,7 @@ public partial class ServerDialogViewModel : ObservableValidator
     {
         ValidationError = DisplayNameError ?? RemoteServerError ?? SshUsernameError ?? WinRmUsernameError ?? WinRmPasswordError ?? EndpointPortError
             ?? LocalPortError ?? RdpGatewayError ?? AudioModeError ?? ColorDepthError
-            ?? RdpFixedWidthError ?? RdpFixedHeightError ?? RdpResizeEnableDelayMsError;
+            ?? RdpFixedWidthError ?? RdpFixedHeightError ?? RdpResizeEnableDelayMsError ?? SshLocalForwardsError;
         GeneralTabErrorCount = (DisplayNameError is not null ? 1 : 0)
             + (RemoteServerError is not null ? 1 : 0)
             + (SshUsernameError is not null ? 1 : 0)
@@ -2342,7 +2353,8 @@ public partial class ServerDialogViewModel : ObservableValidator
             + (ColorDepthError is not null ? 1 : 0)
             + (RdpFixedWidthError is not null ? 1 : 0)
             + (RdpFixedHeightError is not null ? 1 : 0)
-            + (RdpResizeEnableDelayMsError is not null ? 1 : 0);
+            + (RdpResizeEnableDelayMsError is not null ? 1 : 0)
+            + (SshLocalForwardsError is not null ? 1 : 0);
     }
 
     [RelayCommand]
@@ -2896,7 +2908,11 @@ public partial class ServerDialogViewModel : ObservableValidator
             SocksProxyPort = SocksProxyPort,
             RemoteBindPort = RemoteBindPort,
             RemoteLocalPort = RemoteLocalPort,
-            SshLocalForwards = ParseValidSshLocalForwards(SshLocalForwardsText),
+            SshLocalForwards = string.Equals(ConnectionType, "SSH", StringComparison.OrdinalIgnoreCase)
+                ? ParseValidSshLocalForwards(SshLocalForwardsText)
+                : _seed?.SshLocalForwards is { Count: > 0 } preservedForwards
+                    ? [.. preservedForwards]
+                    : [],
             SshMode = SshMode,
             PostConnectSteps = [.. PostConnectSteps.Select(step => step.ToModel())],
             PostConnectCommand = PostConnectCommand,

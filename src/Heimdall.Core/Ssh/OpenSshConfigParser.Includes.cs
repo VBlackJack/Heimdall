@@ -25,9 +25,9 @@ public static partial class OpenSshConfigParser
     internal const int MaxTotalExpandedBytes = 2 * 1024 * 1024;
 
     /// <summary>
-    /// Reads and parses an OpenSSH config file from disk, safely expanding <c>Include</c> directives
-    /// (including glob patterns such as <c>config.d/*.conf</c>) with depth, file-count, size, symlink,
-    /// traversal, and cycle guards.
+    /// Reads and parses an OpenSSH config file from disk, safely expanding top-level and
+    /// <c>Host *</c> <c>Include</c> directives (including glob patterns such as <c>config.d/*.conf</c>)
+    /// with depth, file-count, size, ancestor-symlink, UNC/traversal, and cycle guards.
     /// </summary>
     public static OpenSshParseResult ParseFile(string configFilePath, string? userProfileOverride = null)
     {
@@ -61,10 +61,18 @@ public static partial class OpenSshConfigParser
 
         try
         {
-            string rawText;
             if (isRoot)
             {
-                rawText = File.ReadAllText(canonical, Encoding.UTF8);
+                var rootInfo = new FileInfo(canonical);
+                if (!rootInfo.Exists)
+                {
+                    throw new FileNotFoundException("OpenSSH config file not found.", canonical);
+                }
+
+                if (rootInfo.Length > MaxTotalExpandedBytes)
+                {
+                    throw new IOException($"OpenSSH config file exceeds maximum size of {MaxTotalExpandedBytes} bytes.");
+                }
             }
             else
             {
@@ -74,48 +82,99 @@ public static partial class OpenSshConfigParser
                 }
 
                 var info = new FileInfo(canonical);
-                if (state.TotalBytes + info.Length > MaxTotalExpandedBytes)
+                if (info.Length > MaxTotalExpandedBytes || state.TotalBytes + info.Length > MaxTotalExpandedBytes)
                 {
                     return;
                 }
 
-                rawText = File.ReadAllText(canonical, Encoding.UTF8);
+                if (state.IncludedFileCount >= MaxIncludedFiles)
+                {
+                    return;
+                }
+
+                state.IncludedFileCount++;
             }
 
-            state.TotalBytes += Encoding.UTF8.GetByteCount(rawText);
-            if (state.TotalBytes > MaxTotalExpandedBytes)
+            var rawText = File.ReadAllText(canonical, Encoding.UTF8);
+            var byteCount = Encoding.UTF8.GetByteCount(rawText);
+            if (state.TotalBytes + byteCount > MaxTotalExpandedBytes)
             {
+                if (isRoot)
+                {
+                    throw new IOException($"OpenSSH config file exceeds maximum size of {MaxTotalExpandedBytes} bytes.");
+                }
+
                 return;
             }
 
+            state.TotalBytes += byteCount;
+
             var currentDir = Path.GetDirectoryName(canonical) ?? state.RootDirectory;
             var lines = rawText.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').Split('\n');
+            var inMatchBlock = false;
+            var inSpecificHostBlock = false;
 
             foreach (var line in lines)
             {
                 var trimmed = StripComments(line).Trim();
-                if (trimmed.Length > 0
-                    && TrySplitDirective(trimmed, out var directive, out var value, out _)
-                    && directive.Equals("include", StringComparison.OrdinalIgnoreCase))
+                if (trimmed.Length > 0 && TrySplitDirective(trimmed, out var directive, out var value, out _))
                 {
-                    if (depth < MaxIncludeDepth)
+                    if (directive.Equals("match", StringComparison.OrdinalIgnoreCase))
                     {
+                        inMatchBlock = true;
+                        inSpecificHostBlock = false;
+                        output.Append(line).Append('\n');
+                        continue;
+                    }
+
+                    if (directive.Equals("host", StringComparison.OrdinalIgnoreCase))
+                    {
+                        inMatchBlock = false;
+                        var hostTokens = SplitTokens(value);
+                        inSpecificHostBlock = !(hostTokens.Count == 1 && hostTokens[0] == "*");
+                        output.Append(line).Append('\n');
+                        continue;
+                    }
+
+                    if (directive.Equals("include", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Conditional Include inside Match or specific Host blocks (or beyond max depth)
+                        // is passed through untouched so the parser emits IncludeDirectiveIgnored cleanly
+                        // without corrupting Host/Match block scoping.
+                        if (inMatchBlock || inSpecificHostBlock || depth >= MaxIncludeDepth)
+                        {
+                            output.Append(line).Append('\n');
+                            continue;
+                        }
+
+                        var capReached = false;
                         foreach (var pattern in SplitTokens(value))
                         {
+                            if (state.IncludedFileCount >= MaxIncludedFiles)
+                            {
+                                capReached = true;
+                                break;
+                            }
+
                             foreach (var includedFile in ResolveIncludePattern(pattern, currentDir, state))
                             {
                                 if (state.IncludedFileCount >= MaxIncludedFiles)
                                 {
+                                    capReached = true;
                                     break;
                                 }
 
-                                state.IncludedFileCount++;
                                 ExpandFileRecursive(includedFile, depth + 1, state, output, isRoot: false);
                             }
-                        }
-                    }
 
-                    continue;
+                            if (capReached)
+                            {
+                                break;
+                            }
+                        }
+
+                        continue;
+                    }
                 }
 
                 output.Append(line).Append('\n');
@@ -146,15 +205,23 @@ public static partial class OpenSshConfigParser
         }
 
         var pattern = rawPattern.Trim().Trim('"');
-        if (pattern.Length == 0 || pattern.StartsWith(@"\\", StringComparison.Ordinal))
+        if (pattern.Length == 0)
         {
             return [];
         }
 
-        bool isExplicitHome = pattern.StartsWith("~/", StringComparison.Ordinal)
-            || pattern.StartsWith(@"~\", StringComparison.Ordinal);
+        // Normalize slashes before any UNC/device/root checks so //server/share cannot bypass \\ checks.
+        var normalizedInput = pattern.Replace('/', Path.DirectorySeparatorChar);
+        if (normalizedInput.StartsWith(@"\\", StringComparison.Ordinal)
+            || normalizedInput.StartsWith(@"//", StringComparison.Ordinal))
+        {
+            return [];
+        }
 
+        bool isExplicitHome = normalizedInput.StartsWith("~" + Path.DirectorySeparatorChar, StringComparison.Ordinal);
         string expandedPattern;
+        string allowedRoot;
+
         if (isExplicitHome)
         {
             if (string.IsNullOrWhiteSpace(state.UserProfile))
@@ -162,22 +229,46 @@ public static partial class OpenSshConfigParser
                 return [];
             }
 
-            expandedPattern = Path.Combine(state.UserProfile, pattern[2..]);
+            expandedPattern = Path.Combine(state.UserProfile, normalizedInput[2..]);
+            allowedRoot = state.UserProfile;
         }
-        else if (Path.IsPathRooted(pattern))
+        else if (Path.IsPathRooted(normalizedInput))
         {
-            expandedPattern = pattern;
+            if (!Path.IsPathFullyQualified(normalizedInput))
+            {
+                return [];
+            }
+
+            expandedPattern = normalizedInput;
+            allowedRoot = IsUnderDirectory(normalizedInput, state.RootDirectory)
+                ? state.RootDirectory
+                : !string.IsNullOrWhiteSpace(state.UserProfile) && IsUnderDirectory(normalizedInput, state.UserProfile)
+                    ? state.UserProfile
+                    : string.Empty;
+
+            if (string.IsNullOrEmpty(allowedRoot))
+            {
+                return [];
+            }
         }
         else
         {
-            expandedPattern = Path.Combine(currentDir, pattern);
+            expandedPattern = Path.Combine(currentDir, normalizedInput);
+            allowedRoot = state.RootDirectory;
         }
 
         // Split into parent directory + leaf glob pattern (supports * and ? on file name).
-        var normalized = expandedPattern.Replace('/', Path.DirectorySeparatorChar);
-        var lastSep = normalized.LastIndexOf(Path.DirectorySeparatorChar);
-        var dirPart = lastSep >= 0 ? normalized[..lastSep] : currentDir;
-        var filePattern = lastSep >= 0 ? normalized[(lastSep + 1)..] : normalized;
+        string? dirPart;
+        string filePattern;
+        try
+        {
+            dirPart = Path.GetDirectoryName(expandedPattern);
+            filePattern = Path.GetFileName(expandedPattern);
+        }
+        catch (ArgumentException)
+        {
+            return [];
+        }
 
         if (string.IsNullOrWhiteSpace(dirPart)
             || string.IsNullOrWhiteSpace(filePattern)
@@ -197,18 +288,12 @@ public static partial class OpenSshConfigParser
             return [];
         }
 
-        // Relative patterns must stay within the root config directory; ~/ patterns stay under UserProfile.
-        if (!Path.IsPathRooted(pattern) && !isExplicitHome && !IsUnderDirectory(fullDir, state.RootDirectory))
+        if (!IsUnderDirectory(fullDir, allowedRoot))
         {
             return [];
         }
 
-        if (isExplicitHome && !IsUnderDirectory(fullDir, state.UserProfile))
-        {
-            return [];
-        }
-
-        if (!Directory.Exists(fullDir) || IsReparsePoint(fullDir))
+        if (!Directory.Exists(fullDir) || HasReparsePointAncestor(fullDir, allowedRoot))
         {
             return [];
         }
@@ -230,17 +315,57 @@ public static partial class OpenSshConfigParser
         }
     }
 
-    private static bool IsUnderDirectory(string candidateDir, string allowedRoot)
+    private static bool HasReparsePointAncestor(string directoryPath, string allowedRoot)
+    {
+        var canonicalRoot = Path.GetFullPath(allowedRoot)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var current = Path.GetFullPath(directoryPath)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+        while (!string.IsNullOrEmpty(current))
+        {
+            if (IsReparsePoint(current))
+            {
+                return true;
+            }
+
+            if (string.Equals(current, canonicalRoot, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            var parent = Path.GetDirectoryName(current);
+            if (string.IsNullOrEmpty(parent) || string.Equals(parent, current, StringComparison.OrdinalIgnoreCase))
+            {
+                break;
+            }
+
+            current = parent.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        }
+
+        return false;
+    }
+
+    private static bool IsUnderDirectory(string candidatePath, string allowedRoot)
     {
         if (string.IsNullOrWhiteSpace(allowedRoot))
         {
             return false;
         }
 
-        var root = Path.GetFullPath(allowedRoot)
-            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        var target = Path.GetFullPath(candidateDir)
-            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        string root;
+        string target;
+        try
+        {
+            root = Path.GetFullPath(allowedRoot)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            target = Path.GetFullPath(candidatePath)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        }
+        catch (Exception)
+        {
+            return false;
+        }
 
         if (string.Equals(target, root, StringComparison.OrdinalIgnoreCase))
         {

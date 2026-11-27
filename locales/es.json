@@ -7013,7 +7013,7 @@
   "ToolSshAgentErrLifetimeNotSupported": "Este agente SSH no admite tiempos de vida (TTL). Vuelva a intentarlo con la duraci\u00f3n de sesi\u00f3n.",
   "ToolSshAuditBtnClearAgent": "Vaciar agente",
   "ToolSshAuditAgentClearConfirmTitle": "Vaciar agente SSH",
-  "ToolSshAuditAgentClearConfirmMessage": "\u00bfEliminar todas las claves cargadas actualmente del agente SSH activo?",
-  "ToolSshAgentClearSuccess": "Se eliminaron todas las claves del agente SSH activo.",
+  "ToolSshAuditAgentClearConfirmMessage": "\u00bfEliminar todas las claves cargadas actualmente de todos los agentes SSH activos?",
+  "ToolSshAgentClearSuccess": "Se eliminaron todas las claves de los agentes SSH activos.",
   "ToolSshAgentClearFailed": "No se pudo vaciar el agente SSH: {0}"
 }

@@ -249,6 +249,7 @@ public sealed partial class TrustedHostKeysSettingsViewModel : ObservableObject,
             var resolution = await _dialogService.ShowImportKnownHostsConflictAsync(conflictVm).ConfigureAwait(true);
             if (resolution is null)
             {
+                RefreshPolicySummary();
                 StatusMessage = _localizer.Format("ToastImportSummary", report.Imported, report.Matched);
                 return;
             }
@@ -412,6 +413,11 @@ public sealed partial class TrustedHostKeysSettingsViewModel : ObservableObject,
             {
                 lines.Add($"  {pattern} ({fp})");
             }
+
+            if (cas.Count > 10)
+            {
+                lines.Add($"  ... (+{cas.Count - 10})");
+            }
         }
 
         if (revoked.Count > 0)
@@ -420,6 +426,11 @@ public sealed partial class TrustedHostKeysSettingsViewModel : ObservableObject,
             foreach (var (pattern, fp) in revoked.Take(10))
             {
                 lines.Add($"  {pattern} ({fp})");
+            }
+
+            if (revoked.Count > 10)
+            {
+                lines.Add($"  ... (+{revoked.Count - 10})");
             }
         }
 

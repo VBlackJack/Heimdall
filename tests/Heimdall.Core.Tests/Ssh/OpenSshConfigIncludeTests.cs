@@ -113,6 +113,44 @@ public sealed class OpenSshConfigIncludeTests
         Assert.Contains(result.Diagnostics, d => d.Code == OpenSshDiagnosticCode.IncludeDirectiveIgnored);
     }
 
+    [Fact]
+    public void ParseFile_BlocksForwardSlashUncAbsoluteOutsideRootAndMatchScopedIncludes()
+    {
+        var outerRoot = CreateTempDirectory();
+        var siblingDir = CreateTempDirectory();
+        try
+        {
+            var sshDir = Path.Combine(outerRoot, ".ssh");
+            Directory.CreateDirectory(sshDir);
+
+            var outsideFile = Path.Combine(siblingDir, "outside.conf");
+            File.WriteAllText(outsideFile, "Host outside\n    HostName 10.9.9.1\n");
+
+            var matchTarget = Path.Combine(sshDir, "in-match.conf");
+            File.WriteAllText(matchTarget, "Host leaked-from-match\n    HostName 10.9.9.2\n");
+
+            var mainConfig = Path.Combine(sshDir, "config");
+            File.WriteAllText(
+                mainConfig,
+                $"Include //nonexistent.invalid/share/x.conf\n" +
+                $"Include {outsideFile}\n" +
+                "Match host prod-*\n" +
+                "    Include in-match.conf\n" +
+                "Host clean\n" +
+                "    HostName 10.3.0.1\n");
+
+            var result = OpenSshConfigParser.ParseFile(mainConfig, outerRoot);
+
+            var only = Assert.Single(result.Candidates);
+            Assert.Equal("clean", only.Alias);
+        }
+        finally
+        {
+            TryDeleteDirectory(outerRoot);
+            TryDeleteDirectory(siblingDir);
+        }
+    }
+
     private static string CreateTempDirectory()
     {
         var dir = Path.Combine(Path.GetTempPath(), "heimdall-ssh-include-" + Guid.NewGuid().ToString("N"));

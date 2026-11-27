@@ -216,13 +216,18 @@ public sealed class SshShellSession : IDisposable
     public SshSessionDiagnostics? GetDiagnostics()
     {
         var client = _client;
-        if (client is null || !client.IsConnected)
+        if (client is null)
         {
             return null;
         }
 
         try
         {
+            if (!client.IsConnected)
+            {
+                return null;
+            }
+
             return SshSessionDiagnostics.FromConnectionInfo(client.ConnectionInfo, ActiveForwardedPortCount);
         }
         catch (ObjectDisposedException)

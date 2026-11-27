@@ -4372,19 +4372,25 @@
                                                 Margin="0,0,0,8"
                                                 ToolTip="{Binding Settings.TrustedHostKeys.PolicyDetailsTooltip}"
                                                 Visibility="{Binding Settings.TrustedHostKeys.HasSecurityPolicies, Converter={StaticResource BoolToVisibilityConverter}}">
-                                            <StackPanel Orientation="Horizontal">
-                                                <TextBlock FontFamily="{StaticResource FontFamilyIcons}"
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0"
+                                                           FontFamily="{StaticResource FontFamilyIcons}"
                                                            Text="&#xE72E;"
                                                            FontSize="{StaticResource IconSizeSmall}"
                                                            Foreground="{DynamicResource AccentBrush}"
                                                            VerticalAlignment="Center"/>
-                                                <TextBlock Text="{Binding Settings.TrustedHostKeys.PolicySummaryText}"
+                                                <TextBlock Grid.Column="1"
+                                                           Text="{Binding Settings.TrustedHostKeys.PolicySummaryText}"
                                                            FontSize="{StaticResource FontSizeCaption}"
                                                            Foreground="{DynamicResource TextSecondaryBrush}"
                                                            Margin="8,0,0,0"
                                                            VerticalAlignment="Center"
                                                            TextWrapping="Wrap"/>
-                                            </StackPanel>
+                                            </Grid>
                                         </Border>
                                         <TextBox Text="{Binding Settings.TrustedHostKeys.SearchText, UpdateSourceTrigger=PropertyChanged}"
                                                  Style="{StaticResource WatermarkTextBoxStyle}"

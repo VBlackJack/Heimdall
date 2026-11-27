@@ -110,7 +110,7 @@ public sealed record SshSessionDiagnostics(
             return false;
         }
 
-        return kex.EndsWith("-sha1", StringComparison.OrdinalIgnoreCase)
+        return kex.Contains("-sha1", StringComparison.OrdinalIgnoreCase)
             || kex.Contains("group1-", StringComparison.OrdinalIgnoreCase);
     }
 
@@ -121,7 +121,8 @@ public sealed record SshSessionDiagnostics(
             return false;
         }
 
-        return string.Equals(hostKey, "ssh-dss", StringComparison.OrdinalIgnoreCase);
+        return hostKey.StartsWith("ssh-dss", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(hostKey, "ssh-rsa", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsWeakCipher(string? cipher)
@@ -131,7 +132,7 @@ public sealed record SshSessionDiagnostics(
             return false;
         }
 
-        return cipher.EndsWith("-cbc", StringComparison.OrdinalIgnoreCase)
+        return cipher.Contains("-cbc", StringComparison.OrdinalIgnoreCase)
             || cipher.Contains("arcfour", StringComparison.OrdinalIgnoreCase)
             || cipher.Contains("3des", StringComparison.OrdinalIgnoreCase)
             || cipher.Contains("blowfish", StringComparison.OrdinalIgnoreCase)

@@ -395,20 +395,22 @@ public partial class SshKeyAuditView : UserControl, IToolView
         var configManager = services?.GetService<IConfigManager>();
         var dialogService = services?.GetService<IDialogService>();
 
+        if (dialogService is null)
+        {
+            return;
+        }
+
         BtnClearAgent.IsEnabled = false;
         try
         {
-            if (dialogService is not null)
-            {
-                var confirmed = await dialogService.ShowConfirmAsync(
-                    L("ToolSshAuditAgentClearConfirmTitle"),
-                    L("ToolSshAuditAgentClearConfirmMessage"),
-                    "warning").ConfigureAwait(true);
+            var confirmed = await dialogService.ShowConfirmAsync(
+                L("ToolSshAuditAgentClearConfirmTitle"),
+                L("ToolSshAuditAgentClearConfirmMessage"),
+                "warning").ConfigureAwait(true);
 
-                if (!confirmed)
-                {
-                    return;
-                }
+            if (!confirmed)
+            {
+                return;
             }
 
             var preference = await ResolveAgentPreferenceAsync(configManager).ConfigureAwait(true);

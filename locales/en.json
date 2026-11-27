@@ -7013,7 +7013,7 @@
   "ToolSshAgentErrLifetimeNotSupported": "This SSH agent does not support timed key lifetimes (TTL). Retry using Session lifetime.",
   "ToolSshAuditBtnClearAgent": "Clear Agent",
   "ToolSshAuditAgentClearConfirmTitle": "Clear SSH agent",
-  "ToolSshAuditAgentClearConfirmMessage": "Remove all currently loaded keys from the active SSH agent?",
-  "ToolSshAgentClearSuccess": "All keys removed from the active SSH agent.",
+  "ToolSshAuditAgentClearConfirmMessage": "Remove all currently loaded keys from all running SSH agents?",
+  "ToolSshAgentClearSuccess": "All keys removed from the running SSH agents.",
   "ToolSshAgentClearFailed": "Could not clear SSH agent: {0}"
 }

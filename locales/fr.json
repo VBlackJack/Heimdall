@@ -7012,7 +7012,7 @@
   "ToolSshAgentErrLifetimeNotSupported": "Cet agent SSH ne prend pas en charge la dur\u00e9e de vie temporaire (TTL). R\u00e9essayez avec la dur\u00e9e de session.",
   "ToolSshAuditBtnClearAgent": "Vider l'agent",
   "ToolSshAuditAgentClearConfirmTitle": "Vider l'agent SSH",
-  "ToolSshAuditAgentClearConfirmMessage": "Retirer toutes les cl\u00e9s actuellement charg\u00e9es dans l'agent SSH actif ?",
-  "ToolSshAgentClearSuccess": "Toutes les cl\u00e9s ont \u00e9t\u00e9 retir\u00e9es de l'agent SSH actif.",
+  "ToolSshAuditAgentClearConfirmMessage": "Retirer toutes les cl\u00e9s actuellement charg\u00e9es dans tous les agents SSH actifs ?",
+  "ToolSshAgentClearSuccess": "Toutes les cl\u00e9s ont \u00e9t\u00e9 retir\u00e9es des agents SSH actifs.",
   "ToolSshAgentClearFailed": "Impossible de vider l'agent SSH : {0}"
 }

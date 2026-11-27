@@ -30,9 +30,13 @@ public sealed class SshSessionDiagnosticsTests
 
     [Theory]
     [InlineData("diffie-hellman-group14-sha1", "ssh-ed25519", "aes256-ctr", "hmac-sha2-256")]
+    [InlineData("diffie-hellman-group-exchange-sha1@ssh.com", "ssh-ed25519", "aes256-ctr", "hmac-sha2-256")]
     [InlineData("diffie-hellman-group1-sha1", "ssh-ed25519", "aes256-ctr", "hmac-sha2-256")]
     [InlineData("curve25519-sha256", "ssh-dss", "aes256-ctr", "hmac-sha2-256")]
+    [InlineData("curve25519-sha256", "ssh-dss-cert-v01@openssh.com", "aes256-ctr", "hmac-sha2-256")]
+    [InlineData("curve25519-sha256", "ssh-rsa", "aes256-ctr", "hmac-sha2-256")]
     [InlineData("curve25519-sha256", "ssh-ed25519", "aes128-cbc", "hmac-sha2-256")]
+    [InlineData("curve25519-sha256", "ssh-ed25519", "rijndael-cbc@lysator.liu.se", "hmac-sha2-256")]
     [InlineData("curve25519-sha256", "ssh-ed25519", "3des-cbc", "hmac-sha2-256")]
     [InlineData("curve25519-sha256", "ssh-ed25519", "arcfour256", "hmac-sha2-256")]
     [InlineData("curve25519-sha256", "ssh-ed25519", "aes256-ctr", "hmac-sha1")]
