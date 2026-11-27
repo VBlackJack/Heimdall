@@ -12,6 +12,45 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## 2026-11-27: Reused RDP controls, keyboard after a tab close, self-update relaunch waits on the application (v2026.112701)
+
+Merged as #906 to #909. The user-facing summary is in the release notes.
+
+### Relaunch test sandbox keeps exited stand-ins (#906)
+
+- The relaunch script test sandbox keeps the exited stand-in processes until it is disposed, so Windows cannot hand
+  their ids to another process while a test waits on them. Fixes the intermittent
+  `Execute_HashMismatch_RefusesAtTheMandatoryGate` failure that recorded `ApplicationStillRunning`. Test harness only.
+
+### Self-update relaunch waits on the application itself (#907)
+
+- `UpdateRelaunchSpec` gets a required `ProcessStartTimeUtc` (FILETIME); `Build` refuses a value <= 0 and a wait
+  timeout whose milliseconds do not fit an int. `IUpdateInstallerHost` supplies the start time.
+- The script opens the process once, reads its handle first, compares its start time (one second tolerance) and
+  waits with `WaitForExit`. An id that belongs to another process, or a process that cannot be opened, counts as
+  exited, and the transcript says so. `Wait-Process -Id` is gone.
+- The CI flaky test inventory (EN and FR) lists the new `CIUnstable` case.
+
+### Reuse of RDP controls that carried a password (#908)
+
+- `IReusableHost.IsDisconnectSettled` (COM `Connected == 0`). `ReusableHostPool` keeps a reusable but unsettled host
+  in a settling list, resets and pools it once settled, and disposes it if it became unusable or is still connected
+  after 10 s. `PooledRdpHostProvider` polls every 250 ms while anything settles.
+- `IHostParking<T>`: a settling host is parked in one hidden, never shown tool window, its handle forced, and
+  `Disconnect()` repeated. Every exit from the settling list unparks first; a throw disposes the host. Idle plus
+  settling hosts count against the capacity.
+- Diagnostics: the `Disconnect()` HRESULT, `DescribeSettleState()`, `OnHandleDestroyed`, and the handle state around
+  `FormsHost.Child = null`.
+
+### RDP teardown follow-ups (#909)
+
+- `DisconnectIssueTracker` records whether `Disconnect()` returned since the last `Connect()` or reset; parking calls
+  `RdpActiveXHost.EnsureDisconnectIssued()`, which repeats the call only when none was issued. Removes the
+  `hr=0x80004005` warning logged on every close.
+- `EmbeddedRdpView.ClearHostChild` gives the focus to the owning window before `FormsHost.Child = null` when it sits in
+  the host or a child (`RdpHostFocusPolicy`). `GetFocus`, `IsChild` and `SetFocus` move to `WindowNative`.
+- Not changed: a session abandoned by the connect watchdog still times out after 10 s and is disposed.
+
 ## 2026-11-26: Language switch fixes, import preview hardening, folder move undo rank (v2026.112601)
 
 Merged as #901 to #904. The user-facing summary is in the release notes.
