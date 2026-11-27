@@ -28,6 +28,12 @@ internal interface IUpdateInstallerHost
     /// <summary>Identifier of the current process.</summary>
     int ProcessId { get; }
 
+    /// <summary>
+    /// Start time of the current process as a Windows FILETIME in UTC, which tells it apart
+    /// from an unrelated process that later receives the same id.
+    /// </summary>
+    long ProcessStartTimeUtc { get; }
+
     /// <summary>Creates a unique relauncher script path inside the restrictive staging directory.</summary>
     string CreateScriptPath(string stagingDirectory);
 

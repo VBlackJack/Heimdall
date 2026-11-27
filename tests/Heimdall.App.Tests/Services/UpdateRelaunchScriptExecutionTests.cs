@@ -601,6 +601,7 @@ public sealed class UpdateRelaunchScriptExecutionTests
         using var sandbox = new UpdateScriptSandbox();
         sandbox.PlaceInstaller(exitCode: 0);
         sandbox.WaitedProcessIdOverride = Environment.ProcessId;
+        sandbox.WaitedProcessStartTimeOverride = CurrentProcessStartTimeUtc();
         sandbox.WaitTimeoutSecondsOverride = 1;
 
         ScriptRun run = await sandbox.RunAsync(powerShellHost);
@@ -634,6 +635,64 @@ public sealed class UpdateRelaunchScriptExecutionTests
             "heimdall-update: relaunch started process id 4242",
             StringComparison.Ordinal);
     }
+
+    /// <summary>
+    /// The id the script waits on may belong to an unrelated process: the application exits
+    /// before the script reaches its wait, and Windows hands the id on. Waiting on the bare id
+    /// waited out the whole timeout and then refused the install AND skipped the relaunch.
+    /// </summary>
+    /// <remarks>
+    /// The reuse is simulated with a live process (this test host) whose start time the spec
+    /// gets wrong by one hour, which is what a recycled id looks like to the script. The
+    /// timeout is long on purpose: a script that wrongly waits would sit in it and then
+    /// record ApplicationStillRunning. The verdict is the stage and the installer having run;
+    /// the elapsed time is only a loose backstop. Same lane as its siblings that run the
+    /// installer (CIUnstable, informational).
+    /// </remarks>
+    [Trait("Category", "CIUnstable")]
+    [Theory]
+    [MemberData(nameof(PowerShellHosts))]
+    public async Task Execute_ReusedProcessId_IsTreatedAsExited(string powerShellHost)
+    {
+        using var sandbox = new UpdateScriptSandbox();
+        sandbox.PlaceInstaller(exitCode: 0);
+        sandbox.WaitedProcessIdOverride = Environment.ProcessId;
+        sandbox.WaitedProcessStartTimeOverride = CurrentProcessStartTimeUtc() - ReusedIdStartTimeSkew.Ticks;
+        sandbox.WaitTimeoutSecondsOverride = ReusedIdWaitTimeoutSeconds;
+
+        var stopwatch = Stopwatch.StartNew();
+        ScriptRun run = await sandbox.RunAsync(powerShellHost);
+        stopwatch.Stop();
+
+        await sandbox.WaitForRoleAsync(InstallerRole);
+        await sandbox.WaitForRoleAsync(RelaunchRole);
+
+        Assert.True(
+            sandbox.SequenceContainsRole(InstallerRole),
+            $"the installer must run when the waited id belongs to another process.{Environment.NewLine}{run.StandardError}");
+        Assert.Null(await sandbox.ReadFailureRecordAsync());
+        Assert.True(sandbox.SequenceContainsRole(RelaunchRole), "the application must be relaunched");
+        Assert.Contains(
+            "belongs to another process, treated as exited",
+            sandbox.ReadTranscript(),
+            StringComparison.Ordinal);
+        Assert.True(
+            stopwatch.Elapsed < TimeSpan.FromSeconds(ReusedIdWaitTimeoutSeconds),
+            "the script waited out the timeout on a process that is not the application");
+    }
+
+    /// <summary>The test host's own start time, the way the application reports its own.</summary>
+    private static long CurrentProcessStartTimeUtc()
+    {
+        using Process current = Process.GetCurrentProcess();
+        return current.StartTime.ToFileTimeUtc();
+    }
+
+    /// <summary>How far off the reused id's recorded start time is: far beyond the tolerance.</summary>
+    private static readonly TimeSpan ReusedIdStartTimeSkew = TimeSpan.FromHours(1);
+
+    /// <summary>A timeout the reused-id test must finish well inside.</summary>
+    private const int ReusedIdWaitTimeoutSeconds = 60;
 
     /// <summary>
     /// The production launch, end to end: the real -EncodedCommand arguments from
@@ -1548,6 +1607,13 @@ public sealed class UpdateRelaunchScriptExecutionTests
         /// </summary>
         internal int? WaitedProcessIdOverride { get; set; }
 
+        /// <summary>
+        /// The start time (FILETIME, UTC) the spec carries for the waited process. Required
+        /// whenever <see cref="WaitedProcessIdOverride"/> is set, since there is then no
+        /// stand-in to read it from; otherwise it replaces the stand-in's own.
+        /// </summary>
+        internal long? WaitedProcessStartTimeOverride { get; set; }
+
         internal int? WaitTimeoutSecondsOverride { get; set; }
 
         /// <summary>
@@ -1639,12 +1705,28 @@ public sealed class UpdateRelaunchScriptExecutionTests
 
         internal UpdateRelaunchSpec CreateSpec(bool requiresElevation = false, bool withLog = true)
         {
+            int waitedProcessId;
+            long waitedStartTime;
+            if (WaitedProcessIdOverride is { } overriddenId)
+            {
+                waitedProcessId = overriddenId;
+                waitedStartTime = WaitedProcessStartTimeOverride
+                    ?? throw new InvalidOperationException(
+                        "a waited id override needs a start time override: it has no stand-in to read one from");
+            }
+            else
+            {
+                waitedProcessId = ExitedStandInProcessId(out long standInStartTime);
+                waitedStartTime = WaitedProcessStartTimeOverride ?? standInStartTime;
+            }
+
             return new UpdateRelaunchSpec(
                 InstallerPath: InstallerPath,
                 ExpectedInstallerSha256:
                     ExpectedSha256Override ?? Sha256OfFileOrPlaceholder(InstallerPath),
                 TargetExecutablePath: TargetExecutablePath,
-                ProcessId: WaitedProcessIdOverride ?? ExitedStandInProcessId(),
+                ProcessId: waitedProcessId,
+                ProcessStartTimeUtc: waitedStartTime,
                 ScriptPath: ScriptPath,
                 StagingDirectory: StageDirectory,
                 RequiresElevation: requiresElevation,
@@ -1666,7 +1748,7 @@ public sealed class UpdateRelaunchScriptExecutionTests
         /// Starts the stand-in with no marker and lets it exit, returning the id the
         /// script will wait on. No marker is set on this process, so it records nothing.
         /// </summary>
-        private int ExitedStandInProcessId()
+        private int ExitedStandInProcessId(out long startTimeUtc)
         {
             var psi = new ProcessStartInfo(TargetExecutablePath)
             {
@@ -1681,6 +1763,10 @@ public sealed class UpdateRelaunchScriptExecutionTests
 
             // Held, not disposed: see _exitedStandIns.
             _exitedStandIns.Add(process);
+
+            // Readable only because the handle above is held: the start time is what the
+            // script identifies the waited process by, as the application's own is in production.
+            startTimeUtc = process.StartTime.ToFileTimeUtc();
             return process.Id;
         }
 

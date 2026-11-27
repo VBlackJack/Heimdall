@@ -24,11 +24,17 @@ namespace Heimdall.Core.Updates;
 /// Inputs for the detached relauncher script: which installer to run, which
 /// executable to relaunch, the process to wait on, and where the script lives.
 /// </summary>
+/// <param name="ProcessStartTimeUtc">
+/// The start time of the process to wait on, as a Windows FILETIME in UTC. It identifies
+/// the process: a process id alone can be reused by an unrelated process once the
+/// application has exited. Must be positive.
+/// </param>
 public sealed record UpdateRelaunchSpec(
     string InstallerPath,
     string ExpectedInstallerSha256,
     string TargetExecutablePath,
     int ProcessId,
+    long ProcessStartTimeUtc,
     string ScriptPath,
     string StagingDirectory,
     bool RequiresElevation = false,
@@ -70,6 +76,25 @@ public static class UpdateRelaunchScript
 
     /// <summary>Default number of seconds to wait for the app process to exit.</summary>
     public const int DefaultWaitTimeoutSeconds = 120;
+
+    /// <summary>One second in FILETIME ticks (100 ns units).</summary>
+    public const long FileTimeTicksPerSecond = 10_000_000L;
+
+    /// <summary>
+    /// How far the waited process's start time may differ from the one the application
+    /// captured before it still counts as the application: one second, as
+    /// <c>PlinkSizeSessionJanitor.StartTimeTolerance</c> does for the same comparison.
+    /// </summary>
+    public const long StartTimeToleranceFileTimeTicks = FileTimeTicksPerSecond;
+
+    /// <summary>Milliseconds in a second, for the wait conversion.</summary>
+    public const int MillisecondsPerSecond = 1000;
+
+    /// <summary>
+    /// Largest timeout whose millisecond value still fits an <see cref="int"/>
+    /// (about 24 days), which is what <c>Process.WaitForExit(int)</c> takes.
+    /// </summary>
+    public const int MaxWaitTimeoutSeconds = int.MaxValue / MillisecondsPerSecond;
 
     /// <summary>
     /// Flags passed to the PowerShell host so the relauncher runs hidden, without
@@ -232,6 +257,17 @@ public static class UpdateRelaunchScript
         ValidateOptionalLiteral(spec.LogPath, nameof(spec.LogPath));
         ValidateOptionalLiteral(spec.FailureRecordPath, nameof(spec.FailureRecordPath));
 
+        // Never fall back to matching on the id alone: that is the defect this value fixes.
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(
+            spec.ProcessStartTimeUtc, 0L, nameof(spec.ProcessStartTimeUtc));
+
+        // A negative value would mean "wait forever" to WaitForExit, and a value above the
+        // int range would overflow the millisecond conversion.
+        ArgumentOutOfRangeException.ThrowIfNegative(spec.WaitTimeoutSeconds, nameof(spec.WaitTimeoutSeconds));
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(
+            spec.WaitTimeoutSeconds, MaxWaitTimeoutSeconds, nameof(spec.WaitTimeoutSeconds));
+        int waitMilliseconds = spec.WaitTimeoutSeconds * MillisecondsPerSecond;
+
         bool hasLog = !string.IsNullOrEmpty(spec.LogPath);
         bool hasFailureRecord = !string.IsNullOrEmpty(spec.FailureRecordPath);
         string elevation = spec.RequiresElevation ? " -Verb RunAs" : string.Empty;
@@ -266,17 +302,54 @@ public static class UpdateRelaunchScript
             sb.AppendLine("    }");
         }
 
+        // Waiting on the application, in one step that cannot be fooled by a recycled id.
+        //
+        // Nothing holds a handle to the application while this script starts (about one
+        // second of PowerShell startup), so if the application exits first Windows may
+        // hand its id to an unrelated process. Waiting on the bare id then waited out the
+        // whole timeout (two minutes in production) and recorded ApplicationStillRunning,
+        // which refuses the install AND skips the relaunch: neither the update nor the
+        // application. The same race produced a CI flake in the execution tests on
+        // 2026-11-26 (run 45848223717).
+        //
+        // So the process is opened once and identified by its start time, which the
+        // application captured before it left:
+        //  - Reading Handle opens and caches a handle. Without it, StartTime and the wait
+        //    would each reopen the process by id, which reopens the race between them.
+        //    With it, the identity check and the wait act on one kernel object.
+        //  - A process that cannot be opened or read is "not the application". The script
+        //    host inherits the application's token (UseShellExecute is false in
+        //    SystemUpdateInstallerHost), so it can always open the real application.
+        //  - The start time is compared within a tolerance of one second. A process that
+        //    reuses the id started after the application exited, seconds later at the
+        //    least, so the tolerance costs nothing, whereas a false "different process"
+        //    is the dangerous direction: the installer would then run over the live
+        //    application, which Inno Setup force-closes mid-session.
+        //  - WaitForExit returns false on a timeout and true on an exit, so the two are
+        //    told apart here without the error Wait-Process raised for both. The
+        //    refusal keeps its meaning: an installer must not start over a live
+        //    application.
+        // The timeout is converted to milliseconds in C#, where the range is checked,
+        // and emitted as a literal.
+        sb.AppendLine("    $app = $null");
+        sb.AppendLine("    try {");
+        sb.AppendLine($"        $app = Get-Process -Id {spec.ProcessId} -ErrorAction Stop");
+        sb.AppendLine("        $null = $app.Handle");
         sb.AppendLine(
-            $"    Wait-Process -Id {spec.ProcessId} -Timeout {spec.WaitTimeoutSeconds} -ErrorAction SilentlyContinue");
-
-        // Wait-Process reports a timeout as an error, which the line above suppresses
-        // on purpose because a process that had already exited reports one too. So the
-        // two outcomes are told apart here, by asking. An installer started over a
-        // live application does not update it: Inno Setup force-closes the process it
-        // finds holding the files, mid-session, which is the one thing this script
-        // exists to avoid.
+            "        if ([Math]::Abs($app.StartTime.ToFileTimeUtc() - "
+            + $"{spec.ProcessStartTimeUtc.ToString(CultureInfo.InvariantCulture)}) "
+            + $"-gt {StartTimeToleranceFileTimeTicks.ToString(CultureInfo.InvariantCulture)}) {{");
         sb.AppendLine(
-            $"    if ($null -ne (Get-Process -Id {spec.ProcessId} -ErrorAction SilentlyContinue)) {{");
+            "            Write-Output ('heimdall-update: process id "
+            + $"{spec.ProcessId} belongs to another process, treated as exited')");
+        sb.AppendLine("            $app = $null");
+        sb.AppendLine("        }");
+        sb.AppendLine("    } catch {");
+        sb.AppendLine("        $app = $null");
+        sb.AppendLine("    }");
+        sb.AppendLine(
+            "    if ($null -ne $app -and -not $app.WaitForExit("
+            + $"{waitMilliseconds.ToString(CultureInfo.InvariantCulture)})) {{");
         sb.AppendLine($"        $updateStage = '{UpdateOutcomeStage.ApplicationStillRunning}'");
         sb.AppendLine("        throw 'The application is still running after the wait timeout.'");
         sb.AppendLine("    }");

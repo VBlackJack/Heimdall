@@ -193,7 +193,7 @@ Cinq causes racines distinctes partagent le même symptôme
 
 ## Tests actuellement marqués `CIUnstable`
 
-La solution comporte 22 emplacements `[Trait("Category", "CIUnstable")]` : 19
+La solution comporte 23 emplacements `[Trait("Category", "CIUnstable")]` : 20
 sur des méthodes de test individuelles et 3 sur des classes entières. Chaque
 emplacement est listé ci-dessous.
 
@@ -211,6 +211,7 @@ emplacement est listé ci-dessous.
 | `UpdateRelaunchScriptExecutionTests.Execute_InstallerSucceeds_RunsInstallerAndRelaunches` | `tests/Heimdall.App.Tests/Services/UpdateRelaunchScriptExecutionTests.cs` | `CIUnstable` |
 | `UpdateRelaunchScriptExecutionTests.Execute_StagingDirectoryNotEmpty_IsRemovedAndTheHostExitsCleanly` | `tests/Heimdall.App.Tests/Services/UpdateRelaunchScriptExecutionTests.cs` | `CIUnstable` |
 | `UpdateRelaunchScriptExecutionTests.Execute_ApplicationStillRunning_RefusesToInstallAndRecordsTheStage` | `tests/Heimdall.App.Tests/Services/UpdateRelaunchScriptExecutionTests.cs` | `CIUnstable` |
+| `UpdateRelaunchScriptExecutionTests.Execute_ReusedProcessId_IsTreatedAsExited` | `tests/Heimdall.App.Tests/Services/UpdateRelaunchScriptExecutionTests.cs` | `CIUnstable` |
 | `UpdateRelaunchScriptExecutionTests.Bootstrap_RunsTheEmittedScript_ThroughTheProductionArguments` | `tests/Heimdall.App.Tests/Services/UpdateRelaunchScriptExecutionTests.cs` | `CIUnstable` |
 | `UpdateRelaunchScriptExecutionTests.Bootstrap_ScriptChangedAfterHashing_RefusesAndStillRelaunches` | `tests/Heimdall.App.Tests/Services/UpdateRelaunchScriptExecutionTests.cs` | `CIUnstable` |
 | `UpdateRelaunchScriptExecutionTests.Bootstrap_ScriptThatDoesNotParse_StillRelaunches` | `tests/Heimdall.App.Tests/Services/UpdateRelaunchScriptExecutionTests.cs` | `CIUnstable` |

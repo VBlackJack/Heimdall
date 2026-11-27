@@ -82,6 +82,7 @@ internal sealed class UpdateInstaller : IUpdateInstaller
                 ExpectedInstallerSha256: package.ExpectedSha256,
                 TargetExecutablePath: exe,
                 ProcessId: _host.ProcessId,
+                ProcessStartTimeUtc: _host.ProcessStartTimeUtc,
                 ScriptPath: scriptPath,
                 StagingDirectory: package.StagingDirectory,
                 RequiresElevation: requiresElevation,

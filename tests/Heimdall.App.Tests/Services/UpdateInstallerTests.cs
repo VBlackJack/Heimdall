@@ -33,10 +33,14 @@ public sealed class UpdateInstallerTests
             expectedSha256 ?? InstallerSha256,
             @"C:\Temp\update-stage");
 
+    /// <summary>A plausible positive FILETIME for the fake host's process.</summary>
+    private const long FakeProcessStartTimeUtc = 133_800_000_000_000_000L;
+
     private sealed class FakeHost : IUpdateInstallerHost
     {
         public string? ExecutablePath { get; set; } = @"C:\Program Files\Heimdall\Heimdall.exe";
         public int ProcessId { get; set; } = 1234;
+        public long ProcessStartTimeUtc { get; set; } = FakeProcessStartTimeUtc;
         public bool DirectoryWritable { get; set; } = true;
         public bool StartDetachedResult { get; set; } = true;
         public Func<string, string, bool>? StartDetachedThrows { get; set; }
