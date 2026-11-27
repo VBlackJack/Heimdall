@@ -100,7 +100,7 @@ public sealed class ServerHealthMonitor : IDisposable
         + "printf \"" + MarkerMem + "\\n\"; (free -m 2>/dev/null | grep -E \"^(Mem|Swap):\" || grep -E \"^(MemTotal|MemFree|MemAvailable|SwapTotal|SwapFree):\" /proc/meminfo 2>/dev/null); "
         + "printf \"" + MarkerDisk + "\\n\"; (df -Ph / 2>/dev/null | tail -1); "
         + "printf \"" + MarkerUptime + "\\n\"; (uptime -p 2>/dev/null || cat /proc/uptime 2>/dev/null); "
-        + "printf \"" + MarkerLoad + "\\n\"; (cat /proc/loadavg 2>/dev/null)'";
+        + "printf \"" + MarkerLoad + "\\n\"; (cat /proc/loadavg 2>/dev/null); true'";
 
     private const string CpuCommandText = "LC_ALL=C top -b -n 1 | head -5";
     private const string MemoryCommandText = "LC_ALL=C free -m | grep Mem";

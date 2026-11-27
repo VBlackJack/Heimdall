@@ -213,22 +213,21 @@ public partial class SshKeyAuditView : UserControl, IToolView
         var configManager = services?.GetService<IConfigManager>();
         var dialogService = services?.GetService<IDialogService>();
 
-        var preference = Core.Ssh.SshAgentPreference.AutoOpenSshFirst;
-        if (configManager is not null)
-        {
-            try
-            {
-                var settings = await configManager.LoadSettingsAsync().ConfigureAwait(true);
-                preference = settings.SshAgentPreference;
-            }
-            catch (Exception ex)
-            {
-                Core.Logging.FileLogger.Warn($"SSH agent inspector: settings load failed: {ex.Message}");
-            }
-        }
+        var preference = await ResolveAgentPreferenceAsync(configManager).ConfigureAwait(true);
 
-        var loadedKeys = await Task.Run(() =>
-            SshAgentInspector.ListLoadedKeys(SshAgentRegistry.CreateDefault(preference)));
+        IReadOnlyList<SshAgentKeyInfo> loadedKeys;
+        try
+        {
+            loadedKeys = await Task.Run(() =>
+                SshAgentInspector.ListLoadedKeys(SshAgentRegistry.CreateDefault(preference)));
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"SSH agent inspector failed: {ex.Message}");
+            _vm.FileErrorMessage = ex.Message;
+            _vm.ShowFileError = true;
+            return;
+        }
 
         if (loadedKeys.Count == 0)
         {
@@ -262,6 +261,25 @@ public partial class SshKeyAuditView : UserControl, IToolView
         if (selectedIndex is int index && index >= 0 && index < loadedKeys.Count)
         {
             _vm.KeyText = loadedKeys[index].PublicKeyOpenSsh;
+        }
+    }
+
+    private static async Task<Core.Ssh.SshAgentPreference> ResolveAgentPreferenceAsync(IConfigManager? configManager)
+    {
+        if (configManager is null)
+        {
+            return Core.Ssh.SshAgentPreference.AutoOpenSshFirst;
+        }
+
+        try
+        {
+            var settings = await configManager.LoadSettingsAsync().ConfigureAwait(false);
+            return settings.SshAgentPreference;
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"SSH agent inspector: settings load failed: {ex.Message}");
+            return Core.Ssh.SshAgentPreference.AutoOpenSshFirst;
         }
     }
 

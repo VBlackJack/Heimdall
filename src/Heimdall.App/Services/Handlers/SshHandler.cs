@@ -792,7 +792,7 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
             System.Diagnostics.Process startedProcess = new()
             {
                 StartInfo = psi,
-                EnableRaisingEvents = true
+                EnableRaisingEvents = false
             };
             TaskCompletionSource exitSignal = new(TaskCreationOptions.RunContinuationsAsynchronously);
             int exitedHandled = 0;
@@ -828,20 +828,34 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
                 }
             }
 
-            startedProcess.Exited += (_, _) => HandleExternalExit();
             if (!startedProcess.Start())
             {
                 startedProcess.Dispose();
                 throw new InvalidOperationException("Failed to start putty.exe.");
             }
 
+            int processId = startedProcess.Id;
             Core.Logging.FileLogger.Info(
-                $"Launched putty.exe PID={startedProcess.Id} for {server.DisplayName} ({targetHost}:{targetPort})");
+                $"Launched putty.exe PID={processId} for {server.DisplayName} ({targetHost}:{targetPort})");
             _connectionSm.TryTransition(server.Id, ConnectionState.Connected);
             lease.Transfer();
-            if (startedProcess.HasExited)
+
+            startedProcess.Exited += (_, _) => HandleExternalExit();
+            startedProcess.EnableRaisingEvents = true;
+            try
             {
-                HandleExternalExit();
+                if (startedProcess.HasExited)
+                {
+                    HandleExternalExit();
+                }
+            }
+            catch (ObjectDisposedException)
+            {
+                // The Exited handler already ran and disposed the process.
+            }
+            catch (InvalidOperationException)
+            {
+                // The Exited handler already ran and disposed the process.
             }
 
             return new ConnectionResult(true, null, null, ExternalClientExited: exitSignal.Task);

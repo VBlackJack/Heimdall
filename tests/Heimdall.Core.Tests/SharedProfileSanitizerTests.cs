@@ -105,6 +105,7 @@ public sealed class SharedProfileSanitizerTests
         nameof(SshGatewayDto.ExtensionData), nameof(SshGatewayDto.KeyPath),
         nameof(SshGatewayDto.SshPasswordEncrypted), nameof(SshGatewayDto.SshKeyPassphraseEncrypted),
         nameof(SshGatewayDto.IsDefault), nameof(SshGatewayDto.HostKeyFingerprint),
+        nameof(SshGatewayDto.SshAgentKeyFingerprint),
     ];
 
     [Fact]

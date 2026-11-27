@@ -228,7 +228,6 @@ internal static class OpenSshBcryptKdf
                     }
                 }
 
-                var amt = Math.Min(BcryptBlockSize, outputLength);
                 for (var i = 0; i < BcryptBlockSize; i++)
                 {
                     var dest = i * stride + (count - 1);
@@ -237,8 +236,6 @@ internal static class OpenSshBcryptKdf
                         output[dest] = outBlock[i];
                     }
                 }
-
-                _ = amt;
             }
         }
         finally

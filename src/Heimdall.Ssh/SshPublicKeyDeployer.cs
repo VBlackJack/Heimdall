@@ -106,9 +106,10 @@ public static class SshPublicKeyDeployer
         var base64Payload = Convert.ToBase64String(Encoding.UTF8.GetBytes(validatedPublicKeyLine));
         return $"key=$(printf '%s' '{base64Payload}' | base64 -d) && " +
                "mkdir -p \"$HOME/.ssh\" && chmod 700 \"$HOME/.ssh\" && " +
-               "touch \"$HOME/.ssh/authorized_keys\" && chmod 600 \"$HOME/.ssh/authorized_keys\" && " +
-               $"(grep -Fqx \"$key\" \"$HOME/.ssh/authorized_keys\" && echo {MarkerExists} || " +
-               $"(printf '%s\\n' \"$key\" >> \"$HOME/.ssh/authorized_keys\" && echo {MarkerAdded}))";
+               "ak=\"$HOME/.ssh/authorized_keys\" && touch \"$ak\" && chmod 600 \"$ak\" && " +
+               $"(grep -Fqx \"$key\" \"$ak\" && echo {MarkerExists} || " +
+               $"((! [ -s \"$ak\" ] || [ -z \"$(tail -c 1 \"$ak\")\" ] || printf '\\n' >> \"$ak\") && " +
+               $"printf '%s\\n' \"$key\" >> \"$ak\" && echo {MarkerAdded}))";
     }
 
     /// <summary>

@@ -360,22 +360,30 @@ public static class SshKeyPairGenerator
         initialCounter.CopyTo(counter);
 
         using var aes = Aes.Create();
-        aes.Key = key.ToArray();
-        aes.Mode = CipherMode.ECB;
-        aes.Padding = PaddingMode.None;
-
-        var offset = 0;
-        while (offset < plaintext.Length)
+        var keyCopy = key.ToArray();
+        try
         {
-            aes.EncryptEcb(counter, keystream, PaddingMode.None);
-            var blockLen = Math.Min(AesBlockLength, plaintext.Length - offset);
-            for (var i = 0; i < blockLen; i++)
-            {
-                output[offset + i] = (byte)(plaintext[offset + i] ^ keystream[i]);
-            }
+            aes.Key = keyCopy;
+            aes.Mode = CipherMode.ECB;
+            aes.Padding = PaddingMode.None;
 
-            IncrementBigEndianCounter(counter);
-            offset += blockLen;
+            var offset = 0;
+            while (offset < plaintext.Length)
+            {
+                aes.EncryptEcb(counter, keystream, PaddingMode.None);
+                var blockLen = Math.Min(AesBlockLength, plaintext.Length - offset);
+                for (var i = 0; i < blockLen; i++)
+                {
+                    output[offset + i] = (byte)(plaintext[offset + i] ^ keystream[i]);
+                }
+
+                IncrementBigEndianCounter(counter);
+                offset += blockLen;
+            }
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(keyCopy);
         }
 
         CryptographicOperations.ZeroMemory(keystream);
