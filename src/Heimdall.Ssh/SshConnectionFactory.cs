@@ -607,7 +607,8 @@ public static class SshConnectionFactory
             verificationHost,
             verificationPort,
             hostKeyStore);
-        if (certStatus == HostCertificateVerificationStatus.Revoked)
+        if (certStatus is HostCertificateVerificationStatus.Revoked
+            or HostCertificateVerificationStatus.InvalidForTrustedCertAuthority)
         {
             throw new HostKeyRejectedException(
                 verificationHost,

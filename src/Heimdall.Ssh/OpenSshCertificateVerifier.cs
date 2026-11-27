@@ -29,6 +29,7 @@ public enum HostCertificateVerificationStatus
     NotACertificate,
     TrustedByCertAuthority,
     Revoked,
+    InvalidForTrustedCertAuthority,
     InvalidOrUntrusted
 }
 
@@ -61,32 +62,37 @@ public static class OpenSshCertificateVerifier
             return HostCertificateVerificationStatus.Revoked;
         }
 
+        var isKnownCa = hostKeyStore.IsTrustedCertAuthority(host, port, cert.SignatureKeyFingerprint);
+        var invalidStatus = isKnownCa
+            ? HostCertificateVerificationStatus.InvalidForTrustedCertAuthority
+            : HostCertificateVerificationStatus.InvalidOrUntrusted;
+
         if (cert.Type != OpenSshCertificateType.Host)
         {
-            return HostCertificateVerificationStatus.InvalidOrUntrusted;
+            return invalidStatus;
         }
 
         // Per OpenSSH PROTOCOL.certkeys, any unrecognized critical option MUST fail verification.
         // No critical options are currently defined for host certificates.
         if (cert.CriticalOptions.Count > 0)
         {
-            return HostCertificateVerificationStatus.InvalidOrUntrusted;
+            return invalidStatus;
         }
 
         var checkTime = now ?? DateTimeOffset.UtcNow;
         if (!cert.IsValidAt(checkTime) || !cert.MatchesPrincipal(host))
         {
-            return HostCertificateVerificationStatus.InvalidOrUntrusted;
+            return invalidStatus;
         }
 
-        if (!hostKeyStore.IsTrustedCertAuthority(host, port, cert.SignatureKeyFingerprint))
+        if (!isKnownCa)
         {
             return HostCertificateVerificationStatus.InvalidOrUntrusted;
         }
 
         return VerifyCaSignature(cert)
             ? HostCertificateVerificationStatus.TrustedByCertAuthority
-            : HostCertificateVerificationStatus.InvalidOrUntrusted;
+            : HostCertificateVerificationStatus.InvalidForTrustedCertAuthority;
     }
 
     /// <summary>

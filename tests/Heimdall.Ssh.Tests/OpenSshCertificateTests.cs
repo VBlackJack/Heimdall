@@ -76,16 +76,16 @@ public sealed class OpenSshCertificateTests
             certBlob, "web01.corp.example.com", 22, store);
         Assert.Equal(HostCertificateVerificationStatus.TrustedByCertAuthority, status);
 
-        // Wrong principal is rejected
+        // Wrong principal is rejected as invalid for a trusted CA
         Assert.Equal(
-            HostCertificateVerificationStatus.InvalidOrUntrusted,
+            HostCertificateVerificationStatus.InvalidForTrustedCertAuthority,
             OpenSshCertificateVerifier.VerifyHostCertificate(certBlob, "other.corp.example.com", 22, store));
 
-        // Tampered certificate fails CA signature verification
+        // Tampered certificate fails CA signature verification as invalid for a trusted CA
         var tampered = (byte[])certBlob.Clone();
         tampered[^1] ^= 0xFF;
         Assert.Equal(
-            HostCertificateVerificationStatus.InvalidOrUntrusted,
+            HostCertificateVerificationStatus.InvalidForTrustedCertAuthority,
             OpenSshCertificateVerifier.VerifyHostCertificate(tampered, "web01.corp.example.com", 22, store));
     }
 
@@ -211,8 +211,21 @@ public sealed class OpenSshCertificateTests
         store.LoadPolicyFromKnownHosts($"@cert-authority *.corp.example.com ssh-ed25519 {Convert.ToBase64String(caPubBlob)}\n");
 
         Assert.Equal(
-            HostCertificateVerificationStatus.InvalidOrUntrusted,
+            HostCertificateVerificationStatus.InvalidForTrustedCertAuthority,
             OpenSshCertificateVerifier.VerifyHostCertificate(certBlob, "web01.corp.example.com", 22, store));
+
+        // ResolvePresentedHostKeyAsync must hard-reject invalid certs from a trusted CA without TOFU fallback.
+        var presentation = new SshConnectionFactory.HostKeyPresentation(
+            "web01.corp.example.com",
+            22,
+            OpenSshCertificateParser.CertEd25519,
+            HostKeyFormats.ComputeSha256Fingerprint(certBlob),
+            certBlob);
+        var verifier = new AlwaysAcceptVerifier();
+        Assert.Throws<HostKeyRejectedException>(() =>
+            SshConnectionFactory.ResolvePresentedHostKeyAsync(
+                "web01.corp.example.com", 22, presentation, store, verifier).GetAwaiter().GetResult());
+        Assert.Equal(0, verifier.Calls);
     }
 
     [Fact]

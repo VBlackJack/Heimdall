@@ -16,6 +16,7 @@
 
 using Heimdall.App.Services.Handlers;
 using Heimdall.Core.Configuration;
+using Heimdall.Core.Ssh;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
 using Heimdall.Ssh;
@@ -264,6 +265,13 @@ public sealed class ConnectionService : IConnectionService
         CancellationToken ct = default)
         => DispatchAsync("SFTP", server, settings, ct);
 
+    public Task<ConnectionResult> ConnectSftpAsync(
+        ServerProfileDto server,
+        AppSettings settings,
+        PinnedFingerprintVerifier? preResolvedHostKeyVerifier,
+        CancellationToken ct = default)
+        => DispatchAsync("SFTP", server, settings, ct, preResolvedHostKeyVerifier: preResolvedHostKeyVerifier);
+
     public Task<ConnectionResult> ConnectVncAsync(
         ServerProfileDto server,
         AppSettings settings,
@@ -311,7 +319,8 @@ public sealed class ConnectionService : IConnectionService
         ServerProfileDto server,
         AppSettings settings,
         CancellationToken ct,
-        RdpModeOverride rdpModeOverride = RdpModeOverride.UseProfile)
+        RdpModeOverride rdpModeOverride = RdpModeOverride.UseProfile,
+        PinnedFingerprintVerifier? preResolvedHostKeyVerifier = null)
     {
         ArgumentNullException.ThrowIfNull(server);
         ArgumentNullException.ThrowIfNull(settings);
@@ -342,7 +351,9 @@ public sealed class ConnectionService : IConnectionService
 
         if (_handlers.TryGetValue(protocol, out var handler))
         {
-            var result = await handler.ConnectAsync(server, settings, ct, rdpModeOverride);
+            var result = preResolvedHostKeyVerifier is not null && handler is SftpHandler sftpHandler
+                ? await sftpHandler.ConnectCompanionAsync(server, settings, preResolvedHostKeyVerifier, ct)
+                : await handler.ConnectAsync(server, settings, ct, rdpModeOverride);
             if (result.Success && !string.IsNullOrEmpty(result.Warning))
             {
                 _setStatusText?.Invoke(result.Warning);

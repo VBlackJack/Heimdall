@@ -94,11 +94,29 @@ internal sealed class SftpHandler : IProtocolHandler
     /// Establishes an SFTP browser session, optionally through a tunnel.
     /// Returns a connected <see cref="SftpBrowser"/> on success.
     /// </summary>
-    public async Task<ConnectionResult> ConnectAsync(
+    public Task<ConnectionResult> ConnectAsync(
         ServerProfileDto server,
         AppSettings settings,
         CancellationToken ct,
         RdpModeOverride rdpModeOverride = RdpModeOverride.UseProfile)
+        => ConnectCoreAsync(server, settings, preResolvedHostKeyVerifier: null, ct);
+
+    /// <summary>
+    /// Companion SFTP entry point that reuses the parent SSH session's already-pinned host-key
+    /// verifier to avoid redundant host-key probes even on dual-algorithm or CA-signed hosts.
+    /// </summary>
+    public Task<ConnectionResult> ConnectCompanionAsync(
+        ServerProfileDto server,
+        AppSettings settings,
+        PinnedFingerprintVerifier? preResolvedHostKeyVerifier,
+        CancellationToken ct)
+        => ConnectCoreAsync(server, settings, preResolvedHostKeyVerifier, ct);
+
+    private async Task<ConnectionResult> ConnectCoreAsync(
+        ServerProfileDto server,
+        AppSettings settings,
+        PinnedFingerprintVerifier? preResolvedHostKeyVerifier,
+        CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(server);
         ArgumentNullException.ThrowIfNull(settings);
@@ -218,6 +236,7 @@ internal sealed class SftpHandler : IProtocolHandler
             Compression = server.SshCompression,
             KeepAliveIntervalSeconds = settings.SshKeepAliveIntervalSeconds,
             SkipHostKeyProbeIfTrusted = isCompanionSession,
+            PreResolvedHostKeyVerifier = preResolvedHostKeyVerifier,
             AuthenticationTimeout = TimeSpan.FromMinutes(2),
             KeyboardInteractiveResponder = request =>
             {

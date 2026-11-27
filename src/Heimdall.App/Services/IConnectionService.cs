@@ -15,6 +15,7 @@
  */
 
 using Heimdall.Core.Configuration;
+using Heimdall.Core.Ssh;
 using Heimdall.Ssh;
 
 namespace Heimdall.App.Services;
@@ -42,6 +43,12 @@ public interface IConnectionService : IDisposable
         CancellationToken ct = default,
         RdpModeOverride rdpModeOverride = RdpModeOverride.UseProfile);
     Task<ConnectionResult> ConnectSftpAsync(ServerProfileDto server, AppSettings settings, CancellationToken ct = default);
+    Task<ConnectionResult> ConnectSftpAsync(
+        ServerProfileDto server,
+        AppSettings settings,
+        PinnedFingerprintVerifier? preResolvedHostKeyVerifier,
+        CancellationToken ct = default)
+        => ConnectSftpAsync(server, settings, ct);
     Task<ConnectionResult> ConnectVncAsync(ServerProfileDto server, AppSettings settings, CancellationToken ct = default);
     Task<ConnectionResult> ConnectWebAsync(ServerProfileDto server, AppSettings settings, CancellationToken ct = default);
     Task<ConnectionResult> ConnectTelnetAsync(ServerProfileDto server, AppSettings settings, CancellationToken ct = default);

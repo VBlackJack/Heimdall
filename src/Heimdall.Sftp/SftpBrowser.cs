@@ -473,6 +473,48 @@ public sealed class SftpBrowser : IRemoteBrowser, IRemoteNoClobberPublisher, IRe
     /// <summary>Whether the SFTP client is connected to the remote host.</summary>
     public bool IsConnected => Volatile.Read(ref _client)?.IsConnected ?? false;
 
+    internal static PinnedFingerprintVerifier? TrySelectPinnedHostKeyVerifier(
+        SshConnectionParams connectionParams,
+        HostKeyStore hostKeyStore)
+    {
+        ArgumentNullException.ThrowIfNull(connectionParams);
+        ArgumentNullException.ThrowIfNull(hostKeyStore);
+
+        var verifyHost = connectionParams.HostKeyVerificationHost;
+        var verifyPort = connectionParams.HostKeyVerificationPort;
+
+        if (connectionParams.PreResolvedHostKeyVerifier is { } preResolved
+            && string.Equals(preResolved.Host, verifyHost, StringComparison.OrdinalIgnoreCase)
+            && preResolved.Port == verifyPort
+            && !string.IsNullOrEmpty(preResolved.Fingerprint)
+            && !hostKeyStore.IsRevoked(verifyHost, verifyPort, preResolved.Fingerprint))
+        {
+            return preResolved;
+        }
+
+        if (!connectionParams.SkipHostKeyProbeIfTrusted)
+        {
+            return null;
+        }
+
+        var hostPortKey = HostKeyFormats.MakeKey(verifyHost, verifyPort);
+        var hasMultipleAlgorithms = hostKeyStore.GetAllAlgorithmEntries()
+            .Count(item => string.Equals(item.HostPort, hostPortKey, StringComparison.Ordinal)) > 1;
+        if (hasMultipleAlgorithms)
+        {
+            return null;
+        }
+
+        var candidate = hostKeyStore.GetSessionEntry(verifyHost, verifyPort)?.Fingerprint
+            ?? hostKeyStore.GetEntry(verifyHost, verifyPort)?.Fingerprint;
+        if (string.IsNullOrEmpty(candidate) || hostKeyStore.IsRevoked(verifyHost, verifyPort, candidate))
+        {
+            return null;
+        }
+
+        return new PinnedFingerprintVerifier(verifyHost, verifyPort, candidate);
+    }
+
     /// <summary>
     /// Connects to the remote host using the supplied SSH connection parameters.
     /// </summary>
@@ -498,39 +540,13 @@ public sealed class SftpBrowser : IRemoteBrowser, IRemoteNoClobberPublisher, IRe
             throw new InvalidOperationException("SFTP browser is already connected.");
         }
 
-        PinnedFingerprintVerifier pinnedVerifier;
-        var verifyHost = connectionParams.HostKeyVerificationHost;
-        var verifyPort = connectionParams.HostKeyVerificationPort;
-        string? shortcutFingerprint = null;
-        if (connectionParams.SkipHostKeyProbeIfTrusted)
-        {
-            var hostPortKey = HostKeyFormats.MakeKey(verifyHost, verifyPort);
-            var hasMultipleAlgorithms = hostKeyStore.GetAllAlgorithmEntries()
-                .Count(item => string.Equals(item.HostPort, hostPortKey, StringComparison.Ordinal)) > 1;
-            if (!hasMultipleAlgorithms)
-            {
-                var candidate = hostKeyStore.GetSessionEntry(verifyHost, verifyPort)?.Fingerprint
-                    ?? hostKeyStore.GetEntry(verifyHost, verifyPort)?.Fingerprint;
-                if (!string.IsNullOrEmpty(candidate) && !hostKeyStore.IsRevoked(verifyHost, verifyPort, candidate))
-                {
-                    shortcutFingerprint = candidate;
-                }
-            }
-        }
-
-        if (shortcutFingerprint is not null)
-        {
-            pinnedVerifier = new PinnedFingerprintVerifier(verifyHost, verifyPort, shortcutFingerprint);
-        }
-        else
-        {
-            pinnedVerifier = await SshConnectionFactory.ResolveHostKeyAsync(
+        PinnedFingerprintVerifier pinnedVerifier = TrySelectPinnedHostKeyVerifier(connectionParams, hostKeyStore)
+            ?? await SshConnectionFactory.ResolveHostKeyAsync(
                     connectionParams,
                     hostKeyStore,
                     hostKeyVerifier,
                     ct)
                 .ConfigureAwait(false);
-        }
 
         var client = SshConnectionFactory.CreateSftpClient(connectionParams);
         if (connectionParams.KeepAliveIntervalSeconds is > 0)

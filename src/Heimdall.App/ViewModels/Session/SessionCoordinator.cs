@@ -2101,7 +2101,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
             _main.ServerList.BeginAttributedSession(sftpSessionId, serverId);
 
             var sftpResult = await _main.ServerList.ConnectionService
-                .ConnectSftpAsync(sftpProfile, settings, ct)
+                .ConnectSftpAsync(sftpProfile, settings, parentSshSession?.Session.ResolvedHostKeyVerifier, ct)
                 .ConfigureAwait(false);
 
             if (!sftpResult.Success || sftpResult.Session is null)

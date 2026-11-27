@@ -109,6 +109,13 @@ public sealed class SshConnectionParams
     /// </summary>
     public bool SkipHostKeyProbeIfTrusted { get; init; }
 
+    /// <summary>
+    /// Optional host-key verifier already resolved by a parent SSH session (such as a companion SFTP
+    /// session), allowing zero-reprobe pinned verification even on dual-algorithm or CA-signed hosts.
+    /// Still subject to <c>@revoked</c> enforcement against <see cref="HostKeyStore"/>.
+    /// </summary>
+    public PinnedFingerprintVerifier? PreResolvedHostKeyVerifier { get; init; }
+
     /// <summary>TCP connection timeout. Defaults to 15 seconds.</summary>
     public TimeSpan ConnectTimeout { get; init; } = TimeSpan.FromSeconds(15);
 
