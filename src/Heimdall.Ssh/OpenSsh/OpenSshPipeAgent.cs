@@ -17,13 +17,14 @@
 using System.Buffers.Binary;
 using System.IO.Pipes;
 using Heimdall.Core.Ssh;
+using Heimdall.Ssh.Agents;
 
 namespace Heimdall.Ssh.OpenSsh;
 
 /// <summary>
 /// Windows OpenSSH Authentication Agent client using the named pipe transport.
 /// </summary>
-public sealed class OpenSshPipeAgent : ISshAgent
+public sealed class OpenSshPipeAgent : IMutableSshAgent
 {
     public const string AgentName = "Windows OpenSSH Agent";
     public const string DefaultPipeName = "openssh-ssh-agent";
@@ -87,6 +88,28 @@ public sealed class OpenSshPipeAgent : ISshAgent
         var request = OpenSshAgentProtocol.BuildSignRequestMessage(publicKeyBlob, data, flags);
         var response = SendRequest(request);
         return OpenSshAgentProtocol.ParseSignResponse(response);
+    }
+
+    public bool AddIdentity(byte[] addIdentityWireMessage)
+    {
+        ArgumentNullException.ThrowIfNull(addIdentityWireMessage);
+        var response = SendRequest(addIdentityWireMessage);
+        return OpenSshAgentProtocol.ParseSuccessResponse(response);
+    }
+
+    public bool RemoveIdentity(byte[] publicKeyBlob)
+    {
+        ArgumentNullException.ThrowIfNull(publicKeyBlob);
+        var request = OpenSshAgentProtocol.BuildRemoveIdentityMessage(publicKeyBlob);
+        var response = SendRequest(request);
+        return OpenSshAgentProtocol.ParseSuccessResponse(response);
+    }
+
+    public bool RemoveAllIdentities()
+    {
+        var request = OpenSshAgentProtocol.BuildRemoveAllIdentitiesMessage();
+        var response = SendRequest(request);
+        return OpenSshAgentProtocol.ParseSuccessResponse(response);
     }
 
     internal byte[] SendRequest(byte[] request)

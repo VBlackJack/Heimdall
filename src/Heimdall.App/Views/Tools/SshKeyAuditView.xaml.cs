@@ -91,6 +91,7 @@ public partial class SshKeyAuditView : UserControl, IToolView
         InputLabel.Text = L("ToolSshAuditInput");
         BtnBrowse.Content = L("ToolSshAuditBtnBrowse");
         BtnLoadFromAgent.Content = L("ToolSshAuditBtnLoadAgent");
+        BtnRemoveFromAgent.Content = L("ToolSshAuditBtnRemoveAgent");
         BtnDeployKey.Content = L("ToolSshKeyGenBtnDeploy");
         EmptyState.Text = L("ToolSshAuditEmptyState");
         ParseError.Text = L("ToolSshAuditParseError");
@@ -107,6 +108,7 @@ public partial class SshKeyAuditView : UserControl, IToolView
         System.Windows.Automation.AutomationProperties.SetName(BtnHelp, L("ToolHelpTooltip"));
         System.Windows.Automation.AutomationProperties.SetName(BtnBrowse, L("ToolSshAuditBtnBrowse"));
         System.Windows.Automation.AutomationProperties.SetName(BtnLoadFromAgent, L("ToolSshAuditBtnLoadAgent"));
+        System.Windows.Automation.AutomationProperties.SetName(BtnRemoveFromAgent, L("ToolSshAuditBtnRemoveAgent"));
         System.Windows.Automation.AutomationProperties.SetName(BtnDeployKey, L("ToolSshKeyGenBtnDeploy"));
         System.Windows.Automation.AutomationProperties.SetName(BtnCopyFingerprint, L("ToolSshAuditBtnCopy"));
         System.Windows.Automation.AutomationProperties.SetName(KeyInput, L("ToolSshAuditInput"));
@@ -312,6 +314,81 @@ public partial class SshKeyAuditView : UserControl, IToolView
         if (selectedIndex is int index && index >= 0 && index < loadedKeys.Count)
         {
             _vm.KeyText = loadedKeys[index].PublicKeyOpenSsh;
+        }
+    }
+
+    private async void OnRemoveFromAgentClick(object sender, RoutedEventArgs e)
+    {
+        var services = (Application.Current as App)?.Services;
+        var configManager = services?.GetService<IConfigManager>();
+        var dialogService = services?.GetService<IDialogService>();
+
+        var preference = await ResolveAgentPreferenceAsync(configManager).ConfigureAwait(true);
+
+        IReadOnlyList<SshAgentKeyInfo> loadedKeys;
+        try
+        {
+            loadedKeys = await Task.Run(() =>
+                SshAgentInspector.ListLoadedKeys(SshAgentRegistry.CreateDefault(preference)));
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"SSH agent inspector failed: {ex.Message}");
+            _vm.FileErrorMessage = ex.Message;
+            _vm.ShowFileError = true;
+            return;
+        }
+
+        if (loadedKeys.Count == 0)
+        {
+            _vm.FileErrorMessage = L("ToolSshAuditAgentEmpty");
+            _vm.ShowFileError = true;
+            return;
+        }
+
+        if (dialogService is null)
+        {
+            return;
+        }
+
+        var choices = loadedKeys
+            .Select(k => string.IsNullOrWhiteSpace(k.Comment)
+                ? $"{k.AgentName}: {k.KeyType} ({k.Fingerprint})"
+                : $"{k.AgentName}: {k.KeyType} - {k.Comment} ({k.Fingerprint})")
+            .ToList();
+
+        var selectedIndex = await dialogService.ShowChoiceAsync(
+            L("ToolSshAuditBtnRemoveAgent"),
+            L("ToolSshAuditAgentRemovePrompt"),
+            choices,
+            defaultIndex: 0,
+            cancelLabel: L("BtnCancel"));
+
+        if (selectedIndex is not int idx || idx < 0 || idx >= loadedKeys.Count)
+        {
+            return;
+        }
+
+        var chosen = loadedKeys[idx];
+        try
+        {
+            var result = await Task.Run(() => SshAgentManager.RemoveKeyByFingerprint(
+                SshAgentRegistry.CreateDefault(preference),
+                chosen.Fingerprint)).ConfigureAwait(true);
+
+            _vm.FileErrorMessage = result.Success
+                ? string.Format(CultureInfo.CurrentCulture, L("ToolSshAgentRemoveSuccess"), chosen.Fingerprint)
+                : string.Format(CultureInfo.CurrentCulture, L("ToolSshAgentRemoveFailed"), result.ErrorMessage ?? string.Empty);
+            _vm.ShowFileError = true;
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"SSH agent remove failed: {ex.Message}");
+            _vm.FileErrorMessage = string.Format(
+                CultureInfo.CurrentCulture,
+                L("ToolSshAgentRemoveFailed"),
+                ex.Message);
+            _vm.ShowFileError = true;
         }
     }
 

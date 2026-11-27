@@ -246,6 +246,11 @@
                                 Style="{DynamicResource SecondaryButtonStyle}"
                                 Padding="{StaticResource PaddingButtonCopy}" Margin="{StaticResource MarginInlineStart}"
                                 VerticalAlignment="Center"/>
+                        <Button x:Name="BtnLoadIntoAgent"
+                                Click="OnLoadIntoAgentClick"
+                                Style="{DynamicResource SecondaryButtonStyle}"
+                                Padding="{StaticResource PaddingButtonCopy}" Margin="{StaticResource MarginInlineStart}"
+                                VerticalAlignment="Center"/>
                     </StackPanel>
                     <TextBox x:Name="PrivateKeyOutput"
                              IsReadOnly="True"

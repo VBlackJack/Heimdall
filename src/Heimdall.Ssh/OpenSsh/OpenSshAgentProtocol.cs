@@ -27,15 +27,41 @@ namespace Heimdall.Ssh.OpenSsh;
 internal static class OpenSshAgentProtocol
 {
     internal const byte SshAgentFailure = 5;
+    internal const byte SshAgentSuccess = 6;
     internal const byte SshAgentcRequestIdentities = 11;
     internal const byte SshAgentIdentitiesAnswer = 12;
     internal const byte SshAgentcSignRequest = 13;
     internal const byte SshAgentSignResponse = 14;
+    internal const byte SshAgentcAddIdentity = 17;
+    internal const byte SshAgentcRemoveIdentity = 18;
+    internal const byte SshAgentcRemoveAllIdentities = 19;
+    internal const byte SshAgentcAddIdConstrained = 25;
+    internal const byte SshAgentConstrainLifetime = 1;
     internal const int MaxMessageLength = 262144;
 
     internal static byte[] BuildRequestIdentitiesMessage()
     {
         return BuildMessage(SshAgentcRequestIdentities, static _ => { });
+    }
+
+    internal static byte[] BuildRemoveIdentityMessage(byte[] publicKeyBlob)
+    {
+        ArgumentNullException.ThrowIfNull(publicKeyBlob);
+        return BuildMessage(SshAgentcRemoveIdentity, writer => writer.WriteString(publicKeyBlob));
+    }
+
+    internal static byte[] BuildRemoveAllIdentitiesMessage()
+    {
+        return BuildMessage(SshAgentcRemoveAllIdentities, static _ => { });
+    }
+
+    internal static bool ParseSuccessResponse(byte[] response)
+    {
+        ArgumentNullException.ThrowIfNull(response);
+        var reader = new AgentMessageReader(response);
+        var type = reader.ReadByte();
+        reader.EnsureFullyRead();
+        return type == SshAgentSuccess;
     }
 
     internal static byte[] BuildSignRequestMessage(
@@ -180,6 +206,32 @@ internal static class OpenSshAgentProtocol
         {
             ArgumentNullException.ThrowIfNull(value);
             WriteString(Encoding.UTF8.GetBytes(value));
+        }
+
+        public void WriteMpint(byte[] unsignedBigEndian)
+        {
+            ArgumentNullException.ThrowIfNull(unsignedBigEndian);
+            var start = 0;
+            while (start < unsignedBigEndian.Length && unsignedBigEndian[start] == 0)
+            {
+                start++;
+            }
+
+            if (start == unsignedBigEndian.Length)
+            {
+                WriteUInt32(0);
+                return;
+            }
+
+            var len = unsignedBigEndian.Length - start;
+            var needsLeadingZero = (unsignedBigEndian[start] & 0x80) != 0;
+            WriteUInt32((uint)(len + (needsLeadingZero ? 1 : 0)));
+            if (needsLeadingZero)
+            {
+                WriteByte(0);
+            }
+
+            _stream.Write(unsignedBigEndian, start, len);
         }
 
         public byte[] ToArray() => _stream.ToArray();

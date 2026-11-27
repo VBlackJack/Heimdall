@@ -26,6 +26,7 @@ using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
 using Heimdall.Core.Ssh;
 using Heimdall.Ssh;
+using Heimdall.Ssh.Agents;
 using Microsoft.Extensions.DependencyInjection;
 using SaveFileDialog = Microsoft.Win32.SaveFileDialog;
 
@@ -116,6 +117,7 @@ public partial class SshKeyGeneratorView : UserControl, IToolView
             ? L("ToolSshKeyGenBtnHide")
             : L("ToolSshKeyGenBtnShow");
         BtnSavePrivateKey.Content = L("ToolSshKeyGenBtnSave");
+        BtnLoadIntoAgent.Content = L("ToolSshKeyGenBtnLoadAgent");
 
         Ed25519Item.Content = L("ToolSshKeyGenEd25519");
         Rsa4096Item.Content = L("ToolSshKeyGenRsa4096");
@@ -136,6 +138,7 @@ public partial class SshKeyGeneratorView : UserControl, IToolView
         System.Windows.Automation.AutomationProperties.SetName(BtnSavePublicKey, L("ToolSshKeyGenBtnSave"));
         System.Windows.Automation.AutomationProperties.SetName(BtnDeployPublicKey, L("ToolSshKeyGenBtnDeploy"));
         System.Windows.Automation.AutomationProperties.SetName(BtnSavePrivateKey, L("ToolSshKeyGenBtnSave"));
+        System.Windows.Automation.AutomationProperties.SetName(BtnLoadIntoAgent, L("ToolSshKeyGenBtnLoadAgent"));
         System.Windows.Automation.AutomationProperties.SetName(BtnShowPrivateKey, L("ToolSshKeyGenBtnShow"));
         System.Windows.Automation.AutomationProperties.SetName(AlgorithmCombo, L("ToolSshKeyGenAlgorithm"));
         System.Windows.Automation.AutomationProperties.SetName(FormatCombo, L("ToolSshKeyGenFormat"));
@@ -338,6 +341,97 @@ public partial class SshKeyGeneratorView : UserControl, IToolView
         finally
         {
             BtnDeployPublicKey.IsEnabled = true;
+        }
+    }
+
+    private async void OnLoadIntoAgentClick(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(_privateKey))
+        {
+            return;
+        }
+
+        var services = (Application.Current as App)?.Services;
+        var configManager = services?.GetService<IConfigManager>();
+        var dialogService = services?.GetService<IDialogService>();
+
+        BtnLoadIntoAgent.IsEnabled = false;
+        try
+        {
+            uint? lifetimeSeconds = null;
+            if (dialogService is not null)
+            {
+                var ttlChoices = new List<string>
+                {
+                    L("ToolSshAgentTtlSession"),
+                    L("ToolSshAgentTtl1h"),
+                    L("ToolSshAgentTtl4h"),
+                    L("ToolSshAgentTtl8h")
+                };
+
+                var picked = await dialogService.ShowChoiceAsync(
+                    L("ToolSshKeyGenBtnLoadAgent"),
+                    L("ToolSshAgentTtlPrompt"),
+                    ttlChoices,
+                    defaultIndex: 0,
+                    cancelLabel: L("BtnCancel"));
+
+                if (picked is not int choiceIndex)
+                {
+                    return;
+                }
+
+                lifetimeSeconds = choiceIndex switch
+                {
+                    1 => 3600u,
+                    2 => 14400u,
+                    3 => 28800u,
+                    _ => null
+                };
+            }
+
+            var preference = SshAgentPreference.AutoOpenSshFirst;
+            if (configManager is not null)
+            {
+                var settings = await configManager.LoadSettingsAsync().ConfigureAwait(true);
+                preference = settings.SshAgentPreference;
+            }
+
+            var passphrase = PassphraseInput.Password;
+            var comment = CommentInput.Text.Trim();
+            var result = await Task.Run(() => SshAgentManager.AddKey(
+                SshAgentRegistry.CreateDefault(preference),
+                _privateKey,
+                string.IsNullOrEmpty(passphrase) ? null : passphrase,
+                comment,
+                lifetimeSeconds)).ConfigureAwait(true);
+
+            if (result.Success)
+            {
+                ShowValidation(string.Format(
+                    CultureInfo.CurrentCulture,
+                    L("ToolSshAgentAddSuccess"),
+                    result.AgentName ?? string.Empty));
+            }
+            else
+            {
+                ShowValidation(string.Format(
+                    CultureInfo.CurrentCulture,
+                    L("ToolSshAgentAddFailed"),
+                    result.ErrorMessage ?? string.Empty));
+            }
+        }
+        catch (Exception ex)
+        {
+            Heimdall.Core.Logging.FileLogger.Warn($"SSH agent load failed: {ex.Message}");
+            ShowValidation(string.Format(
+                CultureInfo.CurrentCulture,
+                L("ToolSshAgentAddFailed"),
+                ex.Message));
+        }
+        finally
+        {
+            BtnLoadIntoAgent.IsEnabled = true;
         }
     }
 
