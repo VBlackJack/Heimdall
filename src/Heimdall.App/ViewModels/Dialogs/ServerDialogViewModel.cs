@@ -664,6 +664,12 @@ public partial class ServerDialogViewModel : ObservableValidator
     [NotifyPropertyChangedFor(nameof(AgentKeyForwardingWarningText))]
     private bool _sshAgentForwarding;
 
+    [ObservableProperty]
+    private string _sshLocalForwardsText = "";
+
+    [ObservableProperty]
+    private string? _sshLocalForwardsError;
+
     /// <summary>
     /// The one agent key this session offers, as a fingerprint; null means any key. The single
     /// source of truth: the list below only displays it, and a refresh of that list never writes it.
@@ -2409,6 +2415,13 @@ public partial class ServerDialogViewModel : ObservableValidator
         RdpResizeEnableDelayMsError = ShowRdpResizeEnableDelay
             ? GetLocalizedFieldError(nameof(RdpResizeEnableDelayMs))
             : null;
+        SshLocalForwardsError = string.Equals(ConnectionType, "SSH", StringComparison.OrdinalIgnoreCase)
+            && !TryParseSshLocalForwards(SshLocalForwardsText, out _, out var invalidForward)
+                ? string.Format(
+                    System.Globalization.CultureInfo.CurrentCulture,
+                    L("ValidationSshLocalForwardInvalid"),
+                    invalidForward ?? string.Empty)
+                : null;
 
         // Tab error counts
         GeneralTabErrorCount = (DisplayNameError is not null ? 1 : 0)
@@ -2423,7 +2436,8 @@ public partial class ServerDialogViewModel : ObservableValidator
             + (ColorDepthError is not null ? 1 : 0)
             + (RdpFixedWidthError is not null ? 1 : 0)
             + (RdpFixedHeightError is not null ? 1 : 0)
-            + (RdpResizeEnableDelayMsError is not null ? 1 : 0);
+            + (RdpResizeEnableDelayMsError is not null ? 1 : 0)
+            + (SshLocalForwardsError is not null ? 1 : 0);
 
         // First invalid field for auto-focus. The order mirrors ValidationError below so the
         // summary line and the focused box always name the same error, and every name here needs
@@ -2442,13 +2456,53 @@ public partial class ServerDialogViewModel : ObservableValidator
             : RdpFixedWidthError is not null ? nameof(RdpFixedWidth)
             : RdpFixedHeightError is not null ? nameof(RdpFixedHeight)
             : RdpResizeEnableDelayMsError is not null ? nameof(RdpResizeEnableDelayMs)
+            : SshLocalForwardsError is not null ? nameof(SshLocalForwardsText)
             : null;
 
         // Aggregate summary
         ValidationError = DisplayNameError ?? RemoteServerError ?? SshUsernameError ?? WinRmUsernameError ?? WinRmPasswordError ?? EndpointPortError
             ?? LocalPortError ?? RdpGatewayError ?? AudioModeError ?? ColorDepthError
-            ?? RdpFixedWidthError ?? RdpFixedHeightError ?? RdpResizeEnableDelayMsError;
+            ?? RdpFixedWidthError ?? RdpFixedHeightError ?? RdpResizeEnableDelayMsError ?? SshLocalForwardsError;
     }
+
+    internal static bool TryParseSshLocalForwards(
+        string? rawText,
+        out List<string> canonicalForwards,
+        out string? invalidLine)
+    {
+        canonicalForwards = [];
+        invalidLine = null;
+        if (string.IsNullOrWhiteSpace(rawText))
+        {
+            return true;
+        }
+
+        var lines = rawText.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').Split('\n');
+        foreach (var rawLine in lines)
+        {
+            var trimmed = rawLine.Trim();
+            if (trimmed.Length == 0)
+            {
+                continue;
+            }
+
+            if (!Heimdall.Core.Ssh.SshLocalForwardSpec.TryParse(trimmed, out var parsed) || parsed is null)
+            {
+                invalidLine = trimmed;
+                return false;
+            }
+
+            canonicalForwards.Add(parsed.ToCanonicalString());
+        }
+
+        return true;
+    }
+
+    private static List<string> ParseValidSshLocalForwards(string? rawText)
+        => TryParseSshLocalForwards(rawText, out var forwards, out _) ? forwards : [];
+
+    private static string FormatSshLocalForwards(IEnumerable<string>? forwards)
+        => forwards is null ? "" : string.Join(System.Environment.NewLine, forwards.Where(static s => !string.IsNullOrWhiteSpace(s)));
 
     /// <summary>
     /// Whether an RD Gateway value can be written to a profile: empty means no gateway, and
@@ -2842,6 +2896,7 @@ public partial class ServerDialogViewModel : ObservableValidator
             SocksProxyPort = SocksProxyPort,
             RemoteBindPort = RemoteBindPort,
             RemoteLocalPort = RemoteLocalPort,
+            SshLocalForwards = ParseValidSshLocalForwards(SshLocalForwardsText),
             SshMode = SshMode,
             PostConnectSteps = [.. PostConnectSteps.Select(step => step.ToModel())],
             PostConnectCommand = PostConnectCommand,
@@ -2993,7 +3048,6 @@ public partial class ServerDialogViewModel : ObservableValidator
 
         dto.SortOrder = seed.SortOrder;
         dto.TunnelsPanelExpanded = seed.TunnelsPanelExpanded;
-        dto.SshLocalForwards = seed.SshLocalForwards;
         dto.CitrixId = seed.CitrixId;
         dto.CitrixLaunchCommandLine = seed.CitrixLaunchCommandLine;
         dto.ExtensionData = seed.ExtensionData;
@@ -3070,6 +3124,7 @@ public partial class ServerDialogViewModel : ObservableValidator
         vm.SocksProxyPort = dto.SocksProxyPort;
         vm.RemoteBindPort = dto.RemoteBindPort;
         vm.RemoteLocalPort = dto.RemoteLocalPort;
+        vm.SshLocalForwardsText = FormatSshLocalForwards(dto.SshLocalForwards);
         vm.SshMode = dto.SshMode;
         vm.PostConnectCommand = dto.PostConnectCommand;
         vm.PostConnectDelayMs = dto.PostConnectDelayMs;

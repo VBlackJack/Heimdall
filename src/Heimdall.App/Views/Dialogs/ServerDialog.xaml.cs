@@ -319,6 +319,10 @@ public partial class ServerDialog : Window
                 MainTabControl.SelectedItem = DlgSrv_TabOptions;
                 target = DlgSrv_RdpResizeDelayBox;
                 break;
+            case nameof(ServerDialogViewModel.SshLocalForwardsText):
+                MainTabControl.SelectedItem = DlgSrv_TabOptions;
+                target = DlgSrv_SshLocalForwardsBox;
+                break;
         }
 
         vm.PropertyChanged += OnViewModelPropertyChanged;

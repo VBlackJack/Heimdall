@@ -7001,5 +7001,9 @@
   "SessionCryptoInfoSummary": "Serveur : {0}\nKEX : {1}\nCl\u00e9 d'h\u00f4te : {2}\nChiffrement : {3}\nMAC : {4}\nCompression : {5}\nRedirections actives : {6}",
   "SessionCryptoInfoWeakWarning": "Attention : algorithme SSH obsol\u00e8te ou faible n\u00e9goci\u00e9.",
   "TooltipToggleTerminalHighlightsOn": "Coloration des logs terminal : ACTIV\u00c9E (cliquer pour d\u00e9sactiver)",
-  "TooltipToggleTerminalHighlightsOff": "Coloration des logs terminal : D\u00c9SACTIV\u00c9E (cliquer pour activer)"
+  "TooltipToggleTerminalHighlightsOff": "Coloration des logs terminal : D\u00c9SACTIV\u00c9E (cliquer pour activer)",
+  "ServerDialogSshLocalForwardsLabel": "Redirections de ports locaux SSH directes (-L)",
+  "ServerDialogSshLocalForwardsHint": "Une r\u00e8gle par ligne : portLocal:hoteDistant:portDistant (ex. 8080:127.0.0.1:80 ou [::1]:8443:db.internal:5432).",
+  "A11yServerSshLocalForwards": "Redirections de ports locaux SSH directes, une r\u00e8gle par ligne",
+  "ValidationSshLocalForwardInvalid": "R\u00e8gle de redirection locale invalide : \"{0}\". Format attendu : portLocal:hoteDistant:portDistant."
 }

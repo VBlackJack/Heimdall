@@ -2120,6 +2120,39 @@
                                                 </Style>
                                             </StackPanel.Style>
                                             <TextBlock Style="{StaticResource LabelStyle}"
+                                                       Text="{loc:Translate ServerDialogSshLocalForwardsLabel}"
+                                                       Margin="0,0,0,4"/>
+                                            <TextBlock Style="{StaticResource DialogHintTextStyle}"
+                                                       Text="{loc:Translate ServerDialogSshLocalForwardsHint}"
+                                                       TextWrapping="Wrap"
+                                                       Margin="0,0,0,6"/>
+                                            <TextBox x:Name="DlgSrv_SshLocalForwardsBox"
+                                                     Text="{Binding SshLocalForwardsText, UpdateSourceTrigger=PropertyChanged}"
+                                                     AcceptsReturn="True"
+                                                     VerticalScrollBarVisibility="Auto"
+                                                     MinHeight="64"
+                                                     MaxHeight="120"
+                                                     AutomationProperties.Name="{loc:Translate A11yServerSshLocalForwards}"
+                                                     Style="{StaticResource DialogFormTextBoxStyle}"/>
+                                            <TextBlock Text="{Binding SshLocalForwardsError}"
+                                                       Foreground="{DynamicResource ErrorTextBrush}"
+                                                       FontSize="{StaticResource FontSizeSmallCaption}"
+                                                       TextWrapping="Wrap"
+                                                       Margin="0,4,0,0"
+                                                       Visibility="{Binding SshLocalForwardsError, Converter={StaticResource NullOrEmptyToCollapsedConverter}}"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="0,14,0,0">
+                                            <StackPanel.Style>
+                                                <Style TargetType="StackPanel">
+                                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding ConnectionType}" Value="SSH">
+                                                            <Setter Property="Visibility" Value="Visible"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </StackPanel.Style>
+                                            <TextBlock Style="{StaticResource LabelStyle}"
                                                        Text="{loc:Translate ServerDialogPostConnectStepsLabel}"
                                                        Margin="0,0,0,4"/>
                                             <TextBlock Style="{StaticResource DialogHintTextStyle}"
