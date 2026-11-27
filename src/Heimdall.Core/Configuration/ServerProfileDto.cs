@@ -309,6 +309,7 @@ public sealed class ServerProfileDto : IJsonOnDeserialized
     public int SocksProxyPort { get; set; }
     public int RemoteBindPort { get; set; }
     public int RemoteLocalPort { get; set; }
+    public List<string> SshLocalForwards { get; set; } = [];
     public List<PostConnectStep> PostConnectSteps { get; set; } = [];
     public string PostConnectCommand { get; set; } = "";
     public int PostConnectDelayMs { get; set; } = 800;

@@ -470,6 +470,7 @@ public sealed class AppSettings
 
     // Collections
     public List<SshGatewayDto> SshGateways { get; set; } = new();
+    public List<SavedTunnelPresetDto> SavedTunnelPresets { get; set; } = new();
     public List<ProjectDto> Projects { get; set; } = new();
 
     /// <summary>

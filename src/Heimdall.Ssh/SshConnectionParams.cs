@@ -88,6 +88,18 @@ public sealed class SshConnectionParams
     /// <summary>Whether to request X11 forwarding from the server.</summary>
     public bool X11Forwarding { get; init; }
 
+    /// <summary>Optional local SOCKS5 dynamic forwarding port (-D) attached directly to this SSH session.</summary>
+    public int SocksProxyPort { get; init; }
+
+    /// <summary>Optional remote bind port (-R) attached directly to this SSH session.</summary>
+    public int RemoteBindPort { get; init; }
+
+    /// <summary>Optional local target port for remote forwarding (-R). Defaults to <see cref="RemoteBindPort"/>.</summary>
+    public int RemoteLocalPort { get; init; }
+
+    /// <summary>Optional local port forward specs (-L) attached directly to this SSH session.</summary>
+    public IReadOnlyList<string> LocalForwards { get; init; } = [];
+
     /// <summary>TCP connection timeout. Defaults to 15 seconds.</summary>
     public TimeSpan ConnectTimeout { get; init; } = TimeSpan.FromSeconds(15);
 

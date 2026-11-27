@@ -160,6 +160,7 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
         _configManager.SettingsChanged += OnSettingsChanged;
         _host.Connection.PropertyChanged += _connectionPropertyChangedHandler;
         SubscribeToActiveSessions(_host.Connection.ActiveSessions);
+        SyncSavedPresets(_settingsSnapshot);
     }
 
     // ── Observable state ─────────────────────────────────────────────
@@ -171,6 +172,14 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
     /// <summary>Live snapshot of active tunnels - bound by the DataGrid.</summary>
     [ObservableProperty]
     private ObservableCollection<TunnelInfo> _list = new();
+
+    /// <summary>Saved tunnel favorites / presets persisted in settings.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSavedPresets))]
+    private ObservableCollection<SavedTunnelPresetDto> _savedPresets = new();
+
+    /// <summary>True when at least one tunnel preset is saved.</summary>
+    public bool HasSavedPresets => SavedPresets.Count > 0;
 
     /// <summary>Row currently selected in the tunnels DataGrid.</summary>
     [ObservableProperty]
@@ -456,6 +465,141 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
             return;
         }
 
+        if (vm.SaveAsPreset)
+        {
+            await SaveTunnelPresetAsync(BuildPresetFromDialog(vm)).ConfigureAwait(true);
+        }
+
+        await LaunchManualTunnelViewModelAsync(vm, settings).ConfigureAwait(true);
+    }
+
+    internal static SavedTunnelPresetDto BuildPresetFromDialog(NewTunnelDialogViewModel vm)
+    {
+        ArgumentNullException.ThrowIfNull(vm);
+        return new SavedTunnelPresetDto
+        {
+            Id = Guid.NewGuid().ToString("N"),
+            Name = string.IsNullOrWhiteSpace(vm.Label) ? vm.SelectedGateway?.Name ?? string.Empty : vm.Label.Trim(),
+            GatewayId = vm.SelectedGateway?.Id ?? string.Empty,
+            Mode = vm.ForwardMode switch
+            {
+                TunnelForwardMode.DynamicSocks5 => SavedTunnelPresetDto.ModeDynamicSocks5,
+                TunnelForwardMode.Remote => SavedTunnelPresetDto.ModeRemote,
+                _ => SavedTunnelPresetDto.ModeLocal
+            },
+            LocalPort = vm.ForwardMode == TunnelForwardMode.Remote ? vm.LocalPort : vm.LocalPort,
+            RemoteHost = vm.ForwardMode == TunnelForwardMode.Local ? vm.RemoteHost.Trim() : string.Empty,
+            RemotePort = vm.ForwardMode == TunnelForwardMode.Local ? vm.RemotePort : 0,
+            RemoteBindPort = vm.ForwardMode == TunnelForwardMode.Remote ? vm.RemotePort : 0,
+            RemoteLocalPort = vm.ForwardMode == TunnelForwardMode.Remote ? vm.LocalPort : 0
+        };
+    }
+
+    internal async Task SaveTunnelPresetAsync(SavedTunnelPresetDto preset)
+    {
+        ArgumentNullException.ThrowIfNull(preset);
+        try
+        {
+            await _configManager.MergeSettingAsync(s => s.SavedTunnelPresets.Add(preset))
+                .ConfigureAwait(true);
+            SavedPresets.Add(preset);
+            OnPropertyChanged(nameof(HasSavedPresets));
+            _host.StatusText = _localizer.Format("StatusTunnelPresetSaved", preset.DisplayLabel);
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Warn($"[TunnelsViewModel] save preset failed: {ex.Message}");
+        }
+    }
+
+    [RelayCommand]
+    private async Task StartPresetAsync(SavedTunnelPresetDto? preset)
+    {
+        if (preset is null)
+        {
+            return;
+        }
+
+        var settings = _settingsSnapshot ?? _host.CurrentSettings;
+        if (settings is null)
+        {
+            _host.StatusText = string.Format(
+                System.Globalization.CultureInfo.CurrentCulture,
+                _localizer["StatusManualTunnelFailed"],
+                _localizer["NewTunnelSettingsUnavailable"]);
+            return;
+        }
+
+        var gateway = settings.SshGateways.FirstOrDefault(
+            g => string.Equals(g.Id, preset.GatewayId, StringComparison.OrdinalIgnoreCase));
+        if (gateway is null)
+        {
+            _host.StatusText = _localizer.Format("StatusTunnelPresetGatewayMissing", preset.DisplayLabel);
+            return;
+        }
+
+        var activePorts = _tunnelManager.GetActiveTunnels().Select(t => t.LocalPort).ToHashSet();
+        var vm = new NewTunnelDialogViewModel(settings.SshGateways, _localizer, activePorts)
+        {
+            SelectedGateway = gateway,
+            ForwardMode = preset.Mode switch
+            {
+                SavedTunnelPresetDto.ModeDynamicSocks5 => TunnelForwardMode.DynamicSocks5,
+                SavedTunnelPresetDto.ModeRemote => TunnelForwardMode.Remote,
+                _ => TunnelForwardMode.Local
+            },
+            Label = preset.Name
+        };
+
+        if (vm.ForwardMode == TunnelForwardMode.Remote)
+        {
+            vm.RemotePort = preset.RemoteBindPort;
+            vm.LocalPort = preset.RemoteLocalPort > 0 ? preset.RemoteLocalPort : preset.LocalPort;
+        }
+        else if (vm.ForwardMode == TunnelForwardMode.DynamicSocks5)
+        {
+            vm.LocalPort = preset.LocalPort;
+        }
+        else
+        {
+            vm.RemoteHost = preset.RemoteHost;
+            vm.RemotePort = preset.RemotePort;
+            vm.LocalPort = preset.LocalPort;
+        }
+
+        await LaunchManualTunnelViewModelAsync(vm, settings).ConfigureAwait(true);
+    }
+
+    [RelayCommand]
+    private async Task DeletePresetAsync(SavedTunnelPresetDto? preset)
+    {
+        if (preset is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _configManager.MergeSettingAsync(s =>
+                s.SavedTunnelPresets.RemoveAll(p => string.Equals(p.Id, preset.Id, StringComparison.Ordinal)))
+                .ConfigureAwait(true);
+            SavedPresets.Remove(preset);
+            OnPropertyChanged(nameof(HasSavedPresets));
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Warn($"[TunnelsViewModel] delete preset failed: {ex.Message}");
+        }
+    }
+
+    private void SyncSavedPresets(AppSettings? settings)
+    {
+        var items = settings?.SavedTunnelPresets ?? [];
+        SavedPresets = new ObservableCollection<SavedTunnelPresetDto>(items);
+    }
+
+    private async Task LaunchManualTunnelViewModelAsync(NewTunnelDialogViewModel vm, AppSettings settings)
+    {
         try
         {
             var result = await OpenManualTunnelAsync(vm, settings, CancellationToken.None)
@@ -821,6 +965,13 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
     {
         AppSettings? previous = _settingsSnapshot;
         _settingsSnapshot = settings;
+        _host.RunOnUi(() =>
+        {
+            if (!_disposed)
+            {
+                SyncSavedPresets(settings);
+            }
+        });
         if (previous is null || previous.CollapseTunnelsPanelByDefault != settings.CollapseTunnelsPanelByDefault)
         {
             QueueResolveAndApplyPanelState();

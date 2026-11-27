@@ -58,6 +58,7 @@ public sealed class SharedProfileSanitizerTests
         nameof(ServerProfileDto.SshKeyPassphraseEncrypted), nameof(ServerProfileDto.SshCompression),
         nameof(ServerProfileDto.SshX11Forwarding), nameof(ServerProfileDto.SocksProxyPort),
         nameof(ServerProfileDto.RemoteBindPort), nameof(ServerProfileDto.RemoteLocalPort),
+        nameof(ServerProfileDto.SshLocalForwards),
         nameof(ServerProfileDto.PostConnectCommand), nameof(ServerProfileDto.PostConnectDelayMs),
         nameof(ServerProfileDto.RdpAntiIdle), nameof(ServerProfileDto.RdpAspectRatio),
         // Obsolete setter-only migration shims: named as text, and checked through the
@@ -437,6 +438,11 @@ public sealed class SharedProfileSanitizerTests
         if (type == typeof(int[]))
         {
             return new[] { 3 };
+        }
+
+        if (type == typeof(List<string>))
+        {
+            return new List<string> { "8080:127.0.0.1:80" };
         }
 
         if (type == typeof(List<PostConnectStep>))

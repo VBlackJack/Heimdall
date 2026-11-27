@@ -86,6 +86,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
                 <TextBlock Grid.Row="0" Grid.Column="0"
@@ -168,6 +169,12 @@
                          Text="{Binding Label, UpdateSourceTrigger=PropertyChanged}"
                          Style="{StaticResource DialogFormTextBoxStyle}"
                          AutomationProperties.Name="{loc:Translate NewTunnelLabelLabel}"/>
+
+                <CheckBox Grid.Row="6" Grid.Column="1"
+                          Content="{loc:Translate NewTunnelSaveAsPresetLabel}"
+                          IsChecked="{Binding SaveAsPreset}"
+                          Margin="0,8,0,0"
+                          AutomationProperties.Name="{loc:Translate NewTunnelSaveAsPresetLabel}"/>
             </Grid>
         </Border>
 

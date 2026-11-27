@@ -245,7 +245,13 @@ public sealed class OpenSshConfigImporter(IConfigManager configManager, Localiza
             SshCompression = candidate.Compression,
             SocksProxyPort = candidate.DynamicForwardPort ?? 0,
             RemoteBindPort = candidate.RemoteForwardBindPort ?? 0,
-            RemoteLocalPort = candidate.RemoteForwardLocalPort ?? 0
+            RemoteLocalPort = candidate.RemoteForwardLocalPort ?? 0,
+            SshLocalForwards = candidate.LocalForwards
+                .Select(static raw => SshLocalForwardSpec.TryParse(raw, out var spec) ? spec?.ToCanonicalString() : null)
+                .Where(static formatted => formatted is not null)
+                .Cast<string>()
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList()
         };
     }
 

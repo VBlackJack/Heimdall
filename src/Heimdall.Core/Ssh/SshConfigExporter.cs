@@ -36,7 +36,8 @@ public sealed record SshConfigHostEntry(
     int DynamicForwardPort = 0,
     int RemoteBindPort = 0,
     int RemoteLocalPort = 0,
-    int ServerAliveInterval = 0);
+    int ServerAliveInterval = 0,
+    IReadOnlyList<string>? LocalForwards = null);
 
 /// <summary>
 /// Pure OpenSSH <c>~/.ssh/config</c> exporter for single hosts and full Heimdall inventories.
@@ -126,6 +127,19 @@ public static class SshConfigExporter
                 .Append(LoopbackHost)
                 .Append(':')
                 .AppendLine(localTargetPort.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        }
+
+        if (entry.LocalForwards is { Count: > 0 })
+        {
+            foreach (var rawForward in entry.LocalForwards)
+            {
+                if (SshLocalForwardSpec.TryParse(rawForward, out var parsed) && parsed is not null)
+                {
+                    sb.Append(ConfigIndent)
+                        .Append("LocalForward ")
+                        .AppendLine(parsed.ToOpenSshDirectiveValue());
+                }
+            }
         }
 
         if (entry.ServerAliveInterval > 0)
@@ -234,7 +248,8 @@ public static class SshConfigExporter
                 DynamicForwardPort: server.SocksProxyPort,
                 RemoteBindPort: server.RemoteBindPort,
                 RemoteLocalPort: server.RemoteLocalPort,
-                ServerAliveInterval: defaultServerAliveInterval));
+                ServerAliveInterval: defaultServerAliveInterval,
+                LocalForwards: server.SshLocalForwards));
 
             if (!string.IsNullOrWhiteSpace(block))
             {

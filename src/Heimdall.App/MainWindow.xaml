@@ -2673,6 +2673,65 @@
                     </StackPanel>
                 </DockPanel>
 
+                <!-- Saved tunnel presets / favorites -->
+                <Border DockPanel.Dock="Top"
+                        Margin="16,0,16,8"
+                        Padding="10,8"
+                        CornerRadius="6"
+                        Background="{DynamicResource SurfaceBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="1"
+                        Visibility="{Binding Tunnels.HasSavedPresets, Converter={StaticResource BoolToVisibilityConverter}}">
+                    <StackPanel>
+                        <TextBlock Text="{loc:Translate TunnelsSavedPresetsTitle}"
+                                   FontSize="{StaticResource FontSizeCaption}"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   Margin="0,0,0,6"/>
+                        <ItemsControl ItemsSource="{Binding Tunnels.SavedPresets}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel Orientation="Horizontal"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Margin="0,0,8,4"
+                                            Padding="8,4"
+                                            CornerRadius="4"
+                                            Background="{DynamicResource CardBrush}"
+                                            BorderBrush="{DynamicResource BorderBrush}"
+                                            BorderThickness="1">
+                                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding DisplayLabel}"
+                                                       FontSize="{StaticResource FontSizeCaption}"
+                                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                                       VerticalAlignment="Center"
+                                                       Margin="0,0,8,0"/>
+                                            <Button Content="{loc:Translate TunnelsPresetStartBtn}"
+                                                    Command="{Binding DataContext.Tunnels.StartPresetCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                    CommandParameter="{Binding}"
+                                                    Style="{DynamicResource SecondaryButtonStyle}"
+                                                    Padding="6,2"
+                                                    FontSize="{StaticResource FontSizeCaption}"
+                                                    Margin="0,0,4,0"
+                                                    AutomationProperties.Name="{loc:Translate TunnelsPresetStartBtn}"/>
+                                            <Button Content="{loc:Translate TunnelsPresetDeleteBtn}"
+                                                    Command="{Binding DataContext.Tunnels.DeletePresetCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                    CommandParameter="{Binding}"
+                                                    Style="{DynamicResource SecondaryButtonStyle}"
+                                                    Foreground="{DynamicResource ErrorTextBrush}"
+                                                    Padding="6,2"
+                                                    FontSize="{StaticResource FontSizeCaption}"
+                                                    AutomationProperties.Name="{loc:Translate TunnelsPresetDeleteBtn}"/>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
                 <Grid>
                     <!-- Tunnel DataGrid -->
                     <DataGrid ItemsSource="{Binding Tunnels.List}"

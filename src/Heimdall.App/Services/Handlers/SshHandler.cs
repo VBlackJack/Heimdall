@@ -258,6 +258,10 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
             AgentForwarding = server.SshAgentForwarding,
             Compression = server.SshCompression,
             X11Forwarding = server.SshX11Forwarding,
+            SocksProxyPort = usesTunnel ? 0 : server.SocksProxyPort,
+            RemoteBindPort = usesTunnel ? 0 : server.RemoteBindPort,
+            RemoteLocalPort = usesTunnel ? 0 : server.RemoteLocalPort,
+            LocalForwards = server.SshLocalForwards,
             AuthenticationTimeout = InteractiveAuthenticationTimeout,
             KeyboardInteractiveResponder = request =>
             {
