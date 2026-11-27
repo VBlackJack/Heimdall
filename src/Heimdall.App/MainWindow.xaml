@@ -2013,6 +2013,12 @@
                                                                VerticalAlignment="Center" Margin="0,0,4,0"
                                                                Visibility="{Binding IsPinned, Converter={StaticResource BoolToVisibilityConverter}}"
                                                                AutomationProperties.Name="{loc:Translate SessionPinTab}"/>
+                                                    <TextBlock x:Name="TabBellGlyph" Text="&#xEA8F;" FontFamily="{StaticResource FontFamilyIcons}" FontSize="{StaticResource SessionTabPinGlyphFontSize}"
+                                                               Foreground="{DynamicResource WarningIndicatorBrush}"
+                                                               VerticalAlignment="Center" Margin="0,0,4,0"
+                                                               Visibility="{Binding HasBellNotification, Converter={StaticResource BoolToVisibilityConverter}}"
+                                                               ToolTip="{loc:Translate SessionTabBellTooltip}"
+                                                               AutomationProperties.Name="{loc:Translate SessionTabBellTooltip}"/>
                                                     <TextBlock Text="{Binding DisplayTitle}" FontSize="{StaticResource FontSizeBody}" FontWeight="SemiBold"
                                                                Foreground="{DynamicResource TextPrimaryBrush}"
                                                                VerticalAlignment="Center"
@@ -3934,6 +3940,15 @@
                                                 <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[TerminalFontSize]}"/>
                                             </StackPanel>
                                         </Grid>
+                                        <StackPanel Margin="{StaticResource SettingsFieldGap}">
+                                            <TextBlock x:Name="Mw_SettingsTerminalScrollbackLabel" Text="{loc:Translate SettingsLabelTerminalScrollback}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBox Text="{Binding Settings.TerminalScrollbackLinesText, UpdateSourceTrigger=PropertyChanged}" Width="100"
+                                                         AutomationProperties.LabeledBy="{x:Reference Mw_SettingsTerminalScrollbackLabel}"/>
+                                                <TextBlock Text="{loc:Translate SettingsUnitLines}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
+                                            </StackPanel>
+                                            <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[TerminalScrollbackLines]}"/>
+                                        </StackPanel>
                                         <StackPanel Margin="{StaticResource SettingsFieldGap}">
                                             <TextBlock x:Name="Mw_SettingsTerminalColorSchemeLabel" Text="{loc:Translate SettingsLabelTerminalColorScheme}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                             <ComboBox x:Name="Mw_ColorSchemeCombo" SelectedValue="{Binding Settings.TerminalColorScheme}" SelectedValuePath="Tag" Width="200" HorizontalAlignment="Left"

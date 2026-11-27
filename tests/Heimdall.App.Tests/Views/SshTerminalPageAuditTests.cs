@@ -49,7 +49,7 @@ public sealed class SshTerminalPageAuditTests
     [Fact]
     public void Page_SearchControlsCarryLocalizedAccessibleNames()
     {
-        foreach (string id in new[] { "search-prev", "search-next", "search-close" })
+        foreach (string id in new[] { "search-case", "search-regex", "search-prev", "search-next", "search-close" })
         {
             Match button = Regex.Match(Html, "<button[^>]*id=\"" + id + "\"[^>]*>");
             button.Success.Should().BeTrue(id);
@@ -128,10 +128,38 @@ public sealed class SshTerminalPageAuditTests
         System.Text.Json.JsonElement root = document.RootElement;
         root.GetProperty("next").GetString().Should().Be("Suivant");
         root.GetProperty("previous").GetString().Should().Be(TerminalHtmlLocalizer.FallbackSearchPrevious);
-        foreach (string name in new[] { "placeholder", "close", "noResults", "countFormat", "sessionEnded" })
+        foreach (string name in new[] { "placeholder", "caseSensitive", "regex", "close", "noResults", "countFormat", "invalidRegex", "sessionEnded" })
         {
             root.GetProperty(name).GetString().Should().NotBeNullOrWhiteSpace(name);
         }
+    }
+
+    [Fact]
+    public void Page_ScrollbackComesFromConfiguredPlaceholder_AndBellForwardsToHost()
+    {
+        Html.Should().Contain("/*{{TERMINAL_SCROLLBACK}}*/");
+        Html.Should().NotContain("var scrollbackLines = 10000;");
+        Html.Should().Contain("term.onBell(");
+        Html.Should().Contain("postMessage('bell:')");
+    }
+
+    [Fact]
+    public void SessionTab_BellNotification_SetsOnlyWhenInactive_AndClearsOnActivation()
+    {
+        var tab = new Heimdall.App.ViewModels.SessionTabViewModel
+        {
+            IsActive = true
+        };
+
+        tab.NotifyBell();
+        tab.HasBellNotification.Should().BeFalse();
+
+        tab.IsActive = false;
+        tab.NotifyBell();
+        tab.HasBellNotification.Should().BeTrue();
+
+        tab.IsActive = true;
+        tab.HasBellNotification.Should().BeFalse();
     }
 
     [Theory]

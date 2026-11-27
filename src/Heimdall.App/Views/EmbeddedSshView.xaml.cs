@@ -103,6 +103,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     private const string MsgResize = "resize:";
     private const string MsgInput = "input:";
     private const string MsgCwd = "cwd:";
+    private const string MsgBell = "bell:";
     private const string MsgClipboardWrite = "clipboard-write:";
     private const string MsgClipboardRead = "clipboard-read:";
 
@@ -928,6 +929,11 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     /// </summary>
     public event Action? CancelConnectRequested;
 
+    /// <summary>
+    /// Raised when xterm.js emits a terminal bell (BEL / 0x07), allowing background tabs to alert the user.
+    /// </summary>
+    public event Action? BellReceived;
+
     internal static bool IsConnectionAttemptPending(bool hasSession, bool disposed)
         => !hasSession && !disposed;
 
@@ -1635,6 +1641,12 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
         if (string.IsNullOrWhiteSpace(message))
         {
+            return;
+        }
+
+        if (message.StartsWith(MsgBell, StringComparison.Ordinal))
+        {
+            BellReceived?.Invoke();
             return;
         }
 
@@ -3570,6 +3582,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         // Inject terminal appearance settings from AppSettings
         string fontFamily = TerminalSettings?.TerminalFontFamily ?? AppSettings.DefaultTerminalFontFamily;
         int fontSize = TerminalSettings?.TerminalFontSize ?? AppSettings.DefaultTerminalFontSize;
+        int scrollbackLines = TerminalSettings?.TerminalScrollbackLines ?? AppSettings.DefaultTerminalScrollbackLines;
         string schemeName = TerminalSettings?.TerminalColorScheme ?? AppSettings.DefaultTerminalColorScheme;
         string convertEol = _terminalSession is Heimdall.Terminal.PipeModeSession
             ? "true"
@@ -3581,6 +3594,10 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             : ColorSchemes["Dracula"];
 
         int safeFontSize = Math.Clamp(fontSize, TerminalFontSizeMin, TerminalFontSizeMax);
+        int safeScrollbackLines = Math.Clamp(
+            scrollbackLines,
+            AppSettings.MinTerminalScrollbackLines,
+            AppSettings.MaxTerminalScrollbackLines);
 
         // The offline NavigateToString page requires inline script/style. Keep
         // placeholder values constrained to known constants or sanitized data.
@@ -3593,6 +3610,10 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         html = html.Replace(
             "/*{{TERMINAL_FONT_MAX}}*/",
             TerminalFontSizeMax.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            StringComparison.Ordinal);
+        html = html.Replace(
+            "/*{{TERMINAL_SCROLLBACK}}*/",
+            safeScrollbackLines.ToString(System.Globalization.CultureInfo.InvariantCulture),
             StringComparison.Ordinal);
         html = html.Replace("/*{{TERMINAL_THEME}}*/", themeJson, StringComparison.Ordinal);
         html = html.Replace("/*{{TERMINAL_CONVERT_EOL}}*/", convertEol, StringComparison.Ordinal);

@@ -53,6 +53,7 @@
     "enableEventLog": false,
     "terminalFontFamily": "Consolas",
     "terminalFontSize": 14,
+    "terminalScrollbackLines": 10000,
     "terminalColorScheme": "Dracula",
     "powerShellExecutionPolicy": "Default",
     "sshDefaultMode": "Embedded",

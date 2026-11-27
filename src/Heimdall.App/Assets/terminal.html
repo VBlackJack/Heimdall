@@ -133,6 +133,11 @@
             background: var(--search-hover-bg);
         }
 
+        .search-btn.active {
+            background: var(--search-hover-bg);
+            border-color: var(--search-focus);
+        }
+
         .xterm,
         .xterm .xterm-screen,
         .xterm .xterm-viewport {
@@ -168,6 +173,8 @@
     <div id="loading">Initializing terminal&#x2026;</div>
     <div id="search-bar" role="search">
         <input id="search-input" type="text" placeholder="Search..." aria-label="Search..." />
+        <button class="search-btn" id="search-case" aria-pressed="false" title="{{TERMINAL_SEARCH_CASE_LABEL}}" aria-label="{{TERMINAL_SEARCH_CASE_LABEL}}">Aa</button>
+        <button class="search-btn" id="search-regex" aria-pressed="false" title="{{TERMINAL_SEARCH_REGEX_LABEL}}" aria-label="{{TERMINAL_SEARCH_REGEX_LABEL}}">.*</button>
         <span id="search-status" role="status" aria-live="polite"></span>
         <button class="search-btn" id="search-prev" title="{{TERMINAL_SEARCH_PREVIOUS_LABEL}}" aria-label="{{TERMINAL_SEARCH_PREVIOUS_LABEL}}">&#x25B2;</button>
         <button class="search-btn" id="search-next" title="{{TERMINAL_SEARCH_NEXT_LABEL}}" aria-label="{{TERMINAL_SEARCH_NEXT_LABEL}}">&#x25BC;</button>
@@ -215,7 +222,7 @@
             var fontSizeMax = /*{{TERMINAL_FONT_MAX}}*/;
             var currentFontSize = baseFontSize;
             var resizeDebounceMilliseconds = 60;
-            var scrollbackLines = 10000;
+            var scrollbackLines = /*{{TERMINAL_SCROLLBACK}}*/;
             // Largest UTF-8 text a buffer reply carries; mirrors TerminalBufferReadCoordinator.PageMaxTextBytes.
             var bufferMaxBytes = 4 * 1024 * 1024;
             // Bytes handed to String.fromCharCode at once when encoding a buffer reply.
@@ -228,16 +235,23 @@
             var utf8ContinuationBits = 0x80;
             var searchContextRows = 5;
             var searchStatusElement = document.getElementById('search-status');
+            var searchCaseButton = document.getElementById('search-case');
+            var searchRegexButton = document.getElementById('search-regex');
             var searchNoResultsText = /*{{TERMINAL_SEARCH_NO_RESULTS_LITERAL}}*/;
             var searchCountFormat = /*{{TERMINAL_SEARCH_COUNT_FORMAT_LITERAL}}*/;
+            var searchInvalidRegexText = /*{{TERMINAL_SEARCH_INVALID_REGEX_LITERAL}}*/;
             var suppressSelectionCopy = false;
             var sessionEndedMarked = 'marked';
             var sessionEndedText = /*{{TERMINAL_SESSION_ENDED_LITERAL}}*/;
             var sessionEndedColor = '\x1b[33m';
             var searchMatches = [];
             var searchMatchIndex = -1;
+            var searchCaseSensitive = false;
+            var searchUseRegex = false;
             var searchSnapshotQuery = '';
             var searchSnapshotLength = -1;
+            var searchSnapshotCase = false;
+            var searchSnapshotRegex = false;
             var urlPattern = /https?:\/\/[^\s<>"'`]+/g;
             var urlTrailingPunctuation = /[.,;:!?)\]}]+$/;
 
@@ -521,6 +535,8 @@
                 searchMatchIndex = -1;
                 searchSnapshotQuery = '';
                 searchSnapshotLength = -1;
+                searchSnapshotCase = searchCaseSensitive;
+                searchSnapshotRegex = searchUseRegex;
                 setSearchStatus('', false);
             }
 
@@ -530,25 +546,63 @@
                 searchInput.classList.toggle('no-match', noMatch);
             }
 
-            // Collects every case-insensitive occurrence of the query in the whole buffer,
-            // wrapped lines included, so the same list serves next and previous.
-            function collectSearchMatches(query) {
+            // Collects every occurrence of the query in the whole buffer,
+            // respecting case-sensitivity and optional regex mode.
+            function collectSearchMatches(query, caseSensitive, useRegex) {
                 var buffer = term.buffer.active;
-                var needle = query.toLowerCase();
                 var matches = [];
+                var regex = null;
+                if (useRegex) {
+                    try {
+                        regex = new RegExp(query, caseSensitive ? 'g' : 'gi');
+                    } catch (error) {
+                        return { error: true, matches: [] };
+                    }
+                }
+                var needle = caseSensitive ? query : query.toLowerCase();
                 for (var row = 0; row < buffer.length; row++) {
                     var line = buffer.getLine(row);
                     if (!line) {
                         continue;
                     }
-                    var text = line.translateToString(true).toLowerCase();
-                    var column = text.indexOf(needle);
-                    while (column >= 0) {
-                        matches.push({ row: row, column: column, length: needle.length });
-                        column = text.indexOf(needle, column + needle.length);
+                    var rawText = line.translateToString(true);
+                    if (regex) {
+                        regex.lastIndex = 0;
+                        var found;
+                        while ((found = regex.exec(rawText)) !== null) {
+                            if (found[0].length === 0) {
+                                regex.lastIndex++;
+                                continue;
+                            }
+                            matches.push({ row: row, column: found.index, length: found[0].length });
+                        }
+                    } else {
+                        var text = caseSensitive ? rawText : rawText.toLowerCase();
+                        var column = text.indexOf(needle);
+                        while (column >= 0) {
+                            matches.push({ row: row, column: column, length: needle.length });
+                            column = text.indexOf(needle, column + needle.length);
+                        }
                     }
                 }
-                return matches;
+                return { error: false, matches: matches };
+            }
+
+            function toggleSearchOption(option) {
+                if (option === 'case') {
+                    searchCaseSensitive = !searchCaseSensitive;
+                    searchCaseButton.classList.toggle('active', searchCaseSensitive);
+                    searchCaseButton.setAttribute('aria-pressed', searchCaseSensitive ? 'true' : 'false');
+                } else if (option === 'regex') {
+                    searchUseRegex = !searchUseRegex;
+                    searchRegexButton.classList.toggle('active', searchUseRegex);
+                    searchRegexButton.setAttribute('aria-pressed', searchUseRegex ? 'true' : 'false');
+                }
+                searchSnapshotQuery = '';
+                searchSnapshotLength = -1;
+                if (searchInput.value) {
+                    doSearch('next');
+                }
             }
 
             function doSearch(direction) {
@@ -559,10 +613,27 @@
 
                 var query = searchInput.value;
                 var bufferLength = term.buffer.active.length;
-                if (query !== searchSnapshotQuery || bufferLength !== searchSnapshotLength) {
-                    searchMatches = collectSearchMatches(query);
+                if (query !== searchSnapshotQuery
+                    || bufferLength !== searchSnapshotLength
+                    || searchCaseSensitive !== searchSnapshotCase
+                    || searchUseRegex !== searchSnapshotRegex) {
+                    var collected = collectSearchMatches(query, searchCaseSensitive, searchUseRegex);
+                    if (collected.error) {
+                        searchMatches = [];
+                        searchMatchIndex = -1;
+                        searchSnapshotQuery = query;
+                        searchSnapshotLength = bufferLength;
+                        searchSnapshotCase = searchCaseSensitive;
+                        searchSnapshotRegex = searchUseRegex;
+                        term.clearSelection();
+                        setSearchStatus(searchInvalidRegexText, true);
+                        return;
+                    }
+                    searchMatches = collected.matches;
                     searchSnapshotQuery = query;
                     searchSnapshotLength = bufferLength;
+                    searchSnapshotCase = searchCaseSensitive;
+                    searchSnapshotRegex = searchUseRegex;
                     searchMatchIndex = -1;
                 }
 
@@ -655,7 +726,13 @@
             function applyLabels(labels) {
                 searchInput.placeholder = labels.placeholder;
                 searchInput.setAttribute('aria-label', labels.placeholder);
-                [['search-prev', labels.previous], ['search-next', labels.next], ['search-close', labels.close]]
+                [
+                    ['search-case', labels.caseSensitive],
+                    ['search-regex', labels.regex],
+                    ['search-prev', labels.previous],
+                    ['search-next', labels.next],
+                    ['search-close', labels.close]
+                ]
                     .forEach(function (pair) {
                         var button = document.getElementById(pair[0]);
                         button.title = pair[1];
@@ -663,6 +740,7 @@
                     });
                 searchNoResultsText = labels.noResults;
                 searchCountFormat = labels.countFormat;
+                searchInvalidRegexText = labels.invalidRegex;
                 sessionEndedText = labels.sessionEnded;
             }
 
@@ -795,6 +873,12 @@
                     lastPostedSize = size.cols + ',' + size.rows;
                     postMessage('resize:' + lastPostedSize);
                 });
+
+                if (typeof term.onBell === 'function') {
+                    term.onBell(function () {
+                        postMessage('bell:');
+                    });
+                }
 
                 if (typeof term.registerOscHandler === 'function') {
                     term.registerOscHandler(7, function (data) {
@@ -962,6 +1046,8 @@
             }
 
             // ── Search bar events ───────────────────────────────────
+            searchCaseButton.addEventListener('click', function () { toggleSearchOption('case'); });
+            searchRegexButton.addEventListener('click', function () { toggleSearchOption('regex'); });
             document.getElementById('search-next').addEventListener('click', function () { doSearch('next'); });
             document.getElementById('search-prev').addEventListener('click', function () { doSearch('prev'); });
             document.getElementById('search-close').addEventListener('click', closeSearch);

@@ -32,6 +32,9 @@ internal static class TerminalHtmlLocalizer
     internal const string FallbackSearchClose = "Close search";
     internal const string FallbackSearchNoResults = "No results";
     internal const string FallbackSearchCountFormat = "{0} / {1}";
+    internal const string FallbackSearchCase = "Match case (Aa)";
+    internal const string FallbackSearchRegex = "Use regular expression (.*)";
+    internal const string FallbackSearchInvalidRegex = "Invalid regex";
 
     internal const string KeyLoadingLabel = "TerminalLoadingLabel";
     internal const string KeySearchPlaceholder = "TerminalSearchPlaceholder";
@@ -41,6 +44,9 @@ internal static class TerminalHtmlLocalizer
     internal const string KeySearchClose = "TerminalSearchClose";
     internal const string KeySearchNoResults = "TerminalSearchNoResults";
     internal const string KeySearchCountFormat = "TerminalSearchCount";
+    internal const string KeySearchCase = "TerminalSearchCase";
+    internal const string KeySearchRegex = "TerminalSearchRegex";
+    internal const string KeySearchInvalidRegex = "TerminalSearchInvalidRegex";
 
     internal const string MarkerLoadingLabel = "Initializing terminal&#x2026;";
     internal const string MarkerSearchPlaceholder = "Search...";
@@ -48,8 +54,11 @@ internal static class TerminalHtmlLocalizer
     internal const string MarkerSearchPrevious = "{{TERMINAL_SEARCH_PREVIOUS_LABEL}}";
     internal const string MarkerSearchNext = "{{TERMINAL_SEARCH_NEXT_LABEL}}";
     internal const string MarkerSearchClose = "{{TERMINAL_SEARCH_CLOSE_LABEL}}";
+    internal const string MarkerSearchCase = "{{TERMINAL_SEARCH_CASE_LABEL}}";
+    internal const string MarkerSearchRegex = "{{TERMINAL_SEARCH_REGEX_LABEL}}";
     internal const string MarkerSearchNoResultsLiteral = "/*{{TERMINAL_SEARCH_NO_RESULTS_LITERAL}}*/";
     internal const string MarkerSearchCountFormatLiteral = "/*{{TERMINAL_SEARCH_COUNT_FORMAT_LITERAL}}*/";
+    internal const string MarkerSearchInvalidRegexLiteral = "/*{{TERMINAL_SEARCH_INVALID_REGEX_LITERAL}}*/";
 
     public static string Localize(string html, Func<string, string?> localize)
     {
@@ -86,12 +95,24 @@ internal static class TerminalHtmlLocalizer
             WebUtility.HtmlEncode(ResolveOrFallback(localize, KeySearchClose, FallbackSearchClose)),
             StringComparison.Ordinal);
         localizedHtml = localizedHtml.Replace(
+            MarkerSearchCase,
+            WebUtility.HtmlEncode(ResolveOrFallback(localize, KeySearchCase, FallbackSearchCase)),
+            StringComparison.Ordinal);
+        localizedHtml = localizedHtml.Replace(
+            MarkerSearchRegex,
+            WebUtility.HtmlEncode(ResolveOrFallback(localize, KeySearchRegex, FallbackSearchRegex)),
+            StringComparison.Ordinal);
+        localizedHtml = localizedHtml.Replace(
             MarkerSearchNoResultsLiteral,
             JsonSerializer.Serialize(ResolveOrFallback(localize, KeySearchNoResults, FallbackSearchNoResults)),
             StringComparison.Ordinal);
         localizedHtml = localizedHtml.Replace(
             MarkerSearchCountFormatLiteral,
             JsonSerializer.Serialize(ResolveOrFallback(localize, KeySearchCountFormat, FallbackSearchCountFormat)),
+            StringComparison.Ordinal);
+        localizedHtml = localizedHtml.Replace(
+            MarkerSearchInvalidRegexLiteral,
+            JsonSerializer.Serialize(ResolveOrFallback(localize, KeySearchInvalidRegex, FallbackSearchInvalidRegex)),
             StringComparison.Ordinal);
 
         return localizedHtml;
@@ -111,8 +132,11 @@ internal static class TerminalHtmlLocalizer
             ["previous"] = ResolveOrFallback(localize, KeySearchPrevious, FallbackSearchPrevious),
             ["next"] = ResolveOrFallback(localize, KeySearchNext, FallbackSearchNext),
             ["close"] = ResolveOrFallback(localize, KeySearchClose, FallbackSearchClose),
+            ["caseSensitive"] = ResolveOrFallback(localize, KeySearchCase, FallbackSearchCase),
+            ["regex"] = ResolveOrFallback(localize, KeySearchRegex, FallbackSearchRegex),
             ["noResults"] = ResolveOrFallback(localize, KeySearchNoResults, FallbackSearchNoResults),
             ["countFormat"] = ResolveOrFallback(localize, KeySearchCountFormat, FallbackSearchCountFormat),
+            ["invalidRegex"] = ResolveOrFallback(localize, KeySearchInvalidRegex, FallbackSearchInvalidRegex),
             ["sessionEnded"] = ResolveOrFallback(localize, KeySessionEnded, FallbackSessionEnded),
         });
     }

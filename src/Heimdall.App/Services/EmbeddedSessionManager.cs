@@ -1304,6 +1304,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
         };
         view.CloseRequested += () => RequestHostClose(tab, TerminalRoutingPane(tab, view.OwningPane));
         view.CurrentDirectoryChanged += path => FollowSftpToCurrentDirectory(tab, path);
+        view.BellReceived += () => tab.NotifyBell();
     }
 
     /// <summary>

@@ -215,10 +215,15 @@ public sealed class AppSettings
     // Terminal appearance
     public const string DefaultTerminalFontFamily = "Consolas";
     public const int DefaultTerminalFontSize = 14;
+    public const int DefaultTerminalScrollbackLines = 10000;
+    public const int MinTerminalScrollbackLines = 1000;
+    public const int MaxTerminalScrollbackLines = 100000;
     public const string DefaultTerminalColorScheme = "Dracula";
     public string TerminalFontFamily { get; set; } = DefaultTerminalFontFamily;
     [SettingRange(8, 72)]
     public int TerminalFontSize { get; set; } = DefaultTerminalFontSize;
+    [SettingRange(MinTerminalScrollbackLines, MaxTerminalScrollbackLines)]
+    public int TerminalScrollbackLines { get; set; } = DefaultTerminalScrollbackLines;
     public string TerminalColorScheme { get; set; } = DefaultTerminalColorScheme;
     public string PowerShellExecutionPolicy { get; set; } = "Default";
 

@@ -55,6 +55,30 @@ public partial class SessionTabViewModel : ObservableObject
     private bool _isActive;
 
     /// <summary>
+    /// True when an embedded terminal in this tab emitted a bell (BEL) while the tab was
+    /// in the background. Cleared automatically when the tab becomes active.
+    /// </summary>
+    [ObservableProperty]
+    private bool _hasBellNotification;
+
+    partial void OnIsActiveChanged(bool value)
+    {
+        if (value && HasBellNotification)
+        {
+            HasBellNotification = false;
+        }
+    }
+
+    /// <summary>Records a terminal bell notification when this tab is not currently active.</summary>
+    public void NotifyBell()
+    {
+        if (!IsActive)
+        {
+            HasBellNotification = true;
+        }
+    }
+
+    /// <summary>
     /// Set once the session's panes have been torn down. A floating window hosting it closes on
     /// this, whoever closed the session (a reconnect, a host's close button, a disconnect).
     /// </summary>

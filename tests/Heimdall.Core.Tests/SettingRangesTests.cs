@@ -76,6 +76,7 @@ public sealed class SettingRangesTests
         (nameof(AppSettings.EphemeralHttpPort), 1, 65535, false),
         (nameof(AppSettings.EphemeralTftpPort), 1, 65535, false),
         (nameof(AppSettings.TerminalFontSize), 8, 72, false),
+        (nameof(AppSettings.TerminalScrollbackLines), AppSettings.MinTerminalScrollbackLines, AppSettings.MaxTerminalScrollbackLines, false),
         // Arbitrated 2026-09-04: 0 turns the timer off at the use site and used to be warned
         // about; 3600 is the ceiling the settings screen always accepted, the loader said 600.
         (nameof(AppSettings.AntiIdleIntervalSeconds), 10, 3600, true),

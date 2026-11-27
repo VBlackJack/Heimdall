@@ -362,6 +362,20 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         => CommitNumericText(value, parsed => TerminalFontSize = parsed);
 
     [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [SettingRangeOf(nameof(AppSettings.TerminalScrollbackLines))]
+    private int _terminalScrollbackLines = AppSettings.DefaultTerminalScrollbackLines;
+
+    /// <summary>Text of the field that edits <see cref="TerminalScrollbackLines"/>.</summary>
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [CustomValidation(typeof(SettingsViewModel), nameof(ValidateWholeNumberText))]
+    private string _terminalScrollbackLinesText = string.Empty;
+
+    partial void OnTerminalScrollbackLinesTextChanged(string value)
+        => CommitNumericText(value, parsed => TerminalScrollbackLines = parsed);
+
+    [ObservableProperty]
     private string _terminalColorScheme = "Dracula";
 
     [ObservableProperty]
@@ -1882,6 +1896,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             // Terminal
             TerminalFontFamily = settings.TerminalFontFamily;
             TerminalFontSize = settings.TerminalFontSize;
+            TerminalScrollbackLines = settings.TerminalScrollbackLines;
             TerminalColorScheme = settings.TerminalColorScheme;
             PowerShellExecutionPolicy = settings.PowerShellExecutionPolicy;
 
@@ -2152,6 +2167,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         MaxEmbeddedSessionsText = MaxEmbeddedSessions.ToString(CultureInfo.InvariantCulture);
         UpdateCheckIntervalHoursText = UpdateCheckIntervalHours.ToString(CultureInfo.InvariantCulture);
         TerminalFontSizeText = TerminalFontSize.ToString(CultureInfo.InvariantCulture);
+        TerminalScrollbackLinesText = TerminalScrollbackLines.ToString(CultureInfo.InvariantCulture);
         AntiIdleIntervalText = AntiIdleInterval.ToString(CultureInfo.InvariantCulture);
         SshTmoutResetIntervalText = SshTmoutResetInterval.ToString(CultureInfo.InvariantCulture);
         SshAutoReconnectAttemptsText = SshAutoReconnectAttempts.ToString(CultureInfo.InvariantCulture);
@@ -2372,6 +2388,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         // Terminal
         settings.TerminalFontFamily = TerminalFontFamily;
         settings.TerminalFontSize = TerminalFontSize;
+        settings.TerminalScrollbackLines = TerminalScrollbackLines;
         settings.TerminalColorScheme = TerminalColorScheme;
         settings.PowerShellExecutionPolicy = PowerShellExecutionPolicy;
 
@@ -4992,6 +5009,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         [nameof(AppSettings.UpdateCheckIntervalHours)] = "ValidationSettingsUpdateCheckInterval",
         [nameof(AppSettings.RdpKeepAliveIntervalMs)] = "ValidationSettingsRdpKeepAlive",
         [nameof(AppSettings.TerminalFontSize)] = "ValidationSettingsFontSize",
+        [nameof(AppSettings.TerminalScrollbackLines)] = "ValidationSettingsScrollbackLines",
         [nameof(AppSettings.AntiIdleIntervalSeconds)] = "ValidationSettingsAntiIdle",
         [nameof(AppSettings.SshTmoutResetIntervalSeconds)] = "ValidationSettingsTmoutReset",
         [nameof(AppSettings.SshAutoReconnectAttempts)] = "ValidationSettingsSshAutoReconnectAttempts",
@@ -5027,6 +5045,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         [nameof(MaxEmbeddedSessions)] = "SettingsLabelMaxEmbeddedSessions",
         [nameof(UpdateCheckIntervalHours)] = "SettingsLabelUpdateInterval",
         [nameof(TerminalFontSize)] = "SettingsLabelTerminalFontSize",
+        [nameof(TerminalScrollbackLines)] = "SettingsLabelTerminalScrollback",
         [nameof(AntiIdleInterval)] = "SettingsLabelAntiIdleInterval",
         [nameof(SshTmoutResetInterval)] = "SettingsLabelSshTmoutReset",
         [nameof(SshAutoReconnectAttempts)] = "SettingsSshAutoReconnectMaxAttempts",
@@ -5066,6 +5085,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     [
         nameof(TerminalFontSize),
         nameof(TerminalFontSizeText),
+        nameof(TerminalScrollbackLines),
+        nameof(TerminalScrollbackLinesText),
     ];
 
     private static readonly string[] SshValidatedSettingPropertyNames =
