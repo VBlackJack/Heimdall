@@ -21,7 +21,7 @@ namespace Heimdall.Core.Ssh;
 /// <summary>
 /// Parses a limited ssh_config subset into importable candidates and diagnostics.
 /// </summary>
-public static class OpenSshConfigParser
+public static partial class OpenSshConfigParser
 {
     /// <summary>
     /// Parses OpenSSH config content into structured import candidates.

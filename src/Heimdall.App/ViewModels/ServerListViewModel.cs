@@ -988,10 +988,10 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
 
     private async Task ImportOpenSshConfigCoreAsync(string filePath, CancellationToken cancellationToken)
     {
-        string contents;
+        OpenSshParseResult parseResult;
         try
         {
-            contents = await File.ReadAllTextAsync(filePath, cancellationToken);
+            parseResult = await Task.Run(() => OpenSshConfigParser.ParseFile(filePath), cancellationToken);
         }
         catch (UnauthorizedAccessException)
         {
@@ -1008,7 +1008,6 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             return;
         }
 
-        var parseResult = OpenSshConfigParser.Parse(contents);
         if (parseResult.Candidates.Count == 0 && parseResult.Diagnostics.Count == 0)
         {
             _dialogService.ShowInfo(
