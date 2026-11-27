@@ -193,6 +193,9 @@ internal sealed class SftpHandler : IProtocolHandler
             ? null
             : _localizer[capabilityNotice.StatusLocalizationKey];
 
+        using CancellationTokenSource promptLifetime = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        bool isCompanionSession = server.Id.StartsWith("sftp-", StringComparison.Ordinal);
+
         // One builder for both attempts. SshConnectionParams is sealed with init-only
         // members and there is no `with` expression, so a hand-copied retry object is the
         // one silent bug this change could ship: fourteen properties where thirteen
@@ -213,7 +216,21 @@ internal sealed class SftpHandler : IProtocolHandler
             LegacyCredentialName = server.DisplayName,
             AgentForwarding = server.SshAgentForwarding,
             Compression = server.SshCompression,
-            KeepAliveIntervalSeconds = settings.SshKeepAliveIntervalSeconds
+            KeepAliveIntervalSeconds = settings.SshKeepAliveIntervalSeconds,
+            SkipHostKeyProbeIfTrusted = isCompanionSession,
+            AuthenticationTimeout = TimeSpan.FromMinutes(2),
+            KeyboardInteractiveResponder = request =>
+            {
+                promptLifetime.Token.ThrowIfCancellationRequested();
+                return _dialogService.ShowPasswordInputAsync(
+                    _localizer[SshLocalizationKeys.InteractivePromptTitle],
+                    string.Format(
+                        _localizer[SshLocalizationKeys.InteractivePromptMessage],
+                        server.RemoteServer,
+                        server.SshUsername,
+                        ServerPromptText.Sanitize(request)),
+                    promptLifetime.Token).GetAwaiter().GetResult();
+            }
         };
 
         // The tunnel outlives a failed attempt now, and is released once, here. Releasing

@@ -337,7 +337,28 @@ public sealed class SftpBrowser : IRemoteBrowser, IRemoteNoClobberPublisher, IRe
                 "no pinned connection context was retained for an exec channel");
         }
 
-        return new SshNetSftpExecCommandRunner(connectionParams, pinnedVerifier);
+        return CreateExecRunner(connectionParams, pinnedVerifier);
+    }
+
+    private ISftpExecCommandRunner CreateExecRunner(
+        SshConnectionParams connectionParams,
+        PinnedFingerprintVerifier pinnedVerifier)
+    {
+        ISftpExecCommandRunner fallback = new SshNetSftpExecCommandRunner(connectionParams, pinnedVerifier);
+        Func<SshClient?>? sharedAccessor = Volatile.Read(ref _sharedSshClientAccessor);
+        return sharedAccessor is not null
+            ? new SharedSshClientExecCommandRunner(sharedAccessor, fallback)
+            : fallback;
+    }
+
+    /// <summary>
+    /// Attaches a companion <see cref="SshClient"/> accessor so SFTP helper exec channels
+    /// (server-side copy, no-clobber publish, recursive delete, metadata preflight) multiplex
+    /// directly over the already-authenticated SSH session without extra handshakes or MFA prompts.
+    /// </summary>
+    public void AttachSharedSshClient(Func<SshClient?>? clientAccessor)
+    {
+        Volatile.Write(ref _sharedSshClientAccessor, clientAccessor);
     }
 
     /// <summary>
@@ -385,6 +406,7 @@ public sealed class SftpBrowser : IRemoteBrowser, IRemoteNoClobberPublisher, IRe
     // the SFTP client.
     private SshConnectionParams? _connectionParams;
     private PinnedFingerprintVerifier? _pinnedHostKeyVerifier;
+    private Func<SshClient?>? _sharedSshClientAccessor;
 
     // Generous bound on a server-side cp; a server-local copy is fast, but a large tree may take a
     // while. Reaching the bound refuses the copy: an unproductive exec channel is not a reason to
@@ -476,12 +498,34 @@ public sealed class SftpBrowser : IRemoteBrowser, IRemoteNoClobberPublisher, IRe
             throw new InvalidOperationException("SFTP browser is already connected.");
         }
 
-        var pinnedVerifier = await SshConnectionFactory.ResolveHostKeyAsync(
-                connectionParams,
-                hostKeyStore,
-                hostKeyVerifier,
-                ct)
-            .ConfigureAwait(false);
+        PinnedFingerprintVerifier pinnedVerifier;
+        if (connectionParams.SkipHostKeyProbeIfTrusted
+            && hostKeyStore.GetSessionEntry(connectionParams.HostKeyVerificationHost, connectionParams.HostKeyVerificationPort)
+                is { Fingerprint: { Length: > 0 } sessionFp })
+        {
+            pinnedVerifier = new PinnedFingerprintVerifier(
+                connectionParams.HostKeyVerificationHost,
+                connectionParams.HostKeyVerificationPort,
+                sessionFp);
+        }
+        else if (connectionParams.SkipHostKeyProbeIfTrusted
+            && hostKeyStore.GetEntry(connectionParams.HostKeyVerificationHost, connectionParams.HostKeyVerificationPort)
+                is { Fingerprint: { Length: > 0 } storedFp })
+        {
+            pinnedVerifier = new PinnedFingerprintVerifier(
+                connectionParams.HostKeyVerificationHost,
+                connectionParams.HostKeyVerificationPort,
+                storedFp);
+        }
+        else
+        {
+            pinnedVerifier = await SshConnectionFactory.ResolveHostKeyAsync(
+                    connectionParams,
+                    hostKeyStore,
+                    hostKeyVerifier,
+                    ct)
+                .ConfigureAwait(false);
+        }
 
         var client = SshConnectionFactory.CreateSftpClient(connectionParams);
         if (connectionParams.KeepAliveIntervalSeconds is > 0)
@@ -509,7 +553,12 @@ public sealed class SftpBrowser : IRemoteBrowser, IRemoteNoClobberPublisher, IRe
             // and the attempt ran on to the connect timeout. This helper is the SSH side's,
             // it observes the token through the handshake, and its cancellation oracle
             // lives with it in Heimdall.Ssh.Tests.
-            await SshConnectionFactory.ConnectWithCancellationAsync(client, ct).ConfigureAwait(false);
+            await SshConnectionFactory.ConnectWithTransportBoundAsync(
+                    client,
+                    connectionParams,
+                    token => SshConnectionFactory.ConnectWithCancellationAsync(client, token),
+                    ct)
+                .ConfigureAwait(false);
         }
         catch
         {
@@ -1046,7 +1095,7 @@ public sealed class SftpBrowser : IRemoteBrowser, IRemoteNoClobberPublisher, IRe
                     remotePath);
             }
 
-            runner = new SshNetSftpExecCommandRunner(connectionParams, pinnedVerifier);
+            runner = CreateExecRunner(connectionParams, pinnedVerifier);
         }
 
         SftpExecResult result;
@@ -1365,7 +1414,7 @@ public sealed class SftpBrowser : IRemoteBrowser, IRemoteNoClobberPublisher, IRe
                 return ServerSideCopyOutcome.NoPinnedContext;
             }
 
-            runner = new SshNetSftpExecCommandRunner(connectionParams, pinnedVerifier);
+            runner = CreateExecRunner(connectionParams, pinnedVerifier);
         }
 
         string host = connectionParams?.Host ?? "the remote host";
@@ -1846,7 +1895,7 @@ public sealed class SftpBrowser : IRemoteBrowser, IRemoteNoClobberPublisher, IRe
                     RemoteRecursiveDeleteFailureReason.ExecUnavailable);
             }
 
-            runner = new SshNetSftpExecCommandRunner(connectionParams, pinnedVerifier);
+            runner = CreateExecRunner(connectionParams, pinnedVerifier);
         }
 
         string command = RemoteDeleteCommand.Build(path);

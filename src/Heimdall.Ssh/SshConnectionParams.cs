@@ -100,6 +100,15 @@ public sealed class SshConnectionParams
     /// <summary>Optional local port forward specs (-L) attached directly to this SSH session.</summary>
     public IReadOnlyList<string> LocalForwards { get; init; } = [];
 
+    /// <summary>
+    /// When true and <see cref="HostKeyStore"/> already holds an effective trusted entry for
+    /// <see cref="HostKeyVerificationHost"/>:<see cref="HostKeyVerificationPort"/>, skips the
+    /// preliminary throwaway host-key probe while still enforcing strict pinned verification on
+    /// the real handshake (used by companion SFTP sessions whose parent SSH session just pinned
+    /// the host key).
+    /// </summary>
+    public bool SkipHostKeyProbeIfTrusted { get; init; }
+
     /// <summary>TCP connection timeout. Defaults to 15 seconds.</summary>
     public TimeSpan ConnectTimeout { get; init; } = TimeSpan.FromSeconds(15);
 

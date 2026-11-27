@@ -29,6 +29,84 @@ internal interface ISftpExecCommandRunner
 
 internal sealed record SftpExecResult(int ExitStatus, string StandardError);
 
+/// <summary>
+/// Executes SFTP helper commands directly over an already-authenticated companion
+/// <see cref="SshClient"/> session (eliminating extra TCP/SSH handshakes and duplicate MFA
+/// prompts), falling back transparently to <paramref name="fallback"/> if the shared client
+/// is unavailable or disconnected.
+/// </summary>
+internal sealed class SharedSshClientExecCommandRunner : ISftpExecCommandRunner
+{
+    private readonly Func<SshClient?> _sharedClientAccessor;
+    private readonly ISftpExecCommandRunner _fallback;
+
+    public SharedSshClientExecCommandRunner(
+        Func<SshClient?> sharedClientAccessor,
+        ISftpExecCommandRunner fallback)
+    {
+        _sharedClientAccessor = sharedClientAccessor ?? throw new ArgumentNullException(nameof(sharedClientAccessor));
+        _fallback = fallback ?? throw new ArgumentNullException(nameof(fallback));
+    }
+
+    public async Task<SftpExecResult> ExecuteAsync(string command, CancellationToken ct)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(command);
+        ct.ThrowIfCancellationRequested();
+
+        SshClient? sharedClient;
+        try
+        {
+            sharedClient = _sharedClientAccessor();
+        }
+        catch (ObjectDisposedException)
+        {
+            sharedClient = null;
+        }
+
+        if (sharedClient is null || !IsClientConnected(sharedClient))
+        {
+            return await _fallback.ExecuteAsync(command, ct).ConfigureAwait(false);
+        }
+
+        try
+        {
+            using SshCommand sshCommand = sharedClient.CreateCommand(command);
+            using CancellationTokenRegistration cancelReg = ct.Register(static state =>
+            {
+                try { ((SshCommand)state!).CancelAsync(); }
+                catch (ObjectDisposedException) { }
+                catch (InvalidOperationException) { }
+            }, sshCommand);
+
+            await sshCommand.ExecuteAsync(ct).ConfigureAwait(false);
+            return new SftpExecResult(
+                sshCommand.ExitStatus ?? -1,
+                sshCommand.Error ?? string.Empty);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex) when (ex is ObjectDisposedException or InvalidOperationException or SshConnectionException)
+        {
+            ct.ThrowIfCancellationRequested();
+            return await _fallback.ExecuteAsync(command, ct).ConfigureAwait(false);
+        }
+    }
+
+    private static bool IsClientConnected(SshClient client)
+    {
+        try
+        {
+            return client.IsConnected;
+        }
+        catch (ObjectDisposedException)
+        {
+            return false;
+        }
+    }
+}
+
 internal sealed class SshNetSftpExecCommandRunner : ISftpExecCommandRunner
 {
     private readonly SshConnectionParams _connectionParams;

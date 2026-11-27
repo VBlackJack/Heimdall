@@ -1205,6 +1205,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                     sharedConnection,
                     companionPlaceholder,
                     plannedProfile,
+                    session as SshSessionResult,
                     _main.Split.GetSessionToken(tab))
                 .SafeFireAndForget();
         }
@@ -2065,6 +2066,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         SshConnectionInputs? sharedConnection,
         SessionPaneModel? placeholder,
         ServerProfileDto? plannedProfile,
+        SshSessionResult? parentSshSession = null,
         CancellationToken ct = default)
     {
         var attached = false;
@@ -2116,6 +2118,11 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                 SafeDisposeSessionResult(sftpResult.Session);
                 _main.Split.CleanupOrphanedPane(sftpSessionId);
                 return;
+            }
+
+            if (parentSshSession is not null && sftpResult.Session is SftpSessionBundle sftpBundle)
+            {
+                sftpBundle.Browser.AttachSharedSshClient(() => parentSshSession.Session.Client);
             }
 
             // Create the SFTP host control on the UI thread. The pane that was standing in for it

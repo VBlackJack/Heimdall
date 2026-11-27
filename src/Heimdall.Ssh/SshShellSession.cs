@@ -62,6 +62,7 @@ public sealed class SshShellSession : IDisposable
     private readonly TimeProvider _timeProvider;
     private readonly Transport _transport;
     private SshClient? _client;
+    private PinnedFingerprintVerifier? _resolvedHostKeyVerifier;
     private ISshShellStream? _stream;
     private readonly List<ForwardedPort> _sessionForwardedPorts = [];
     private CancellationTokenSource? _readCts;
@@ -262,6 +263,7 @@ public sealed class SshShellSession : IDisposable
                 hostKeyVerifier,
                 cancellationToken)
             .ConfigureAwait(false);
+        Volatile.Write(ref _resolvedHostKeyVerifier, pinnedVerifier);
 
         // The host key prompt can stay open for a long time, and the owner may dispose the
         // session while it is: Dispose found nothing to tear down at that point and only
@@ -710,6 +712,12 @@ public sealed class SshShellSession : IDisposable
         }
     }
 
+    /// <summary>
+    /// The pinned host-key verifier resolved during <see cref="ConnectAsync"/>, available to
+    /// companion transports (such as SFTP) that connect to the same host.
+    /// </summary>
+    public PinnedFingerprintVerifier? ResolvedHostKeyVerifier => Volatile.Read(ref _resolvedHostKeyVerifier);
+
     /// <summary>Number of active port forwards (-L/-D/-R) attached directly to this shell session.</summary>
     public int ActiveForwardedPortCount
     {
@@ -827,6 +835,7 @@ public sealed class SshShellSession : IDisposable
         Interlocked.Exchange(ref _readLoopTask, null);
 
         StopSessionPortForwards();
+        Volatile.Write(ref _resolvedHostKeyVerifier, null);
         CleanupStream();
         DisconnectClient();
 
