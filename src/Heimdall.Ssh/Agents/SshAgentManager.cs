@@ -31,11 +31,23 @@ public interface IMutableSshAgent : ISshAgent
     bool RemoveAllIdentities();
 }
 
+/// <summary>Machine-readable error classification for <see cref="SshAgentOperationResult"/>.</summary>
+public enum SshAgentOperationErrorCode
+{
+    None,
+    NoWritableAgent,
+    KeyRefused,
+    RemoveRefused,
+    KeyNotFound,
+    Exception
+}
+
 /// <summary>Result of an active SSH agent management operation.</summary>
 public sealed record SshAgentOperationResult(
     bool Success,
     string? AgentName = null,
-    string? ErrorMessage = null);
+    string? ErrorMessage = null,
+    SshAgentOperationErrorCode ErrorCode = SshAgentOperationErrorCode.None);
 
 /// <summary>
 /// High-level facade for loading and removing SSH keys from local SSH agents
@@ -59,7 +71,7 @@ public static class SshAgentManager
         var targetAgent = registry.GetAvailableAgents().OfType<IMutableSshAgent>().FirstOrDefault();
         if (targetAgent is null)
         {
-            return new SshAgentOperationResult(false, null, "No writable SSH agent is running.");
+            return new SshAgentOperationResult(false, null, null, SshAgentOperationErrorCode.NoWritableAgent);
         }
 
         byte[]? message = null;
@@ -74,11 +86,11 @@ public static class SshAgentManager
             var added = targetAgent.AddIdentity(message);
             return added
                 ? new SshAgentOperationResult(true, targetAgent.Name)
-                : new SshAgentOperationResult(false, targetAgent.Name, "The SSH agent refused the key.");
+                : new SshAgentOperationResult(false, targetAgent.Name, null, SshAgentOperationErrorCode.KeyRefused);
         }
         catch (Exception ex)
         {
-            return new SshAgentOperationResult(false, targetAgent.Name, ex.Message);
+            return new SshAgentOperationResult(false, targetAgent.Name, ex.Message, SshAgentOperationErrorCode.Exception);
         }
         finally
         {
@@ -90,22 +102,36 @@ public static class SshAgentManager
     }
 
     /// <summary>
-    /// Removes the key matching <paramref name="fingerprint"/> from every reachable mutable agent
-    /// currently holding it.
+    /// Removes the key matching <paramref name="fingerprint"/> from the targeted agent (when
+    /// <paramref name="agentName"/> is provided) or from every reachable mutable agent currently holding it.
     /// </summary>
     public static SshAgentOperationResult RemoveKeyByFingerprint(
         SshAgentRegistry registry,
-        string fingerprint)
+        string fingerprint,
+        string? agentName = null)
     {
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentException.ThrowIfNullOrWhiteSpace(fingerprint);
 
+        var matchedAny = false;
+        var removedAny = false;
+        string? lastSuccessAgent = null;
+        string? lastFailureAgent = null;
+        string? lastFailureMessage = null;
+        var lastFailureCode = SshAgentOperationErrorCode.KeyNotFound;
+
         foreach (var agent in registry.GetAvailableAgents().OfType<IMutableSshAgent>())
         {
+            if (!string.IsNullOrWhiteSpace(agentName)
+                && !string.Equals(agent.Name, agentName, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
             IReadOnlyList<ISshAgentKey> identities;
             try
             {
-                identities = agent.GetIdentities();
+                identities = agent.GetIdentities().ToList();
             }
             catch (Exception)
             {
@@ -120,20 +146,40 @@ public static class SshAgentManager
                     continue;
                 }
 
+                matchedAny = true;
                 try
                 {
-                    return agent.RemoveIdentity(key.PublicKeyBlob)
-                        ? new SshAgentOperationResult(true, agent.Name)
-                        : new SshAgentOperationResult(false, agent.Name, "The SSH agent refused to remove the key.");
+                    if (agent.RemoveIdentity(key.PublicKeyBlob))
+                    {
+                        removedAny = true;
+                        lastSuccessAgent = agent.Name;
+                    }
+                    else
+                    {
+                        lastFailureAgent = agent.Name;
+                        lastFailureCode = SshAgentOperationErrorCode.RemoveRefused;
+                    }
                 }
                 catch (Exception ex)
                 {
-                    return new SshAgentOperationResult(false, agent.Name, ex.Message);
+                    lastFailureAgent = agent.Name;
+                    lastFailureMessage = ex.Message;
+                    lastFailureCode = SshAgentOperationErrorCode.Exception;
                 }
             }
         }
 
-        return new SshAgentOperationResult(false, null, "Key not found in any running SSH agent.");
+        if (removedAny)
+        {
+            return new SshAgentOperationResult(true, lastSuccessAgent);
+        }
+
+        if (matchedAny)
+        {
+            return new SshAgentOperationResult(false, lastFailureAgent, lastFailureMessage, lastFailureCode);
+        }
+
+        return new SshAgentOperationResult(false, agentName, null, SshAgentOperationErrorCode.KeyNotFound);
     }
 
     /// <summary>Removes all loaded identities from every available mutable agent.</summary>
@@ -144,7 +190,7 @@ public static class SshAgentManager
         var agents = registry.GetAvailableAgents().OfType<IMutableSshAgent>().ToList();
         if (agents.Count == 0)
         {
-            return new SshAgentOperationResult(false, null, "No writable SSH agent is running.");
+            return new SshAgentOperationResult(false, null, null, SshAgentOperationErrorCode.NoWritableAgent);
         }
 
         var anyRemoved = false;
@@ -167,6 +213,6 @@ public static class SshAgentManager
 
         return anyRemoved
             ? new SshAgentOperationResult(true, lastAgent)
-            : new SshAgentOperationResult(false, agents[0].Name, "The SSH agent refused to remove identities.");
+            : new SshAgentOperationResult(false, agents[0].Name, null, SshAgentOperationErrorCode.RemoveRefused);
     }
 }

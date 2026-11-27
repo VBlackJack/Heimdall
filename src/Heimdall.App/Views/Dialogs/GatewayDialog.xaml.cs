@@ -125,13 +125,13 @@ public partial class GatewayDialog : Window
                 var settings = await config.LoadSettingsAsync().ConfigureAwait(true);
                 preference = settings.SshAgentPreference;
             }
+
+            await LoadAgentKeysAsync(vm, preference).ConfigureAwait(true);
         }
         catch (Exception ex)
         {
-            FileLogger.Warn($"Gateway agent key preference load failed: {ex.GetType().Name}");
+            FileLogger.Warn($"Gateway agent key refresh failed: {ex.GetType().Name}");
         }
-
-        await LoadAgentKeysAsync(vm, preference).ConfigureAwait(true);
     }
 
     private static async Task LoadAgentKeysAsync(GatewayDialogViewModel vm, SshAgentPreference preference)

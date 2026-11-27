@@ -143,7 +143,8 @@ public static class KnownHostsParser
             var keyType = fields[2];
             var base64 = fields[3];
 
-            if (!SupportedKeyTypes.Contains(keyType))
+            if (!SupportedKeyTypes.Contains(keyType)
+                && !OpenSshCertificateParser.IsCertificateKeyType(keyType))
             {
                 continue;
             }

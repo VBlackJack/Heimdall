@@ -6989,5 +6989,12 @@
   "RecipeImportReplaceIconSame": "Icon: unchanged",
   "RecipeImportReplaceIconChanged": "Icon: changed",
   "RecipeFolderRefusalLeadsToUnallowedLocation": "This folder leads to a location that cannot be allowed: the path it leads to is too long, or is not an ordinary local folder path.",
-  "RecipeFolderChecking": "Checking the folder..."
+  "RecipeFolderChecking": "Checking the folder...",
+  "ToolSshAgentErrNoWritableAgent": "No writable SSH agent is running.",
+  "ToolSshAgentErrKeyRefused": "The SSH agent refused the key.",
+  "ToolSshAgentErrRemoveRefused": "The SSH agent refused to remove the key.",
+  "ToolSshAgentErrKeyNotFound": "Key not found in the running SSH agent.",
+  "ToolSshAuditCertMetadataFormat": "CA: {0} | Key ID: {1} | Principals: {2}",
+  "ToolSshAuditFormatCertHost": "OpenSSH Certificate (Host)",
+  "ToolSshAuditFormatCertUser": "OpenSSH Certificate (User)"
 }

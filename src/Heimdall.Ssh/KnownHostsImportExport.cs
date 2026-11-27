@@ -69,7 +69,9 @@ public sealed class KnownHostsImporter(IHostKeyTrustService trustService)
 
             using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
             using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
-            parseResult = KnownHostsParser.Parse(reader);
+            var content = reader.ReadToEnd();
+            parseResult = KnownHostsParser.Parse(content);
+            _trustService.LoadPolicyFromKnownHosts(content);
         }
         catch (IOException ex)
         {

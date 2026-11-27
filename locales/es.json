@@ -6989,5 +6989,12 @@
   "RecipeImportReplaceIconSame": "Icono: sin cambios",
   "RecipeImportReplaceIconChanged": "Icono: modificado",
   "RecipeFolderRefusalLeadsToUnallowedLocation": "Esta carpeta lleva a una ubicaci\u00f3n que no se puede permitir: la ruta a la que lleva es demasiado larga, o no es una ruta ordinaria de carpeta local.",
-  "RecipeFolderChecking": "Comprobando la carpeta..."
+  "RecipeFolderChecking": "Comprobando la carpeta...",
+  "ToolSshAgentErrNoWritableAgent": "No hay ning\u00fan agente SSH con permisos de escritura en ejecuci\u00f3n.",
+  "ToolSshAgentErrKeyRefused": "El agente SSH rechaz\u00f3 la clave.",
+  "ToolSshAgentErrRemoveRefused": "El agente SSH rechaz\u00f3 eliminar la clave.",
+  "ToolSshAgentErrKeyNotFound": "Clave no encontrada en el agente SSH en ejecuci\u00f3n.",
+  "ToolSshAuditCertMetadataFormat": "CA: {0} | ID de clave: {1} | Principales: {2}",
+  "ToolSshAuditFormatCertHost": "Certificado OpenSSH (Host)",
+  "ToolSshAuditFormatCertUser": "Certificado OpenSSH (Usuario)"
 }

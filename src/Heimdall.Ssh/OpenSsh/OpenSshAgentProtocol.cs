@@ -15,6 +15,7 @@
  */
 
 using System.Buffers.Binary;
+using System.Security.Cryptography;
 using System.Text;
 using Heimdall.Core.Ssh;
 
@@ -165,26 +166,28 @@ internal static class OpenSshAgentProtocol
     {
         ArgumentNullException.ThrowIfNull(writePayload);
 
-        var writer = new AgentMessageWriter();
+        using var writer = new AgentMessageWriter();
         writer.WriteByte(messageType);
         writePayload(writer);
 
-        var payload = writer.ToArray();
-        if (payload.Length > MaxMessageLength)
+        var payloadLength = writer.Length;
+        if (payloadLength > MaxMessageLength)
         {
             throw new ArgumentException(
                 $"SSH agent message exceeds maximum length of {MaxMessageLength} bytes.");
         }
 
-        var message = new byte[sizeof(uint) + payload.Length];
-        BinaryPrimitives.WriteUInt32BigEndian(message.AsSpan(0, sizeof(uint)), (uint)payload.Length);
-        payload.CopyTo(message.AsSpan(sizeof(uint)));
+        var message = new byte[sizeof(uint) + payloadLength];
+        BinaryPrimitives.WriteUInt32BigEndian(message.AsSpan(0, sizeof(uint)), (uint)payloadLength);
+        writer.CopyTo(message.AsSpan(sizeof(uint)));
         return message;
     }
 
-    internal sealed class AgentMessageWriter
+    internal sealed class AgentMessageWriter : IDisposable
     {
         private readonly MemoryStream _stream = new();
+
+        public int Length => (int)_stream.Length;
 
         public void WriteByte(byte value) => _stream.WriteByte(value);
 
@@ -235,6 +238,35 @@ internal static class OpenSshAgentProtocol
         }
 
         public byte[] ToArray() => _stream.ToArray();
+
+        public void CopyTo(Span<byte> destination)
+        {
+            if (_stream.TryGetBuffer(out var segment) && segment.Array is not null)
+            {
+                segment.AsSpan().CopyTo(destination);
+                return;
+            }
+
+            var fallback = _stream.ToArray();
+            try
+            {
+                fallback.CopyTo(destination);
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(fallback);
+            }
+        }
+
+        public void Dispose()
+        {
+            if (_stream.TryGetBuffer(out var segment) && segment.Array is not null)
+            {
+                CryptographicOperations.ZeroMemory(segment.Array);
+            }
+
+            _stream.Dispose();
+        }
     }
 
     internal sealed class AgentMessageReader

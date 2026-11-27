@@ -401,6 +401,21 @@ public partial class App : System.Windows.Application
                 hostKeyStore.LoadFromConfig(entries);
             }
 
+            // Load OpenSSH @cert-authority and @revoked policy markers from default known_hosts when present.
+            try
+            {
+                var defaultKnownHosts = Heimdall.Ssh.KnownHostsImporter.GetDefaultKnownHostsPath();
+                if (File.Exists(defaultKnownHosts)
+                    && new FileInfo(defaultKnownHosts).Length <= Heimdall.Core.Ssh.KnownHostsParser.MaxFileSizeBytes)
+                {
+                    hostKeyStore.LoadPolicyFromKnownHosts(File.ReadAllText(defaultKnownHosts));
+                }
+            }
+            catch (Exception ex)
+            {
+                Heimdall.Core.Logging.FileLogger.Warn($"Startup known_hosts policy load skipped: {ex.Message}");
+            }
+
             // Persist newly trusted host keys back to settings via transactional merge.
             // Fire-and-forget on purpose: TOFU acceptance must not block the caller path.
             // Batched: a known_hosts sync raises one event per line, and each write is a

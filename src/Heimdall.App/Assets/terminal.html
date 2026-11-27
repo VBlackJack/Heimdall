@@ -224,8 +224,9 @@
             var resizeDebounceMilliseconds = 60;
             var scrollbackLines = /*{{TERMINAL_SCROLLBACK}}*/;
             var highlightsEnabled = /*{{TERMINAL_HIGHLIGHTS}}*/;
+            var highlightUtf8Decoder = new TextDecoder('utf-8', { fatal: true });
             var highlightAnsiSplit = /(\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\))/g;
-            var highlightControlGuard = /\x1b\[\?|\x1b\[[0-9;]*[ABCDEFGHJKSTfsu]/;
+            var highlightControlGuard = /\x1b\[\?|\x1b\[[0-9;]*[ABCDEFGHJKSTfsu]|\x1b[P_^X]/;
             var highlightCombinedRegex = /\b(?:FATAL|CRITICAL|ERROR|FAILED|FAIL|EXCEPTION)\b|\b(?:WARNING|WARN|DEPRECATED)\b|\b(?:SUCCESS|PASSED|READY|ACTIVE|OK)\b|\b(?:\d{1,3}\.){3}\d{1,3}\b/g;
             // Largest UTF-8 text a buffer reply carries; mirrors TerminalBufferReadCoordinator.PageMaxTextBytes.
             var bufferMaxBytes = 4 * 1024 * 1024;
@@ -1036,7 +1037,7 @@
                     }
                     var decoded;
                     try {
-                        decoded = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+                        decoded = highlightUtf8Decoder.decode(bytes);
                     } catch (error) {
                         return null;
                     }
@@ -1058,6 +1059,10 @@
                                 inColor = true;
                             }
                             continue;
+                        }
+                        if (segment.indexOf('\x1b') !== -1) {
+                            // Unterminated or unknown escape sequence: never rewrite bytes.
+                            return null;
                         }
                         if (inColor) {
                             continue;

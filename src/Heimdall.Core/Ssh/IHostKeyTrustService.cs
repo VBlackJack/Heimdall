@@ -46,6 +46,11 @@ public interface IHostKeyTrustService
     /// </summary>
     bool RemoveAlgorithm(string host, int port, string algorithm) => Remove(host, port);
 
+    /// <summary>
+    /// Loads <c>@cert-authority</c> and <c>@revoked</c> policy entries from OpenSSH <c>known_hosts</c> text.
+    /// </summary>
+    KnownHostsPolicyEntries LoadPolicyFromKnownHosts(string knownHostsContent) => new([], []);
+
     event Action<string, HostKeyEntry>? EntryTrusted;
 
     event Action<string>? EntryRemoved;

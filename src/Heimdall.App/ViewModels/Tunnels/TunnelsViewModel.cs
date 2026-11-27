@@ -487,7 +487,7 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
                 TunnelForwardMode.Remote => SavedTunnelPresetDto.ModeRemote,
                 _ => SavedTunnelPresetDto.ModeLocal
             },
-            LocalPort = vm.ForwardMode == TunnelForwardMode.Remote ? vm.LocalPort : vm.LocalPort,
+            LocalPort = vm.LocalPort,
             RemoteHost = vm.ForwardMode == TunnelForwardMode.Local ? vm.RemoteHost.Trim() : string.Empty,
             RemotePort = vm.ForwardMode == TunnelForwardMode.Local ? vm.RemotePort : 0,
             RemoteBindPort = vm.ForwardMode == TunnelForwardMode.Remote ? vm.RemotePort : 0,
@@ -502,7 +502,11 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
         {
             await _configManager.MergeSettingAsync(s => s.SavedTunnelPresets.Add(preset))
                 .ConfigureAwait(true);
-            SavedPresets.Add(preset);
+            if (!SavedPresets.Any(p => string.Equals(p.Id, preset.Id, StringComparison.Ordinal)))
+            {
+                SavedPresets.Add(preset);
+            }
+
             OnPropertyChanged(nameof(HasSavedPresets));
             _host.StatusText = _localizer.Format("StatusTunnelPresetSaved", preset.DisplayLabel);
         }

@@ -2993,6 +2993,7 @@ public partial class ServerDialogViewModel : ObservableValidator
 
         dto.SortOrder = seed.SortOrder;
         dto.TunnelsPanelExpanded = seed.TunnelsPanelExpanded;
+        dto.SshLocalForwards = seed.SshLocalForwards;
         dto.CitrixId = seed.CitrixId;
         dto.CitrixLaunchCommandLine = seed.CitrixLaunchCommandLine;
         dto.ExtensionData = seed.ExtensionData;

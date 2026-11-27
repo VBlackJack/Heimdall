@@ -47,7 +47,8 @@ public sealed record OpenSshCertificateInfo(
     string SignatureKeyFingerprint,
     string CertificateFingerprint,
     byte[] SignedData,
-    byte[] SignatureBlob)
+    byte[] SignatureBlob,
+    string? SubjectPublicKeyFingerprint = null)
 {
     public DateTimeOffset? ValidAfter => ValidAfterUnix == 0 || ValidAfterUnix > (ulong)DateTimeOffset.MaxValue.ToUnixTimeSeconds()
         ? null
@@ -164,6 +165,7 @@ public static class OpenSshCertificateParser
 
         string underlyingKeyType;
         int keySize;
+        byte[] subjectPublicKeyBlob;
 
         switch (keyType)
         {
@@ -175,22 +177,37 @@ public static class OpenSshCertificateParser
 
                 underlyingKeyType = "ssh-ed25519";
                 keySize = 256;
+                subjectPublicKeyBlob = BuildStandardPublicKeyBlob(underlyingKeyType, pk);
                 break;
 
             case CertRsa:
-                if (!TryReadBytes(blob, ref offset, out _) || !TryReadBytes(blob, ref offset, out var n))
+                if (!TryReadBytes(blob, ref offset, out var rsaE) || !TryReadBytes(blob, ref offset, out var n))
                 {
                     return false;
                 }
 
                 underlyingKeyType = "ssh-rsa";
                 keySize = GetMpintBitLength(n);
+                subjectPublicKeyBlob = BuildStandardPublicKeyBlob(underlyingKeyType, rsaE, n);
                 break;
 
             case CertEcdsa256:
             case CertEcdsa384:
             case CertEcdsa521:
-                if (!TryReadString(blob, ref offset, out var curve) || !TryReadBytes(blob, ref offset, out _))
+                if (!TryReadString(blob, ref offset, out var curve) || !TryReadBytes(blob, ref offset, out var qPoint))
+                {
+                    return false;
+                }
+
+                var expectedCurve = keyType switch
+                {
+                    CertEcdsa256 => "nistp256",
+                    CertEcdsa384 => "nistp384",
+                    CertEcdsa521 => "nistp521",
+                    _ => string.Empty
+                };
+
+                if (!string.Equals(curve, expectedCurve, StringComparison.Ordinal))
                 {
                     return false;
                 }
@@ -208,6 +225,7 @@ public static class OpenSshCertificateParser
                 }
 
                 underlyingKeyType = $"ecdsa-sha2-{curve}";
+                subjectPublicKeyBlob = BuildStandardPublicKeyBlob(underlyingKeyType, Encoding.ASCII.GetBytes(curve), qPoint);
                 break;
 
             default:
@@ -245,6 +263,7 @@ public static class OpenSshCertificateParser
         var signedData = blob.AsSpan(0, signedLength).ToArray();
         var caFingerprint = HostKeyFormats.ComputeSha256Fingerprint(signatureKeyBlob);
         var certFingerprint = HostKeyFormats.ComputeSha256Fingerprint(blob);
+        var subjectKeyFingerprint = HostKeyFormats.ComputeSha256Fingerprint(subjectPublicKeyBlob);
 
         certificate = new OpenSshCertificateInfo(
             keyType,
@@ -262,8 +281,36 @@ public static class OpenSshCertificateParser
             caFingerprint,
             certFingerprint,
             signedData,
-            signatureBlob);
+            signatureBlob,
+            subjectKeyFingerprint);
         return true;
+    }
+
+    private static byte[] BuildStandardPublicKeyBlob(string keyType, params byte[][] parts)
+    {
+        var typeBytes = Encoding.ASCII.GetBytes(keyType);
+        var total = 4 + typeBytes.Length;
+        foreach (var part in parts)
+        {
+            total += 4 + part.Length;
+        }
+
+        var buffer = new byte[total];
+        var pos = 0;
+        BinaryPrimitives.WriteUInt32BigEndian(buffer.AsSpan(pos, 4), (uint)typeBytes.Length);
+        pos += 4;
+        typeBytes.CopyTo(buffer.AsSpan(pos));
+        pos += typeBytes.Length;
+
+        foreach (var part in parts)
+        {
+            BinaryPrimitives.WriteUInt32BigEndian(buffer.AsSpan(pos, 4), (uint)part.Length);
+            pos += 4;
+            part.CopyTo(buffer.AsSpan(pos));
+            pos += part.Length;
+        }
+
+        return buffer;
     }
 
     private static bool TryParseStringList(byte[] data, out IReadOnlyList<string> items)
@@ -433,7 +480,7 @@ public static class OpenSshHostPatternMatcher
                 ? MatchesWildcard(pattern, candidateWithPort)
                 : port == 22
                     ? MatchesWildcard(pattern, candidateDefault) || MatchesWildcard(pattern, candidateWithPort)
-                    : MatchesWildcard(pattern, candidateDefault);
+                    : string.Equals(pattern, "*", StringComparison.Ordinal);
 
             if (tokenMatches)
             {

@@ -6988,5 +6988,12 @@
   "RecipeImportReplaceIconSame": "Ic\u00f4ne : inchang\u00e9e",
   "RecipeImportReplaceIconChanged": "Ic\u00f4ne : modifi\u00e9e",
   "RecipeFolderRefusalLeadsToUnallowedLocation": "Ce dossier m\u00e8ne \u00e0 un emplacement qui ne peut pas \u00eatre autoris\u00e9 : le chemin vers lequel il m\u00e8ne est trop long, ou n'est pas un chemin ordinaire de dossier local.",
-  "RecipeFolderChecking": "V\u00e9rification du dossier..."
+  "RecipeFolderChecking": "V\u00e9rification du dossier...",
+  "ToolSshAgentErrNoWritableAgent": "Aucun agent SSH accessible en \u00e9criture n'est en cours d'ex\u00e9cution.",
+  "ToolSshAgentErrKeyRefused": "L'agent SSH a refus\u00e9 la cl\u00e9.",
+  "ToolSshAgentErrRemoveRefused": "L'agent SSH a refus\u00e9 de retirer la cl\u00e9.",
+  "ToolSshAgentErrKeyNotFound": "Cl\u00e9 introuvable dans l'agent SSH actif.",
+  "ToolSshAuditCertMetadataFormat": "AC : {0} | ID de cl\u00e9 : {1} | Principaux : {2}",
+  "ToolSshAuditFormatCertHost": "Certificat OpenSSH (H\u00f4te)",
+  "ToolSshAuditFormatCertUser": "Certificat OpenSSH (Utilisateur)"
 }

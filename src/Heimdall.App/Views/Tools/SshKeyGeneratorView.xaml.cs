@@ -418,7 +418,7 @@ public partial class SshKeyGeneratorView : UserControl, IToolView
                 ShowValidation(string.Format(
                     CultureInfo.CurrentCulture,
                     L("ToolSshAgentAddFailed"),
-                    result.ErrorMessage ?? string.Empty));
+                    FormatAgentOperationError(result)));
             }
         }
         catch (Exception ex)
@@ -433,6 +433,18 @@ public partial class SshKeyGeneratorView : UserControl, IToolView
         {
             BtnLoadIntoAgent.IsEnabled = true;
         }
+    }
+
+    private string FormatAgentOperationError(SshAgentOperationResult result)
+    {
+        return result.ErrorCode switch
+        {
+            SshAgentOperationErrorCode.NoWritableAgent => L("ToolSshAgentErrNoWritableAgent"),
+            SshAgentOperationErrorCode.KeyRefused => L("ToolSshAgentErrKeyRefused"),
+            SshAgentOperationErrorCode.RemoveRefused => L("ToolSshAgentErrRemoveRefused"),
+            SshAgentOperationErrorCode.KeyNotFound => L("ToolSshAgentErrKeyNotFound"),
+            _ => result.ErrorMessage ?? string.Empty
+        };
     }
 
     /// <summary>

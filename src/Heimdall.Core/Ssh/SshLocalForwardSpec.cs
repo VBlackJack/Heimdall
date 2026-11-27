@@ -33,13 +33,18 @@ public sealed record SshLocalForwardSpec(
 
     /// <summary>Formats as OpenSSH <c>LocalForward</c> directive arguments.</summary>
     public string ToOpenSshDirectiveValue()
-        => string.Create(CultureInfo.InvariantCulture, $"{BindAddress}:{LocalPort} {RemoteHost}:{RemotePort}");
+        => string.Create(CultureInfo.InvariantCulture, $"{FormatHost(BindAddress)}:{LocalPort} {FormatHost(RemoteHost)}:{RemotePort}");
 
     /// <summary>Formats as compact <c>localPort:remoteHost:remotePort</c> (or with bind address).</summary>
     public string ToCanonicalString()
         => string.Equals(BindAddress, DefaultLoopback, StringComparison.Ordinal)
-            ? string.Create(CultureInfo.InvariantCulture, $"{LocalPort}:{RemoteHost}:{RemotePort}")
-            : string.Create(CultureInfo.InvariantCulture, $"{BindAddress}:{LocalPort}:{RemoteHost}:{RemotePort}");
+            ? string.Create(CultureInfo.InvariantCulture, $"{LocalPort}:{FormatHost(RemoteHost)}:{RemotePort}")
+            : string.Create(CultureInfo.InvariantCulture, $"{FormatHost(BindAddress)}:{LocalPort}:{FormatHost(RemoteHost)}:{RemotePort}");
+
+    private static string FormatHost(string host)
+        => host.Contains(':', StringComparison.Ordinal) && !host.StartsWith('[')
+            ? $"[{host}]"
+            : host;
 
     /// <summary>
     /// Parses an OpenSSH <c>LocalForward</c> value such as <c>8080 127.0.0.1:80</c>,
@@ -67,13 +72,19 @@ public sealed record SshLocalForwardSpec(
         else if (whitespaceTokens.Length == 1)
         {
             // Compact form: localPort:remoteHost:remotePort or bindAddr:localPort:remoteHost:remotePort
-            var parts = trimmed.Split(':');
-            if (parts.Length == 3)
+            // Respects bracketed IPv6 literals such as [::1]:8443:app.local:443.
+            var parts = SplitColonOutsideBrackets(trimmed);
+            if (parts is null)
+            {
+                return false;
+            }
+
+            if (parts.Count == 3)
             {
                 localPart = parts[0];
                 remotePart = $"{parts[1]}:{parts[2]}";
             }
-            else if (parts.Length == 4)
+            else if (parts.Count == 4)
             {
                 localPart = $"{parts[0]}:{parts[1]}";
                 remotePart = $"{parts[2]}:{parts[3]}";
@@ -100,6 +111,49 @@ public sealed record SshLocalForwardSpec(
 
         spec = new SshLocalForwardSpec(bindAddress, localPort, remoteHost, remotePort);
         return true;
+    }
+
+    private static List<string>? SplitColonOutsideBrackets(string input)
+    {
+        var result = new List<string>(4);
+        var start = 0;
+        var inBrackets = false;
+
+        for (var i = 0; i < input.Length; i++)
+        {
+            var ch = input[i];
+            if (ch == '[')
+            {
+                if (inBrackets)
+                {
+                    return null;
+                }
+
+                inBrackets = true;
+            }
+            else if (ch == ']')
+            {
+                if (!inBrackets)
+                {
+                    return null;
+                }
+
+                inBrackets = false;
+            }
+            else if (ch == ':' && !inBrackets)
+            {
+                result.Add(input[start..i]);
+                start = i + 1;
+            }
+        }
+
+        if (inBrackets)
+        {
+            return null;
+        }
+
+        result.Add(input[start..]);
+        return result;
     }
 
     private static bool TryParseBindAndPort(string value, out string bindAddress, out int port)

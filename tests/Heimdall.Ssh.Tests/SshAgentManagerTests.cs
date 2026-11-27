@@ -136,4 +136,48 @@ public sealed class SshAgentManagerTests
         Assert.True(OpenSshAgentProtocol.ParseSuccessResponse(okResponse));
         Assert.False(OpenSshAgentProtocol.ParseSuccessResponse(failResponse));
     }
+
+    [Fact]
+    public void SshAgentManager_RemoveKeyByFingerprint_RespectsAgentNameAndRemovesAcrossAllWhenUnfiltered()
+    {
+        var agentA = new NamedFakeMutableAgent("OpenSSH Agent");
+        var agentB = new NamedFakeMutableAgent("Pageant");
+        var registry = new SshAgentRegistry([agentA, agentB]);
+        var pair = SshKeyPairGenerator.Generate(SshKeyAlgorithm.Ed25519, "multi@host", "", SshPrivateKeyFormat.OpenSsh);
+        var pubBlob = Convert.FromBase64String(pair.PublicKeyOpenSsh.Split(' ')[1]);
+        var fp = SshAgentKeyFingerprints.Compute(pubBlob);
+
+        agentA.Keys.Add(new FakeAgentKey(pubBlob, "ssh-ed25519", "multi@host"));
+        agentB.Keys.Add(new FakeAgentKey(pubBlob, "ssh-ed25519", "multi@host"));
+
+        // Targeted removal removes only from Pageant.
+        var targeted = SshAgentManager.RemoveKeyByFingerprint(registry, fp, "Pageant");
+        Assert.True(targeted.Success);
+        Assert.Equal("Pageant", targeted.AgentName);
+        Assert.Single(agentA.Keys);
+        Assert.Empty(agentB.Keys);
+
+        // Re-add to Pageant and remove with null agentName -> removes from BOTH agents.
+        agentB.Keys.Add(new FakeAgentKey(pubBlob, "ssh-ed25519", "multi@host"));
+        var all = SshAgentManager.RemoveKeyByFingerprint(registry, fp);
+        Assert.True(all.Success);
+        Assert.Empty(agentA.Keys);
+        Assert.Empty(agentB.Keys);
+    }
+
+    private sealed class NamedFakeMutableAgent(string name) : IMutableSshAgent
+    {
+        public List<FakeAgentKey> Keys { get; } = [];
+        public string Name => name;
+        public bool IsAvailable() => true;
+        public IReadOnlyList<ISshAgentKey> GetIdentities() => Keys.Cast<ISshAgentKey>().ToList();
+        public bool AddIdentity(byte[] addIdentityWireMessage) => true;
+        public bool RemoveIdentity(byte[] publicKeyBlob)
+            => Keys.RemoveAll(k => k.PublicKeyBlob.AsSpan().SequenceEqual(publicKeyBlob)) > 0;
+        public bool RemoveAllIdentities()
+        {
+            Keys.Clear();
+            return true;
+        }
+    }
 }

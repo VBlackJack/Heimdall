@@ -54,7 +54,7 @@
     "terminalFontFamily": "Consolas",
     "terminalFontSize": 14,
     "terminalScrollbackLines": 10000,
-  "terminalHighlightsEnabled": false,
+    "terminalHighlightsEnabled": false,
     "terminalColorScheme": "Dracula",
     "powerShellExecutionPolicy": "Default",
     "sshDefaultMode": "Embedded",

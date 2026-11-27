@@ -225,6 +225,7 @@ internal sealed class SftpHandler : IProtocolHandler
                 return _dialogService.ShowPasswordInputAsync(
                     _localizer[SshLocalizationKeys.InteractivePromptTitle],
                     string.Format(
+                        System.Globalization.CultureInfo.CurrentCulture,
                         _localizer[SshLocalizationKeys.InteractivePromptMessage],
                         server.RemoteServer,
                         server.SshUsername,

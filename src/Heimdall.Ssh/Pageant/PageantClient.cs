@@ -232,6 +232,7 @@ public sealed class PageantClient : IPageantClient
                 $"Failed to map view of file. Win32 error: {Marshal.GetLastWin32Error()}");
         }
 
+        var wipedLength = request.Length;
         try
         {
             // Write request to shared memory
@@ -267,6 +268,7 @@ public sealed class PageantClient : IPageantClient
             Marshal.Copy(view, lengthBytes, 0, lengthBytes.Length);
             uint responsePayloadLength = ReadBigEndianUInt32(lengthBytes, 0);
             int totalResponseLength = GetValidatedTotalResponseLength(responsePayloadLength);
+            wipedLength = Math.Max(wipedLength, totalResponseLength);
             var response = new byte[totalResponseLength];
             Marshal.Copy(view, response, 0, totalResponseLength);
 
@@ -274,6 +276,12 @@ public sealed class PageantClient : IPageantClient
         }
         finally
         {
+            if (wipedLength > 0)
+            {
+                var zeros = new byte[Math.Min(wipedLength, AgentMaxMessageLength)];
+                Marshal.Copy(zeros, 0, view, zeros.Length);
+            }
+
             NativeMethods.UnmapViewOfFile(view);
         }
     }

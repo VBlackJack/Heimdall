@@ -300,6 +300,7 @@ public sealed class SshShellSession : IDisposable
             _stream = shellStream;
         }
 
+        AbandonConnectIfDisposed(client);
         StartSessionPortForwards(client, connectionParams);
         AbandonConnectIfDisposed(client);
 
@@ -738,62 +739,118 @@ public sealed class SshShellSession : IDisposable
         }
 
         var started = new List<ForwardedPort>();
-        try
+        if (connectionParams.SocksProxyPort is >= 1 and <= 65535)
         {
-            if (connectionParams.SocksProxyPort is >= 1 and <= 65535)
-            {
-                var socks = new ForwardedPortDynamic(LoopbackBinding.DefaultHost, (uint)connectionParams.SocksProxyPort);
-                client.AddForwardedPort(socks);
-                socks.Start();
-                started.Add(socks);
-            }
+            TryStartPortForward(
+                client,
+                new ForwardedPortDynamic(LoopbackBinding.DefaultHost, (uint)connectionParams.SocksProxyPort),
+                started);
+        }
 
-            if (connectionParams.RemoteBindPort is >= 1 and <= 65535)
-            {
-                var localTarget = connectionParams.RemoteLocalPort is >= 1 and <= 65535
-                    ? connectionParams.RemoteLocalPort
-                    : connectionParams.RemoteBindPort;
-                var remote = new ForwardedPortRemote(
+        if (connectionParams.RemoteBindPort is >= 1 and <= 65535)
+        {
+            var localTarget = connectionParams.RemoteLocalPort is >= 1 and <= 65535
+                ? connectionParams.RemoteLocalPort
+                : connectionParams.RemoteBindPort;
+            TryStartPortForward(
+                client,
+                new ForwardedPortRemote(
                     LoopbackBinding.DefaultHost,
                     (uint)connectionParams.RemoteBindPort,
                     LoopbackBinding.DefaultHost,
-                    (uint)localTarget);
-                client.AddForwardedPort(remote);
-                remote.Start();
-                started.Add(remote);
-            }
+                    (uint)localTarget),
+                started);
+        }
 
-            if (connectionParams.LocalForwards is { Count: > 0 })
+        if (connectionParams.LocalForwards is { Count: > 0 })
+        {
+            foreach (var raw in connectionParams.LocalForwards)
             {
-                foreach (var raw in connectionParams.LocalForwards)
+                if (!SshLocalForwardSpec.TryParse(raw, out var spec) || spec is null)
                 {
-                    if (!SshLocalForwardSpec.TryParse(raw, out var spec) || spec is null)
-                    {
-                        continue;
-                    }
+                    continue;
+                }
 
-                    var local = new ForwardedPortLocal(
+                TryStartPortForward(
+                    client,
+                    new ForwardedPortLocal(
                         spec.BindAddress,
                         (uint)spec.LocalPort,
                         spec.RemoteHost,
-                        (uint)spec.RemotePort);
-                    client.AddForwardedPort(local);
-                    local.Start();
-                    started.Add(local);
-                }
+                        (uint)spec.RemotePort),
+                    started);
             }
+        }
+
+        if (started.Count == 0)
+        {
+            return;
+        }
+
+        bool abandoned;
+        lock (_teardownGate)
+        {
+            abandoned = _disposed || _teardownStarted;
+            if (!abandoned)
+            {
+                _sessionForwardedPorts.AddRange(started);
+            }
+        }
+
+        if (abandoned)
+        {
+            foreach (var port in started)
+            {
+                DisposeForwardedPortSafely(client, port);
+            }
+        }
+    }
+
+    private static void TryStartPortForward(SshClient client, ForwardedPort port, List<ForwardedPort> started)
+    {
+        try
+        {
+            client.AddForwardedPort(port);
+            port.Start();
+            started.Add(port);
         }
         catch (Exception ex)
         {
             FileLogger.Warn($"SshShellSession direct port forward setup failed: {ex.Message}");
+            DisposeForwardedPortSafely(client, port);
+        }
+    }
+
+    private static void DisposeForwardedPortSafely(SshClient client, ForwardedPort port)
+    {
+        try
+        {
+            if (port.IsStarted)
+            {
+                port.Stop();
+            }
+        }
+        catch (Exception)
+        {
+            // Best-effort cleanup of failed or abandoned port forward.
         }
 
-        if (started.Count > 0)
+        try
         {
-            lock (_teardownGate)
-            {
-                _sessionForwardedPorts.AddRange(started);
-            }
+            client.RemoveForwardedPort(port);
+        }
+        catch (Exception)
+        {
+            // Client may already be disconnected or disposed.
+        }
+
+        try
+        {
+            port.Dispose();
+        }
+        catch (Exception)
+        {
+            // Ignore disposal races.
         }
     }
 

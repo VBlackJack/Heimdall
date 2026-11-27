@@ -322,7 +322,16 @@ public sealed class HostKeyTrustService(HostKeyStore store) : IHostKeyTrustServi
         if (!string.IsNullOrWhiteSpace(algorithm)
             && _store.RemoveAdditionalAlgorithm(host, port, algorithm))
         {
-            EntryRemoved?.Invoke(hostPort);
+            // Keep the persisted primary host key intact; notify observers to refresh multi-algorithm rows.
+            if (_store.GetEntry(host, port) is { } remainingPrimary)
+            {
+                EntryReplaced?.Invoke(hostPort, remainingPrimary, remainingPrimary);
+            }
+            else
+            {
+                EntryRemoved?.Invoke(hostPort);
+            }
+
             return true;
         }
 
@@ -330,6 +339,16 @@ public sealed class HostKeyTrustService(HostKeyStore store) : IHostKeyTrustServi
         if (existing is null)
         {
             return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(algorithm))
+        {
+            var requestedCanonical = KnownHostsParser.CanonicalizeKeyType(algorithm);
+            var existingCanonical = KnownHostsParser.CanonicalizeKeyType(existing.Algorithm);
+            if (!string.Equals(requestedCanonical, existingCanonical, StringComparison.Ordinal))
+            {
+                return false;
+            }
         }
 
         if (!_store.RemovePrimaryOrPromote(host, port, out var promoted))
@@ -348,6 +367,9 @@ public sealed class HostKeyTrustService(HostKeyStore store) : IHostKeyTrustServi
 
         return true;
     }
+
+    public KnownHostsPolicyEntries LoadPolicyFromKnownHosts(string knownHostsContent)
+        => _store.LoadPolicyFromKnownHosts(knownHostsContent);
 
     private static string NormalizeAlgorithm(string? candidate, string? fallback = null)
     {

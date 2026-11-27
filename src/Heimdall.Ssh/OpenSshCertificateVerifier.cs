@@ -54,12 +54,21 @@ public static class OpenSshCertificateVerifier
         }
 
         if (hostKeyStore.IsRevoked(host, port, cert.CertificateFingerprint)
-            || hostKeyStore.IsRevoked(host, port, cert.SignatureKeyFingerprint))
+            || hostKeyStore.IsRevoked(host, port, cert.SignatureKeyFingerprint)
+            || (!string.IsNullOrEmpty(cert.SubjectPublicKeyFingerprint)
+                && hostKeyStore.IsRevoked(host, port, cert.SubjectPublicKeyFingerprint)))
         {
             return HostCertificateVerificationStatus.Revoked;
         }
 
         if (cert.Type != OpenSshCertificateType.Host)
+        {
+            return HostCertificateVerificationStatus.InvalidOrUntrusted;
+        }
+
+        // Per OpenSSH PROTOCOL.certkeys, any unrecognized critical option MUST fail verification.
+        // No critical options are currently defined for host certificates.
+        if (cert.CriticalOptions.Count > 0)
         {
             return HostCertificateVerificationStatus.InvalidOrUntrusted;
         }
@@ -127,7 +136,9 @@ public static class OpenSshCertificateVerifier
             return false;
         }
 
-        if (!TryReadBytes(keyBlob, ref keyOffset, out var pubKeyBytes) || pubKeyBytes.Length != 32)
+        if (!TryReadBytes(keyBlob, ref keyOffset, out var pubKeyBytes)
+            || pubKeyBytes.Length != 32
+            || keyOffset != keyBlob.Length)
         {
             return false;
         }
@@ -149,17 +160,14 @@ public static class OpenSshCertificateVerifier
         {
             hashAlg = HashAlgorithmName.SHA256;
         }
-        else if (string.Equals(sigAlg, "ssh-rsa", StringComparison.Ordinal))
-        {
-            hashAlg = HashAlgorithmName.SHA1;
-        }
         else
         {
             return false;
         }
 
         if (!TryReadBytes(keyBlob, ref keyOffset, out var eRaw)
-            || !TryReadBytes(keyBlob, ref keyOffset, out var nRaw))
+            || !TryReadBytes(keyBlob, ref keyOffset, out var nRaw)
+            || keyOffset != keyBlob.Length)
         {
             return false;
         }
@@ -184,6 +192,8 @@ public static class OpenSshCertificateVerifier
 
         if (!TryReadString(keyBlob, ref keyOffset, out var curveName)
             || !TryReadBytes(keyBlob, ref keyOffset, out var qPoint)
+            || keyOffset != keyBlob.Length
+            || !string.Equals(caKeyType, $"ecdsa-sha2-{curveName}", StringComparison.Ordinal)
             || qPoint.Length < 3
             || qPoint[0] != 0x04)
         {
@@ -212,8 +222,11 @@ public static class OpenSshCertificateVerifier
         }
 
         var ieeeSig = new byte[coordSize * 2];
-        CopyFixedUnsigned(rRaw, ieeeSig.AsSpan(0, coordSize));
-        CopyFixedUnsigned(sRaw, ieeeSig.AsSpan(coordSize, coordSize));
+        if (!TryCopyFixedUnsigned(rRaw, ieeeSig.AsSpan(0, coordSize))
+            || !TryCopyFixedUnsigned(sRaw, ieeeSig.AsSpan(coordSize, coordSize)))
+        {
+            return false;
+        }
 
         var parameters = new ECParameters
         {
@@ -240,12 +253,22 @@ public static class OpenSshCertificateVerifier
         return mpint.AsSpan(start).ToArray();
     }
 
-    private static void CopyFixedUnsigned(byte[] mpint, Span<byte> destination)
+    private static bool TryCopyFixedUnsigned(byte[] mpint, Span<byte> destination)
     {
+        if (mpint.Length == 0 || (mpint[0] & 0x80) != 0)
+        {
+            return false;
+        }
+
         var trimmed = TrimLeadingZero(mpint);
+        if (trimmed.Length > destination.Length)
+        {
+            return false;
+        }
+
         destination.Clear();
-        var len = Math.Min(trimmed.Length, destination.Length);
-        trimmed.AsSpan(trimmed.Length - len, len).CopyTo(destination.Slice(destination.Length - len, len));
+        trimmed.CopyTo(destination.Slice(destination.Length - trimmed.Length, trimmed.Length));
+        return true;
     }
 
     private static bool TryReadBytes(byte[] data, ref int offset, out byte[] value)

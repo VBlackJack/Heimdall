@@ -323,62 +323,53 @@ public partial class SshKeyAuditView : UserControl, IToolView
         var configManager = services?.GetService<IConfigManager>();
         var dialogService = services?.GetService<IDialogService>();
 
-        var preference = await ResolveAgentPreferenceAsync(configManager).ConfigureAwait(true);
-
-        IReadOnlyList<SshAgentKeyInfo> loadedKeys;
+        BtnRemoveFromAgent.IsEnabled = false;
         try
         {
-            loadedKeys = await Task.Run(() =>
-                SshAgentInspector.ListLoadedKeys(SshAgentRegistry.CreateDefault(preference)));
-        }
-        catch (Exception ex)
-        {
-            Core.Logging.FileLogger.Warn($"SSH agent inspector failed: {ex.Message}");
-            _vm.FileErrorMessage = ex.Message;
-            _vm.ShowFileError = true;
-            return;
-        }
+            var preference = await ResolveAgentPreferenceAsync(configManager).ConfigureAwait(true);
 
-        if (loadedKeys.Count == 0)
-        {
-            _vm.FileErrorMessage = L("ToolSshAuditAgentEmpty");
-            _vm.ShowFileError = true;
-            return;
-        }
+            var loadedKeys = await Task.Run(() =>
+                SshAgentInspector.ListLoadedKeys(SshAgentRegistry.CreateDefault(preference))).ConfigureAwait(true);
 
-        if (dialogService is null)
-        {
-            return;
-        }
+            if (loadedKeys.Count == 0)
+            {
+                _vm.FileErrorMessage = L("ToolSshAuditAgentEmpty");
+                _vm.ShowFileError = true;
+                return;
+            }
 
-        var choices = loadedKeys
-            .Select(k => string.IsNullOrWhiteSpace(k.Comment)
-                ? $"{k.AgentName}: {k.KeyType} ({k.Fingerprint})"
-                : $"{k.AgentName}: {k.KeyType} - {k.Comment} ({k.Fingerprint})")
-            .ToList();
+            if (dialogService is null)
+            {
+                return;
+            }
 
-        var selectedIndex = await dialogService.ShowChoiceAsync(
-            L("ToolSshAuditBtnRemoveAgent"),
-            L("ToolSshAuditAgentRemovePrompt"),
-            choices,
-            defaultIndex: 0,
-            cancelLabel: L("BtnCancel"));
+            var choices = loadedKeys
+                .Select(k => string.IsNullOrWhiteSpace(k.Comment)
+                    ? $"{k.AgentName}: {k.KeyType} ({k.Fingerprint})"
+                    : $"{k.AgentName}: {k.KeyType} - {k.Comment} ({k.Fingerprint})")
+                .ToList();
 
-        if (selectedIndex is not int idx || idx < 0 || idx >= loadedKeys.Count)
-        {
-            return;
-        }
+            var selectedIndex = await dialogService.ShowChoiceAsync(
+                L("ToolSshAuditBtnRemoveAgent"),
+                L("ToolSshAuditAgentRemovePrompt"),
+                choices,
+                defaultIndex: 0,
+                cancelLabel: L("BtnCancel"));
 
-        var chosen = loadedKeys[idx];
-        try
-        {
+            if (selectedIndex is not int idx || idx < 0 || idx >= loadedKeys.Count)
+            {
+                return;
+            }
+
+            var chosen = loadedKeys[idx];
             var result = await Task.Run(() => SshAgentManager.RemoveKeyByFingerprint(
                 SshAgentRegistry.CreateDefault(preference),
-                chosen.Fingerprint)).ConfigureAwait(true);
+                chosen.Fingerprint,
+                chosen.AgentName)).ConfigureAwait(true);
 
             _vm.FileErrorMessage = result.Success
                 ? string.Format(CultureInfo.CurrentCulture, L("ToolSshAgentRemoveSuccess"), chosen.Fingerprint)
-                : string.Format(CultureInfo.CurrentCulture, L("ToolSshAgentRemoveFailed"), result.ErrorMessage ?? string.Empty);
+                : string.Format(CultureInfo.CurrentCulture, L("ToolSshAgentRemoveFailed"), FormatAgentOperationError(result));
             _vm.ShowFileError = true;
         }
         catch (Exception ex)
@@ -390,6 +381,22 @@ public partial class SshKeyAuditView : UserControl, IToolView
                 ex.Message);
             _vm.ShowFileError = true;
         }
+        finally
+        {
+            BtnRemoveFromAgent.IsEnabled = true;
+        }
+    }
+
+    private string FormatAgentOperationError(SshAgentOperationResult result)
+    {
+        return result.ErrorCode switch
+        {
+            SshAgentOperationErrorCode.NoWritableAgent => L("ToolSshAgentErrNoWritableAgent"),
+            SshAgentOperationErrorCode.KeyRefused => L("ToolSshAgentErrKeyRefused"),
+            SshAgentOperationErrorCode.RemoveRefused => L("ToolSshAgentErrRemoveRefused"),
+            SshAgentOperationErrorCode.KeyNotFound => L("ToolSshAgentErrKeyNotFound"),
+            _ => result.ErrorMessage ?? string.Empty
+        };
     }
 
     private static async Task<Core.Ssh.SshAgentPreference> ResolveAgentPreferenceAsync(IConfigManager? configManager)

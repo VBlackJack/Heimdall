@@ -499,23 +499,28 @@ public sealed class SftpBrowser : IRemoteBrowser, IRemoteNoClobberPublisher, IRe
         }
 
         PinnedFingerprintVerifier pinnedVerifier;
-        if (connectionParams.SkipHostKeyProbeIfTrusted
-            && hostKeyStore.GetSessionEntry(connectionParams.HostKeyVerificationHost, connectionParams.HostKeyVerificationPort)
-                is { Fingerprint: { Length: > 0 } sessionFp })
+        var verifyHost = connectionParams.HostKeyVerificationHost;
+        var verifyPort = connectionParams.HostKeyVerificationPort;
+        string? shortcutFingerprint = null;
+        if (connectionParams.SkipHostKeyProbeIfTrusted)
         {
-            pinnedVerifier = new PinnedFingerprintVerifier(
-                connectionParams.HostKeyVerificationHost,
-                connectionParams.HostKeyVerificationPort,
-                sessionFp);
+            var hostPortKey = HostKeyFormats.MakeKey(verifyHost, verifyPort);
+            var hasMultipleAlgorithms = hostKeyStore.GetAllAlgorithmEntries()
+                .Count(item => string.Equals(item.HostPort, hostPortKey, StringComparison.Ordinal)) > 1;
+            if (!hasMultipleAlgorithms)
+            {
+                var candidate = hostKeyStore.GetSessionEntry(verifyHost, verifyPort)?.Fingerprint
+                    ?? hostKeyStore.GetEntry(verifyHost, verifyPort)?.Fingerprint;
+                if (!string.IsNullOrEmpty(candidate) && !hostKeyStore.IsRevoked(verifyHost, verifyPort, candidate))
+                {
+                    shortcutFingerprint = candidate;
+                }
+            }
         }
-        else if (connectionParams.SkipHostKeyProbeIfTrusted
-            && hostKeyStore.GetEntry(connectionParams.HostKeyVerificationHost, connectionParams.HostKeyVerificationPort)
-                is { Fingerprint: { Length: > 0 } storedFp })
+
+        if (shortcutFingerprint is not null)
         {
-            pinnedVerifier = new PinnedFingerprintVerifier(
-                connectionParams.HostKeyVerificationHost,
-                connectionParams.HostKeyVerificationPort,
-                storedFp);
+            pinnedVerifier = new PinnedFingerprintVerifier(verifyHost, verifyPort, shortcutFingerprint);
         }
         else
         {

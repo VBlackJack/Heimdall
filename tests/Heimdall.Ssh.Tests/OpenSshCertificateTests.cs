@@ -166,7 +166,7 @@ public sealed class OpenSshCertificateTests
         Assert.NotNull(validAudit);
         Assert.Equal("Ed25519", validAudit.Algorithm);
         Assert.Equal(256, validAudit.KeySize);
-        Assert.Equal("OpenSSH Certificate (User)", validAudit.Format);
+        Assert.Equal("ToolSshAuditFormatCertUser", validAudit.Format);
         Assert.Equal(SecurityRating.Strong, validAudit.Rating);
 
         var expiredBlob = BuildEd25519Certificate(
@@ -184,6 +184,113 @@ public sealed class OpenSshCertificateTests
         Assert.NotNull(expiredAudit);
         Assert.Equal(SecurityRating.Weak, expiredAudit.Rating);
         Assert.Contains(expiredAudit.Findings, f => f.Severity == FindingSeverity.Fail);
+    }
+
+    [Fact]
+    public void HostCertificate_WithUnknownCriticalOption_IsRejected()
+    {
+        var (caPriv, caPubBlob) = GenerateEd25519KeyPair();
+        var (_, hostPubRaw) = GenerateEd25519RawKeyPair();
+
+        using var critMs = new MemoryStream();
+        WriteString(critMs, "force-command");
+        WriteString(critMs, "/bin/true");
+
+        var certBlob = BuildEd25519Certificate(
+            OpenSshCertificateType.Host,
+            hostPubRaw,
+            "host-crit",
+            ["web01.corp.example.com"],
+            DateTimeOffset.UtcNow.AddMinutes(-5),
+            DateTimeOffset.UtcNow.AddHours(1),
+            caPriv,
+            caPubBlob,
+            criticalOptionsBlob: critMs.ToArray());
+
+        var store = new HostKeyStore();
+        store.LoadPolicyFromKnownHosts($"@cert-authority *.corp.example.com ssh-ed25519 {Convert.ToBase64String(caPubBlob)}\n");
+
+        Assert.Equal(
+            HostCertificateVerificationStatus.InvalidOrUntrusted,
+            OpenSshCertificateVerifier.VerifyHostCertificate(certBlob, "web01.corp.example.com", 22, store));
+    }
+
+    [Fact]
+    public void HostCertificate_WithRevokedSubjectKey_IsRevoked()
+    {
+        var (caPriv, caPubBlob) = GenerateEd25519KeyPair();
+        var (_, hostPubRaw) = GenerateEd25519RawKeyPair();
+
+        using var subjPubMs = new MemoryStream();
+        WriteString(subjPubMs, "ssh-ed25519");
+        WriteBytes(subjPubMs, hostPubRaw);
+        var subjectPubBlob = subjPubMs.ToArray();
+
+        var certBlob = BuildEd25519Certificate(
+            OpenSshCertificateType.Host,
+            hostPubRaw,
+            "host-revoked-subj",
+            ["web01.corp.example.com"],
+            DateTimeOffset.UtcNow.AddMinutes(-5),
+            DateTimeOffset.UtcNow.AddHours(1),
+            caPriv,
+            caPubBlob);
+
+        var store = new HostKeyStore();
+        store.LoadPolicyFromKnownHosts(
+            $"@cert-authority *.corp.example.com ssh-ed25519 {Convert.ToBase64String(caPubBlob)}\n" +
+            $"@revoked *.corp.example.com ssh-ed25519 {Convert.ToBase64String(subjectPubBlob)}\n");
+
+        Assert.Equal(
+            HostCertificateVerificationStatus.Revoked,
+            OpenSshCertificateVerifier.VerifyHostCertificate(certBlob, "web01.corp.example.com", 22, store));
+    }
+
+    [Fact]
+    public void HostKeyTrustService_RemoveAlgorithm_PreservesPrimaryPersistenceAndRejectsMismatch()
+    {
+        var store = new HostKeyStore();
+        var trustService = new HostKeyTrustService(store);
+
+        var removedEvents = new List<string>();
+        var replacedEvents = new List<(string Key, string Alg)>();
+        trustService.EntryRemoved += key => removedEvents.Add(key);
+        trustService.EntryReplaced += (key, _, next) => replacedEvents.Add((key, next.Algorithm));
+
+        trustService.Trust("dual.example.com", 22, "SHA256:ed25519fp", "ssh-ed25519", HostKeySource.UserConfirmed);
+        store.TrustAdditionalAlgorithm("dual.example.com", 22, "SHA256:rsafp", "ssh-rsa", HostKeySource.UserConfirmed);
+
+        // Revoking an algorithm that is NOT stored must return false and leave primary intact.
+        Assert.False(trustService.RemoveAlgorithm("dual.example.com", 22, "ecdsa-sha2-nistp256"));
+        Assert.NotNull(trustService.GetEntry("dual.example.com", 22));
+        Assert.Empty(removedEvents);
+
+        // Revoking the additional algorithm must NOT raise EntryRemoved (which wipes persisted primary key).
+        Assert.True(trustService.RemoveAlgorithm("dual.example.com", 22, "ssh-rsa"));
+        Assert.Empty(removedEvents);
+        Assert.Single(replacedEvents);
+        Assert.Equal("ssh-ed25519", trustService.GetEntry("dual.example.com", 22)?.Algorithm);
+    }
+
+    [Fact]
+    public void SshLocalForwardSpec_Ipv6Loopback_RoundTripsThroughCanonicalAndDirectiveFormats()
+    {
+        Assert.True(SshLocalForwardSpec.TryParse("[::1]:8443 [::1]:443", out var spec));
+        Assert.NotNull(spec);
+        Assert.Equal("::1", spec.BindAddress);
+        Assert.Equal(8443, spec.LocalPort);
+        Assert.Equal("::1", spec.RemoteHost);
+        Assert.Equal(443, spec.RemotePort);
+
+        var canonical = spec.ToCanonicalString();
+        Assert.Equal("[::1]:8443:[::1]:443", canonical);
+        Assert.True(SshLocalForwardSpec.TryParse(canonical, out var roundTripped));
+        Assert.Equal(spec, roundTripped);
+
+        var directive = spec.ToOpenSshDirectiveValue();
+        Assert.Equal("[::1]:8443 [::1]:443", directive);
+        Assert.True(SshLocalForwardSpec.TryParse(directive, out var fromDirective));
+        Assert.Equal(spec, fromDirective);
     }
 
     private static (Ed25519PrivateKeyParameters Priv, byte[] PubBlob) GenerateEd25519KeyPair()
@@ -213,7 +320,8 @@ public sealed class OpenSshCertificateTests
         DateTimeOffset validAfter,
         DateTimeOffset validBefore,
         Ed25519PrivateKeyParameters caPrivateKey,
-        byte[] caPublicKeyBlob)
+        byte[] caPublicKeyBlob,
+        byte[]? criticalOptionsBlob = null)
     {
         using var body = new MemoryStream();
         WriteString(body, OpenSshCertificateParser.CertEd25519);
@@ -235,7 +343,7 @@ public sealed class OpenSshCertificateTests
 
         WriteUInt64(body, (ulong)validAfter.ToUnixTimeSeconds());
         WriteUInt64(body, (ulong)validBefore.ToUnixTimeSeconds());
-        WriteBytes(body, []); // critical options
+        WriteBytes(body, criticalOptionsBlob ?? []); // critical options
         WriteBytes(body, []); // extensions
         WriteBytes(body, []); // reserved
         WriteBytes(body, caPublicKeyBlob);

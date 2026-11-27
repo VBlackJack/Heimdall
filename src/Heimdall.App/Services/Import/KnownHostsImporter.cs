@@ -48,10 +48,10 @@ public sealed class KnownHostsImporter
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
 
-        return await Task.Run(() => ParseFileStreaming(filePath), ct).ConfigureAwait(false);
+        return await Task.Run(() => ParseFileStreaming(filePath, _hostKeyTrustService), ct).ConfigureAwait(false);
     }
 
-    private static KnownHostsParseResult ParseFileStreaming(string filePath)
+    private static KnownHostsParseResult ParseFileStreaming(string filePath, IHostKeyTrustService trustService)
     {
         try
         {
@@ -75,7 +75,9 @@ public sealed class KnownHostsImporter
 
             using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
             using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
-            return KnownHostsParser.Parse(reader);
+            var content = reader.ReadToEnd();
+            trustService.LoadPolicyFromKnownHosts(content);
+            return KnownHostsParser.Parse(content);
         }
         catch (IOException ex)
         {

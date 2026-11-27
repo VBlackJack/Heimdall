@@ -256,13 +256,18 @@ public static class SshKeyAuditEngine
             findings.Add(new SshKeyAuditFinding
             {
                 Severity = FindingSeverity.Pass,
-                Text = $"CA: {cert.SignatureKeyFingerprint} | Key ID: {cert.KeyId} | Principals: {(cert.ValidPrincipals.Count == 0 ? "*" : string.Join(", ", cert.ValidPrincipals))}"
+                Text = string.Format(
+                    System.Globalization.CultureInfo.CurrentCulture,
+                    L(localize, "ToolSshAuditCertMetadataFormat"),
+                    cert.SignatureKeyFingerprint,
+                    cert.KeyId,
+                    cert.ValidPrincipals.Count == 0 ? "*" : string.Join(", ", cert.ValidPrincipals))
             });
         }
 
         var format = cert.Type == Ssh.OpenSshCertificateType.Host
-            ? "OpenSSH Certificate (Host)"
-            : "OpenSSH Certificate (User)";
+            ? L(localize, "ToolSshAuditFormatCertHost")
+            : L(localize, "ToolSshAuditFormatCertUser");
 
         return new SshKeyAuditResult
         {
