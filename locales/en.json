@@ -4187,7 +4187,15 @@
   "ToolSshKeyGenPublicKey": "Public Key",
   "ToolSshKeyGenPrivateKey": "Private Key",
   "ToolSshKeyGenEd25519Notice": "Ed25519 keys provide strong security with compact 256-bit keys.",
-  "ToolSshKeyGenEd25519Unsupported": "Ed25519 key generation is not supported by the current .NET runtime. Please update to .NET 10 or later.",
+  "ToolSshKeyGenFormat": "Private Key Format",
+  "ToolSshKeyGenFormatOpenSsh": "OpenSSH (modern, recommended)",
+  "ToolSshKeyGenFormatPkcs8": "PKCS#8 PEM",
+  "ToolSshKeyGenEcdsaP256": "ECDSA (P-256)",
+  "ToolSshKeyGenEcdsaP384": "ECDSA (P-384)",
+  "ToolSshKeyGenEcdsaP521": "ECDSA (P-521)",
+  "ToolSshKeyGenPrivOpenSshFilter": "OpenSSH Private Key (*.*)|*.*|PEM Private Key (*.pem)|*.pem",
+  "ToolSshKeyGenGenerateFailed": "Key generation failed: {0}",
+  "ToolSshConfigGenerateAllEmpty": "No SSH servers or gateways are configured in Heimdall.",
 
   "PaletteToolSshAudit": "SSH Key Auditor",
 

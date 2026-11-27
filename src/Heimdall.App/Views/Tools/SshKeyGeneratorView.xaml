@@ -84,12 +84,27 @@
                                    Foreground="{DynamicResource TextPrimaryBrush}"
                                    VerticalAlignment="Center" Width="120"/>
                         <ComboBox x:Name="AlgorithmCombo"
-                                  SelectedIndex="1"
-                                  MinWidth="200"
->
-                            <ComboBoxItem x:Name="Rsa2048Item" Content="" Tag="RSA2048"/>
-                            <ComboBoxItem x:Name="Rsa4096Item" Content="" Tag="RSA4096"/>
+                                  SelectedIndex="0"
+                                  MinWidth="220">
                             <ComboBoxItem x:Name="Ed25519Item" Content="" Tag="Ed25519"/>
+                            <ComboBoxItem x:Name="Rsa4096Item" Content="" Tag="RSA4096"/>
+                            <ComboBoxItem x:Name="Rsa2048Item" Content="" Tag="RSA2048"/>
+                            <ComboBoxItem x:Name="EcdsaP256Item" Content="" Tag="ECDSA256"/>
+                            <ComboBoxItem x:Name="EcdsaP384Item" Content="" Tag="ECDSA384"/>
+                            <ComboBoxItem x:Name="EcdsaP521Item" Content="" Tag="ECDSA521"/>
+                        </ComboBox>
+                    </DockPanel>
+
+                    <!-- Private key format -->
+                    <DockPanel Margin="{StaticResource MarginStackItem}">
+                        <TextBlock x:Name="FormatLabel"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                   VerticalAlignment="Center" Width="120"/>
+                        <ComboBox x:Name="FormatCombo"
+                                  SelectedIndex="0"
+                                  MinWidth="220">
+                            <ComboBoxItem x:Name="FormatOpenSshItem" Content="" Tag="OpenSsh"/>
+                            <ComboBoxItem x:Name="FormatPkcs8Item" Content="" Tag="Pkcs8Pem"/>
                         </ComboBox>
                     </DockPanel>
 

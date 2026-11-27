@@ -35,9 +35,11 @@ public static class OpenSshConfigParser
         var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         var diagnostics = new List<OpenSshImportDiagnostic>();
         var blocks = new List<HostBlockState>();
+        var globalDefaults = new HostBlockState(0, []);
         var seenAliases = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         HostBlockState? currentBlock = null;
         var isInsideMatchBlock = false;
+        var isInsideGlobalWildcard = false;
 
         var lines = contents.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').Split('\n');
         for (var index = 0; index < lines.Length; index++)
@@ -77,7 +79,17 @@ public static class OpenSshConfigParser
             if (directive.Equals("host", StringComparison.OrdinalIgnoreCase))
             {
                 AddCurrentBlock(currentBlock, blocks);
-                currentBlock = CreateHostBlock(value, lineNumber, diagnostics, seenAliases);
+                var hostTokens = SplitTokens(value);
+                if (hostTokens.Count == 1 && hostTokens[0] == "*")
+                {
+                    currentBlock = null;
+                    isInsideGlobalWildcard = true;
+                }
+                else
+                {
+                    isInsideGlobalWildcard = false;
+                    currentBlock = CreateHostBlock(value, lineNumber, diagnostics, seenAliases);
+                }
                 continue;
             }
 
@@ -85,6 +97,7 @@ public static class OpenSshConfigParser
             {
                 AddCurrentBlock(currentBlock, blocks);
                 currentBlock = null;
+                isInsideGlobalWildcard = false;
                 diagnostics.Add(new OpenSshImportDiagnostic(
                     OpenSshDiagnosticLevel.Warning,
                     lineNumber,
@@ -103,7 +116,8 @@ public static class OpenSshConfigParser
                 continue;
             }
 
-            if (currentBlock is null)
+            var targetBlock = currentBlock ?? (isInsideGlobalWildcard ? globalDefaults : null);
+            if (targetBlock is null)
             {
                 diagnostics.Add(new OpenSshImportDiagnostic(
                     OpenSshDiagnosticLevel.Info,
@@ -113,12 +127,12 @@ public static class OpenSshConfigParser
                 continue;
             }
 
-            ApplyDirective(currentBlock, directive, value, valueWasQuoted, userProfile, lineNumber, diagnostics);
+            ApplyDirective(targetBlock, directive, value, valueWasQuoted, userProfile, lineNumber, diagnostics);
         }
 
         AddCurrentBlock(currentBlock, blocks);
 
-        return new OpenSshParseResult(BuildCandidates(blocks, diagnostics), diagnostics);
+        return new OpenSshParseResult(BuildCandidates(blocks, globalDefaults, diagnostics), diagnostics);
     }
 
     private static void AddCurrentBlock(HostBlockState? block, ICollection<HostBlockState> blocks)
@@ -256,11 +270,130 @@ public static class OpenSshConfigParser
             return;
         }
 
+        if (directive.Equals("forwardagent", StringComparison.OrdinalIgnoreCase))
+        {
+            if (block.ForwardAgent is null && TryParseYesNo(value, out var enabled))
+            {
+                block.ForwardAgent = enabled;
+            }
+
+            return;
+        }
+
+        if (directive.Equals("compression", StringComparison.OrdinalIgnoreCase))
+        {
+            if (block.Compression is null && TryParseYesNo(value, out var enabled))
+            {
+                block.Compression = enabled;
+            }
+
+            return;
+        }
+
+        if (directive.Equals("dynamicforward", StringComparison.OrdinalIgnoreCase))
+        {
+            if (block.DynamicForwardPort is null && TryParseBindPort(value, out var socksPort))
+            {
+                block.DynamicForwardPort = socksPort;
+            }
+
+            return;
+        }
+
+        if (directive.Equals("remoteforward", StringComparison.OrdinalIgnoreCase))
+        {
+            if (block.RemoteForwardBindPort is null && TryParseRemoteForward(value, out var bindPort, out var localPort))
+            {
+                block.RemoteForwardBindPort = bindPort;
+                block.RemoteForwardLocalPort = localPort;
+            }
+
+            return;
+        }
+
+        if (directive.Equals("localforward", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                block.LocalForwards.Add(value);
+            }
+
+            return;
+        }
+
         diagnostics.Add(new OpenSshImportDiagnostic(
             OpenSshDiagnosticLevel.Info,
             lineNumber,
             OpenSshDiagnosticCode.UnknownDirectiveIgnored,
             directive));
+    }
+
+    private static bool TryParseYesNo(string value, out bool result)
+    {
+        if (value.Equals("yes", StringComparison.OrdinalIgnoreCase)
+            || value.Equals("true", StringComparison.OrdinalIgnoreCase))
+        {
+            result = true;
+            return true;
+        }
+
+        if (value.Equals("no", StringComparison.OrdinalIgnoreCase)
+            || value.Equals("false", StringComparison.OrdinalIgnoreCase))
+        {
+            result = false;
+            return true;
+        }
+
+        result = false;
+        return false;
+    }
+
+    private static bool TryParseBindPort(string value, out int port)
+    {
+        port = 0;
+        var tokens = SplitTokens(value);
+        if (tokens.Count == 0)
+        {
+            return false;
+        }
+
+        return TryParseTrailingPort(tokens[0], out port);
+    }
+
+    private static bool TryParseRemoteForward(string value, out int bindPort, out int localPort)
+    {
+        bindPort = 0;
+        localPort = 0;
+        var tokens = SplitTokens(value);
+        if (tokens.Count < 2)
+        {
+            return false;
+        }
+
+        if (!TryParseTrailingPort(tokens[0], out bindPort))
+        {
+            return false;
+        }
+
+        if (!TryParseTrailingPort(tokens[1], out localPort))
+        {
+            localPort = bindPort;
+        }
+
+        return true;
+    }
+
+    private static bool TryParseTrailingPort(string spec, out int port)
+    {
+        port = 0;
+        if (string.IsNullOrWhiteSpace(spec))
+        {
+            return false;
+        }
+
+        var colonIndex = spec.LastIndexOf(':');
+        var portText = colonIndex >= 0 ? spec[(colonIndex + 1)..] : spec;
+        return int.TryParse(portText, out port) && port is >= 1 and <= 65535;
     }
 
     private static string ExpandIdentityFile(
@@ -297,6 +430,7 @@ public static class OpenSshConfigParser
 
     private static IReadOnlyList<OpenSshImportCandidate> BuildCandidates(
         IReadOnlyList<HostBlockState> blocks,
+        HostBlockState globalDefaults,
         ICollection<OpenSshImportDiagnostic> diagnostics)
     {
         var candidates = new List<OpenSshImportCandidate>();
@@ -314,15 +448,35 @@ public static class OpenSshConfigParser
                     continue;
                 }
 
+                var effectivePort = block.ObtainedPort ?? globalDefaults.ObtainedPort ?? HostBlockState.DefaultPort;
+                var effectiveUser = block.User ?? globalDefaults.User;
+                var effectiveIdentityFile = block.IdentityFile ?? globalDefaults.IdentityFile;
+                var effectiveForwardAgent = block.ForwardAgent ?? globalDefaults.ForwardAgent ?? false;
+                var effectiveCompression = block.Compression ?? globalDefaults.Compression ?? false;
+                var effectiveDynamicForward = block.DynamicForwardPort ?? globalDefaults.DynamicForwardPort;
+                var effectiveRemoteBind = block.RemoteForwardBindPort ?? globalDefaults.RemoteForwardBindPort;
+                var effectiveRemoteLocal = block.RemoteForwardBindPort is not null
+                    ? block.RemoteForwardLocalPort
+                    : globalDefaults.RemoteForwardLocalPort;
+                var effectiveLocalForwards = block.LocalForwards.Count > 0
+                    ? block.LocalForwards.ToList()
+                    : globalDefaults.LocalForwards.ToList();
+
                 candidates.Add(new OpenSshImportCandidate
                 {
                     Alias = alias,
                     HostName = hostName,
-                    Port = block.Port,
-                    User = block.User,
-                    IdentityFile = block.IdentityFile,
+                    Port = effectivePort,
+                    User = effectiveUser,
+                    IdentityFile = effectiveIdentityFile,
                     SourceLineNumber = block.SourceLineNumber,
-                    ProxyJumpChain = BuildProxyJumpChain(alias, hostName, block, blockByAlias, diagnostics)
+                    ProxyJumpChain = BuildProxyJumpChain(alias, hostName, block, blockByAlias, diagnostics),
+                    ForwardAgent = effectiveForwardAgent,
+                    Compression = effectiveCompression,
+                    DynamicForwardPort = effectiveDynamicForward,
+                    RemoteForwardBindPort = effectiveRemoteBind,
+                    RemoteForwardLocalPort = effectiveRemoteLocal,
+                    LocalForwards = effectiveLocalForwards
                 });
             }
         }
@@ -822,5 +976,17 @@ public static class OpenSshConfigParser
         public string? ProxyCommandValue { get; set; }
 
         public int? ProxyCommandLineNumber { get; set; }
+
+        public bool? ForwardAgent { get; set; }
+
+        public bool? Compression { get; set; }
+
+        public int? DynamicForwardPort { get; set; }
+
+        public int? RemoteForwardBindPort { get; set; }
+
+        public int? RemoteForwardLocalPort { get; set; }
+
+        public List<string> LocalForwards { get; } = [];
     }
 }

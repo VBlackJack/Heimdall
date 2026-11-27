@@ -4186,8 +4186,16 @@
   "ToolSshKeyGenFingerprint": "Huella",
   "ToolSshKeyGenPublicKey": "Clave pública",
   "ToolSshKeyGenPrivateKey": "Clave privada",
-  "ToolSshKeyGenEd25519Notice": "Las claves Ed25519 ofrecen una seguridad sólida con claves compactas de 256 bits.",
-  "ToolSshKeyGenEd25519Unsupported": "La generación de claves Ed25519 no es compatible con el runtime .NET actual. Actualiza a .NET 10 o posterior.",
+  "ToolSshKeyGenEd25519Notice": "Las claves Ed25519 ofrecen una seguridad s\u00f3lida con claves compactas de 256 bits.",
+  "ToolSshKeyGenFormat": "Formato de clave privada",
+  "ToolSshKeyGenFormatOpenSsh": "OpenSSH (moderno, recomendado)",
+  "ToolSshKeyGenFormatPkcs8": "PKCS#8 PEM",
+  "ToolSshKeyGenEcdsaP256": "ECDSA (P-256)",
+  "ToolSshKeyGenEcdsaP384": "ECDSA (P-384)",
+  "ToolSshKeyGenEcdsaP521": "ECDSA (P-521)",
+  "ToolSshKeyGenPrivOpenSshFilter": "Clave privada OpenSSH (*.*)|*.*|Clave privada PEM (*.pem)|*.pem",
+  "ToolSshKeyGenGenerateFailed": "Error al generar la clave: {0}",
+  "ToolSshConfigGenerateAllEmpty": "No hay servidores SSH ni pasarelas configurados en Heimdall.",
 
   "PaletteToolSshAudit": "Auditor de claves SSH",
 

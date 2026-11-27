@@ -416,6 +416,37 @@ public sealed class OpenSshConfigImporterTests
             outcome.Sanitization.Items.SelectMany(item => item.ClearedPaths).Select(removal => removal.Value));
     }
 
+    [Fact]
+    public async Task ImportSelectedAsync_MapsForwardAgentCompressionAndPortForwards()
+    {
+        using var fixture = new OpenSshImportFixture();
+        var outcome = await fixture.Importer.ImportSelectedAsync(
+        [
+            new OpenSshImportCandidate
+            {
+                Alias = "tunnel-host",
+                HostName = "tunnel.example.com",
+                SourceLineNumber = 1,
+                ForwardAgent = true,
+                Compression = true,
+                DynamicForwardPort = 1080,
+                RemoteForwardBindPort = 9000,
+                RemoteForwardLocalPort = 3000
+            }
+        ]);
+
+        Assert.Equal(1, outcome.ImportedCount);
+        var server = Assert.Single(await fixture.ConfigManager.LoadServersAsync());
+        // ForwardAgent is captured by the parser and intentionally stripped at the import boundary
+        // by ImportedProfileSanitizer (Recorded in Sanitization), while compression and port forwards map through.
+        Assert.False(server.SshAgentForwarding);
+        Assert.True(outcome.Sanitization.HasChanges);
+        Assert.True(server.SshCompression);
+        Assert.Equal(1080, server.SocksProxyPort);
+        Assert.Equal(9000, server.RemoteBindPort);
+        Assert.Equal(3000, server.RemoteLocalPort);
+    }
+
     private static OpenSshProxyJumpHop Hop(
         string hostName,
         string? user = null,

@@ -55,6 +55,36 @@ public sealed record OpenSshImportCandidate
     /// Gets the resolved ProxyJump hops, ordered root-to-target.
     /// </summary>
     public IReadOnlyList<OpenSshProxyJumpHop> ProxyJumpChain { get; init; } = [];
+
+    /// <summary>
+    /// Gets whether <c>ForwardAgent yes</c> was configured for this host.
+    /// </summary>
+    public bool ForwardAgent { get; init; }
+
+    /// <summary>
+    /// Gets whether <c>Compression yes</c> was configured for this host.
+    /// </summary>
+    public bool Compression { get; init; }
+
+    /// <summary>
+    /// Gets the first valid <c>DynamicForward</c> port configured for this host, if any.
+    /// </summary>
+    public int? DynamicForwardPort { get; init; }
+
+    /// <summary>
+    /// Gets the remote bind port from the first valid <c>RemoteForward</c> directive, if any.
+    /// </summary>
+    public int? RemoteForwardBindPort { get; init; }
+
+    /// <summary>
+    /// Gets the local target port from the first valid <c>RemoteForward</c> directive, if any.
+    /// </summary>
+    public int? RemoteForwardLocalPort { get; init; }
+
+    /// <summary>
+    /// Gets raw <c>LocalForward</c> specifications captured for this host.
+    /// </summary>
+    public IReadOnlyList<string> LocalForwards { get; init; } = [];
 }
 
 /// <summary>

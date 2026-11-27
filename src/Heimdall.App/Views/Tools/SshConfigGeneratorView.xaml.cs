@@ -14,12 +14,14 @@
  * limitations under the License.
  */
 
-using System.Text;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Models;
+using Heimdall.Core.Ssh;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Heimdall.App.Views.Tools;
 
@@ -31,10 +33,10 @@ public partial class SshConfigGeneratorView : UserControl, IToolView
 {
     private const int DefaultAliveInterval = 0;
     private const int DefaultAliveIntervalInput = 60;
-    private const string ConfigIndent = "    ";
 
     private LocalizationManager? _localizer;
     private ToolContext? _context;
+    private bool _keyHandlersAttached;
 
     public SshConfigGeneratorView()
     {
@@ -43,20 +45,33 @@ public partial class SshConfigGeneratorView : UserControl, IToolView
 
     public void Initialize(ToolContext? context, LocalizationManager? localizer)
     {
+        if (_localizer is not null)
+        {
+            _localizer.LocaleChanged -= OnLocaleChanged;
+        }
+
         _localizer = localizer;
         _context = context;
+        if (_localizer is not null)
+        {
+            _localizer.LocaleChanged += OnLocaleChanged;
+        }
+
         ApplyLocalization();
         TxtPort.Text = DefaultPorts.Ssh.ToString();
         TxtServerAliveInterval.Text = DefaultAliveIntervalInput.ToString();
 
-        // Enter key handlers for single-line inputs
-        TxtHostAlias.KeyDown += (s, e) => { if (e.Key == System.Windows.Input.Key.Enter) OnGenerateClick(s, e); };
-        TxtHostName.KeyDown += (s, e) => { if (e.Key == System.Windows.Input.Key.Enter) OnGenerateClick(s, e); };
-        TxtUser.KeyDown += (s, e) => { if (e.Key == System.Windows.Input.Key.Enter) OnGenerateClick(s, e); };
-        TxtPort.KeyDown += (s, e) => { if (e.Key == System.Windows.Input.Key.Enter) OnGenerateClick(s, e); };
-        TxtIdentityFile.KeyDown += (s, e) => { if (e.Key == System.Windows.Input.Key.Enter) OnGenerateClick(s, e); };
-        TxtProxyJump.KeyDown += (s, e) => { if (e.Key == System.Windows.Input.Key.Enter) OnGenerateClick(s, e); };
-        TxtServerAliveInterval.KeyDown += (s, e) => { if (e.Key == System.Windows.Input.Key.Enter) OnGenerateClick(s, e); };
+        if (!_keyHandlersAttached)
+        {
+            _keyHandlersAttached = true;
+            TxtHostAlias.KeyDown += (s, e) => { if (e.Key == System.Windows.Input.Key.Enter) OnGenerateClick(s, e); };
+            TxtHostName.KeyDown += (s, e) => { if (e.Key == System.Windows.Input.Key.Enter) OnGenerateClick(s, e); };
+            TxtUser.KeyDown += (s, e) => { if (e.Key == System.Windows.Input.Key.Enter) OnGenerateClick(s, e); };
+            TxtPort.KeyDown += (s, e) => { if (e.Key == System.Windows.Input.Key.Enter) OnGenerateClick(s, e); };
+            TxtIdentityFile.KeyDown += (s, e) => { if (e.Key == System.Windows.Input.Key.Enter) OnGenerateClick(s, e); };
+            TxtProxyJump.KeyDown += (s, e) => { if (e.Key == System.Windows.Input.Key.Enter) OnGenerateClick(s, e); };
+            TxtServerAliveInterval.KeyDown += (s, e) => { if (e.Key == System.Windows.Input.Key.Enter) OnGenerateClick(s, e); };
+        }
 
         // Pre-fill from context if available
         if (!string.IsNullOrWhiteSpace(context?.TargetHost))
@@ -80,6 +95,11 @@ public partial class SshConfigGeneratorView : UserControl, IToolView
             TxtHostAlias.Focus();
             TxtHostAlias.SelectAll();
         });
+    }
+
+    private void OnLocaleChanged(string _)
+    {
+        Dispatcher.BeginInvoke(ApplyLocalization);
     }
 
     private void ApplyLocalization()
@@ -124,6 +144,8 @@ public partial class SshConfigGeneratorView : UserControl, IToolView
         if (string.IsNullOrWhiteSpace(hostname))
         {
             TxtOutput.Text = L("ToolSshConfigErrorHostRequired");
+            EmptyStatePanel.Visibility = Visibility.Collapsed;
+            OutputPanel.Visibility = Visibility.Visible;
             return;
         }
 
@@ -132,29 +154,57 @@ public partial class SshConfigGeneratorView : UserControl, IToolView
             alias = hostname;
         }
 
-        var block = GenerateConfigBlock(
-            alias,
-            hostname,
-            TxtUser.Text.Trim(),
-            ParseInt(TxtPort.Text, DefaultPorts.Ssh),
-            TxtIdentityFile.Text.Trim(),
-            TxtProxyJump.Text.Trim(),
-            ChkForwardAgent.IsChecked == true,
-            ParseInt(TxtServerAliveInterval.Text, DefaultAliveInterval));
+        var block = SshConfigExporter.ExportSingleHost(new SshConfigHostEntry(
+            Alias: alias,
+            HostName: hostname,
+            User: TxtUser.Text.Trim(),
+            Port: ParseInt(TxtPort.Text, DefaultPorts.Ssh),
+            IdentityFile: TxtIdentityFile.Text.Trim(),
+            ProxyJump: TxtProxyJump.Text.Trim(),
+            ForwardAgent: ChkForwardAgent.IsChecked == true,
+            ServerAliveInterval: ParseInt(TxtServerAliveInterval.Text, DefaultAliveInterval)));
 
         TxtOutput.Text = block;
         EmptyStatePanel.Visibility = Visibility.Collapsed;
         OutputPanel.Visibility = Visibility.Visible;
     }
 
-    private void OnGenerateAllClick(object sender, RoutedEventArgs e)
+    private async void OnGenerateAllClick(object sender, RoutedEventArgs e)
     {
-        // This generates a placeholder message since server inventory access
-        // requires dependency injection which tools don't have direct access to.
-        // The context-based prefill covers the single-server use case.
-        TxtOutput.Text = L("ToolSshConfigGenerateAllHint");
-        EmptyStatePanel.Visibility = Visibility.Collapsed;
-        OutputPanel.Visibility = Visibility.Visible;
+        var configManager = (Application.Current as App)?.Services?.GetService<IConfigManager>();
+        if (configManager is null)
+        {
+            TxtOutput.Text = L("ToolSshConfigGenerateAllHint");
+            EmptyStatePanel.Visibility = Visibility.Collapsed;
+            OutputPanel.Visibility = Visibility.Visible;
+            return;
+        }
+
+        BtnGenerateAll.IsEnabled = false;
+        try
+        {
+            var servers = await configManager.LoadServersAsync().ConfigureAwait(true);
+            var settings = await configManager.LoadSettingsAsync().ConfigureAwait(true);
+            var aliveInterval = ParseInt(TxtServerAliveInterval.Text, DefaultAliveIntervalInput);
+            var exported = SshConfigExporter.ExportInventory(servers, settings.SshGateways, aliveInterval);
+
+            TxtOutput.Text = string.IsNullOrWhiteSpace(exported)
+                ? L("ToolSshConfigGenerateAllEmpty")
+                : exported;
+            EmptyStatePanel.Visibility = Visibility.Collapsed;
+            OutputPanel.Visibility = Visibility.Visible;
+        }
+        catch (Exception ex)
+        {
+            Heimdall.Core.Logging.FileLogger.Warn($"SSH config inventory export failed: {ex.Message}");
+            TxtOutput.Text = L("ToolSshConfigGenerateAllHint");
+            EmptyStatePanel.Visibility = Visibility.Collapsed;
+            OutputPanel.Visibility = Visibility.Visible;
+        }
+        finally
+        {
+            BtnGenerateAll.IsEnabled = true;
+        }
     }
 
     private void OnCopyClick(object sender, RoutedEventArgs e)
@@ -165,53 +215,6 @@ public partial class SshConfigGeneratorView : UserControl, IToolView
             catch (System.Runtime.InteropServices.ExternalException) { return; }
             CopyFeedbackHelper.ShowCopyFeedback(sender as Button);
         }
-    }
-
-    private static string GenerateConfigBlock(
-        string alias,
-        string hostname,
-        string user,
-        int port,
-        string identityFile,
-        string proxyJump,
-        bool forwardAgent,
-        int aliveInterval)
-    {
-        var sb = new StringBuilder();
-        sb.AppendLine($"Host {alias}");
-        sb.AppendLine($"{ConfigIndent}HostName {hostname}");
-
-        if (!string.IsNullOrWhiteSpace(user))
-        {
-            sb.AppendLine($"{ConfigIndent}User {user}");
-        }
-
-        if (port != DefaultPorts.Ssh)
-        {
-            sb.AppendLine($"{ConfigIndent}Port {port}");
-        }
-
-        if (!string.IsNullOrWhiteSpace(identityFile))
-        {
-            sb.AppendLine($"{ConfigIndent}IdentityFile {identityFile}");
-        }
-
-        if (!string.IsNullOrWhiteSpace(proxyJump))
-        {
-            sb.AppendLine($"{ConfigIndent}ProxyJump {proxyJump}");
-        }
-
-        if (forwardAgent)
-        {
-            sb.AppendLine($"{ConfigIndent}ForwardAgent yes");
-        }
-
-        if (aliveInterval > 0)
-        {
-            sb.AppendLine($"{ConfigIndent}ServerAliveInterval {aliveInterval}");
-        }
-
-        return sb.ToString().TrimEnd();
     }
 
     private static int ParseInt(string text, int fallback)
@@ -239,6 +242,11 @@ public partial class SshConfigGeneratorView : UserControl, IToolView
 
     public void Dispose()
     {
+        if (_localizer is not null)
+        {
+            _localizer.LocaleChanged -= OnLocaleChanged;
+        }
+
         GC.SuppressFinalize(this);
     }
 }

@@ -4186,7 +4186,15 @@
   "ToolSshKeyGenPublicKey": "Cl\u00e9 publique",
   "ToolSshKeyGenPrivateKey": "Cl\u00e9 priv\u00e9e",
   "ToolSshKeyGenEd25519Notice": "Les cl\u00e9s Ed25519 offrent une s\u00e9curit\u00e9 robuste avec des cl\u00e9s compactes de 256 bits.",
-  "ToolSshKeyGenEd25519Unsupported": "La g\u00e9n\u00e9ration de cl\u00e9s Ed25519 n'est pas support\u00e9e par le runtime .NET actuel. Veuillez mettre \u00e0 jour vers .NET 10 ou ult\u00e9rieur.",
+  "ToolSshKeyGenFormat": "Format de cl\u00e9 priv\u00e9e",
+  "ToolSshKeyGenFormatOpenSsh": "OpenSSH (moderne, recommand\u00e9)",
+  "ToolSshKeyGenFormatPkcs8": "PKCS#8 PEM",
+  "ToolSshKeyGenEcdsaP256": "ECDSA (P-256)",
+  "ToolSshKeyGenEcdsaP384": "ECDSA (P-384)",
+  "ToolSshKeyGenEcdsaP521": "ECDSA (P-521)",
+  "ToolSshKeyGenPrivOpenSshFilter": "Cl\u00e9 priv\u00e9e OpenSSH (*.*)|*.*|Cl\u00e9 priv\u00e9e PEM (*.pem)|*.pem",
+  "ToolSshKeyGenGenerateFailed": "\u00c9chec de la g\u00e9n\u00e9ration de la cl\u00e9 : {0}",
+  "ToolSshConfigGenerateAllEmpty": "Aucun serveur SSH ni aucune passerelle n'est configur\u00e9 dans Heimdall.",
 
   "PaletteToolSshAudit": "Auditeur de cl\u00e9 SSH",
 

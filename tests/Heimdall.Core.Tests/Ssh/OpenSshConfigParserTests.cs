@@ -442,4 +442,44 @@ public sealed class OpenSshConfigParserTests
         Assert.Equal("alice", candidate.User);
         Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == OpenSshDiagnosticCode.UnknownDirectiveIgnored);
     }
+
+    [Fact]
+    public void Parse_ForwardingCompressionAndGlobalWildcardDefaults_AreAppliedWithFirstObtainedWins()
+    {
+        var result = OpenSshConfigParser.Parse(
+            """
+            Host prod
+                HostName prod.example.com
+                ForwardAgent yes
+                Compression yes
+                DynamicForward 127.0.0.1:1080
+                RemoteForward 8080 127.0.0.1:3000
+                LocalForward 5432 db.internal:5432
+
+            Host staging
+                HostName staging.example.com
+
+            Host *
+                User default-ops
+                Port 2222
+                Compression yes
+            """);
+
+        Assert.Equal(2, result.Candidates.Count);
+        var prod = Assert.Single(result.Candidates, c => c.Alias == "prod");
+        Assert.Equal("default-ops", prod.User);
+        Assert.Equal(2222, prod.Port);
+        Assert.True(prod.ForwardAgent);
+        Assert.True(prod.Compression);
+        Assert.Equal(1080, prod.DynamicForwardPort);
+        Assert.Equal(8080, prod.RemoteForwardBindPort);
+        Assert.Equal(3000, prod.RemoteForwardLocalPort);
+        Assert.Equal(["5432 db.internal:5432"], prod.LocalForwards);
+
+        var staging = Assert.Single(result.Candidates, c => c.Alias == "staging");
+        Assert.Equal("default-ops", staging.User);
+        Assert.Equal(2222, staging.Port);
+        Assert.False(staging.ForwardAgent);
+        Assert.True(staging.Compression);
+    }
 }
