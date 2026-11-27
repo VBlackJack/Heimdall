@@ -568,6 +568,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         _shellSessionHasInput = false;
         _winRmEarlyOutputDiagnostic = null;
         ShowHealthButton(true);
+        UpdateSessionCryptoInfo();
 
         _session.DataReceived += OnDataReceived;
         _session.Disconnected += OnDisconnected;
@@ -930,6 +931,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         }
 
         _highlightsEnabled = !_highlightsEnabled;
+        UpdateHighlightsToggleVisual();
         PostTerminalMessage(MsgSetHighlights + (_highlightsEnabled ? "true" : "false"));
     }
 
@@ -2215,6 +2217,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             safeScrollbackLines.ToString(System.Globalization.CultureInfo.InvariantCulture),
             StringComparison.Ordinal);
         _highlightsEnabled = TerminalSettings?.TerminalHighlightsEnabled ?? false;
+        UpdateHighlightsToggleVisual();
         html = html.Replace(
             "/*{{TERMINAL_HIGHLIGHTS}}*/",
             _highlightsEnabled ? "true" : "false",

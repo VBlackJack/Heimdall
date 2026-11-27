@@ -129,6 +129,16 @@
                             Style="{DynamicResource GhostButtonStyle}"
                             Padding="6,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0"/>
 
+                    <Button x:Name="SessionInfoButton"
+                            Content="&#xE946;"
+                            FontFamily="{StaticResource FontFamilyIcons}"
+                            Click="OnSessionInfoClick"
+                            ToolTip="{loc:Translate TooltipSessionCryptoInfo}"
+                            AutomationProperties.Name="{loc:Translate A11ySessionCryptoInfo}"
+                            Style="{DynamicResource GhostButtonStyle}"
+                            Padding="6,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0"
+                            Visibility="Collapsed"/>
+
                     <Button x:Name="HealthToggleButton"
                             Content="&#xE9D9;"
                             FontFamily="{StaticResource FontFamilyIcons}"

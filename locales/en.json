@@ -6996,5 +6996,11 @@
   "ToolSshAgentErrKeyNotFound": "Key not found in the running SSH agent.",
   "ToolSshAuditCertMetadataFormat": "CA: {0} | Key ID: {1} | Principals: {2}",
   "ToolSshAuditFormatCertHost": "OpenSSH Certificate (Host)",
-  "ToolSshAuditFormatCertUser": "OpenSSH Certificate (User)"
+  "ToolSshAuditFormatCertUser": "OpenSSH Certificate (User)",
+  "TooltipSessionCryptoInfo": "SSH transport & crypto diagnostics (click to copy)",
+  "A11ySessionCryptoInfo": "SSH transport and cryptography diagnostics",
+  "SessionCryptoInfoSummary": "Server: {0}\nKEX: {1}\nHost key: {2}\nCipher: {3}\nMAC: {4}\nCompression: {5}\nActive forwards: {6}",
+  "SessionCryptoInfoWeakWarning": "Warning: legacy or weak SSH algorithm negotiated.",
+  "TooltipToggleTerminalHighlightsOn": "Terminal log highlights: ON (click to disable)",
+  "TooltipToggleTerminalHighlightsOff": "Terminal log highlights: OFF (click to enable)"
 }

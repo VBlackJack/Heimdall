@@ -6996,5 +6996,11 @@
   "ToolSshAgentErrKeyNotFound": "Clave no encontrada en el agente SSH en ejecuci\u00f3n.",
   "ToolSshAuditCertMetadataFormat": "CA: {0} | ID de clave: {1} | Principales: {2}",
   "ToolSshAuditFormatCertHost": "Certificado OpenSSH (Host)",
-  "ToolSshAuditFormatCertUser": "Certificado OpenSSH (Usuario)"
+  "ToolSshAuditFormatCertUser": "Certificado OpenSSH (Usuario)",
+  "TooltipSessionCryptoInfo": "Diagn\u00f3stico de transporte y criptograf\u00eda SSH (clic para copiar)",
+  "A11ySessionCryptoInfo": "Diagn\u00f3stico de transporte y criptograf\u00eda SSH",
+  "SessionCryptoInfoSummary": "Servidor: {0}\nKEX: {1}\nClave de host: {2}\nCifrado: {3}\nMAC: {4}\nCompresi\u00f3n: {5}\nReenv\u00edos activos: {6}",
+  "SessionCryptoInfoWeakWarning": "Advertencia: se negoci\u00f3 un algoritmo SSH heredado o d\u00e9bil.",
+  "TooltipToggleTerminalHighlightsOn": "Resaltado de registros del terminal: ACTIVADO (clic para desactivar)",
+  "TooltipToggleTerminalHighlightsOff": "Resaltado de registros del terminal: DESACTIVADO (clic para activar)"
 }

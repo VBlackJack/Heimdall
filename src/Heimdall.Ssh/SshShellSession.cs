@@ -210,6 +210,28 @@ public sealed class SshShellSession : IDisposable
     public SshClient? Client => _client;
 
     /// <summary>
+    /// Returns negotiated SSH cryptographic and transport diagnostics for the active session,
+    /// or <c>null</c> when the session is not connected.
+    /// </summary>
+    public SshSessionDiagnostics? GetDiagnostics()
+    {
+        var client = _client;
+        if (client is null || !client.IsConnected)
+        {
+            return null;
+        }
+
+        try
+        {
+            return SshSessionDiagnostics.FromConnectionInfo(client.ConnectionInfo, ActiveForwardedPortCount);
+        }
+        catch (ObjectDisposedException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Connects to the SSH server, allocates a PTY, and starts the interactive shell.
     /// A background read loop begins immediately after connection, raising
     /// <see cref="DataReceived"/> for each chunk of output.

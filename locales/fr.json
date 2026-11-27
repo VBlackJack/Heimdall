@@ -6995,5 +6995,11 @@
   "ToolSshAgentErrKeyNotFound": "Cl\u00e9 introuvable dans l'agent SSH actif.",
   "ToolSshAuditCertMetadataFormat": "AC : {0} | ID de cl\u00e9 : {1} | Principaux : {2}",
   "ToolSshAuditFormatCertHost": "Certificat OpenSSH (H\u00f4te)",
-  "ToolSshAuditFormatCertUser": "Certificat OpenSSH (Utilisateur)"
+  "ToolSshAuditFormatCertUser": "Certificat OpenSSH (Utilisateur)",
+  "TooltipSessionCryptoInfo": "Diagnostic transport et cryptographie SSH (cliquer pour copier)",
+  "A11ySessionCryptoInfo": "Diagnostic transport et cryptographie SSH",
+  "SessionCryptoInfoSummary": "Serveur : {0}\nKEX : {1}\nCl\u00e9 d'h\u00f4te : {2}\nChiffrement : {3}\nMAC : {4}\nCompression : {5}\nRedirections actives : {6}",
+  "SessionCryptoInfoWeakWarning": "Attention : algorithme SSH obsol\u00e8te ou faible n\u00e9goci\u00e9.",
+  "TooltipToggleTerminalHighlightsOn": "Coloration des logs terminal : ACTIV\u00c9E (cliquer pour d\u00e9sactiver)",
+  "TooltipToggleTerminalHighlightsOff": "Coloration des logs terminal : D\u00c9SACTIV\u00c9E (cliquer pour activer)"
 }

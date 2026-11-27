@@ -77,7 +77,8 @@ public partial class EmbeddedSshView
         ReconnectButton.ToolTip = L("TooltipReconnectSession");
         SplitButton.ToolTip = L("TooltipSplitSession");
         HealthToggleButton.ToolTip = L("TooltipToggleHealthMonitoring");
-        HighlightsToggleButton.ToolTip = L("TooltipToggleTerminalHighlights");
+        UpdateHighlightsToggleVisual();
+        UpdateSessionCryptoInfo();
         ElevateButton.ToolTip = L("TooltipElevateToRoot");
 
         // Accessibility: automation names for toolbar buttons
@@ -86,6 +87,7 @@ public partial class EmbeddedSshView
         System.Windows.Automation.AutomationProperties.SetName(SplitButton, L("A11ySplitSession"));
         System.Windows.Automation.AutomationProperties.SetName(HealthToggleButton, L("A11yToggleHealthMonitoring"));
         System.Windows.Automation.AutomationProperties.SetName(HighlightsToggleButton, L("A11yToggleTerminalHighlights"));
+        System.Windows.Automation.AutomationProperties.SetName(SessionInfoButton, L("A11ySessionCryptoInfo"));
         System.Windows.Automation.AutomationProperties.SetName(ElevateButton, L("A11yElevateToRoot"));
         System.Windows.Automation.AutomationProperties.SetName(OverlayReconnectButton, L("A11yReconnectSession"));
         System.Windows.Automation.AutomationProperties.SetName(OverlayCloseButton, L("A11yCloseOverlay"));
@@ -273,6 +275,7 @@ public partial class EmbeddedSshView
         if (isDisconnected)
         {
             HidePipeSizeBadge();
+            SessionInfoButton.Visibility = Visibility.Collapsed;
         }
 
         DisconnectButton.IsEnabled = !_disposed && !isDisconnected;
@@ -284,6 +287,86 @@ public partial class EmbeddedSshView
             forceErrorBrush || string.Equals(status, SessionStatusTokens.Error, StringComparison.OrdinalIgnoreCase)
                 ? "ErrorTextBrush"
                 : "TextPrimaryBrush");
+    }
+
+    private void UpdateHighlightsToggleVisual()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        HighlightsToggleButton.SetResourceReference(
+            System.Windows.Controls.Control.ForegroundProperty,
+            _highlightsEnabled ? "AccentBrush" : "TextSecondaryBrush");
+        HighlightsToggleButton.ToolTip = _highlightsEnabled
+            ? L("TooltipToggleTerminalHighlightsOn")
+            : L("TooltipToggleTerminalHighlightsOff");
+    }
+
+    private void UpdateSessionCryptoInfo()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        var diag = _session?.GetDiagnostics();
+        if (diag is null)
+        {
+            SessionInfoButton.Visibility = Visibility.Collapsed;
+            SessionInfoButton.ToolTip = L("TooltipSessionCryptoInfo");
+            return;
+        }
+
+        SessionInfoButton.Visibility = Visibility.Visible;
+        SessionInfoButton.SetResourceReference(
+            System.Windows.Controls.Control.ForegroundProperty,
+            diag.HasWeakCrypto ? "WarningTextBrush" : "TextSecondaryBrush");
+        SessionInfoButton.ToolTip = FormatSessionCryptoInfoSummary(diag);
+    }
+
+    private string FormatSessionCryptoInfoSummary(SshSessionDiagnostics diag)
+    {
+        var summary = string.Format(
+            System.Globalization.CultureInfo.CurrentCulture,
+            L("SessionCryptoInfoSummary"),
+            diag.ServerVersion,
+            diag.KeyExchangeAlgorithm,
+            diag.HostKeyAlgorithm,
+            diag.ClientToServerEncryption,
+            diag.ClientToServerMac,
+            diag.ClientToServerCompression,
+            diag.ActiveForwardedPorts);
+
+        return diag.HasWeakCrypto
+            ? summary + Environment.NewLine + L("SessionCryptoInfoWeakWarning")
+            : summary;
+    }
+
+    private void OnSessionInfoClick(object sender, RoutedEventArgs e)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        var diag = _session?.GetDiagnostics();
+        if (diag is null)
+        {
+            return;
+        }
+
+        UpdateSessionCryptoInfo();
+        try
+        {
+            Clipboard.SetText(FormatSessionCryptoInfoSummary(diag));
+            Tools.CopyFeedbackHelper.ShowCopyFeedback(SessionInfoButton);
+        }
+        catch (System.Runtime.InteropServices.ExternalException)
+        {
+            // Clipboard locked by another process.
+        }
     }
 
     private Brush GetBrush(string resourceKey, Brush fallback)
