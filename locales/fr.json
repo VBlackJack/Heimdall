@@ -438,6 +438,7 @@
   "StatusSshDirectCompressionUnavailable": "Le chemin SSH.NET direct choisi ne prend pas en charge la compression. La connexion continue sans cette fonction.",
   "StatusSshDirectX11AndCompressionUnavailable": "Le chemin SSH.NET direct choisi ne prend en charge ni le transfert X11 ni la compression. La connexion continue sans ces fonctions.",
   "StatusSshDirectX11Unavailable": "Le chemin SSH.NET direct choisi ne prend pas en charge le transfert X11. La connexion continue sans cette fonction.",
+  "StatusSshPlinkStrictCryptoUnavailable": "La politique cryptographique SSH StrictModern ne peut pas \u00eatre appliqu\u00e9e par Plink/PuTTY. La connexion continue avec les r\u00e9glages par d\u00e9faut de Plink/PuTTY.",
   "StatusSshPortForwardFailed": "Un ou plusieurs transferts de port SSH configur\u00e9s n'ont pas pu d\u00e9marrer : {0}",
   "StatusSshRetryingViaPlink": "Authentification SSH.NET \u00e9chou\u00e9e, nouvelle tentative via Plink...",
   "StatusLaunchingSftp": "Lancement de la session SFTP...",

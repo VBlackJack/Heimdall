@@ -15,6 +15,7 @@
  */
 
 using Heimdall.App.Localization;
+using Heimdall.Core.Ssh;
 
 namespace Heimdall.App.Services.Handlers;
 
@@ -43,7 +44,10 @@ internal enum SshUnavailableCapability
     X11Forwarding = 1,
 
     /// <summary>SSH compression is unavailable.</summary>
-    Compression = 2
+    Compression = 2,
+
+    /// <summary>StrictModern cryptographic policy cannot be enforced on external Plink/PuTTY transports.</summary>
+    StrictCryptoPolicy = 4
 }
 
 /// <summary>
@@ -61,6 +65,7 @@ internal sealed record SshCapabilityNotice(SshUnavailableCapability UnavailableC
         SshUnavailableCapability.Compression => "compression",
         SshUnavailableCapability.X11Forwarding | SshUnavailableCapability.Compression =>
             "X11 forwarding, compression",
+        SshUnavailableCapability.StrictCryptoPolicy => "strict modern cryptography policy",
         _ => throw new InvalidOperationException("The capability notice must identify at least one unavailable capability.")
     };
 
@@ -73,6 +78,7 @@ internal sealed record SshCapabilityNotice(SshUnavailableCapability UnavailableC
         SshUnavailableCapability.Compression => SshLocalizationKeys.StatusSshDirectCompressionUnavailable,
         SshUnavailableCapability.X11Forwarding | SshUnavailableCapability.Compression =>
             SshLocalizationKeys.StatusSshDirectX11AndCompressionUnavailable,
+        SshUnavailableCapability.StrictCryptoPolicy => SshLocalizationKeys.StatusSshPlinkStrictCryptoUnavailable,
         _ => throw new InvalidOperationException("The capability notice must identify at least one unavailable capability.")
     };
 }
@@ -103,11 +109,14 @@ internal static class SshCapabilityScope
     public static SshCapabilityNotice? Evaluate(
         SshResolvedPath path,
         bool x11Forwarding,
-        bool compression)
+        bool compression,
+        SshCryptoPolicy cryptoPolicy = SshCryptoPolicy.Standard)
     {
         if (SupportsForwarding(path))
         {
-            return null;
+            return cryptoPolicy == SshCryptoPolicy.StrictModern
+                ? new SshCapabilityNotice(SshUnavailableCapability.StrictCryptoPolicy)
+                : null;
         }
 
         SshUnavailableCapability unavailableCapabilities = 0;

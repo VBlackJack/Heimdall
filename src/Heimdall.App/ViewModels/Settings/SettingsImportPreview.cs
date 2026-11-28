@@ -67,6 +67,8 @@ internal static class SettingsImportPreview
         "SharedSessionSources",
         "DisabledToolPacks",
         "RecipeProgramFolders",
+        "SshCryptoPolicy",
+        "SshConfirmAgentSigning",
         SettingsTransfer.RecipesPackTurnedOnKey,
     };
 

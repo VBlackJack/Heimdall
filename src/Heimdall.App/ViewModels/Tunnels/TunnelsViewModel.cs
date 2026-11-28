@@ -719,53 +719,51 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
                 ConnectionHelpers.DecryptPassword,
                 sshAgentPreference: settings.SshAgentPreference,
                 sshCryptoPolicy: settings.SshCryptoPolicy);
-            if (_dialogService is not null || settings.SshConfirmAgentSigning)
+            chain = chain.Select(hop => new SshConnectionParams
             {
-                chain = chain.Select(hop => new SshConnectionParams
-                {
-                    Host = hop.Host,
-                    Port = hop.Port,
-                    LogicalHost = hop.LogicalHost,
-                    LogicalPort = hop.LogicalPort,
-                    Username = hop.Username,
-                    KeyPath = hop.KeyPath,
-                    CertificatePath = hop.CertificatePath,
-                    Password = hop.Password,
-                    KeyPassphrase = hop.KeyPassphrase,
-                    UseLegacyPasswordAsKeyPassphrase = hop.UseLegacyPasswordAsKeyPassphrase,
-                    LegacyCredentialName = hop.LegacyCredentialName,
-                    SshAgentPreference = hop.SshAgentPreference,
-                    AgentKeyFingerprint = hop.AgentKeyFingerprint,
-                    ConfirmAgentSign = SshAgentSignConfirmHelper.BuildConfirmCallback(
-                        settings,
-                        hop.HostKeyVerificationHost,
-                        hop.HostKeyVerificationPort,
-                        _localizer,
-                        ct),
-                    AgentForwarding = hop.AgentForwarding,
-                    Compression = hop.Compression,
-                    CryptoPolicy = hop.CryptoPolicy,
-                    X11Forwarding = hop.X11Forwarding,
-                    ConnectTimeout = hop.ConnectTimeout,
-                    AuthenticationTimeout = _dialogService is not null ? InteractiveGatewayAuthTimeout : hop.AuthenticationTimeout,
-                    KeepAliveIntervalSeconds = hop.KeepAliveIntervalSeconds,
-                    KeyboardInteractive = hop.KeyboardInteractive,
-                    KeyboardInteractiveResponder = _dialogService is null
-                        ? hop.KeyboardInteractiveResponder
-                        : request =>
-                        {
-                            ct.ThrowIfCancellationRequested();
-                            return _dialogService.ShowPasswordInputAsync(
-                                _localizer[SshLocalizationKeys.InteractivePromptTitle],
-                                string.Format(
-                                    _localizer[SshLocalizationKeys.InteractivePromptMessage],
-                                    hop.HostKeyVerificationHost,
-                                    hop.Username,
-                                    ServerPromptText.Sanitize(request)),
-                                ct).GetAwaiter().GetResult();
-                        }
-                }).ToList();
-            }
+                Host = hop.Host,
+                Port = hop.Port,
+                LogicalHost = hop.LogicalHost,
+                LogicalPort = hop.LogicalPort,
+                Username = hop.Username,
+                KeyPath = hop.KeyPath,
+                CertificatePath = hop.CertificatePath,
+                Password = hop.Password,
+                KeyPassphrase = hop.KeyPassphrase,
+                UseLegacyPasswordAsKeyPassphrase = hop.UseLegacyPasswordAsKeyPassphrase,
+                LegacyCredentialName = hop.LegacyCredentialName,
+                SshAgentPreference = hop.SshAgentPreference,
+                AgentKeyFingerprint = hop.AgentKeyFingerprint,
+                OnBeforeAgentSign = SshAgentSignConfirmHelper.BuildBeforeSignNotification(_localizer, reportStatus: null),
+                ConfirmAgentSign = SshAgentSignConfirmHelper.BuildConfirmCallback(
+                    settings,
+                    hop.HostKeyVerificationHost,
+                    hop.HostKeyVerificationPort,
+                    _localizer,
+                    ct),
+                AgentForwarding = hop.AgentForwarding,
+                Compression = hop.Compression,
+                CryptoPolicy = hop.CryptoPolicy,
+                X11Forwarding = hop.X11Forwarding,
+                ConnectTimeout = hop.ConnectTimeout,
+                AuthenticationTimeout = _dialogService is not null ? InteractiveGatewayAuthTimeout : hop.AuthenticationTimeout,
+                KeepAliveIntervalSeconds = hop.KeepAliveIntervalSeconds,
+                KeyboardInteractive = hop.KeyboardInteractive,
+                KeyboardInteractiveResponder = _dialogService is null
+                    ? hop.KeyboardInteractiveResponder
+                    : request =>
+                    {
+                        ct.ThrowIfCancellationRequested();
+                        return _dialogService.ShowPasswordInputAsync(
+                            _localizer[SshLocalizationKeys.InteractivePromptTitle],
+                            string.Format(
+                                _localizer[SshLocalizationKeys.InteractivePromptMessage],
+                                hop.HostKeyVerificationHost,
+                                hop.Username,
+                                ServerPromptText.Sanitize(request)),
+                            ct).GetAwaiter().GetResult();
+                    }
+            }).ToList();
         }
         catch (Exception ex)
         {

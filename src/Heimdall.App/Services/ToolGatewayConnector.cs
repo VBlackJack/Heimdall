@@ -47,6 +47,7 @@ internal static class ToolGatewayConnector
         IServiceProvider services = (Application.Current as App)?.Services
             ?? throw new InvalidOperationException(ToolGatewayServicesUnavailableKey);
         IConfigManager config = services.GetRequiredService<IConfigManager>();
+        HostKeyStore hostKeyStore = services.GetRequiredService<HostKeyStore>();
         IHostKeyTrustService trust = services.GetRequiredService<IHostKeyTrustService>();
         LocalizationManager localizer = services.GetRequiredService<LocalizationManager>();
         AppSettings settings = await config.LoadSettingsAsync().ConfigureAwait(false);
@@ -57,42 +58,49 @@ internal static class ToolGatewayConnector
         {
             List<SshGatewayDto> gateways = GatewayChainResolver.ResolveChainDtos(gateway.Id, settings.SshGateways);
             List<SshConnectionParams> chain = GatewayChainResolver.ToConnectionParams(
-                gateways, CredentialProtector.Unprotect, settings.SshAgentPreference);
-            if (settings.SshConfirmAgentSigning)
+                gateways, CredentialProtector.Unprotect, settings.SshAgentPreference, settings.SshCryptoPolicy);
+            Action<ISshAgentKey> beforeAgentSign = SshAgentSignConfirmHelper.BuildBeforeSignNotification(
+                localizer,
+                reportStatus: null);
+            chain = chain.Select(hop => new SshConnectionParams
             {
-                chain = chain.Select(hop => new SshConnectionParams
-                {
-                    Host = hop.Host,
-                    Port = hop.Port,
-                    LogicalHost = hop.LogicalHost,
-                    LogicalPort = hop.LogicalPort,
-                    Username = hop.Username,
-                    KeyPath = hop.KeyPath,
-                    CertificatePath = hop.CertificatePath,
-                    Password = hop.Password,
-                    KeyPassphrase = hop.KeyPassphrase,
-                    UseLegacyPasswordAsKeyPassphrase = hop.UseLegacyPasswordAsKeyPassphrase,
-                    LegacyCredentialName = hop.LegacyCredentialName,
-                    SshAgentPreference = hop.SshAgentPreference,
-                    AgentKeyFingerprint = hop.AgentKeyFingerprint,
-                    ConfirmAgentSign = SshAgentSignConfirmHelper.BuildConfirmCallback(
-                        settings,
-                        hop.HostKeyVerificationHost,
-                        hop.HostKeyVerificationPort,
-                        localizer,
-                        ct),
-                    AgentForwarding = hop.AgentForwarding,
-                    Compression = hop.Compression,
-                    CryptoPolicy = hop.CryptoPolicy,
-                    X11Forwarding = hop.X11Forwarding,
-                    ConnectTimeout = hop.ConnectTimeout,
-                    AuthenticationTimeout = hop.AuthenticationTimeout,
-                    KeepAliveIntervalSeconds = hop.KeepAliveIntervalSeconds,
-                    KeyboardInteractive = hop.KeyboardInteractive,
-                    KeyboardInteractiveResponder = hop.KeyboardInteractiveResponder
-                }).ToList();
-            }
-            return await ConnectCoreAsync(chain, trust, localizer, settings.SshKeepAliveIntervalSeconds, ct)
+                Host = hop.Host,
+                Port = hop.Port,
+                LogicalHost = hop.LogicalHost,
+                LogicalPort = hop.LogicalPort,
+                Username = hop.Username,
+                KeyPath = hop.KeyPath,
+                CertificatePath = hop.CertificatePath,
+                Password = hop.Password,
+                KeyPassphrase = hop.KeyPassphrase,
+                UseLegacyPasswordAsKeyPassphrase = hop.UseLegacyPasswordAsKeyPassphrase,
+                LegacyCredentialName = hop.LegacyCredentialName,
+                SshAgentPreference = hop.SshAgentPreference,
+                AgentKeyFingerprint = hop.AgentKeyFingerprint,
+                OnBeforeAgentSign = beforeAgentSign,
+                ConfirmAgentSign = SshAgentSignConfirmHelper.BuildConfirmCallback(
+                    settings,
+                    hop.HostKeyVerificationHost,
+                    hop.HostKeyVerificationPort,
+                    localizer,
+                    ct),
+                AgentForwarding = hop.AgentForwarding,
+                Compression = hop.Compression,
+                CryptoPolicy = hop.CryptoPolicy,
+                X11Forwarding = hop.X11Forwarding,
+                ConnectTimeout = hop.ConnectTimeout,
+                AuthenticationTimeout = hop.AuthenticationTimeout,
+                KeepAliveIntervalSeconds = hop.KeepAliveIntervalSeconds,
+                KeyboardInteractive = hop.KeyboardInteractive,
+                KeyboardInteractiveResponder = hop.KeyboardInteractiveResponder
+            }).ToList();
+            return await ConnectCoreAsync(
+                    chain,
+                    trust,
+                    localizer,
+                    settings.SshKeepAliveIntervalSeconds,
+                    ct,
+                    hostKeyStore: hostKeyStore)
                 .ConfigureAwait(false);
         }, ct).ConfigureAwait(false);
     }
@@ -107,7 +115,8 @@ internal static class ToolGatewayConnector
         LocalizationManager localizer, int keepAliveSeconds, CancellationToken ct,
         OpenParentRoute? openParents = null,
         Func<SshConnectionParams, IDisposable?, SshClient>? createClient = null,
-        Func<SshClient, CancellationToken, Task>? connectClient = null)
+        Func<SshClient, CancellationToken, Task>? connectClient = null,
+        HostKeyStore? hostKeyStore = null)
     {
         ct.ThrowIfCancellationRequested();
         if (chain.Count == 0) throw new ArgumentException(localizer["ErrorGatewayRouteEmpty"], nameof(chain));
@@ -116,6 +125,11 @@ internal static class ToolGatewayConnector
         {
             string fingerprint = trust.GetEffectiveEntry(hop.Host, hop.Port)?.Fingerprint
                 ?? throw new InvalidOperationException(localizer.Format("ErrorGatewayHostKeyNotTrusted", hop.Host, hop.Port));
+            if (trust.IsRevoked(hop.Host, hop.Port, fingerprint))
+            {
+                throw new InvalidOperationException(localizer[SshLocalizationKeys.ErrorSshHostKeyRevoked]);
+            }
+
             fingerprints[(hop.Host, hop.Port)] = fingerprint;
         }
         ChainPreflightResult preflight = AuthPreflightChecker.CheckChain(chain, isTunnelMode: true);
@@ -124,7 +138,7 @@ internal static class ToolGatewayConnector
             throw new InvalidOperationException(TunnelFailureMessageResolver.ResolvePreflightMessage(preflight.Result, localizer));
         }
         openParents ??= (parents, target, verifier, interval, token) =>
-            OpenParentsAsync(parents, target, verifier, interval, token, localizer);
+            OpenParentsAsync(parents, target, verifier, interval, token, localizer, hostKeyStore);
         createClient ??= (parameters, route) => route is null
             ? SshConnectionFactory.CreateSshClient(parameters)
             : SshConnectionFactory.CreateSshClient(parameters, route);
@@ -138,7 +152,7 @@ internal static class ToolGatewayConnector
             if (chain.Count > 1)
             {
                 parentRoute = await openParents(chain.Take(chain.Count - 1).ToArray(), target,
-                    new RouteVerifier(fingerprints), keepAliveSeconds, ct).ConfigureAwait(false);
+                    new RouteVerifier(fingerprints, trust), keepAliveSeconds, ct).ConfigureAwait(false);
                 dial = new SshConnectionParams
                 {
                     Host = parentRoute.Host,
@@ -148,12 +162,23 @@ internal static class ToolGatewayConnector
                     Username = target.Username,
                     Password = target.Password,
                     KeyPath = target.KeyPath,
+                    CertificatePath = target.CertificatePath,
                     KeyPassphrase = target.KeyPassphrase,
                     SshAgentPreference = target.SshAgentPreference,
+                    AgentKeyFingerprint = target.AgentKeyFingerprint,
+                    OnBeforeAgentSign = target.OnBeforeAgentSign,
                     ConfirmAgentSign = target.ConfirmAgentSign,
                     UseLegacyPasswordAsKeyPassphrase = target.UseLegacyPasswordAsKeyPassphrase,
                     LegacyCredentialName = target.LegacyCredentialName,
-                    ConnectTimeout = target.ConnectTimeout
+                    AgentForwarding = target.AgentForwarding,
+                    Compression = target.Compression,
+                    CryptoPolicy = target.CryptoPolicy,
+                    X11Forwarding = target.X11Forwarding,
+                    ConnectTimeout = target.ConnectTimeout,
+                    AuthenticationTimeout = target.AuthenticationTimeout,
+                    KeepAliveIntervalSeconds = target.KeepAliveIntervalSeconds,
+                    KeyboardInteractive = target.KeyboardInteractive,
+                    KeyboardInteractiveResponder = target.KeyboardInteractiveResponder
                 };
             }
             ct.ThrowIfCancellationRequested();
@@ -180,13 +205,14 @@ internal static class ToolGatewayConnector
 
     private static async Task<ParentRoute> OpenParentsAsync(
         IReadOnlyList<SshConnectionParams> parents, SshConnectionParams target,
-        IHostKeyVerifier verifier, int keepAliveSeconds, CancellationToken ct, LocalizationManager localizer)
+        IHostKeyVerifier verifier, int keepAliveSeconds, CancellationToken ct, LocalizationManager localizer,
+        HostKeyStore? hostKeyStore = null)
     {
         TunnelManager manager = new();
         try
         {
             TunnelResult result = await manager.OpenChainedTunnelAsync(parents,
-                target.Host, target.Port, 0, new HostKeyStore(), verifier,
+                target.Host, target.Port, 0, hostKeyStore ?? new HostKeyStore(), verifier,
                 cancellationToken: ct, keepAliveIntervalSeconds: keepAliveSeconds).ConfigureAwait(false);
             ct.ThrowIfCancellationRequested();
             result = TunnelFailureMessageResolver.Localize(result, localizer);
@@ -203,12 +229,19 @@ internal static class ToolGatewayConnector
         }
     }
 
-    private sealed class RouteVerifier(IReadOnlyDictionary<(string Host, int Port), string> fingerprints) : IHostKeyVerifier
+    private sealed class RouteVerifier(
+        IReadOnlyDictionary<(string Host, int Port), string> fingerprints,
+        IHostKeyTrustService trust) : IHostKeyVerifier
     {
         public Task<HostKeyDecision> VerifyAsync(string host, int port, string algorithm,
             string presentedFingerprint, string? storedFingerprint, CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
+            if (trust.IsRevoked(host, port, presentedFingerprint))
+            {
+                return Task.FromResult(HostKeyDecision.Reject);
+            }
+
             bool trusted = fingerprints.TryGetValue((host, port), out string? fingerprint)
                 && new PinnedFingerprintVerifier(host, port, fingerprint).Matches(host, port, presentedFingerprint);
             return Task.FromResult(trusted ? HostKeyDecision.TrustOnce : HostKeyDecision.Reject);

@@ -123,23 +123,31 @@ internal static class SshAgentSignConfirmHelper
             fp,
             string.IsNullOrWhiteSpace(key.Comment) ? "-" : key.Comment);
 
+        string allowLabel = localizer?["BtnYes"] ?? "Yes";
+        string declineLabel = localizer?["BtnNo"] ?? "No";
+
         try
         {
             PromptGate.Wait(ct);
             try
             {
-                if (ct.IsCancellationRequested)
+                if (ct.IsCancellationRequested || app.Dispatcher.HasShutdownStarted)
                 {
                     return false;
                 }
 
+                // Use the 5-argument ShowConfirmAsync overload: it fails CLOSED (returns false)
+                // during application shutdown and sets primaryIsDefault: false so pressing Enter
+                // cannot accidentally authorize an SSH agent signature.
                 if (app.Dispatcher.CheckAccess())
                 {
-                    return dialogService.ShowConfirmAsync(title, message).GetAwaiter().GetResult();
+                    return dialogService.ShowConfirmAsync(title, message, "warning", allowLabel, declineLabel)
+                        .GetAwaiter()
+                        .GetResult();
                 }
 
                 return app.Dispatcher
-                    .InvokeAsync(() => dialogService.ShowConfirmAsync(title, message))
+                    .InvokeAsync(() => dialogService.ShowConfirmAsync(title, message, "warning", allowLabel, declineLabel))
                     .Task.Unwrap()
                     .WaitAsync(ct)
                     .GetAwaiter()

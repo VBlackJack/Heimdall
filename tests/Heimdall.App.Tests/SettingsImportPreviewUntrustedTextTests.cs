@@ -150,6 +150,13 @@ public sealed class SettingsImportPreviewUntrustedTextTests
         Assert.Equal(SettingsImportPreview.MaxValueLength, SettingsImportPreview.DescribeValue(localizer, list).Length);
     }
 
+    [Fact]
+    public void SensitiveKeys_IncludesSshCryptoPolicyAndAgentSignConfirmation()
+    {
+        Assert.Contains(nameof(AppSettings.SshCryptoPolicy), SettingsImportPreview.SensitiveKeys);
+        Assert.Contains(nameof(AppSettings.SshConfirmAgentSigning), SettingsImportPreview.SensitiveKeys);
+    }
+
     private static async Task<LocalizationManager> LoadLocalizerAsync()
     {
         LocalizationManager localizer = new();

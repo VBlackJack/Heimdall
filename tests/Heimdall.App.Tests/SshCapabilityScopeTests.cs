@@ -91,6 +91,38 @@ public sealed class SshCapabilityScopeTests
     }
 
     [Fact]
+    public void Evaluate_ReturnsStrictCryptoNotice_WhenExternalPuttyUsesStrictModern()
+    {
+        SshCapabilityNotice? notice = SshCapabilityScope.Evaluate(
+            SshResolvedPath.ExternalPutty,
+            x11Forwarding: false,
+            compression: false,
+            cryptoPolicy: Heimdall.Core.Ssh.SshCryptoPolicy.StrictModern);
+
+        Assert.NotNull(notice);
+        Assert.Equal(SshUnavailableCapability.StrictCryptoPolicy, notice.UnavailableCapabilities);
+        Assert.Equal(
+            Heimdall.App.Localization.SshLocalizationKeys.StatusSshPlinkStrictCryptoUnavailable,
+            notice.StatusLocalizationKey);
+    }
+
+    [Fact]
+    public void Evaluate_ReturnsStrictCryptoNotice_WhenPlinkPipeUsesStrictModern()
+    {
+        SshCapabilityNotice? notice = SshCapabilityScope.Evaluate(
+            SshResolvedPath.PlinkPipe,
+            x11Forwarding: false,
+            compression: false,
+            cryptoPolicy: Heimdall.Core.Ssh.SshCryptoPolicy.StrictModern);
+
+        Assert.NotNull(notice);
+        Assert.Equal(SshUnavailableCapability.StrictCryptoPolicy, notice.UnavailableCapabilities);
+        Assert.Equal(
+            Heimdall.App.Localization.SshLocalizationKeys.StatusSshPlinkStrictCryptoUnavailable,
+            notice.StatusLocalizationKey);
+    }
+
+    [Fact]
     public void SupportsForwarding_ReturnsFalse_ForDirectPath()
     {
         bool supportsForwarding = SshCapabilityScope.SupportsForwarding(SshResolvedPath.Direct);

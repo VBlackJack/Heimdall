@@ -267,4 +267,31 @@ public sealed class ImportedProfileSanitizerTests
         Assert.Null(profiles[1].CitrixLaunchCommandLine);
         Assert.Equal("profile-3", profiles[1].Id);
     }
+
+    [Fact]
+    public void Sanitize_ResetsLegacyCompatibleSshCryptoPolicy_AndKeepsStrictModern()
+    {
+        var profiles = new List<ServerProfileDto>
+        {
+            new()
+            {
+                Id = "legacy-1",
+                DisplayName = "Legacy SSH",
+                ConnectionType = "SSH",
+                SshCryptoPolicy = Heimdall.Core.Ssh.SshCryptoPolicy.LegacyCompatible
+            },
+            new()
+            {
+                Id = "strict-1",
+                DisplayName = "Strict SSH",
+                ConnectionType = "SSH",
+                SshCryptoPolicy = Heimdall.Core.Ssh.SshCryptoPolicy.StrictModern
+            }
+        };
+
+        ImportedProfileSanitizer.Sanitize(profiles);
+
+        Assert.Null(profiles[0].SshCryptoPolicy);
+        Assert.Equal(Heimdall.Core.Ssh.SshCryptoPolicy.StrictModern, profiles[1].SshCryptoPolicy);
+    }
 }

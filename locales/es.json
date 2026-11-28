@@ -438,6 +438,7 @@
   "StatusSshDirectCompressionUnavailable": "La ruta directa de SSH.NET resuelta no admite compresi\u00f3n. La conexi\u00f3n continuar\u00e1 sin ella.",
   "StatusSshDirectX11AndCompressionUnavailable": "La ruta directa de SSH.NET resuelta no admite el reenv\u00edo X11 ni la compresi\u00f3n. La conexi\u00f3n continuar\u00e1 sin ellos.",
   "StatusSshDirectX11Unavailable": "La ruta directa de SSH.NET resuelta no admite el reenv\u00edo X11. La conexi\u00f3n continuar\u00e1 sin \u00e9l.",
+  "StatusSshPlinkStrictCryptoUnavailable": "La pol\u00edtica criptogr\u00e1fica SSH StrictModern no puede aplicarse en Plink/PuTTY. La conexi\u00f3n continuar\u00e1 con los valores predeterminados de Plink/PuTTY.",
   "StatusSshPortForwardFailed": "Uno o m\u00e1s reenv\u00edos de puertos SSH configurados no pudieron iniciarse: {0}",
   "StatusSshRetryingViaPlink": "Fall\u00f3 la autenticaci\u00f3n de SSH.NET, reintentando a trav\u00e9s de Plink...",
   "StatusLaunchingSftp": "Iniciando sesi\u00f3n SFTP...",

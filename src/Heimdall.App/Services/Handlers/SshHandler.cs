@@ -258,7 +258,7 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
             ConfirmAgentSign = SshAgentSignConfirmHelper.BuildConfirmCallback(
                 settings,
                 server.RemoteServer,
-                targetPort,
+                sshPort,
                 _localizer,
                 ct),
             UseLegacyPasswordAsKeyPassphrase = server.UsesLegacySshCredentialMapping,
@@ -828,6 +828,19 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
                 : targetHost;
 
             bool x11Forwarding = await ResolveX11ForwardingAsync(server).ConfigureAwait(false);
+            SshCryptoPolicy effectivePolicy = SshCryptoPolicyResolver.Resolve(server.SshCryptoPolicy, settings.SshCryptoPolicy);
+            SshCapabilityNotice? externalNotice = SshCapabilityScope.Evaluate(
+                SshResolvedPath.ExternalPutty,
+                x11Forwarding: false,
+                compression: false,
+                cryptoPolicy: effectivePolicy);
+            if (externalNotice is not null)
+            {
+                Core.Logging.FileLogger.Warn(
+                    $"External PuTTY path cannot enforce requested capabilities: {externalNotice.LogDescription}. Connection will continue with PuTTY defaults.");
+                SetStatusText?.Invoke(_localizer[externalNotice.StatusLocalizationKey]);
+            }
+
             System.Diagnostics.ProcessStartInfo psi = BuildPuttyStartInfo(
                 puttyPath,
                 server.SshKeyPath,
@@ -1179,6 +1192,18 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
             // Resolved before the attestation so a slow X server start does not widen the gap
             // between identifying the launcher image and launching it.
             bool x11Forwarding = await ResolveX11ForwardingAsync(server).ConfigureAwait(false);
+            SshCryptoPolicy effectivePolicy = SshCryptoPolicyResolver.Resolve(server.SshCryptoPolicy, settings.SshCryptoPolicy);
+            SshCapabilityNotice? plinkNotice = SshCapabilityScope.Evaluate(
+                SshResolvedPath.PlinkPipe,
+                x11Forwarding: false,
+                compression: false,
+                cryptoPolicy: effectivePolicy);
+            if (plinkNotice is not null)
+            {
+                Core.Logging.FileLogger.Warn(
+                    $"Plink pipe path cannot enforce requested capabilities: {plinkNotice.LogDescription}. Connection will continue with Plink defaults.");
+                SetStatusText?.Invoke(_localizer[plinkNotice.StatusLocalizationKey]);
+            }
 
             using (PlinkAttestationLease attestation = _plinkAttestation(plinkPath))
             {

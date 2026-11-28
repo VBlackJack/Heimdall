@@ -119,6 +119,12 @@ public static class ImportedProfileSanitizer
             // A trust decision about the remote certificate, made on the exporting machine.
             profile.WinRmSkipCertificateCheck = false;
 
+            // An imported profile must not downgrade a workstation configured for StrictModern SSH crypto.
+            if (profile.SshCryptoPolicy == Ssh.SshCryptoPolicy.LegacyCompatible)
+            {
+                profile.SshCryptoPolicy = null;
+            }
+
             IReadOnlyList<ImportedTrustFlag> resetFlags = ImportedTrustFlags.Reset(profile);
             IReadOnlyList<ImportedPathRemoval> clearedPaths = ClearNetworkPaths(profile);
             if (resetFlags.Count > 0 || clearedPaths.Count > 0)
