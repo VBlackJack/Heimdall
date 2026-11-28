@@ -321,7 +321,7 @@ Security above). External uses more memory per
 session but isolates each session in its own process.
 
 **Default SSH mode** - `Embedded` uses the built-in SSH.NET terminal. `External` uses PuTTY, which needs
-**PuTTY path** set. `OpenSshNative` runs Windows OpenSSH (`ssh.exe`) inside ConPTY with an ephemeral
+**PuTTY path** set. `OpenSsh` runs Windows OpenSSH (`ssh.exe`) inside ConPTY with an ephemeral
 owner-only ACL `known_hosts` file.
 
 **Apply to all saved sessions** - beside each default mode, rewrites the mode of every saved

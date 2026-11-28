@@ -1365,11 +1365,13 @@ d'éviter toute fuite DNS split-horizon.
   `SSHFP` côté client dès qu'un proxy est actif afin d'éviter toute fuite DNS
   contournant le proxy. Les invites de confiance et diagnostics de passerelle
   appliquent la parité `SshCryptoPolicy` et `@revoked` via
-  `SshSessionDiagnosticFactory`, et la vérification de clé d'hôte au démarrage
-  SSH/SFTP passe par `SshStartupTrustGate` avant toute session. Le mode natif
+  `SshSessionDiagnosticFactory`. `SshStartupTrustGate` n'est pas un contrôle de
+  clé d'hôte : il transmet seulement l'approbation par l'utilisateur de la
+  commande de démarrage / `SetEnv` (`RemoteCommand`) d'un profil de
+  `ConnectionService` vers `SshHandler` (SSH uniquement, pas SFTP). Le mode natif
   Windows OpenSSH (`ssh.exe`) sous ConPTY écrit un fichier `known_hosts`
   éphémère UTF-8 sans BOM protégé par ACL réservée au propriétaire courant
-  (`AclEnforcer.ApplyOwnerOnlyFileAcl`) incluant clés épinglées,
+  (`AclEnforcer.SetFileAcl`) incluant clés épinglées,
   `@cert-authority` et `@revoked`, puis le supprime à la fermeture. La
   révocation de parc `authorized_keys` (`SshFleetAuthorizedKeysService`) réutilise
   les gardes atomiques anti-symlink et anti-verrouillage de dernière clé et

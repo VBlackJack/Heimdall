@@ -1219,10 +1219,12 @@ reached through an SSH gateway to prevent split-horizon DNS leaks.
   suppress client-side DNS `SSHFP` lookups whenever a proxy is active to prevent
   split-horizon or proxy-bypass DNS leaks. Gateway host-key trust prompts and
   diagnostics enforce `SshCryptoPolicy` and `@revoked` parity through
-  `SshSessionDiagnosticFactory`, and SSH/SFTP startup host-key trust runs before
-  session creation via `SshStartupTrustGate`. Native Windows OpenSSH (`ssh.exe`)
+  `SshSessionDiagnosticFactory`. `SshStartupTrustGate` is not a host-key control:
+  it only carries the user's approval of a profile's startup command / `SetEnv`
+  (`RemoteCommand`) from `ConnectionService` to `SshHandler` (SSH only, not
+  SFTP). Native Windows OpenSSH (`ssh.exe`)
   ConPTY mode writes an ephemeral UTF-8 no-BOM `known_hosts` file protected by
-  an owner-only Windows ACL (`AclEnforcer.ApplyOwnerOnlyFileAcl`) containing
+  an owner-only Windows ACL (`AclEnforcer.SetFileAcl`) containing
   pinned entries, `@cert-authority`, and `@revoked` rules, deleting it on exit.
   Fleet `authorized_keys` revocation (`SshFleetAuthorizedKeysService`) reuses
   symlink/last-key atomic removal guards and neutralizes CSV formulas on export.
