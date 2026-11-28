@@ -1111,6 +1111,54 @@ mode with a chosen key is refused.
 linked timeout/cancellation token, replacing the best-effort `ReadTimeout`
 that `NamedPipeClientStream` silently ignores in some modes.
 
+Opt-in per-signature confirmation (`AppSettings.SshConfirmAgentSigning`) prompts
+on the UI thread with target `host:port`, key type, `SHA256:` fingerprint, and
+comment before any SSH agent signs an authentication challenge across SSH
+sessions, SFTP, multi-hop tunnel chains, tool gateways, manual tunnels, public-key
+deployment, and key rotation. Declining raises `SshAgentSigningDeclinedException`
+(classified as `SshFailureCode.AgentSigningDeclined`) and aborts authentication
+without retrying. Hardware FIDO2 (`sk-*`) keys and certificates use a 30 s signing
+timeout (omitting Win32 `SMTO_ABORTIFHUNG` on Pageant so touch waits are not
+aborted early) and display a touch prompt in the status bar. Because SSH.NET
+`2026.0.1` rejects `auth-agent@openssh.com` channel opens natively, `-A` agent
+forwarding remains on the Plink path rather than using reflection hacks.
+
+### Advisory DNS SSHFP verification
+
+`HostKeyPromptDialog` runs a non-blocking RFC 4255/6594/8709 DNS `SSHFP` lookup
+(`SshfpLookupService`, `SshfpMatcher`) using a raw wire codec with EDNS0 DO bit
+enabled, connected UDP sockets (with TCP fallback on TC truncation), and strict
+backward-only compression pointer validation (`MaxDnsCompressionHops = 16`). The
+result is advisory only and never auto-trusts a host key. The UI distinguishes
+local loopback DNSSEC AD validation, network-resolver AD validation, unsigned
+matches, and mismatches. Lookups are skipped whenever the target is reached
+through an SSH gateway to prevent split-horizon DNS leaks.
+
+### Guided SSH key rotation, KEXINIT probe, recordings, and fleet compliance
+
+- **Guided SSH key rotation** (`SshKeyRotator`, `SshKeyRotationDialogViewModel`):
+  refuses to overwrite any existing file or the profile's current key path,
+  deletes newly created key files if rotation fails or is cancelled before profile
+  save, verifies the new key in strict isolation (`DisableAgentAuthentication =
+  true`, no password/certificate fallback), persists the updated profile before
+  touching remote `authorized_keys`, and removes the old key atomically via
+  `mktemp` + `mv -f` while refusing symlinks (`-L`), checking `grep` exit code
+  `<= 1`, and enforcing `[ -s "$tmp" ] && grep -Fq -- "$new_id" "$tmp"`.
+- **SSH Server Cryptographic Audit** (`SshKexInitProbe`): reads only the RFC 4253
+  banner and `SSH_MSG_KEXINIT` packet without authenticating, enforcing hard DoS
+  bounds (`MaxPreBannerLines`, `MaxBannerBytesTotal`, `MaxKexInitPacketLength =
+  65 536` bytes), HTML-encoding all report fields, and neutralizing CSV formula
+  prefixes.
+- **Session `.cast` v2 recording & OSC 133 masked copy**: `AsciinemaCastRecorder`
+  buffers multi-byte UTF-8 across arbitrary chunk boundaries, enforces a character
+  cap, and supports fail-closed `TextRedactor` secret masking across chunk
+  boundaries (refusing export if any redaction regex times out). OSC 133
+  `last-cmd-output:` WebView2 messages propagate truncation state into
+  `MaskedCopyDialogViewModel` and are redacted to length-only in diagnostic logs.
+- **Offline SSH Fleet Compliance** (`SshFleetComplianceAnalyzer`): performs zero
+  network I/O, blocks both `\\` and `//` UNC key paths, bounds local file reads to
+  256 KiB, flags corrupt/unparseable key files, and neutralizes CSV formula cells.
+
 ### Host-key fingerprint comparison
 
 `HostKeyStore.Verify` and `HostKeyTrustService.Verify` / `Trust` / `Import`

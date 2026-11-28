@@ -460,6 +460,17 @@ vide, il est cherché à côté de plink.exe. Un chemin saisi là où il n'y a p
 clés d'hôtes de votre `.ssh/known_hosts` à la liste de confiance de Heimdall à chaque démarrage.
 Une clé différente de celle à laquelle Heimdall fait déjà confiance n'est pas remplacée.
 
+**Confirmer avant chaque signature de l'agent SSH** (SSH & SFTP > Session) affiche l'hôte cible,
+le type de clé, l'empreinte et le commentaire avant qu'un agent SSH ne signe une authentification
+(sessions, SFTP, passerelles, tunnels, déploiement et rotation de clé). **Délai d'interrogation
+de l'agent SSH** borne l'attente lors de l'énumération des clés des agents locaux.
+
+**Politique cryptographique SSH** (SSH & SFTP > Session) permet de choisir globalement entre
+`Standard`, `StrictModern` (algorithmes modernes ANSSI / SecNumCloud uniquement) et
+`LegacyCompatible`, avec surcharge possible par profil. **Autoriser l'écriture presse-papiers
+OSC 52** (Terminal) est désactivé par défaut et n'autorise que l'écriture bornée à 128 Kio (les
+requêtes de lecture `?` sont toujours bloquées).
+
 ## Détection des outils tiers
 
 **Répertoires Sysinternals, NirSoft et NanaRun** - Heimdall n'embarque pas ces suites. Indiquez

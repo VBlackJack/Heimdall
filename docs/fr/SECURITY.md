@@ -1248,6 +1248,61 @@ asynchrones (`NamedPipeClientStream` ouvert avec `PipeOptions.Asynchronous`) et
 sur un jeton lié de délai/annulation, en remplacement du `ReadTimeout` au
 mieux, que `NamedPipeClientStream` ignore silencieusement dans certains modes.
 
+La confirmation opt-in par signature (`AppSettings.SshConfirmAgentSigning`)
+affiche sur le thread UI l'hôte cible (`hote:port`), le type de clé, l'empreinte
+`SHA256:` et le commentaire avant qu'un agent SSH ne signe un défi
+d'authentification sur les sessions SSH, SFTP, chaînes de tunnels multi-sauts,
+outils via passerelle, tunnels manuels, déploiement de clé publique et rotation de
+clé. Un refus lève `SshAgentSigningDeclinedException` (classé
+`SshFailureCode.AgentSigningDeclined`) et interrompt l'authentification sans
+nouvelle tentative. Les clés matérielles FIDO2 (`sk-*`) et leurs certificats
+utilisent un délai de signature de 30 s (sans `SMTO_ABORTIFHUNG` sur Pageant pour
+ne pas interrompre l'attente du contact matériel) et affichent un rappel dans la
+barre d'état. Comme SSH.NET `2026.0.1` refuse nativement l'ouverture du canal
+`auth-agent@openssh.com`, le transfert d'agent `-A` reste sur la voie Plink sans
+contournement par réflexion.
+
+### Vérification consultative DNS SSHFP
+
+`HostKeyPromptDialog` lance une requête DNS `SSHFP` RFC 4255/6594/8709 non
+bloquante (`SshfpLookupService`, `SshfpMatcher`) via un codec binaire brut avec
+bit EDNS0 DO, socket UDP connecté (repli TCP sur troncature TC) et validation
+stricte des pointeurs de compression uniquement vers l'arrière
+(`MaxDnsCompressionHops = 16`). Le résultat reste purement consultatif et
+n'approuve jamais automatiquement une clé d'hôte. L'interface distingue la
+validation DNSSEC AD d'un résolveur local loopback, celle d'un résolveur réseau,
+une correspondance DNS non signée et une divergence. La vérification est ignorée
+dès que la cible passe par une passerelle SSH afin d'éviter toute fuite DNS
+split-horizon.
+
+### Rotation guidée de clé SSH, sonde KEXINIT, enregistrements et conformité du parc
+
+- **Rotation guidée de clé SSH** (`SshKeyRotator`, `SshKeyRotationDialogViewModel`) :
+  refuse d'écraser tout fichier existant ou la clé actuelle du profil, supprime
+  les fichiers nouvellement générés en cas d'échec ou d'annulation avant la
+  sauvegarde du profil, vérifie la nouvelle clé en isolation stricte
+  (`DisableAgentAuthentication = true`, sans repli mot de passe ni certificat),
+  enregistre le profil avant toute modification de `authorized_keys`, puis retire
+  l'ancienne clé de façon atomique (`mktemp` + `mv -f`) en refusant les liens
+  symboliques (`-L`), en vérifiant le code retour `grep <= 1` et l'invariant
+  `[ -s "$tmp" ] && grep -Fq -- "$new_id" "$tmp"`.
+- **Audit cryptographique serveur SSH** (`SshKexInitProbe`) : lit uniquement la
+  bannière RFC 4253 et le paquet `SSH_MSG_KEXINIT` sans authentification, avec
+  plafonds stricts anti-DoS (`MaxPreBannerLines`, `MaxBannerBytesTotal`,
+  `MaxKexInitPacketLength = 65 536` octets), encodage HTML de tous les champs et
+  neutralisation des formules CSV.
+- **Enregistrement `.cast` v2 et copie masquée OSC 133** : `AsciinemaCastRecorder`
+  tamponne les séquences UTF-8 multi-octets à cheval sur n'importe quel découpage
+  de tampon, applique un plafond de caractères et propose un masquage des secrets
+  fail-closed via `TextRedactor` sur toute la transcription (refus d'export si une
+  règle expire). Les messages WebView2 `last-cmd-output:` OSC 133 propagent l'état
+  de troncature vers `MaskedCopyDialogViewModel` et sont journalisés uniquement
+  par leur longueur.
+- **Conformité hors-ligne du parc SSH** (`SshFleetComplianceAnalyzer`) : aucun
+  accès réseau, refus des chemins UNC `\\` et `//`, lecture locale bornée à
+  256 Ko, signalement des fichiers de clés corrompus ou illisibles et
+  neutralisation des cellules CSV.
+
 ### Comparaison des empreintes de clé d'hôte
 
 `HostKeyStore.Verify` et `HostKeyTrustService.Verify` / `Trust` / `Import`

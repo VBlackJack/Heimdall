@@ -405,6 +405,17 @@ an empty field says nothing.
 your `.ssh/known_hosts` to Heimdall's trusted list each time Heimdall starts. A key that differs
 from one Heimdall already trusts is not replaced.
 
+**Confirm before SSH agent signs authentication** (SSH & SFTP > Session) prompts with the target
+host, key type, fingerprint, and comment before any SSH agent signs an authentication challenge
+(sessions, SFTP, gateways, tunnels, key deployment, and rotation). **SSH agent lookup timeout**
+bounds how long Heimdall waits when enumerating keys from local agents.
+
+**SSH cryptographic policy** (SSH & SFTP > Session) lets you choose between `Standard`,
+`StrictModern` (ANSSI / SecNumCloud modern algorithms only), and `LegacyCompatible` globally, with
+per-profile overrides in the session dialog. **Allow OSC 52 clipboard write** (Terminal) is off by
+default and only permits write-only clipboard updates capped at 128 KiB (read queries `?` are always
+blocked).
+
 ## Third-party tool detection
 
 **Sysinternals, NirSoft and NanaRun directories** - Heimdall does not ship these suites. Point it
