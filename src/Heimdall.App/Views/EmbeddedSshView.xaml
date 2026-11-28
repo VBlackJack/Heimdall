@@ -129,6 +129,15 @@
                             Style="{DynamicResource GhostButtonStyle}"
                             Padding="6,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0"/>
 
+                    <Button x:Name="RecordCastButton"
+                            Content="&#xE7C8;"
+                            FontFamily="{StaticResource FontFamilyIcons}"
+                            Click="OnRecordCastClick"
+                            ToolTip="{loc:Translate TooltipRecordAsciinemaCast}"
+                            AutomationProperties.Name="{loc:Translate A11yRecordAsciinemaCast}"
+                            Style="{DynamicResource GhostButtonStyle}"
+                            Padding="6,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0"/>
+
                     <Button x:Name="HotForwardButton"
                             Content="&#xE8AB;"
                             FontFamily="{StaticResource FontFamilyIcons}"

@@ -79,6 +79,7 @@ public partial class EmbeddedSshView
         HotForwardButton.ToolTip = L("TooltipHotPortForward");
         HealthToggleButton.ToolTip = L("TooltipToggleHealthMonitoring");
         UpdateHighlightsToggleVisual();
+        UpdateCastRecordVisual();
         UpdateSessionCryptoInfo();
         ElevateButton.ToolTip = L("TooltipElevateToRoot");
 
@@ -89,6 +90,7 @@ public partial class EmbeddedSshView
         System.Windows.Automation.AutomationProperties.SetName(HotForwardButton, L("A11yHotPortForward"));
         System.Windows.Automation.AutomationProperties.SetName(HealthToggleButton, L("A11yToggleHealthMonitoring"));
         System.Windows.Automation.AutomationProperties.SetName(HighlightsToggleButton, L("A11yToggleTerminalHighlights"));
+        System.Windows.Automation.AutomationProperties.SetName(RecordCastButton, L("A11yRecordAsciinemaCast"));
         System.Windows.Automation.AutomationProperties.SetName(SessionInfoButton, L("A11ySessionCryptoInfo"));
         System.Windows.Automation.AutomationProperties.SetName(ElevateButton, L("A11yElevateToRoot"));
         System.Windows.Automation.AutomationProperties.SetName(OverlayReconnectButton, L("A11yReconnectSession"));

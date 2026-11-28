@@ -6992,5 +6992,16 @@
   "SshKeyRotateSuccess": "Clave SSH rotada correctamente ({0}).",
   "SshKeyRotatePartialSuccess": "Nueva clave activa y guardada, pero fall\u00f3 la eliminaci\u00f3n de la anterior: {0}",
   "SshKeyRotateFailed": "Error al rotar la clave SSH: {0}",
-  "SshKeyRotateCancelled": "Rotaci\u00f3n de clave SSH cancelada."
+  "SshKeyRotateCancelled": "Rotaci\u00f3n de clave SSH cancelada.",
+  "TooltipRecordAsciinemaCast": "Grabar sesi\u00f3n en formato asciinema (.cast v2)",
+  "TooltipRecordAsciinemaCastActive": "Grabaci\u00f3n asciinema (.cast) activa - haz clic para detener y guardar",
+  "A11yRecordAsciinemaCast": "Grabar sesi\u00f3n asciinema",
+  "CastRecordStartedStatus": "Grabando sesi\u00f3n asciinema (.cast)...",
+  "CastRecordMaskPromptTitle": "\u00bfEnmascarar secretos en la grabaci\u00f3n .cast?",
+  "CastRecordMaskPromptMessage": "\u00bfOcultar autom\u00e1ticamente los secretos detectados (tokens, contrase\u00f1as, claves privadas) antes de guardar el archivo asciinema (.cast)?",
+  "CastRecordMaskRefused": "Exportaci\u00f3n rechazada: expir\u00f3 una regla de enmascaramiento ({0}). No se guard\u00f3 el archivo.",
+  "CastRecordSavedStatus": "Grabaci\u00f3n asciinema guardada ({0} eventos).",
+  "CastRecordSaveFailed": "Error al guardar la grabaci\u00f3n asciinema: {0}",
+  "MenuCopyLastCommandOutput": "Copiar salida del \u00faltimo comando (secretos ocultos)",
+  "Osc133NoLastCommand": "A\u00fan no se captur\u00f3 la salida de ning\u00fan comando OSC 133."
 }

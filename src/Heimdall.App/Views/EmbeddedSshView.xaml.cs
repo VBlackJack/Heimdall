@@ -65,6 +65,8 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     private const string MsgClipboardWrite = "clipboard-write:";
     private const string MsgClipboardRead = "clipboard-read:";
     private const string MsgFileDrop = "file-drop:";
+    private const string MsgLastCmdOutput = "last-cmd-output:";
+    private const string MsgCopyLastCommandOutput = "copy-last-command-output:";
     internal const string MsgOsc52Write = "osc52-write:";
     internal const int MaxOsc52DecodedBytes = 128 * 1024;
     internal const int MaxOsc52Base64Length = ((MaxOsc52DecodedBytes + 2) / 3) * 4;
@@ -310,6 +312,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     private string _sessionLogDisplayName = string.Empty;
     private string _sessionLogEndpoint = string.Empty;
     private string? _lastKnownCwd;
+    private Heimdall.Terminal.Logging.AsciinemaCastRecorder? _castRecorder;
     private SshShellSession? _session;
     private Heimdall.Terminal.ITerminalSession? _terminalSession;
     private SessionTabViewModel? _sessionTab;
@@ -778,6 +781,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
         StopHealthMonitor();
         StopTranscript();
+        StopCastRecorderSilently();
         StopKeepAliveTimer();
         StopAutoReconnectTimer();
         ReleaseSleepPrevention();
@@ -1415,6 +1419,31 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             return;
         }
 
+        if (message.StartsWith(MsgLastCmdOutput, StringComparison.Ordinal))
+        {
+            string b64 = message[MsgLastCmdOutput.Length..];
+            if (string.IsNullOrEmpty(b64))
+            {
+                _ = Dispatcher.BeginInvoke(() => _ = OpenMaskedCopyForLastCommandAsync(string.Empty));
+                return;
+            }
+
+            if (TryAcceptInboundBase64Payload("last-cmd-output", b64))
+            {
+                try
+                {
+                    string outputText = Encoding.UTF8.GetString(Convert.FromBase64String(b64));
+                    _ = Dispatcher.BeginInvoke(() => _ = OpenMaskedCopyForLastCommandAsync(outputText));
+                }
+                catch (FormatException ex)
+                {
+                    Core.Logging.FileLogger.Warn($"EmbeddedSSH invalid last-cmd-output payload: {ex.Message}");
+                }
+            }
+
+            return;
+        }
+
         Core.Logging.FileLogger.Warn(
             $"EmbeddedSSH dropped unknown WebView2 terminal message: {DescribeWebViewText(message)}");
     }
@@ -1439,6 +1468,9 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         string label = _localizer?[TerminalLibraryCapture.MenuItemLabelKey]
             ?? TerminalLibraryCapture.MenuItemLabelKey;
         ContextMenu menu = TerminalLibraryCapture.CreateMenu(selection, label, RaiseSaveToLibraryRequested);
+        var copyLastCmdItem = new MenuItem { Header = L("MenuCopyLastCommandOutput") };
+        copyLastCmdItem.Click += (_, _) => PostTerminalMessage(MsgCopyLastCommandOutput);
+        menu.Items.Add(copyLastCmdItem);
         menu.PlacementTarget = TerminalWebView;
         menu.Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint;
         menu.IsOpen = true;
@@ -1630,6 +1662,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         }
 
         ForwardToActiveMacroExpect(data);
+        Volatile.Read(ref _castRecorder)?.WriteOutput(data);
 
         if (SessionLogService is not null && _sessionLogKey is not null)
         {
@@ -1767,6 +1800,8 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             // left running would poll that disposed client until the tab
             // closes. Whatever branch below is taken, there is nothing to poll.
             StopHealthMonitor();
+            StopCastRecorderSilently();
+            UpdateCastRecordVisual();
 
             // Nothing is connected any more: a tab left open on a dead session kept the machine
             // awake overnight and kept sending keep-alives into a closed shell. A reconnect builds
@@ -1983,6 +2018,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         int clampedRows = Math.Clamp(rows, 1, MaxResizeRows);
 
         ObservePipeSessionSize(new TerminalSize(clampedColumns, clampedRows));
+        Volatile.Read(ref _castRecorder)?.WriteResize(clampedColumns, clampedRows);
 
         try
         {

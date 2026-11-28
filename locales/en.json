@@ -6992,5 +6992,16 @@
   "SshKeyRotateSuccess": "SSH key rotated successfully ({0}).",
   "SshKeyRotatePartialSuccess": "New SSH key is active and saved, but old key removal failed: {0}",
   "SshKeyRotateFailed": "SSH key rotation failed: {0}",
-  "SshKeyRotateCancelled": "SSH key rotation cancelled."
+  "SshKeyRotateCancelled": "SSH key rotation cancelled.",
+  "TooltipRecordAsciinemaCast": "Record session to asciinema (.cast v2)",
+  "TooltipRecordAsciinemaCastActive": "Recording asciinema (.cast) - click to stop and save",
+  "A11yRecordAsciinemaCast": "Record asciinema session cast",
+  "CastRecordStartedStatus": "Recording asciinema (.cast) session...",
+  "CastRecordMaskPromptTitle": "Mask secrets in .cast recording?",
+  "CastRecordMaskPromptMessage": "Automatically redact detected secrets (tokens, passwords, private keys) before saving the asciinema (.cast) file?",
+  "CastRecordMaskRefused": "Export refused: secret redaction rule timed out ({0}). File was not written.",
+  "CastRecordSavedStatus": "Asciinema recording saved ({0} events).",
+  "CastRecordSaveFailed": "Failed to save asciinema recording: {0}",
+  "MenuCopyLastCommandOutput": "Copy last command output (secrets masked)",
+  "Osc133NoLastCommand": "No completed OSC 133 command output captured yet."
 }

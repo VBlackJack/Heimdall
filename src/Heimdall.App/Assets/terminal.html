@@ -807,6 +807,11 @@
                     return;
                 }
 
+                if (message === 'copy-last-command-output:') {
+                    postLastCommandOutput();
+                    return;
+                }
+
                 if (message.indexOf('clipboard-paste:') === 0) {
                     var pasteB64 = message.substring('clipboard-paste:'.length);
                     if (pasteB64) {
@@ -922,7 +927,160 @@
                     });
                 }
 
+                // ── OSC 133 Prompt Marks (FinalTerm / shell integration) ──
+                var maxPromptZones = 500;
+                var promptZones = [];
+                var activePromptZone = null;
+
+                function pruneDisposedPromptZones() {
+                    var kept = [];
+                    for (var i = 0; i < promptZones.length; i++) {
+                        var z = promptZones[i];
+                        if (z.promptMarker && !z.promptMarker.isDisposed && z.promptMarker.line >= 0) {
+                            kept.push(z);
+                        } else if (z.decoration && typeof z.decoration.dispose === 'function') {
+                            try { z.decoration.dispose(); } catch (e) { }
+                        }
+                    }
+                    promptZones = kept;
+                }
+
+                function disposeZone(z) {
+                    if (!z) return;
+                    try { if (z.decoration) z.decoration.dispose(); } catch (e) { }
+                    try { if (z.promptMarker) z.promptMarker.dispose(); } catch (e) { }
+                    try { if (z.outputStartMarker) z.outputStartMarker.dispose(); } catch (e) { }
+                    try { if (z.outputEndMarker) z.outputEndMarker.dispose(); } catch (e) { }
+                }
+
+                function navigatePromptMark(direction) {
+                    pruneDisposedPromptZones();
+                    if (promptZones.length === 0 || !term || !term.buffer) {
+                        return;
+                    }
+                    var currentTop = term.buffer.active.viewportY;
+                    if (direction < 0) {
+                        for (var i = promptZones.length - 1; i >= 0; i--) {
+                            var line = promptZones[i].promptMarker.line;
+                            if (line < currentTop) {
+                                term.scrollToLine(line);
+                                return;
+                            }
+                        }
+                        term.scrollToLine(promptZones[0].promptMarker.line);
+                    } else {
+                        for (var j = 0; j < promptZones.length; j++) {
+                            var nextLine = promptZones[j].promptMarker.line;
+                            if (nextLine > currentTop) {
+                                term.scrollToLine(nextLine);
+                                return;
+                            }
+                        }
+                        term.scrollToBottom();
+                    }
+                }
+
+                function postLastCommandOutput() {
+                    pruneDisposedPromptZones();
+                    if (!term || !term.buffer || !term.buffer.normal) {
+                        postMessage('last-cmd-output:');
+                        return;
+                    }
+                    var targetZone = null;
+                    for (var i = promptZones.length - 1; i >= 0; i--) {
+                        var z = promptZones[i];
+                        if (z.outputStartMarker && !z.outputStartMarker.isDisposed && z.outputStartMarker.line >= 0
+                            && z.outputEndMarker && !z.outputEndMarker.isDisposed && z.outputEndMarker.line >= z.outputStartMarker.line) {
+                            targetZone = z;
+                            break;
+                        }
+                    }
+                    if (!targetZone) {
+                        postMessage('last-cmd-output:');
+                        return;
+                    }
+                    var buffer = term.buffer.normal;
+                    var startRow = Math.max(0, targetZone.outputStartMarker.line);
+                    var endRow = Math.min(buffer.length - 1, targetZone.outputEndMarker.line);
+                    var lines = [];
+                    for (var row = startRow; row <= endRow; row++) {
+                        var line = buffer.getLine(row);
+                        if (!line) continue;
+                        var next = row + 1 <= endRow ? buffer.getLine(row + 1) : null;
+                        var rowText = line.translateToString(!(next && next.isWrapped));
+                        if (line.isWrapped && lines.length > 0) {
+                            lines[lines.length - 1] += rowText;
+                        } else {
+                            lines.push(rowText);
+                        }
+                    }
+                    while (lines.length > 0 && lines[lines.length - 1] === '') {
+                        lines.pop();
+                    }
+                    var text = lines.join('\n');
+                    var encoded = new TextEncoder().encode(text);
+                    var maxBytes = 1024 * 1024;
+                    if (encoded.length > maxBytes) {
+                        var cut = encoded.length - maxBytes;
+                        while (cut < encoded.length && (encoded[cut] & utf8ContinuationMask) === utf8ContinuationBits) {
+                            cut++;
+                        }
+                        encoded = encoded.subarray(cut);
+                    }
+                    postMessage('last-cmd-output:' + bytesToBase64Chunked(encoded));
+                }
+
                 if (typeof term.registerOscHandler === 'function') {
+                    term.registerOscHandler(133, function (data) {
+                        if (!term || !term.buffer || term.buffer.active.type !== 'normal' || typeof term.registerMarker !== 'function') {
+                            return true;
+                        }
+                        var parts = typeof data === 'string' ? data.split(';') : [];
+                        var code = parts[0] || '';
+                        if (code === 'A') {
+                            pruneDisposedPromptZones();
+                            var marker = term.registerMarker(0);
+                            if (marker) {
+                                activePromptZone = {
+                                    promptMarker: marker,
+                                    outputStartMarker: null,
+                                    outputEndMarker: null,
+                                    exitCode: null,
+                                    decoration: null
+                                };
+                                promptZones.push(activePromptZone);
+                                while (promptZones.length > maxPromptZones) {
+                                    disposeZone(promptZones.shift());
+                                }
+                            }
+                        } else if (code === 'C' && activePromptZone) {
+                            activePromptZone.outputStartMarker = term.registerMarker(0);
+                        } else if (code === 'D' && activePromptZone) {
+                            activePromptZone.outputEndMarker = term.registerMarker(0);
+                            var exitCode = parts.length > 1 ? parseInt(parts[1], 10) : 0;
+                            if (isNaN(exitCode)) {
+                                exitCode = 0;
+                            }
+                            activePromptZone.exitCode = exitCode;
+                            if (typeof term.registerDecoration === 'function' && activePromptZone.promptMarker && !activePromptZone.promptMarker.isDisposed) {
+                                try {
+                                    var markerColor = exitCode === 0 ? '#50FA7B' : '#FF5555';
+                                    activePromptZone.decoration = term.registerDecoration({
+                                        marker: activePromptZone.promptMarker,
+                                        width: 1,
+                                        overviewRulerOptions: {
+                                            color: markerColor,
+                                            position: 'left'
+                                        }
+                                    });
+                                } catch (e) {
+                                    // Decoration optional if renderer unavailable.
+                                }
+                            }
+                            activePromptZone = null;
+                        }
+                        return true;
+                    });
                     term.registerOscHandler(7, function (data) {
                         var path = tryParseOsc7Path(data);
                         if (path) {
@@ -1014,6 +1172,18 @@
                         event.preventDefault();
                         var librarySelection = term.getSelection();
                         if (librarySelection) postMessage('library-save:' + stringToBase64(librarySelection));
+                        return false;
+                    }
+
+                    // Ctrl+Shift+Up / Ctrl+Shift+Down: jump between OSC 133 command prompt marks
+                    if (event.ctrlKey && event.shiftKey && !event.altKey && !event.metaKey && event.key === 'ArrowUp') {
+                        event.preventDefault();
+                        navigatePromptMark(-1);
+                        return false;
+                    }
+                    if (event.ctrlKey && event.shiftKey && !event.altKey && !event.metaKey && event.key === 'ArrowDown') {
+                        event.preventDefault();
+                        navigatePromptMark(1);
                         return false;
                     }
 

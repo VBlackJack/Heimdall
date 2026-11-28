@@ -17,6 +17,7 @@
 using Heimdall.App.Localization;
 using Heimdall.App.Services;
 using Heimdall.App.Services.Macros;
+using Heimdall.App.ViewModels;
 using Heimdall.Core.Models;
 using Heimdall.Terminal.Logging;
 using Heimdall.Terminal.Macros;
@@ -45,6 +46,180 @@ public partial class EmbeddedSshView
         if (SessionLogService is not null && _sessionLogKey is not null)
         {
             SessionLogService.StopSession(_sessionLogKey);
+        }
+    }
+
+    /// <summary>Whether an asciinema (.cast v2) session recording is currently active.</summary>
+    public bool IsRecordingCast => _castRecorder is { IsRecording: true };
+
+    private void StopCastRecorderSilently()
+    {
+        var recorder = Interlocked.Exchange(ref _castRecorder, null);
+        recorder?.Stop();
+    }
+
+    private void UpdateCastRecordVisual()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        bool active = IsRecordingCast;
+        RecordCastButton.SetResourceReference(
+            System.Windows.Controls.Control.ForegroundProperty,
+            active ? "ErrorTextBrush" : "TextSecondaryBrush");
+        RecordCastButton.ToolTip = active
+            ? L("TooltipRecordAsciinemaCastActive")
+            : L("TooltipRecordAsciinemaCast");
+    }
+
+    private void OnRecordCastClick(object sender, System.Windows.RoutedEventArgs e)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        if (_castRecorder is null)
+        {
+            int cols = LastKnownTerminalSize?.Columns ?? 120;
+            int rows = LastKnownTerminalSize?.Rows ?? 40;
+            _castRecorder = new AsciinemaCastRecorder(cols, rows, _sessionLogDisplayName);
+            UpdateCastRecordVisual();
+            UpdateStatus(
+                CurrentPaneStatus ?? SessionStatusTokens.Connected,
+                displayTextOverride: L("CastRecordStartedStatus"));
+            return;
+        }
+
+        var recorder = Interlocked.Exchange(ref _castRecorder, null);
+        recorder?.Stop();
+        UpdateCastRecordVisual();
+        if (recorder is not null)
+        {
+            _ = SaveCastRecordingAsync(recorder);
+        }
+    }
+
+    private async Task SaveCastRecordingAsync(AsciinemaCastRecorder recorder)
+    {
+        try
+        {
+            var services = (System.Windows.Application.Current as App)?.Services;
+            var dialogService = services?.GetService(typeof(IDialogService)) as IDialogService;
+
+            bool maskSecrets = true;
+            if (dialogService is not null)
+            {
+                maskSecrets = await dialogService.ShowConfirmAsync(
+                    L("CastRecordMaskPromptTitle"),
+                    L("CastRecordMaskPromptMessage")).ConfigureAwait(true);
+            }
+
+            string castContent = await Task.Run(() =>
+            {
+                string serialized = recorder.SerializeToCastV2(
+                    maskSecrets,
+                    out bool refused,
+                    out string? ruleId);
+                return (serialized, refused, ruleId);
+            }).ConfigureAwait(true) switch
+            {
+                (_, true, var ruleId) => throw new InvalidOperationException(
+                    string.Format(
+                        System.Globalization.CultureInfo.CurrentCulture,
+                        L("CastRecordMaskRefused"),
+                        ruleId ?? "unknown")),
+                (var serialized, false, _) => serialized
+            };
+
+            string safeBase = string.IsNullOrWhiteSpace(_sessionLogDisplayName)
+                ? "session"
+                : new string(_sessionLogDisplayName.Select(c => char.IsLetterOrDigit(c) || c is '-' or '_' ? c : '_').ToArray());
+            var saveDialog = new Microsoft.Win32.SaveFileDialog
+            {
+                Filter = "asciinema v2 (*.cast)|*.cast",
+                FileName = $"{safeBase}-{DateTime.UtcNow:yyyyMMdd-HHmmss}.cast"
+            };
+
+            if (saveDialog.ShowDialog() != true)
+            {
+                return;
+            }
+
+            await System.IO.File.WriteAllTextAsync(
+                saveDialog.FileName,
+                castContent,
+                new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false)).ConfigureAwait(true);
+
+            UpdateStatus(
+                CurrentPaneStatus ?? SessionStatusTokens.Connected,
+                displayTextOverride: string.Format(
+                    System.Globalization.CultureInfo.CurrentCulture,
+                    L("CastRecordSavedStatus"),
+                    recorder.EventCount));
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"EmbeddedSSH asciinema cast save failed: {ex.Message}");
+            UpdateStatus(
+                CurrentPaneStatus ?? SessionStatusTokens.Connected,
+                displayTextOverride: string.Format(
+                    System.Globalization.CultureInfo.CurrentCulture,
+                    L("CastRecordSaveFailed"),
+                    ex.Message),
+                forceErrorBrush: true);
+        }
+    }
+
+    private async Task OpenMaskedCopyForLastCommandAsync(string outputText)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        if (string.IsNullOrEmpty(outputText))
+        {
+            UpdateStatus(
+                CurrentPaneStatus ?? SessionStatusTokens.Connected,
+                displayTextOverride: L("Osc133NoLastCommand"));
+            return;
+        }
+
+        if (_localizer is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var services = (System.Windows.Application.Current as App)?.Services;
+            var dialogService = services?.GetService(typeof(IDialogService)) as IDialogService;
+            var clipboard = services?.GetService(typeof(IClipboardService)) as IClipboardService
+                ?? new WpfClipboardService();
+            var vm = await ViewModels.Dialogs.MaskedCopyDialogViewModel
+                .CreateAsync(outputText, truncated: false, _localizer, clipboard)
+                .ConfigureAwait(true);
+
+            if (dialogService is not null)
+            {
+                await dialogService.ShowMaskedCopyAsync(vm).ConfigureAwait(true);
+            }
+            else
+            {
+                var dialog = new Dialogs.MaskedCopyDialog
+                {
+                    DataContext = vm,
+                    Owner = System.Windows.Window.GetWindow(this)
+                };
+                dialog.ShowDialog();
+            }
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"EmbeddedSSH OSC 133 masked copy failed: {ex.Message}");
         }
     }
 
