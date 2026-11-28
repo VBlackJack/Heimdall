@@ -145,4 +145,46 @@ public sealed class SshCapabilityScopeTests
 
         Assert.True(supportsForwarding);
     }
+
+    [Fact]
+    public void Evaluate_ReturnsStartupCommandNotice_WhenPlinkOrPuttyHasStartupCommandOrEnv()
+    {
+        foreach (SshResolvedPath path in new[] { SshResolvedPath.ExternalPutty, SshResolvedPath.PlinkPipe })
+        {
+            SshCapabilityNotice? notice = SshCapabilityScope.Evaluate(
+                path,
+                x11Forwarding: false,
+                compression: false,
+                cryptoPolicy: Heimdall.Core.Ssh.SshCryptoPolicy.Standard,
+                hasStartupCommandOrEnv: true);
+
+            Assert.NotNull(notice);
+            Assert.Equal(SshUnavailableCapability.StartupCommandOrEnv, notice.UnavailableCapabilities);
+            Assert.Equal(
+                Heimdall.App.Localization.SshLocalizationKeys.StatusSshPlinkStartupCommandUnavailable,
+                notice.StatusLocalizationKey);
+        }
+    }
+
+    [Fact]
+    public void Evaluate_ReturnsCombinedNotice_WhenStrictCryptoAndStartupCommandCoexist()
+    {
+        foreach (SshResolvedPath path in new[] { SshResolvedPath.ExternalPutty, SshResolvedPath.PlinkPipe })
+        {
+            SshCapabilityNotice? notice = SshCapabilityScope.Evaluate(
+                path,
+                x11Forwarding: false,
+                compression: false,
+                cryptoPolicy: Heimdall.Core.Ssh.SshCryptoPolicy.StrictModern,
+                hasStartupCommandOrEnv: true);
+
+            Assert.NotNull(notice);
+            Assert.Equal(
+                SshUnavailableCapability.StrictCryptoPolicy | SshUnavailableCapability.StartupCommandOrEnv,
+                notice.UnavailableCapabilities);
+            Assert.Equal(
+                Heimdall.App.Localization.SshLocalizationKeys.StatusSshPlinkStrictCryptoAndStartupUnavailable,
+                notice.StatusLocalizationKey);
+        }
+    }
 }

@@ -7139,5 +7139,9 @@
   "SshErrorProxyUnsupportedOnPutty": "External PuTTY launches cannot enforce Heimdall's outbound SSH proxy settings. Use the built-in SSH client or an SSH gateway.",
   "TunnelErrorProxyUnsupportedOnPlink": "Plink tunnel fallback cannot route through an outbound proxy configured on the gateway. Fix authentication for the built-in SSH client.",
   "ToolSshServerAuditProxyNotSupportedDirect": "Direct outbound proxy auditing without an SSH gateway is unsupported (probe refused to avoid bypassing the proxy).",
-  "GatewayDiagnosticTrustRevoked": "Revoked host key detected. Connection blocked by local trust policy."
+  "GatewayDiagnosticTrustRevoked": "Revoked host key detected. Connection blocked by local trust policy.",
+  "StatusSshPlinkStartupCommandUnavailable": "Plink/PuTTY cannot run SSH startup commands or SetEnv variables. The connection will continue without them.",
+  "StatusSshPlinkStrictCryptoAndStartupUnavailable": "Plink/PuTTY cannot enforce strict cryptography or run SSH startup commands/SetEnv. The connection will continue with transport defaults.",
+  "SshCertWarningNotYetValid": "SSH user certificate is not valid yet (valid from {0}).",
+  "CastPlayerLoading": "Loading recording..."
 }

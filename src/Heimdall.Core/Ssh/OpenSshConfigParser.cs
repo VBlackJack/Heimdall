@@ -340,6 +340,50 @@ public static partial class OpenSshConfigParser
             return;
         }
 
+        if (directive.Equals("forwardx11", StringComparison.OrdinalIgnoreCase))
+        {
+            if (block.ForwardX11 is null && TryParseYesNo(value, out var parsedForwardX11))
+            {
+                block.ForwardX11 = parsedForwardX11;
+            }
+
+            return;
+        }
+
+        if (directive.Equals("remotecommand", StringComparison.OrdinalIgnoreCase))
+        {
+            if (block.RemoteCommand is null &&
+                SshStartupCommandPolicy.TryNormalizeStartupCommand(value, out string normalizedCommand))
+            {
+                block.RemoteCommand = normalizedCommand;
+            }
+
+            return;
+        }
+
+        if (directive.Equals("setenv", StringComparison.OrdinalIgnoreCase))
+        {
+            foreach (string token in SplitTokens(value))
+            {
+                if (block.EnvironmentVariables.Count >= SshStartupCommandPolicy.MaxEnvironmentVariables)
+                {
+                    break;
+                }
+
+                if (SshStartupCommandPolicy.TryParseEnvAssignment(token, out string envName, out string envVal))
+                {
+                    string prefix = envName + "=";
+                    if (!block.EnvironmentVariables.Any(existing =>
+                            existing.StartsWith(prefix, StringComparison.Ordinal)))
+                    {
+                        block.EnvironmentVariables.Add($"{envName}={envVal}");
+                    }
+                }
+            }
+
+            return;
+        }
+
         diagnostics.Add(new OpenSshImportDiagnostic(
             OpenSshDiagnosticLevel.Info,
             lineNumber,
@@ -481,6 +525,11 @@ public static partial class OpenSshConfigParser
                 var effectiveLocalForwards = block.LocalForwards.Count > 0
                     ? block.LocalForwards.ToList()
                     : globalDefaults.LocalForwards.ToList();
+                var effectiveForwardX11 = block.ForwardX11 ?? globalDefaults.ForwardX11 ?? false;
+                var effectiveRemoteCommand = block.RemoteCommand ?? globalDefaults.RemoteCommand;
+                var effectiveEnvironmentVariables = block.EnvironmentVariables.Count > 0
+                    ? block.EnvironmentVariables.ToList()
+                    : globalDefaults.EnvironmentVariables.ToList();
 
                 candidates.Add(new OpenSshImportCandidate
                 {
@@ -497,7 +546,10 @@ public static partial class OpenSshConfigParser
                     DynamicForwardPort = effectiveDynamicForward,
                     RemoteForwardBindPort = effectiveRemoteBind,
                     RemoteForwardLocalPort = effectiveRemoteLocal,
-                    LocalForwards = effectiveLocalForwards
+                    LocalForwards = effectiveLocalForwards,
+                    ForwardX11 = effectiveForwardX11,
+                    RemoteCommand = effectiveRemoteCommand,
+                    EnvironmentVariables = effectiveEnvironmentVariables
                 });
             }
         }
@@ -1011,5 +1063,11 @@ public static partial class OpenSshConfigParser
         public int? RemoteForwardLocalPort { get; set; }
 
         public List<string> LocalForwards { get; } = [];
+
+        public bool? ForwardX11 { get; set; }
+
+        public string? RemoteCommand { get; set; }
+
+        public List<string> EnvironmentVariables { get; } = [];
     }
 }

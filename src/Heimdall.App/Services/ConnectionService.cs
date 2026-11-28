@@ -38,6 +38,7 @@ public sealed class ConnectionService : IConnectionService
     private readonly Dictionary<string, IProtocolHandler> _handlers;
     private Action<string>? _setStatusText;
     private Func<ServerProfileDto, Task<bool>>? _confirmExecution;
+    private Func<ServerProfileDto, Task<bool>>? _confirmSshStartupTrust;
     private Func<string, TimeSpan, CancellationToken, Task<TerminalSizeLookup>>? _resolveInitialTerminalSize;
     private Action<string>? _plinkRetryStarting;
 
@@ -111,6 +112,16 @@ public sealed class ConnectionService : IConnectionService
     {
         get => _confirmExecution;
         set => _confirmExecution = value;
+    }
+
+    /// <summary>
+    /// Relay wired by the shell to confirm an unconfirmed SSH startup command or <c>SetEnv</c>
+    /// variable before opening the SSH session so approved payloads run on the first connection.
+    /// </summary>
+    internal Func<ServerProfileDto, Task<bool>>? ConfirmSshStartupTrust
+    {
+        get => _confirmSshStartupTrust;
+        set => _confirmSshStartupTrust = value;
     }
 
     public ConnectionService(
@@ -350,6 +361,29 @@ public sealed class ConnectionService : IConnectionService
         // Every path that opens a connection lands here, the split pane and its reconnect
         // included, which used to skip the group defaults and open direct where the tab tunnelled.
         GroupDefaultsDto.ApplyInherited(server, settings.GroupDefaults);
+
+        if (string.Equals(protocol, "SSH", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(server.SshMode, "External", StringComparison.OrdinalIgnoreCase)
+            && (!string.IsNullOrWhiteSpace(server.SshStartupCommand)
+                || server.SshEnvironmentVariables is { Count: > 0 }))
+        {
+            if (SharedSessionIds.IsSharedProfile(server) || !server.ExecutionConfirmed)
+            {
+                bool startupApproved = _confirmSshStartupTrust is not null
+                    && await _confirmSshStartupTrust(server).ConfigureAwait(false);
+                SshStartupTrustGate.Set(server, startupApproved);
+                if (!startupApproved && _confirmSshStartupTrust is not null)
+                {
+                    _setStatusText?.Invoke(_localizer.Format(
+                        "StatusPostConnectDeclined",
+                        ExecutionTrustDescriber.Visible(server.DisplayName)));
+                }
+            }
+            else
+            {
+                SshStartupTrustGate.Set(server, approved: true);
+            }
+        }
 
         if (_handlers.TryGetValue(protocol, out var handler))
         {

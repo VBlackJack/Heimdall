@@ -68,6 +68,20 @@ public sealed class SshCertificateExpiryEvaluatorTests : IDisposable
             validBefore: (ulong)now.AddDays(90).ToUnixTimeSeconds());
         var valid = SshCertificateExpiryEvaluator.EvaluateContent(validLine, nowUtc: now);
         Assert.Equal(SshCertificateExpiryStatus.Valid, valid.Status);
+
+        string futureLine = BuildTestUserCertLine(
+            OpenSshCertificateType.User,
+            validAfter: (ulong)now.AddDays(3).ToUnixTimeSeconds(),
+            validBefore: (ulong)now.AddDays(30).ToUnixTimeSeconds());
+        var notYetValid = SshCertificateExpiryEvaluator.EvaluateContent(futureLine, nowUtc: now);
+        Assert.Equal(SshCertificateExpiryStatus.NotYetValid, notYetValid.Status);
+        Assert.NotNull(notYetValid.ValidAfterUtc);
+
+        var localizer = new Heimdall.Core.Localization.LocalizationManager();
+        Assert.Equal("SshCertWarningNotYetValid", SshCertificateExpiryEvaluator.FormatLocalizedWarning(notYetValid, localizer));
+        Assert.Equal("SshCertWarningExpired", SshCertificateExpiryEvaluator.FormatLocalizedWarning(expired, localizer));
+        Assert.Equal("SshCertWarningExpiringSoon", SshCertificateExpiryEvaluator.FormatLocalizedWarning(soon, localizer));
+        Assert.Null(SshCertificateExpiryEvaluator.FormatLocalizedWarning(valid, localizer));
     }
 
     [Fact]

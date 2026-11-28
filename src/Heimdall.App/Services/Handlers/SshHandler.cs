@@ -254,6 +254,10 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
         }
 
         using CancellationTokenSource promptLifetime = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        SshStartupTrustGate.Decision? startupTrustDecision = SshStartupTrustGate.Take(server);
+        bool allowStartupExecution = startupTrustDecision is not null
+            ? startupTrustDecision.Approved
+            : !SharedSessionIds.IsSharedProfile(server) && server.ExecutionConfirmed;
         SshConnectionParams sshParams = new()
         {
             Host = targetHost,
@@ -289,10 +293,10 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
             RemoteBindPort = usesTunnel ? 0 : server.RemoteBindPort,
             RemoteLocalPort = usesTunnel ? 0 : server.RemoteLocalPort,
             LocalForwards = server.SshLocalForwards,
-            StartupCommand = !SharedSessionIds.IsSharedProfile(server) && server.ExecutionConfirmed
+            StartupCommand = allowStartupExecution
                 ? server.SshStartupCommand
                 : null,
-            EnvironmentVariables = !SharedSessionIds.IsSharedProfile(server) && server.ExecutionConfirmed
+            EnvironmentVariables = allowStartupExecution
                 ? server.SshEnvironmentVariables
                 : [],
             AuthenticationTimeout = InteractiveAuthenticationTimeout,
@@ -568,12 +572,19 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
                 return fallback with { FallbackFrom = failure.Code };
             }
 
-            _connectionSm.SetError(server.Id, localizedFailure.Message);
+            SshCertificateWarningHelper.EvaluationSummary failCertSummary =
+                SshCertificateWarningHelper.EvaluateServerAndGateways(server, settings, _localizer);
+            string finalFailureMessage = SshAuthFailureDiagnoser.IsAuthRejection(failure.Code)
+                ? SshCertificateWarningHelper.AppendInvalidWindowHint(localizedFailure.Message, failCertSummary) ?? localizedFailure.Message
+                : localizedFailure.Message;
+            SshFailureInfo finalLocalizedFailure = localizedFailure with { Message = finalFailureMessage };
+
+            _connectionSm.SetError(server.Id, finalLocalizedFailure.Message);
             return new ConnectionResult(
                 false,
-                localizedFailure.Message,
+                finalLocalizedFailure.Message,
                 null,
-                SshSessionDiagnosticFactory.FromClassifiedFailure(localizedFailure, usesTunnel));
+                SshSessionDiagnosticFactory.FromClassifiedFailure(finalLocalizedFailure, usesTunnel));
         }
 
         _connectionSm.TryTransition(server.Id, ConnectionState.Connected);
@@ -583,9 +594,7 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
                 SshLocalizationKeys.StatusSshPortForwardFailed,
                 string.Join(", ", session.FailedPortForwards))
             : null;
-        string? certWarning = SshCertificateExpiryEvaluator.FormatLocalizedWarning(
-            SshCertificateExpiryEvaluator.Evaluate(server.SshKeyPath, server.SshCertificatePath),
-            _localizer);
+        string? certWarning = SshCertificateWarningHelper.EvaluateServerAndGateways(server, settings, _localizer).WarningMessage;
         string? combinedWarning = (forwardWarning, certWarning) switch
         {
             (not null, not null) => $"{forwardWarning} {certWarning}",
@@ -596,7 +605,10 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
         return new ConnectionResult(
             true,
             null,
-            new SshSessionResult(session, server.SessionLoggingOverride),
+            new SshSessionResult(session, server.SessionLoggingOverride)
+            {
+                StartupTrustDeclined = startupTrustDecision is { Approved: false }
+            },
             Warning: combinedWarning);
     }
 
@@ -863,17 +875,24 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
 
             bool x11Forwarding = await ResolveX11ForwardingAsync(server).ConfigureAwait(false);
             SshCryptoPolicy effectivePolicy = SshCryptoPolicyResolver.Resolve(server.SshCryptoPolicy, settings.SshCryptoPolicy);
+            bool hasStartupCommandOrEnv = !string.IsNullOrWhiteSpace(server.SshStartupCommand)
+                || server.SshEnvironmentVariables is { Count: > 0 };
             SshCapabilityNotice? externalNotice = SshCapabilityScope.Evaluate(
                 SshResolvedPath.ExternalPutty,
                 x11Forwarding: false,
                 compression: false,
-                cryptoPolicy: effectivePolicy);
+                cryptoPolicy: effectivePolicy,
+                hasStartupCommandOrEnv: hasStartupCommandOrEnv);
             if (externalNotice is not null)
             {
                 Core.Logging.FileLogger.Warn(
                     $"External PuTTY path cannot enforce requested capabilities: {externalNotice.LogDescription}. Connection will continue with PuTTY defaults.");
                 SetStatusText?.Invoke(_localizer[externalNotice.StatusLocalizationKey]);
             }
+
+            string? externalCertWarning = SshCertificateWarningHelper
+                .EvaluateServerAndGateways(server, settings, _localizer)
+                .WarningMessage;
 
             System.Diagnostics.ProcessStartInfo psi = BuildPuttyStartInfo(
                 puttyPath,
@@ -959,7 +978,7 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
                 // The Exited handler already ran and disposed the process.
             }
 
-            return new ConnectionResult(true, null, null, ExternalClientExited: exitSignal.Task);
+            return new ConnectionResult(true, null, null, ExternalClientExited: exitSignal.Task, Warning: externalCertWarning);
         }
         catch (Exception ex)
         {
@@ -1247,11 +1266,14 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
             // between identifying the launcher image and launching it.
             bool x11Forwarding = await ResolveX11ForwardingAsync(server).ConfigureAwait(false);
             SshCryptoPolicy effectivePolicy = SshCryptoPolicyResolver.Resolve(server.SshCryptoPolicy, settings.SshCryptoPolicy);
+            bool hasStartupCommandOrEnv = !string.IsNullOrWhiteSpace(server.SshStartupCommand)
+                || server.SshEnvironmentVariables is { Count: > 0 };
             SshCapabilityNotice? plinkNotice = SshCapabilityScope.Evaluate(
                 SshResolvedPath.PlinkPipe,
                 x11Forwarding: false,
                 compression: false,
-                cryptoPolicy: effectivePolicy);
+                cryptoPolicy: effectivePolicy,
+                hasStartupCommandOrEnv: hasStartupCommandOrEnv);
             if (plinkNotice is not null)
             {
                 Core.Logging.FileLogger.Warn(
@@ -1348,13 +1370,17 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
 
             _connectionSm.TryTransition(server.Id, ConnectionState.Connected);
             tunnelLease.Transfer();
+            string? plinkCertWarning = SshCertificateWarningHelper
+                .EvaluateServerAndGateways(server, settings, _localizer)
+                .WarningMessage;
             return new ConnectionResult(true, null, new TerminalSessionResult(
                 terminalSession,
                 BuildDisplayEndpoint(server),
                 server.SessionLoggingOverride)
             {
                 CredentialFreeLaunch = credentialFree,
-            });
+            },
+            Warning: plinkCertWarning);
         }
         finally
         {

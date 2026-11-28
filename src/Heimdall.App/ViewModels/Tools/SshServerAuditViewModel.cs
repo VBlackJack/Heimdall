@@ -136,6 +136,9 @@ public sealed partial class SshServerAuditViewModel : ObservableObject, IDisposa
         ShowFleetResults = true;
         ShowEmptyState = false;
 
+        var gatewayLocks = new System.Collections.Concurrent.ConcurrentDictionary<string, SemaphoreSlim>(StringComparer.OrdinalIgnoreCase);
+        var pooledGateways = new System.Collections.Concurrent.ConcurrentDictionary<string, SshClient>(StringComparer.OrdinalIgnoreCase);
+
         try
         {
             var gatewayLookup = settings.SshGateways
@@ -143,6 +146,7 @@ public sealed partial class SshServerAuditViewModel : ObservableObject, IDisposa
                 .DistinctBy(g => g.Id, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Id, StringComparer.OrdinalIgnoreCase);
 
+            bool usePooledRunner = _probeRunner == (Func<string, int, SshGatewayDto?, CancellationToken, Task<SshKexInitSnapshot>>)ProbeWithOptionalGatewayAsync;
             var ordered = new SshFleetServerAuditEntry?[sshTargets.Count];
             using var gate = new SemaphoreSlim(MaxFleetAuditConcurrency, MaxFleetAuditConcurrency);
 
@@ -186,7 +190,9 @@ public sealed partial class SshServerAuditViewModel : ObservableObject, IDisposa
 
                     try
                     {
-                        SshKexInitSnapshot snapshot = await _probeRunner(host, port, gw, ct).ConfigureAwait(false);
+                        SshKexInitSnapshot snapshot = gw is not null && usePooledRunner
+                            ? await ProbeThroughPooledGatewayAsync(host, port, gw, gatewayLocks, pooledGateways, ct).ConfigureAwait(false)
+                            : await _probeRunner(host, port, gw, ct).ConfigureAwait(false);
                         SshServerAuditReport report = SshServerAuditEngine.Evaluate(snapshot);
                         ordered[index] = new SshFleetServerAuditEntry(displayName, host, port, gwName, report);
                     }
@@ -262,6 +268,17 @@ public sealed partial class SshServerAuditViewModel : ObservableObject, IDisposa
         }
         finally
         {
+            foreach (SshClient pooledClient in pooledGateways.Values)
+            {
+                try { pooledClient.Dispose(); }
+                catch (Exception) { }
+            }
+
+            foreach (SemaphoreSlim gwLock in gatewayLocks.Values)
+            {
+                gwLock.Dispose();
+            }
+
             IsAuditing = false;
         }
     }
@@ -362,6 +379,50 @@ public sealed partial class SshServerAuditViewModel : ObservableObject, IDisposa
 
         using var gatewayClient = await ToolGatewayConnector.ConnectAsync(gateway, ct)
             .ConfigureAwait(false);
+        return await ProbeThroughGatewayClientAsync(gatewayClient, host, port, ct).ConfigureAwait(false);
+    }
+
+    private static async Task<SshKexInitSnapshot> ProbeThroughPooledGatewayAsync(
+        string host,
+        int port,
+        SshGatewayDto gateway,
+        System.Collections.Concurrent.ConcurrentDictionary<string, SemaphoreSlim> gatewayLocks,
+        System.Collections.Concurrent.ConcurrentDictionary<string, SshClient> pooledGateways,
+        CancellationToken ct)
+    {
+        SemaphoreSlim gwLock = gatewayLocks.GetOrAdd(gateway.Id, static _ => new SemaphoreSlim(1, 1));
+        SshClient gatewayClient;
+        await gwLock.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            if (!pooledGateways.TryGetValue(gateway.Id, out SshClient? existing) || !existing.IsConnected)
+            {
+                if (existing is not null)
+                {
+                    try { existing.Dispose(); }
+                    catch (Exception) { }
+                }
+
+                existing = await ToolGatewayConnector.ConnectAsync(gateway, ct).ConfigureAwait(false);
+                pooledGateways[gateway.Id] = existing;
+            }
+
+            gatewayClient = existing;
+        }
+        finally
+        {
+            gwLock.Release();
+        }
+
+        return await ProbeThroughGatewayClientAsync(gatewayClient, host, port, ct).ConfigureAwait(false);
+    }
+
+    private static async Task<SshKexInitSnapshot> ProbeThroughGatewayClientAsync(
+        SshClient gatewayClient,
+        string host,
+        int port,
+        CancellationToken ct)
+    {
         using var forward = new ForwardedPortLocal(LoopbackBinding.DefaultHost, 0, host, (uint)port);
         gatewayClient.AddForwardedPort(forward);
         try

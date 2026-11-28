@@ -7139,5 +7139,9 @@
   "SshErrorProxyUnsupportedOnPutty": "Le lancement externe de PuTTY ne peut pas appliquer les param\u00e8tres de proxy SSH sortant de Heimdall. Utilisez le client SSH int\u00e9gr\u00e9 ou une passerelle SSH.",
   "TunnelErrorProxyUnsupportedOnPlink": "Le repli tunnel Plink ne peut pas passer par le proxy sortant configur\u00e9 sur la passerelle. Corrigez l'authentification pour le client SSH int\u00e9gr\u00e9.",
   "ToolSshServerAuditProxyNotSupportedDirect": "L'audit direct via proxy sortant sans passerelle SSH n'est pas pris en charge (sonde refus\u00e9e pour ne pas contourner le proxy).",
-  "GatewayDiagnosticTrustRevoked": "Cl\u00e9 d'h\u00f4te r\u00e9voqu\u00e9e d\u00e9tect\u00e9e. Connexion bloqu\u00e9e par la politique de confiance locale."
+  "GatewayDiagnosticTrustRevoked": "Cl\u00e9 d'h\u00f4te r\u00e9voqu\u00e9e d\u00e9tect\u00e9e. Connexion bloqu\u00e9e par la politique de confiance locale.",
+  "StatusSshPlinkStartupCommandUnavailable": "Plink/PuTTY ne peut pas ex\u00e9cuter les commandes de d\u00e9marrage SSH ni les variables SetEnv. La connexion va continuer sans elles.",
+  "StatusSshPlinkStrictCryptoAndStartupUnavailable": "Plink/PuTTY ne peut pas appliquer la cryptographie stricte ni ex\u00e9cuter les commandes de d\u00e9marrage SSH/SetEnv. La connexion va continuer avec les param\u00e8tres par d\u00e9faut.",
+  "SshCertWarningNotYetValid": "Le certificat utilisateur SSH n'est pas encore valide (valide \u00e0 partir du {0}).",
+  "CastPlayerLoading": "Chargement de l'enregistrement..."
 }

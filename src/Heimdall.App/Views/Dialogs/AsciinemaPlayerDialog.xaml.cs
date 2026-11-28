@@ -36,12 +36,15 @@ namespace Heimdall.App.Views.Dialogs;
 /// </summary>
 public partial class AsciinemaPlayerDialog : Window, IDisposable
 {
-    private const string TerminalClearResetSequence = "\x1b[2J\x1b[H\x1b[3J";
+    private const string TerminalClearResetSequence = "\x1b[?1049l\x1b[0m\x1bc";
+    private const int SeekThrottleMilliseconds = 40;
+    private const string ClipboardWritePrefix = "clipboard-write:";
 
     private readonly LocalizationManager _localizer;
     private readonly AppSettings? _settings;
     private readonly string? _initialFilePath;
     private readonly DispatcherTimer _playbackTimer;
+    private readonly DispatcherTimer _seekThrottleTimer;
 
     private IDisposable? _lockdown;
     private AsciinemaCastRecording? _recording;
@@ -53,6 +56,9 @@ public partial class AsciinemaPlayerDialog : Window, IDisposable
     private int _nextEventIndex;
     private double _speed = 1.0;
     private long _lastTickMs;
+    private int _loadVersion;
+    private double _pendingSeekSeconds;
+    private bool _hasPendingSeek;
     private bool _disposed;
 
     public AsciinemaPlayerDialog(
@@ -73,6 +79,12 @@ public partial class AsciinemaPlayerDialog : Window, IDisposable
         };
         _playbackTimer.Tick += OnPlaybackTick;
 
+        _seekThrottleTimer = new DispatcherTimer(DispatcherPriority.Input)
+        {
+            Interval = TimeSpan.FromMilliseconds(SeekThrottleMilliseconds)
+        };
+        _seekThrottleTimer.Tick += OnSeekThrottleTick;
+
         Loaded += OnLoaded;
     }
 
@@ -82,7 +94,7 @@ public partial class AsciinemaPlayerDialog : Window, IDisposable
 
         if (!_disposed && !string.IsNullOrWhiteSpace(_initialFilePath))
         {
-            LoadRecordingFile(_initialFilePath);
+            await LoadRecordingFileAsync(_initialFilePath).ConfigureAwait(true);
         }
     }
 
@@ -120,6 +132,8 @@ public partial class AsciinemaPlayerDialog : Window, IDisposable
                 }
             };
 
+            PlayerWebView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
+
             PlayerWebView.CoreWebView2.NavigationCompleted += (_, _) =>
             {
                 _allowInitialNavigation = false;
@@ -129,6 +143,15 @@ public partial class AsciinemaPlayerDialog : Window, IDisposable
                 }
 
                 _webViewReady = true;
+                try
+                {
+                    PlayerWebView.CoreWebView2?.PostWebMessageAsString("session-ended:marked");
+                }
+                catch (Exception ex)
+                {
+                    FileLogger.Debug($"[AsciinemaPlayerDialog] session-ended marker suppressed: {ex.Message}");
+                }
+
                 if (_recording is not null)
                 {
                     RenderSeekState(_currentSeconds);
@@ -151,7 +174,7 @@ public partial class AsciinemaPlayerDialog : Window, IDisposable
         }
     }
 
-    private void OnOpenClick(object sender, RoutedEventArgs e)
+    private async void OnOpenClick(object sender, RoutedEventArgs e)
     {
         var dlg = new Microsoft.Win32.OpenFileDialog
         {
@@ -160,24 +183,45 @@ public partial class AsciinemaPlayerDialog : Window, IDisposable
         };
         if (dlg.ShowDialog(this) == true)
         {
-            LoadRecordingFile(dlg.FileName);
+            await LoadRecordingFileAsync(dlg.FileName).ConfigureAwait(true);
         }
     }
 
-    private void LoadRecordingFile(string filePath)
+    private async Task LoadRecordingFileAsync(string filePath)
     {
         StopPlayback();
+        _seekThrottleTimer.Stop();
+        _hasPendingSeek = false;
+        int version = ++_loadVersion;
 
-        if (!AsciinemaCastPlayerEngine.TryLoadFile(filePath, out var recording, out var errorCode, out string? rawError) || recording is null)
+        BtnPlayPause.IsEnabled = false;
+        BtnRestart.IsEnabled = false;
+        TimelineSlider.IsEnabled = false;
+        TxtMeta.Text = _localizer["CastPlayerLoading"];
+
+        var loadResult = await Task.Run(() =>
         {
-            string localizedReason = FormatLoadError(errorCode, rawError);
-            TxtMeta.Text = _localizer.Format("CastPlayerLoadFailed", localizedReason);
-            BtnPlayPause.IsEnabled = false;
-            BtnRestart.IsEnabled = false;
-            TimelineSlider.IsEnabled = false;
+            bool ok = AsciinemaCastPlayerEngine.TryLoadFile(
+                filePath,
+                out var parsed,
+                out var errorCode,
+                out string? rawError);
+            return (Ok: ok, Recording: parsed, ErrorCode: errorCode, RawError: rawError);
+        }).ConfigureAwait(true);
+
+        if (_disposed || version != _loadVersion)
+        {
             return;
         }
 
+        if (!loadResult.Ok || loadResult.Recording is null)
+        {
+            string localizedReason = FormatLoadError(loadResult.ErrorCode, loadResult.RawError);
+            TxtMeta.Text = _localizer.Format("CastPlayerLoadFailed", localizedReason);
+            return;
+        }
+
+        var recording = loadResult.Recording;
         _recording = recording;
         _currentSeconds = 0;
         _nextEventIndex = 0;
@@ -250,8 +294,23 @@ public partial class AsciinemaPlayerDialog : Window, IDisposable
         }
 
         _currentSeconds = Math.Clamp(e.NewValue, 0, CurrentDuration());
-        RenderSeekState(_currentSeconds);
+        _pendingSeekSeconds = _currentSeconds;
+        _hasPendingSeek = true;
         UpdateClockText();
+        _seekThrottleTimer.Stop();
+        _seekThrottleTimer.Start();
+    }
+
+    private void OnSeekThrottleTick(object? sender, EventArgs e)
+    {
+        _seekThrottleTimer.Stop();
+        if (_disposed || !_hasPendingSeek || _recording is null)
+        {
+            return;
+        }
+
+        _hasPendingSeek = false;
+        RenderSeekState(_pendingSeekSeconds);
     }
 
     private void OnSpeedSelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -308,6 +367,16 @@ public partial class AsciinemaPlayerDialog : Window, IDisposable
             {
                 batch.Append(evt.Data);
             }
+            else if (evt.Type == "r" && AsciinemaCastPlayerEngine.TryParseResizePayload(evt.Data, out int cols, out int rows))
+            {
+                if (batch.Length > 0)
+                {
+                    PostTerminalData(batch.ToString());
+                    batch.Clear();
+                }
+
+                PostTerminalResize(cols, rows);
+            }
 
             _nextEventIndex++;
         }
@@ -356,15 +425,78 @@ public partial class AsciinemaPlayerDialog : Window, IDisposable
             return;
         }
 
-        var (output, lastIdx) = AsciinemaCastPlayerEngine.BuildStateAtTime(_recording, seconds, UseIdleCap());
+        var (output, lastIdx, width, height) = AsciinemaCastPlayerEngine.BuildSeekStateAtTime(
+            _recording,
+            seconds,
+            UseIdleCap());
         _nextEventIndex = lastIdx + 1;
 
         if (_webViewReady)
         {
+            PostTerminalResize(width, height);
             PostTerminalData(TerminalClearResetSequence + output);
         }
 
         UpdateSliderAndClock();
+    }
+
+    private void PostTerminalResize(int cols, int rows)
+    {
+        if (_disposed || !_webViewReady || PlayerWebView.CoreWebView2 is null)
+        {
+            return;
+        }
+
+        try
+        {
+            PlayerWebView.CoreWebView2.PostWebMessageAsString(
+                string.Create(CultureInfo.InvariantCulture, $"resize-cols-rows:{cols},{rows}"));
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Warn($"[AsciinemaPlayerDialog] PostTerminalResize failed: {ex.Message}");
+        }
+    }
+
+    private void OnWebMessageReceived(
+        object? sender,
+        Microsoft.Web.WebView2.Core.CoreWebView2WebMessageReceivedEventArgs e)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        string msg;
+        try
+        {
+            msg = e.TryGetWebMessageAsString();
+        }
+        catch (ArgumentException)
+        {
+            return;
+        }
+
+        if (string.IsNullOrEmpty(msg) || !msg.StartsWith(ClipboardWritePrefix, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        string b64 = msg[ClipboardWritePrefix.Length..];
+        if (string.IsNullOrEmpty(b64))
+        {
+            return;
+        }
+
+        try
+        {
+            string text = Encoding.UTF8.GetString(Convert.FromBase64String(b64));
+            Clipboard.SetText(text);
+        }
+        catch (Exception ex) when (ex is FormatException or System.Runtime.InteropServices.ExternalException)
+        {
+            FileLogger.Debug($"[AsciinemaPlayerDialog] clipboard-write skipped: {ex.Message}");
+        }
     }
 
     private void PostTerminalData(string text)
@@ -469,6 +601,7 @@ public partial class AsciinemaPlayerDialog : Window, IDisposable
 
         _disposed = true;
         _playbackTimer.Stop();
+        _seekThrottleTimer.Stop();
         _lockdown?.Dispose();
         _lockdown = null;
         try

@@ -102,6 +102,8 @@ internal static class SshLocalizationKeys
     public const string StatusSshDirectX11AndCompressionUnavailable = "StatusSshDirectX11AndCompressionUnavailable";
     public const string StatusSshDirectX11Unavailable = "StatusSshDirectX11Unavailable";
     public const string StatusSshPlinkStrictCryptoUnavailable = "StatusSshPlinkStrictCryptoUnavailable";
+    public const string StatusSshPlinkStartupCommandUnavailable = "StatusSshPlinkStartupCommandUnavailable";
+    public const string StatusSshPlinkStrictCryptoAndStartupUnavailable = "StatusSshPlinkStrictCryptoAndStartupUnavailable";
     public const string StatusSshPortForwardFailed = "StatusSshPortForwardFailed";
     public const string SshErrorProxyUnsupportedOnPlink = "SshErrorProxyUnsupportedOnPlink";
     public const string SshErrorProxyUnsupportedOnPutty = "SshErrorProxyUnsupportedOnPutty";

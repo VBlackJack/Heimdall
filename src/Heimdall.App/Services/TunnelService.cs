@@ -523,6 +523,19 @@ public sealed class TunnelService : ITunnelService
         {
             string? relayedMessage = result.ErrorMessage;
             result = AppendAuthFailureContext(result, chain, agentAtDial);
+            if (SshAuthFailureDiagnoser.IsAuthRejection(result.FailureCode))
+            {
+                SshCertificateWarningHelper.EvaluationSummary chainCertSummary =
+                    SshCertificateWarningHelper.EvaluateChain(chain, _localizer);
+                string? enrichedMessage = SshCertificateWarningHelper.AppendInvalidWindowHint(
+                    result.ErrorMessage,
+                    chainCertSummary);
+                if (!string.Equals(enrichedMessage, result.ErrorMessage, StringComparison.Ordinal))
+                {
+                    result = result with { ErrorMessage = enrichedMessage };
+                }
+            }
+
             string message = result.ErrorMessage ?? _localizer[SshLocalizationKeys.ErrorTunnelFailed];
             ReportTunnelFailure(serverId, gatewayId, gatewayChainKey, result, message, relayedMessage);
             _connectionSm.SetError(serverId, message);

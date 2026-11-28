@@ -88,7 +88,14 @@ public sealed record RdpSessionResult(
 /// <summary>Wraps an SSH.NET shell session.</summary>
 public sealed record SshSessionResult(
     SshShellSession Session,
-    bool? SessionLoggingOverride = null) : ISessionResult;
+    bool? SessionLoggingOverride = null) : ISessionResult
+{
+    /// <summary>
+    /// True when the connect-time execution trust prompt already ran and declined SSH startup
+    /// payloads for this session so the post-connect sequence does not prompt a second time.
+    /// </summary>
+    public bool StartupTrustDeclined { get; init; }
+}
 
 /// <summary>Wraps a terminal session (Plink pipe mode, Telnet, or ConPTY).</summary>
 public sealed record TerminalSessionResult(

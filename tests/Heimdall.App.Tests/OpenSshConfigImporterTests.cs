@@ -464,6 +464,35 @@ public sealed class OpenSshConfigImporterTests
         };
     }
 
+    [Fact]
+    public async Task ImportSelectedAsync_MapsForwardX11RemoteCommandAndSetEnv_AndMarksUnconfirmed()
+    {
+        using var fixture = new OpenSshImportFixture();
+
+        var outcome = await fixture.Importer.ImportSelectedAsync(
+        [
+            new OpenSshImportCandidate
+            {
+                Alias = "bastion-app",
+                HostName = "app.example.com",
+                SourceLineNumber = 1,
+                ForwardX11 = true,
+                RemoteCommand = "tmux attach || tmux new",
+                EnvironmentVariables = ["ENV=prod", "FOO=bar"]
+            }
+        ]);
+
+        Assert.Equal(1, outcome.ImportedCount);
+        Assert.True(outcome.Sanitization.HasChanges);
+        var sanitizedItem = Assert.Single(outcome.Sanitization.Items);
+        Assert.Contains(sanitizedItem.ResetFlags, f => f.PropertyName == nameof(ServerProfileDto.SshX11Forwarding));
+        var server = Assert.Single(await fixture.ConfigManager.LoadServersAsync());
+        Assert.False(server.SshX11Forwarding);
+        Assert.Equal("tmux attach || tmux new", server.SshStartupCommand);
+        Assert.Equal(["ENV=prod", "FOO=bar"], server.SshEnvironmentVariables);
+        Assert.False(server.ExecutionConfirmed);
+    }
+
     private sealed class OpenSshImportFixture : IDisposable
     {
         public OpenSshImportFixture()

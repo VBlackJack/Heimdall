@@ -90,6 +90,21 @@ public sealed record OpenSshImportCandidate
     /// Gets raw <c>LocalForward</c> specifications captured for this host.
     /// </summary>
     public IReadOnlyList<string> LocalForwards { get; init; } = [];
+
+    /// <summary>
+    /// Gets a value indicating whether <c>ForwardX11 yes</c> was configured for this host.
+    /// </summary>
+    public bool ForwardX11 { get; init; }
+
+    /// <summary>
+    /// Gets the normalized <c>RemoteCommand</c> configured for this host, if any.
+    /// </summary>
+    public string? RemoteCommand { get; init; }
+
+    /// <summary>
+    /// Gets validated <c>SetEnv</c> <c>NAME=VALUE</c> assignments captured for this host.
+    /// </summary>
+    public IReadOnlyList<string> EnvironmentVariables { get; init; } = [];
 }
 
 /// <summary>

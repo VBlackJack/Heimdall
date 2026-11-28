@@ -7139,5 +7139,9 @@
   "SshErrorProxyUnsupportedOnPutty": "El inicio externo de PuTTY no puede aplicar la configuraci\u00f3n de proxy SSH saliente de Heimdall. Usa el cliente SSH integrado o una pasarela SSH.",
   "TunnelErrorProxyUnsupportedOnPlink": "El t\u00fanel alternativo de Plink no puede enrutar mediante el proxy saliente configurado en la pasarela. Corrige la autenticaci\u00f3n para el cliente SSH integrado.",
   "ToolSshServerAuditProxyNotSupportedDirect": "No se admite la auditor\u00eda directa a trav\u00e9s de proxy saliente sin pasarela SSH (sonda rechazada para evitar eludir el proxy).",
-  "GatewayDiagnosticTrustRevoked": "Se detect\u00f3 una clave de host revocada. Conexi\u00f3n bloqueada por la pol\u00edtica de confianza local."
+  "GatewayDiagnosticTrustRevoked": "Se detect\u00f3 una clave de host revocada. Conexi\u00f3n bloqueada por la pol\u00edtica de confianza local.",
+  "StatusSshPlinkStartupCommandUnavailable": "Plink/PuTTY no puede ejecutar comandos de inicio SSH ni variables SetEnv. La conexi\u00f3n continuar\u00e1 sin ellos.",
+  "StatusSshPlinkStrictCryptoAndStartupUnavailable": "Plink/PuTTY no puede aplicar criptograf\u00eda estricta ni ejecutar comandos de inicio SSH/SetEnv. La conexi\u00f3n continuar\u00e1 con los valores predeterminados.",
+  "SshCertWarningNotYetValid": "El certificado de usuario SSH a\u00fan no es v\u00e1lido (v\u00e1lido desde {0}).",
+  "CastPlayerLoading": "Cargando grabaci\u00f3n..."
 }

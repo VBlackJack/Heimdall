@@ -788,6 +788,18 @@
                     return;
                 }
 
+                if (message.indexOf('resize-cols-rows:') === 0) {
+                    var dims = message.substring('resize-cols-rows:'.length).split(',');
+                    if (dims.length === 2) {
+                        var cols = parseInt(dims[0], 10);
+                        var rows = parseInt(dims[1], 10);
+                        if (cols >= 1 && cols <= 500 && rows >= 1 && rows <= 200) {
+                            term.resize(cols, rows);
+                        }
+                    }
+                    return;
+                }
+
                 if (message.indexOf('set-convert-eol:') === 0) {
                     term.options.convertEol = message.substring('set-convert-eol:'.length) === 'true';
                     return;

@@ -482,4 +482,36 @@ public sealed class OpenSshConfigParserTests
         Assert.False(staging.ForwardAgent);
         Assert.True(staging.Compression);
     }
+
+    [Fact]
+    public void Parse_ForwardX11RemoteCommandAndSetEnv_AreParsedWithDefaultsAndValidation()
+    {
+        var result = OpenSshConfigParser.Parse(
+            """
+            Host app
+                HostName app.example.com
+                ForwardX11 yes
+                RemoteCommand "tmux attach -t main || tmux new -s main"
+                SetEnv FOO=bar ENV=prod INVALID-NAME=bad
+                SetEnv FOO=ignored SECOND=two
+
+            Host fallback
+                HostName fallback.example.com
+
+            Host *
+                ForwardX11 no
+                RemoteCommand uname -a
+                SetEnv GLOBAL_ENV=1
+            """);
+
+        var app = Assert.Single(result.Candidates, c => c.Alias == "app");
+        Assert.True(app.ForwardX11);
+        Assert.Equal("tmux attach -t main || tmux new -s main", app.RemoteCommand);
+        Assert.Equal(["FOO=bar", "ENV=prod", "SECOND=two"], app.EnvironmentVariables);
+
+        var fallback = Assert.Single(result.Candidates, c => c.Alias == "fallback");
+        Assert.False(fallback.ForwardX11);
+        Assert.Equal("uname -a", fallback.RemoteCommand);
+        Assert.Equal(["GLOBAL_ENV=1"], fallback.EnvironmentVariables);
+    }
 }

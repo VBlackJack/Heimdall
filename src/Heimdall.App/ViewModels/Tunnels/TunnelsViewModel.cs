@@ -519,7 +519,9 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
 
         var name = !string.IsNullOrWhiteSpace(tunnel.Label) ? tunnel.Label.Trim() : gateway.Name;
 
-        if (tunnel.RemoteBindPort > 0 && tunnel.SocksProxyPort <= 0 && tunnel.RemotePort <= 0)
+        if (tunnel.RemoteBindPort > 0
+            && tunnel.SocksProxyPort <= 0
+            && (string.IsNullOrEmpty(tunnel.RemoteHost) || tunnel.RemotePort <= 0))
         {
             int localTarget = tunnel.EffectiveRemoteLocalPort > 0 ? tunnel.EffectiveRemoteLocalPort : tunnel.LocalPort;
             if (localTarget <= 0)
@@ -573,7 +575,9 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
         ArgumentNullException.ThrowIfNull(profile);
         ArgumentNullException.ThrowIfNull(tunnel);
 
-        if (tunnel.RemoteBindPort > 0 && tunnel.SocksProxyPort <= 0 && tunnel.RemotePort <= 0)
+        if (tunnel.RemoteBindPort > 0
+            && tunnel.SocksProxyPort <= 0
+            && (string.IsNullOrEmpty(tunnel.RemoteHost) || tunnel.RemotePort <= 0))
         {
             int localTarget = tunnel.EffectiveRemoteLocalPort > 0 ? tunnel.EffectiveRemoteLocalPort : tunnel.LocalPort;
             if (localTarget <= 0)

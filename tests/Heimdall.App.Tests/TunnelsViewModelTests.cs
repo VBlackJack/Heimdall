@@ -778,8 +778,8 @@ public sealed class TunnelsViewModelTests
         var remote = new TunnelInfo(
             "App",
             LocalPort: 0,
-            RemoteHost: "127.0.0.1",
-            RemotePort: 0,
+            RemoteHost: string.Empty,
+            RemotePort: 9090,
             StartedAt: DateTime.UnixEpoch,
             IsAlive: true)
         {

@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using Heimdall.Core.Ssh;
 using Heimdall.Ssh;
 
 namespace Heimdall.Ssh.Tests;
@@ -111,5 +112,41 @@ public sealed class SshAuthorizedKeysServiceTests
         Assert.Contains("[ -L \"$ak\" ]", cmd, StringComparison.Ordinal);
         Assert.Contains(SshPublicKeyDeployer.MarkerSymlinkRefused, cmd, StringComparison.Ordinal);
         Assert.Contains("grep -Ev '^[[:space:]]*(#|$)' \"$ak\" | grep -Fq -- \"$key_id\"", cmd, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AddKeyAndListAsync_RejectsInvalidPublicKeyAndOptionsBeforeConnecting()
+    {
+        var conn = new SshConnectionParams { Host = "example.invalid", Username = "ops" };
+        var store = new HostKeyStore();
+        var verifier = new StrictVerifier();
+
+        var badKey = await SshAuthorizedKeysService.AddKeyAndListAsync(conn, "not-a-valid-key", null, store, verifier);
+        Assert.False(badKey.Mutation.Success);
+        Assert.Equal(SshAuthorizedKeysErrorCode.InvalidPublicKey, badKey.Mutation.ErrorCode);
+        Assert.Null(badKey.List);
+
+        var pair = SshKeyPairGenerator.Generate(SshKeyAlgorithm.Ed25519, comment: "ops@host");
+        var badOpts = await SshAuthorizedKeysService.AddKeyAndListAsync(conn, pair.PublicKeyOpenSsh, "unquoted space", store, verifier);
+        Assert.False(badOpts.Mutation.Success);
+        Assert.Equal(SshAuthorizedKeysErrorCode.InvalidOptions, badOpts.Mutation.ErrorCode);
+        Assert.Null(badOpts.List);
+
+        var badRemove = await SshAuthorizedKeysService.RemoveKeyAndListAsync(conn, "ssh-unknown", "AAAA", false, store, verifier);
+        Assert.False(badRemove.Mutation.Success);
+        Assert.Equal(SshAuthorizedKeysErrorCode.InvalidPublicKey, badRemove.Mutation.ErrorCode);
+        Assert.Null(badRemove.List);
+    }
+
+    private sealed class StrictVerifier : IHostKeyVerifier
+    {
+        public Task<HostKeyDecision> VerifyAsync(
+            string host,
+            int port,
+            string algorithm,
+            string presentedFingerprint,
+            string? storedFingerprint,
+            CancellationToken ct = default)
+            => Task.FromResult(HostKeyDecision.Reject);
     }
 }

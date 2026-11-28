@@ -294,9 +294,9 @@ internal sealed class SftpHandler : IProtocolHandler
 
                     // The session takes ownership of the tunnel from here.
                     releaseTunnel = false;
-                    string? certWarning = SshCertificateExpiryEvaluator.FormatLocalizedWarning(
-                        SshCertificateExpiryEvaluator.Evaluate(server.SshKeyPath, server.SshCertificatePath),
-                        _localizer);
+                    string? certWarning = SshCertificateWarningHelper
+                        .EvaluateServerAndGateways(server, settings, _localizer)
+                        .WarningMessage;
                     capabilityWarning = (capabilityWarning, certWarning) switch
                     {
                         (not null, not null) => $"{capabilityWarning} {certWarning}",
@@ -406,6 +406,15 @@ internal sealed class SftpHandler : IProtocolHandler
                 // the catalogue. The same server produced English from one protocol and
                 // French from the other.
                 SshFailureInfo localized = SshFailureLocalizer.Localize(failure, _localizer, targetHost);
+                if (SshAuthFailureDiagnoser.IsAuthRejection(failure.Code))
+                {
+                    SshCertificateWarningHelper.EvaluationSummary sftpCertSummary =
+                        SshCertificateWarningHelper.EvaluateServerAndGateways(server, settings, _localizer);
+                    string enriched = SshCertificateWarningHelper.AppendInvalidWindowHint(localized.Message, sftpCertSummary)
+                        ?? localized.Message;
+                    localized = localized with { Message = enriched };
+                }
+
                 _connectionSm.SetError(server.Id, localized.Message);
                 return new ConnectionResult(
                     false,

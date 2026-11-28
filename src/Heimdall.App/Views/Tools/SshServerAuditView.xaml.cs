@@ -287,7 +287,7 @@ public partial class SshServerAuditView : UserControl, IToolView
             var newBaseline = SshServerAuditEngine.BuildBaseline(_vm.FleetResults);
             if (newBaseline.Count > 0)
             {
-                SaveFleetBaseline(baselinePath, newBaseline);
+                SaveFleetBaseline(baselinePath, SshServerAuditEngine.MergeBaseline(previousBaseline, newBaseline));
             }
 
             RefreshFleetGrid();
@@ -321,7 +321,7 @@ public partial class SshServerAuditView : UserControl, IToolView
             };
             if (dialog.ShowDialog() == true)
             {
-                File.WriteAllText(dialog.FileName, SshServerAuditEngine.FormatBatchHtmlReport(_vm.FleetResults), new UTF8Encoding(false));
+                File.WriteAllText(dialog.FileName, SshServerAuditEngine.FormatBatchHtmlReport(_vm.FleetResults, _vm.LastFleetDrift), new UTF8Encoding(false));
                 CopyFeedbackHelper.ShowCopyFeedback(BtnExportFleetHtml);
             }
         }
@@ -344,7 +344,7 @@ public partial class SshServerAuditView : UserControl, IToolView
             };
             if (dialog.ShowDialog() == true)
             {
-                File.WriteAllText(dialog.FileName, SshServerAuditEngine.FormatBatchCsvReport(_vm.FleetResults), new UTF8Encoding(false));
+                File.WriteAllText(dialog.FileName, SshServerAuditEngine.FormatBatchCsvReport(_vm.FleetResults, _vm.LastFleetDrift), new UTF8Encoding(false));
                 CopyFeedbackHelper.ShowCopyFeedback(BtnExportFleetCsv);
             }
         }

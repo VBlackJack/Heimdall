@@ -262,6 +262,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
 
         // Wire connect-time execution-trust confirmation relay
         _main.ServerList.ConnectionService.ConfirmExecution = ConfirmExecutionWithTitlesAsync;
+        _main.ServerList.ConnectionService.ConfirmSshStartupTrust = ConfirmSshStartupTrustAsync;
 
         // Wire broadcast relay so terminal views can fan out input
         _embeddedSessionManager.BroadcastCallback = BroadcastToAllTerminals;
@@ -2386,7 +2387,13 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                 return;
             }
 
-            if (!await AuthorizePostConnectAsync(server, runnableSteps).ConfigureAwait(false))
+            if (sshSession.StartupTrustDeclined)
+            {
+                FileLogger.Info($"Post-connect skipped for {displayName}: declined at connect.");
+                return;
+            }
+
+            if (!await AuthorizePostConnectAsync(server, ProfileExecutionTrust.CountPostConnectPayloads(server)).ConfigureAwait(false))
             {
                 FileLogger.Info($"Post-connect skipped for {displayName}: commands not approved.");
                 InvokeOnUi(() => _main.StatusText = _localizer.Format(
@@ -2465,6 +2472,13 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         return await ConfirmOnUiThreadAsync(
                 () => _main.ServerList.ConfirmAndTrustPostConnectAsync(server, runnableSteps, linkedTitles))
             .ConfigureAwait(false);
+    }
+
+    private async Task<bool> ConfirmSshStartupTrustAsync(ServerProfileDto profile)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+        int payloadCount = Math.Max(1, ProfileExecutionTrust.CountPostConnectPayloads(profile));
+        return await AuthorizePostConnectAsync(profile, payloadCount).ConfigureAwait(false);
     }
 
     /// <summary>

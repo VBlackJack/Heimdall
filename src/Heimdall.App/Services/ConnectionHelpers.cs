@@ -32,32 +32,15 @@ internal static class ConnectionHelpers
     /// </summary>
     internal static SshConnectionParams CreateGatewayConnectionParams(
         SshGatewayDto gateway,
-        SshAgentPreference sshAgentPreference = SshAgentPreference.AutoOpenSshFirst)
+        SshAgentPreference sshAgentPreference = SshAgentPreference.AutoOpenSshFirst,
+        SshCryptoPolicy sshCryptoPolicy = SshCryptoPolicy.Standard)
     {
-        string? password = null;
-        if (!string.IsNullOrEmpty(gateway.SshPasswordEncrypted))
-        {
-            password = DecryptPassword(gateway.SshPasswordEncrypted);
-        }
-
-        string? keyPassphrase = null;
-        if (!string.IsNullOrEmpty(gateway.SshKeyPassphraseEncrypted))
-        {
-            keyPassphrase = DecryptPassword(gateway.SshKeyPassphraseEncrypted);
-        }
-
-        return new SshConnectionParams
-        {
-            Host = gateway.Host,
-            Port = gateway.Port,
-            Username = gateway.User,
-            KeyPath = string.IsNullOrWhiteSpace(gateway.KeyPath) ? null : gateway.KeyPath,
-            Password = password,
-            KeyPassphrase = keyPassphrase,
-            SshAgentPreference = sshAgentPreference,
-            UseLegacyPasswordAsKeyPassphrase = gateway.UsesLegacySshCredentialMapping,
-            LegacyCredentialName = gateway.Name
-        };
+        ArgumentNullException.ThrowIfNull(gateway);
+        return GatewayChainResolver.ToConnectionParams(
+            [gateway],
+            DecryptPassword,
+            sshAgentPreference,
+            sshCryptoPolicy)[0];
     }
 
     /// <summary>

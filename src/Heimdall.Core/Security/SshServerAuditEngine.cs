@@ -524,14 +524,17 @@ public static class SshServerAuditEngine
     }
 
     /// <summary>Exports a consolidated multi-host batch SSH audit report to CSV (RFC 4180 + formula-safe).</summary>
-    public static string FormatBatchCsvReport(IReadOnlyList<SshFleetServerAuditEntry> entries)
+    public static string FormatBatchCsvReport(
+        IReadOnlyList<SshFleetServerAuditEntry> entries,
+        SshFleetAuditDriftSummary? drift = null)
     {
         ArgumentNullException.ThrowIfNull(entries);
 
         var sb = new StringBuilder();
-        sb.AppendLine("Name,Host,Port,Gateway,Status,Grade,AnssiCompliant,PostQuantumKex,StrictKex,Banner,FindingsCount,Error");
+        sb.AppendLine("Name,Host,Port,Gateway,Status,Grade,Drift,AnssiCompliant,PostQuantumKex,StrictKex,Banner,FindingsCount,Error");
         foreach (var e in entries)
         {
+            string driftLabel = ResolveDriftLabel(e.Host, e.Port, drift);
             if (e.Report is { } r)
             {
                 sb.AppendLine(string.Join(",",
@@ -541,6 +544,7 @@ public static class SshServerAuditEngine
                     SanitizeCsvCell(e.GatewayName ?? string.Empty),
                     SanitizeCsvCell("OK"),
                     SanitizeCsvCell(GradeToString(r.Grade)),
+                    SanitizeCsvCell(driftLabel),
                     r.IsAnssiCompliant ? "true" : "false",
                     r.HasPostQuantumKex ? "true" : "false",
                     r.HasStrictKex ? "true" : "false",
@@ -557,6 +561,7 @@ public static class SshServerAuditEngine
                     SanitizeCsvCell(e.GatewayName ?? string.Empty),
                     SanitizeCsvCell("ERROR"),
                     SanitizeCsvCell(string.Empty),
+                    SanitizeCsvCell(driftLabel),
                     "false",
                     "false",
                     "false",
@@ -570,7 +575,9 @@ public static class SshServerAuditEngine
     }
 
     /// <summary>Exports a consolidated multi-host batch SSH audit report to standalone HTML.</summary>
-    public static string FormatBatchHtmlReport(IReadOnlyList<SshFleetServerAuditEntry> entries)
+    public static string FormatBatchHtmlReport(
+        IReadOnlyList<SshFleetServerAuditEntry> entries,
+        SshFleetAuditDriftSummary? drift = null)
     {
         ArgumentNullException.ThrowIfNull(entries);
 
@@ -587,10 +594,11 @@ public static class SshServerAuditEngine
         sb.AppendLine("</head><body>");
         sb.AppendLine("<h1>SSH Fleet Cryptographic Audit</h1>");
         sb.AppendLine($"<p><span class=\"badge\">Hosts: {entries.Count}</span><span class=\"badge\">Audited: {succeeded}</span><span class=\"badge\">ANSSI PASS: {anssiPass}</span><span class=\"badge\">PQ KEX: {pqReady}</span><span class=\"badge\">Errors: {failed}</span></p>");
-        sb.AppendLine("<table><thead><tr><th>Name</th><th>Endpoint</th><th>Gateway</th><th>Grade</th><th>ANSSI</th><th>PQ KEX</th><th>Strict KEX</th><th>Banner / Error</th></tr></thead><tbody>");
+        sb.AppendLine("<table><thead><tr><th>Name</th><th>Endpoint</th><th>Gateway</th><th>Grade</th><th>Drift</th><th>ANSSI</th><th>PQ KEX</th><th>Strict KEX</th><th>Banner / Error</th></tr></thead><tbody>");
         foreach (var e in entries)
         {
             string endpoint = $"{e.Host}:{e.Port}";
+            string driftLabel = ResolveDriftLabel(e.Host, e.Port, drift);
             if (e.Report is { } r)
             {
                 sb.AppendLine(
@@ -598,6 +606,7 @@ public static class SshServerAuditEngine
                     $"<td><code>{WebUtility.HtmlEncode(endpoint)}</code></td>" +
                     $"<td>{WebUtility.HtmlEncode(e.GatewayName ?? "-")}</td>" +
                     $"<td><strong>{WebUtility.HtmlEncode(GradeToString(r.Grade))}</strong></td>" +
+                    $"<td>{WebUtility.HtmlEncode(driftLabel)}</td>" +
                     $"<td>{(r.IsAnssiCompliant ? "PASS" : "FAIL")}</td>" +
                     $"<td>{(r.HasPostQuantumKex ? "YES" : "NO")}</td>" +
                     $"<td>{(r.HasStrictKex ? "YES" : "NO")}</td>" +
@@ -609,13 +618,37 @@ public static class SshServerAuditEngine
                     $"<tr><td>{WebUtility.HtmlEncode(e.DisplayName)}</td>" +
                     $"<td><code>{WebUtility.HtmlEncode(endpoint)}</code></td>" +
                     $"<td>{WebUtility.HtmlEncode(e.GatewayName ?? "-")}</td>" +
-                    $"<td>-</td><td>-</td><td>-</td><td>-</td>" +
+                    $"<td>-</td><td>{WebUtility.HtmlEncode(driftLabel)}</td><td>-</td><td>-</td><td>-</td>" +
                     $"<td>{WebUtility.HtmlEncode(e.ErrorMessage ?? "Error")}</td></tr>");
             }
         }
 
         sb.AppendLine("</tbody></table></body></html>");
         return sb.ToString();
+    }
+
+    private static string ResolveDriftLabel(string host, int port, SshFleetAuditDriftSummary? drift)
+    {
+        if (drift?.ByEndpoint is not { } byEndpoint)
+        {
+            return "-";
+        }
+
+        string endpointKey = FormatEndpointKey(host, port);
+        if (!byEndpoint.TryGetValue(endpointKey, out SshFleetAuditDriftStatus status))
+        {
+            return "-";
+        }
+
+        return status switch
+        {
+            SshFleetAuditDriftStatus.Improved => "Improved",
+            SshFleetAuditDriftStatus.Regressed => "Regressed",
+            SshFleetAuditDriftStatus.Unchanged => "Same",
+            SshFleetAuditDriftStatus.New => "New",
+            SshFleetAuditDriftStatus.Error => "Error",
+            _ => "-"
+        };
     }
 
     /// <summary>
@@ -716,6 +749,41 @@ public static class SshServerAuditEngine
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Merges newly succeeded baseline entries into an existing baseline so hosts that were
+    /// unreachable or skipped during the current run retain their previous baseline history.
+    /// </summary>
+    public static IReadOnlyList<SshFleetAuditBaselineEntry> MergeBaseline(
+        IReadOnlyList<SshFleetAuditBaselineEntry>? previous,
+        IReadOnlyList<SshFleetAuditBaselineEntry> current)
+    {
+        ArgumentNullException.ThrowIfNull(current);
+
+        var merged = new Dictionary<string, SshFleetAuditBaselineEntry>(StringComparer.OrdinalIgnoreCase);
+        if (previous is not null)
+        {
+            foreach (var entry in previous)
+            {
+                if (!string.IsNullOrWhiteSpace(entry.Endpoint))
+                {
+                    merged[entry.Endpoint] = entry;
+                }
+            }
+        }
+
+        foreach (var entry in current)
+        {
+            if (!string.IsNullOrWhiteSpace(entry.Endpoint))
+            {
+                merged[entry.Endpoint] = entry;
+            }
+        }
+
+        return merged.Values
+            .OrderBy(static e => e.Endpoint, StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     /// <summary>Compares the current fleet audit against a previous baseline to classify per-host drift.</summary>

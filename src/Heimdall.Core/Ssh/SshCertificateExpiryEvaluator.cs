@@ -28,7 +28,8 @@ public enum SshCertificateExpiryStatus
     None = 0,
     Valid = 1,
     ExpiringSoon = 2,
-    Expired = 3
+    Expired = 3,
+    NotYetValid = 4
 }
 
 /// <summary>Result of evaluating a local OpenSSH user certificate's validity window.</summary>
@@ -36,7 +37,8 @@ public sealed record SshCertificateExpiryAssessment(
     SshCertificateExpiryStatus Status,
     DateTimeOffset? ValidBeforeUtc,
     int DaysRemaining,
-    string? ResolvedPath)
+    string? ResolvedPath,
+    DateTimeOffset? ValidAfterUtc = null)
 {
     public static readonly SshCertificateExpiryAssessment Empty =
         new(SshCertificateExpiryStatus.None, null, 0, null);
@@ -101,34 +103,46 @@ public static class SshCertificateExpiryEvaluator
             return SshCertificateExpiryAssessment.Empty;
         }
 
-        if (cert.ValidBefore is not { } validBefore)
-        {
-            return new SshCertificateExpiryAssessment(SshCertificateExpiryStatus.Valid, null, int.MaxValue, resolvedPath);
-        }
-
         DateTimeOffset now = nowUtc ?? DateTimeOffset.UtcNow;
-        if (validBefore <= now)
+        if (cert.ValidBefore is { } validBefore && validBefore <= now)
         {
-            return new SshCertificateExpiryAssessment(SshCertificateExpiryStatus.Expired, validBefore, 0, resolvedPath);
+            return new SshCertificateExpiryAssessment(SshCertificateExpiryStatus.Expired, validBefore, 0, resolvedPath, cert.ValidAfter);
         }
 
-        if (validBefore <= now.AddDays(ExpiringSoonDays))
+        if (cert.ValidAfter is { } validAfter && validAfter > now)
         {
-            int daysLeft = Math.Max(1, (int)Math.Ceiling((validBefore - now).TotalDays));
-            return new SshCertificateExpiryAssessment(SshCertificateExpiryStatus.ExpiringSoon, validBefore, daysLeft, resolvedPath);
+            return new SshCertificateExpiryAssessment(SshCertificateExpiryStatus.NotYetValid, cert.ValidBefore, 0, resolvedPath, validAfter);
         }
 
-        int remaining = Math.Max(ExpiringSoonDays + 1, (int)Math.Ceiling((validBefore - now).TotalDays));
-        return new SshCertificateExpiryAssessment(SshCertificateExpiryStatus.Valid, validBefore, remaining, resolvedPath);
+        if (cert.ValidBefore is not { } validBeforeEnd)
+        {
+            return new SshCertificateExpiryAssessment(SshCertificateExpiryStatus.Valid, null, int.MaxValue, resolvedPath, cert.ValidAfter);
+        }
+
+        if (validBeforeEnd <= now.AddDays(ExpiringSoonDays))
+        {
+            int daysLeft = Math.Max(1, (int)Math.Ceiling((validBeforeEnd - now).TotalDays));
+            return new SshCertificateExpiryAssessment(SshCertificateExpiryStatus.ExpiringSoon, validBeforeEnd, daysLeft, resolvedPath, cert.ValidAfter);
+        }
+
+        int remaining = Math.Max(ExpiringSoonDays + 1, (int)Math.Ceiling((validBeforeEnd - now).TotalDays));
+        return new SshCertificateExpiryAssessment(SshCertificateExpiryStatus.Valid, validBeforeEnd, remaining, resolvedPath, cert.ValidAfter);
     }
 
-    /// <summary>Formats a localized non-blocking status warning when the certificate is expired or expiring soon.</summary>
+    /// <summary>Formats a localized non-blocking status warning when the certificate is expired, not yet valid, or expiring soon.</summary>
     public static string? FormatLocalizedWarning(
         SshCertificateExpiryAssessment assessment,
         LocalizationManager localizer)
     {
         ArgumentNullException.ThrowIfNull(assessment);
         ArgumentNullException.ThrowIfNull(localizer);
+
+        if (assessment.Status == SshCertificateExpiryStatus.NotYetValid
+            && assessment.ValidAfterUtc is { } validAfter)
+        {
+            string startDateText = validAfter.ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            return localizer.Format("SshCertWarningNotYetValid", startDateText);
+        }
 
         if (assessment.ValidBeforeUtc is not { } validBefore)
         {

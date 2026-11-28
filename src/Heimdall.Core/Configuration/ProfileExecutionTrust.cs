@@ -110,6 +110,50 @@ public static class ProfileExecutionTrust
     }
 
     /// <summary>
+    /// Counts all post-connect payloads (startup command, SetEnv variables, and enabled steps).
+    /// </summary>
+    public static int CountPostConnectPayloads(ServerProfileDto profile)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+
+        int count = 0;
+        if (string.Equals(profile.ConnectionType, "SSH", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!string.IsNullOrWhiteSpace(profile.SshStartupCommand))
+            {
+                count++;
+            }
+
+            if (profile.SshEnvironmentVariables is { Count: > 0 })
+            {
+                foreach (string? env in profile.SshEnvironmentVariables)
+                {
+                    if (!string.IsNullOrWhiteSpace(env))
+                    {
+                        count++;
+                    }
+                }
+            }
+        }
+
+        if (profile.PostConnectSteps is not null)
+        {
+            foreach (PostConnectStep? step in profile.PostConnectSteps)
+            {
+                if (step is not null
+                    && step.Enabled
+                    && (!string.IsNullOrWhiteSpace(step.Input)
+                        || !string.IsNullOrWhiteSpace(step.CommandLibraryId)))
+                {
+                    count++;
+                }
+            }
+        }
+
+        return count;
+    }
+
+    /// <summary>
     /// Returns true when a profile carries post-connect payload that has not been confirmed.
     /// </summary>
     public static bool RequiresPostConnectConfirmation(ServerProfileDto profile)

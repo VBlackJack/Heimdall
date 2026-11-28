@@ -226,10 +226,25 @@ public static class AsciinemaCastPlayerEngine
         double targetSeconds,
         bool useIdleCap)
     {
+        var (output, lastIdx, _, _) = BuildSeekStateAtTime(recording, targetSeconds, useIdleCap);
+        return (output, lastIdx);
+    }
+
+    /// <summary>
+    /// Reconstructs cumulative terminal output and effective terminal dimensions (<c>COLSxROWS</c>
+    /// from the header and any <c>"r"</c> resize events) up to <paramref name="targetSeconds"/>.
+    /// </summary>
+    public static (string CumulativeOutput, int LastEventIndex, int Width, int Height) BuildSeekStateAtTime(
+        AsciinemaCastRecording recording,
+        double targetSeconds,
+        bool useIdleCap)
+    {
         ArgumentNullException.ThrowIfNull(recording);
 
         var sb = new StringBuilder();
         int lastIdx = -1;
+        int width = Math.Clamp(recording.Header.Width, 1, 500);
+        int height = Math.Clamp(recording.Header.Height, 1, 200);
         double bound = Math.Max(0, targetSeconds);
 
         for (int i = 0; i < recording.Events.Count; i++)
@@ -246,9 +261,46 @@ public static class AsciinemaCastPlayerEngine
             {
                 sb.Append(evt.Data);
             }
+            else if (evt.Type == "r" && TryParseResizePayload(evt.Data, out int cols, out int rows))
+            {
+                width = cols;
+                height = rows;
+            }
         }
 
-        return (sb.ToString(), lastIdx);
+        return (sb.ToString(), lastIdx, width, height);
+    }
+
+    /// <summary>Parses an asciinema v2 <c>"r"</c> resize event payload (<c>COLSxROWS</c>).</summary>
+    public static bool TryParseResizePayload(string? payload, out int columns, out int rows)
+    {
+        columns = 0;
+        rows = 0;
+        if (string.IsNullOrWhiteSpace(payload))
+        {
+            return false;
+        }
+
+        int sep = payload.IndexOf('x', StringComparison.OrdinalIgnoreCase);
+        if (sep <= 0 || sep >= payload.Length - 1)
+        {
+            return false;
+        }
+
+        if (!int.TryParse(payload[..sep].Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out int parsedCols)
+            || !int.TryParse(payload[(sep + 1)..].Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out int parsedRows))
+        {
+            return false;
+        }
+
+        if (parsedCols is < 1 or > 500 || parsedRows is < 1 or > 200)
+        {
+            return false;
+        }
+
+        columns = parsedCols;
+        rows = parsedRows;
+        return true;
     }
 
     /// <summary>Formats a non-negative playback position in seconds as <c>mm:ss</c> or <c>h:mm:ss</c>.</summary>

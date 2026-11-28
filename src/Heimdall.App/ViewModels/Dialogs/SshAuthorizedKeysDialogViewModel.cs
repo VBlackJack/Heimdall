@@ -173,7 +173,7 @@ public sealed partial class SshAuthorizedKeysDialogViewModel : ObservableObject
 
         await RunWithConnectionAsync(async (connParams, hostKeyStore, hostKeyVerifier, ct) =>
         {
-            var addResult = await SshAuthorizedKeysService.AddKeyAsync(
+            var (addResult, listResult) = await SshAuthorizedKeysService.AddKeyAndListAsync(
                     connParams,
                     NewPublicKeyLine,
                     NewKeyOptions,
@@ -196,9 +196,7 @@ public sealed partial class SshAuthorizedKeysDialogViewModel : ObservableObject
             NewPublicKeyLine = string.Empty;
             NewKeyOptions = string.Empty;
 
-            var listResult = await SshAuthorizedKeysService.ListAsync(connParams, hostKeyStore, hostKeyVerifier, ct)
-                .ConfigureAwait(true);
-            if (listResult.Success)
+            if (listResult is { Success: true })
             {
                 Entries.Clear();
                 foreach (var entry in listResult.Entries)
@@ -246,7 +244,7 @@ public sealed partial class SshAuthorizedKeysDialogViewModel : ObservableObject
 
         await RunWithConnectionAsync(async (connParams, hostKeyStore, hostKeyVerifier, ct) =>
         {
-            var removeResult = await SshAuthorizedKeysService.RemoveKeyAsync(
+            var (removeResult, listResult) = await SshAuthorizedKeysService.RemoveKeyAndListAsync(
                     connParams,
                     targetEntry.KeyType,
                     targetEntry.KeyBase64,
@@ -268,9 +266,7 @@ public sealed partial class SshAuthorizedKeysDialogViewModel : ObservableObject
                 return;
             }
 
-            var listResult = await SshAuthorizedKeysService.ListAsync(connParams, hostKeyStore, hostKeyVerifier, ct)
-                .ConfigureAwait(true);
-            if (listResult.Success)
+            if (listResult is { Success: true })
             {
                 Entries.Clear();
                 foreach (var entry in listResult.Entries)

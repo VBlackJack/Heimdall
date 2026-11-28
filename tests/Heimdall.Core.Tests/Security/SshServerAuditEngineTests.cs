@@ -271,4 +271,55 @@ public sealed class SshServerAuditEngineTests
         Assert.Equal(0, drift.NewHosts);
         Assert.Equal(SshFleetAuditDriftStatus.Improved, drift.ByEndpoint["host-dup:22"]);
     }
+
+    [Fact]
+    public void MergeBaseline_AndBatchExports_IncludeDriftStatus()
+    {
+        DateTimeOffset t0 = new(2026, 10, 1, 10, 0, 0, TimeSpan.Zero);
+        DateTimeOffset t1 = new(2026, 11, 1, 10, 0, 0, TimeSpan.Zero);
+        SshFleetAuditBaselineEntry[] previous =
+        [
+            new("host-old:22", "A", true, false, false, t0),
+            new("host-a:22", "B", false, false, false, t0)
+        ];
+        SshFleetAuditBaselineEntry[] currentRun =
+        [
+            new("host-a:22", "A+", true, true, true, t1),
+            new("host-b:22", "A", true, false, true, t1)
+        ];
+
+        var merged = SshServerAuditEngine.MergeBaseline(previous, currentRun);
+        Assert.Equal(3, merged.Count);
+        Assert.Equal("A+", Assert.Single(merged, e => e.Endpoint == "host-a:22").Grade);
+        Assert.Equal("A", Assert.Single(merged, e => e.Endpoint == "host-old:22").Grade);
+
+        var strongSnap = new SshKexInitSnapshot(
+            "host-a",
+            22,
+            "SSH-2.0-OpenSSH_9.9",
+            ["mlkem768x25519-sha256", "kex-strict-s-v00@openssh.com"],
+            ["ssh-ed25519"],
+            ["aes256-gcm@openssh.com"],
+            ["aes256-gcm@openssh.com"],
+            ["hmac-sha2-512-etm@openssh.com"],
+            ["hmac-sha2-512-etm@openssh.com"],
+            ["none"],
+            ["none"]);
+        var strongReport = SshServerAuditEngine.Evaluate(strongSnap);
+        SshFleetServerAuditEntry[] entries =
+        [
+            new("HostA", "host-a", 22, null, strongReport),
+            new("HostB", "host-b", 22, null, null, "Timeout")
+        ];
+        var drift = SshServerAuditEngine.CompareAgainstBaseline(entries, previous);
+
+        string csv = SshServerAuditEngine.FormatBatchCsvReport(entries, drift);
+        Assert.Contains("Grade,Drift,AnssiCompliant", csv, StringComparison.Ordinal);
+        Assert.Contains("Improved", csv, StringComparison.Ordinal);
+        Assert.Contains("Error", csv, StringComparison.Ordinal);
+
+        string html = SshServerAuditEngine.FormatBatchHtmlReport(entries, drift);
+        Assert.Contains("<th>Drift</th>", html, StringComparison.Ordinal);
+        Assert.Contains("Improved", html, StringComparison.Ordinal);
+    }
 }

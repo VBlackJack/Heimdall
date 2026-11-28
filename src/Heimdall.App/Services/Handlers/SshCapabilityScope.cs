@@ -47,7 +47,10 @@ internal enum SshUnavailableCapability
     Compression = 2,
 
     /// <summary>StrictModern cryptographic policy cannot be enforced on external Plink/PuTTY transports.</summary>
-    StrictCryptoPolicy = 4
+    StrictCryptoPolicy = 4,
+
+    /// <summary>Startup commands and SetEnv variables are unavailable on external Plink/PuTTY transports.</summary>
+    StartupCommandOrEnv = 8
 }
 
 /// <summary>
@@ -66,6 +69,9 @@ internal sealed record SshCapabilityNotice(SshUnavailableCapability UnavailableC
         SshUnavailableCapability.X11Forwarding | SshUnavailableCapability.Compression =>
             "X11 forwarding, compression",
         SshUnavailableCapability.StrictCryptoPolicy => "strict modern cryptography policy",
+        SshUnavailableCapability.StartupCommandOrEnv => "startup command / SetEnv",
+        SshUnavailableCapability.StrictCryptoPolicy | SshUnavailableCapability.StartupCommandOrEnv =>
+            "strict modern cryptography policy, startup command / SetEnv",
         _ => throw new InvalidOperationException("The capability notice must identify at least one unavailable capability.")
     };
 
@@ -79,6 +85,9 @@ internal sealed record SshCapabilityNotice(SshUnavailableCapability UnavailableC
         SshUnavailableCapability.X11Forwarding | SshUnavailableCapability.Compression =>
             SshLocalizationKeys.StatusSshDirectX11AndCompressionUnavailable,
         SshUnavailableCapability.StrictCryptoPolicy => SshLocalizationKeys.StatusSshPlinkStrictCryptoUnavailable,
+        SshUnavailableCapability.StartupCommandOrEnv => SshLocalizationKeys.StatusSshPlinkStartupCommandUnavailable,
+        SshUnavailableCapability.StrictCryptoPolicy | SshUnavailableCapability.StartupCommandOrEnv =>
+            SshLocalizationKeys.StatusSshPlinkStrictCryptoAndStartupUnavailable,
         _ => throw new InvalidOperationException("The capability notice must identify at least one unavailable capability.")
     };
 }
@@ -110,13 +119,25 @@ internal static class SshCapabilityScope
         SshResolvedPath path,
         bool x11Forwarding,
         bool compression,
-        SshCryptoPolicy cryptoPolicy = SshCryptoPolicy.Standard)
+        SshCryptoPolicy cryptoPolicy = SshCryptoPolicy.Standard,
+        bool hasStartupCommandOrEnv = false)
     {
         if (SupportsForwarding(path))
         {
-            return cryptoPolicy == SshCryptoPolicy.StrictModern
-                ? new SshCapabilityNotice(SshUnavailableCapability.StrictCryptoPolicy)
-                : null;
+            SshUnavailableCapability externalUnavailable = 0;
+            if (cryptoPolicy == SshCryptoPolicy.StrictModern)
+            {
+                externalUnavailable |= SshUnavailableCapability.StrictCryptoPolicy;
+            }
+
+            if (hasStartupCommandOrEnv)
+            {
+                externalUnavailable |= SshUnavailableCapability.StartupCommandOrEnv;
+            }
+
+            return externalUnavailable == 0
+                ? null
+                : new SshCapabilityNotice(externalUnavailable);
         }
 
         SshUnavailableCapability unavailableCapabilities = 0;
