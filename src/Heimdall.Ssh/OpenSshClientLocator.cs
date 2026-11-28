@@ -65,6 +65,11 @@ public static class OpenSshClientLocator
         string pathVar = pathEnvironment ?? Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
         foreach (string dir in pathVar.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
+            if (!Path.IsPathFullyQualified(dir))
+            {
+                continue;
+            }
+
             string candidate = Path.Combine(dir, ExecutableName);
             if (!ImportedPathPolicy.IsNetworkOrDevicePath(candidate) && exists(candidate))
             {
@@ -73,5 +78,82 @@ public static class OpenSshClientLocator
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Same lookup as <see cref="ResolveExecutablePath"/> but every candidate must pass attestation
+    /// (<c>ssh -V</c> reports an <c>OpenSSH_for_Windows</c> build). A configured path is never
+    /// replaced by a fallback. PATH entries that are not fully qualified are skipped.
+    /// </summary>
+    public static OpenSshResolution ResolveAttested(
+        string? configuredPath,
+        OpenSshCapabilitiesReader? reader = null,
+        Func<string, bool>? fileExists = null,
+        string? windowsDirectory = null,
+        string? pathEnvironment = null)
+    {
+        OpenSshCapabilitiesReader attestor = reader ?? OpenSshCapabilitiesReader.Shared;
+        Func<string, bool> exists = fileExists ?? File.Exists;
+        OpenSshRefusalReason? firstRefusal = null;
+
+        foreach (string candidate in EnumerateCandidates(configuredPath, exists, windowsDirectory, pathEnvironment))
+        {
+            OpenSshResolution result = attestor.Read(candidate);
+            if (result.IsAccepted)
+            {
+                return result;
+            }
+
+            firstRefusal ??= result.Refusal;
+        }
+
+        return new OpenSshResolution(null, firstRefusal ?? OpenSshRefusalReason.NotFound);
+    }
+
+    private static IEnumerable<string> EnumerateCandidates(
+        string? configuredPath,
+        Func<string, bool> exists,
+        string? windowsDirectory,
+        string? pathEnvironment)
+    {
+        if (!string.IsNullOrWhiteSpace(configuredPath))
+        {
+            string expanded = Environment.ExpandEnvironmentVariables(configuredPath.Trim());
+            if (!ImportedPathPolicy.IsNetworkOrDevicePath(expanded)
+                && Path.IsPathFullyQualified(expanded)
+                && exists(expanded))
+            {
+                yield return expanded;
+            }
+
+            yield break;
+        }
+
+        string winDir = !string.IsNullOrWhiteSpace(windowsDirectory)
+            ? windowsDirectory
+            : Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+        if (!string.IsNullOrWhiteSpace(winDir))
+        {
+            string system32Candidate = Path.Combine(winDir, "System32", "OpenSSH", ExecutableName);
+            if (exists(system32Candidate))
+            {
+                yield return system32Candidate;
+            }
+        }
+
+        string pathVar = pathEnvironment ?? Environment.GetEnvironmentVariable("PATH") ?? string.Empty;
+        foreach (string dir in pathVar.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (!Path.IsPathFullyQualified(dir))
+            {
+                continue;
+            }
+
+            string candidate = Path.Combine(dir, ExecutableName);
+            if (!ImportedPathPolicy.IsNetworkOrDevicePath(candidate) && exists(candidate))
+            {
+                yield return candidate;
+            }
+        }
     }
 }

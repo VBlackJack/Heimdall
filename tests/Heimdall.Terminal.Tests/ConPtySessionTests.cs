@@ -497,4 +497,30 @@ public sealed class ConPtySessionTests
             : TerminalTimeoutDiagnostics.CreateMessage(timeoutContext, elapsed.Elapsed);
         Assert.True(stopped, message);
     }
+
+    [Fact]
+    public void Dispose_RaisesDisposedExactlyOnce_EvenWhenDisposedTwice()
+    {
+        ConPtySession session = new();
+        int raised = 0;
+        session.Disposed += () => Interlocked.Increment(ref raised);
+
+        session.Dispose();
+        session.Dispose();
+
+        Assert.Equal(1, raised);
+    }
+
+    [Fact]
+    public void Dispose_ASubscriberThatThrows_DoesNotSkipTheNextOne()
+    {
+        ConPtySession session = new();
+        bool secondRan = false;
+        session.Disposed += () => throw new InvalidOperationException("subscriber failure");
+        session.Disposed += () => secondRan = true;
+
+        session.Dispose();
+
+        Assert.True(secondRan);
+    }
 }

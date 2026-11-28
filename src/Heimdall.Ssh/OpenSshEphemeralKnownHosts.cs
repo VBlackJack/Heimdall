@@ -26,89 +26,84 @@ using Heimdall.Core.Ssh;
 namespace Heimdall.Ssh;
 
 /// <summary>
-/// Materializes a short-lived, UTF-8 without BOM, owner-restricted <c>known_hosts</c> file
-/// populated from Heimdall's <see cref="HostKeyStore"/> so native <c>ssh.exe</c> trusts pinned
-/// keys without touching the user's global OpenSSH files.
+/// One host key line of the ephemeral <c>known_hosts</c> file: the key type written in the
+/// second column and the base64 public key blob. Heimdall decided these keys; the file holds
+/// nothing else.
+/// </summary>
+/// <param name="KeyType">Key type, one of the types in <see cref="OpenSshHostKeyTypes"/>.</param>
+/// <param name="PublicKeyBase64">Base64 of the public key blob (never a certificate).</param>
+public sealed record OpenSshKnownHostsKey(string KeyType, string PublicKeyBase64);
+
+/// <summary>
+/// Materializes a short-lived, UTF-8 without BOM, owner-restricted <c>known_hosts</c> file that
+/// holds only the host keys Heimdall decided, under a fixed <c>HostKeyAlias</c>, so native
+/// <c>ssh.exe</c> verifies the server against those keys and nothing else. It never copies the
+/// host-key store and never touches the user's global OpenSSH files.
 /// </summary>
 public sealed class OpenSshEphemeralKnownHosts : IDisposable
 {
     internal const string FilePrefix = "kh-";
     internal const string FileExtension = ".txt";
 
+    /// <summary>
+    /// Alias written in the first column of every line and passed to ssh as
+    /// <c>HostKeyAlias</c>: the lookup no longer depends on the endpoint ssh dials (a loopback
+    /// port opened for a gateway, or the host itself), nor on its port.
+    /// </summary>
+    public const string HostKeyAlias = "heimdall-pinned-host";
+
     private static readonly UTF8Encoding Utf8NoBom = new(encoderShouldEmitUTF8Identifier: false);
     private int _disposed;
 
     public string FilePath { get; }
 
-    public bool TargetHostPinned { get; }
-
-    private OpenSshEphemeralKnownHosts(string filePath, bool targetHostPinned)
+    private OpenSshEphemeralKnownHosts(string filePath)
     {
         FilePath = filePath;
-        TargetHostPinned = targetHostPinned;
     }
 
-    public static string BuildKnownHostsContent(
-        HostKeyStore store,
-        string transportHost,
-        int transportPort,
-        string? logicalHost = null,
-        int? logicalPort = null)
+    /// <summary>
+    /// Builds the file content: exactly one <c>&lt;alias&gt; &lt;keytype&gt; &lt;base64&gt;</c>
+    /// line per distinct key, in the order given.
+    /// </summary>
+    /// <exception cref="ArgumentException">No key, an unsupported key type, or a malformed blob.</exception>
+    public static string BuildKnownHostsContent(IReadOnlyList<OpenSshKnownHostsKey> keys)
     {
-        ArgumentNullException.ThrowIfNull(store);
-        ArgumentException.ThrowIfNullOrWhiteSpace(transportHost);
-
-        var lines = new List<string>();
-        var entries = store.GetAllEntries();
-
-        string effectiveHost = string.IsNullOrWhiteSpace(logicalHost) ? transportHost : logicalHost;
-        int effectivePort = logicalPort ?? transportPort;
-
-        if (entries.TryGetValue(HostKeyFormats.MakeKey(effectiveHost, effectivePort), out HostKeyEntry? targetEntry)
-            && !string.IsNullOrWhiteSpace(targetEntry.PublicKeyBase64)
-            && !store.IsRevoked(effectiveHost, effectivePort, targetEntry.Fingerprint))
+        ArgumentNullException.ThrowIfNull(keys);
+        if (keys.Count == 0)
         {
-            string transportToken = FormatHostToken(transportHost, transportPort);
-            lines.Add($"{transportToken} {targetEntry.Algorithm} {targetEntry.PublicKeyBase64}");
+            throw new ArgumentException("At least one pinned host key is required.", nameof(keys));
         }
 
-        foreach (var (hostPort, entry) in entries)
+        var lines = new List<string>(keys.Count);
+        foreach (OpenSshKnownHostsKey key in keys)
         {
-            if (string.IsNullOrWhiteSpace(entry.PublicKeyBase64)
-                || !HostKeyFormats.TryParseKey(hostPort, out string host, out int port)
-                || host.StartsWith("|1|", StringComparison.Ordinal)
-                || store.IsRevoked(host, port, entry.Fingerprint))
+            ArgumentNullException.ThrowIfNull(key);
+            if (!OpenSshHostKeyTypes.IsSupported(key.KeyType))
             {
-                continue;
+                throw new ArgumentException("Unsupported pinned host key type.", nameof(keys));
             }
 
-            string token = FormatHostToken(host, port);
-            string line = $"{token} {entry.Algorithm} {entry.PublicKeyBase64}";
+            if (!IsBase64Blob(key.PublicKeyBase64))
+            {
+                throw new ArgumentException("Pinned host key blob is not valid base64.", nameof(keys));
+            }
+
+            string line = $"{HostKeyAlias} {key.KeyType} {key.PublicKeyBase64}";
             if (!lines.Contains(line, StringComparer.Ordinal))
             {
                 lines.Add(line);
             }
         }
 
-        return lines.Count == 0 ? string.Empty : string.Join('\n', lines) + '\n';
+        return string.Join('\n', lines) + '\n';
     }
 
     public static OpenSshEphemeralKnownHosts Create(
-        HostKeyStore store,
-        string transportHost,
-        int transportPort,
-        string? logicalHost = null,
-        int? logicalPort = null,
+        IReadOnlyList<OpenSshKnownHostsKey> keys,
         string? baseDirectory = null)
     {
-        ArgumentNullException.ThrowIfNull(store);
-
-        string effectiveHost = string.IsNullOrWhiteSpace(logicalHost) ? transportHost : logicalHost;
-        int effectivePort = logicalPort ?? transportPort;
-        HostKeyEntry? pinned = store.GetEntry(effectiveHost, effectivePort);
-        bool targetPinned = pinned is not null
-            && !string.IsNullOrWhiteSpace(pinned.PublicKeyBase64)
-            && !store.IsRevoked(effectiveHost, effectivePort, pinned.Fingerprint);
+        string content = BuildKnownHostsContent(keys);
 
         string dir = !string.IsNullOrWhiteSpace(baseDirectory)
             ? baseDirectory
@@ -124,14 +119,13 @@ public sealed class OpenSshEphemeralKnownHosts : IDisposable
         string fileName = $"{FilePrefix}{pid.ToString(CultureInfo.InvariantCulture)}-{Guid.NewGuid():N}{FileExtension}";
         string filePath = Path.Combine(dir, fileName);
 
-        string content = BuildKnownHostsContent(store, transportHost, transportPort, logicalHost, logicalPort);
         File.WriteAllText(filePath, content, Utf8NoBom);
         if (OperatingSystem.IsWindows())
         {
             AclEnforcer.SetFileAcl(filePath);
         }
 
-        return new OpenSshEphemeralKnownHosts(filePath, targetPinned);
+        return new OpenSshEphemeralKnownHosts(filePath);
     }
 
     public static string GetDefaultDirectory()
@@ -141,8 +135,27 @@ public sealed class OpenSshEphemeralKnownHosts : IDisposable
             "tmp",
             "openssh");
 
-    private static string FormatHostToken(string host, int port)
-        => port == 22 ? host : $"[{host}]:{port.ToString(CultureInfo.InvariantCulture)}";
+    private static bool IsBase64Blob(string? value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return false;
+        }
+
+        foreach (char c in value)
+        {
+            bool valid = (c is >= 'A' and <= 'Z')
+                || (c is >= 'a' and <= 'z')
+                || (c is >= '0' and <= '9')
+                || c is '+' or '/' or '=';
+            if (!valid)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     public void Dispose()
     {

@@ -371,6 +371,38 @@ public sealed class ConPtySession : ITerminalSession
 
         _cts?.Dispose();
         _cts = null;
+
+        RaiseDisposed();
+    }
+
+    /// <summary>
+    /// Raised exactly once, at the end of <see cref="Dispose"/>, after the child process was
+    /// terminated and every handle released. Disposal can end a session whose exit notification
+    /// is never delivered, so an owner holding a temporary file for the process listens to this
+    /// event as well as to <see cref="ProcessExited"/>.
+    /// </summary>
+    public event Action? Disposed;
+
+    private void RaiseDisposed()
+    {
+        Action? subscribers = Disposed;
+        if (subscribers is null)
+        {
+            return;
+        }
+
+        // Each subscriber in its own try: one that throws must not skip the next.
+        foreach (Action subscriber in subscribers.GetInvocationList().Cast<Action>())
+        {
+            try
+            {
+                subscriber();
+            }
+            catch (Exception ex)
+            {
+                Heimdall.Core.Logging.FileLogger.Warn($"[ConPtySession] Disposed subscriber: {ex.Message}");
+            }
+        }
     }
 
     // ========================================================================

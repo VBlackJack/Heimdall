@@ -77,6 +77,7 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
     private readonly IX11ServerManager _x11ServerManager;
     private readonly IDialogService _dialogService;
     private readonly IPlinkHostKeyProbe _plinkHostKeyProbe;
+    private readonly Lazy<OpenSshHostKeyResolver> _openSshHostKeyResolver;
     private readonly PlinkPasswordFileJanitor _plinkPasswordFileJanitor;
     private readonly SensitiveFileJanitorScheduler _plinkPasswordFileJanitorScheduler;
     private readonly Action<string?> _deletePlinkPasswordFile;
@@ -131,7 +132,8 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
         ConnectShellSession? connectShellSession = null,
         StartPipeModeSession? startPipeModeSession = null,
         IPuttySessionRegistry? puttySessionRegistry = null,
-        Action<string, ISshAgentKey>? writeAgentKeyFile = null)
+        Action<string, ISshAgentKey>? writeAgentKeyFile = null,
+        IOpenSshHostKeyProbe? openSshHostKeyProbe = null)
     {
         _writeAgentKeyFile = writeAgentKeyFile ?? PlinkAgentKeyFile.Write;
         _tunnelService = tunnelService;
@@ -143,6 +145,11 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
         _x11ServerManager = x11ServerManager;
         _dialogService = dialogService;
         _plinkHostKeyProbe = plinkHostKeyProbe ?? new DefaultPlinkHostKeyProbe();
+        // Built on first native OpenSSH launch: its dependencies are the handler's own, and a
+        // handler that never launches ssh.exe (the embedded and Plink paths) never needs it.
+        IOpenSshHostKeyProbe nativeProbe = openSshHostKeyProbe ?? new SshNetOpenSshHostKeyProbe();
+        _openSshHostKeyResolver = new Lazy<OpenSshHostKeyResolver>(
+            () => new OpenSshHostKeyResolver(hostKeyStore, hostKeyTrustService, hostKeyVerifier, nativeProbe));
         _plinkPasswordFileJanitor = plinkPasswordFileJanitor ?? new PlinkPasswordFileJanitor();
         _deletePlinkPasswordFile = deletePlinkPasswordFile ?? DeletePlinkPasswordFile;
         _plinkAttestation = plinkAttestation ?? PlinkCompatibilityAttestation.Acquire;
@@ -1409,8 +1416,87 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
     }
 
     /// <summary>
+    /// Maps a refused native OpenSSH host-key resolution to the same result and diagnostic the
+    /// Plink path gives for the same failure.
+    /// </summary>
+    private ConnectionResult BuildOpenSshHostKeyRejectionResult(
+        string serverId,
+        string host,
+        int port,
+        OpenSshHostKeyResolution resolution)
+    {
+        if (resolution.Failure == OpenSshHostKeyFailure.CertificateInvalid)
+        {
+            string certMessage = SshFailureMessageBuilder.HostCertificateInvalid(_localizer);
+            _connectionSm.SetError(serverId, certMessage);
+            return new ConnectionResult(
+                false,
+                certMessage,
+                null,
+                SshSessionDiagnosticFactory.CreateHostCertificateInvalidFailure(
+                    resolution.PresentedFingerprint ?? string.Empty,
+                    host,
+                    port));
+        }
+
+        if (resolution.Failure == OpenSshHostKeyFailure.UnsupportedKeyType)
+        {
+            string typeMessage = _localizer[SshLocalizationKeys.ErrorSshHostKeyTypeUnsupported];
+            _connectionSm.SetError(serverId, typeMessage);
+            return new ConnectionResult(
+                false,
+                typeMessage,
+                null,
+                SshSessionDiagnosticFactory.CreatePreflightFailure(
+                    SshLocalizationKeys.ErrorSshHostKeyTypeUnsupported,
+                    typeMessage));
+        }
+
+        bool delegatesToPlinkMapping = resolution.Failure switch
+        {
+            OpenSshHostKeyFailure.Revoked => true,
+            OpenSshHostKeyFailure.Cancelled => true,
+            OpenSshHostKeyFailure.Mismatch => resolution.StoredFingerprint is not null
+                && resolution.PresentedFingerprint is not null,
+            _ => false,
+        };
+        if (!delegatesToPlinkMapping)
+        {
+            // The Plink text speaks of a gateway and plink; native OpenSSH has its own wording.
+            string unavailableMessage = _localizer[SshLocalizationKeys.ErrorOpenSshHostKeyUnavailable];
+            _connectionSm.SetError(serverId, unavailableMessage);
+            return new ConnectionResult(
+                false,
+                unavailableMessage,
+                null,
+                SshSessionDiagnosticFactory.CreateHostKeyUnavailableFailure(
+                    unavailableMessage,
+                    host,
+                    port));
+        }
+
+        (SshFailureCode code, string messageKey) = resolution.Failure switch
+        {
+            OpenSshHostKeyFailure.Revoked => (SshFailureCode.HostKeyRevoked, SshLocalizationKeys.ErrorSshHostKeyRevoked),
+            OpenSshHostKeyFailure.Mismatch => (SshFailureCode.HostKeyMismatch, SshLocalizationKeys.ErrorHostKeyMismatch),
+            _ => (SshFailureCode.Cancelled, SshLocalizationKeys.ErrorSshCancelled),
+        };
+        return BuildPlinkHostKeyRejectionResult(
+            serverId,
+            host,
+            port,
+            new PlinkHostKeyDecision(
+                ShouldProceed: false,
+                Fingerprint: null,
+                code,
+                messageKey,
+                resolution.StoredFingerprint,
+                resolution.PresentedFingerprint));
+    }
+
+    /// <summary>
     /// Launches native Windows OpenSSH (<c>ssh.exe</c>) inside <see cref="Heimdall.Terminal.ConPty.ConPtySession"/>
-    /// with an ephemeral owner-only ACL <c>known_hosts</c> file bridged from <see cref="_hostKeyStore"/>.
+    /// with an ephemeral owner-only ACL <c>known_hosts</c> file holding only the host key Heimdall decided.
     /// </summary>
     private async Task<ConnectionResult> ConnectSshOpenSshAsync(
         ServerProfileDto server,
@@ -1467,17 +1553,25 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
                 SshSessionDiagnosticFactory.CreatePreflightFailure(SshLocalizationKeys.ErrorConnectionFailed, keyPathMessage));
         }
 
-        string? sshExePath = OpenSshClientLocator.ResolveExecutablePath(settings.OpenSshPath);
-        if (string.IsNullOrWhiteSpace(sshExePath) || !File.Exists(sshExePath))
+        // Up to five ssh.exe processes run here, so it stays off the calling thread.
+        string? configuredOpenSshPath = settings.OpenSshPath;
+        OpenSshResolution sshResolution = await Task
+            .Run(() => OpenSshClientLocator.ResolveAttested(configuredOpenSshPath), ct)
+            .ConfigureAwait(false);
+        if (sshResolution.Capabilities is not { } sshCapabilities)
         {
-            string msg = _localizer[SshLocalizationKeys.ErrorOpenSshNotFound];
+            string refusalKey = OpenSshLaunchFailureMessages.KeyFor(sshResolution.Refusal);
+            string msg = _localizer[refusalKey];
             _connectionSm.SetError(server.Id, msg);
             return new ConnectionResult(
                 false,
                 msg,
                 null,
-                SshSessionDiagnosticFactory.CreatePreflightFailure(SshLocalizationKeys.ErrorOpenSshNotFound, msg));
+                SshSessionDiagnosticFactory.CreatePreflightFailure(refusalKey, msg));
         }
+
+        string sshExePath = sshCapabilities.ExecutablePath;
+        Core.Logging.FileLogger.Info($"Native OpenSSH client: {sshExePath} version {sshCapabilities.Version}");
 
         if (!Heimdall.Terminal.ConPty.ConPtySession.IsAvailable)
         {
@@ -1490,18 +1584,24 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
                 SshSessionDiagnosticFactory.CreatePreflightFailure(SshLocalizationKeys.ErrorOpenSshConPtyUnavailable, msg));
         }
 
-        string logicalHost = usesTunnel ? server.RemoteServer : targetHost;
-        int logicalPort = usesTunnel ? logicalSshPort : targetPort;
-        HostKeyEntry? storedEntry = _hostKeyTrustService.GetEffectiveEntry(logicalHost, logicalPort);
-        if (storedEntry is not null && _hostKeyTrustService.IsRevoked(logicalHost, logicalPort, storedEntry.Fingerprint))
+        // The same decision as for Plink, plus the certificate rules, before anything is consumed:
+        // a host-key rejection must never spend the startup-command approval. ssh.exe only ever
+        // sees the key decided here and never asks about host keys itself.
+        (string logicalHost, int logicalPort) = ResolvePlinkHostKeyIdentity(server, targetHost, targetPort, usesTunnel);
+        SshCryptoPolicy hostKeyPolicy = SshCryptoPolicyResolver.Resolve(server.SshCryptoPolicy, settings.SshCryptoPolicy);
+        OpenSshHostKeyResolution hostKeyResolution = await _openSshHostKeyResolver.Value
+            .ResolveAsync(
+                targetHost,
+                targetPort,
+                logicalHost,
+                logicalPort,
+                hostKeyPolicy,
+                settings.HostKeyProbeTimeoutMs,
+                ct)
+            .ConfigureAwait(false);
+        if (!hostKeyResolution.Succeeded)
         {
-            string msg = _localizer.Format(SshLocalizationKeys.ErrorSshHostKeyRevoked, logicalHost, logicalPort);
-            _connectionSm.SetError(server.Id, msg);
-            return new ConnectionResult(
-                false,
-                msg,
-                null,
-                SshSessionDiagnosticFactory.CreateHostKeyRevokedFailure(storedEntry.Fingerprint, logicalHost, logicalPort));
+            return BuildOpenSshHostKeyRejectionResult(server.Id, logicalHost, logicalPort, hostKeyResolution);
         }
 
         SshStartupTrustGate.Decision? startupTrustDecision = SshStartupTrustGate.Take(server);
@@ -1510,7 +1610,7 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
             : !SharedSessionIds.IsSharedProfile(server) && server.ExecutionConfirmed;
 
         bool x11Forwarding = await ResolveX11ForwardingAsync(server).ConfigureAwait(false);
-        SshCryptoPolicy effectivePolicy = SshCryptoPolicyResolver.Resolve(server.SshCryptoPolicy, settings.SshCryptoPolicy);
+        SshCryptoPolicy effectivePolicy = hostKeyPolicy;
         bool hasStartupCommandOrEnv = !string.IsNullOrWhiteSpace(server.SshStartupCommand)
             || server.SshEnvironmentVariables is { Count: > 0 };
 
@@ -1519,7 +1619,9 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
             x11Forwarding,
             server.SshCompression,
             effectivePolicy,
-            hasStartupCommandOrEnv);
+            hasStartupCommandOrEnv,
+            sendsEnvironmentVariables: allowStartupExecution && server.SshEnvironmentVariables is { Count: > 0 },
+            agentKeyChosen: !string.IsNullOrWhiteSpace(server.SshAgentKeyFingerprint));
         if (capabilityNotice is not null)
         {
             SetStatusText?.Invoke(_localizer[capabilityNotice.StatusLocalizationKey]);
@@ -1529,12 +1631,7 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
         OpenSshEphemeralKnownHosts? knownHosts = null;
         try
         {
-            knownHosts = OpenSshEphemeralKnownHosts.Create(
-                _hostKeyStore,
-                targetHost,
-                targetPort,
-                logicalHost: usesTunnel ? server.RemoteServer : null,
-                logicalPort: usesTunnel ? logicalSshPort : null);
+            knownHosts = OpenSshEphemeralKnownHosts.Create(hostKeyResolution.Keys);
 
             OpenSshLaunchSpec spec = new()
             {
@@ -1542,7 +1639,11 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
                 Port = targetPort,
                 Username = string.IsNullOrWhiteSpace(server.SshUsername) ? null : server.SshUsername.Trim(),
                 EphemeralKnownHostsPath = knownHosts.FilePath,
-                StrictKnownHostOnly = knownHosts.TargetHostPinned,
+                PinnedKeyTypes = hostKeyResolution.Keys
+                    .Select(static key => key.KeyType)
+                    .Distinct(StringComparer.Ordinal)
+                    .ToList(),
+                HostCertificatePresented = hostKeyResolution.CertificatePresented,
                 KeyPath = string.IsNullOrWhiteSpace(server.SshKeyPath) ? null : server.SshKeyPath.Trim(),
                 CertificatePath = string.IsNullOrWhiteSpace(server.SshCertificatePath) ? null : server.SshCertificatePath.Trim(),
                 AgentForwarding = server.SshAgentForwarding,
@@ -1550,23 +1651,34 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
                 Compression = server.SshCompression,
                 CryptoPolicy = effectivePolicy,
                 LocalForwards = server.SshLocalForwards,
-                SocksProxyPort = server.SocksProxyPort,
-                RemoteBindPort = server.RemoteBindPort,
-                RemoteLocalPort = server.RemoteLocalPort,
+
+                // Through a gateway the tunnel already carries these three, as on the other paths.
+                SocksProxyPort = usesTunnel ? 0 : server.SocksProxyPort,
+                RemoteBindPort = usesTunnel ? 0 : server.RemoteBindPort,
+                RemoteLocalPort = usesTunnel ? 0 : server.RemoteLocalPort,
                 AllowStartupExecution = allowStartupExecution,
                 StartupCommand = server.SshStartupCommand,
                 EnvironmentVariables = server.SshEnvironmentVariables,
-                ServerAliveIntervalSeconds = settings.SshKeepAliveIntervalSeconds
+                ServerAliveIntervalSeconds = settings.SshKeepAliveIntervalSeconds,
+                Capabilities = sshCapabilities
             };
 
-            IReadOnlyList<string> args = OpenSshLaunchBuilder.BuildArguments(spec);
-            string commandLine = OpenSshLaunchBuilder.JoinWindowsCommandLine(args);
+            OpenSshLaunchPlan launchPlan = OpenSshLaunchBuilder.Build(spec);
+            string commandLine = OpenSshLaunchBuilder.JoinWindowsCommandLine(launchPlan.Arguments);
+            if (launchPlan.DroppedEntryCount > 0)
+            {
+                // One line: it replaces the capability notice shown above, so it carries it along.
+                SetStatusText?.Invoke(OpenSshLaunchStatusText.Compose(
+                    _localizer,
+                    capabilityNotice,
+                    launchPlan.DroppedEntryCount)!);
+            }
 
             if (x11Forwarding)
             {
                 terminalSession.EnvironmentVariables = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                 {
-                    ["DISPLAY"] = "127.0.0.1:0.0"
+                    ["DISPLAY"] = X11ServerManager.IPv4LoopbackDisplay
                 };
             }
 
@@ -1577,7 +1689,12 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
                 .ConfigureAwait(false);
 
             OpenSshEphemeralKnownHosts pinnedKnownHosts = knownHosts;
+
+            // The file is read again at every rekey, so it stays until the session is over: the
+            // process exit, or the disposal that ends a session whose exit is never delivered.
+            // Dispose is idempotent, whichever comes first wins.
             terminalSession.ProcessExited += _ => pinnedKnownHosts.Dispose();
+            terminalSession.Disposed += pinnedKnownHosts.Dispose;
 
             await terminalSession.StartAsync(
                     sshExePath,
@@ -1612,17 +1729,32 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
             knownHosts?.Dispose();
             throw;
         }
+        catch (OpenSshLaunchException ex)
+        {
+            terminalSession.Dispose();
+            knownHosts?.Dispose();
+            Core.Logging.FileLogger.Warn($"Native OpenSSH launch refused: {ex.Reason}");
+            string refusalKey = OpenSshLaunchFailureMessages.KeyFor(ex.Reason);
+            string refusalMessage = _localizer[refusalKey];
+            _connectionSm.SetError(server.Id, refusalMessage);
+            return new ConnectionResult(
+                false,
+                refusalMessage,
+                null,
+                SshSessionDiagnosticFactory.CreatePreflightFailure(refusalKey, refusalMessage));
+        }
         catch (Exception ex)
         {
             terminalSession.Dispose();
             knownHosts?.Dispose();
             Core.Logging.FileLogger.Error("Native OpenSSH ConPTY launch failed", ex);
-            _connectionSm.SetError(server.Id, ex.Message);
+            string failureMessage = _localizer[SshLocalizationKeys.ErrorConnectionFailed];
+            _connectionSm.SetError(server.Id, failureMessage);
             return new ConnectionResult(
                 false,
-                ex.Message,
+                failureMessage,
                 null,
-                SshSessionDiagnosticFactory.CreatePipeModeFailure(ex.Message));
+                SshSessionDiagnosticFactory.CreatePipeModeFailure(failureMessage));
         }
     }
 }

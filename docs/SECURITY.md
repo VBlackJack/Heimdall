@@ -1219,11 +1219,38 @@ reached through an SSH gateway to prevent split-horizon DNS leaks.
   suppress client-side DNS `SSHFP` lookups whenever a proxy is active to prevent
   split-horizon or proxy-bypass DNS leaks. Gateway host-key trust prompts and
   diagnostics enforce `SshCryptoPolicy` and `@revoked` parity through
-  `SshSessionDiagnosticFactory`, and SSH/SFTP startup host-key trust runs before
-  session creation via `SshStartupTrustGate`. Native Windows OpenSSH (`ssh.exe`)
-  ConPTY mode writes an ephemeral UTF-8 no-BOM `known_hosts` file protected by
-  an owner-only Windows ACL (`AclEnforcer.ApplyOwnerOnlyFileAcl`) containing
-  pinned entries, `@cert-authority`, and `@revoked` rules, deleting it on exit.
+  `SshSessionDiagnosticFactory`. `SshStartupTrustGate` is not a host-key control:
+  it only carries the user's approval of a profile's startup command / `SetEnv`
+  (`RemoteCommand`) from `ConnectionService` to `SshHandler` (SSH only, not
+  SFTP). Native Windows OpenSSH (`ssh.exe`)
+  ConPTY mode decides the host key in Heimdall before launching `ssh.exe`: the
+  server key is probed with SSH.NET (no authentication) and judged by the same
+  rules as the other modes (revoked keys refused, stored multi-algorithm pin
+  compared, certificate checked against the trusted-CA rules, otherwise the
+  Heimdall host-key dialog). `ssh.exe` then runs with
+  `StrictHostKeyChecking=yes`, `CheckHostIP=no`, `UpdateHostKeys=no`, a fixed
+  `HostKeyAlias` and `HostKeyAlgorithms` limited to the decided key type,
+  against an ephemeral UTF-8 no-BOM `known_hosts` file protected by an
+  owner-only Windows ACL (`AclEnforcer.SetFileAcl`) that holds only the decided
+  key(s), never the whole store and never `~/.ssh/known_hosts`. `ssh.exe` never
+  asks about host keys and refuses any other key. When the probe fails, the
+  host's stored pinned keys that have a key blob are used; a legacy pin without
+  a blob refuses the connection. Only `ssh-ed25519`,
+  `ecdsa-sha2-nistp256/384/521` and `ssh-rsa` host keys are accepted. The file is
+  deleted when the session ends (process exit or tab close) and a janitor sweeps
+  leftovers. `HostKeyAlgorithms` also covers the matching certificate algorithms
+  when the host presented a certificate. Only a Windows build of OpenSSH is used:
+  `ssh -V` must report `OpenSSH_for_Windows`, MSYS, Cygwin and Git builds are
+  refused, and `PATH` entries that are not fully qualified are skipped. Under
+  `StrictModern`, the KEX, cipher and MAC lists are intersected with what the
+  installed `ssh.exe` supports (`ssh -Q`) and an empty intersection refuses the
+  launch. `IdentitiesOnly=yes` is added when a key file is given. Key,
+  certificate and `known_hosts` paths that contain `%`, `${`, a double quote or
+  `\'`, or that end with `\`, are refused because `ssh` would expand or
+  mis-tokenize them. `SetEnv` needs OpenSSH 7.8 or later (the launch is refused
+  otherwise when variables are set); a value containing a double quote, a single
+  quote, a backslash or a control character is not sent and a notice says so,
+  and `sshd` ignores variables not listed in its `AcceptEnv`.
   Fleet `authorized_keys` revocation (`SshFleetAuthorizedKeysService`) reuses
   symlink/last-key atomic removal guards and neutralizes CSV formulas on export.
   `.cast` transcript export passes full redaction spans through `TextRedactor`

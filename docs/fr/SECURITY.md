@@ -1365,12 +1365,42 @@ d'éviter toute fuite DNS split-horizon.
   `SSHFP` côté client dès qu'un proxy est actif afin d'éviter toute fuite DNS
   contournant le proxy. Les invites de confiance et diagnostics de passerelle
   appliquent la parité `SshCryptoPolicy` et `@revoked` via
-  `SshSessionDiagnosticFactory`, et la vérification de clé d'hôte au démarrage
-  SSH/SFTP passe par `SshStartupTrustGate` avant toute session. Le mode natif
-  Windows OpenSSH (`ssh.exe`) sous ConPTY écrit un fichier `known_hosts`
-  éphémère UTF-8 sans BOM protégé par ACL réservée au propriétaire courant
-  (`AclEnforcer.ApplyOwnerOnlyFileAcl`) incluant clés épinglées,
-  `@cert-authority` et `@revoked`, puis le supprime à la fermeture. La
+  `SshSessionDiagnosticFactory`. `SshStartupTrustGate` n'est pas un contrôle de
+  clé d'hôte : il transmet seulement l'approbation par l'utilisateur de la
+  commande de démarrage / `SetEnv` (`RemoteCommand`) d'un profil de
+  `ConnectionService` vers `SshHandler` (SSH uniquement, pas SFTP). Le mode natif
+  Windows OpenSSH (`ssh.exe`) sous ConPTY décide de la clé d'hôte dans
+  Heimdall avant de lancer `ssh.exe` : la clé du serveur est sondée par SSH.NET
+  (sans authentification) et jugée par les mêmes règles que les autres modes
+  (clés révoquées refusées, épingle stockée multi-algorithme comparée,
+  certificat vérifié selon les règles d'autorité approuvée, sinon boîte de
+  dialogue de clé d'hôte de Heimdall). `ssh.exe` s'exécute ensuite avec
+  `StrictHostKeyChecking=yes`, `CheckHostIP=no`, `UpdateHostKeys=no`, un
+  `HostKeyAlias` fixe et `HostKeyAlgorithms` limité au type de la clé décidée,
+  sur un fichier `known_hosts` éphémère UTF-8 sans BOM protégé par ACL réservée
+  au propriétaire courant (`AclEnforcer.SetFileAcl`) qui ne contient que la ou
+  les clés décidées, jamais l'ensemble du magasin ni `~/.ssh/known_hosts`.
+  `ssh.exe` ne pose jamais de question sur les clés d'hôte et refuse toute autre
+  clé. Quand la sonde échoue, les clés épinglées stockées de l'hôte qui ont un
+  blob de clé sont utilisées ; une épingle ancienne sans blob refuse la
+  connexion. Seules les clés d'hôte `ssh-ed25519`, `ecdsa-sha2-nistp256/384/521`
+  et `ssh-rsa` sont acceptées. Le fichier est supprimé à la fin de la session
+  (sortie du processus ou fermeture de l'onglet) et un balayeur nettoie les
+  restes. `HostKeyAlgorithms` couvre aussi les algorithmes de certificat
+  correspondants quand l'hôte a présenté un certificat. Seule une version
+  Windows d'OpenSSH est utilisée : `ssh -V` doit annoncer `OpenSSH_for_Windows`,
+  les versions MSYS, Cygwin et Git sont refusées, et les entrées de `PATH` qui
+  ne sont pas entièrement qualifiées sont ignorées. Sous `StrictModern`, les
+  listes KEX, chiffrements et MAC sont croisées avec ce que le `ssh.exe`
+  installé prend en charge (`ssh -Q`) et une intersection vide refuse le
+  lancement. `IdentitiesOnly=yes` est ajouté quand un fichier de clé est
+  fourni. Les chemins de clé, de certificat et de `known_hosts` qui contiennent
+  `%`, `${`, un guillemet double ou `\'`, ou qui se terminent par `\`, sont
+  refusés car `ssh` les développerait ou les découperait mal. `SetEnv` exige
+  OpenSSH 7.8 ou plus (le lancement est sinon refusé quand des variables sont
+  définies) ; une valeur contenant un guillemet double, une apostrophe, une
+  barre oblique inverse ou un caractère de contrôle n'est pas envoyée et un avis
+  le signale, et `sshd` ignore les variables absentes de son `AcceptEnv`. La
   révocation de parc `authorized_keys` (`SshFleetAuthorizedKeysService`) réutilise
   les gardes atomiques anti-symlink et anti-verrouillage de dernière clé et
   neutralise les formules CSV à l'export. L'export de transcription `.cast`
