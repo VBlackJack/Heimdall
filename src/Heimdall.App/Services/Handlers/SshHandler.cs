@@ -1457,7 +1457,7 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
             OpenSshHostKeyFailure.Revoked => (SshFailureCode.HostKeyRevoked, SshLocalizationKeys.ErrorSshHostKeyRevoked),
             OpenSshHostKeyFailure.Mismatch => (SshFailureCode.HostKeyMismatch, SshLocalizationKeys.ErrorHostKeyMismatch),
             OpenSshHostKeyFailure.Cancelled => (SshFailureCode.Cancelled, SshLocalizationKeys.ErrorSshCancelled),
-            _ => (SshFailureCode.HostKeyUnavailable, SshLocalizationKeys.ErrorSshHostKeyUnavailable),
+            _ => (SshFailureCode.HostKeyUnavailable, SshLocalizationKeys.ErrorOpenSshHostKeyUnavailable),
         };
         return BuildPlinkHostKeyRejectionResult(
             serverId,
@@ -1531,17 +1531,21 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
                 SshSessionDiagnosticFactory.CreatePreflightFailure(SshLocalizationKeys.ErrorConnectionFailed, keyPathMessage));
         }
 
-        string? sshExePath = OpenSshClientLocator.ResolveExecutablePath(settings.OpenSshPath);
-        if (string.IsNullOrWhiteSpace(sshExePath) || !File.Exists(sshExePath))
+        OpenSshResolution sshResolution = OpenSshClientLocator.ResolveAttested(settings.OpenSshPath);
+        if (sshResolution.Capabilities is not { } sshCapabilities)
         {
-            string msg = _localizer[SshLocalizationKeys.ErrorOpenSshNotFound];
+            string refusalKey = OpenSshLaunchFailureMessages.KeyFor(sshResolution.Refusal);
+            string msg = _localizer[refusalKey];
             _connectionSm.SetError(server.Id, msg);
             return new ConnectionResult(
                 false,
                 msg,
                 null,
-                SshSessionDiagnosticFactory.CreatePreflightFailure(SshLocalizationKeys.ErrorOpenSshNotFound, msg));
+                SshSessionDiagnosticFactory.CreatePreflightFailure(refusalKey, msg));
         }
+
+        string sshExePath = sshCapabilities.ExecutablePath;
+        Core.Logging.FileLogger.Info($"Native OpenSSH client: {sshExePath} version {sshCapabilities.Version}");
 
         if (!Heimdall.Terminal.ConPty.ConPtySession.IsAvailable)
         {
@@ -1589,7 +1593,9 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
             x11Forwarding,
             server.SshCompression,
             effectivePolicy,
-            hasStartupCommandOrEnv);
+            hasStartupCommandOrEnv,
+            sendsEnvironmentVariables: allowStartupExecution && server.SshEnvironmentVariables is { Count: > 0 },
+            agentKeyChosen: !string.IsNullOrWhiteSpace(server.SshAgentKeyFingerprint));
         if (capabilityNotice is not null)
         {
             SetStatusText?.Invoke(_localizer[capabilityNotice.StatusLocalizationKey]);
@@ -1619,23 +1625,32 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
                 Compression = server.SshCompression,
                 CryptoPolicy = effectivePolicy,
                 LocalForwards = server.SshLocalForwards,
-                SocksProxyPort = server.SocksProxyPort,
-                RemoteBindPort = server.RemoteBindPort,
-                RemoteLocalPort = server.RemoteLocalPort,
+
+                // Through a gateway the tunnel already carries these three, as on the other paths.
+                SocksProxyPort = usesTunnel ? 0 : server.SocksProxyPort,
+                RemoteBindPort = usesTunnel ? 0 : server.RemoteBindPort,
+                RemoteLocalPort = usesTunnel ? 0 : server.RemoteLocalPort,
                 AllowStartupExecution = allowStartupExecution,
                 StartupCommand = server.SshStartupCommand,
                 EnvironmentVariables = server.SshEnvironmentVariables,
-                ServerAliveIntervalSeconds = settings.SshKeepAliveIntervalSeconds
+                ServerAliveIntervalSeconds = settings.SshKeepAliveIntervalSeconds,
+                Capabilities = sshCapabilities
             };
 
-            IReadOnlyList<string> args = OpenSshLaunchBuilder.BuildArguments(spec);
-            string commandLine = OpenSshLaunchBuilder.JoinWindowsCommandLine(args);
+            OpenSshLaunchPlan launchPlan = OpenSshLaunchBuilder.Build(spec);
+            string commandLine = OpenSshLaunchBuilder.JoinWindowsCommandLine(launchPlan.Arguments);
+            if (launchPlan.DroppedEntryCount > 0)
+            {
+                SetStatusText?.Invoke(_localizer.Format(
+                    SshLocalizationKeys.StatusOpenSshEntriesNotApplied,
+                    launchPlan.DroppedEntryCount));
+            }
 
             if (x11Forwarding)
             {
                 terminalSession.EnvironmentVariables = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                 {
-                    ["DISPLAY"] = "127.0.0.1:0.0"
+                    ["DISPLAY"] = X11ServerManager.DefaultDisplay
                 };
             }
 
@@ -1686,17 +1701,32 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
             knownHosts?.Dispose();
             throw;
         }
+        catch (OpenSshLaunchException ex)
+        {
+            terminalSession.Dispose();
+            knownHosts?.Dispose();
+            Core.Logging.FileLogger.Warn($"Native OpenSSH launch refused: {ex.Reason}");
+            string refusalKey = OpenSshLaunchFailureMessages.KeyFor(ex.Reason);
+            string refusalMessage = _localizer[refusalKey];
+            _connectionSm.SetError(server.Id, refusalMessage);
+            return new ConnectionResult(
+                false,
+                refusalMessage,
+                null,
+                SshSessionDiagnosticFactory.CreatePreflightFailure(refusalKey, refusalMessage));
+        }
         catch (Exception ex)
         {
             terminalSession.Dispose();
             knownHosts?.Dispose();
             Core.Logging.FileLogger.Error("Native OpenSSH ConPTY launch failed", ex);
-            _connectionSm.SetError(server.Id, ex.Message);
+            string failureMessage = _localizer[SshLocalizationKeys.ErrorConnectionFailed];
+            _connectionSm.SetError(server.Id, failureMessage);
             return new ConnectionResult(
                 false,
-                ex.Message,
+                failureMessage,
                 null,
-                SshSessionDiagnosticFactory.CreatePipeModeFailure(ex.Message));
+                SshSessionDiagnosticFactory.CreatePipeModeFailure(failureMessage));
         }
     }
 }

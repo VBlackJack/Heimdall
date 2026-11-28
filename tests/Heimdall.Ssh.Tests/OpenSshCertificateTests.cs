@@ -449,6 +449,33 @@ public sealed class OpenSshCertificateTests
         Assert.Equal(certBlob, pinned.HostKeyBlob);
     }
 
+    [Fact]
+    public void ParsedCertificate_ExposesTheSubjectKeyBlobAndItsFingerprint()
+    {
+        var (caPriv, caPubBlob) = GenerateEd25519KeyPair();
+        var (_, hostPubRaw) = GenerateEd25519RawKeyPair();
+        var certBlob = BuildEd25519Certificate(
+            OpenSshCertificateType.Host,
+            hostPubRaw,
+            keyId: "host-subject",
+            principals: ["subject.example.com"],
+            validAfter: DateTimeOffset.UtcNow.AddMinutes(-5),
+            validBefore: DateTimeOffset.UtcNow.AddHours(1),
+            caPriv,
+            caPubBlob);
+
+        Assert.True(OpenSshCertificateParser.TryParseBlob(certBlob, out var cert));
+        Assert.NotNull(cert);
+
+        using var expected = new MemoryStream();
+        WriteString(expected, "ssh-ed25519");
+        WriteBytes(expected, hostPubRaw);
+        Assert.Equal(expected.ToArray(), cert.SubjectPublicKeyBlob);
+        Assert.Equal(HostKeyFormats.ComputeSha256Fingerprint(expected.ToArray()), cert.SubjectPublicKeyFingerprint);
+        Assert.NotEqual(cert.CertificateFingerprint, cert.SubjectPublicKeyFingerprint);
+        Assert.NotEqual(cert.SignatureKeyFingerprint, cert.SubjectPublicKeyFingerprint);
+    }
+
     private static (Ed25519PrivateKeyParameters Priv, byte[] PubBlob) GenerateEd25519KeyPair()
     {
         var (priv, pubRaw) = GenerateEd25519RawKeyPair();

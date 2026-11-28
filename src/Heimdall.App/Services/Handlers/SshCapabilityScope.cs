@@ -53,7 +53,13 @@ internal enum SshUnavailableCapability
     StrictCryptoPolicy = 4,
 
     /// <summary>Startup commands and SetEnv variables are unavailable on external Plink/PuTTY transports.</summary>
-    StartupCommandOrEnv = 8
+    StartupCommandOrEnv = 8,
+
+    /// <summary>Native OpenSSH sends variables with SetEnv, which sshd only accepts when listed in its AcceptEnv.</summary>
+    ServerAcceptEnvRequired = 16,
+
+    /// <summary>Native OpenSSH offers the agent keys itself and cannot honour the profile's chosen agent key.</summary>
+    AgentKeyChoiceIgnored = 32
 }
 
 /// <summary>
@@ -75,6 +81,10 @@ internal sealed record SshCapabilityNotice(SshUnavailableCapability UnavailableC
         SshUnavailableCapability.StartupCommandOrEnv => "startup command / SetEnv",
         SshUnavailableCapability.StrictCryptoPolicy | SshUnavailableCapability.StartupCommandOrEnv =>
             "strict modern cryptography policy, startup command / SetEnv",
+        SshUnavailableCapability.ServerAcceptEnvRequired => "SetEnv subject to the server AcceptEnv list",
+        SshUnavailableCapability.AgentKeyChoiceIgnored => "agent key choice",
+        SshUnavailableCapability.ServerAcceptEnvRequired | SshUnavailableCapability.AgentKeyChoiceIgnored =>
+            "SetEnv subject to the server AcceptEnv list, agent key choice",
         _ => throw new InvalidOperationException("The capability notice must identify at least one unavailable capability.")
     };
 
@@ -91,6 +101,10 @@ internal sealed record SshCapabilityNotice(SshUnavailableCapability UnavailableC
         SshUnavailableCapability.StartupCommandOrEnv => SshLocalizationKeys.StatusSshPlinkStartupCommandUnavailable,
         SshUnavailableCapability.StrictCryptoPolicy | SshUnavailableCapability.StartupCommandOrEnv =>
             SshLocalizationKeys.StatusSshPlinkStrictCryptoAndStartupUnavailable,
+        SshUnavailableCapability.ServerAcceptEnvRequired => SshLocalizationKeys.StatusOpenSshAcceptEnvOnly,
+        SshUnavailableCapability.AgentKeyChoiceIgnored => SshLocalizationKeys.StatusOpenSshAgentKeyNotHonoured,
+        SshUnavailableCapability.ServerAcceptEnvRequired | SshUnavailableCapability.AgentKeyChoiceIgnored =>
+            SshLocalizationKeys.StatusOpenSshAcceptEnvAndAgentKey,
         _ => throw new InvalidOperationException("The capability notice must identify at least one unavailable capability.")
     };
 }
@@ -124,13 +138,29 @@ internal static class SshCapabilityScope
         bool x11Forwarding,
         bool compression,
         SshCryptoPolicy cryptoPolicy = SshCryptoPolicy.Standard,
-        bool hasStartupCommandOrEnv = false)
+        bool hasStartupCommandOrEnv = false,
+        bool sendsEnvironmentVariables = false,
+        bool agentKeyChosen = false)
     {
         if (path == SshResolvedPath.NativeOpenSsh)
         {
             // Native OpenSSH honors X11 forwarding (-X), compression (-C), StrictModern
-            // algorithm options (-o), and startup command / SetEnv directly.
-            return null;
+            // algorithm options (-o), and startup command directly. Two limits remain: sshd drops
+            // SetEnv variables missing from its AcceptEnv list, and ssh picks the agent key itself.
+            SshUnavailableCapability nativeLimits = 0;
+            if (sendsEnvironmentVariables)
+            {
+                nativeLimits |= SshUnavailableCapability.ServerAcceptEnvRequired;
+            }
+
+            if (agentKeyChosen)
+            {
+                nativeLimits |= SshUnavailableCapability.AgentKeyChoiceIgnored;
+            }
+
+            return nativeLimits == 0
+                ? null
+                : new SshCapabilityNotice(nativeLimits);
         }
 
         if (SupportsForwarding(path))

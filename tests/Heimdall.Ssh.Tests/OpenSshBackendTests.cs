@@ -205,7 +205,7 @@ public sealed class OpenSshBackendTests : IDisposable
         Assert.Contains("-F", argsUntrusted);
         Assert.Contains("none", argsUntrusted);
         Assert.Contains("GlobalKnownHostsFile=none", argsUntrusted);
-        Assert.Contains("UserKnownHostsFile=C:\\temp\\kh.txt", argsUntrusted);
+        Assert.Contains("UserKnownHostsFile=\"C:\\temp\\kh.txt\"", argsUntrusted);
         Assert.Contains("StrictHostKeyChecking=yes", argsUntrusted);
         Assert.Contains("-X", argsUntrusted);
         Assert.Contains("-C", argsUntrusted);
@@ -232,7 +232,7 @@ public sealed class OpenSshBackendTests : IDisposable
         });
 
         Assert.Contains("StrictHostKeyChecking=yes", argsTrusted);
-        Assert.Contains("SetEnv=ENV=prod", argsTrusted);
+        Assert.Contains("SetEnv=ENV=\"prod\"", argsTrusted);
         Assert.Contains("-t", argsTrusted);
         Assert.Equal("--", argsTrusted[^3]);
         Assert.Equal("alice@prod.example.com", argsTrusted[^2]);
@@ -343,13 +343,16 @@ public sealed class OpenSshBackendTests : IDisposable
     [InlineData("nonsense")]
     public void LaunchBuilder_RefusesAnUnsupportedPinnedKeyType(string keyType)
     {
-        Assert.Throws<ArgumentException>(() => OpenSshLaunchBuilder.BuildArguments(PinnedSpec([keyType])));
+        OpenSshLaunchException ex = Assert.Throws<OpenSshLaunchException>(
+            () => OpenSshLaunchBuilder.BuildArguments(PinnedSpec([keyType])));
+        Assert.Equal(OpenSshLaunchFailure.UnsupportedPinnedKeyType, ex.Reason);
     }
 
     [Fact]
     public void LaunchBuilder_RefusesAnAliasWithWhitespace()
     {
-        Assert.Throws<ArgumentException>(() => OpenSshLaunchBuilder.BuildArguments(
+        OpenSshLaunchException ex = Assert.Throws<OpenSshLaunchException>(() => OpenSshLaunchBuilder.BuildArguments(
             PinnedSpec(["ssh-ed25519"]) with { HostKeyAlias = "bad alias" }));
+        Assert.Equal(OpenSshLaunchFailure.InvalidHostKeyAlias, ex.Reason);
     }
 }

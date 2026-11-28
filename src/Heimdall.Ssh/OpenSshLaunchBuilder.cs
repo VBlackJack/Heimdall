@@ -82,6 +82,80 @@ public sealed record OpenSshLaunchSpec
     public IReadOnlyList<string> EnvironmentVariables { get; init; } = [];
 
     public int ServerAliveIntervalSeconds { get; init; }
+
+    /// <summary>
+    /// What the attested <c>ssh.exe</c> can do. Null means unknown: algorithm lists are then passed
+    /// unchanged and no version gate is applied.
+    /// </summary>
+    public OpenSshClientCapabilities? Capabilities { get; init; }
+}
+
+/// <summary>Why the launch of native OpenSSH was refused before any process started.</summary>
+public enum OpenSshLaunchFailure
+{
+    /// <summary>The target host is not a valid SSH host.</summary>
+    InvalidHost,
+
+    /// <summary>The port is out of range.</summary>
+    InvalidPort,
+
+    /// <summary>The username is not valid.</summary>
+    InvalidUsername,
+
+    /// <summary>The ephemeral known_hosts path is missing or not local.</summary>
+    InvalidKnownHostsPath,
+
+    /// <summary>The host key alias is missing or contains whitespace.</summary>
+    InvalidHostKeyAlias,
+
+    /// <summary>A pinned host key type is not supported.</summary>
+    UnsupportedPinnedKeyType,
+
+    /// <summary>No host key algorithm is allowed for the pinned key types.</summary>
+    NoAllowedHostKeyAlgorithm,
+
+    /// <summary>A file path contains characters ssh would expand or misread.</summary>
+    PathNotAllowed,
+
+    /// <summary>Environment variables are requested but the binary predates <c>SetEnv</c>.</summary>
+    SetEnvUnsupported,
+
+    /// <summary>StrictModern and the binary share no key exchange algorithm.</summary>
+    NoCommonKexAlgorithm,
+
+    /// <summary>StrictModern and the binary share no cipher.</summary>
+    NoCommonCipher,
+
+    /// <summary>StrictModern and the binary share no MAC.</summary>
+    NoCommonMac,
+}
+
+/// <summary>
+/// Raised by <see cref="OpenSshLaunchBuilder"/> with a typed <see cref="Reason"/>. The message is
+/// for logs only: the caller maps the reason to a localized text.
+/// </summary>
+public sealed class OpenSshLaunchException : ArgumentException
+{
+    public OpenSshLaunchException(OpenSshLaunchFailure reason, string logMessage)
+        : base(logMessage)
+    {
+        Reason = reason;
+    }
+
+    public OpenSshLaunchFailure Reason { get; }
+}
+
+/// <summary>An argument vector plus what was left out of it because it could not be applied.</summary>
+/// <param name="Arguments">The arguments for <c>ssh.exe</c>.</param>
+/// <param name="DroppedLocalForwards">Local forward entries that did not parse.</param>
+/// <param name="DroppedEnvironmentVariables">Environment entries that were invalid, refused or beyond the limit.</param>
+public sealed record OpenSshLaunchPlan(
+    IReadOnlyList<string> Arguments,
+    int DroppedLocalForwards,
+    int DroppedEnvironmentVariables)
+{
+    /// <summary>Total number of entries that were not applied.</summary>
+    public int DroppedEntryCount => DroppedLocalForwards + DroppedEnvironmentVariables;
 }
 
 /// <summary>
@@ -102,43 +176,64 @@ public static class OpenSshLaunchBuilder
     public const string StrictModernMacs =
         "hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,umac-128-etm@openssh.com,hmac-sha2-512,hmac-sha2-256";
 
-    public static IReadOnlyList<string> BuildArguments(OpenSshLaunchSpec spec)
+    /// <summary>Quote written around the two <c>-o</c> path values and the <c>SetEnv</c> value.</summary>
+    private const char ConfigQuote = '"';
+
+    /// <summary>Characters refused inside an environment value because they cannot be quoted for both ssh config tokenizers.</summary>
+    private const string RefusedEnvironmentValueCharacters = "\"'\\";
+
+    /// <summary>Convenience wrapper returning only the argument vector.</summary>
+    public static IReadOnlyList<string> BuildArguments(OpenSshLaunchSpec spec) => Build(spec).Arguments;
+
+    /// <summary>
+    /// Builds the argument vector and reports the entries that could not be applied. Throws
+    /// <see cref="OpenSshLaunchException"/> with a typed reason when the launch must be refused.
+    /// </summary>
+    public static OpenSshLaunchPlan Build(OpenSshLaunchSpec spec)
     {
         ArgumentNullException.ThrowIfNull(spec);
+        OpenSshClientCapabilities? capabilities = spec.Capabilities;
+        int droppedForwards = 0;
+        int droppedEnvironment = 0;
 
         string trimmedHost = spec.Host?.Trim() ?? string.Empty;
         if (!InputValidator.IsValidSshHost(trimmedHost))
         {
-            throw new ArgumentException("Invalid SSH target host.", nameof(spec));
+            throw new OpenSshLaunchException(OpenSshLaunchFailure.InvalidHost, "Invalid SSH target host.");
         }
 
         if (!InputValidator.ValidatePortRange(spec.Port))
         {
-            throw new ArgumentOutOfRangeException(nameof(spec), spec.Port, "SSH port must be in range 1..65535.");
+            throw new OpenSshLaunchException(OpenSshLaunchFailure.InvalidPort, "SSH port must be in range 1..65535.");
         }
 
         string? trimmedUser = string.IsNullOrWhiteSpace(spec.Username) ? null : spec.Username.Trim();
         if (trimmedUser is not null && !InputValidator.Validate(trimmedUser, "SshUser"))
         {
-            throw new ArgumentException("Invalid SSH username.", nameof(spec));
+            throw new OpenSshLaunchException(OpenSshLaunchFailure.InvalidUsername, "Invalid SSH username.");
         }
 
         if (string.IsNullOrWhiteSpace(spec.EphemeralKnownHostsPath)
             || ImportedPathPolicy.IsNetworkOrDevicePath(spec.EphemeralKnownHostsPath))
         {
-            throw new ArgumentException("Valid local ephemeral known_hosts path is required.", nameof(spec));
+            throw new OpenSshLaunchException(
+                OpenSshLaunchFailure.InvalidKnownHostsPath,
+                "Valid local ephemeral known_hosts path is required.");
         }
 
         if (string.IsNullOrWhiteSpace(spec.HostKeyAlias) || spec.HostKeyAlias.Any(static c => char.IsWhiteSpace(c) || char.IsControl(c)))
         {
-            throw new ArgumentException("A host key alias without whitespace is required.", nameof(spec));
+            throw new OpenSshLaunchException(
+                OpenSshLaunchFailure.InvalidHostKeyAlias,
+                "A host key alias without whitespace is required.");
         }
 
+        string knownHostsPath = NormalizeLocalPath(spec.EphemeralKnownHostsPath);
         var args = new List<string>
         {
             "-F", "none",
             "-o", "GlobalKnownHostsFile=none",
-            "-o", $"UserKnownHostsFile={spec.EphemeralKnownHostsPath}",
+            "-o", $"UserKnownHostsFile={Quote(knownHostsPath)}",
             "-o", "StrictHostKeyChecking=yes",
             "-o", "CheckHostIP=no",
             "-o", "UpdateHostKeys=no",
@@ -172,8 +267,12 @@ public static class OpenSshLaunchBuilder
             string trimmedKey = spec.KeyPath.Trim();
             if (!ImportedPathPolicy.IsNetworkOrDevicePath(trimmedKey))
             {
+                // A separate argv element: no ssh config tokenizer sees it. IdentitiesOnly keeps
+                // the agent and the default key files from being offered before the chosen key.
                 args.Add("-i");
-                args.Add(trimmedKey);
+                args.Add(NormalizeLocalPath(trimmedKey));
+                args.Add("-o");
+                args.Add("IdentitiesOnly=yes");
             }
         }
 
@@ -183,7 +282,7 @@ public static class OpenSshLaunchBuilder
             if (!ImportedPathPolicy.IsNetworkOrDevicePath(trimmedCert))
             {
                 args.Add("-o");
-                args.Add($"CertificateFile={trimmedCert}");
+                args.Add($"CertificateFile={Quote(NormalizeLocalPath(trimmedCert))}");
             }
         }
 
@@ -199,21 +298,32 @@ public static class OpenSshLaunchBuilder
         if (spec.CryptoPolicy == SshCryptoPolicy.StrictModern)
         {
             args.Add("-o");
-            args.Add($"KexAlgorithms={StrictModernKexAlgorithms}");
+            args.Add($"KexAlgorithms={SelectSupported(StrictModernKexAlgorithms, capabilities, static (c, r) => c.IntersectKex(r), OpenSshLaunchFailure.NoCommonKexAlgorithm)}");
             args.Add("-o");
             args.Add($"HostKeyAlgorithms={pinnedHostKeyAlgorithms ?? StrictModernHostKeyAlgorithms}");
             args.Add("-o");
-            args.Add($"Ciphers={StrictModernCiphers}");
+            args.Add($"Ciphers={SelectSupported(StrictModernCiphers, capabilities, static (c, r) => c.IntersectCiphers(r), OpenSshLaunchFailure.NoCommonCipher)}");
             args.Add("-o");
-            args.Add($"MACs={StrictModernMacs}");
+            args.Add($"MACs={SelectSupported(StrictModernMacs, capabilities, static (c, r) => c.IntersectMacs(r), OpenSshLaunchFailure.NoCommonMac)}");
         }
 
         foreach (string rawForward in spec.LocalForwards)
         {
+            if (string.IsNullOrWhiteSpace(rawForward))
+            {
+                continue;
+            }
+
             if (SshLocalForwardSpec.TryParse(rawForward, out var parsed) && parsed is not null)
             {
                 args.Add("-L");
-                args.Add($"{parsed.BindAddress}:{parsed.LocalPort}:{parsed.RemoteHost}:{parsed.RemotePort}");
+                args.Add(string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"{FormatForwardHost(parsed.BindAddress)}:{parsed.LocalPort}:{FormatForwardHost(parsed.RemoteHost)}:{parsed.RemotePort}"));
+            }
+            else
+            {
+                droppedForwards++;
             }
         }
 
@@ -239,17 +349,29 @@ public static class OpenSshLaunchBuilder
             int envCount = 0;
             foreach (string rawEnv in spec.EnvironmentVariables)
             {
-                if (envCount >= SshStartupCommandPolicy.MaxEnvironmentVariables)
+                if (string.IsNullOrWhiteSpace(rawEnv))
                 {
-                    break;
+                    continue;
                 }
 
-                if (SshStartupCommandPolicy.TryParseEnvAssignment(rawEnv, out string envName, out string envVal))
+                if (envCount >= SshStartupCommandPolicy.MaxEnvironmentVariables
+                    || !SshStartupCommandPolicy.TryParseEnvAssignment(rawEnv, out string envName, out string envVal)
+                    || !IsQuotableEnvironmentValue(envVal))
                 {
-                    args.Add("-o");
-                    args.Add($"SetEnv={envName}={envVal}");
-                    envCount++;
+                    droppedEnvironment++;
+                    continue;
                 }
+
+                if (capabilities is { SupportsSetEnv: false })
+                {
+                    throw new OpenSshLaunchException(
+                        OpenSshLaunchFailure.SetEnvUnsupported,
+                        "The OpenSSH client predates SetEnv (7.8).");
+                }
+
+                args.Add("-o");
+                args.Add($"SetEnv={envName}={Quote(envVal)}");
+                envCount++;
             }
 
             if (SshStartupCommandPolicy.TryNormalizeStartupCommand(spec.StartupCommand, out string cmd))
@@ -267,7 +389,80 @@ public static class OpenSshLaunchBuilder
             args.Add(normalizedStartupCmd);
         }
 
-        return args;
+        return new OpenSshLaunchPlan(args, droppedForwards, droppedEnvironment);
+    }
+
+    /// <summary>
+    /// Makes a file path absolute and refuses what ssh would expand or misread. ssh percent-expands
+    /// these keywords and not every inbox build expands <c>%%</c>, so refusing is the only rule that
+    /// holds on every version. The path is written inside double quotes, so a quote, a backslash
+    /// before a quote and a trailing backslash are refused too.
+    /// </summary>
+    private static string NormalizeLocalPath(string path)
+    {
+        string full;
+        try
+        {
+            full = Path.GetFullPath(path.Trim());
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            throw new OpenSshLaunchException(OpenSshLaunchFailure.PathNotAllowed, "The path cannot be made absolute.");
+        }
+
+        bool refused = full.Contains('%', StringComparison.Ordinal)
+            || full.Contains("${", StringComparison.Ordinal)
+            || full.Contains(ConfigQuote, StringComparison.Ordinal)
+            || full.Contains("\\'", StringComparison.Ordinal)
+            || full.EndsWith('\\')
+            || full.Any(char.IsControl);
+        if (refused)
+        {
+            throw new OpenSshLaunchException(
+                OpenSshLaunchFailure.PathNotAllowed,
+                "The path contains a character that ssh would expand or misread.");
+        }
+
+        return full;
+    }
+
+    private static string Quote(string value) => $"{ConfigQuote}{value}{ConfigQuote}";
+
+    private static bool IsQuotableEnvironmentValue(string value)
+        => !value.Any(static c => RefusedEnvironmentValueCharacters.Contains(c) || char.IsControl(c));
+
+    private static string FormatForwardHost(string host)
+        => host.Contains(':', StringComparison.Ordinal) && !host.StartsWith('[')
+            ? $"[{host}]"
+            : host;
+
+    /// <summary>
+    /// Keeps, in order, the entries of <paramref name="requested"/> the binary supports. An unknown
+    /// binary list leaves the request unchanged; an empty intersection refuses the launch.
+    /// </summary>
+    private static string SelectSupported(
+        string requested,
+        OpenSshClientCapabilities? capabilities,
+        Func<OpenSshClientCapabilities, IEnumerable<string>, OpenSshAlgorithmSelection> intersect,
+        OpenSshLaunchFailure failure)
+    {
+        if (capabilities is null)
+        {
+            return requested;
+        }
+
+        OpenSshAlgorithmSelection selection = intersect(capabilities, requested.Split(','));
+        if (!selection.Verified)
+        {
+            return requested;
+        }
+
+        if (selection.Algorithms.Count == 0)
+        {
+            throw new OpenSshLaunchException(failure, "The OpenSSH client supports none of the required algorithms.");
+        }
+
+        return string.Join(',', selection.Algorithms);
     }
 
     /// <summary>
@@ -291,7 +486,9 @@ public static class OpenSshLaunchBuilder
         {
             if (!OpenSshHostKeyTypes.IsSupported(keyType))
             {
-                throw new ArgumentException("Unsupported pinned host key type.", nameof(spec));
+                throw new OpenSshLaunchException(
+                    OpenSshLaunchFailure.UnsupportedPinnedKeyType,
+                    "Unsupported pinned host key type.");
             }
 
             plain.AddRange(OpenSshHostKeyTypes.PlainAlgorithms(keyType, allowSha1Rsa));
@@ -311,7 +508,9 @@ public static class OpenSshLaunchBuilder
         string joined = string.Join(',', ordered);
         if (joined.Length == 0)
         {
-            throw new ArgumentException("No host key algorithm is allowed for the pinned key types.", nameof(spec));
+            throw new OpenSshLaunchException(
+                OpenSshLaunchFailure.NoAllowedHostKeyAlgorithm,
+                "No host key algorithm is allowed for the pinned key types.");
         }
 
         return joined;
