@@ -2778,6 +2778,65 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         }
     }
 
+    [RelayCommand]
+    private async Task RotateSshKeyAsync(ServerItemViewModel? server)
+    {
+        if (server is null
+            || !string.Equals(server.ConnectionType, "SSH", StringComparison.OrdinalIgnoreCase)
+            || string.IsNullOrWhiteSpace(server.RemoteServer))
+        {
+            return;
+        }
+
+        if (SharedSessionIds.IsShared(server.Id))
+        {
+            StatusMessageRequested?.Invoke(_localizer["SshKeyRotateSharedRefused"]);
+            return;
+        }
+
+        try
+        {
+            var services = (Application.Current as App)?.Services;
+            if (services is null)
+            {
+                return;
+            }
+
+            var settings = await _configManager.LoadSettingsAsync().ConfigureAwait(true);
+            var targetDto = await _profileLookup.FindAsync(server.Id).ConfigureAwait(true);
+            if (targetDto is null)
+            {
+                return;
+            }
+
+            settings = _profileLookup.EffectiveSettingsFor(targetDto, settings);
+
+            var vm = new ViewModels.Dialogs.SshKeyRotationDialogViewModel(services, targetDto, settings, _localizer);
+            var dialog = new Views.Dialogs.SshKeyRotationDialog
+            {
+                DataContext = vm,
+                Owner = Application.Current?.MainWindow
+            };
+            dialog.ShowDialog();
+
+            if (vm.Succeeded)
+            {
+                var updatedDto = await _profileLookup.FindAsync(server.Id).ConfigureAwait(true);
+                if (updatedDto is not null)
+                {
+                    server.UpdateFromDto(updatedDto);
+                }
+
+                StatusMessageRequested?.Invoke(vm.StatusMessage);
+            }
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Warn($"Context-menu SSH key rotation failed: {ex.Message}");
+            StatusMessageRequested?.Invoke(_localizer.Format("SshKeyRotateFailed", ex.Message));
+        }
+    }
+
     private string? PromptForPublicKeyFile()
     {
         var dialog = new OpenFileDialog
