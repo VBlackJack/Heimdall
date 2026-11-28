@@ -1287,10 +1287,12 @@ d'éviter toute fuite DNS split-horizon.
   les sessions SSH, SFTP, tunnels manuels, outils via passerelle
   (`ToolGatewayConnector` appliquant aussi `HostKeyStore`, `SshCryptoPolicy` et
   `@revoked`), déploiement de clé publique, rotation de clé et gestion distante
-  de `authorized_keys`. `ImportedProfileSanitizer` réinitialise
-  `SshCryptoPolicy.LegacyCompatible` sur les profils importés pour empêcher tout
-  affaiblissement silencieux, et `SettingsImportPreview` signale `SshCryptoPolicy`
-  et `SshConfirmAgentSigning` comme changements sensibles. Sous `StrictModern`, un
+  de `authorized_keys`. `ImportedProfileSanitizer` réinitialise toute surcharge
+  `SshCryptoPolicy` autre que `StrictModern` (`LegacyCompatible` et `Standard`)
+  sur les profils et passerelles importés pour empêcher tout affaiblissement
+  silencieux d'un poste configuré en `StrictModern`, et `SettingsImportPreview`
+  signale `SshCryptoPolicy` et `SshConfirmAgentSigning` comme changements
+  sensibles. Sous `StrictModern`, un
   repli vers Plink ou PuTTY externe affiche un avis explicite indiquant que
   Plink/PuTTY n'applique pas le filtre cryptographique intégré `StrictModern`.
 - **Rotation guidée de clé SSH** (`SshKeyRotator`, `SshKeyRotationDialogViewModel`) :
@@ -1307,9 +1309,11 @@ d'éviter toute fuite DNS split-horizon.
   `SshAuthorizedKeysDialogViewModel`) : analyse les entrées OpenSSH avec options
   entre guillemets et empreintes SHA-256, rejette les espaces hors guillemets et
   caractères de contrôle dans les options, transfère les lignes ajoutées en Base64
-  contre toute injection shell, refuse les liens symboliques (`-L`), écrit de
-  façon atomique (`mktemp` + `chmod 600` + `mv -f`) et empêche par défaut la
-  suppression de la dernière clé restante sans confirmation explicite.
+  contre toute injection shell, refuse les liens symboliques (`-L`), ajoute les
+  nouvelles clés par ajout `>>` après déduplication, retire les clés de façon
+  atomique (`mktemp` + `chmod 600` + `mv -f`, avec nettoyage de `$tmp` en cas
+  d'échec) et empêche par défaut la suppression de la dernière clé restante sans
+  confirmation explicite.
 - **Audit cryptographique serveur SSH** (`SshKexInitProbe`, `SshServerAuditEngine`) :
   lit uniquement la bannière RFC 4253 et le paquet `SSH_MSG_KEXINIT` sans
   authentification, avec plafonds stricts anti-DoS (`MaxPreBannerLines`,

@@ -770,7 +770,7 @@ public sealed class TunnelService : ITunnelService
                 SshLocalizationKeys.ErrorTunnelNoLoopbackAlias);
         }
 
-        if (settings.SshCryptoPolicy == SshCryptoPolicy.StrictModern)
+        if (gatewayParams.CryptoPolicy == SshCryptoPolicy.StrictModern)
         {
             Core.Logging.FileLogger.Warn(
                 $"Plink fallback tunnel for {serverId} cannot enforce SshCryptoPolicy.StrictModern; proceeding with Plink defaults.");

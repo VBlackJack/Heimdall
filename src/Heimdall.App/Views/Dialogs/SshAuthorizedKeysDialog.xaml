@@ -16,6 +16,7 @@
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource BackgroundBrush}"
         ResizeMode="CanResizeWithGrip"
+        behaviors:WorkingAreaMinimumBehavior.IsEnabled="True"
         behaviors:DialogChromeBehavior.HideCaptionButtons="True"
         ShowInTaskbar="False">
 
@@ -82,6 +83,21 @@
                   ColumnHeaderStyle="{DynamicResource ThemedDataGridColumnHeaderStyle}"
                   CellStyle="{DynamicResource ThemedDataGridCellStyle}"
                   AutomationProperties.Name="{loc:Translate SshAuthKeysDialogTitle}">
+            <DataGrid.RowStyle>
+                <Style TargetType="{x:Type DataGridRow}"
+                       BasedOn="{StaticResource ThemedDataGridRowStyle}">
+                    <Setter Property="AutomationProperties.Name">
+                        <Setter.Value>
+                            <MultiBinding Converter="{StaticResource AccessibleRowNameConverter}">
+                                <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[A11ySshAuthKeyRow]"/>
+                                <Binding Path="KeyType"/>
+                                <Binding Path="Fingerprint"/>
+                                <Binding Path="Comment"/>
+                            </MultiBinding>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </DataGrid.RowStyle>
             <DataGrid.Columns>
                 <DataGridTextColumn Header="#" Binding="{Binding LineNumber}" Width="42"/>
                 <DataGridTextColumn Header="{loc:Translate SshAuthKeysColType}" Binding="{Binding KeyType}" Width="140"/>

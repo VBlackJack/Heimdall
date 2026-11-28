@@ -325,7 +325,7 @@ public sealed class AsciinemaCastRecorder
 
                 int firstAffected = 0;
                 int prefixKeptLen = 0;
-                while (firstAffected < parts.Length
+                while (firstAffected < parts.Length - 1
                     && prefixKeptLen + parts[firstAffected].Length <= commonPrefix)
                 {
                     prefixKeptLen += parts[firstAffected].Length;

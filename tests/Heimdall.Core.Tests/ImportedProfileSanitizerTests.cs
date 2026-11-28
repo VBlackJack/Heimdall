@@ -269,7 +269,7 @@ public sealed class ImportedProfileSanitizerTests
     }
 
     [Fact]
-    public void Sanitize_ResetsLegacyCompatibleSshCryptoPolicy_AndKeepsStrictModern()
+    public void Sanitize_ResetsNonStrictModernSshCryptoPolicies_AndKeepsStrictModern()
     {
         var profiles = new List<ServerProfileDto>
         {
@@ -279,6 +279,13 @@ public sealed class ImportedProfileSanitizerTests
                 DisplayName = "Legacy SSH",
                 ConnectionType = "SSH",
                 SshCryptoPolicy = Heimdall.Core.Ssh.SshCryptoPolicy.LegacyCompatible
+            },
+            new()
+            {
+                Id = "standard-1",
+                DisplayName = "Standard SSH",
+                ConnectionType = "SSH",
+                SshCryptoPolicy = Heimdall.Core.Ssh.SshCryptoPolicy.Standard
             },
             new()
             {
@@ -292,18 +299,19 @@ public sealed class ImportedProfileSanitizerTests
         ImportedProfileSanitizer.Sanitize(profiles);
 
         Assert.Null(profiles[0].SshCryptoPolicy);
-        Assert.Equal(Heimdall.Core.Ssh.SshCryptoPolicy.StrictModern, profiles[1].SshCryptoPolicy);
+        Assert.Null(profiles[1].SshCryptoPolicy);
+        Assert.Equal(Heimdall.Core.Ssh.SshCryptoPolicy.StrictModern, profiles[2].SshCryptoPolicy);
     }
 
     [Fact]
-    public void SanitizeGatewayPaths_ClearsNetworkCertificatePathAndLegacyCryptoPolicy()
+    public void SanitizeGatewayPaths_ClearsNetworkCertificatePathAndNonStrictModernCryptoPolicy()
     {
         var gw = new SshGatewayDto
         {
             Name = "CorpBastion",
             KeyPath = @"C:\keys\bastion",
             SshCertificatePath = @"\\share\certs\bastion-cert.pub",
-            SshCryptoPolicy = Heimdall.Core.Ssh.SshCryptoPolicy.LegacyCompatible
+            SshCryptoPolicy = Heimdall.Core.Ssh.SshCryptoPolicy.Standard
         };
 
         ImportedItemSanitization? item = ImportedProfileSanitizer.SanitizeGatewayPaths(gw);

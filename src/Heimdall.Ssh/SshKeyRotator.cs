@@ -100,7 +100,7 @@ public static class SshKeyRotator
             "if chmod 600 \"$tmp\" && " +
             "(grep -Fv -- \"$old_id\" \"$ak\" > \"$tmp\"; rc=$?; [ \"$rc\" -le 1 ]) && " +
             "[ -s \"$tmp\" ] && grep -Fq -- \"$new_id\" \"$tmp\"; then " +
-            $"mv -f \"$tmp\" \"$ak\" && chmod 600 \"$ak\" && echo {OldKeyRemovedMarker}; " +
+            $"(mv -f \"$tmp\" \"$ak\" && chmod 600 \"$ak\" && echo {OldKeyRemovedMarker}) || {{ rm -f \"$tmp\"; exit 1; }}; " +
             $"else rm -f \"$tmp\"; echo {InvariantFailedMarker}; exit 1; fi";
     }
 

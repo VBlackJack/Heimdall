@@ -129,6 +129,7 @@ public sealed partial class SshServerAuditViewModel : ObservableObject, IDisposa
         {
             var gatewayLookup = settings.SshGateways
                 .Where(g => !string.IsNullOrWhiteSpace(g.Id))
+                .DistinctBy(g => g.Id, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Id, StringComparer.OrdinalIgnoreCase);
 
             var ordered = new SshFleetServerAuditEntry?[sshTargets.Count];
@@ -149,6 +150,15 @@ public sealed partial class SshServerAuditViewModel : ObservableObject, IDisposa
                     SshGatewayDto? gw = gatewayId is not null && gatewayLookup.TryGetValue(gatewayId, out var resolved)
                         ? resolved
                         : null;
+                    if (gatewayId is not null && gw is null)
+                    {
+                        string missingMsg = _localizer is not null
+                            ? _localizer.Format("StatusTunnelPresetGatewayMissing", gatewayId)
+                            : $"Gateway '{gatewayId}' not found.";
+                        ordered[index] = new SshFleetServerAuditEntry(displayName, host, port, gatewayId, null, missingMsg);
+                        return;
+                    }
+
                     string? gwName = gw is null ? null : (string.IsNullOrWhiteSpace(gw.Name) ? gw.Host : gw.Name);
 
                     try

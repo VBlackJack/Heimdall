@@ -222,6 +222,11 @@ public partial class SshServerAuditView : UserControl, IToolView
         AutomationProperties.SetName(BtnCloseHelp, L("BtnClose"));
         BtnHelp.ToolTip = L("ToolHelpTooltip");
 
+        if (_vm.ShowFleetResults)
+        {
+            RefreshFleetGrid();
+        }
+
         RefreshUiFromVm();
     }
 
@@ -269,7 +274,11 @@ public partial class SshServerAuditView : UserControl, IToolView
             var settings = await configManager.LoadSettingsAsync().ConfigureAwait(true);
             if (_disposed) return;
             await _vm.RunFleetAuditAsync(servers, settings).ConfigureAwait(true);
-            if (!_disposed) RefreshUiFromVm();
+            if (!_disposed)
+            {
+                RefreshFleetGrid();
+                RefreshUiFromVm();
+            }
         }
         catch (Exception ex)
         {
@@ -284,7 +293,6 @@ public partial class SshServerAuditView : UserControl, IToolView
         {
             _vm.Report = selectedReport;
             _vm.ShowResults = true;
-            RefreshUiFromVm();
         }
     }
 
@@ -383,24 +391,29 @@ public partial class SshServerAuditView : UserControl, IToolView
         if (_vm.ShowFleetResults)
         {
             TxtFleetSummary.Text = _vm.FleetSummaryText;
-            FleetResultsGrid.ItemsSource = _vm.FleetResults.Select(entry => new FleetRowDisplayItem
-            {
-                Entry = entry,
-                DisplayName = entry.DisplayName,
-                Endpoint = $"{entry.Host}:{entry.Port}",
-                Gateway = entry.GatewayName ?? "-",
-                Grade = entry.Report is { } r ? SshServerAuditEngine.GradeToString(r.Grade) : "-",
-                Anssi = entry.Report is { } r1 ? (r1.IsAnssiCompliant ? "PASS" : "FAIL") : "-",
-                PostQuantum = entry.Report is { } r2 ? (r2.HasPostQuantumKex ? "YES" : "NO") : "-",
-                StrictKex = entry.Report is { } r3 ? (r3.HasStrictKex ? "YES" : "NO") : "-",
-                Status = entry.Report is { } r4 ? r4.Snapshot.ServerBanner : (entry.ErrorMessage ?? "Error")
-            }).ToList();
         }
 
         if (_vm.Report is { } report)
         {
             ProjectReport(report);
         }
+    }
+
+    private void RefreshFleetGrid()
+    {
+        TxtFleetSummary.Text = _vm.FleetSummaryText;
+        FleetResultsGrid.ItemsSource = _vm.FleetResults.Select(entry => new FleetRowDisplayItem
+        {
+            Entry = entry,
+            DisplayName = entry.DisplayName,
+            Endpoint = $"{entry.Host}:{entry.Port}",
+            Gateway = entry.GatewayName ?? "-",
+            Grade = entry.Report is { } r ? SshServerAuditEngine.GradeToString(r.Grade) : "-",
+            Anssi = entry.Report is { } r1 ? (r1.IsAnssiCompliant ? "PASS" : "FAIL") : "-",
+            PostQuantum = entry.Report is { } r2 ? (r2.HasPostQuantumKex ? "YES" : "NO") : "-",
+            StrictKex = entry.Report is { } r3 ? (r3.HasStrictKex ? "YES" : "NO") : "-",
+            Status = entry.Report is { } r4 ? r4.Snapshot.ServerBanner : (entry.ErrorMessage ?? L("SshSessionStatusError"))
+        }).ToList();
     }
 
     private void ProjectReport(SshServerAuditReport report)

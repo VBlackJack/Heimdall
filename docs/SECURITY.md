@@ -1145,10 +1145,11 @@ reached through an SSH gateway to prevent split-horizon DNS leaks.
   returning `false` on dispatcher shutdown) wired across SSH sessions, SFTP,
   manual tunnels, tool gateways (`ToolGatewayConnector` also enforcing `HostKeyStore`,
   `SshCryptoPolicy`, and `@revoked`), public-key deployment, key rotation, and
-  remote `authorized_keys` management. `ImportedProfileSanitizer` strips
-  `SshCryptoPolicy.LegacyCompatible` from imported profiles so an imported file
-  cannot silently downgrade crypto, and `SettingsImportPreview` highlights
-  `SshCryptoPolicy` and `SshConfirmAgentSigning` as sensitive changes. When
+  remote `authorized_keys` management. `ImportedProfileSanitizer` strips any
+  non-`StrictModern` `SshCryptoPolicy` override (`LegacyCompatible` and
+  `Standard`) from imported profiles and gateways so an imported file cannot
+  silently downgrade a `StrictModern` workstation, and `SettingsImportPreview`
+  highlights `SshCryptoPolicy` and `SshConfirmAgentSigning` as sensitive changes. When
   `StrictModern` is active and a session falls back to Plink or external PuTTY,
   Heimdall surfaces an explicit notice stating that Plink/PuTTY does not enforce
   the embedded `StrictModern` algorithm filter.
@@ -1165,9 +1166,10 @@ reached through an SSH gateway to prevent split-horizon DNS leaks.
   `SshAuthorizedKeysDialogViewModel`): parses OpenSSH entries with quoted options
   and SHA-256 fingerprints, validates option strings against unquoted whitespace
   or control characters, transfers new lines Base64-encoded to prevent shell
-  injection, refuses symlinks (`-L`), writes atomically via `mktemp` + `chmod 600`
-  + `mv -f`, and blocks last-key removal by default unless explicitly confirmed
-  in the UI.
+  injection, refuses symlinks (`-L`), appends new keys via `>>` after
+  deduplication, removes keys atomically via `mktemp` + `chmod 600` + `mv -f`
+  (cleaning up `$tmp` on any failure), and blocks last-key removal by default
+  unless explicitly confirmed in the UI.
 - **SSH Server Cryptographic Audit** (`SshKexInitProbe`, `SshServerAuditEngine`):
   reads only the RFC 4253 banner and `SSH_MSG_KEXINIT` packet without
   authenticating, enforcing hard DoS bounds (`MaxPreBannerLines`,

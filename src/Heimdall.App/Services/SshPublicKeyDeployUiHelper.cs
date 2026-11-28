@@ -402,9 +402,7 @@ internal static class SshPublicKeyDeployUiHelper
                 return null;
             }
 
-            string vaultTitle = string.IsNullOrWhiteSpace(target.VaultEntryName)
-                ? target.DisplayName
-                : target.VaultEntryName;
+            string vaultTitle = ViewModels.ServerListViewModel.CredentialLookupTitle(target);
             var credential = await provider.GetCredentialAsync(
                     target.RemoteServer,
                     targetPort,

@@ -7081,5 +7081,7 @@
   "Osc133CmdDoneFailed": "Command exited ({0}) in {1}",
   "TunnelCtxSaveAsPreset": "Save as preset / profile",
   "StatusHotForwardSavedToProfile": "Port forward saved to server profile '{0}'.",
-  "StatusTunnelPromoteUnsupported": "This tunnel cannot be saved as a preset or local profile forward."
+  "StatusTunnelPromoteUnsupported": "This tunnel cannot be saved as a preset or local profile forward.",
+  "A11ySshFleetAuditRow": "{0}, {1}, grade {2}",
+  "A11ySshAuthKeyRow": "{0}, {1}, {2}"
 }

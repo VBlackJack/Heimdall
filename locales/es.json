@@ -7081,5 +7081,7 @@
   "Osc133CmdDoneFailed": "Comando finalizado con error ({0}) en {1}",
   "TunnelCtxSaveAsPreset": "Guardar como preajuste / perfil",
   "StatusHotForwardSavedToProfile": "Redirecci\u00f3n guardada en el perfil de servidor '{0}'.",
-  "StatusTunnelPromoteUnsupported": "Este t\u00fanel no se puede guardar como preajuste ni en un perfil local."
+  "StatusTunnelPromoteUnsupported": "Este t\u00fanel no se puede guardar como preajuste ni en un perfil local.",
+  "A11ySshFleetAuditRow": "{0}, {1}, nota {2}",
+  "A11ySshAuthKeyRow": "{0}, {1}, {2}"
 }

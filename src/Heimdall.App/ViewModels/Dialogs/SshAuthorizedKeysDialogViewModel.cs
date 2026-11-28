@@ -126,6 +126,11 @@ public sealed partial class SshAuthorizedKeysDialogViewModel : ObservableObject
 
             if (!result.Success)
             {
+                if (result.ErrorCode == SshAuthorizedKeysErrorCode.ConnectionFailed)
+                {
+                    _cachedPromptedPassword = null;
+                }
+
                 ReportStatus(FormatError(result.ErrorCode, result.ErrorMessage, null), isError: true);
                 return;
             }
@@ -179,6 +184,11 @@ public sealed partial class SshAuthorizedKeysDialogViewModel : ObservableObject
 
             if (!addResult.Success)
             {
+                if (addResult.ErrorCode == SshAuthorizedKeysErrorCode.ConnectionFailed)
+                {
+                    _cachedPromptedPassword = null;
+                }
+
                 ReportStatus(FormatError(addResult.ErrorCode, addResult.ErrorMessage, addResult.ExitStatus), isError: true);
                 return;
             }
@@ -248,6 +258,11 @@ public sealed partial class SshAuthorizedKeysDialogViewModel : ObservableObject
 
             if (!removeResult.Success)
             {
+                if (removeResult.ErrorCode == SshAuthorizedKeysErrorCode.ConnectionFailed)
+                {
+                    _cachedPromptedPassword = null;
+                }
+
                 ReportStatus(FormatError(removeResult.ErrorCode, removeResult.ErrorMessage, removeResult.ExitStatus), isError: true);
                 return;
             }

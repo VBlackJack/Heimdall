@@ -18,9 +18,14 @@ using System.IO;
 using System.Text.Json;
 using Heimdall.App.Localization;
 using Heimdall.App.Services;
+using Heimdall.App.ViewModels.Tools;
+using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
+using Heimdall.Core.Models;
+using Heimdall.Core.Security;
 using Heimdall.Core.Ssh;
 using Heimdall.Ssh;
+using Microsoft.Extensions.DependencyInjection;
 using Renci.SshNet;
 
 namespace Heimdall.App.Tests;
@@ -164,6 +169,93 @@ public sealed class ToolGatewayConnectorSecurityTests : IDisposable
         Assert.Equal("SHA256:agentfp", capturedDial.AgentKeyFingerprint);
         Assert.Same(beforeSignCallback, capturedDial.OnBeforeAgentSign);
         Assert.Same(confirmCallback, capturedDial.ConfirmAgentSign);
+    }
+
+    [Fact]
+    public async Task TryResolveExternalSshPasswordAsync_SharedProfile_UsesRemoteServerAsVaultTitle()
+    {
+        var capturingProvider = new CapturingCredentialProvider();
+        var services = new ServiceCollection()
+            .AddSingleton<ICredentialProviderFactory>(new StubCredentialProviderFactory(capturingProvider))
+            .BuildServiceProvider();
+
+        var sharedTarget = new ServerProfileDto
+        {
+            Id = SharedSessionIds.PrefixFor(SharedSessionIds.NewSourceId()) + "srv-1",
+            DisplayName = "Victim Prod Vault Entry",
+            VaultEntryName = "Victim Vault Override",
+            RemoteServer = "attacker.example.test",
+            SshUsername = "ops",
+            CredentialLookupConfirmed = false
+        };
+        var settings = new AppSettings { UseExternalCredentialProvider = true };
+
+        var password = await SshPublicKeyDeployUiHelper.TryResolveExternalSshPasswordAsync(
+            services,
+            sharedTarget,
+            settings,
+            22,
+            CancellationToken.None);
+
+        Assert.Equal("vault-secret", password);
+        Assert.Equal("attacker.example.test", capturingProvider.CapturedHost);
+        Assert.Equal("attacker.example.test", capturingProvider.CapturedTitle);
+    }
+
+    [Fact]
+    public async Task RunFleetAuditAsync_MissingConfiguredGateway_FailsClosedWithoutDirectProbe()
+    {
+        bool probeCalled = false;
+        using var vm = new SshServerAuditViewModel((_, _, _, _) =>
+        {
+            probeCalled = true;
+            throw new InvalidOperationException("Direct probe must not run when gateway is missing.");
+        });
+
+        var servers = new List<ServerProfileDto>
+        {
+            new()
+            {
+                Id = "srv-gw-missing",
+                DisplayName = "Internal Host",
+                RemoteServer = "10.20.30.40",
+                ConnectionType = "SSH",
+                SshGatewayId = "missing-gateway-id"
+            }
+        };
+        var settings = new AppSettings { SshGateways = [] };
+
+        await vm.RunFleetAuditAsync(servers, settings);
+
+        Assert.False(probeCalled);
+        var entry = Assert.Single(vm.FleetResults);
+        Assert.Null(entry.Report);
+        Assert.False(string.IsNullOrWhiteSpace(entry.ErrorMessage));
+    }
+
+    private sealed class CapturingCredentialProvider : ICredentialProvider
+    {
+        public string Name => "Stub";
+        public bool IsAvailable => true;
+        public string? CapturedHost { get; private set; }
+        public string? CapturedTitle { get; private set; }
+
+        public Task<CredentialResult?> GetCredentialAsync(
+            string serverHost,
+            int port,
+            string? username,
+            string? title,
+            CancellationToken ct = default)
+        {
+            CapturedHost = serverHost;
+            CapturedTitle = title;
+            return Task.FromResult<CredentialResult?>(new CredentialResult(username ?? string.Empty, "vault-secret"));
+        }
+    }
+
+    private sealed class StubCredentialProviderFactory(ICredentialProvider provider) : ICredentialProviderFactory
+    {
+        public ICredentialProvider Create(AppSettings settings) => provider;
     }
 
     private sealed class NoOpDisposable : IDisposable

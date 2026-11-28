@@ -7081,5 +7081,7 @@
   "Osc133CmdDoneFailed": "Commande \u00e9chou\u00e9e (code {0}) en {1}",
   "TunnelCtxSaveAsPreset": "Enregistrer en pr\u00e9r\u00e9glage / profil",
   "StatusHotForwardSavedToProfile": "Redirection enregistr\u00e9e dans le profil serveur '{0}'.",
-  "StatusTunnelPromoteUnsupported": "Ce tunnel ne peut pas \u00eatre enregistr\u00e9 en pr\u00e9r\u00e9glage ni dans un profil local."
+  "StatusTunnelPromoteUnsupported": "Ce tunnel ne peut pas \u00eatre enregistr\u00e9 en pr\u00e9r\u00e9glage ni dans un profil local.",
+  "A11ySshFleetAuditRow": "{0}, {1}, note {2}",
+  "A11ySshAuthKeyRow": "{0}, {1}, {2}"
 }

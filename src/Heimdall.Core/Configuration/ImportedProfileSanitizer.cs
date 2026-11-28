@@ -120,7 +120,7 @@ public static class ImportedProfileSanitizer
             profile.WinRmSkipCertificateCheck = false;
 
             // An imported profile must not downgrade a workstation configured for StrictModern SSH crypto.
-            if (profile.SshCryptoPolicy == Ssh.SshCryptoPolicy.LegacyCompatible)
+            if (profile.SshCryptoPolicy is not null and not Ssh.SshCryptoPolicy.StrictModern)
             {
                 profile.SshCryptoPolicy = null;
             }
@@ -148,7 +148,7 @@ public static class ImportedProfileSanitizer
         gateway.SshAgentKeyFingerprint = null;
 
         // An imported gateway must not downgrade a workstation configured for StrictModern SSH crypto.
-        if (gateway.SshCryptoPolicy == Ssh.SshCryptoPolicy.LegacyCompatible)
+        if (gateway.SshCryptoPolicy is not null and not Ssh.SshCryptoPolicy.StrictModern)
         {
             gateway.SshCryptoPolicy = null;
         }

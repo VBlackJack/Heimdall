@@ -227,7 +227,7 @@ public static class SshAuthorizedKeysService
             "if chmod 600 \"$tmp\" && " +
             "(grep -Fv -- \"$key_id\" \"$ak\" > \"$tmp\"; rc=$?; [ \"$rc\" -le 1 ]); then " +
             $"if {emptyCheck}; then " +
-            $"mv -f \"$tmp\" \"$ak\" && chmod 600 \"$ak\" && echo {KeyRemovedMarker}; " +
+            $"(mv -f \"$tmp\" \"$ak\" && chmod 600 \"$ak\" && echo {KeyRemovedMarker}) || {{ rm -f \"$tmp\"; exit 1; }}; " +
             $"else rm -f \"$tmp\"; echo {LastKeyRefusedMarker}; exit 1; fi; " +
             "else rm -f \"$tmp\"; exit 1; fi";
     }
