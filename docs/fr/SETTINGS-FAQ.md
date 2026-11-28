@@ -370,7 +370,8 @@ plus de mémoire par session mais isole chaque session dans son processus.
 
 **Mode SSH par défaut** - `Embedded` utilise le terminal intégré SSH.NET. `External` utilise PuTTY, ce
 qui exige de renseigner **Chemin de PuTTY**. `OpenSsh` exécute Windows OpenSSH (`ssh.exe`) sous
-ConPTY avec un fichier `known_hosts` éphémère protégé par ACL réservée au propriétaire courant.
+ConPTY après que Heimdall a lui-même décidé de la clé d'hôte du serveur ; `ssh.exe` ne voit qu'un fichier
+`known_hosts` temporaire réservé au propriétaire contenant cette clé et ne pose jamais de question sur les clés d'hôte.
 
 **Appliquer à toutes les sessions enregistrées** - à côté de chaque mode par défaut, réécrit le
 mode de chaque session enregistrée de ce protocole (celui de SSH ne touche que les sessions SSH)

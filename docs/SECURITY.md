@@ -1223,9 +1223,22 @@ reached through an SSH gateway to prevent split-horizon DNS leaks.
   it only carries the user's approval of a profile's startup command / `SetEnv`
   (`RemoteCommand`) from `ConnectionService` to `SshHandler` (SSH only, not
   SFTP). Native Windows OpenSSH (`ssh.exe`)
-  ConPTY mode writes an ephemeral UTF-8 no-BOM `known_hosts` file protected by
-  an owner-only Windows ACL (`AclEnforcer.SetFileAcl`) containing
-  pinned entries, `@cert-authority`, and `@revoked` rules, deleting it on exit.
+  ConPTY mode decides the host key in Heimdall before launching `ssh.exe`: the
+  server key is probed with SSH.NET (no authentication) and judged by the same
+  rules as the other modes (revoked keys refused, stored multi-algorithm pin
+  compared, certificate checked against the trusted-CA rules, otherwise the
+  Heimdall host-key dialog). `ssh.exe` then runs with
+  `StrictHostKeyChecking=yes`, `CheckHostIP=no`, `UpdateHostKeys=no`, a fixed
+  `HostKeyAlias` and `HostKeyAlgorithms` limited to the decided key type,
+  against an ephemeral UTF-8 no-BOM `known_hosts` file protected by an
+  owner-only Windows ACL (`AclEnforcer.SetFileAcl`) that holds only the decided
+  key(s), never the whole store and never `~/.ssh/known_hosts`. `ssh.exe` never
+  asks about host keys and refuses any other key. When the probe fails, the
+  host's stored pinned keys that have a key blob are used; a legacy pin without
+  a blob refuses the connection. Only `ssh-ed25519`,
+  `ecdsa-sha2-nistp256/384/521` and `ssh-rsa` host keys are accepted. The file is
+  deleted when the session ends (process exit or tab close) and a janitor sweeps
+  leftovers.
   Fleet `authorized_keys` revocation (`SshFleetAuthorizedKeysService`) reuses
   symlink/last-key atomic removal guards and neutralizes CSV formulas on export.
   `.cast` transcript export passes full redaction spans through `TextRedactor`

@@ -1369,10 +1369,24 @@ d'éviter toute fuite DNS split-horizon.
   clé d'hôte : il transmet seulement l'approbation par l'utilisateur de la
   commande de démarrage / `SetEnv` (`RemoteCommand`) d'un profil de
   `ConnectionService` vers `SshHandler` (SSH uniquement, pas SFTP). Le mode natif
-  Windows OpenSSH (`ssh.exe`) sous ConPTY écrit un fichier `known_hosts`
-  éphémère UTF-8 sans BOM protégé par ACL réservée au propriétaire courant
-  (`AclEnforcer.SetFileAcl`) incluant clés épinglées,
-  `@cert-authority` et `@revoked`, puis le supprime à la fermeture. La
+  Windows OpenSSH (`ssh.exe`) sous ConPTY décide de la clé d'hôte dans
+  Heimdall avant de lancer `ssh.exe` : la clé du serveur est sondée par SSH.NET
+  (sans authentification) et jugée par les mêmes règles que les autres modes
+  (clés révoquées refusées, épingle stockée multi-algorithme comparée,
+  certificat vérifié selon les règles d'autorité approuvée, sinon boîte de
+  dialogue de clé d'hôte de Heimdall). `ssh.exe` s'exécute ensuite avec
+  `StrictHostKeyChecking=yes`, `CheckHostIP=no`, `UpdateHostKeys=no`, un
+  `HostKeyAlias` fixe et `HostKeyAlgorithms` limité au type de la clé décidée,
+  sur un fichier `known_hosts` éphémère UTF-8 sans BOM protégé par ACL réservée
+  au propriétaire courant (`AclEnforcer.SetFileAcl`) qui ne contient que la ou
+  les clés décidées, jamais l'ensemble du magasin ni `~/.ssh/known_hosts`.
+  `ssh.exe` ne pose jamais de question sur les clés d'hôte et refuse toute autre
+  clé. Quand la sonde échoue, les clés épinglées stockées de l'hôte qui ont un
+  blob de clé sont utilisées ; une épingle ancienne sans blob refuse la
+  connexion. Seules les clés d'hôte `ssh-ed25519`, `ecdsa-sha2-nistp256/384/521`
+  et `ssh-rsa` sont acceptées. Le fichier est supprimé à la fin de la session
+  (sortie du processus ou fermeture de l'onglet) et un balayeur nettoie les
+  restes. La
   révocation de parc `authorized_keys` (`SshFleetAuthorizedKeysService`) réutilise
   les gardes atomiques anti-symlink et anti-verrouillage de dernière clé et
   neutralise les formules CSV à l'export. L'export de transcription `.cast`
