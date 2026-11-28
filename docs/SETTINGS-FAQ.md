@@ -320,8 +320,9 @@ their logs matters more to you than the status dots.
 Security above). External uses more memory per
 session but isolates each session in its own process.
 
-**Default SSH mode** - `Embedded` uses the built-in terminal. `External` uses PuTTY, which needs
-**PuTTY path** set.
+**Default SSH mode** - `Embedded` uses the built-in SSH.NET terminal. `External` uses PuTTY, which needs
+**PuTTY path** set. `OpenSshNative` runs Windows OpenSSH (`ssh.exe`) inside ConPTY with an ephemeral
+owner-only ACL `known_hosts` file.
 
 **Apply to all saved sessions** - beside each default mode, rewrites the mode of every saved
 session of that protocol (the SSH one touches SSH sessions only) and saves the chosen default at
@@ -415,6 +416,11 @@ bounds how long Heimdall waits when enumerating keys from local agents.
 per-profile overrides in the session dialog. **Allow OSC 52 clipboard write** (Terminal) is off by
 default and only permits write-only clipboard updates capped at 128 KiB (read queries `?` are always
 blocked).
+
+**Tunnel auto-reconnect max attempts** (Tunnels / SSH & SFTP, 1 to 20, default 5) bounds opt-in
+automatic tunnel recovery with exponential backoff (`2s`-`32s`) when a supervised manual tunnel or
+preset drops unexpectedly. Reconnection aborts fail-closed without retrying on host-key mismatches,
+revoked keys, authentication rejections, agent signing declines, or user cancellations.
 
 ## Third-party tool detection
 

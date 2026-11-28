@@ -368,8 +368,9 @@ serveurs et que le bruit dans leurs journaux compte plus que les pastilles d'ét
 plus haut). Le mode externe consomme
 plus de mémoire par session mais isole chaque session dans son processus.
 
-**Mode SSH par défaut** - `Embedded` utilise le terminal intégré. `External` utilise PuTTY, ce
-qui exige de renseigner **Chemin de PuTTY**.
+**Mode SSH par défaut** - `Embedded` utilise le terminal intégré SSH.NET. `External` utilise PuTTY, ce
+qui exige de renseigner **Chemin de PuTTY**. `OpenSshNative` exécute Windows OpenSSH (`ssh.exe`) sous
+ConPTY avec un fichier `known_hosts` éphémère protégé par ACL réservée au propriétaire courant.
 
 **Appliquer à toutes les sessions enregistrées** - à côté de chaque mode par défaut, réécrit le
 mode de chaque session enregistrée de ce protocole (celui de SSH ne touche que les sessions SSH)
@@ -470,6 +471,12 @@ de l'agent SSH** borne l'attente lors de l'énumération des clés des agents lo
 `LegacyCompatible`, avec surcharge possible par profil. **Autoriser l'écriture presse-papiers
 OSC 52** (Terminal) est désactivé par défaut et n'autorise que l'écriture bornée à 128 Kio (les
 requêtes de lecture `?` sont toujours bloquées).
+
+**Tentatives max de reconnexion de tunnel** (Tunnels / SSH & SFTP, de 1 à 20, 5 par défaut)
+plafonne la reprise automatique opt-in des tunnels manuels et préréglages avec backoff exponentiel
+(`2s`-`32s`) en cas de coupure inattendue. La reconnexion s'interrompt en fail-closed sans nouvelle
+tentative sur échec de clé d'hôte, clé révoquée, rejet d'authentification, refus de signature agent
+ou annulation utilisateur.
 
 ## Détection des outils tiers
 

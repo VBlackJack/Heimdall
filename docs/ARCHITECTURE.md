@@ -75,15 +75,17 @@ Heimdall.slnx (14 projects)
 
 ## Key Design Decisions
 
-### 1. SSH.NET + Plink Dual Strategy
+### 1. SSH.NET + Plink + Native Windows OpenSSH Strategy
 
-**Problem**: SSH.NET 2026.0.1 has no built-in Pageant agent support. Many enterprise environments use PPK keys loaded exclusively in Pageant.
+**Problem**: SSH.NET 2026.0.1 has no built-in Pageant agent support. Many enterprise environments use PPK keys loaded exclusively in Pageant, while some workflows also require native Windows OpenSSH (`ssh.exe`) behavior.
 
-**Solution**: Two-pronged approach:
+**Solution**: Three-pronged approach:
 
-1. **SSH.NET (primary)**: Programmatic auth with password, private key file, keyboard-interactive, or SSH agent (`OpenSshPipeAgent`, `PageantAgent`, and `gpg-agent` when Pageant compatibility is enabled). Custom `PageantClient` communicates with Pageant via Win32 shared memory (`CreateFileMapping` + `WM_COPYDATA`) and wraps keys as `IPrivateKeySource` for SSH.NET; `SshAgentManager` coordinates active key management (`IMutableSshAgent`) across mutable agents. `OpenSshCertificateVerifier` handles OpenSSH v01 host certificates (`@cert-authority` / `@revoked`), `SshSessionDiagnostics` inspects live negotiated session cryptography, and the embedded SSH terminal UI is decomposed into focused partials (`EmbeddedSshView.Health.cs`, `EmbeddedSshView.Reconnect.cs`, `EmbeddedSshView.Broadcast.cs`, `EmbeddedSshView.LocalizationAndStatus.cs`, `EmbeddedSshView.WebViewMessaging.cs`, `EmbeddedSshView.MacrosAndLog.cs`).
+1. **SSH.NET (primary)**: Programmatic auth with password, private key file, keyboard-interactive, or SSH agent (`OpenSshPipeAgent`, `PageantAgent`, and `gpg-agent` when Pageant compatibility is enabled). Custom `PageantClient` communicates with Pageant via Win32 shared memory (`CreateFileMapping` + `WM_COPYDATA`) and wraps keys as `IPrivateKeySource` for SSH.NET; `SshAgentManager` coordinates active key management (`IMutableSshAgent`) across mutable agents. `SshStartupTrustGate` unifies pre-connect SSH/SFTP host-key trust resolution, `OpenSshCertificateVerifier` handles OpenSSH v01 host certificates (`@cert-authority` / `@revoked`), `SshSessionDiagnostics` inspects live negotiated session cryptography, `SshFleetAuthorizedKeysService` orchestrates fleet-wide `authorized_keys` search and selective revocation, `AsciinemaCastPlayerEngine` powers enriched `.cast` v2 replay (OSC 133 command chapters, ANSI-stripped search, fail-closed `TextRedactor` export), `TunnelReconnectPolicy` + `ForwardedPort.RequestReceived` drive opt-in tunnel auto-reconnect and live metrics, and the embedded SSH terminal UI is decomposed into focused partials (`EmbeddedSshView.Health.cs`, `EmbeddedSshView.Reconnect.cs`, `EmbeddedSshView.Broadcast.cs`, `EmbeddedSshView.LocalizationAndStatus.cs`, `EmbeddedSshView.WebViewMessaging.cs`, `EmbeddedSshView.MacrosAndLog.cs`).
 
 2. **Plink fallback**: When `SshConnectionFactory.RequiresPlinkFallback()` is true (agent forwarding enabled on the profile and a Plink-compatible agent, Pageant, running), or when `SshPlinkRetryPolicy` retries through Plink after a refused SSH.NET sign-in, `PlinkTunnelRunner` handles tunnels and `PipeModeSession` handles interactive SSH. Plink communicates with Pageant natively, but Heimdall still owns host-key trust. `PlinkHostKeyDecider` accepts a stored fingerprint, or uses injectable `IPlinkHostKeyProbe` plus `IHostKeyVerifier` to resolve first-use trust before launch. If no Heimdall-trusted fingerprint can be resolved, the path fails with `SshFailureCode.HostKeyUnavailable` instead of falling back to PuTTY/Plink's cache.
+
+3. **Native Windows OpenSSH (`ssh.exe`, opt-in)**: Selectable globally (`AppSettings.SshDefaultMode`) or per profile (`SshMode.OpenSshNative`), executed inside `ConPtySession` with an ephemeral UTF-8 no-BOM `known_hosts` file protected by an owner-only Windows ACL (`AclEnforcer.ApplyOwnerOnlyFileAcl`) carrying pinned keys, `@cert-authority`, and `@revoked` rules, and deleted on exit.
 
 **Pageant integration fixes** (3 critical bugs resolved):
 - `AGENT_COPYDATA_ID` must be `0x804e50ba` - any other value causes Pageant to silently ignore the request
@@ -102,7 +104,7 @@ xterm.js  -->  stdin pipe  -->  plink -t  -->  remote PTY  -->  bash
 xterm.js  <--  stdout pipe <--  plink     <---------+
 ```
 
-ConPTY (`ConPtySession`) is kept for local shell scenarios only.
+ConPTY (`ConPtySession`) is used for local shell scenarios and the opt-in native Windows OpenSSH (`ssh.exe`) backend.
 
 **Terminal size on this path**: Windows plink builds the remote PTY request only from its configuration (`TermWidth`/`TermHeight`), never from a console, and never sends a window change. Before each launch, `PlinkSizeSession` creates a temporary saved session `HKCU\Software\SimonTatham\PuTTY\Sessions\HeimdallPtySize-<random>`: a copy of every "Default Settings" value (`-load` replaces "Default Settings" entirely), then `TermWidth`/`TermHeight` set to the size xterm.js reported, and never `HostName`. The arguments start with `-load <name>`; every other flag keeps its meaning, and `-hostkey` still wins over the loaded session. The key is deleted through a single release handle, on the first byte of output for an attested launcher, and otherwise on process exit, launch failure or cancellation. `PlinkSizeSessionJanitor` removes prefixed leftovers when the SSH handler starts, and the PuTTY import skips them. If the registry refuses any step, a warning is logged and plink starts without `-load`, at 80x24, exactly as before. On a fresh tab the terminal page is still loading when the launch is prepared, so the launch waits for the page's first `ready:` size, at most `AppSettings.PlinkInitialSizeWaitMs` (default 3000 ms, 0 disables the wait), through `TerminalSizeReport`; SSH.NET never waits, since it resizes after start. The log shows `SSH opening the PTY for <profile> at the reported <cols>x<rows>` or `... at the default 80x24: <reason>` (no view, timeout, not reported yet), then `[PlinkSizeSession] Created Plink size session <name> carrying <cols>x<rows>`. Resizing after start remains impossible on this transport.
 
