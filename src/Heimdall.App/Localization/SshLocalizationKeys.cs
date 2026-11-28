@@ -107,6 +107,9 @@ internal static class SshLocalizationKeys
     public const string StatusSshPortForwardFailed = "StatusSshPortForwardFailed";
     public const string SshErrorProxyUnsupportedOnPlink = "SshErrorProxyUnsupportedOnPlink";
     public const string SshErrorProxyUnsupportedOnPutty = "SshErrorProxyUnsupportedOnPutty";
+    public const string SshErrorProxyUnsupportedOnOpenSsh = "SshErrorProxyUnsupportedOnOpenSsh";
+    public const string ErrorOpenSshNotFound = "ErrorOpenSshNotFound";
+    public const string ErrorOpenSshConPtyUnavailable = "ErrorOpenSshConPtyUnavailable";
     public const string TunnelErrorProxyUnsupportedOnPlink = "TunnelErrorProxyUnsupportedOnPlink";
     public const string ToolSshServerAuditProxyNotSupportedDirect = "ToolSshServerAuditProxyNotSupportedDirect";
     public const string X11ServerNotFound = "X11ServerNotFound";

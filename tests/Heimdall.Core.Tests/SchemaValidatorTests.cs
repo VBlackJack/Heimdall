@@ -182,6 +182,28 @@ public class SchemaValidatorTests
     }
 
     [Fact]
+    public void ValidateSettingsAndServer_OpenSshMode_ValidForSshAndInvalidForRdp()
+    {
+        var sshSettings = new AppSettings { SshDefaultMode = "OpenSsh" };
+        Assert.True(SchemaValidator.ValidateSettings(sshSettings).IsValid);
+
+        var sshServer = new ServerProfileDto
+        {
+            Id = "ssh-openssh",
+            DisplayName = "OpenSSH Box",
+            RemoteServer = "box.example.com",
+            ConnectionType = "SSH",
+            SshMode = "OpenSsh"
+        };
+        Assert.True(SchemaValidator.ValidateServer(sshServer).IsValid);
+
+        var rdpSettings = new AppSettings { RdpDefaultMode = "OpenSsh" };
+        var rdpResult = SchemaValidator.ValidateSettings(rdpSettings);
+        Assert.False(rdpResult.IsValid);
+        Assert.Contains(rdpResult.Errors, e => e.Contains("RdpDefaultMode"));
+    }
+
+    [Fact]
     public void ValidateSettings_InvalidRdpDefaultMode_ReturnsError()
     {
         var settings = new AppSettings { RdpDefaultMode = "Detached" };

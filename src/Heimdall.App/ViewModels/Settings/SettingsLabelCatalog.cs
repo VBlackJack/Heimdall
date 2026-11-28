@@ -59,6 +59,7 @@ internal static class SettingsLabelCatalog
         [nameof(AppSettings.TerminalAllowOsc52Clipboard)] = new("SettingsLabelTerminalAllowOsc52", "SettingsTabTerminal", "SettingsSectionTerminal"),
         [nameof(AppSettings.PlinkPath)] = new("SettingsLabelPlinkPath", "SettingsTabSshSftp", "SettingsSshSubTabConnection"),
         [nameof(AppSettings.PuttyPath)] = new("SettingsLabelPuttyPath", "SettingsTabSshSftp", "SettingsSshSubTabConnection"),
+        [nameof(AppSettings.OpenSshPath)] = new("SettingsLabelOpenSshPath", "SettingsTabSshSftp", "SettingsSshSubTabConnection"),
         [nameof(AppSettings.SshAgentPreference)] = new("SettingsSshAgentPreferenceLabel", "SettingsTabSshSftp", "SettingsSshSubTabConnection"),
         [nameof(AppSettings.SshAgentLookupTimeoutMs)] = new("SettingsLabelSshAgentLookupTimeout", "SettingsTabSshSftp", "SettingsSshSubTabConnection"),
         [nameof(AppSettings.SshConfirmAgentSigning)] = new("SettingsSshConfirmAgentSigningLabel", "SettingsTabSshSftp", "SettingsSshSubTabConnection"),

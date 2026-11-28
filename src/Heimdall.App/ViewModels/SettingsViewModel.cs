@@ -472,6 +472,9 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private string _puttyPath = "";
 
     [ObservableProperty]
+    private string _openSshPath = "";
+
+    [ObservableProperty]
     private string _sshDefaultMode = "Embedded";
 
     [ObservableProperty]
@@ -655,6 +658,9 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     /// <summary>True when a PuTTY path is typed and no file is there.</summary>
     public bool IsPuttyPathMissing => IsFileMissing(PuttyPath);
 
+    /// <summary>True when an OpenSSH executable path is typed and no file is there.</summary>
+    public bool IsOpenSshPathMissing => IsFileMissing(OpenSshPath);
+
     /// <summary>True when an external editor path is typed and no file is there.</summary>
     public bool IsExternalEditorPathMissing => IsFileMissing(ExternalEditorPath);
 
@@ -686,6 +692,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     partial void OnPlinkPathChanged(string value) => OnPropertyChanged(nameof(IsPlinkPathMissing));
 
     partial void OnPuttyPathChanged(string value) => OnPropertyChanged(nameof(IsPuttyPathMissing));
+
+    partial void OnOpenSshPathChanged(string value) => OnPropertyChanged(nameof(IsOpenSshPathMissing));
 
     partial void OnExternalEditorPathChanged(string value) => OnPropertyChanged(nameof(IsExternalEditorPathMissing));
 
@@ -1890,10 +1898,12 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             "SettingsApplyModeToAllConfirmTitle",
             "SettingsApplyModeToAllConfirmBody");
 
-    private static string SshModeDisplayKey(string mode) =>
-        string.Equals(mode, "External", StringComparison.Ordinal)
-            ? "SettingsSshModeExternal"
-            : "SettingsSshModeEmbedded";
+    private static string SshModeDisplayKey(string mode) => mode switch
+    {
+        "External" => "SettingsSshModeExternal",
+        "OpenSsh" => "SettingsSshModeOpenSsh",
+        _ => "SettingsSshModeEmbedded"
+    };
 
     private static string RdpModeDisplayKey(string mode) =>
         string.Equals(mode, "External", StringComparison.Ordinal)
@@ -2042,6 +2052,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             // SSH & SFTP
             PlinkPath = settings.PlinkPath;
             PuttyPath = settings.PuttyPath ?? "";
+            OpenSshPath = settings.OpenSshPath ?? "";
             SshDefaultMode = settings.SshDefaultMode;
             SshAgentPreference = settings.SshAgentPreference.ToString();
             SshCryptoPolicy = settings.SshCryptoPolicy.ToString();
@@ -2558,6 +2569,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         // SSH & SFTP
         settings.PlinkPath = PlinkPath;
         settings.PuttyPath = string.IsNullOrWhiteSpace(PuttyPath) ? null : PuttyPath;
+        settings.OpenSshPath = OpenSshPath?.Trim() ?? string.Empty;
         settings.SshDefaultMode = SshDefaultMode;
         settings.SshAgentPreference = parsedSshAgentPreference;
         settings.SshCryptoPolicy = parsedSshCryptoPolicy;

@@ -10,6 +10,7 @@
     "plinkPath": "C:\\Program Files\\PuTTY\\plink.exe",
     "puttyPath": null,
     "psftpPath": null,
+    "openSshPath": "",
     "tunnelEstablishmentDelayMs": 2500,
     "tunnelRetryDelayMs": 1500,
     "processKillTimeoutMs": 2000,

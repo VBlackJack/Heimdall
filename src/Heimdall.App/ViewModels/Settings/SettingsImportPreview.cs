@@ -55,6 +55,7 @@ internal static class SettingsImportPreview
         "PlinkPath",
         "PuttyPath",
         "PsftpPath",
+        "OpenSshPath",
         "X11ServerPath",
         "X11AutoStart",
         "CitrixSelfServicePath",

@@ -48,6 +48,7 @@ public sealed class SshCapabilityWiringTests
     [
         SshResolvedPath.ExternalPutty,
         SshResolvedPath.PlinkPipe,
+        SshResolvedPath.NativeOpenSsh,
     ];
 
     // The paths are swept inside the bodies rather than carried as theory arguments: the enum is
@@ -196,6 +197,20 @@ public sealed class SshCapabilityWiringTests
                 passwordFilePath: null);
 
             return arguments.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        }
+
+        if (path == SshResolvedPath.NativeOpenSsh)
+        {
+            return Heimdall.Ssh.OpenSshLaunchBuilder.BuildArguments(new Heimdall.Ssh.OpenSshLaunchSpec
+            {
+                Host = "example.com",
+                Port = 22,
+                Username = "user",
+                EphemeralKnownHostsPath = @"C:\temp\kh.txt",
+                Compression = compression,
+                X11Forwarding = x11Forwarding,
+                AgentForwarding = false
+            });
         }
 
         throw new ArgumentOutOfRangeException(

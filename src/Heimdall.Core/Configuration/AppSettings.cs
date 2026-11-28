@@ -66,6 +66,7 @@ public sealed class AppSettings
     public string PlinkPath { get; set; } = LegacyPlinkPath;
     public string? PuttyPath { get; set; }
     public string? PsftpPath { get; set; }
+    public string OpenSshPath { get; set; } = string.Empty;
 
     // Updates
     public bool UpdateCheckEnabled { get; set; } = true;

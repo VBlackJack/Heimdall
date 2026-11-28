@@ -4241,6 +4241,28 @@
                                         <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[PuttyPath]}"/>
                                         <TextBlock x:Name="Mw_SettingsPuttyPathMissing" Text="{loc:Translate SettingsFileNotFound}" Foreground="{DynamicResource WarningTextBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,4,0,0" Visibility="{Binding Settings.IsPuttyPathMissing, Converter={StaticResource BoolToVisibilityConverter}}"/>
                                         <TextBlock x:Name="Mw_SettingsPuttyPathHint" Text="{loc:Translate SettingsPuttyPathHint}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                        <TextBlock x:Name="Mw_SettingsOpenSshPathLabel" Text="{loc:Translate SettingsLabelOpenSshPath}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,12,0,4"/>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBox Grid.Column="0" Text="{Binding Settings.OpenSshPath, UpdateSourceTrigger=PropertyChanged}" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsOpenSshPathLabel}"
+                                                     AutomationProperties.HelpText="{loc:Translate SettingsOpenSshPathHint}"/>
+                                            <Button Grid.Column="1" x:Name="Mw_SettingsBrowseOpenSshPath"
+                                                    Padding="6,2" Margin="4,0,0,0" Click="OnBrowseOpenSshPathClick"
+                                                    Style="{DynamicResource SecondaryButtonStyle}"
+                                                    FontSize="{StaticResource FontSizeCaption}"
+                                                    AutomationProperties.Name="{loc:Translate A11yBrowseOpenSshPath}">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock FontFamily="{StaticResource FontFamilyIcons}" Text="&#xE838;" FontSize="{StaticResource IconSizeSmall}" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{loc:Translate BtnBrowse}" Margin="4,0,0,0" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Button>
+                                        </Grid>
+                                        <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[OpenSshPath]}"/>
+                                        <TextBlock x:Name="Mw_SettingsOpenSshPathMissing" Text="{loc:Translate SettingsFileNotFound}" Foreground="{DynamicResource WarningTextBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap" Margin="0,4,0,0" Visibility="{Binding Settings.IsOpenSshPathMissing, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                        <TextBlock x:Name="Mw_SettingsOpenSshPathHint" Text="{loc:Translate SettingsOpenSshPathHint}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                                         <StackPanel Margin="{StaticResource SettingsFieldGap}">
                                             <TextBlock x:Name="Mw_SettingsSshModeLabel" Text="{loc:Translate SettingsLabelSshMode}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                             <StackPanel Orientation="Horizontal">
@@ -4248,6 +4270,7 @@
                                                           AutomationProperties.HelpText="{loc:Translate SettingsSshModeHint}">
                                                     <ComboBoxItem x:Name="Mw_SshModeEmbedded" Content="{loc:Translate SettingsSshModeEmbedded}" Tag="Embedded" AutomationProperties.Name="{loc:Translate SettingsSshModeEmbedded}"/>
                                                     <ComboBoxItem x:Name="Mw_SshModeExternal" Content="{loc:Translate SettingsSshModeExternal}" Tag="External" AutomationProperties.Name="{loc:Translate SettingsSshModeExternal}"/>
+                                                    <ComboBoxItem x:Name="Mw_SshModeOpenSsh" Content="{loc:Translate SettingsSshModeOpenSsh}" Tag="OpenSsh" AutomationProperties.Name="{loc:Translate SettingsSshModeOpenSsh}"/>
                                                 </ComboBox>
                                                 <Button x:Name="Mw_ApplySshModeAll"
                                                         Content="{loc:Translate SettingsApplyModeToAll}"

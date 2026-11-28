@@ -62,7 +62,7 @@ public sealed class ComboBoxWidthGuardTests
                 "PsPolicyDefault", "PsPolicyBypass", "PsPolicyRemoteSigned", "PsPolicyUnrestricted",
                 "PsPolicyAllSigned"),
             ["MainWindow.xaml|{Binding Settings.SshDefaultMode}"] = Keys(
-                "SettingsSshModeEmbedded", "SettingsSshModeExternal"),
+                "SettingsSshModeEmbedded", "SettingsSshModeExternal", "SettingsSshModeOpenSsh"),
             ["MainWindow.xaml|{Binding Settings.RdpDefaultMode}"] = Keys(
                 "SettingsRdpModeEmbedded", "SettingsRdpModeExternal"),
             ["MainWindow.xaml|{Binding Settings.RdpDefaultColorDepth}"] = Keys(

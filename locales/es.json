@@ -7143,5 +7143,15 @@
   "StatusSshPlinkStartupCommandUnavailable": "Plink/PuTTY no puede ejecutar comandos de inicio SSH ni variables SetEnv. La conexi\u00f3n continuar\u00e1 sin ellos.",
   "StatusSshPlinkStrictCryptoAndStartupUnavailable": "Plink/PuTTY no puede aplicar criptograf\u00eda estricta ni ejecutar comandos de inicio SSH/SetEnv. La conexi\u00f3n continuar\u00e1 con los valores predeterminados.",
   "SshCertWarningNotYetValid": "El certificado de usuario SSH a\u00fan no es v\u00e1lido (v\u00e1lido desde {0}).",
-  "CastPlayerLoading": "Cargando grabaci\u00f3n..."
+  "CastPlayerLoading": "Cargando grabaci\u00f3n...",
+  "SettingsLabelOpenSshPath": "Ruta del cliente OpenSSH (ssh.exe)",
+  "SettingsOpenSshPathHint": "D\u00e9jalo vac\u00edo para detectar autom\u00e1ticamente OpenSSH de Windows (System32\\OpenSSH\\ssh.exe o PATH). Se usa cuando el modo SSH es OpenSSH nativo.",
+  "A11yBrowseOpenSshPath": "Buscar el ejecutable ssh.exe",
+  "BrowseOpenSshTitle": "Seleccionar ssh.exe",
+  "BrowseOpenSshFilter": "Cliente OpenSSH (ssh.exe)|ssh.exe|Todos los ejecutables (*.exe)|*.exe",
+  "SettingsSshModeOpenSsh": "OpenSSH nativo",
+  "ServerDialogModeOpenSsh": "OpenSSH nativo",
+  "ErrorOpenSshNotFound": "No se encontr\u00f3 el cliente OpenSSH nativo (ssh.exe). Instala el cliente OpenSSH de Windows o configura su ruta en Ajustes.",
+  "SshErrorProxyUnsupportedOnOpenSsh": "El modo OpenSSH nativo no puede aplicar un proxy saliente HTTP/SOCKS directo sin pasarela SSH. Usa el modo Incrustado o con\u00e9ctate mediante una pasarela SSH.",
+  "ErrorOpenSshConPtyUnavailable": "Windows ConPTY no est\u00e1 disponible en este equipo; OpenSSH nativo no puede ejecutarse integrado."
 }

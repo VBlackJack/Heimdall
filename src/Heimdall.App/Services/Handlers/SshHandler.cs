@@ -158,6 +158,7 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
         // Synchronous and before any launch, so the sweep can never delete a size session this
         // process has just created for a Plink that has not read it yet.
         new PlinkSizeSessionJanitor(_puttySessionRegistry).SweepLeftovers();
+        new OpenSshKnownHostsJanitor().SweepStaleFiles();
     }
 
     public string Protocol => "SSH";
@@ -236,6 +237,25 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
             }
 
             return await ConnectSshExternal(server, settings, targetHost, targetPort, usesTunnel, lease, ct)
+                .ConfigureAwait(false);
+        }
+
+        if (string.Equals(sshMode, "OpenSsh", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!usesTunnel && server.SshProxyType != SshProxyType.None)
+            {
+                string msg = _localizer[SshLocalizationKeys.SshErrorProxyUnsupportedOnOpenSsh];
+                _connectionSm.SetError(server.Id, msg);
+                return new ConnectionResult(
+                    false,
+                    msg,
+                    null,
+                    SshSessionDiagnosticFactory.CreatePreflightFailure(
+                        SshLocalizationKeys.SshErrorProxyUnsupportedOnOpenSsh,
+                        msg));
+            }
+
+            return await ConnectSshOpenSshAsync(server, settings, targetHost, targetPort, sshPort, usesTunnel, lease, ct)
                 .ConfigureAwait(false);
         }
 
@@ -1385,6 +1405,224 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
         finally
         {
             tunnelLease.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Launches native Windows OpenSSH (<c>ssh.exe</c>) inside <see cref="Heimdall.Terminal.ConPty.ConPtySession"/>
+    /// with an ephemeral owner-only ACL <c>known_hosts</c> file bridged from <see cref="_hostKeyStore"/>.
+    /// </summary>
+    private async Task<ConnectionResult> ConnectSshOpenSshAsync(
+        ServerProfileDto server,
+        AppSettings settings,
+        string targetHost,
+        int targetPort,
+        int logicalSshPort,
+        bool usesTunnel,
+        TunnelLease tunnelLease,
+        CancellationToken ct)
+    {
+        if (!string.IsNullOrWhiteSpace(server.SshUsername)
+            && !InputValidator.Validate(server.SshUsername.Trim(), "SshUser"))
+        {
+            string msg = _localizer[SshLocalizationKeys.ErrorInvalidSshUsername];
+            _connectionSm.SetError(server.Id, msg);
+            return new ConnectionResult(
+                false,
+                msg,
+                null,
+                SshSessionDiagnosticFactory.CreatePreflightFailure(SshLocalizationKeys.ErrorInvalidSshUsername, msg));
+        }
+
+        if (!InputValidator.IsValidSshHost(targetHost))
+        {
+            string msg = _localizer[SshLocalizationKeys.ErrorInvalidTargetHost];
+            _connectionSm.SetError(server.Id, msg);
+            return new ConnectionResult(
+                false,
+                msg,
+                null,
+                SshSessionDiagnosticFactory.CreatePreflightFailure(SshLocalizationKeys.ErrorInvalidTargetHost, msg));
+        }
+
+        if (!InputValidator.ValidatePortRange(targetPort))
+        {
+            string msg = _localizer[SshLocalizationKeys.ErrorInvalidTargetPort];
+            _connectionSm.SetError(server.Id, msg);
+            return new ConnectionResult(
+                false,
+                msg,
+                null,
+                SshSessionDiagnosticFactory.CreatePreflightFailure(SshLocalizationKeys.ErrorInvalidTargetPort, msg));
+        }
+
+        if (!TryValidateKeyPath(server.SshKeyPath, out SshKeyPathValidationError keyPathError))
+        {
+            string keyPathMessage = LocalizeKeyPathError(keyPathError, server.SshKeyPath);
+            _connectionSm.SetError(server.Id, keyPathMessage);
+            return new ConnectionResult(
+                false,
+                keyPathMessage,
+                null,
+                SshSessionDiagnosticFactory.CreatePreflightFailure(SshLocalizationKeys.ErrorConnectionFailed, keyPathMessage));
+        }
+
+        string? sshExePath = OpenSshClientLocator.ResolveExecutablePath(settings.OpenSshPath);
+        if (string.IsNullOrWhiteSpace(sshExePath) || !File.Exists(sshExePath))
+        {
+            string msg = _localizer[SshLocalizationKeys.ErrorOpenSshNotFound];
+            _connectionSm.SetError(server.Id, msg);
+            return new ConnectionResult(
+                false,
+                msg,
+                null,
+                SshSessionDiagnosticFactory.CreatePreflightFailure(SshLocalizationKeys.ErrorOpenSshNotFound, msg));
+        }
+
+        if (!Heimdall.Terminal.ConPty.ConPtySession.IsAvailable)
+        {
+            string msg = _localizer[SshLocalizationKeys.ErrorOpenSshConPtyUnavailable];
+            _connectionSm.SetError(server.Id, msg);
+            return new ConnectionResult(
+                false,
+                msg,
+                null,
+                SshSessionDiagnosticFactory.CreatePreflightFailure(SshLocalizationKeys.ErrorOpenSshConPtyUnavailable, msg));
+        }
+
+        string logicalHost = usesTunnel ? server.RemoteServer : targetHost;
+        int logicalPort = usesTunnel ? logicalSshPort : targetPort;
+        HostKeyEntry? storedEntry = _hostKeyTrustService.GetEffectiveEntry(logicalHost, logicalPort);
+        if (storedEntry is not null && _hostKeyTrustService.IsRevoked(logicalHost, logicalPort, storedEntry.Fingerprint))
+        {
+            string msg = _localizer.Format(SshLocalizationKeys.ErrorSshHostKeyRevoked, logicalHost, logicalPort);
+            _connectionSm.SetError(server.Id, msg);
+            return new ConnectionResult(
+                false,
+                msg,
+                null,
+                SshSessionDiagnosticFactory.CreateHostKeyRevokedFailure(storedEntry.Fingerprint, logicalHost, logicalPort));
+        }
+
+        SshStartupTrustGate.Decision? startupTrustDecision = SshStartupTrustGate.Take(server);
+        bool allowStartupExecution = startupTrustDecision is not null
+            ? startupTrustDecision.Approved
+            : !SharedSessionIds.IsSharedProfile(server) && server.ExecutionConfirmed;
+
+        bool x11Forwarding = await ResolveX11ForwardingAsync(server).ConfigureAwait(false);
+        SshCryptoPolicy effectivePolicy = SshCryptoPolicyResolver.Resolve(server.SshCryptoPolicy, settings.SshCryptoPolicy);
+        bool hasStartupCommandOrEnv = !string.IsNullOrWhiteSpace(server.SshStartupCommand)
+            || server.SshEnvironmentVariables is { Count: > 0 };
+
+        SshCapabilityNotice? capabilityNotice = SshCapabilityScope.Evaluate(
+            SshResolvedPath.NativeOpenSsh,
+            x11Forwarding,
+            server.SshCompression,
+            effectivePolicy,
+            hasStartupCommandOrEnv);
+        if (capabilityNotice is not null)
+        {
+            SetStatusText?.Invoke(_localizer[capabilityNotice.StatusLocalizationKey]);
+        }
+
+        Heimdall.Terminal.ConPty.ConPtySession terminalSession = new();
+        OpenSshEphemeralKnownHosts? knownHosts = null;
+        try
+        {
+            knownHosts = OpenSshEphemeralKnownHosts.Create(
+                _hostKeyStore,
+                targetHost,
+                targetPort,
+                logicalHost: usesTunnel ? server.RemoteServer : null,
+                logicalPort: usesTunnel ? logicalSshPort : null);
+
+            OpenSshLaunchSpec spec = new()
+            {
+                Host = targetHost,
+                Port = targetPort,
+                Username = string.IsNullOrWhiteSpace(server.SshUsername) ? null : server.SshUsername.Trim(),
+                EphemeralKnownHostsPath = knownHosts.FilePath,
+                StrictKnownHostOnly = knownHosts.TargetHostPinned,
+                KeyPath = string.IsNullOrWhiteSpace(server.SshKeyPath) ? null : server.SshKeyPath.Trim(),
+                CertificatePath = string.IsNullOrWhiteSpace(server.SshCertificatePath) ? null : server.SshCertificatePath.Trim(),
+                AgentForwarding = server.SshAgentForwarding,
+                X11Forwarding = x11Forwarding,
+                Compression = server.SshCompression,
+                CryptoPolicy = effectivePolicy,
+                LocalForwards = server.SshLocalForwards,
+                SocksProxyPort = server.SocksProxyPort,
+                RemoteBindPort = server.RemoteBindPort,
+                RemoteLocalPort = server.RemoteLocalPort,
+                AllowStartupExecution = allowStartupExecution,
+                StartupCommand = server.SshStartupCommand,
+                EnvironmentVariables = server.SshEnvironmentVariables,
+                ServerAliveIntervalSeconds = settings.SshKeepAliveIntervalSeconds
+            };
+
+            IReadOnlyList<string> args = OpenSshLaunchBuilder.BuildArguments(spec);
+            string commandLine = OpenSshLaunchBuilder.JoinWindowsCommandLine(args);
+
+            if (x11Forwarding)
+            {
+                terminalSession.EnvironmentVariables = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["DISPLAY"] = "127.0.0.1:0.0"
+                };
+            }
+
+            TerminalSize initialSize = await ResolveInitialTerminalSizeForAsync(
+                    server,
+                    TimeSpan.FromMilliseconds(Math.Max(0, settings.PlinkInitialSizeWaitMs)),
+                    ct)
+                .ConfigureAwait(false);
+
+            OpenSshEphemeralKnownHosts pinnedKnownHosts = knownHosts;
+            terminalSession.ProcessExited += _ => pinnedKnownHosts.Dispose();
+
+            await terminalSession.StartAsync(
+                    sshExePath,
+                    commandLine,
+                    initialSize.Columns,
+                    initialSize.Rows,
+                    cancellationToken: ct)
+                .ConfigureAwait(false);
+
+            Core.Logging.FileLogger.Info($"Native OpenSSH ConPTY session started: PID={terminalSession.ProcessId}");
+            _connectionSm.TryTransition(server.Id, ConnectionState.Connected);
+            tunnelLease.Transfer();
+            string? certWarning = SshCertificateWarningHelper
+                .EvaluateServerAndGateways(server, settings, _localizer)
+                .WarningMessage;
+
+            return new ConnectionResult(
+                true,
+                null,
+                new TerminalSessionResult(
+                    terminalSession,
+                    BuildDisplayEndpoint(server),
+                    server.SessionLoggingOverride)
+                {
+                    CredentialFreeLaunch = string.IsNullOrWhiteSpace(server.SshKeyPath),
+                },
+                Warning: certWarning);
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            terminalSession.Dispose();
+            knownHosts?.Dispose();
+            throw;
+        }
+        catch (Exception ex)
+        {
+            terminalSession.Dispose();
+            knownHosts?.Dispose();
+            Core.Logging.FileLogger.Error("Native OpenSSH ConPTY launch failed", ex);
+            _connectionSm.SetError(server.Id, ex.Message);
+            return new ConnectionResult(
+                false,
+                ex.Message,
+                null,
+                SshSessionDiagnosticFactory.CreatePipeModeFailure(ex.Message));
         }
     }
 }

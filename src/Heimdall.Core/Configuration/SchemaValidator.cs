@@ -41,6 +41,11 @@ public static partial class SchemaValidator
         "External", "Embedded"
     };
 
+    private static readonly HashSet<string> ValidSshModes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "External", "Embedded", "OpenSsh"
+    };
+
     private static readonly HashSet<string> ValidAspectRatios = new(StringComparer.OrdinalIgnoreCase)
     {
         "Stretch", "Auto", "16:9", "4:3", "21:9"
@@ -70,9 +75,9 @@ public static partial class SchemaValidator
             errors.Add($"{nameof(settings.PowerShellExecutionPolicy)}: unknown policy '{settings.PowerShellExecutionPolicy}'.");
         }
 
-        if (!ValidModes.Contains(settings.SshDefaultMode))
+        if (!ValidSshModes.Contains(settings.SshDefaultMode))
         {
-            errors.Add($"{nameof(settings.SshDefaultMode)}: must be 'External' or 'Embedded'.");
+            errors.Add($"{nameof(settings.SshDefaultMode)}: must be 'Embedded', 'External', or 'OpenSsh'.");
         }
 
         if (!ValidModes.Contains(settings.RdpDefaultMode))
@@ -181,9 +186,9 @@ public static partial class SchemaValidator
                 $"{nameof(server.ConnectionType)}: unsupported type '{server.ConnectionType}'.");
         }
 
-        if (!ValidModes.Contains(server.SshMode))
+        if (!ValidSshModes.Contains(server.SshMode))
         {
-            errors.Add($"{nameof(server.SshMode)}: must be 'External' or 'Embedded'.");
+            errors.Add($"{nameof(server.SshMode)}: must be 'Embedded', 'External', or 'OpenSsh'.");
         }
 
         if (!ValidModes.Contains(server.RdpMode))

@@ -7143,5 +7143,15 @@
   "StatusSshPlinkStartupCommandUnavailable": "Plink/PuTTY cannot run SSH startup commands or SetEnv variables. The connection will continue without them.",
   "StatusSshPlinkStrictCryptoAndStartupUnavailable": "Plink/PuTTY cannot enforce strict cryptography or run SSH startup commands/SetEnv. The connection will continue with transport defaults.",
   "SshCertWarningNotYetValid": "SSH user certificate is not valid yet (valid from {0}).",
-  "CastPlayerLoading": "Loading recording..."
+  "CastPlayerLoading": "Loading recording...",
+  "SettingsLabelOpenSshPath": "OpenSSH client path (ssh.exe)",
+  "SettingsOpenSshPathHint": "Leave empty to auto-detect Windows OpenSSH (System32\\OpenSSH\\ssh.exe or PATH). Used when SSH mode is set to Native OpenSSH.",
+  "A11yBrowseOpenSshPath": "Browse for ssh.exe executable",
+  "BrowseOpenSshTitle": "Select ssh.exe",
+  "BrowseOpenSshFilter": "OpenSSH Client (ssh.exe)|ssh.exe|All Executables (*.exe)|*.exe",
+  "SettingsSshModeOpenSsh": "Native OpenSSH",
+  "ServerDialogModeOpenSsh": "Native OpenSSH",
+  "ErrorOpenSshNotFound": "Native OpenSSH client (ssh.exe) was not found. Install Windows OpenSSH Client or configure its path in Settings.",
+  "SshErrorProxyUnsupportedOnOpenSsh": "Native OpenSSH mode cannot enforce direct HTTP/SOCKS outbound proxy settings without an SSH gateway. Use Embedded mode or route through an SSH gateway.",
+  "ErrorOpenSshConPtyUnavailable": "Windows ConPTY is unavailable on this host, so Native OpenSSH cannot run embedded."
 }

@@ -2341,7 +2341,7 @@ public partial class ServerDialogViewModel : ObservableValidator
     public bool RequiresSshUsername =>
         !_credentialProviderSuppliesUsername
         && (IsSftpConnection
-            || (IsSshConnection && !string.Equals(SshMode, "External", StringComparison.OrdinalIgnoreCase)));
+            || (IsSshConnection && string.Equals(SshMode, "Embedded", StringComparison.OrdinalIgnoreCase)));
 
     /// <summary>
     /// The username label, carrying the required marker only when it is true.

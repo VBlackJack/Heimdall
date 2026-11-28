@@ -724,6 +724,7 @@ public partial class ServerDialog : Window
         DlgSrv_SshModeLabel.Text = _localizer["ServerDialogLabelSshMode"];
         DlgSrv_SshModeEmbedded.Content = _localizer["ServerDialogModeEmbedded"];
         DlgSrv_SshModeExternal.Content = _localizer["ServerDialogModeExternal"];
+        DlgSrv_SshModeOpenSsh.Content = _localizer["ServerDialogModeOpenSsh"];
         DlgSrv_SshCompressionCb.Content = _localizer["ServerDialogSshCompression"];
         DlgSrv_SshAgentFwdCb.Content = _localizer["ServerDialogSshAgentForward"];
         DlgSrv_SshX11Cb.Content = _localizer["ServerDialogSshX11"];

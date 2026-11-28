@@ -2105,6 +2105,7 @@
                                                       Style="{StaticResource DialogFormComboBoxStyle}">
                                                 <ComboBoxItem x:Name="DlgSrv_SshModeEmbedded" Content="" Tag="Embedded"/>
                                                 <ComboBoxItem x:Name="DlgSrv_SshModeExternal" Content="" Tag="External"/>
+                                                <ComboBoxItem x:Name="DlgSrv_SshModeOpenSsh" Content="" Tag="OpenSsh"/>
                                             </ComboBox>
                                         </Grid>
                                         <Grid Margin="0,10,0,0">

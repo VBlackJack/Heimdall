@@ -3602,6 +3602,24 @@ public partial class MainWindow : Window, IContextMenuCallbacks, ISessionTabCont
             vm.Settings.PuttyPath = dlg.FileName;
     }
 
+    private void OnBrowseOpenSshPathClick(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is not MainViewModel vm) return;
+        var dlg = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = vm.Localize("BrowseOpenSshTitle"),
+            Filter = vm.Localize("BrowseOpenSshFilter")
+        };
+        if (!string.IsNullOrEmpty(vm.Settings.OpenSshPath))
+        {
+            var dir = System.IO.Path.GetDirectoryName(vm.Settings.OpenSshPath);
+            if (!string.IsNullOrEmpty(dir) && System.IO.Directory.Exists(dir))
+                dlg.InitialDirectory = dir;
+        }
+        if (dlg.ShowDialog(this) == true)
+            vm.Settings.OpenSshPath = dlg.FileName;
+    }
+
     private void OnBrowseX11PathClick(object sender, RoutedEventArgs e)
     {
         if (DataContext is not MainViewModel vm) return;

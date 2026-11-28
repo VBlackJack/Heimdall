@@ -47,8 +47,9 @@ internal sealed partial class SshHandler
             return (null, null);
         }
 
-        // An external PuTTY has no way to be told which agent key to use.
-        if (string.Equals(server.SshMode, "External", StringComparison.OrdinalIgnoreCase))
+        // Neither external PuTTY nor native OpenSSH can be pinned to a specific agent key fingerprint.
+        if (string.Equals(server.SshMode, "External", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(server.SshMode, "OpenSsh", StringComparison.OrdinalIgnoreCase))
         {
             return (RefuseAgentKey(server, SshAgentKeyRefusal.LauncherUnsupported, fingerprint), null);
         }

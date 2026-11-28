@@ -31,7 +31,10 @@ internal enum SshResolvedPath
     ExternalPutty,
 
     /// <summary>An interactive Plink process connected through pipes.</summary>
-    PlinkPipe
+    PlinkPipe,
+
+    /// <summary>Native Windows OpenSSH (<c>ssh.exe</c>) running inside ConPTY.</summary>
+    NativeOpenSsh
 }
 
 /// <summary>
@@ -107,6 +110,7 @@ internal static class SshCapabilityScope
             SshResolvedPath.Direct => false,
             SshResolvedPath.ExternalPutty => true,
             SshResolvedPath.PlinkPipe => true,
+            SshResolvedPath.NativeOpenSsh => true,
             _ => throw new ArgumentOutOfRangeException(nameof(path), path, "Unknown SSH resolved path.")
         };
     }
@@ -122,6 +126,13 @@ internal static class SshCapabilityScope
         SshCryptoPolicy cryptoPolicy = SshCryptoPolicy.Standard,
         bool hasStartupCommandOrEnv = false)
     {
+        if (path == SshResolvedPath.NativeOpenSsh)
+        {
+            // Native OpenSSH honors X11 forwarding (-X), compression (-C), StrictModern
+            // algorithm options (-o), and startup command / SetEnv directly.
+            return null;
+        }
+
         if (SupportsForwarding(path))
         {
             SshUnavailableCapability externalUnavailable = 0;
