@@ -53,7 +53,7 @@ public sealed class SshConnectionFactoryProxyTests
     }
 
     [Fact]
-    public void BuildConnectionInfo_IgnoresIncompleteOrDisabledProxyConfiguration()
+    public void BuildConnectionInfo_IgnoresDisabledProxyAndFailsClosedOnIncompleteEnabledProxy()
     {
         var noProxy = new SshConnectionParams
         {
@@ -80,10 +80,25 @@ public sealed class SshConnectionFactoryProxyTests
             ProxyHost = "proxy.corp.test",
             ProxyPort = 0
         };
-        ConnectionInfo infoBad = SshConnectionFactory.BuildConnectionInfo(
-            badPort,
-            [new PasswordAuthenticationMethod("ops", "pw")]);
-        Assert.Equal(ProxyTypes.None, infoBad.ProxyType);
+        Assert.Throws<ArgumentException>(() =>
+            SshConnectionFactory.BuildConnectionInfo(
+                badPort,
+                [new PasswordAuthenticationMethod("ops", "pw")]));
+
+        var missingHost = new SshConnectionParams
+        {
+            Host = "ssh.internal.test",
+            Port = 22,
+            Username = "ops",
+            Password = "pw",
+            ProxyType = SshProxyType.Http,
+            ProxyHost = " ",
+            ProxyPort = 8080
+        };
+        Assert.Throws<ArgumentException>(() =>
+            SshConnectionFactory.BuildConnectionInfo(
+                missingHost,
+                [new PasswordAuthenticationMethod("ops", "pw")]));
     }
 
     [Fact]

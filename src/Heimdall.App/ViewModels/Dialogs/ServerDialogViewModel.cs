@@ -724,6 +724,14 @@ public partial class ServerDialogViewModel : ObservableValidator
 
     partial void OnSshProxyTypeSelectionChanged(string value)
     {
+        if (!_isInitializing
+            && Enum.TryParse<Heimdall.Core.Ssh.SshProxyType>(value, out var proxyType)
+            && proxyType != Heimdall.Core.Ssh.SshProxyType.None
+            && string.IsNullOrWhiteSpace(SshProxyPortText))
+        {
+            SshProxyPortText = proxyType == Heimdall.Core.Ssh.SshProxyType.Http ? "8080" : "1080";
+        }
+
         if (SshProxyError is not null)
         {
             ValidateSshProxy();
@@ -779,9 +787,8 @@ public partial class ServerDialogViewModel : ObservableValidator
         bool validHost = !string.IsNullOrEmpty(host)
             && (System.Net.IPAddress.TryParse(host, out _)
                 || Heimdall.Core.Security.InputValidator.Validate(host, "SshGateway"));
-        bool validPort = string.IsNullOrWhiteSpace(SshProxyPortText)
-            || (int.TryParse(SshProxyPortText.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out int port)
-                && port is >= 1 and <= 65535);
+        bool validPort = int.TryParse(SshProxyPortText?.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out int port)
+            && port is >= 1 and <= 65535;
 
         if (!validHost || !validPort)
         {

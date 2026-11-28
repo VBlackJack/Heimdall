@@ -196,12 +196,16 @@ public static class SshAuthorizedKeysService
             "ak=\"$HOME/.ssh/authorized_keys\" && " +
             $"if [ -L \"$ak\" ]; then echo {SymlinkRefusedMarker}; exit 1; fi && " +
             "touch \"$ak\" && chmod 600 \"$ak\" && " +
-            $"(grep -Fq -- \"$key_id\" \"$ak\" && echo {KeyExistsMarker} || " +
+            $"((grep -Ev '^[[:space:]]*(#|$)' \"$ak\" | grep -Fq -- \"$key_id\") && echo {KeyExistsMarker} || " +
             $"((! [ -s \"$ak\" ] || [ -z \"$(tail -c 1 \"$ak\")\" ] || printf '\\n' >> \"$ak\") && " +
             $"printf '%s\\n' \"$key\" >> \"$ak\" && echo {KeyAddedMarker}))";
     }
 
-    internal static string BuildRemoveKeyCommand(string keyType, string keyBase64, bool allowRemoveLastKey)
+    internal static string BuildRemoveKeyCommand(
+        string keyType,
+        string keyBase64,
+        bool allowRemoveLastKey,
+        string? exactRawLine = null)
     {
         if (string.IsNullOrWhiteSpace(keyType)
             || !SupportedKeyTypes.Contains(keyType)
@@ -216,16 +220,28 @@ public static class SshAuthorizedKeysService
 
         string emptyCheck = allowRemoveLastKey
             ? "true"
-            : "[ -s \"$tmp\" ]";
+            : "grep -Eq '^[[:space:]]*[^[:space:]#]' \"$tmp\"";
+
+        string trimmedExact = exactRawLine?.Trim() ?? string.Empty;
+        bool useExactLine = !string.IsNullOrEmpty(trimmedExact)
+            && !trimmedExact.Contains('\n')
+            && !trimmedExact.Contains('\r');
+
+        string filterAssign = useExactLine
+            ? $"exact_line=$(printf '%s' '{Convert.ToBase64String(Encoding.UTF8.GetBytes(trimmedExact))}' | base64 -d) && "
+            : $"key_id=$(printf '%s' '{identityB64}' | base64 -d) && ";
+        string filterCmd = useExactLine
+            ? "(grep -Fvx -- \"$exact_line\" \"$ak\" > \"$tmp\"; rc=$?; [ \"$rc\" -le 1 ])"
+            : "(grep -Fv -- \"$key_id\" \"$ak\" > \"$tmp\"; rc=$?; [ \"$rc\" -le 1 ])";
 
         return
-            $"key_id=$(printf '%s' '{identityB64}' | base64 -d) && " +
+            filterAssign +
             "ak=\"$HOME/.ssh/authorized_keys\" && " +
             $"if [ -L \"$ak\" ]; then echo {SymlinkRefusedMarker}; exit 1; fi && " +
             "[ -f \"$ak\" ] && " +
             "tmp=$(mktemp \"$HOME/.ssh/.authorized_keys.heimdall.XXXXXX\") && " +
             "if chmod 600 \"$tmp\" && " +
-            "(grep -Fv -- \"$key_id\" \"$ak\" > \"$tmp\"; rc=$?; [ \"$rc\" -le 1 ]); then " +
+            $"{filterCmd}; then " +
             $"if {emptyCheck}; then " +
             $"(mv -f \"$tmp\" \"$ak\" && chmod 600 \"$ak\" && echo {KeyRemovedMarker}) || {{ rm -f \"$tmp\"; exit 1; }}; " +
             $"else rm -f \"$tmp\"; echo {LastKeyRefusedMarker}; exit 1; fi; " +
@@ -368,7 +384,8 @@ public static class SshAuthorizedKeysService
         bool allowRemoveLastKey,
         HostKeyStore hostKeyStore,
         IHostKeyVerifier verifier,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        string? exactRawLine = null)
     {
         ArgumentNullException.ThrowIfNull(connParams);
         ArgumentNullException.ThrowIfNull(hostKeyStore);
@@ -377,7 +394,7 @@ public static class SshAuthorizedKeysService
         string commandText;
         try
         {
-            commandText = BuildRemoveKeyCommand(keyType, keyBase64, allowRemoveLastKey);
+            commandText = BuildRemoveKeyCommand(keyType, keyBase64, allowRemoveLastKey, exactRawLine);
         }
         catch (Exception ex) when (ex is ArgumentException or FormatException)
         {

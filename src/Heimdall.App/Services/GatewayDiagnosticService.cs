@@ -16,6 +16,7 @@
 
 using Heimdall.App.ViewModels.Dialogs;
 using Heimdall.Core.Configuration;
+using Heimdall.Core.Localization;
 using Heimdall.Core.Security;
 using Heimdall.Core.Ssh;
 using Heimdall.Ssh;
@@ -25,19 +26,82 @@ namespace Heimdall.App.Services;
 /// <summary>Adapts the dialog snapshot to isolated, pinned diagnostics without saving configuration.</summary>
 internal static class GatewayDiagnosticService
 {
-    public static void Configure(GatewayDialogViewModel viewModel, AppSettings settings, IHostKeyTrustService trust)
+    public static void Configure(
+        GatewayDialogViewModel viewModel,
+        AppSettings settings,
+        IHostKeyTrustService trust,
+        LocalizationManager? localizer = null)
     {
         viewModel.ConfigureDiagnostics(settings.SshGateways, (route, host, port, progress, ct) =>
             Task.Run(async () =>
             {
                 // Authentication material is prepared off the dispatcher and never enters report models.
-                List<SshConnectionParams> chain = GatewayChainResolver.ToConnectionParams(
-                    route, CredentialProtector.Unprotect, settings.SshAgentPreference);
+                List<SshConnectionParams> chain = BuildChainParams(route, settings, localizer, ct);
                 return await GatewayRouteDiagnostic.RunAsync(chain,
                     hop => trust.GetEffectiveEntry(hop.Host, hop.Port)?.Fingerprint,
                     ResolveStepTimeout(chain),
-                    host, port, progress, ct).ConfigureAwait(false);
+                    host, port, progress, ct,
+                    isRevoked: (hop, pin) => trust.IsRevoked(hop.Host, hop.Port, pin)).ConfigureAwait(false);
             }, ct));
+    }
+
+    internal static List<SshConnectionParams> BuildChainParams(
+        IReadOnlyList<SshGatewayDto> route,
+        AppSettings settings,
+        LocalizationManager? localizer,
+        CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(route);
+        ArgumentNullException.ThrowIfNull(settings);
+
+        List<SshConnectionParams> rawChain = GatewayChainResolver.ToConnectionParams(
+            route,
+            CredentialProtector.Unprotect,
+            settings.SshAgentPreference,
+            settings.SshCryptoPolicy);
+
+        Action<ISshAgentKey> beforeAgentSign = SshAgentSignConfirmHelper.BuildBeforeSignNotification(
+            localizer,
+            reportStatus: null);
+
+        return rawChain.Select(hop => new SshConnectionParams
+        {
+            Host = hop.Host,
+            Port = hop.Port,
+            LogicalHost = hop.LogicalHost,
+            LogicalPort = hop.LogicalPort,
+            Username = hop.Username,
+            KeyPath = hop.KeyPath,
+            CertificatePath = hop.CertificatePath,
+            Password = hop.Password,
+            KeyPassphrase = hop.KeyPassphrase,
+            UseLegacyPasswordAsKeyPassphrase = hop.UseLegacyPasswordAsKeyPassphrase,
+            LegacyCredentialName = hop.LegacyCredentialName,
+            SshAgentPreference = hop.SshAgentPreference,
+            AgentKeyFingerprint = hop.AgentKeyFingerprint,
+            DisableAgentAuthentication = hop.DisableAgentAuthentication,
+            OnBeforeAgentSign = beforeAgentSign,
+            ConfirmAgentSign = SshAgentSignConfirmHelper.BuildConfirmCallback(
+                settings,
+                hop.HostKeyVerificationHost,
+                hop.HostKeyVerificationPort,
+                localizer,
+                ct),
+            AgentForwarding = hop.AgentForwarding,
+            Compression = hop.Compression,
+            CryptoPolicy = hop.CryptoPolicy,
+            ProxyType = hop.ProxyType,
+            ProxyHost = hop.ProxyHost,
+            ProxyPort = hop.ProxyPort,
+            ProxyUsername = hop.ProxyUsername,
+            ProxyPassword = hop.ProxyPassword,
+            X11Forwarding = hop.X11Forwarding,
+            ConnectTimeout = hop.ConnectTimeout,
+            AuthenticationTimeout = hop.AuthenticationTimeout,
+            KeepAliveIntervalSeconds = hop.KeepAliveIntervalSeconds,
+            KeyboardInteractive = hop.KeyboardInteractive,
+            KeyboardInteractiveResponder = hop.KeyboardInteractiveResponder
+        }).ToList();
     }
 
     /// <summary>

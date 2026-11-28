@@ -342,6 +342,47 @@ public sealed class PlinkFailClosedTests
         }
     }
 
+    [Fact]
+    public async Task TunnelService_PlinkFallback_FailsClosed_WhenGatewayHasOutboundProxy()
+    {
+        var probe = new FakeProbe(Presentation("SHA256:should-not-probe"));
+        using var tunnelManager = new TunnelManager();
+        var trust = new FakeHostKeyTrustService();
+        var localizer = await CreateLocalizerAsync();
+        var service = new TunnelService(
+            tunnelManager,
+            new HostKeyStore(),
+            trust,
+            new ConnectionStateMachine(),
+            localizer,
+            RejectingHostKeyVerifier.Instance,
+            probe);
+
+        var result = await service.EstablishPlinkTunnelAsync(
+            "server-1",
+            new SshConnectionParams
+            {
+                Host = "gateway.local",
+                Port = 22,
+                Username = "user",
+                ProxyType = SshProxyType.Socks5,
+                ProxyHost = "proxy.corp.local",
+                ProxyPort = 1080
+            },
+            "10.0.0.5",
+            3389,
+            50123,
+            new AppSettings(),
+            "gw-key",
+            CancellationToken.None,
+            gatewayRoute: "Paris datacentre");
+
+        Assert.False(result.Success);
+        Assert.Equal(SshFailureCode.ForwardingFailed, result.FailureCode);
+        Assert.Equal(0, probe.CallCount);
+        Assert.Empty(tunnelManager.GetActiveTunnels());
+    }
+
     private static Task<PlinkHostKeyDecision> DecideAsync(
         string? storedFingerprint,
         IPlinkHostKeyProbe probe,

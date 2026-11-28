@@ -233,6 +233,39 @@ public sealed class ToolGatewayConnectorSecurityTests : IDisposable
         Assert.False(string.IsNullOrWhiteSpace(entry.ErrorMessage));
     }
 
+    [Fact]
+    public async Task RunFleetAuditAsync_DirectOutboundProxy_FailsClosedWithoutDirectProbe()
+    {
+        bool probeCalled = false;
+        using var vm = new SshServerAuditViewModel((_, _, _, _) =>
+        {
+            probeCalled = true;
+            throw new InvalidOperationException("Direct probe must not run when outbound proxy is configured.");
+        });
+
+        var servers = new List<ServerProfileDto>
+        {
+            new()
+            {
+                Id = "srv-proxy-direct",
+                DisplayName = "Proxied Host",
+                RemoteServer = "10.20.30.50",
+                ConnectionType = "SSH",
+                SshProxyType = Heimdall.Core.Ssh.SshProxyType.Socks5,
+                SshProxyHost = "proxy.corp.local",
+                SshProxyPort = 1080
+            }
+        };
+        var settings = new AppSettings();
+
+        await vm.RunFleetAuditAsync(servers, settings);
+
+        Assert.False(probeCalled);
+        var entry = Assert.Single(vm.FleetResults);
+        Assert.Null(entry.Report);
+        Assert.False(string.IsNullOrWhiteSpace(entry.ErrorMessage));
+    }
+
     private sealed class CapturingCredentialProvider : ICredentialProvider
     {
         public string Name => "Stub";

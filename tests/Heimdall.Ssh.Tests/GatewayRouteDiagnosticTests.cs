@@ -174,6 +174,63 @@ public sealed class GatewayRouteDiagnosticTests
     private static Task<IReadOnlyList<GatewayDiagnosticStep>> Run(FakeSession session, string? target = null) =>
         GatewayRouteDiagnostic.RunAsync(Chain, _ => "pin", TestTimeout, target, 443, null, default, () => session);
 
+    [Fact]
+    public async Task RevokedPin_StopsBeforeConnectingAffectedHopWithHostKeyRevoked()
+    {
+        FakeSession session = new();
+        IReadOnlyList<GatewayDiagnosticStep> result = await GatewayRouteDiagnostic.RunAsync(
+            Chain,
+            _ => "SHA256:revoked",
+            TestTimeout,
+            null,
+            0,
+            null,
+            default,
+            () => session,
+            isRevoked: (hop, _) => hop.Host == "child.invalid");
+
+        Assert.Equal(new[] { "root.invalid" }, session.Visited);
+        Assert.Equal(SshFailureCode.HostKeyRevoked, result[^1].Failure);
+        Assert.Equal(2, result[^1].Hop);
+        Assert.True(session.Disposed);
+    }
+
+    [Fact]
+    public void SshGatewayDiagnosticSession_BuildLoopbackHopParams_PreservesAllSecurityFields()
+    {
+        Action<Heimdall.Core.Ssh.ISshAgentKey> beforeSign = _ => { };
+        Func<Heimdall.Core.Ssh.ISshAgentKey, bool> confirmSign = _ => true;
+        var source = new SshConnectionParams
+        {
+            Host = "hop2.internal",
+            Port = 2222,
+            Username = "ops",
+            CertificatePath = @"C:\certs\hop2-cert.pub",
+            CryptoPolicy = Heimdall.Core.Ssh.SshCryptoPolicy.StrictModern,
+            AgentKeyFingerprint = "SHA256:keyfp",
+            DisableAgentAuthentication = true,
+            OnBeforeAgentSign = beforeSign,
+            ConfirmAgentSign = confirmSign,
+            Compression = true,
+            AuthenticationTimeout = TimeSpan.FromSeconds(45)
+        };
+
+        SshConnectionParams dial = SshGatewayDiagnosticSession.BuildLoopbackHopParams(source, 45678);
+
+        Assert.Equal(LoopbackBinding.DefaultHost, dial.Host);
+        Assert.Equal(45678, dial.Port);
+        Assert.Equal("hop2.internal", dial.LogicalHost);
+        Assert.Equal(2222, dial.LogicalPort);
+        Assert.Equal(@"C:\certs\hop2-cert.pub", dial.CertificatePath);
+        Assert.Equal(Heimdall.Core.Ssh.SshCryptoPolicy.StrictModern, dial.CryptoPolicy);
+        Assert.Equal("SHA256:keyfp", dial.AgentKeyFingerprint);
+        Assert.True(dial.DisableAgentAuthentication);
+        Assert.Same(beforeSign, dial.OnBeforeAgentSign);
+        Assert.Same(confirmSign, dial.ConfirmAgentSign);
+        Assert.True(dial.Compression);
+        Assert.Equal(TimeSpan.FromSeconds(45), dial.AuthenticationTimeout);
+    }
+
     private sealed class FakeSession : IGatewayDiagnosticSession
     {
         public List<string> Visited { get; } = [];

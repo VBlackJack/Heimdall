@@ -7134,5 +7134,10 @@
   "CastPlayerErrorMissingHeader": "Missing asciinema header line.",
   "CastPlayerErrorInvalidHeader": "Invalid asciinema header.",
   "CastPlayerErrorUnsupportedVersion": "Only asciinema v2 (.cast) recordings are supported.",
-  "CastPlayerErrorReadFailed": "Unable to read recording file."
+  "CastPlayerErrorReadFailed": "Unable to read recording file.",
+  "SshErrorProxyUnsupportedOnPlink": "Plink does not support direct outbound SSH proxy settings (HTTP CONNECT / SOCKS). Use the built-in SSH client or connect through an SSH gateway.",
+  "SshErrorProxyUnsupportedOnPutty": "External PuTTY launches cannot enforce Heimdall's outbound SSH proxy settings. Use the built-in SSH client or an SSH gateway.",
+  "TunnelErrorProxyUnsupportedOnPlink": "Plink tunnel fallback cannot route through an outbound proxy configured on the gateway. Fix authentication for the built-in SSH client.",
+  "ToolSshServerAuditProxyNotSupportedDirect": "Direct outbound proxy auditing without an SSH gateway is unsupported (probe refused to avoid bypassing the proxy).",
+  "GatewayDiagnosticTrustRevoked": "Revoked host key detected. Connection blocked by local trust policy."
 }

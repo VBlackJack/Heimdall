@@ -203,6 +203,7 @@ public partial class GatewayDialogViewModel
     {
         SshFailureCode.HostKeyUnavailable => "GatewayDiagnosticTrustRequired",
         SshFailureCode.HostKeyMismatch => "GatewayDiagnosticTrustChanged",
+        SshFailureCode.HostKeyRevoked => "GatewayDiagnosticTrustRevoked",
         SshFailureCode.NetworkTimedOut => "GatewayDiagnosticTimeout",
         SshFailureCode.NetworkRefused or SshFailureCode.NetworkUnreachable => "GatewayDiagnosticNetwork",
         SshFailureCode.ForwardingFailed => "GatewayDiagnosticForwarding",

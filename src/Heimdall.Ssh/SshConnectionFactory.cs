@@ -259,10 +259,16 @@ public static class SshConnectionFactory
 
         string effectiveUser = usernameOverride ?? connectionParams.Username;
 
-        if (connectionParams.ProxyType != SshProxyType.None
-            && !string.IsNullOrWhiteSpace(connectionParams.ProxyHost)
-            && connectionParams.ProxyPort is > 0 and <= 65535)
+        if (connectionParams.ProxyType != SshProxyType.None)
         {
+            if (string.IsNullOrWhiteSpace(connectionParams.ProxyHost)
+                || connectionParams.ProxyPort is < 1 or > 65535)
+            {
+                throw new ArgumentException(
+                    $"Outbound SSH proxy type '{connectionParams.ProxyType}' requires a valid host and port (1-65535).",
+                    nameof(connectionParams));
+            }
+
             ProxyTypes proxyType = connectionParams.ProxyType switch
             {
                 SshProxyType.Http => ProxyTypes.Http,
@@ -270,19 +276,23 @@ public static class SshConnectionFactory
                 SshProxyType.Socks4 => ProxyTypes.Socks4,
                 _ => ProxyTypes.None
             };
-            if (proxyType != ProxyTypes.None)
+            if (proxyType == ProxyTypes.None)
             {
-                return new ConnectionInfo(
-                    connectionParams.Host,
-                    connectionParams.Port,
-                    effectiveUser,
-                    proxyType,
-                    connectionParams.ProxyHost.Trim(),
-                    connectionParams.ProxyPort,
-                    connectionParams.ProxyUsername ?? string.Empty,
-                    connectionParams.ProxyPassword ?? string.Empty,
-                    authMethods);
+                throw new ArgumentException(
+                    $"Unsupported outbound SSH proxy type '{connectionParams.ProxyType}'.",
+                    nameof(connectionParams));
             }
+
+            return new ConnectionInfo(
+                connectionParams.Host,
+                connectionParams.Port,
+                effectiveUser,
+                proxyType,
+                connectionParams.ProxyHost.Trim(),
+                connectionParams.ProxyPort,
+                connectionParams.ProxyUsername ?? string.Empty,
+                connectionParams.ProxyPassword ?? string.Empty,
+                authMethods);
         }
 
         return new ConnectionInfo(
@@ -465,7 +475,8 @@ public static class SshConnectionFactory
             .ConfigureAwait(false);
 
         bool isViaGateway = !string.Equals(connectionParams.Host, verificationHost, StringComparison.OrdinalIgnoreCase)
-            || connectionParams.Port != verificationPort;
+            || connectionParams.Port != verificationPort
+            || connectionParams.ProxyType != SshProxyType.None;
 
         return await ResolvePresentedHostKeyAsync(
                 verificationHost,

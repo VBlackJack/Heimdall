@@ -106,7 +106,7 @@ public sealed class SshAgentKeyMemoryAndInspectorTests
         Assert.Contains("chmod 700", command, StringComparison.Ordinal);
         Assert.Contains("chmod 600", command, StringComparison.Ordinal);
         Assert.Contains("key_id=", command, StringComparison.Ordinal);
-        Assert.Contains("grep -Fq \"$key_id\"", command, StringComparison.Ordinal);
+        Assert.Contains("grep -Fq -- \"$key_id\"", command, StringComparison.Ordinal);
     }
 
     [Theory]

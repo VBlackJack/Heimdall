@@ -32,7 +32,7 @@ public sealed class SshKeyRotatorTests
         Assert.Contains(SshKeyRotator.SymlinkRefusedMarker, cmd, StringComparison.Ordinal);
         Assert.Contains("mktemp \"$HOME/.ssh/.authorized_keys.heimdall.XXXXXX\"", cmd, StringComparison.Ordinal);
         Assert.Contains("grep -Fv -- \"$old_id\" \"$ak\" > \"$tmp\"", cmd, StringComparison.Ordinal);
-        Assert.Contains("[ -s \"$tmp\" ] && grep -Fq -- \"$new_id\" \"$tmp\"", cmd, StringComparison.Ordinal);
+        Assert.Contains("[ -s \"$tmp\" ] && (grep -Ev '^[[:space:]]*(#|$)' \"$tmp\" | grep -Fq -- \"$new_id\")", cmd, StringComparison.Ordinal);
         Assert.Contains(SshKeyRotator.InvariantFailedMarker, cmd, StringComparison.Ordinal);
         Assert.Contains(SshKeyRotator.OldKeyRemovedMarker, cmd, StringComparison.Ordinal);
         Assert.Contains("if chmod 600 \"$tmp\" &&", cmd, StringComparison.Ordinal);

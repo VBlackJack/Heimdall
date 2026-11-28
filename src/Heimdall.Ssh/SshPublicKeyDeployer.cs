@@ -29,6 +29,7 @@ public enum SshPublicKeyDeployErrorCode
     InvalidPublicKey,
     RemoteCommandFailed,
     ConfirmationMissing,
+    SymlinkRefused,
     Exception
 }
 
@@ -52,6 +53,7 @@ public static class SshPublicKeyDeployer
 {
     internal const string MarkerAdded = "HEIMDALL_KEY_ADDED";
     internal const string MarkerExists = "HEIMDALL_KEY_EXISTS";
+    internal const string MarkerSymlinkRefused = "HEIMDALL_AK_SYMLINK";
     internal static readonly TimeSpan DefaultCommandTimeout = TimeSpan.FromSeconds(30);
 
     private static readonly HashSet<string> SupportedKeyTypes = new(StringComparer.Ordinal)
@@ -126,8 +128,10 @@ public static class SshPublicKeyDeployer
         return $"key=$(printf '%s' '{base64Payload}' | base64 -d) && " +
                $"key_id=$(printf '%s' '{base64Identity}' | base64 -d) && " +
                "mkdir -p \"$HOME/.ssh\" && chmod 700 \"$HOME/.ssh\" && " +
-               "ak=\"$HOME/.ssh/authorized_keys\" && touch \"$ak\" && chmod 600 \"$ak\" && " +
-               $"(grep -Fq \"$key_id\" \"$ak\" && echo {MarkerExists} || " +
+               "ak=\"$HOME/.ssh/authorized_keys\" && " +
+               $"if [ -L \"$ak\" ]; then echo {MarkerSymlinkRefused}; exit 1; fi && " +
+               "touch \"$ak\" && chmod 600 \"$ak\" && " +
+               $"((grep -Ev '^[[:space:]]*(#|$)' \"$ak\" | grep -Fq -- \"$key_id\") && echo {MarkerExists} || " +
                $"((! [ -s \"$ak\" ] || [ -z \"$(tail -c 1 \"$ak\")\" ] || printf '\\n' >> \"$ak\") && " +
                $"printf '%s\\n' \"$key\" >> \"$ak\" && echo {MarkerAdded}))";
     }
@@ -188,6 +192,16 @@ public static class SshPublicKeyDeployer
 
             var output = await Task<string>.Factory.FromAsync(asyncResult, cmd.EndExecute)
                 .ConfigureAwait(false);
+
+            if (output.Contains(MarkerSymlinkRefused, StringComparison.Ordinal))
+            {
+                return new SshPublicKeyDeployResult(
+                    false,
+                    false,
+                    "Remote authorized_keys is a symbolic link.",
+                    SshPublicKeyDeployErrorCode.SymlinkRefused,
+                    cmd.ExitStatus);
+            }
 
             if (cmd.ExitStatus != 0)
             {

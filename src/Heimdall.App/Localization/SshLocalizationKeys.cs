@@ -103,6 +103,10 @@ internal static class SshLocalizationKeys
     public const string StatusSshDirectX11Unavailable = "StatusSshDirectX11Unavailable";
     public const string StatusSshPlinkStrictCryptoUnavailable = "StatusSshPlinkStrictCryptoUnavailable";
     public const string StatusSshPortForwardFailed = "StatusSshPortForwardFailed";
+    public const string SshErrorProxyUnsupportedOnPlink = "SshErrorProxyUnsupportedOnPlink";
+    public const string SshErrorProxyUnsupportedOnPutty = "SshErrorProxyUnsupportedOnPutty";
+    public const string TunnelErrorProxyUnsupportedOnPlink = "TunnelErrorProxyUnsupportedOnPlink";
+    public const string ToolSshServerAuditProxyNotSupportedDirect = "ToolSshServerAuditProxyNotSupportedDirect";
     public const string X11ServerNotFound = "X11ServerNotFound";
     public const string StatusSshRetryingViaPlink = "StatusSshRetryingViaPlink";
 }

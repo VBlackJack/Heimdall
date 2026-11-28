@@ -133,4 +133,35 @@ public sealed class GatewayDialogAgentKeyTests
         Assert.Contains("127", SshPublicKeyDeployUiHelper.FormatDeployError(exit, localizer), StringComparison.Ordinal);
         Assert.NotEqual("raw", SshPublicKeyDeployUiHelper.FormatDeployError(noConfirm, localizer));
     }
+
+    [Fact]
+    public void GatewayAndServerDialogs_RequirePortWhenOutboundProxyEnabled_AndPrefillDefaultPort()
+    {
+        var gwVm = new GatewayDialogViewModel
+        {
+            Name = "Bastion",
+            Host = "bastion.example.com",
+            Port = 22,
+            User = "ops",
+            SshProxyTypeSelection = nameof(SshProxyType.Socks5),
+            SshProxyHost = "proxy.corp.local"
+        };
+        Assert.Equal("1080", gwVm.SshProxyPortText);
+        gwVm.SshProxyPortText = string.Empty;
+        gwVm.ValidateCommand.Execute(null);
+        Assert.NotNull(gwVm.SshProxyError);
+
+        var srvVm = new ServerDialogViewModel
+        {
+            DisplayName = "Target",
+            RemoteServer = "srv.internal",
+            ConnectionType = "SSH",
+            SshProxyTypeSelection = nameof(SshProxyType.Http),
+            SshProxyHost = "proxy.corp.local"
+        };
+        Assert.Equal("8080", srvVm.SshProxyPortText);
+        srvVm.SshProxyPortText = string.Empty;
+        srvVm.ValidateCommand.Execute(null);
+        Assert.NotNull(srvVm.SshProxyError);
+    }
 }

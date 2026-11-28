@@ -328,6 +328,28 @@ public sealed class ImportedProfileValidatorTests
         Assert.Contains(nameof(ServerProfileDto.RemoteServer), failure, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Validate_EnabledSshProxyWithBlankHostOrZeroPort_ReturnsErrors()
+    {
+        ServerProfileDto missingHost = CreateValidProfile();
+        missingHost.ConnectionType = "SSH";
+        missingHost.SshProxyType = Heimdall.Core.Ssh.SshProxyType.Socks5;
+        missingHost.SshProxyHost = " ";
+        missingHost.SshProxyPort = 1080;
+
+        IReadOnlyList<string> hostErrors = ImportedProfileValidator.Validate(missingHost, SupportedConnectionTypes);
+        Assert.Contains(hostErrors, e => e.Contains(nameof(ServerProfileDto.SshProxyHost), StringComparison.Ordinal));
+
+        ServerProfileDto zeroPort = CreateValidProfile();
+        zeroPort.ConnectionType = "SSH";
+        zeroPort.SshProxyType = Heimdall.Core.Ssh.SshProxyType.Http;
+        zeroPort.SshProxyHost = "proxy.example.com";
+        zeroPort.SshProxyPort = 0;
+
+        IReadOnlyList<string> portErrors = ImportedProfileValidator.Validate(zeroPort, SupportedConnectionTypes);
+        Assert.Contains(portErrors, e => e.Contains(nameof(ServerProfileDto.SshProxyPort), StringComparison.Ordinal));
+    }
+
     private static ServerProfileDto CreateValidProfile() =>
         new()
         {

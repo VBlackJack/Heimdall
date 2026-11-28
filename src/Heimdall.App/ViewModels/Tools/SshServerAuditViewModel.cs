@@ -170,6 +170,18 @@ public sealed partial class SshServerAuditViewModel : ObservableObject, IDisposa
                         return;
                     }
 
+                    if (gw is null && server.SshProxyType != Heimdall.Core.Ssh.SshProxyType.None)
+                    {
+                        ordered[index] = new SshFleetServerAuditEntry(
+                            displayName,
+                            host,
+                            port,
+                            null,
+                            null,
+                            L(Heimdall.App.Localization.SshLocalizationKeys.ToolSshServerAuditProxyNotSupportedDirect));
+                        return;
+                    }
+
                     string? gwName = gw is null ? null : (string.IsNullOrWhiteSpace(gw.Name) ? gw.Host : gw.Name);
 
                     try

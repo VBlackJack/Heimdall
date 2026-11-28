@@ -253,7 +253,8 @@ public sealed partial class SshAuthorizedKeysDialogViewModel : ObservableObject
                     allowRemoveLastKey: isLastKey,
                     hostKeyStore,
                     hostKeyVerifier,
-                    ct)
+                    ct,
+                    exactRawLine: targetEntry.RawLine)
                 .ConfigureAwait(true);
 
             if (!removeResult.Success)

@@ -713,6 +713,16 @@ public sealed class TunnelService : ITunnelService
         // without them reported success for a proxy that did not exist, and
         // registered it under a reuse identity (0, 0) that no later attempt
         // for the same profile could match.
+        if (gatewayParams.ProxyType != SshProxyType.None)
+        {
+            Core.Logging.FileLogger.Warn(
+                $"Plink fallback refused for {serverId}: gateway uses outbound proxy type {gatewayParams.ProxyType}, which Plink cannot route through.");
+            return Refuse(
+                _localizer[SshLocalizationKeys.TunnelErrorProxyUnsupportedOnPlink],
+                SshFailureCode.ForwardingFailed,
+                SshLocalizationKeys.TunnelErrorProxyUnsupportedOnPlink);
+        }
+
         if (socksProxyPort > 0 || remoteBindPort > 0)
         {
             Core.Logging.FileLogger.Warn(

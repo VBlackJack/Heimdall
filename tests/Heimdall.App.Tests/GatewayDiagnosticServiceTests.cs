@@ -60,4 +60,37 @@ public sealed class GatewayDiagnosticServiceTests
 
         Assert.Equal(slow.ConnectTimeout, step);
     }
+
+    [Fact]
+    public void BuildChainParams_PropagatesCryptoPolicyAndAgentSignConfirmAndBeforeSign()
+    {
+        AppSettings settings = new()
+        {
+            SshCryptoPolicy = Heimdall.Core.Ssh.SshCryptoPolicy.StrictModern,
+            SshConfirmAgentSigning = true,
+        };
+        SshGatewayDto gateway = new()
+        {
+            Id = "g-sec",
+            Name = "Bastion",
+            Host = "bastion.internal",
+            Port = 22,
+            User = "ops",
+            SshCertificatePath = @"C:\certs\ops-cert.pub",
+            SshAgentKeyFingerprint = "SHA256:testfp",
+        };
+
+        List<SshConnectionParams> chain = GatewayDiagnosticService.BuildChainParams(
+            [gateway],
+            settings,
+            localizer: null,
+            CancellationToken.None);
+
+        SshConnectionParams hop = Assert.Single(chain);
+        Assert.Equal(Heimdall.Core.Ssh.SshCryptoPolicy.StrictModern, hop.CryptoPolicy);
+        Assert.NotNull(hop.ConfirmAgentSign);
+        Assert.NotNull(hop.OnBeforeAgentSign);
+        Assert.Equal(@"C:\certs\ops-cert.pub", hop.CertificatePath);
+        Assert.Equal("SHA256:testfp", hop.AgentKeyFingerprint);
+    }
 }

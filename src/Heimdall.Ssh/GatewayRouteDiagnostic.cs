@@ -42,7 +42,8 @@ public static class GatewayRouteDiagnostic
         IReadOnlyList<SshConnectionParams> chain, Func<SshConnectionParams, string?> fingerprint,
         TimeSpan stepTimeout, string? targetHost, int targetPort,
         IProgress<GatewayDiagnosticStep>? progress, CancellationToken ct,
-        Func<IGatewayDiagnosticSession>? createSession = null)
+        Func<IGatewayDiagnosticSession>? createSession = null,
+        Func<SshConnectionParams, string, bool>? isRevoked = null)
     {
         ArgumentNullException.ThrowIfNull(chain);
         if (chain.Count == 0) throw new ArgumentException("A route must contain a gateway.", nameof(chain));
@@ -56,6 +57,7 @@ public static class GatewayRouteDiagnostic
             {
                 string? pin = fingerprint(hop);
                 if (string.IsNullOrWhiteSpace(pin)) return SshFailureCode.HostKeyUnavailable;
+                if (isRevoked?.Invoke(hop, pin) == true) return SshFailureCode.HostKeyRevoked;
                 await session.ConnectHopAsync(hop, pin, token).ConfigureAwait(false);
                 return null;
             }, hop).ConfigureAwait(false);

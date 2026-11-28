@@ -44,6 +44,7 @@ internal static class SshPublicKeyDeployUiHelper
         {
             SshPublicKeyDeployErrorCode.InvalidPublicKey => localizer["ToolSshKeyDeployErrInvalidKey"],
             SshPublicKeyDeployErrorCode.ConfirmationMissing => localizer["ToolSshKeyDeployErrNoConfirmation"],
+            SshPublicKeyDeployErrorCode.SymlinkRefused => localizer["SshKeyRotateErrSymlinkRefused"],
             SshPublicKeyDeployErrorCode.RemoteCommandFailed when result.ExitStatus is { } exitCode
                 && (string.IsNullOrWhiteSpace(result.ErrorMessage)
                     || result.ErrorMessage.StartsWith("Remote command exited with status ", StringComparison.Ordinal))

@@ -7134,5 +7134,10 @@
   "CastPlayerErrorMissingHeader": "En-t\u00eate asciinema manquant.",
   "CastPlayerErrorInvalidHeader": "En-t\u00eate asciinema invalide.",
   "CastPlayerErrorUnsupportedVersion": "Seuls les enregistrements asciinema v2 (.cast) sont pris en charge.",
-  "CastPlayerErrorReadFailed": "Impossible de lire le fichier d'enregistrement."
+  "CastPlayerErrorReadFailed": "Impossible de lire le fichier d'enregistrement.",
+  "SshErrorProxyUnsupportedOnPlink": "Plink ne prend pas en charge le proxy SSH sortant direct (HTTP CONNECT / SOCKS). Utilisez le client SSH int\u00e9gr\u00e9 ou passez par une passerelle SSH.",
+  "SshErrorProxyUnsupportedOnPutty": "Le lancement externe de PuTTY ne peut pas appliquer les param\u00e8tres de proxy SSH sortant de Heimdall. Utilisez le client SSH int\u00e9gr\u00e9 ou une passerelle SSH.",
+  "TunnelErrorProxyUnsupportedOnPlink": "Le repli tunnel Plink ne peut pas passer par le proxy sortant configur\u00e9 sur la passerelle. Corrigez l'authentification pour le client SSH int\u00e9gr\u00e9.",
+  "ToolSshServerAuditProxyNotSupportedDirect": "L'audit direct via proxy sortant sans passerelle SSH n'est pas pris en charge (sonde refus\u00e9e pour ne pas contourner le proxy).",
+  "GatewayDiagnosticTrustRevoked": "Cl\u00e9 d'h\u00f4te r\u00e9voqu\u00e9e d\u00e9tect\u00e9e. Connexion bloqu\u00e9e par la politique de confiance locale."
 }

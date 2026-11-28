@@ -103,7 +103,11 @@ public partial class GatewayDialog : Window
             if (services is null) return;
             IConfigManager config = services.GetRequiredService<IConfigManager>();
             AppSettings settings = await config.LoadSettingsAsync();
-            GatewayDiagnosticService.Configure(vm, settings, services.GetRequiredService<IHostKeyTrustService>());
+            GatewayDiagnosticService.Configure(
+                vm,
+                settings,
+                services.GetRequiredService<IHostKeyTrustService>(),
+                services.GetService<Heimdall.Core.Localization.LocalizationManager>());
             await LoadAgentKeysAsync(vm, settings.SshAgentPreference).ConfigureAwait(true);
         }
         catch (Exception ex)

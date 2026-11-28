@@ -55,8 +55,20 @@ public static class ImportedProfileValidator
             errors.Add(
                 $"{nameof(profile.SshProxyType)}: unsupported value '{(int)profile.SshProxyType}'.");
         }
+        else if (profile.SshProxyType != Ssh.SshProxyType.None)
+        {
+            if (string.IsNullOrWhiteSpace(profile.SshProxyHost)
+                || CanonicalizeHost(profile.SshProxyHost) is null)
+            {
+                errors.Add($"{nameof(profile.SshProxyHost)}: not a usable host '{profile.SshProxyHost}'.");
+            }
 
-        if (!string.IsNullOrWhiteSpace(profile.SshProxyHost)
+            if (profile.SshProxyPort is < MinPort or > MaxPort)
+            {
+                errors.Add($"{nameof(profile.SshProxyPort)}: must be between {MinPort} and {MaxPort} when an outbound proxy is enabled.");
+            }
+        }
+        else if (!string.IsNullOrWhiteSpace(profile.SshProxyHost)
             && CanonicalizeHost(profile.SshProxyHost) is null)
         {
             errors.Add($"{nameof(profile.SshProxyHost)}: not a usable host '{profile.SshProxyHost}'.");

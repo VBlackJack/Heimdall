@@ -40,23 +40,7 @@ internal sealed class SshGatewayDiagnosticSession : IGatewayDiagnosticSession
             _ports.Add(forward);
             _clients[^1].AddForwardedPort(forward);
             forward.Start();
-            dial = new SshConnectionParams
-            {
-                Host = LoopbackBinding.DefaultHost,
-                Port = (int)forward.BoundPort,
-                LogicalHost = hop.Host,
-                LogicalPort = hop.Port,
-                Username = hop.Username,
-                Password = hop.Password,
-                KeyPath = hop.KeyPath,
-                KeyPassphrase = hop.KeyPassphrase,
-                SshAgentPreference = hop.SshAgentPreference,
-                ConnectTimeout = hop.ConnectTimeout,
-                KeepAliveIntervalSeconds = hop.KeepAliveIntervalSeconds,
-                UseLegacyPasswordAsKeyPassphrase = hop.UseLegacyPasswordAsKeyPassphrase,
-                LegacyCredentialName = hop.LegacyCredentialName,
-                KeyboardInteractive = hop.KeyboardInteractive
-            };
+            dial = BuildLoopbackHopParams(hop, (int)forward.BoundPort);
         }
         SshClient client = SshConnectionFactory.CreateSshClient(dial);
         _clients.Add(client);
@@ -65,6 +49,36 @@ internal sealed class SshGatewayDiagnosticSession : IGatewayDiagnosticSession
             new PinnedFingerprintVerifier(hop.Host, hop.Port, fingerprint));
         await client.ConnectAsync(ct).ConfigureAwait(false);
         ct.ThrowIfCancellationRequested();
+    }
+
+    internal static SshConnectionParams BuildLoopbackHopParams(SshConnectionParams hop, int boundPort)
+    {
+        return new SshConnectionParams
+        {
+            Host = LoopbackBinding.DefaultHost,
+            Port = boundPort,
+            LogicalHost = hop.Host,
+            LogicalPort = hop.Port,
+            Username = hop.Username,
+            KeyPath = hop.KeyPath,
+            CertificatePath = hop.CertificatePath,
+            Password = hop.Password,
+            KeyPassphrase = hop.KeyPassphrase,
+            UseLegacyPasswordAsKeyPassphrase = hop.UseLegacyPasswordAsKeyPassphrase,
+            LegacyCredentialName = hop.LegacyCredentialName,
+            SshAgentPreference = hop.SshAgentPreference,
+            AgentKeyFingerprint = hop.AgentKeyFingerprint,
+            DisableAgentAuthentication = hop.DisableAgentAuthentication,
+            OnBeforeAgentSign = hop.OnBeforeAgentSign,
+            ConfirmAgentSign = hop.ConfirmAgentSign,
+            Compression = hop.Compression,
+            CryptoPolicy = hop.CryptoPolicy,
+            ConnectTimeout = hop.ConnectTimeout,
+            AuthenticationTimeout = hop.AuthenticationTimeout,
+            KeepAliveIntervalSeconds = hop.KeepAliveIntervalSeconds,
+            KeyboardInteractive = hop.KeyboardInteractive,
+            KeyboardInteractiveResponder = hop.KeyboardInteractiveResponder
+        };
     }
 
     public async Task ProbeTargetAsync(string host, int port, CancellationToken ct)

@@ -7134,5 +7134,10 @@
   "CastPlayerErrorMissingHeader": "Falta la cabecera asciinema.",
   "CastPlayerErrorInvalidHeader": "Cabecera asciinema no v\u00e1lida.",
   "CastPlayerErrorUnsupportedVersion": "Solo se admiten grabaciones asciinema v2 (.cast).",
-  "CastPlayerErrorReadFailed": "No se puede leer el archivo de grabaci\u00f3n."
+  "CastPlayerErrorReadFailed": "No se puede leer el archivo de grabaci\u00f3n.",
+  "SshErrorProxyUnsupportedOnPlink": "Plink no admite la configuraci\u00f3n de proxy SSH saliente directo (HTTP CONNECT / SOCKS). Usa el cliente SSH integrado o con\u00e9ctate mediante una pasarela SSH.",
+  "SshErrorProxyUnsupportedOnPutty": "El inicio externo de PuTTY no puede aplicar la configuraci\u00f3n de proxy SSH saliente de Heimdall. Usa el cliente SSH integrado o una pasarela SSH.",
+  "TunnelErrorProxyUnsupportedOnPlink": "El t\u00fanel alternativo de Plink no puede enrutar mediante el proxy saliente configurado en la pasarela. Corrige la autenticaci\u00f3n para el cliente SSH integrado.",
+  "ToolSshServerAuditProxyNotSupportedDirect": "No se admite la auditor\u00eda directa a trav\u00e9s de proxy saliente sin pasarela SSH (sonda rechazada para evitar eludir el proxy).",
+  "GatewayDiagnosticTrustRevoked": "Se detect\u00f3 una clave de host revocada. Conexi\u00f3n bloqueada por la pol\u00edtica de confianza local."
 }

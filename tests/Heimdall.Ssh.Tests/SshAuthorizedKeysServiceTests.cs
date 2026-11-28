@@ -71,11 +71,45 @@ public sealed class SshAuthorizedKeysServiceTests
         string guarded = SshAuthorizedKeysService.BuildRemoveKeyCommand(parts[0], parts[1], allowRemoveLastKey: false);
         Assert.Contains("[ -L \"$ak\" ]", guarded, StringComparison.Ordinal);
         Assert.Contains(SshAuthorizedKeysService.SymlinkRefusedMarker, guarded, StringComparison.Ordinal);
-        Assert.Contains("[ -s \"$tmp\" ]", guarded, StringComparison.Ordinal);
+        Assert.Contains("grep -Eq '^[[:space:]]*[^[:space:]#]' \"$tmp\"", guarded, StringComparison.Ordinal);
+        Assert.DoesNotContain("[ -s \"$tmp\" ]", guarded, StringComparison.Ordinal);
         Assert.Contains(SshAuthorizedKeysService.LastKeyRefusedMarker, guarded, StringComparison.Ordinal);
 
         string allowLast = SshAuthorizedKeysService.BuildRemoveKeyCommand(parts[0], parts[1], allowRemoveLastKey: true);
         Assert.Contains("[ -L \"$ak\" ]", allowLast, StringComparison.Ordinal);
-        Assert.DoesNotContain("[ -s \"$tmp\" ]", allowLast, StringComparison.Ordinal);
+        Assert.DoesNotContain("grep -Eq '^[[:space:]]*[^[:space:]#]' \"$tmp\"", allowLast, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BuildRemoveKeyCommand_WithExactRawLine_TargetsSingleRowForDuplicateKeysWithDifferentOptions()
+    {
+        var pair = SshKeyPairGenerator.Generate(SshKeyAlgorithm.Ed25519, comment: "ops@host");
+        string[] parts = pair.PublicKeyOpenSsh.Split(' ', 3, StringSplitOptions.RemoveEmptyEntries);
+        string exactRow = $"from=\"10.0.0.1\" {pair.PublicKeyOpenSsh}";
+
+        string cmd = SshAuthorizedKeysService.BuildRemoveKeyCommand(parts[0], parts[1], allowRemoveLastKey: false, exactRow);
+
+        Assert.Contains("grep -Fvx -- \"$exact_line\" \"$ak\"", cmd, StringComparison.Ordinal);
+        Assert.Contains(Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(exactRow)), cmd, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void BuildAddKeyCommand_IgnoresCommentedOutMatchingKeys()
+    {
+        var pair = SshKeyPairGenerator.Generate(SshKeyAlgorithm.Ed25519, comment: "ops@host");
+        string cmd = SshAuthorizedKeysService.BuildAddKeyCommand(pair.PublicKeyOpenSsh, null);
+
+        Assert.Contains("grep -Ev '^[[:space:]]*(#|$)' \"$ak\" | grep -Fq -- \"$key_id\"", cmd, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SshPublicKeyDeployer_BuildDeployCommand_EnforcesSymlinkGuardAndIgnoresCommentedMatches()
+    {
+        var pair = SshKeyPairGenerator.Generate(SshKeyAlgorithm.Ed25519, comment: "ops@host");
+        string cmd = SshPublicKeyDeployer.BuildDeployCommand(pair.PublicKeyOpenSsh);
+
+        Assert.Contains("[ -L \"$ak\" ]", cmd, StringComparison.Ordinal);
+        Assert.Contains(SshPublicKeyDeployer.MarkerSymlinkRefused, cmd, StringComparison.Ordinal);
+        Assert.Contains("grep -Ev '^[[:space:]]*(#|$)' \"$ak\" | grep -Fq -- \"$key_id\"", cmd, StringComparison.Ordinal);
     }
 }

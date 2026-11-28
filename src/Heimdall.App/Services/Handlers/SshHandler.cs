@@ -222,6 +222,19 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
 
         if (string.Equals(sshMode, "External", StringComparison.OrdinalIgnoreCase))
         {
+            if (!usesTunnel && server.SshProxyType != SshProxyType.None)
+            {
+                string msg = _localizer[SshLocalizationKeys.SshErrorProxyUnsupportedOnPutty];
+                _connectionSm.SetError(server.Id, msg);
+                return new ConnectionResult(
+                    false,
+                    msg,
+                    null,
+                    SshSessionDiagnosticFactory.CreatePreflightFailure(
+                        SshLocalizationKeys.SshErrorProxyUnsupportedOnPutty,
+                        msg));
+            }
+
             return await ConnectSshExternal(server, settings, targetHost, targetPort, usesTunnel, lease, ct)
                 .ConfigureAwait(false);
         }
@@ -985,6 +998,26 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
         TunnelLease tunnelLease = lease ?? new TunnelLease(_tunnelService, usesTunnel, targetPort, tunnelLeaseId);
         try
         {
+            if (!usesTunnel && server.SshProxyType != SshProxyType.None)
+            {
+                string msg = _localizer[SshLocalizationKeys.SshErrorProxyUnsupportedOnPlink];
+                string composed = string.IsNullOrWhiteSpace(originalFailureMessage)
+                    ? msg
+                    : SshAuthFailureMessageComposer.AppendSentence(
+                        originalFailureMessage,
+                        msg,
+                        SshLocalizationKeys.SshErrorProxyUnsupportedOnPlink) ?? msg;
+                _connectionSm.SetError(server.Id, composed);
+                return new ConnectionResult(
+                    false,
+                    composed,
+                    null,
+                    SshSessionDiagnosticFactory.CreatePlinkFallbackFailure(
+                        SshLocalizationKeys.SshErrorProxyUnsupportedOnPlink,
+                        composed,
+                        originalFailure));
+            }
+
             string? plinkPath = ConnectionHelpers.ResolvePlinkPath(settings.PlinkPath);
             if (string.IsNullOrWhiteSpace(plinkPath) || !File.Exists(plinkPath))
             {

@@ -99,7 +99,7 @@ public static class SshKeyRotator
             "tmp=$(mktemp \"$HOME/.ssh/.authorized_keys.heimdall.XXXXXX\") && " +
             "if chmod 600 \"$tmp\" && " +
             "(grep -Fv -- \"$old_id\" \"$ak\" > \"$tmp\"; rc=$?; [ \"$rc\" -le 1 ]) && " +
-            "[ -s \"$tmp\" ] && grep -Fq -- \"$new_id\" \"$tmp\"; then " +
+            "[ -s \"$tmp\" ] && (grep -Ev '^[[:space:]]*(#|$)' \"$tmp\" | grep -Fq -- \"$new_id\"); then " +
             $"(mv -f \"$tmp\" \"$ak\" && chmod 600 \"$ak\" && echo {OldKeyRemovedMarker}) || {{ rm -f \"$tmp\"; exit 1; }}; " +
             $"else rm -f \"$tmp\"; echo {InvariantFailedMarker}; exit 1; fi";
     }
