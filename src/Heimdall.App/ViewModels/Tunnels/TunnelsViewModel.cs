@@ -23,10 +23,12 @@ using CommunityToolkit.Mvvm.Input;
 using Heimdall.App.Localization;
 using Heimdall.App.Services;
 using Heimdall.App.ViewModels.Dialogs;
+using Heimdall.App.Views;
 using Heimdall.App.Views.Dialogs;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Logging;
+using Heimdall.Core.Models;
 using Heimdall.Core.Ssh;
 using Heimdall.Core.StateMachine;
 using Heimdall.Ssh;
@@ -852,7 +854,22 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
     /// </summary>
     public void RefreshList()
     {
-        var tunnels = _tunnelManager.GetActiveTunnels();
+        var tunnels = new List<TunnelInfo>(_tunnelManager.GetActiveTunnels());
+        foreach (var tab in _host.Connection.ActiveSessions)
+        {
+            foreach (var pane in SplitTreeHelper.EnumerateLeaves(tab.RootContent))
+            {
+                if (pane.HostControl is EmbeddedSshView sshView)
+                {
+                    var sessionForwards = sshView.GetActiveSessionForwards();
+                    if (sessionForwards.Count > 0)
+                    {
+                        tunnels.AddRange(sessionForwards);
+                    }
+                }
+            }
+        }
+
         List = new ObservableCollection<TunnelInfo>(tunnels);
         Count = tunnels.Count;
     }
@@ -1039,6 +1056,8 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
             ReconcileTrackedTabsWithActiveSessions();
             RefreshAllTunnelBadgeStates();
         }
+
+        RefreshList();
     }
 
     private void OnTabPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -1047,6 +1066,11 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
             && string.Equals(e.PropertyName, nameof(SessionTabViewModel.RootContent), StringComparison.Ordinal))
         {
             UpdateTunnelBadgeState(tab);
+            RefreshList();
+        }
+        else if (string.Equals(e.PropertyName, nameof(SessionTabViewModel.Status), StringComparison.Ordinal))
+        {
+            RefreshList();
         }
     }
 

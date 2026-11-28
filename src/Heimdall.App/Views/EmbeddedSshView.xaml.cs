@@ -64,6 +64,9 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     private const string MsgBell = "bell:";
     private const string MsgClipboardWrite = "clipboard-write:";
     private const string MsgClipboardRead = "clipboard-read:";
+    internal const string MsgOsc52Write = "osc52-write:";
+    internal const int MaxOsc52DecodedBytes = 128 * 1024;
+    internal const int MaxOsc52Base64Length = ((MaxOsc52DecodedBytes + 2) / 3) * 4;
 
     /// <summary>Inbound message: the page's text, <c>buffer:&lt;id&gt;:&lt;truncated 0|1&gt;:&lt;base64&gt;</c>.</summary>
     private const string MsgBuffer = TerminalBufferReadCoordinator.ReplyPrefix;
@@ -103,6 +106,48 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
     /// <summary>Outbound message: toggles real-time regex log highlighting at runtime.</summary>
     private const string MsgSetHighlights = "set-highlights:";
+
+    /// <summary>Outbound message: updates compiled regex highlight rules at runtime.</summary>
+    private const string MsgSetHighlightRules = "set-highlight-rules:";
+
+    /// <summary>Returns active direct session-bound forwards (-L/-D/-R) owned by this SSH view.</summary>
+    internal IReadOnlyList<TunnelInfo> GetActiveSessionForwards()
+        => _session?.GetActiveSessionForwards() ?? [];
+
+    /// <summary>
+    /// Validates and decodes an inbound write-only OSC 52 clipboard payload.
+    /// Enforces the user opt-in flag, rejects clipboard read queries (<c>?</c>), and bounds payload size.
+    /// </summary>
+    internal static bool TryDecodeOsc52Payload(bool allowOsc52, string base64Payload, out string decodedText)
+    {
+        decodedText = string.Empty;
+        if (!allowOsc52 || string.IsNullOrEmpty(base64Payload))
+        {
+            return false;
+        }
+
+        var trimmed = base64Payload.Trim();
+        if (trimmed.Length == 0 || trimmed == "?" || trimmed.Length > MaxOsc52Base64Length)
+        {
+            return false;
+        }
+
+        try
+        {
+            var bytes = Convert.FromBase64String(trimmed);
+            if (bytes.Length == 0 || bytes.Length > MaxOsc52DecodedBytes)
+            {
+                return false;
+            }
+
+            decodedText = Encoding.UTF8.GetString(bytes);
+            return !string.IsNullOrEmpty(decodedText);
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
 
     /// <summary>
     /// Outbound message: the box the page lays itself out in while its surface is hidden
@@ -1233,6 +1278,27 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             return;
         }
 
+        // Opt-in write-only OSC 52 clipboard write (remote -> local, reads strictly refused)
+        if (message.StartsWith(MsgOsc52Write, StringComparison.Ordinal))
+        {
+            bool allowOsc52 = TerminalSettings?.TerminalAllowOsc52Clipboard == true;
+            string payload = message[MsgOsc52Write.Length..];
+            if (!TryDecodeOsc52Payload(allowOsc52, payload, out string oscText))
+            {
+                return;
+            }
+
+            try
+            {
+                Clipboard.SetText(oscText);
+            }
+            catch (Exception ex)
+            {
+                Core.Logging.FileLogger.Warn($"EmbeddedSSH osc52-write failed: {ex.Message}");
+            }
+            return;
+        }
+
         // Clipboard read: terminal requests paste from system clipboard
         // Protected by SmartPasteGuard to prevent dangerous multi-line or destructive pastes.
         if (message.StartsWith(MsgClipboardRead, StringComparison.Ordinal))
@@ -2221,6 +2287,10 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         html = html.Replace(
             "/*{{TERMINAL_HIGHLIGHTS}}*/",
             _highlightsEnabled ? "true" : "false",
+            StringComparison.Ordinal);
+        html = html.Replace(
+            "/*{{TERMINAL_HIGHLIGHT_RULES}}*/",
+            TerminalHighlightRuleDefaults.SerializeForTerminalJs(TerminalSettings?.TerminalHighlightRules),
             StringComparison.Ordinal);
         html = html.Replace("/*{{TERMINAL_THEME}}*/", themeJson, StringComparison.Ordinal);
         html = html.Replace("/*{{TERMINAL_CONVERT_EOL}}*/", convertEol, StringComparison.Ordinal);

@@ -7046,5 +7046,20 @@
   "ToastPolicyAdded": "Added {0} rule for {1}.",
   "ToastPolicyRemoved": "Removed {0} rule for {1}.",
   "DialogTrustedHostKeyPolicyRemoveTitle": "Remove host key policy",
-  "DialogTrustedHostKeyPolicyRemoveMessage": "Remove the {0} rule for {1} ({2})?"
+  "DialogTrustedHostKeyPolicyRemoveMessage": "Remove the {0} rule for {1} ({2})?",
+  "HealthPanelNet": "Network",
+  "HealthPanelNetFormat": "RX {0} / TX {1}",
+  "SettingsTerminalHighlightRulesTitle": "Highlight rules",
+  "SettingsTerminalHighlightNameHint": "Name",
+  "SettingsTerminalHighlightPatternHint": "Regex pattern (e.g. \\bERROR\\b)",
+  "SettingsTerminalHighlightColorLabel": "Highlight color",
+  "BtnAddHighlightRule": "Add",
+  "BtnResetHighlightRules": "Defaults",
+  "SettingsTerminalHighlightInvalidRegex": "Invalid highlight pattern: {0}",
+  "SettingsTerminalHighlightMaxRules": "Maximum of {0} highlight rules reached.",
+  "SettingsLabelTerminalAllowOsc52": "Allow remote OSC 52 clipboard write (opt-in)",
+  "SettingsTerminalAllowOsc52Hint": "Lets remote tools (such as tmux or vim) copy text into your local clipboard via OSC 52. Clipboard read queries are always blocked.",
+  "SettingsLabelSshHealthMonitorInterval": "Server health poll interval",
+  "SettingsSshHealthMonitorIntervalHint": "How often the SSH server health side panel polls CPU, memory, disk, and network metrics (5-300 seconds).",
+  "ValidationSettingsSshHealthMonitorInterval": "Server health poll interval must be between {0} and {1} seconds."
 }

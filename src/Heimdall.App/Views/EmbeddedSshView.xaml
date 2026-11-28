@@ -507,7 +507,7 @@
                         </StackPanel>
 
                         <!-- Load Average -->
-                        <StackPanel x:Name="HealthLoadSection" Visibility="Collapsed">
+                        <StackPanel x:Name="HealthLoadSection" Visibility="Collapsed" Margin="0,0,0,10">
                             <TextBlock x:Name="HealthLoadLabel"
                                        FontSize="{StaticResource FontSizeCaption}"
                                        FontWeight="SemiBold"
@@ -515,6 +515,20 @@
                                        Margin="0,0,0,2"/>
                             <TextBlock x:Name="HealthLoadText"
                                        FontSize="{StaticResource FontSizeCaption}"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+
+                        <!-- Network RX/TX -->
+                        <StackPanel x:Name="HealthNetSection" Visibility="Collapsed">
+                            <TextBlock x:Name="HealthNetLabel"
+                                       FontSize="{StaticResource FontSizeCaption}"
+                                       FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Margin="0,0,0,2"/>
+                            <TextBlock x:Name="HealthNetText"
+                                       FontSize="{StaticResource FontSizeCaption}"
+                                       FontFamily="{StaticResource FontFamilyMonospace}"
                                        Foreground="{DynamicResource TextPrimaryBrush}"
                                        TextWrapping="Wrap"/>
                         </StackPanel>

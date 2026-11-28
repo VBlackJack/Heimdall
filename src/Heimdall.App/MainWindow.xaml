@@ -4014,6 +4014,129 @@
                                                       IsChecked="{Binding Settings.TerminalHighlightsEnabled}"
                                                       AutomationProperties.Name="{loc:Translate SettingsLabelTerminalHighlights}"/>
                                             <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[TerminalHighlightsEnabled]}"/>
+                                            <Expander Header="{loc:Translate SettingsTerminalHighlightRulesTitle}"
+                                                      Margin="20,6,0,0"
+                                                      Foreground="{DynamicResource TextSecondaryBrush}"
+                                                      AutomationProperties.Name="{loc:Translate SettingsTerminalHighlightRulesTitle}">
+                                                <StackPanel Margin="0,6,0,0">
+                                                    <ItemsControl ItemsSource="{Binding Settings.TerminalHighlightRules}">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate>
+                                                                <Grid Margin="0,0,0,4">
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="Auto"/>
+                                                                        <ColumnDefinition Width="110"/>
+                                                                        <ColumnDefinition Width="*"/>
+                                                                        <ColumnDefinition Width="70"/>
+                                                                        <ColumnDefinition Width="Auto"/>
+                                                                    </Grid.ColumnDefinitions>
+                                                                    <CheckBox Grid.Column="0"
+                                                                              IsChecked="{Binding Enabled}"
+                                                                              Command="{Binding DataContext.Settings.MarkHighlightRulesDirtyCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                              VerticalAlignment="Center"
+                                                                              Margin="0,0,6,0"
+                                                                              AutomationProperties.Name="{Binding Name}"/>
+                                                                    <TextBlock Grid.Column="1"
+                                                                               Text="{Binding Name}"
+                                                                               FontSize="{StaticResource FontSizeCaption}"
+                                                                               Foreground="{DynamicResource TextPrimaryBrush}"
+                                                                               VerticalAlignment="Center"
+                                                                               TextTrimming="CharacterEllipsis"/>
+                                                                    <TextBlock Grid.Column="2"
+                                                                               Text="{Binding Pattern}"
+                                                                               FontFamily="{StaticResource FontFamilyMonospace}"
+                                                                               FontSize="{StaticResource FontSizeCaption}"
+                                                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                               VerticalAlignment="Center"
+                                                                               TextTrimming="CharacterEllipsis"
+                                                                               ToolTip="{Binding Pattern}"
+                                                                               Margin="6,0"/>
+                                                                    <TextBlock Grid.Column="3"
+                                                                               Text="{Binding Color}"
+                                                                               FontSize="{StaticResource FontSizeCaption}"
+                                                                               Foreground="{DynamicResource AccentTextBrush}"
+                                                                               VerticalAlignment="Center"/>
+                                                                    <Button Grid.Column="4"
+                                                                            Command="{Binding DataContext.Settings.RemoveHighlightRuleCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                            CommandParameter="{Binding}"
+                                                                            Content="{loc:Translate BtnRemove}"
+                                                                            Style="{StaticResource GhostButtonStyle}"
+                                                                            Padding="6,2"
+                                                                            FontSize="{StaticResource FontSizeCaption}"
+                                                                            AutomationProperties.Name="{loc:Translate BtnRemove}"/>
+                                                                </Grid>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                    <Grid Margin="0,6,0,0">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="110"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="95"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBox Grid.Column="0"
+                                                                 Text="{Binding Settings.NewHighlightRuleName, UpdateSourceTrigger=PropertyChanged}"
+                                                                 Style="{StaticResource WatermarkTextBoxStyle}"
+                                                                 Tag="{loc:Translate SettingsTerminalHighlightNameHint}"
+                                                                 AutomationProperties.Name="{loc:Translate SettingsTerminalHighlightNameHint}"
+                                                                 Margin="0,0,6,0"/>
+                                                        <TextBox Grid.Column="1"
+                                                                 Text="{Binding Settings.NewHighlightRulePattern, UpdateSourceTrigger=PropertyChanged}"
+                                                                 Style="{StaticResource WatermarkTextBoxStyle}"
+                                                                 Tag="{loc:Translate SettingsTerminalHighlightPatternHint}"
+                                                                 AutomationProperties.Name="{loc:Translate SettingsTerminalHighlightPatternHint}"
+                                                                 Margin="0,0,6,0"/>
+                                                        <ComboBox Grid.Column="2"
+                                                                  SelectedValue="{Binding Settings.NewHighlightRuleColor}"
+                                                                  SelectedValuePath="Tag"
+                                                                  Margin="0,0,6,0"
+                                                                  AutomationProperties.Name="{loc:Translate SettingsTerminalHighlightColorLabel}">
+                                                            <ComboBoxItem Content="red" Tag="red"/>
+                                                            <ComboBoxItem Content="yellow" Tag="yellow"/>
+                                                            <ComboBoxItem Content="green" Tag="green"/>
+                                                            <ComboBoxItem Content="cyan" Tag="cyan"/>
+                                                            <ComboBoxItem Content="magenta" Tag="magenta"/>
+                                                            <ComboBoxItem Content="blue" Tag="blue"/>
+                                                        </ComboBox>
+                                                        <Button Grid.Column="3"
+                                                                Command="{Binding Settings.AddHighlightRuleCommand}"
+                                                                Content="{loc:Translate BtnAddHighlightRule}"
+                                                                Style="{DynamicResource SecondaryButtonStyle}"
+                                                                Padding="8,3"
+                                                                Margin="0,0,6,0"
+                                                                FontSize="{StaticResource FontSizeCaption}"
+                                                                AutomationProperties.Name="{loc:Translate BtnAddHighlightRule}"/>
+                                                        <Button Grid.Column="4"
+                                                                Command="{Binding Settings.ResetHighlightRulesToDefaultCommand}"
+                                                                Content="{loc:Translate BtnResetHighlightRules}"
+                                                                Style="{StaticResource GhostButtonStyle}"
+                                                                Padding="8,3"
+                                                                FontSize="{StaticResource FontSizeCaption}"
+                                                                AutomationProperties.Name="{loc:Translate BtnResetHighlightRules}"/>
+                                                    </Grid>
+                                                    <TextBlock Text="{Binding Settings.HighlightRuleValidationError}"
+                                                               Foreground="{DynamicResource ErrorTextBrush}"
+                                                               FontSize="{StaticResource FontSizeCaption}"
+                                                               Margin="0,4,0,0"
+                                                               TextWrapping="Wrap"
+                                                               Visibility="{Binding Settings.HighlightRuleValidationError, Converter={StaticResource NullToVisibilityConverter}}"/>
+                                                </StackPanel>
+                                            </Expander>
+                                        </StackPanel>
+                                        <StackPanel Margin="{StaticResource SettingsFieldGap}">
+                                            <CheckBox x:Name="Mw_SettingsTerminalOsc52"
+                                                      Content="{loc:Translate SettingsLabelTerminalAllowOsc52}"
+                                                      IsChecked="{Binding Settings.TerminalAllowOsc52Clipboard}"
+                                                      AutomationProperties.Name="{loc:Translate SettingsLabelTerminalAllowOsc52}"
+                                                      AutomationProperties.HelpText="{loc:Translate SettingsTerminalAllowOsc52Hint}"/>
+                                            <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[TerminalAllowOsc52Clipboard]}"/>
+                                            <TextBlock Text="{loc:Translate SettingsTerminalAllowOsc52Hint}"
+                                                       Foreground="{DynamicResource TextTertiaryBrush}"
+                                                       FontSize="{StaticResource FontSizeCaption}"
+                                                       Margin="20,4,0,0"
+                                                       TextWrapping="Wrap"/>
                                         </StackPanel>
                                         <StackPanel Margin="{StaticResource SettingsFieldGap}">
                                             <TextBlock x:Name="Mw_SettingsTerminalColorSchemeLabel" Text="{loc:Translate SettingsLabelTerminalColorScheme}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
@@ -4200,6 +4323,15 @@
                                             </StackPanel>
                                             <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[SshKeepAliveIntervalSeconds]}"/>
                                             <TextBlock x:Name="Mw_SettingsSshKeepAliveHint" Text="{loc:Translate SettingsSshKeepAliveIntervalHint}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="{StaticResource SettingsFieldGap}">
+                                            <TextBlock x:Name="Mw_SettingsSshHealthIntervalLabel" Text="{loc:Translate SettingsLabelSshHealthMonitorInterval}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBox Text="{Binding Settings.SshHealthMonitorIntervalSecondsText, UpdateSourceTrigger=PropertyChanged}" Width="{StaticResource SettingsNumericFieldWidth}" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsSshHealthIntervalLabel}"/>
+                                                <TextBlock Text="{loc:Translate SettingsUnitSeconds}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
+                                            </StackPanel>
+                                            <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[SshHealthMonitorIntervalSeconds]}"/>
+                                            <TextBlock Text="{loc:Translate SettingsSshHealthMonitorIntervalHint}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                                         </StackPanel>
                                         <StackPanel Margin="{StaticResource SettingsFieldGap}">
                                             <TextBlock x:Name="Mw_SettingsSshAutoReconnectTitle" Text="{loc:Translate SettingsSshAutoReconnect}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>

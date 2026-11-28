@@ -167,6 +167,9 @@ public sealed class AppSettings
     public const int DefaultSshKeepAliveIntervalSeconds = 30;
     [SettingRange(5, 600)]
     public int SshKeepAliveIntervalSeconds { get; set; } = DefaultSshKeepAliveIntervalSeconds;
+    public const int DefaultSshHealthMonitorIntervalSeconds = 15;
+    [SettingRange(5, 300)]
+    public int SshHealthMonitorIntervalSeconds { get; set; } = DefaultSshHealthMonitorIntervalSeconds;
     public const int DefaultPlinkPortCheckIntervalMs = 2000;
     [SettingRange(500, 30000)]
     public int PlinkPortCheckIntervalMs { get; set; } = DefaultPlinkPortCheckIntervalMs;
@@ -225,6 +228,8 @@ public sealed class AppSettings
     [SettingRange(MinTerminalScrollbackLines, MaxTerminalScrollbackLines)]
     public int TerminalScrollbackLines { get; set; } = DefaultTerminalScrollbackLines;
     public bool TerminalHighlightsEnabled { get; set; }
+    public List<TerminalHighlightRuleDto> TerminalHighlightRules { get; set; } = [];
+    public bool TerminalAllowOsc52Clipboard { get; set; }
     public string TerminalColorScheme { get; set; } = DefaultTerminalColorScheme;
     public string PowerShellExecutionPolicy { get; set; } = "Default";
 

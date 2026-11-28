@@ -7045,5 +7045,20 @@
   "ToastPolicyAdded": "R\u00e8gle {0} ajout\u00e9e pour {1}.",
   "ToastPolicyRemoved": "R\u00e8gle {0} supprim\u00e9e pour {1}.",
   "DialogTrustedHostKeyPolicyRemoveTitle": "Supprimer la politique de cl\u00e9 h\u00f4te",
-  "DialogTrustedHostKeyPolicyRemoveMessage": "Supprimer la r\u00e8gle {0} pour {1} ({2}) ?"
+  "DialogTrustedHostKeyPolicyRemoveMessage": "Supprimer la r\u00e8gle {0} pour {1} ({2}) ?",
+  "HealthPanelNet": "R\u00e9seau",
+  "HealthPanelNetFormat": "RX {0} / TX {1}",
+  "SettingsTerminalHighlightRulesTitle": "R\u00e8gles de surlignage",
+  "SettingsTerminalHighlightNameHint": "Nom",
+  "SettingsTerminalHighlightPatternHint": "Motif regex (ex. \\bERROR\\b)",
+  "SettingsTerminalHighlightColorLabel": "Couleur de surlignage",
+  "BtnAddHighlightRule": "Ajouter",
+  "BtnResetHighlightRules": "Par d\u00e9faut",
+  "SettingsTerminalHighlightInvalidRegex": "Motif de surlignage invalide : {0}",
+  "SettingsTerminalHighlightMaxRules": "Nombre maximal de {0} r\u00e8gles de surlignage atteint.",
+  "SettingsLabelTerminalAllowOsc52": "Autoriser l'\u00e9criture presse-papiers OSC 52 distante (opt-in)",
+  "SettingsTerminalAllowOsc52Hint": "Permet aux outils distants (comme tmux ou vim) de copier du texte vers le presse-papiers local via OSC 52. Les lectures du presse-papiers restent toujours bloqu\u00e9es.",
+  "SettingsLabelSshHealthMonitorInterval": "Intervalle du moniteur de sant\u00e9 serveur",
+  "SettingsSshHealthMonitorIntervalHint": "Fr\u00e9quence d'interrogation CPU, m\u00e9moire, disque et r\u00e9seau du panneau de sant\u00e9 SSH (5-300 secondes).",
+  "ValidationSettingsSshHealthMonitorInterval": "L'intervalle du moniteur de sant\u00e9 serveur doit \u00eatre compris entre {0} et {1} secondes."
 }

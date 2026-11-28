@@ -36,7 +36,9 @@ public sealed record ServerHealthData(
     string? Uptime = null,
     string? LoadAverage = null,
     long SwapTotalMb = 0,
-    long SwapUsedMb = 0);
+    long SwapUsedMb = 0,
+    long? NetRxBytesPerSec = null,
+    long? NetTxBytesPerSec = null);
 
 internal interface IHealthCommandRunner
 {
@@ -88,7 +90,9 @@ internal sealed class SshHealthCommandRunner(SshClient client) : IHealthCommandR
 /// </summary>
 public sealed class ServerHealthMonitor : IDisposable
 {
-    private const int PollIntervalSeconds = 15;
+    private const int DefaultPollIntervalSeconds = 15;
+    private const int MinPollIntervalSeconds = 5;
+    private const int MaxPollIntervalSeconds = 300;
     private static readonly TimeSpan RegexTimeout = TimeSpan.FromMilliseconds(100);
 
     internal const string MarkerCpu = "__H_CPU__";
@@ -96,6 +100,7 @@ public sealed class ServerHealthMonitor : IDisposable
     internal const string MarkerDisk = "__H_DISK__";
     internal const string MarkerUptime = "__H_UPTIME__";
     internal const string MarkerLoad = "__H_LOAD__";
+    internal const string MarkerNet = "__H_NET__";
 
     internal const string CombinedHealthCommandText =
         "env LC_ALL=C sh -c '"
@@ -103,7 +108,8 @@ public sealed class ServerHealthMonitor : IDisposable
         + "printf \"" + MarkerMem + "\\n\"; (free -m 2>/dev/null | grep -E \"^(Mem|Swap):\" || grep -E \"^(MemTotal|MemFree|MemAvailable|SwapTotal|SwapFree):\" /proc/meminfo 2>/dev/null); "
         + "printf \"" + MarkerDisk + "\\n\"; (df -Ph / 2>/dev/null | tail -1); "
         + "printf \"" + MarkerUptime + "\\n\"; (uptime -p 2>/dev/null || cat /proc/uptime 2>/dev/null); "
-        + "printf \"" + MarkerLoad + "\\n\"; (cat /proc/loadavg 2>/dev/null); true'";
+        + "printf \"" + MarkerLoad + "\\n\"; (cat /proc/loadavg 2>/dev/null); "
+        + "printf \"" + MarkerNet + "\\n\"; (cat /proc/net/dev 2>/dev/null); true'";
 
     private const string CpuCommandText = "env LC_ALL=C top -b -n 1 | head -5";
     private const string MemoryCommandText = "env LC_ALL=C free -m | grep Mem";
@@ -152,21 +158,29 @@ public sealed class ServerHealthMonitor : IDisposable
     private CancellationTokenSource? _cts;
     private Task? _pollTask;
     private readonly Func<SshClient, IHealthCommandRunner> _commandRunnerFactory;
+    private readonly TimeSpan _pollInterval;
     private readonly Lock _stateLock = new();
+    private (long RxBytes, long TxBytes, DateTimeOffset SampledAt)? _previousNetSample;
     private bool _disposed;
 
     /// <summary>Raised on the thread pool when new health data is available.</summary>
     public event Action<ServerHealthData>? HealthUpdated;
 
-    public ServerHealthMonitor()
-        : this(static client => new SshHealthCommandRunner(client))
+    public ServerHealthMonitor(TimeSpan? pollInterval = null)
+        : this(static client => new SshHealthCommandRunner(client), pollInterval)
     {
     }
 
-    internal ServerHealthMonitor(Func<SshClient, IHealthCommandRunner> commandRunnerFactory)
+    internal ServerHealthMonitor(
+        Func<SshClient, IHealthCommandRunner> commandRunnerFactory,
+        TimeSpan? pollInterval = null)
     {
         _commandRunnerFactory = commandRunnerFactory
             ?? throw new ArgumentNullException(nameof(commandRunnerFactory));
+        var seconds = pollInterval.HasValue
+            ? Math.Clamp((int)Math.Round(pollInterval.Value.TotalSeconds), MinPollIntervalSeconds, MaxPollIntervalSeconds)
+            : DefaultPollIntervalSeconds;
+        _pollInterval = TimeSpan.FromSeconds(seconds);
     }
 
     /// <summary>
@@ -305,7 +319,7 @@ public sealed class ServerHealthMonitor : IDisposable
                     break;
                 }
 
-                var data = await CollectHealthDataAsync(commandRunner, ct).ConfigureAwait(false);
+                var data = await CollectHealthDataCoreAsync(commandRunner, ct).ConfigureAwait(false);
                 if (data is not null)
                 {
                     HealthUpdated?.Invoke(data);
@@ -332,7 +346,7 @@ public sealed class ServerHealthMonitor : IDisposable
 
             try
             {
-                await Task.Delay(TimeSpan.FromSeconds(PollIntervalSeconds), ct)
+                await Task.Delay(_pollInterval, ct)
                     .ConfigureAwait(false);
             }
             catch (OperationCanceledException)
@@ -342,7 +356,7 @@ public sealed class ServerHealthMonitor : IDisposable
         }
     }
 
-    internal static async Task<ServerHealthData?> CollectHealthDataAsync(
+    private async Task<ServerHealthData?> CollectHealthDataCoreAsync(
         IHealthCommandRunner commandRunner,
         CancellationToken cancellationToken)
     {
@@ -356,7 +370,21 @@ public sealed class ServerHealthMonitor : IDisposable
         if (!string.IsNullOrWhiteSpace(combined)
             && combined.Contains(MarkerCpu, StringComparison.Ordinal))
         {
-            return ParseCombinedOutput(combined);
+            var parsed = ParseCombinedOutput(combined, out var netTotals);
+            if (netTotals is { } sample)
+            {
+                var rates = ComputeNetworkRates(sample.RxBytes, sample.TxBytes, DateTimeOffset.UtcNow);
+                if (rates is { } r)
+                {
+                    parsed = parsed with
+                    {
+                        NetRxBytesPerSec = r.RxBytesPerSec,
+                        NetTxBytesPerSec = r.TxBytesPerSec
+                    };
+                }
+            }
+
+            return parsed;
         }
 
         // Fallback for non-POSIX shells or stub runners that answer individual commands.
@@ -368,15 +396,138 @@ public sealed class ServerHealthMonitor : IDisposable
         return BuildHealthData(results[0], results[1], results[2], uptimeOutput: null, loadOutput: null);
     }
 
+    internal (long RxBytesPerSec, long TxBytesPerSec)? ComputeNetworkRates(
+        long currentRxBytes,
+        long currentTxBytes,
+        DateTimeOffset sampledAt)
+    {
+        var previous = _previousNetSample;
+        _previousNetSample = (currentRxBytes, currentTxBytes, sampledAt);
+
+        if (previous is null)
+        {
+            return null;
+        }
+
+        var elapsedSeconds = (sampledAt - previous.Value.SampledAt).TotalSeconds;
+        if (elapsedSeconds <= 0.05)
+        {
+            return null;
+        }
+
+        var rxDelta = currentRxBytes - previous.Value.RxBytes;
+        var txDelta = currentTxBytes - previous.Value.TxBytes;
+        if (rxDelta < 0 || txDelta < 0)
+        {
+            return null;
+        }
+
+        return (
+            (long)Math.Round(rxDelta / elapsedSeconds),
+            (long)Math.Round(txDelta / elapsedSeconds));
+    }
+
+    internal static Task<ServerHealthData?> CollectHealthDataAsync(
+        IHealthCommandRunner commandRunner,
+        CancellationToken cancellationToken)
+    {
+        using var monitor = new ServerHealthMonitor();
+        return monitor.CollectHealthDataCoreAsync(commandRunner, cancellationToken);
+    }
+
     internal static ServerHealthData ParseCombinedOutput(string combinedOutput)
+        => ParseCombinedOutput(combinedOutput, out _);
+
+    internal static ServerHealthData ParseCombinedOutput(
+        string combinedOutput,
+        out (long RxBytes, long TxBytes)? netTotals)
     {
         var cpuSection = ExtractSection(combinedOutput, MarkerCpu, MarkerMem);
         var memSection = ExtractSection(combinedOutput, MarkerMem, MarkerDisk);
         var diskSection = ExtractSection(combinedOutput, MarkerDisk, MarkerUptime);
         var uptimeSection = ExtractSection(combinedOutput, MarkerUptime, MarkerLoad);
-        var loadSection = ExtractSection(combinedOutput, MarkerLoad, nextMarker: null);
+        var hasNetMarker = combinedOutput.Contains(MarkerNet, StringComparison.Ordinal);
+        var loadSection = ExtractSection(combinedOutput, MarkerLoad, hasNetMarker ? MarkerNet : null);
+        var netSection = hasNetMarker ? ExtractSection(combinedOutput, MarkerNet, nextMarker: null) : string.Empty;
 
+        netTotals = TryParseNetworkBytes(netSection, out var rx, out var tx) ? (rx, tx) : null;
         return BuildHealthData(cpuSection, memSection, diskSection, uptimeSection, loadSection);
+    }
+
+    /// <summary>
+    /// Sums non-loopback RX and TX byte counters from Linux <c>/proc/net/dev</c>.
+    /// </summary>
+    internal static bool TryParseNetworkBytes(string? netDevOutput, out long totalRxBytes, out long totalTxBytes)
+    {
+        totalRxBytes = 0;
+        totalTxBytes = 0;
+        if (string.IsNullOrWhiteSpace(netDevOutput))
+        {
+            return false;
+        }
+
+        var matchedAny = false;
+        var lines = netDevOutput.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        foreach (var rawLine in lines)
+        {
+            var colonIdx = rawLine.IndexOf(':');
+            if (colonIdx <= 0)
+            {
+                continue;
+            }
+
+            var iface = rawLine[..colonIdx].Trim();
+            if (string.IsNullOrEmpty(iface)
+                || iface.Equals("lo", StringComparison.OrdinalIgnoreCase)
+                || iface.StartsWith("Inter-", StringComparison.OrdinalIgnoreCase)
+                || iface.StartsWith("face", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            var fields = rawLine[(colonIdx + 1)..].Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries);
+            if (fields.Length < 9)
+            {
+                continue;
+            }
+
+            if (long.TryParse(fields[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out var rx)
+                && long.TryParse(fields[8], NumberStyles.Integer, CultureInfo.InvariantCulture, out var tx)
+                && rx >= 0
+                && tx >= 0)
+            {
+                totalRxBytes += rx;
+                totalTxBytes += tx;
+                matchedAny = true;
+            }
+        }
+
+        return matchedAny;
+    }
+
+    /// <summary>Formats a byte-per-second throughput rate for compact UI display.</summary>
+    public static string FormatNetworkRate(long bytesPerSec)
+    {
+        var safe = Math.Max(0, bytesPerSec);
+        if (safe < 1024)
+        {
+            return string.Format(CultureInfo.InvariantCulture, "{0} B/s", safe);
+        }
+
+        double kb = safe / 1024.0;
+        if (kb < 1024.0)
+        {
+            return string.Format(CultureInfo.InvariantCulture, "{0:F1} KB/s", kb);
+        }
+
+        double mb = kb / 1024.0;
+        if (mb < 1024.0)
+        {
+            return string.Format(CultureInfo.InvariantCulture, "{0:F1} MB/s", mb);
+        }
+
+        double gb = mb / 1024.0;
+        return string.Format(CultureInfo.InvariantCulture, "{0:F2} GB/s", gb);
     }
 
     private static ServerHealthData BuildHealthData(

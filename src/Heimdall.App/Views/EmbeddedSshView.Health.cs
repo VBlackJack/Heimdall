@@ -60,7 +60,9 @@ public partial class EmbeddedSshView
 
         StopHealthMonitor();
 
-        _healthMonitor = new ServerHealthMonitor();
+        var pollSeconds = TerminalSettings?.SshHealthMonitorIntervalSeconds
+            ?? Core.Configuration.AppSettings.DefaultSshHealthMonitorIntervalSeconds;
+        _healthMonitor = new ServerHealthMonitor(TimeSpan.FromSeconds(pollSeconds));
         _healthMonitor.HealthUpdated += OnHealthDataReceived;
         _ = _healthMonitor.StartAsync(client);
 
@@ -116,6 +118,7 @@ public partial class EmbeddedSshView
                 DiskDetailText.Text = unsupported;
                 HealthUptimeSection.Visibility = Visibility.Collapsed;
                 HealthLoadSection.Visibility = Visibility.Collapsed;
+                HealthNetSection.Visibility = Visibility.Collapsed;
                 StopHealthMonitor();
                 return;
             }
@@ -163,6 +166,20 @@ public partial class EmbeddedSshView
             {
                 HealthLoadSection.Visibility = Visibility.Collapsed;
             }
+
+            if (data.NetRxBytesPerSec.HasValue && data.NetTxBytesPerSec.HasValue)
+            {
+                HealthNetText.Text = string.Format(
+                    System.Globalization.CultureInfo.CurrentCulture,
+                    L("HealthPanelNetFormat"),
+                    ServerHealthMonitor.FormatNetworkRate(data.NetRxBytesPerSec.Value),
+                    ServerHealthMonitor.FormatNetworkRate(data.NetTxBytesPerSec.Value));
+                HealthNetSection.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                HealthNetSection.Visibility = Visibility.Collapsed;
+            }
         });
     }
 
@@ -180,5 +197,6 @@ public partial class EmbeddedSshView
         HealthDiskLabel.Text = L("HealthPanelDisk");
         HealthUptimeLabel.Text = L("HealthPanelUptime");
         HealthLoadLabel.Text = L("HealthPanelLoad");
+        HealthNetLabel.Text = L("HealthPanelNet");
     }
 }

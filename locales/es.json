@@ -7046,5 +7046,20 @@
   "ToastPolicyAdded": "Regla {0} a\u00f1adida para {1}.",
   "ToastPolicyRemoved": "Regla {0} eliminada para {1}.",
   "DialogTrustedHostKeyPolicyRemoveTitle": "Eliminar pol\u00edtica de clave de host",
-  "DialogTrustedHostKeyPolicyRemoveMessage": "\u00bfEliminar la regla {0} para {1} ({2})?"
+  "DialogTrustedHostKeyPolicyRemoveMessage": "\u00bfEliminar la regla {0} para {1} ({2})?",
+  "HealthPanelNet": "Red",
+  "HealthPanelNetFormat": "RX {0} / TX {1}",
+  "SettingsTerminalHighlightRulesTitle": "Reglas de resaltado",
+  "SettingsTerminalHighlightNameHint": "Nombre",
+  "SettingsTerminalHighlightPatternHint": "Patr\u00f3n regex (p. ej. \\bERROR\\b)",
+  "SettingsTerminalHighlightColorLabel": "Color de resaltado",
+  "BtnAddHighlightRule": "A\u00f1adir",
+  "BtnResetHighlightRules": "Predeterminadas",
+  "SettingsTerminalHighlightInvalidRegex": "Patr\u00f3n de resaltado no v\u00e1lido: {0}",
+  "SettingsTerminalHighlightMaxRules": "Se alcanz\u00f3 el m\u00e1ximo de {0} reglas de resaltado.",
+  "SettingsLabelTerminalAllowOsc52": "Permitir escritura remota en el portapapeles por OSC 52 (opcional)",
+  "SettingsTerminalAllowOsc52Hint": "Permite a herramientas remotas (como tmux o vim) copiar texto al portapapeles local mediante OSC 52. Las lecturas del portapapeles siempre est\u00e1n bloqueadas.",
+  "SettingsLabelSshHealthMonitorInterval": "Intervalo del monitor de salud del servidor",
+  "SettingsSshHealthMonitorIntervalHint": "Frecuencia con la que el panel de salud SSH consulta CPU, memoria, disco y red (5-300 segundos).",
+  "ValidationSettingsSshHealthMonitorInterval": "El intervalo del monitor de salud del servidor debe estar entre {0} y {1} segundos."
 }
