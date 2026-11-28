@@ -1359,6 +1359,27 @@ d'éviter toute fuite DNS split-horizon.
   fichiers `.cast` v2 en lecture seule sous plafonds stricts (`50 Mio`,
   `500 000` événements), et `AsciinemaPlayerDialog` verrouille son hôte WebView2
   via `WebView2Lockdown.Apply` avec blocage de toute navigation après chargement.
+- **Durcissement post-Phase 7 et frontières de la Phase 8** : les proxies
+  sortants HTTP CONNECT / SOCKS échouent en fail-closed
+  (`SshConnectionFactory.BuildConnectionInfo`) et suppriment les requêtes DNS
+  `SSHFP` côté client dès qu'un proxy est actif afin d'éviter toute fuite DNS
+  contournant le proxy. Les invites de confiance et diagnostics de passerelle
+  appliquent la parité `SshCryptoPolicy` et `@revoked` via
+  `SshSessionDiagnosticFactory`, et la vérification de clé d'hôte au démarrage
+  SSH/SFTP passe par `SshStartupTrustGate` avant toute session. Le mode natif
+  Windows OpenSSH (`ssh.exe`) sous ConPTY écrit un fichier `known_hosts`
+  éphémère UTF-8 sans BOM protégé par ACL réservée au propriétaire courant
+  (`AclEnforcer.ApplyOwnerOnlyFileAcl`) incluant clés épinglées,
+  `@cert-authority` et `@revoked`, puis le supprime à la fermeture. La
+  révocation de parc `authorized_keys` (`SshFleetAuthorizedKeysService`) réutilise
+  les gardes atomiques anti-symlink et anti-verrouillage de dernière clé et
+  neutralise les formules CSV à l'export. L'export de transcription `.cast`
+  passe en fail-closed par `TextRedactor` (refus d'export en cas de timeout ou
+  troncature). La reconnexion automatique de tunnel (`TunnelReconnectPolicy`)
+  est opt-in, bornée par `TunnelAutoReconnectMaxAttempts` et s'interrompt en
+  fail-closed sans nouvelle tentative en cas d'écart de clé d'hôte, clé
+  révoquée, échec d'authentification, refus de signature agent ou annulation
+  utilisateur.
 
 ### Comparaison des empreintes de clé d'hôte
 
@@ -1753,7 +1774,7 @@ remplacer la destination.
   bloquante (la suite moins les cas marqués `CIUnstable` ou `RequiresDesktop`,
   qui tournent dans deux autres lanes signalant leurs échecs sans faire rougir
   l'exécution), la parité des locales JSON (chaque catalogue porte exactement
-  le jeu de clés anglais, actuellement 7 100+ clés) et une analyse informative
+  le jeu de clés anglais, actuellement 7 200+ clés) et une analyse informative
   `dotnet list package --vulnerable`.
 - Analyse des dépendances pour revue manuelle : `dotnet list Heimdall.slnx
   package --vulnerable --include-transitive`. La CI émet des avertissements mais

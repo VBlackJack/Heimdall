@@ -1214,6 +1214,24 @@ reached through an SSH gateway to prevent split-horizon DNS leaks.
   within hard size (`50 MiB`) and event (`500 000`) bounds, and
   `AsciinemaPlayerDialog` hardens its WebView2 host via `WebView2Lockdown.Apply`
   with post-load navigation blocked.
+- **Post-Phase-7 SSH hardening & Phase 8 boundaries**: outbound HTTP CONNECT /
+  SOCKS proxies fail closed (`SshConnectionFactory.BuildConnectionInfo`) and
+  suppress client-side DNS `SSHFP` lookups whenever a proxy is active to prevent
+  split-horizon or proxy-bypass DNS leaks. Gateway host-key trust prompts and
+  diagnostics enforce `SshCryptoPolicy` and `@revoked` parity through
+  `SshSessionDiagnosticFactory`, and SSH/SFTP startup host-key trust runs before
+  session creation via `SshStartupTrustGate`. Native Windows OpenSSH (`ssh.exe`)
+  ConPTY mode writes an ephemeral UTF-8 no-BOM `known_hosts` file protected by
+  an owner-only Windows ACL (`AclEnforcer.ApplyOwnerOnlyFileAcl`) containing
+  pinned entries, `@cert-authority`, and `@revoked` rules, deleting it on exit.
+  Fleet `authorized_keys` revocation (`SshFleetAuthorizedKeysService`) reuses
+  symlink/last-key atomic removal guards and neutralizes CSV formulas on export.
+  `.cast` transcript export passes full redaction spans through `TextRedactor`
+  fail-closed (refusing export on rule timeout or truncation). Tunnel
+  auto-reconnect (`TunnelReconnectPolicy`) is opt-in per tunnel/preset, bounded
+  by configurable retry limits (`TunnelAutoReconnectMaxAttempts`), and fails
+  closed without retrying on host-key mismatches, revoked keys, auth
+  rejections, agent signing declines, or user cancellations.
 
 ### Host-key fingerprint comparison
 
@@ -1574,7 +1592,7 @@ caller refuses: there is no fallback to a primitive that could replace the desti
   `dotnet format --verify-no-changes`, the blocking test lane (the suite minus
   the cases marked `CIUnstable` or `RequiresDesktop`, which run in two further
   lanes that report their failures without turning the run red), JSON locale
-  parity (every catalogue holds exactly the English key set, currently 7,100+
+  parity (every catalogue holds exactly the English key set, currently 7,200+
   keys each), and an informational `dotnet list package --vulnerable` scan.
 - Dependency scan for manual review: `dotnet list Heimdall.slnx package
   --vulnerable --include-transitive`. CI emits warnings but does not gate on
