@@ -83,6 +83,7 @@ internal static class SshLocalizationKeys
     /// <summary>Asked when something was sent and the server refused it.</summary>
     public const string DialogSftpPasswordPromptRefused = "DialogSftpPasswordPromptRefused";
     public const string ErrorSshHostKeyUnavailable = "ErrorSshHostKeyUnavailable";
+    public const string ErrorSshHostKeyTypeUnsupported = "ErrorSshHostKeyTypeUnsupported";
     public const string ErrorSshKeyFileNotFound = "ErrorSshKeyFileNotFound";
     public const string ErrorSshKeyPathInvalid = "ErrorSshKeyPathInvalid";
     public const string ErrorSshKeyPathNotAbsolute = "ErrorSshKeyPathNotAbsolute";

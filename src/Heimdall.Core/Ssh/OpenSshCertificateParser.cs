@@ -48,7 +48,8 @@ public sealed record OpenSshCertificateInfo(
     string CertificateFingerprint,
     byte[] SignedData,
     byte[] SignatureBlob,
-    string? SubjectPublicKeyFingerprint = null)
+    string? SubjectPublicKeyFingerprint = null,
+    byte[]? SubjectPublicKeyBlob = null)
 {
     public DateTimeOffset? ValidAfter => ValidAfterUnix == 0 || ValidAfterUnix > (ulong)DateTimeOffset.MaxValue.ToUnixTimeSeconds()
         ? null
@@ -311,7 +312,8 @@ public static class OpenSshCertificateParser
             certFingerprint,
             signedData,
             signatureBlob,
-            subjectKeyFingerprint);
+            subjectKeyFingerprint,
+            subjectPublicKeyBlob);
         return true;
     }
 

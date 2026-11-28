@@ -35,7 +35,25 @@ public sealed record OpenSshLaunchSpec
 
     public required string EphemeralKnownHostsPath { get; init; }
 
-    public bool StrictKnownHostOnly { get; init; }
+    /// <summary>
+    /// Alias ssh looks the server up under in the ephemeral <c>known_hosts</c> file. It must match
+    /// the alias that file was written with.
+    /// </summary>
+    public string HostKeyAlias { get; init; } = OpenSshEphemeralKnownHosts.HostKeyAlias;
+
+    /// <summary>
+    /// Key types (see <see cref="OpenSshHostKeyTypes"/>) of the keys written to the ephemeral
+    /// file. When present, ssh is restricted to host key algorithms of those types so it never
+    /// negotiates a key Heimdall did not decide. Empty leaves the algorithm choice to ssh: the
+    /// file still holds only decided keys, so any other key fails the strict check.
+    /// </summary>
+    public IReadOnlyList<string> PinnedKeyTypes { get; init; } = [];
+
+    /// <summary>
+    /// True when the host presented an OpenSSH certificate: the matching certificate algorithms
+    /// are offered after the plain ones.
+    /// </summary>
+    public bool HostCertificatePresented { get; init; }
 
     public string? KeyPath { get; init; }
 
@@ -111,12 +129,20 @@ public static class OpenSshLaunchBuilder
             throw new ArgumentException("Valid local ephemeral known_hosts path is required.", nameof(spec));
         }
 
+        if (string.IsNullOrWhiteSpace(spec.HostKeyAlias) || spec.HostKeyAlias.Any(static c => char.IsWhiteSpace(c) || char.IsControl(c)))
+        {
+            throw new ArgumentException("A host key alias without whitespace is required.", nameof(spec));
+        }
+
         var args = new List<string>
         {
             "-F", "none",
             "-o", "GlobalKnownHostsFile=none",
             "-o", $"UserKnownHostsFile={spec.EphemeralKnownHostsPath}",
-            "-o", $"StrictHostKeyChecking={(spec.StrictKnownHostOnly ? "yes" : "ask")}",
+            "-o", "StrictHostKeyChecking=yes",
+            "-o", "CheckHostIP=no",
+            "-o", "UpdateHostKeys=no",
+            "-o", $"HostKeyAlias={spec.HostKeyAlias}",
             "-p", spec.Port.ToString(CultureInfo.InvariantCulture)
         };
 
@@ -161,12 +187,21 @@ public static class OpenSshLaunchBuilder
             }
         }
 
+        // ssh keeps the first value of a repeated option: the host key algorithms are emitted once,
+        // here, whatever the policy.
+        string? pinnedHostKeyAlgorithms = BuildPinnedHostKeyAlgorithms(spec);
+        if (spec.CryptoPolicy != SshCryptoPolicy.StrictModern && pinnedHostKeyAlgorithms is not null)
+        {
+            args.Add("-o");
+            args.Add($"HostKeyAlgorithms={pinnedHostKeyAlgorithms}");
+        }
+
         if (spec.CryptoPolicy == SshCryptoPolicy.StrictModern)
         {
             args.Add("-o");
             args.Add($"KexAlgorithms={StrictModernKexAlgorithms}");
             args.Add("-o");
-            args.Add($"HostKeyAlgorithms={StrictModernHostKeyAlgorithms}");
+            args.Add($"HostKeyAlgorithms={pinnedHostKeyAlgorithms ?? StrictModernHostKeyAlgorithms}");
             args.Add("-o");
             args.Add($"Ciphers={StrictModernCiphers}");
             args.Add("-o");
@@ -233,6 +268,53 @@ public static class OpenSshLaunchBuilder
         }
 
         return args;
+    }
+
+    /// <summary>
+    /// The <c>HostKeyAlgorithms</c> value for the pinned key types: their plain algorithms, then
+    /// the matching certificate algorithms when the host presented a certificate. Under
+    /// <see cref="SshCryptoPolicy.StrictModern"/> it replaces the StrictModern list and is filtered
+    /// to the algorithms that list allows. Null when no key type is pinned.
+    /// </summary>
+    private static string? BuildPinnedHostKeyAlgorithms(OpenSshLaunchSpec spec)
+    {
+        if (spec.PinnedKeyTypes.Count == 0)
+        {
+            return null;
+        }
+
+        bool strictModern = spec.CryptoPolicy == SshCryptoPolicy.StrictModern;
+        bool allowSha1Rsa = !strictModern;
+        var plain = new List<string>();
+        var certificates = new List<string>();
+        foreach (string keyType in spec.PinnedKeyTypes)
+        {
+            if (!OpenSshHostKeyTypes.IsSupported(keyType))
+            {
+                throw new ArgumentException("Unsupported pinned host key type.", nameof(spec));
+            }
+
+            plain.AddRange(OpenSshHostKeyTypes.PlainAlgorithms(keyType, allowSha1Rsa));
+            if (spec.HostCertificatePresented)
+            {
+                certificates.AddRange(OpenSshHostKeyTypes.CertificateAlgorithms(keyType, allowSha1Rsa));
+            }
+        }
+
+        IEnumerable<string> ordered = plain.Concat(certificates).Distinct(StringComparer.Ordinal);
+        if (strictModern)
+        {
+            var allowed = new HashSet<string>(StrictModernHostKeyAlgorithms.Split(','), StringComparer.Ordinal);
+            ordered = ordered.Where(allowed.Contains);
+        }
+
+        string joined = string.Join(',', ordered);
+        if (joined.Length == 0)
+        {
+            throw new ArgumentException("No host key algorithm is allowed for the pinned key types.", nameof(spec));
+        }
+
+        return joined;
     }
 
     /// <summary>

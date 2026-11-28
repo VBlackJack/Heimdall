@@ -28,7 +28,8 @@ internal sealed record PlinkHostKeyDecision(
     SshFailureCode? FailureCode,
     string? FailureMessageKey,
     string? StoredFingerprint,
-    string? PresentedFingerprint);
+    string? PresentedFingerprint,
+    PlinkHostKeyPresentation? Presentation = null);
 
 internal static class PlinkHostKeyDecider
 {
@@ -92,21 +93,54 @@ internal static class PlinkHostKeyDecider
         ArgumentNullException.ThrowIfNull(trustService);
         ct.ThrowIfCancellationRequested();
 
+        bool isViaGateway = !string.Equals(transportHost, verificationHost, StringComparison.OrdinalIgnoreCase)
+            || transportPort != verificationPort;
+        return await DecideAsync(
+                verificationHost,
+                verificationPort,
+                isViaGateway,
+                storedFingerprint,
+                presentationProvider: string.IsNullOrWhiteSpace(plinkPath)
+                    ? static _ => Task.FromResult<PlinkHostKeyPresentation?>(null)
+                    : probeCt => probe.ProbeAsync(
+                        plinkPath,
+                        transportHost,
+                        transportPort,
+                        username,
+                        probeTimeoutMs,
+                        probeCt),
+                verifier,
+                trustService,
+                ct)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Decides the host-key fingerprint from a presentation supplied by any backend, so the
+    /// same trust decision serves Plink and the native OpenSSH client. The provider yields the
+    /// presented key, or null when none could be obtained, in which case an existing stored
+    /// fingerprint proceeds and first use fails closed.
+    /// </summary>
+    internal static async Task<PlinkHostKeyDecision> DecideAsync(
+        string verificationHost,
+        int verificationPort,
+        bool isViaGateway,
+        string? storedFingerprint,
+        Func<CancellationToken, Task<PlinkHostKeyPresentation?>> presentationProvider,
+        IHostKeyVerifier verifier,
+        IHostKeyTrustService trustService,
+        CancellationToken ct)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(verificationHost);
+        ArgumentNullException.ThrowIfNull(presentationProvider);
+        ArgumentNullException.ThrowIfNull(verifier);
+        ArgumentNullException.ThrowIfNull(trustService);
+        ct.ThrowIfCancellationRequested();
+
         string? normalizedStored = string.IsNullOrWhiteSpace(storedFingerprint)
             ? null
             : storedFingerprint;
-        bool isViaGateway = !string.Equals(transportHost, verificationHost, StringComparison.OrdinalIgnoreCase)
-            || transportPort != verificationPort;
-        PlinkHostKeyPresentation? presentation = string.IsNullOrWhiteSpace(plinkPath)
-            ? null
-            : await probe.ProbeAsync(
-                    plinkPath,
-                    transportHost,
-                    transportPort,
-                    username,
-                    probeTimeoutMs,
-                    ct)
-                .ConfigureAwait(false);
+        PlinkHostKeyPresentation? presentation = await presentationProvider(ct).ConfigureAwait(false);
 
         if (normalizedStored is not null)
         {
@@ -155,7 +189,7 @@ internal static class PlinkHostKeyDecider
             }
 
             Core.Logging.FileLogger.Warn(
-                $"Plink host-key probe returned no presentation for {host}:{port}; proceeding with stored Heimdall fingerprint.");
+                $"Host-key probe returned no presentation for {host}:{port}; proceeding with stored Heimdall fingerprint.");
             return Proceed(storedFingerprint);
         }
 
@@ -170,7 +204,7 @@ internal static class PlinkHostKeyDecider
 
         if (ConstantTimeEquals(presentation.Fingerprint, storedFingerprint))
         {
-            return Proceed(storedFingerprint);
+            return Proceed(storedFingerprint, presentation: presentation);
         }
 
         // Multi-algorithm match: if Heimdall already pinned a key for this host under the exact
@@ -180,7 +214,7 @@ internal static class PlinkHostKeyDecider
         if (!string.IsNullOrWhiteSpace(algorithmStored)
             && ConstantTimeEquals(presentation.Fingerprint, algorithmStored))
         {
-            return Proceed(algorithmStored);
+            return Proceed(algorithmStored, presentation: presentation);
         }
 
         HostKeyDecision decision = await verifier.VerifyAsync(
@@ -189,7 +223,7 @@ internal static class PlinkHostKeyDecider
                 presentation.Algorithm,
                 presentation.Fingerprint,
                 storedFingerprint,
-                ReadOnlyMemory<byte>.Empty,
+                DecodeBlob(presentation),
                 isViaGateway,
                 ct)
             .ConfigureAwait(false);
@@ -236,7 +270,7 @@ internal static class PlinkHostKeyDecider
                 presentation.Algorithm,
                 presentation.Fingerprint,
                 storedFingerprint: null,
-                ReadOnlyMemory<byte>.Empty,
+                DecodeBlob(presentation),
                 isViaGateway,
                 ct)
             .ConfigureAwait(false);
@@ -267,7 +301,7 @@ internal static class PlinkHostKeyDecider
                 presentation.Algorithm,
                 HostKeySource.UserConfirmed,
                 presentation.PublicKeyBase64);
-            return Proceed(presentation.Fingerprint, storedFingerprint, presentation.Fingerprint);
+            return Proceed(presentation.Fingerprint, storedFingerprint, presentation.Fingerprint, presentation);
         }
 
         if (decision == HostKeyDecision.TrustOnce)
@@ -278,7 +312,7 @@ internal static class PlinkHostKeyDecider
                 presentation.Fingerprint,
                 presentation.Algorithm,
                 presentation.PublicKeyBase64);
-            return Proceed(presentation.Fingerprint, storedFingerprint, presentation.Fingerprint);
+            return Proceed(presentation.Fingerprint, storedFingerprint, presentation.Fingerprint, presentation);
         }
 
         return storedFingerprint is null
@@ -294,6 +328,27 @@ internal static class PlinkHostKeyDecider
                 presentation.Fingerprint);
     }
 
+    /// <summary>
+    /// The raw host-key blob of a presentation, or empty when the backend could not capture it
+    /// (the Plink text probe). The verifier uses it for DNS fingerprint checks.
+    /// </summary>
+    private static ReadOnlyMemory<byte> DecodeBlob(PlinkHostKeyPresentation presentation)
+    {
+        if (string.IsNullOrWhiteSpace(presentation.PublicKeyBase64))
+        {
+            return ReadOnlyMemory<byte>.Empty;
+        }
+
+        try
+        {
+            return Convert.FromBase64String(presentation.PublicKeyBase64);
+        }
+        catch (FormatException)
+        {
+            return ReadOnlyMemory<byte>.Empty;
+        }
+    }
+
     private static bool ConstantTimeEquals(string a, string b)
     {
         byte[] aBytes = Encoding.UTF8.GetBytes(a);
@@ -304,7 +359,8 @@ internal static class PlinkHostKeyDecider
     private static PlinkHostKeyDecision Proceed(
         string fingerprint,
         string? storedFingerprint = null,
-        string? presentedFingerprint = null)
+        string? presentedFingerprint = null,
+        PlinkHostKeyPresentation? presentation = null)
     {
         return new PlinkHostKeyDecision(
             ShouldProceed: true,
@@ -312,7 +368,8 @@ internal static class PlinkHostKeyDecider
             FailureCode: null,
             FailureMessageKey: null,
             storedFingerprint,
-            presentedFingerprint);
+            presentedFingerprint,
+            presentation);
     }
 
     private static PlinkHostKeyDecision Reject(

@@ -122,6 +122,7 @@
   "ErrorSshHostKeyRevoked": "La clave de host del servidor est\u00e1 revocada expl\u00edcitamente por tu pol\u00edtica @revoked. La conexi\u00f3n ha sido bloqueada.",
   "ErrorSshHostCertificateInvalid": "El certificado de host presentado por el servidor no es v\u00e1lido, ha caducado o no coincide con el nombre de host para una autoridad certificadora de confianza. La conexi\u00f3n ha sido bloqueada.",
   "ErrorSshHostKeyUnavailable": "Heimdall no pudo verificar la clave de host de la pasarela. Se niega a recurrir a la cach\u00e9 local de plink.",
+  "ErrorSshHostKeyTypeUnsupported": "El tipo de clave de host del servidor no es compatible con el cliente OpenSSH nativo (solo se pueden fijar claves ed25519, ECDSA y RSA). La conexi\u00f3n ha sido bloqueada.",
   "ErrorSshNetworkUnreachable": "El host o la red no son accesibles. Comprueba el DNS y el enrutamiento.",
   "ErrorSshPortInUse": "El puerto local ya est\u00e1 en uso. Cierra la aplicaci\u00f3n en conflicto o elige otro puerto.",
   "ErrorSshSessionDisconnected": "El servidor desconect\u00f3 la sesi\u00f3n SSH.",

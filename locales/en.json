@@ -122,6 +122,7 @@
   "ErrorSshHostKeyRevoked": "The server host key is explicitly revoked by your @revoked policy. The connection was blocked.",
   "ErrorSshHostCertificateInvalid": "The server host certificate is invalid, expired, or does not match the hostname for a trusted certificate authority. The connection was blocked.",
   "ErrorSshHostKeyUnavailable": "Heimdall could not verify the gateway host key. Refusing to fall back to plink's local cache.",
+  "ErrorSshHostKeyTypeUnsupported": "The server host key type is not supported by the native OpenSSH client (only ed25519, ECDSA and RSA keys can be pinned). The connection was blocked.",
   "ErrorSshNetworkUnreachable": "Host or network is unreachable. Check DNS and routing.",
   "ErrorSshPortInUse": "The local port is already in use. Close the conflicting application or choose a different port.",
   "ErrorSshSessionDisconnected": "SSH session was disconnected by the server.",

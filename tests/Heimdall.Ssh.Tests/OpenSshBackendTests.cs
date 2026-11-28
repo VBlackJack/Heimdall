@@ -87,36 +87,65 @@ public sealed class OpenSshBackendTests : IDisposable
     }
 
     [Fact]
-    public void EphemeralKnownHosts_WritesNoBomMapsTunnelEndpointExcludesRevokedAndDisposesCleanly()
+    public void EphemeralKnownHosts_WritesExactlyTheGivenLinesUnderTheAlias_NoBom_AndDisposesCleanly()
     {
-        var store = new HostKeyStore();
-        DateTimeOffset now = DateTimeOffset.UtcNow;
-        store.TrustEntry("app.internal", 2222, new HostKeyEntry("SHA256:app", now, now, "ssh-ed25519", HostKeySource.UserConfirmed) { PublicKeyBase64 = "AAAAC3NzaC1lZDI1NTE5AAAAIAppKey" });
-        store.TrustEntry("revoked.internal", 22, new HostKeyEntry("SHA256:rev", now, now, "ssh-ed25519", HostKeySource.UserConfirmed) { PublicKeyBase64 = "AAAAC3NzaC1lZDI1NTE5AAAAIRevKey" });
-        store.AddRevokedKey("*", "SHA256:rev");
-
         using var ephemeral = OpenSshEphemeralKnownHosts.Create(
-            store,
-            transportHost: "127.0.0.1",
-            transportPort: 49200,
-            logicalHost: "app.internal",
-            logicalPort: 2222,
+            [
+                new OpenSshKnownHostsKey("ssh-ed25519", "AAAAC3NzaC1lZDI1NTE5AAAAIAppKey"),
+                new OpenSshKnownHostsKey("ssh-rsa", "AAAAB3NzaC1yc2EAAAADAQABAAABgQC+/="),
+                new OpenSshKnownHostsKey("ssh-ed25519", "AAAAC3NzaC1lZDI1NTE5AAAAIAppKey"),
+            ],
             baseDirectory: _tempDir);
 
-        Assert.True(ephemeral.TargetHostPinned);
         Assert.True(File.Exists(ephemeral.FilePath));
 
         byte[] raw = File.ReadAllBytes(ephemeral.FilePath);
         Assert.False(raw.Length >= 3 && raw[0] == 0xEF && raw[1] == 0xBB && raw[2] == 0xBF);
 
         string text = Encoding.UTF8.GetString(raw);
-        Assert.Contains("[127.0.0.1]:49200 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAppKey", text, StringComparison.Ordinal);
-        Assert.Contains("[app.internal]:2222 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAppKey", text, StringComparison.Ordinal);
-        Assert.DoesNotContain("revoked.internal", text, StringComparison.Ordinal);
+        Assert.Equal(
+            $"{OpenSshEphemeralKnownHosts.HostKeyAlias} ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAppKey\n"
+            + $"{OpenSshEphemeralKnownHosts.HostKeyAlias} ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC+/=\n",
+            text);
 
         string createdPath = ephemeral.FilePath;
         ephemeral.Dispose();
         Assert.False(File.Exists(createdPath));
+    }
+
+    [Fact]
+    public void EphemeralKnownHosts_NeverCopiesTheHostKeyStore()
+    {
+        var store = new HostKeyStore();
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        store.TrustEntry("other.internal", 22, new HostKeyEntry("SHA256:other", now, now, "ssh-ed25519", HostKeySource.UserConfirmed) { PublicKeyBase64 = "AAAAC3NzaC1lZDI1NTE5AAAAIOtherKey" });
+
+        using var ephemeral = OpenSshEphemeralKnownHosts.Create(
+            [new OpenSshKnownHostsKey("ssh-ed25519", "AAAAC3NzaC1lZDI1NTE5AAAAIDecided")],
+            baseDirectory: _tempDir);
+
+        string text = File.ReadAllText(ephemeral.FilePath);
+        Assert.DoesNotContain("other.internal", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("OtherKey", text, StringComparison.Ordinal);
+        Assert.Single(text.Split('\n', StringSplitOptions.RemoveEmptyEntries));
+    }
+
+    [Theory]
+    [InlineData("ssh-dss", "AAAAB3NzaC1kc3M=")]
+    [InlineData("sk-ssh-ed25519@openssh.com", "AAAAGnNrLXNzaC1lZDI1NTE5")]
+    [InlineData("ssh-ed25519", "AAAA BBBB")]
+    [InlineData("ssh-ed25519", "AAAA\nssh-rsa BBBB")]
+    [InlineData("ssh-ed25519", "")]
+    public void EphemeralKnownHosts_RefusesAnUnsupportedTypeOrAMalformedBlob(string keyType, string blob)
+    {
+        Assert.Throws<ArgumentException>(() => OpenSshEphemeralKnownHosts.BuildKnownHostsContent(
+            [new OpenSshKnownHostsKey(keyType, blob)]));
+    }
+
+    [Fact]
+    public void EphemeralKnownHosts_RefusesAnEmptyKeyList()
+    {
+        Assert.Throws<ArgumentException>(() => OpenSshEphemeralKnownHosts.BuildKnownHostsContent([]));
     }
 
     [Fact]
@@ -157,7 +186,6 @@ public sealed class OpenSshBackendTests : IDisposable
             Port = 2222,
             Username = "alice",
             EphemeralKnownHostsPath = @"C:\temp\kh.txt",
-            StrictKnownHostOnly = true,
             KeyPath = @"C:\keys\id ed25519",
             CertificatePath = @"C:\keys\id ed25519-cert.pub",
             AgentForwarding = true,
@@ -198,13 +226,12 @@ public sealed class OpenSshBackendTests : IDisposable
             Port = 22,
             Username = "alice",
             EphemeralKnownHostsPath = @"C:\temp\kh.txt",
-            StrictKnownHostOnly = false,
             AllowStartupExecution = true,
             StartupCommand = "tmux attach",
             EnvironmentVariables = ["ENV=prod"]
         });
 
-        Assert.Contains("StrictHostKeyChecking=ask", argsTrusted);
+        Assert.Contains("StrictHostKeyChecking=yes", argsTrusted);
         Assert.Contains("SetEnv=ENV=prod", argsTrusted);
         Assert.Contains("-t", argsTrusted);
         Assert.Equal("--", argsTrusted[^3]);
@@ -213,5 +240,116 @@ public sealed class OpenSshBackendTests : IDisposable
 
         string joined = OpenSshLaunchBuilder.JoinWindowsCommandLine(argsUntrusted);
         Assert.Contains("\"C:\\keys\\id ed25519\"", joined, StringComparison.Ordinal);
+    }
+
+    private static OpenSshLaunchSpec PinnedSpec(
+        IReadOnlyList<string> keyTypes,
+        SshCryptoPolicy policy = SshCryptoPolicy.Standard,
+        bool certificate = false)
+        => new()
+        {
+            Host = "prod.example.com",
+            EphemeralKnownHostsPath = @"C:\temp\kh.txt",
+            PinnedKeyTypes = keyTypes,
+            HostCertificatePresented = certificate,
+            CryptoPolicy = policy,
+        };
+
+    private static string[] HostKeyAlgorithmValues(IReadOnlyList<string> args)
+        => args.Where(a => a.StartsWith("HostKeyAlgorithms=", StringComparison.Ordinal)).ToArray();
+
+    [Theory]
+    [InlineData(SshCryptoPolicy.Standard)]
+    [InlineData(SshCryptoPolicy.StrictModern)]
+    public void LaunchBuilder_AlwaysStrict_NeverAsksOrAcceptsNew_WhateverTheSpec(SshCryptoPolicy policy)
+    {
+        IReadOnlyList<string> args = OpenSshLaunchBuilder.BuildArguments(PinnedSpec(["ssh-ed25519"], policy));
+
+        Assert.Contains("StrictHostKeyChecking=yes", args);
+        Assert.Contains("CheckHostIP=no", args);
+        Assert.Contains("UpdateHostKeys=no", args);
+        Assert.Contains($"HostKeyAlias={OpenSshEphemeralKnownHosts.HostKeyAlias}", args);
+        Assert.DoesNotContain(args, a => a.Contains("=ask", StringComparison.Ordinal));
+        Assert.DoesNotContain(args, a => a.Contains("accept-new", StringComparison.Ordinal));
+        Assert.DoesNotContain(args, a => a.Contains("StrictHostKeyChecking=no", StringComparison.Ordinal));
+        Assert.Single(args, a => a.StartsWith("StrictHostKeyChecking=", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("ssh-ed25519", "ssh-ed25519")]
+    [InlineData("ecdsa-sha2-nistp256", "ecdsa-sha2-nistp256")]
+    [InlineData("ecdsa-sha2-nistp384", "ecdsa-sha2-nistp384")]
+    [InlineData("ecdsa-sha2-nistp521", "ecdsa-sha2-nistp521")]
+    [InlineData("ssh-rsa", "rsa-sha2-512,rsa-sha2-256,ssh-rsa")]
+    public void LaunchBuilder_PinsHostKeyAlgorithmsToThePinnedKeyType(string keyType, string expected)
+    {
+        IReadOnlyList<string> args = OpenSshLaunchBuilder.BuildArguments(PinnedSpec([keyType]));
+
+        Assert.Equal([$"HostKeyAlgorithms={expected}"], HostKeyAlgorithmValues(args));
+    }
+
+    [Fact]
+    public void LaunchBuilder_AppendsTheMatchingCertificateAlgorithmsAfterThePlainOnes()
+    {
+        IReadOnlyList<string> ed = OpenSshLaunchBuilder.BuildArguments(PinnedSpec(["ssh-ed25519"], certificate: true));
+        IReadOnlyList<string> rsa = OpenSshLaunchBuilder.BuildArguments(PinnedSpec(["ssh-rsa"], certificate: true));
+
+        Assert.Equal(
+            ["HostKeyAlgorithms=ssh-ed25519,ssh-ed25519-cert-v01@openssh.com"],
+            HostKeyAlgorithmValues(ed));
+        Assert.Equal(
+            ["HostKeyAlgorithms=rsa-sha2-512,rsa-sha2-256,ssh-rsa,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-rsa-cert-v01@openssh.com"],
+            HostKeyAlgorithmValues(rsa));
+    }
+
+    [Fact]
+    public void LaunchBuilder_StrictModern_ReplacesItsHostKeyListWithTheFilteredPinnedOne_EmittedOnce()
+    {
+        IReadOnlyList<string> rsa = OpenSshLaunchBuilder.BuildArguments(
+            PinnedSpec(["ssh-rsa"], SshCryptoPolicy.StrictModern, certificate: true));
+        IReadOnlyList<string> ed = OpenSshLaunchBuilder.BuildArguments(
+            PinnedSpec(["ssh-ed25519"], SshCryptoPolicy.StrictModern));
+
+        Assert.Equal(
+            ["HostKeyAlgorithms=rsa-sha2-512,rsa-sha2-256,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com"],
+            HostKeyAlgorithmValues(rsa));
+        Assert.Equal(["HostKeyAlgorithms=ssh-ed25519"], HostKeyAlgorithmValues(ed));
+        Assert.DoesNotContain(
+            rsa,
+            a => a.Contains("ssh-rsa", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void LaunchBuilder_StrictModernWithoutAPinnedType_KeepsItsOwnHostKeyList_EmittedOnce()
+    {
+        IReadOnlyList<string> args = OpenSshLaunchBuilder.BuildArguments(PinnedSpec([], SshCryptoPolicy.StrictModern));
+
+        Assert.Equal(
+            [$"HostKeyAlgorithms={OpenSshLaunchBuilder.StrictModernHostKeyAlgorithms}"],
+            HostKeyAlgorithmValues(args));
+    }
+
+    [Fact]
+    public void LaunchBuilder_StandardWithoutAPinnedType_LeavesTheAlgorithmChoiceToSsh()
+    {
+        IReadOnlyList<string> args = OpenSshLaunchBuilder.BuildArguments(PinnedSpec([]));
+
+        Assert.Empty(HostKeyAlgorithmValues(args));
+    }
+
+    [Theory]
+    [InlineData("ssh-dss")]
+    [InlineData("sk-ssh-ed25519@openssh.com")]
+    [InlineData("nonsense")]
+    public void LaunchBuilder_RefusesAnUnsupportedPinnedKeyType(string keyType)
+    {
+        Assert.Throws<ArgumentException>(() => OpenSshLaunchBuilder.BuildArguments(PinnedSpec([keyType])));
+    }
+
+    [Fact]
+    public void LaunchBuilder_RefusesAnAliasWithWhitespace()
+    {
+        Assert.Throws<ArgumentException>(() => OpenSshLaunchBuilder.BuildArguments(
+            PinnedSpec(["ssh-ed25519"]) with { HostKeyAlias = "bad alias" }));
     }
 }
