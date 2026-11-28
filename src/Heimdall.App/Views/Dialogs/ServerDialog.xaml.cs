@@ -160,6 +160,7 @@ public partial class ServerDialog : Window
         {
             (FindName("SshPasswordBox") as System.Windows.Controls.PasswordBox)?.Clear();
             (FindName("SshKeyPassphraseBox") as System.Windows.Controls.PasswordBox)?.Clear();
+            (FindName("SshProxyPasswordBox") as System.Windows.Controls.PasswordBox)?.Clear();
             (FindName("RdpPasswordBox") as System.Windows.Controls.PasswordBox)?.Clear();
             (FindName("VncPasswordBox") as System.Windows.Controls.PasswordBox)?.Clear();
             (FindName("WebPasswordBox") as System.Windows.Controls.PasswordBox)?.Clear();
@@ -328,6 +329,18 @@ public partial class ServerDialog : Window
             case nameof(ServerDialogViewModel.SshLocalForwardsText):
                 MainTabControl.SelectedItem = DlgSrv_TabOptions;
                 target = DlgSrv_SshLocalForwardsBox;
+                break;
+            case nameof(ServerDialogViewModel.SshProxyHost):
+                MainTabControl.SelectedItem = DlgSrv_TabOptions;
+                target = DlgSrv_SshProxyHostBox;
+                break;
+            case nameof(ServerDialogViewModel.SshStartupCommand):
+                MainTabControl.SelectedItem = DlgSrv_TabOptions;
+                target = DlgSrv_SshStartupCommandBox;
+                break;
+            case nameof(ServerDialogViewModel.SshEnvironmentVariablesText):
+                MainTabControl.SelectedItem = DlgSrv_TabOptions;
+                target = DlgSrv_SshEnvVarsBox;
                 break;
         }
 

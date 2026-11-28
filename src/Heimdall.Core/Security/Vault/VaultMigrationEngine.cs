@@ -82,6 +82,8 @@ internal static class VaultMigrationEngine
                     v => gateway.SshPasswordEncrypted = v, ForwardEncrypted);
                 Apply(gateway.SshKeyPassphraseEncrypted,
                     v => gateway.SshKeyPassphraseEncrypted = v, ForwardEncrypted);
+                Apply(gateway.SshProxyPasswordEncrypted,
+                    v => gateway.SshProxyPasswordEncrypted = v, ForwardEncrypted);
             }
         });
 
@@ -124,7 +126,9 @@ internal static class VaultMigrationEngine
         }
 
         return settings.SshGateways.Any(gateway =>
-            NeedsSealing(gateway.SshPasswordEncrypted) || NeedsSealing(gateway.SshKeyPassphraseEncrypted));
+            NeedsSealing(gateway.SshPasswordEncrypted)
+            || NeedsSealing(gateway.SshKeyPassphraseEncrypted)
+            || NeedsSealing(gateway.SshProxyPasswordEncrypted));
     }
 
     /// <summary>
@@ -303,6 +307,8 @@ internal static class VaultMigrationEngine
                     v => gateway.SshPasswordEncrypted = v, legacy);
                 Apply(gateway.SshKeyPassphraseEncrypted,
                     v => gateway.SshKeyPassphraseEncrypted = v, legacy);
+                Apply(gateway.SshProxyPasswordEncrypted,
+                    v => gateway.SshProxyPasswordEncrypted = v, legacy);
             }
         }).ConfigureAwait(false);
     }
@@ -313,6 +319,7 @@ internal static class VaultMigrationEngine
         changed |= Apply(profile.RdpPasswordEncrypted, v => profile.RdpPasswordEncrypted = v, ForwardEncrypted);
         changed |= Apply(profile.SshPasswordEncrypted, v => profile.SshPasswordEncrypted = v, ForwardEncrypted);
         changed |= Apply(profile.SshKeyPassphraseEncrypted, v => profile.SshKeyPassphraseEncrypted = v, ForwardEncrypted);
+        changed |= Apply(profile.SshProxyPasswordEncrypted, v => profile.SshProxyPasswordEncrypted = v, ForwardEncrypted);
         changed |= Apply(profile.WinRmPasswordEncrypted, v => profile.WinRmPasswordEncrypted = v, ForwardEncrypted);
         changed |= Apply(profile.FtpPasswordEncrypted, v => profile.FtpPasswordEncrypted = v, ForwardEncrypted);
         changed |= Apply(profile.TelnetPasswordEncrypted, v => profile.TelnetPasswordEncrypted = v, ForwardEncrypted);
@@ -330,6 +337,7 @@ internal static class VaultMigrationEngine
         Apply(profile.RdpPasswordEncrypted, v => profile.RdpPasswordEncrypted = v, legacy);
         Apply(profile.SshPasswordEncrypted, v => profile.SshPasswordEncrypted = v, legacy);
         Apply(profile.SshKeyPassphraseEncrypted, v => profile.SshKeyPassphraseEncrypted = v, legacy);
+        Apply(profile.SshProxyPasswordEncrypted, v => profile.SshProxyPasswordEncrypted = v, legacy);
         Apply(profile.WinRmPasswordEncrypted, v => profile.WinRmPasswordEncrypted = v, legacy);
         Apply(profile.FtpPasswordEncrypted, v => profile.FtpPasswordEncrypted = v, legacy);
         Apply(profile.TelnetPasswordEncrypted, v => profile.TelnetPasswordEncrypted = v, legacy);

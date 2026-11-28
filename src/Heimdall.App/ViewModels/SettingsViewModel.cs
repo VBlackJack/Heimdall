@@ -70,6 +70,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                                 JsonNamingPolicy.CamelCase.ConvertName(nameof(ServerProfileDto.TelnetPasswordEncrypted)),
                                 JsonNamingPolicy.CamelCase.ConvertName(nameof(ServerProfileDto.WebPasswordEncrypted)),
                                 JsonNamingPolicy.CamelCase.ConvertName(nameof(ServerProfileDto.SshKeyPassphraseEncrypted)),
+                                JsonNamingPolicy.CamelCase.ConvertName(nameof(ServerProfileDto.SshProxyPasswordEncrypted)),
                                 JsonNamingPolicy.CamelCase.ConvertName(nameof(ServerProfileDto.VncPassword)),
                                 JsonNamingPolicy.CamelCase.ConvertName(nameof(ServerProfileDto.CitrixLaunchCommandLine)),
 
@@ -87,6 +88,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                             [
                                 JsonNamingPolicy.CamelCase.ConvertName(nameof(SshGatewayDto.SshPasswordEncrypted)),
                                 JsonNamingPolicy.CamelCase.ConvertName(nameof(SshGatewayDto.SshKeyPassphraseEncrypted)),
+                                JsonNamingPolicy.CamelCase.ConvertName(nameof(SshGatewayDto.SshProxyPasswordEncrypted)),
                                 JsonNamingPolicy.CamelCase.ConvertName(nameof(SshGatewayDto.SshAgentKeyFingerprint))
                             ]);
                     }

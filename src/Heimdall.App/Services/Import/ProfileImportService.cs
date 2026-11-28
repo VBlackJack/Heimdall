@@ -608,6 +608,7 @@ public sealed class ProfileImportService(
         {
             gateway.SshPasswordEncrypted = null;
             gateway.SshKeyPassphraseEncrypted = null;
+            gateway.SshProxyPasswordEncrypted = null;
         }
 
         return document;

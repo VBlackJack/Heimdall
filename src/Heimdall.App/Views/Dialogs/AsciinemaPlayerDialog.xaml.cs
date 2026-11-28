@@ -34,7 +34,7 @@ namespace Heimdall.App.Views.Dialogs;
 /// Built-in read-only asciinema v2 (<c>.cast</c>) replay window powered by the embedded xterm.js
 /// WebView2 surface. Supports play/pause, speed control, idle-time compression, and instant seeking.
 /// </summary>
-public partial class AsciinemaPlayerDialog : Window
+public partial class AsciinemaPlayerDialog : Window, IDisposable
 {
     private const string TerminalClearResetSequence = "\x1b[2J\x1b[H\x1b[3J";
 
@@ -43,7 +43,9 @@ public partial class AsciinemaPlayerDialog : Window
     private readonly string? _initialFilePath;
     private readonly DispatcherTimer _playbackTimer;
 
+    private IDisposable? _lockdown;
     private AsciinemaCastRecording? _recording;
+    private bool _allowInitialNavigation;
     private bool _webViewReady;
     private bool _isPlaying;
     private bool _updatingSlider;
@@ -100,8 +102,27 @@ public partial class AsciinemaPlayerDialog : Window
                 return;
             }
 
+            _lockdown?.Dispose();
+            _lockdown = WebView2Lockdown.Apply(PlayerWebView.CoreWebView2, onNewWindow: null);
+            PlayerWebView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
+            PlayerWebView.CoreWebView2.Settings.AreDevToolsEnabled = false;
+            PlayerWebView.CoreWebView2.Settings.AreBrowserAcceleratorKeysEnabled = false;
+            PlayerWebView.CoreWebView2.Settings.AreDefaultScriptDialogsEnabled = false;
+            PlayerWebView.CoreWebView2.Settings.IsStatusBarEnabled = false;
+            PlayerWebView.CoreWebView2.Settings.IsZoomControlEnabled = false;
+            PlayerWebView.CoreWebView2.Settings.IsPinchZoomEnabled = false;
+
+            PlayerWebView.CoreWebView2.NavigationStarting += (_, navArgs) =>
+            {
+                if (!_allowInitialNavigation)
+                {
+                    navArgs.Cancel = true;
+                }
+            };
+
             PlayerWebView.CoreWebView2.NavigationCompleted += (_, _) =>
             {
+                _allowInitialNavigation = false;
                 if (_disposed)
                 {
                     return;
@@ -113,11 +134,18 @@ public partial class AsciinemaPlayerDialog : Window
                     RenderSeekState(_currentSeconds);
                 }
             };
+
+            _allowInitialNavigation = true;
             PlayerWebView.CoreWebView2.NavigateToString(
                 EmbeddedSshView.BuildReadOnlyTerminalHtml(_settings, _localizer));
         }
         catch (Exception ex)
         {
+            if (_disposed)
+            {
+                return;
+            }
+
             FileLogger.Warn($"[AsciinemaPlayerDialog] WebView2 init failed: {ex.Message}");
             TxtMeta.Text = _localizer.Format("CastPlayerLoadFailed", ex.Message);
         }
@@ -140,9 +168,10 @@ public partial class AsciinemaPlayerDialog : Window
     {
         StopPlayback();
 
-        if (!AsciinemaCastPlayerEngine.TryLoadFile(filePath, out var recording, out string? error) || recording is null)
+        if (!AsciinemaCastPlayerEngine.TryLoadFile(filePath, out var recording, out var errorCode, out string? rawError) || recording is null)
         {
-            TxtMeta.Text = _localizer.Format("CastPlayerLoadFailed", error ?? string.Empty);
+            string localizedReason = FormatLoadError(errorCode, rawError);
+            TxtMeta.Text = _localizer.Format("CastPlayerLoadFailed", localizedReason);
             BtnPlayPause.IsEnabled = false;
             BtnRestart.IsEnabled = false;
             TimelineSlider.IsEnabled = false;
@@ -405,6 +434,21 @@ public partial class AsciinemaPlayerDialog : Window
         return UseIdleCap() ? _recording.CompressedDurationSeconds : _recording.TotalDurationSeconds;
     }
 
+    private string FormatLoadError(AsciinemaCastLoadErrorCode code, string? rawError)
+    {
+        return code switch
+        {
+            AsciinemaCastLoadErrorCode.EmptyPath => _localizer["CastPlayerErrorEmptyPath"],
+            AsciinemaCastLoadErrorCode.FileNotFound => _localizer["CastPlayerErrorFileNotFound"],
+            AsciinemaCastLoadErrorCode.FileTooLargeOrEmpty => _localizer["CastPlayerErrorFileTooLargeOrEmpty"],
+            AsciinemaCastLoadErrorCode.EmptyContent => _localizer["CastPlayerErrorEmptyContent"],
+            AsciinemaCastLoadErrorCode.MissingHeader => _localizer["CastPlayerErrorMissingHeader"],
+            AsciinemaCastLoadErrorCode.InvalidHeader => _localizer["CastPlayerErrorInvalidHeader"],
+            AsciinemaCastLoadErrorCode.UnsupportedVersion => _localizer["CastPlayerErrorUnsupportedVersion"],
+            _ => string.IsNullOrWhiteSpace(rawError) ? _localizer["CastPlayerErrorReadFailed"] : rawError
+        };
+    }
+
     private void OnCloseClick(object sender, RoutedEventArgs e)
     {
         DialogResult = true;
@@ -412,8 +456,21 @@ public partial class AsciinemaPlayerDialog : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        Dispose();
+        base.OnClosed(e);
+    }
+
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
         _disposed = true;
         _playbackTimer.Stop();
+        _lockdown?.Dispose();
+        _lockdown = null;
         try
         {
             PlayerWebView.Dispose();
@@ -421,7 +478,5 @@ public partial class AsciinemaPlayerDialog : Window
         catch (Exception)
         {
         }
-
-        base.OnClosed(e);
     }
 }

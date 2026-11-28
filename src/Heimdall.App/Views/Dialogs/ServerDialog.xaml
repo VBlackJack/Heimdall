@@ -2149,7 +2149,7 @@
                                                     <ColumnDefinition Width="96"/>
                                                 </Grid.ColumnDefinitions>
                                                 <TextBlock Grid.Column="0" Text="{loc:Translate SshProxyHostLabel}" Style="{StaticResource LabelStyle}" Margin="0,6,0,0"/>
-                                                <TextBox Grid.Column="1" Text="{Binding SshProxyHost, UpdateSourceTrigger=PropertyChanged}"
+                                                <TextBox x:Name="DlgSrv_SshProxyHostBox" Grid.Column="1" Text="{Binding SshProxyHost, UpdateSourceTrigger=PropertyChanged}"
                                                          AutomationProperties.Name="{loc:Translate SshProxyHostLabel}"
                                                          Margin="0,0,8,0"
                                                          Style="{StaticResource DialogFormTextBoxStyle}"/>
@@ -2157,6 +2157,9 @@
                                                          AutomationProperties.Name="{loc:Translate SshProxyPortLabel}"
                                                          Style="{StaticResource DialogFormTextBoxStyle}"/>
                                             </Grid>
+                                            <TextBlock Text="{Binding SshProxyError}"
+                                                       Style="{StaticResource FieldValidationErrorStyle}"
+                                                       Visibility="{Binding SshProxyError, Converter={StaticResource NullToVisibilityConverter}}"/>
                                             <Grid Margin="0,8,0,0">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="180"/>
@@ -2249,6 +2252,9 @@
                                                      Text="{Binding SshStartupCommand, UpdateSourceTrigger=PropertyChanged}"
                                                      AutomationProperties.Name="{loc:Translate ServerDialogSshStartupCommandLabel}"
                                                      Style="{StaticResource DialogFormTextBoxStyle}"/>
+                                            <TextBlock Text="{Binding SshStartupCommandError}"
+                                                       Style="{StaticResource FieldValidationErrorStyle}"
+                                                       Visibility="{Binding SshStartupCommandError, Converter={StaticResource NullToVisibilityConverter}}"/>
                                             <TextBlock Style="{StaticResource DialogHintTextStyle}"
                                                        Text="{loc:Translate ServerDialogSshStartupCommandHint}"
                                                        TextWrapping="Wrap"

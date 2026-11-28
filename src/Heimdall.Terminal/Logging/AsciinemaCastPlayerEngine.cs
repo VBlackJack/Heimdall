@@ -15,10 +15,25 @@
  */
 
 using System.Globalization;
+using System.Security;
 using System.Text;
 using System.Text.Json;
 
 namespace Heimdall.Terminal.Logging;
+
+/// <summary>Structured error code returned when loading or parsing an asciinema v2 recording fails.</summary>
+public enum AsciinemaCastLoadErrorCode
+{
+    None = 0,
+    EmptyPath = 1,
+    FileNotFound = 2,
+    FileTooLargeOrEmpty = 3,
+    EmptyContent = 4,
+    MissingHeader = 5,
+    InvalidHeader = 6,
+    UnsupportedVersion = 7,
+    ReadFailed = 8
+}
 
 /// <summary>Parsed asciinema v2 (<c>.cast</c>) file header.</summary>
 public sealed record AsciinemaCastHeader(
@@ -58,12 +73,23 @@ public static class AsciinemaCastPlayerEngine
         out AsciinemaCastRecording? recording,
         out string? errorMessage,
         double maxIdleSeconds = DefaultMaxIdleSeconds)
+        => TryLoadFile(path, out recording, out _, out errorMessage, maxIdleSeconds);
+
+    /// <summary>Loads and parses an asciinema v2 recording from a local file with structured error code.</summary>
+    public static bool TryLoadFile(
+        string path,
+        out AsciinemaCastRecording? recording,
+        out AsciinemaCastLoadErrorCode errorCode,
+        out string? errorMessage,
+        double maxIdleSeconds = DefaultMaxIdleSeconds)
     {
         recording = null;
+        errorCode = AsciinemaCastLoadErrorCode.None;
         errorMessage = null;
 
         if (string.IsNullOrWhiteSpace(path))
         {
+            errorCode = AsciinemaCastLoadErrorCode.EmptyPath;
             errorMessage = "File path is empty.";
             return false;
         }
@@ -73,26 +99,24 @@ public static class AsciinemaCastPlayerEngine
             var info = new FileInfo(path);
             if (!info.Exists)
             {
+                errorCode = AsciinemaCastLoadErrorCode.FileNotFound;
                 errorMessage = "File does not exist.";
                 return false;
             }
 
             if (info.Length <= 0 || info.Length > MaxCastFileBytes)
             {
+                errorCode = AsciinemaCastLoadErrorCode.FileTooLargeOrEmpty;
                 errorMessage = "File is empty or exceeds the maximum supported size (50 MiB).";
                 return false;
             }
 
             string content = File.ReadAllText(path, Encoding.UTF8);
-            return TryParse(content, out recording, out errorMessage, maxIdleSeconds);
+            return TryParse(content, out recording, out errorCode, out errorMessage, maxIdleSeconds);
         }
-        catch (IOException ex)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException or SecurityException)
         {
-            errorMessage = ex.Message;
-            return false;
-        }
-        catch (UnauthorizedAccessException ex)
-        {
+            errorCode = AsciinemaCastLoadErrorCode.ReadFailed;
             errorMessage = ex.Message;
             return false;
         }
@@ -104,12 +128,23 @@ public static class AsciinemaCastPlayerEngine
         out AsciinemaCastRecording? recording,
         out string? errorMessage,
         double maxIdleSeconds = DefaultMaxIdleSeconds)
+        => TryParse(content, out recording, out _, out errorMessage, maxIdleSeconds);
+
+    /// <summary>Parses asciinema v2 NDJSON content into a playback recording with structured error code.</summary>
+    public static bool TryParse(
+        string? content,
+        out AsciinemaCastRecording? recording,
+        out AsciinemaCastLoadErrorCode errorCode,
+        out string? errorMessage,
+        double maxIdleSeconds = DefaultMaxIdleSeconds)
     {
         recording = null;
+        errorCode = AsciinemaCastLoadErrorCode.None;
         errorMessage = null;
 
         if (string.IsNullOrWhiteSpace(content))
         {
+            errorCode = AsciinemaCastLoadErrorCode.EmptyContent;
             errorMessage = "Recording content is empty.";
             return false;
         }
@@ -131,11 +166,12 @@ public static class AsciinemaCastPlayerEngine
 
         if (headerLine is null)
         {
+            errorCode = AsciinemaCastLoadErrorCode.MissingHeader;
             errorMessage = "Missing asciinema header line.";
             return false;
         }
 
-        if (!TryParseHeader(headerLine, out AsciinemaCastHeader? header, out errorMessage) || header is null)
+        if (!TryParseHeader(headerLine, out AsciinemaCastHeader? header, out errorCode, out errorMessage) || header is null)
         {
             return false;
         }
@@ -233,9 +269,14 @@ public static class AsciinemaCastPlayerEngine
             : string.Create(CultureInfo.InvariantCulture, $"{minutes:00}:{secs:00}");
     }
 
-    private static bool TryParseHeader(string line, out AsciinemaCastHeader? header, out string? error)
+    private static bool TryParseHeader(
+        string line,
+        out AsciinemaCastHeader? header,
+        out AsciinemaCastLoadErrorCode errorCode,
+        out string? error)
     {
         header = null;
+        errorCode = AsciinemaCastLoadErrorCode.None;
         error = null;
 
         try
@@ -244,6 +285,7 @@ public static class AsciinemaCastPlayerEngine
             var root = doc.RootElement;
             if (root.ValueKind != JsonValueKind.Object)
             {
+                errorCode = AsciinemaCastLoadErrorCode.InvalidHeader;
                 error = "Header must be a JSON object.";
                 return false;
             }
@@ -251,17 +293,18 @@ public static class AsciinemaCastPlayerEngine
             if (!root.TryGetProperty("version", out var versionProp) || versionProp.ValueKind != JsonValueKind.Number
                 || !versionProp.TryGetInt32(out int version) || version != 2)
             {
+                errorCode = AsciinemaCastLoadErrorCode.UnsupportedVersion;
                 error = "Only asciinema v2 (.cast) recordings are supported.";
                 return false;
             }
 
-            int width = root.TryGetProperty("width", out var wProp) && wProp.TryGetInt32(out int w)
+            int width = root.TryGetProperty("width", out var wProp) && wProp.ValueKind == JsonValueKind.Number && wProp.TryGetInt32(out int w)
                 ? Math.Clamp(w, 1, 500)
                 : 80;
-            int height = root.TryGetProperty("height", out var hProp) && hProp.TryGetInt32(out int h)
+            int height = root.TryGetProperty("height", out var hProp) && hProp.ValueKind == JsonValueKind.Number && hProp.TryGetInt32(out int h)
                 ? Math.Clamp(h, 1, 200)
                 : 24;
-            long? timestamp = root.TryGetProperty("timestamp", out var tsProp) && tsProp.TryGetInt64(out long ts)
+            long? timestamp = root.TryGetProperty("timestamp", out var tsProp) && tsProp.ValueKind == JsonValueKind.Number && tsProp.TryGetInt64(out long ts)
                 ? ts
                 : null;
             string title = root.TryGetProperty("title", out var titleProp) && titleProp.ValueKind == JsonValueKind.String
@@ -273,6 +316,7 @@ public static class AsciinemaCastPlayerEngine
         }
         catch (JsonException ex)
         {
+            errorCode = AsciinemaCastLoadErrorCode.InvalidHeader;
             error = $"Invalid asciinema header JSON: {ex.Message}";
             return false;
         }

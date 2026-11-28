@@ -129,4 +129,19 @@ public sealed class SshConfigExporterTests
         var hop = Assert.Single(appCandidate.ProxyJumpChain);
         Assert.Equal("dmz.example.com", hop.HostName);
     }
+
+    [Fact]
+    public void ExportSingleHost_SkipsSetEnvValuesContainingDoubleQuotes()
+    {
+        var exported = SshConfigExporter.ExportSingleHost(new SshConfigHostEntry(
+            Alias: "ops",
+            HostName: "ops.example.com",
+            User: "admin",
+            EnvironmentVariables: ["SAFE_ENV=prod", "UNSAFE_ENV=a\"b"],
+            StartupCommand: "tmux new -As ops"));
+
+        Assert.Contains("    SetEnv SAFE_ENV=prod", exported, StringComparison.Ordinal);
+        Assert.DoesNotContain("UNSAFE_ENV", exported, StringComparison.Ordinal);
+        Assert.Contains("    RemoteCommand tmux new -As ops", exported, StringComparison.Ordinal);
+    }
 }

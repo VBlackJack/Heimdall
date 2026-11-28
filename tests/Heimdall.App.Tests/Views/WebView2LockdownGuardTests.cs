@@ -69,6 +69,7 @@ public sealed class WebView2LockdownGuardTests
             .ToArray();
         string[] expected = new[]
         {
+            "AsciinemaPlayerDialog.xaml.cs",
             "EmbeddedVncView.xaml.cs", "EmbeddedSshView.xaml.cs", "EmbeddedWebView.xaml.cs",
             "DiagramEditorView.xaml.cs", "MilkdownEditorControl.xaml.cs",
         }.Order(StringComparer.Ordinal).ToArray();

@@ -7123,5 +7123,16 @@
   "CastPlayerLoadFailed": "No se pudo cargar la grabaci\u00f3n .cast: {0}",
   "CastPlayerMetaFormat": "{0} ({1}x{2}, {3})",
   "CastPlayerEventCountOne": "{0} evento",
-  "CastPlayerEventCount": "{0} eventos"
+  "CastPlayerEventCount": "{0} eventos",
+  "ValidationSshProxyInvalid": "Introduce un host y un puerto de proxy v\u00e1lidos (1-65535).",
+  "ServerDialogSshStartupCommandInvalid": "El comando de inicio debe ser una sola l\u00ednea sin caracteres de control (m\u00e1x. 2048 caracteres).",
+  "ServerDialogExecutionTrustSshEnvVar": "Variable de entorno: {0}",
+  "CastPlayerErrorEmptyPath": "La ruta del archivo est\u00e1 vac\u00eda.",
+  "CastPlayerErrorFileNotFound": "El archivo no existe.",
+  "CastPlayerErrorFileTooLargeOrEmpty": "El archivo est\u00e1 vac\u00edo o supera el tama\u00f1o m\u00e1ximo admitido (50 MiB).",
+  "CastPlayerErrorEmptyContent": "El contenido de la grabaci\u00f3n est\u00e1 vac\u00edo.",
+  "CastPlayerErrorMissingHeader": "Falta la cabecera asciinema.",
+  "CastPlayerErrorInvalidHeader": "Cabecera asciinema no v\u00e1lida.",
+  "CastPlayerErrorUnsupportedVersion": "Solo se admiten grabaciones asciinema v2 (.cast).",
+  "CastPlayerErrorReadFailed": "No se puede leer el archivo de grabaci\u00f3n."
 }

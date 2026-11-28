@@ -562,6 +562,8 @@ public sealed class ServerProfileDto : IJsonOnDeserialized
         ServerProfileDto clone = (ServerProfileDto)MemberwiseClone();
 
         clone.RdpSelectedMonitorIndices = [.. RdpSelectedMonitorIndices];
+        clone.SshLocalForwards = [.. SshLocalForwards];
+        clone.SshEnvironmentVariables = [.. SshEnvironmentVariables];
         clone.PostConnectSteps = [.. PostConnectSteps.Select(CloneStep)];
         clone.ExtensionData = new Dictionary<string, JsonElement>(
             ExtensionData.Count,

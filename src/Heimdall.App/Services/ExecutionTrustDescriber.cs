@@ -37,6 +37,7 @@ internal static class ExecutionTrustDescriber
     private const string ProgramKey = "ServerDialogExecutionTrustProgram";
     private const string IcaFileKey = "ServerDialogExecutionTrustIcaFile";
     private const string CommandKey = "ServerDialogExecutionTrustCommand";
+    private const string SshEnvVarKey = "ServerDialogExecutionTrustSshEnvVar";
     private const string LibraryCommandKey = "ServerDialogExecutionTrustLibraryCommand";
     private const string PostConnectNotRunKey = "ServerDialogExecutionTrustPostConnectNotRun";
 
@@ -67,6 +68,21 @@ internal static class ExecutionTrustDescriber
         if (ProfileExecutionTrust.CarriesLocalExecutionPayload(profile))
         {
             rows.Add(DescribeExecutionRow(profile, localizer));
+        }
+
+        if (!string.IsNullOrWhiteSpace(profile.SshStartupCommand))
+        {
+            rows.Add(localizer.Format(CommandKey, Visible(profile.SshStartupCommand)));
+            addedStepRow = true;
+        }
+
+        foreach (string? envEntry in profile.SshEnvironmentVariables ?? [])
+        {
+            if (!string.IsNullOrWhiteSpace(envEntry))
+            {
+                rows.Add(localizer.Format(SshEnvVarKey, Visible(envEntry)));
+                addedStepRow = true;
+            }
         }
 
         foreach (PostConnectStep? step in profile.PostConnectSteps ?? [])

@@ -711,10 +711,52 @@ public partial class ServerDialogViewModel : ObservableValidator
     private string _sshStartupCommand = "";
 
     [ObservableProperty]
+    private string? _sshStartupCommandError;
+
+    [ObservableProperty]
+    private string? _sshProxyError;
+
+    [ObservableProperty]
     private string _sshEnvironmentVariablesText = "";
 
     [ObservableProperty]
     private string? _sshEnvironmentVariablesError;
+
+    partial void OnSshProxyTypeSelectionChanged(string value)
+    {
+        if (SshProxyError is not null)
+        {
+            ValidateSshProxy();
+            RefreshValidationSummary();
+        }
+    }
+
+    partial void OnSshProxyHostChanged(string value)
+    {
+        if (SshProxyError is not null)
+        {
+            ValidateSshProxy();
+            RefreshValidationSummary();
+        }
+    }
+
+    partial void OnSshProxyPortTextChanged(string value)
+    {
+        if (SshProxyError is not null)
+        {
+            ValidateSshProxy();
+            RefreshValidationSummary();
+        }
+    }
+
+    partial void OnSshStartupCommandChanged(string value)
+    {
+        if (SshStartupCommandError is not null)
+        {
+            ValidateSshStartupCommand();
+            RefreshValidationSummary();
+        }
+    }
 
     partial void OnSshEnvironmentVariablesTextChanged(string value)
     {
@@ -723,6 +765,49 @@ public partial class ServerDialogViewModel : ObservableValidator
             ValidateSshEnvironmentVariables();
             RefreshValidationSummary();
         }
+    }
+
+    private bool ValidateSshProxy()
+    {
+        SshProxyError = null;
+        if (!IsSshFamilyConnection || !HasSshProxy)
+        {
+            return true;
+        }
+
+        string host = SshProxyHost?.Trim() ?? string.Empty;
+        bool validHost = !string.IsNullOrEmpty(host)
+            && (System.Net.IPAddress.TryParse(host, out _)
+                || Heimdall.Core.Security.InputValidator.Validate(host, "SshGateway"));
+        bool validPort = string.IsNullOrWhiteSpace(SshProxyPortText)
+            || (int.TryParse(SshProxyPortText.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out int port)
+                && port is >= 1 and <= 65535);
+
+        if (!validHost || !validPort)
+        {
+            SshProxyError = L("ValidationSshProxyInvalid");
+            return false;
+        }
+
+        return true;
+    }
+
+    private bool ValidateSshStartupCommand()
+    {
+        SshStartupCommandError = null;
+        if (!string.Equals(ConnectionType, "SSH", StringComparison.OrdinalIgnoreCase)
+            || string.IsNullOrWhiteSpace(SshStartupCommand))
+        {
+            return true;
+        }
+
+        if (!Heimdall.Core.Ssh.SshStartupCommandPolicy.TryNormalizeStartupCommand(SshStartupCommand, out _))
+        {
+            SshStartupCommandError = L("ServerDialogSshStartupCommandInvalid");
+            return false;
+        }
+
+        return true;
     }
 
     private bool ValidateSshEnvironmentVariables()
@@ -1960,7 +2045,9 @@ public partial class ServerDialogViewModel : ObservableValidator
         nameof(RdpFixedHeightError),
         nameof(RdpResizeEnableDelayMsError),
         nameof(RdpGatewayError),
+        nameof(SshProxyError),
         nameof(SshLocalForwardsError),
+        nameof(SshStartupCommandError),
         nameof(SshEnvironmentVariablesError),
         nameof(GeneralTabErrorCount),
         nameof(NetworkTabErrorCount),
@@ -2443,7 +2530,9 @@ public partial class ServerDialogViewModel : ObservableValidator
         RdpFixedHeightError = null;
         RdpResizeEnableDelayMsError = null;
         RdpGatewayError = null;
+        SshProxyError = null;
         SshLocalForwardsError = null;
+        SshStartupCommandError = null;
         SshEnvironmentVariablesError = null;
         GeneralTabErrorCount = 0;
         NetworkTabErrorCount = 0;
@@ -2456,8 +2545,8 @@ public partial class ServerDialogViewModel : ObservableValidator
     {
         ValidationError = DisplayNameError ?? RemoteServerError ?? SshUsernameError ?? WinRmUsernameError ?? WinRmPasswordError ?? EndpointPortError
             ?? LocalPortError ?? RdpGatewayError ?? AudioModeError ?? ColorDepthError
-            ?? RdpFixedWidthError ?? RdpFixedHeightError ?? RdpResizeEnableDelayMsError ?? SshLocalForwardsError
-            ?? SshEnvironmentVariablesError;
+            ?? RdpFixedWidthError ?? RdpFixedHeightError ?? RdpResizeEnableDelayMsError ?? SshProxyError ?? SshLocalForwardsError
+            ?? SshStartupCommandError ?? SshEnvironmentVariablesError;
         GeneralTabErrorCount = (DisplayNameError is not null ? 1 : 0)
             + (RemoteServerError is not null ? 1 : 0)
             + (SshUsernameError is not null ? 1 : 0)
@@ -2471,7 +2560,9 @@ public partial class ServerDialogViewModel : ObservableValidator
             + (RdpFixedWidthError is not null ? 1 : 0)
             + (RdpFixedHeightError is not null ? 1 : 0)
             + (RdpResizeEnableDelayMsError is not null ? 1 : 0)
+            + (SshProxyError is not null ? 1 : 0)
             + (SshLocalForwardsError is not null ? 1 : 0)
+            + (SshStartupCommandError is not null ? 1 : 0)
             + (SshEnvironmentVariablesError is not null ? 1 : 0);
     }
 
@@ -2545,6 +2636,7 @@ public partial class ServerDialogViewModel : ObservableValidator
         RdpResizeEnableDelayMsError = ShowRdpResizeEnableDelay
             ? GetLocalizedFieldError(nameof(RdpResizeEnableDelayMs))
             : null;
+        ValidateSshProxy();
         SshLocalForwardsError = string.Equals(ConnectionType, "SSH", StringComparison.OrdinalIgnoreCase)
             && !TryParseSshLocalForwards(SshLocalForwardsText, out _, out var invalidForward)
                 ? string.Format(
@@ -2552,6 +2644,7 @@ public partial class ServerDialogViewModel : ObservableValidator
                     L("ValidationSshLocalForwardInvalid"),
                     invalidForward ?? string.Empty)
                 : null;
+        ValidateSshStartupCommand();
         ValidateSshEnvironmentVariables();
 
         // Tab error counts
@@ -2568,7 +2661,9 @@ public partial class ServerDialogViewModel : ObservableValidator
             + (RdpFixedWidthError is not null ? 1 : 0)
             + (RdpFixedHeightError is not null ? 1 : 0)
             + (RdpResizeEnableDelayMsError is not null ? 1 : 0)
+            + (SshProxyError is not null ? 1 : 0)
             + (SshLocalForwardsError is not null ? 1 : 0)
+            + (SshStartupCommandError is not null ? 1 : 0)
             + (SshEnvironmentVariablesError is not null ? 1 : 0);
 
         // First invalid field for auto-focus. The order mirrors ValidationError below so the
@@ -2588,14 +2683,17 @@ public partial class ServerDialogViewModel : ObservableValidator
             : RdpFixedWidthError is not null ? nameof(RdpFixedWidth)
             : RdpFixedHeightError is not null ? nameof(RdpFixedHeight)
             : RdpResizeEnableDelayMsError is not null ? nameof(RdpResizeEnableDelayMs)
+            : SshProxyError is not null ? nameof(SshProxyHost)
             : SshLocalForwardsError is not null ? nameof(SshLocalForwardsText)
+            : SshStartupCommandError is not null ? nameof(SshStartupCommand)
+            : SshEnvironmentVariablesError is not null ? nameof(SshEnvironmentVariablesText)
             : null;
 
         // Aggregate summary
         ValidationError = DisplayNameError ?? RemoteServerError ?? SshUsernameError ?? WinRmUsernameError ?? WinRmPasswordError ?? EndpointPortError
             ?? LocalPortError ?? RdpGatewayError ?? AudioModeError ?? ColorDepthError
-            ?? RdpFixedWidthError ?? RdpFixedHeightError ?? RdpResizeEnableDelayMsError ?? SshLocalForwardsError
-            ?? SshEnvironmentVariablesError;
+            ?? RdpFixedWidthError ?? RdpFixedHeightError ?? RdpResizeEnableDelayMsError ?? SshProxyError ?? SshLocalForwardsError
+            ?? SshStartupCommandError ?? SshEnvironmentVariablesError;
     }
 
     internal static bool TryParseSshLocalForwards(

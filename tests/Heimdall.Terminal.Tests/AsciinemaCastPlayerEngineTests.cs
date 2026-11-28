@@ -58,9 +58,25 @@ public sealed class AsciinemaCastPlayerEngineTests
     [Fact]
     public void TryParse_RejectsUnsupportedVersionAndInvalidJson()
     {
-        Assert.False(AsciinemaCastPlayerEngine.TryParse("{\"version\":1,\"width\":80,\"height\":24}", out _, out _));
-        Assert.False(AsciinemaCastPlayerEngine.TryParse("not-json", out _, out _));
-        Assert.False(AsciinemaCastPlayerEngine.TryParse("", out _, out _));
+        Assert.False(AsciinemaCastPlayerEngine.TryParse("{\"version\":1,\"width\":80,\"height\":24}", out _, out var verCode, out _));
+        Assert.Equal(AsciinemaCastLoadErrorCode.UnsupportedVersion, verCode);
+        Assert.False(AsciinemaCastPlayerEngine.TryParse("not-json", out _, out var jsonCode, out _));
+        Assert.Equal(AsciinemaCastLoadErrorCode.InvalidHeader, jsonCode);
+        Assert.False(AsciinemaCastPlayerEngine.TryParse("", out _, out var emptyCode, out _));
+        Assert.Equal(AsciinemaCastLoadErrorCode.EmptyContent, emptyCode);
+    }
+
+    [Fact]
+    public void TryParse_HandlesNullOrStringHeaderDimensionsWithoutThrowing()
+    {
+        string cast = "{\"version\":2,\"width\":\"80\",\"height\":null,\"timestamp\":null,\"title\":\"safe\"}\n[0.1,\"o\",\"ok\"]\n";
+        Assert.True(AsciinemaCastPlayerEngine.TryParse(cast, out var recording, out var code, out string? error), error);
+        Assert.Equal(AsciinemaCastLoadErrorCode.None, code);
+        Assert.NotNull(recording);
+        Assert.Equal(80, recording.Header.Width);
+        Assert.Equal(24, recording.Header.Height);
+        Assert.Null(recording.Header.TimestampUnix);
+        Assert.Equal("safe", recording.Header.Title);
     }
 
     [Theory]

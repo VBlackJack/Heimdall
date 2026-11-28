@@ -157,6 +157,9 @@
                                      Style="{StaticResource DialogFormTextBoxStyle}"/>
                         </StackPanel>
                     </Grid>
+                    <TextBlock Text="{Binding SshProxyError}"
+                               Style="{StaticResource FieldValidationErrorStyle}"
+                               Visibility="{Binding SshProxyError, Converter={StaticResource NullToVisibilityConverter}}"/>
                     <TextBlock Text="{loc:Translate SshProxyUsernameLabel}" Style="{StaticResource DialogLabelStyle}" Margin="0,8,0,4"/>
                     <TextBox Text="{Binding SshProxyUsername, UpdateSourceTrigger=PropertyChanged}"
                              AutomationProperties.Name="{loc:Translate SshProxyUsernameLabel}"

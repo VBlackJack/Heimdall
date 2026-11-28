@@ -376,6 +376,8 @@ public partial class GatewayDialogViewModel : ObservableValidator
         // Mark dirty when any user-editable property changes
         if (e.PropertyName is nameof(Name) or nameof(Host) or nameof(Port)
             or nameof(User) or nameof(KeyPath) or nameof(SshCertificatePath) or nameof(SshCryptoPolicySelection)
+            or nameof(SshProxyTypeSelection) or nameof(SshProxyHost) or nameof(SshProxyPortText)
+            or nameof(SshProxyUsername) or nameof(SshProxyPassword)
             or nameof(Password) or nameof(KeyPassphrase)
             or nameof(SelectedParentGatewayId))
         {
@@ -401,6 +403,9 @@ public partial class GatewayDialogViewModel : ObservableValidator
     [ObservableProperty]
     private string? _userError;
 
+    [ObservableProperty]
+    private string? _sshProxyError;
+
     /// <summary>
     /// Triggers full validation of all annotated properties.
     /// Populates per-field inline errors and an aggregate summary.
@@ -414,13 +419,63 @@ public partial class GatewayDialogViewModel : ObservableValidator
         HostError = GetLocalizedFieldError(nameof(Host));
         PortError = GetLocalizedFieldError(nameof(Port));
         UserError = GetLocalizedFieldError(nameof(User));
+        ValidateSshProxy();
 
         RefreshValidationSummary();
     }
 
+    private void ValidateSshProxy()
+    {
+        SshProxyError = null;
+        if (!HasSshProxy)
+        {
+            return;
+        }
+
+        string host = SshProxyHost?.Trim() ?? string.Empty;
+        bool validHost = !string.IsNullOrEmpty(host)
+            && (System.Net.IPAddress.TryParse(host, out _)
+                || Heimdall.Core.Security.InputValidator.Validate(host, "SshGateway"));
+        bool validPort = string.IsNullOrWhiteSpace(SshProxyPortText)
+            || (int.TryParse(SshProxyPortText.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out int port)
+                && port is >= 1 and <= 65535);
+
+        if (!validHost || !validPort)
+        {
+            SshProxyError = Localizer?["ValidationSshProxyInvalid"] ?? "Enter a valid proxy host and port (1-65535).";
+        }
+    }
+
+    partial void OnSshProxyTypeSelectionChanged(string value)
+    {
+        if (SshProxyError is not null)
+        {
+            ValidateSshProxy();
+            RefreshValidationSummary();
+        }
+    }
+
+    partial void OnSshProxyHostChanged(string value)
+    {
+        if (SshProxyError is not null)
+        {
+            ValidateSshProxy();
+            RefreshValidationSummary();
+        }
+    }
+
+    partial void OnSshProxyPortTextChanged(string value)
+    {
+        if (SshProxyError is not null)
+        {
+            ValidateSshProxy();
+            RefreshValidationSummary();
+        }
+    }
+
     private void RefreshValidationSummary()
     {
-        ValidationError = NameError ?? HostError ?? PortError ?? UserError;
+        ValidationError = NameError ?? HostError ?? PortError ?? UserError ?? SshProxyError;
     }
 
     // --- Live re-validation (only when errors are already showing) ---

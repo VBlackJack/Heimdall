@@ -7123,5 +7123,16 @@
   "CastPlayerLoadFailed": "\u00c9chec du chargement du fichier .cast : {0}",
   "CastPlayerMetaFormat": "{0} ({1}x{2}, {3})",
   "CastPlayerEventCountOne": "{0} \u00e9v\u00e9nement",
-  "CastPlayerEventCount": "{0} \u00e9v\u00e9nements"
+  "CastPlayerEventCount": "{0} \u00e9v\u00e9nements",
+  "ValidationSshProxyInvalid": "Saisissez un h\u00f4te proxy et un port valides (1-65535).",
+  "ServerDialogSshStartupCommandInvalid": "La commande de d\u00e9marrage doit tenir sur une seule ligne sans caract\u00e8res de contr\u00f4le (2048 caract\u00e8res max).",
+  "ServerDialogExecutionTrustSshEnvVar": "Variable d'environnement : {0}",
+  "CastPlayerErrorEmptyPath": "Le chemin du fichier est vide.",
+  "CastPlayerErrorFileNotFound": "Le fichier est introuvable.",
+  "CastPlayerErrorFileTooLargeOrEmpty": "Le fichier est vide ou d\u00e9passe la taille maximale prise en charge (50 Mio).",
+  "CastPlayerErrorEmptyContent": "Le contenu de l'enregistrement est vide.",
+  "CastPlayerErrorMissingHeader": "En-t\u00eate asciinema manquant.",
+  "CastPlayerErrorInvalidHeader": "En-t\u00eate asciinema invalide.",
+  "CastPlayerErrorUnsupportedVersion": "Seuls les enregistrements asciinema v2 (.cast) sont pris en charge.",
+  "CastPlayerErrorReadFailed": "Impossible de lire le fichier d'enregistrement."
 }

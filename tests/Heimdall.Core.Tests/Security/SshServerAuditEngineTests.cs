@@ -235,4 +235,40 @@ public sealed class SshServerAuditEngineTests
         Assert.Equal(SshFleetAuditDriftStatus.New, drift.ByEndpoint["host-d:22"]);
         Assert.Equal(SshFleetAuditDriftStatus.Error, drift.ByEndpoint["host-e:22"]);
     }
+
+    [Fact]
+    public void CompareAgainstBaseline_DeduplicatesSharedEndpointsAndPrefersSucceededOverError()
+    {
+        var strongSnap = new SshKexInitSnapshot(
+            "host-dup",
+            22,
+            "SSH-2.0-OpenSSH_9.9",
+            ["mlkem768x25519-sha256", "kex-strict-s-v00@openssh.com"],
+            ["ssh-ed25519"],
+            ["aes256-gcm@openssh.com"],
+            ["aes256-gcm@openssh.com"],
+            ["hmac-sha2-512-etm@openssh.com"],
+            ["hmac-sha2-512-etm@openssh.com"],
+            ["none"],
+            ["none"]);
+        var strongReport = SshServerAuditEngine.Evaluate(strongSnap);
+        SshFleetAuditBaselineEntry[] previous =
+        [
+            new("host-dup:22", "B", false, false, false, DateTimeOffset.UtcNow)
+        ];
+        SshFleetServerAuditEntry[] current =
+        [
+            new("Profile1", "host-dup", 22, null, null, "Timeout"),
+            new("Profile2", "host-dup", 22, null, strongReport),
+            new("Profile3", "host-dup", 22, null, strongReport)
+        ];
+
+        var drift = SshServerAuditEngine.CompareAgainstBaseline(current, previous);
+
+        Assert.Equal(1, drift.Improved);
+        Assert.Equal(0, drift.Regressed);
+        Assert.Equal(0, drift.Unchanged);
+        Assert.Equal(0, drift.NewHosts);
+        Assert.Equal(SshFleetAuditDriftStatus.Improved, drift.ByEndpoint["host-dup:22"]);
+    }
 }

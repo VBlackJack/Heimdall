@@ -7123,5 +7123,16 @@
   "CastPlayerLoadFailed": "Failed to load .cast recording: {0}",
   "CastPlayerMetaFormat": "{0} ({1}x{2}, {3})",
   "CastPlayerEventCountOne": "{0} event",
-  "CastPlayerEventCount": "{0} events"
+  "CastPlayerEventCount": "{0} events",
+  "ValidationSshProxyInvalid": "Enter a valid proxy host and port (1-65535).",
+  "ServerDialogSshStartupCommandInvalid": "Startup command must be a single line without control characters (max 2048 characters).",
+  "ServerDialogExecutionTrustSshEnvVar": "Environment variable: {0}",
+  "CastPlayerErrorEmptyPath": "File path is empty.",
+  "CastPlayerErrorFileNotFound": "File does not exist.",
+  "CastPlayerErrorFileTooLargeOrEmpty": "File is empty or exceeds the maximum supported size (50 MiB).",
+  "CastPlayerErrorEmptyContent": "Recording content is empty.",
+  "CastPlayerErrorMissingHeader": "Missing asciinema header line.",
+  "CastPlayerErrorInvalidHeader": "Invalid asciinema header.",
+  "CastPlayerErrorUnsupportedVersion": "Only asciinema v2 (.cast) recordings are supported.",
+  "CastPlayerErrorReadFailed": "Unable to read recording file."
 }

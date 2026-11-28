@@ -46,7 +46,7 @@ public sealed class SensitiveLoggingGuardTests
     };
 
     private static readonly Regex SshForbiddenLogExpressionRegex = new(
-        @"\.(?:Username|SshUsername|Password|SshPasswordEncrypted|KeyPassphrase|SshKeyPassphraseEncrypted)\b|\bprobeArgs\b|\bprobeTarget\b",
+        @"\.(?:Username|SshUsername|Password|SshPasswordEncrypted|KeyPassphrase|SshKeyPassphraseEncrypted|ProxyPassword|SshProxyPasswordEncrypted|ProxyUsername|SshProxyUsername)\b|\bprobeArgs\b|\bprobeTarget\b",
         RegexOptions.Compiled);
 
     private const string DisconnectedCallback = "private void OnRdpDisconnected(int reason)";

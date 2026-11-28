@@ -736,9 +736,20 @@ public static class SshServerAuditEngine
         int unchanged = 0;
         int newHosts = 0;
 
+        // Deduplicate endpoints before counting so summary counters match ByEndpoint 1:1.
+        // When multiple profiles share the same host:port, prefer a succeeded audit over an error.
+        var deduped = new Dictionary<string, SshFleetServerAuditEntry>(StringComparer.OrdinalIgnoreCase);
         foreach (var entry in current)
         {
             string endpoint = FormatEndpointKey(entry.Host, entry.Port);
+            if (!deduped.TryGetValue(endpoint, out var existing) || (existing.Report is null && entry.Report is not null))
+            {
+                deduped[endpoint] = entry;
+            }
+        }
+
+        foreach (var (endpoint, entry) in deduped)
+        {
             if (entry.Report is not { } report)
             {
                 byEndpoint[endpoint] = SshFleetAuditDriftStatus.Error;

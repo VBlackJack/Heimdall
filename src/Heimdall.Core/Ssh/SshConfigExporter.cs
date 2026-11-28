@@ -162,7 +162,8 @@ public static class SshConfigExporter
         {
             foreach (var rawEnv in entry.EnvironmentVariables)
             {
-                if (SshStartupCommandPolicy.TryParseEnvAssignment(rawEnv, out string envName, out string envVal))
+                if (SshStartupCommandPolicy.TryParseEnvAssignment(rawEnv, out string envName, out string envVal)
+                    && !envVal.Contains('"', StringComparison.Ordinal))
                 {
                     string pair = $"{envName}={envVal}";
                     sb.Append(ConfigIndent)

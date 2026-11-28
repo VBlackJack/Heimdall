@@ -214,7 +214,9 @@ public sealed class ConnectionService : IConnectionService
 
         foreach (SshGatewayDto hop in route)
         {
-            if (IsUnreadable(hop.SshPasswordEncrypted) || IsUnreadable(hop.SshKeyPassphraseEncrypted))
+            if (IsUnreadable(hop.SshPasswordEncrypted)
+                || IsUnreadable(hop.SshKeyPassphraseEncrypted)
+                || IsUnreadable(hop.SshProxyPasswordEncrypted))
             {
                 return PreflightResult.Fail(
                     SshFailureCode.CredentialUnreadable,

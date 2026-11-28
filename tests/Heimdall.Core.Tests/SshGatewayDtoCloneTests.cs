@@ -129,11 +129,13 @@ public sealed class SshGatewayDtoCloneTests
     public void ACopyWithoutSecretsDropsThemWithoutFabricatingPresence()
     {
         SshGatewayDto source = LegacyGateway();
+        source.SshProxyPasswordEncrypted = "proxy-cipher";
 
         SshGatewayDto stripped = source.CloneWithoutSecrets();
 
         Assert.Null(stripped.SshPasswordEncrypted);
         Assert.Null(stripped.SshKeyPassphraseEncrypted);
+        Assert.Null(stripped.SshProxyPasswordEncrypted);
 
         // Removing a secret says nothing about whether the source declared the field, so the flag
         // is carried over rather than raised by the act of clearing.

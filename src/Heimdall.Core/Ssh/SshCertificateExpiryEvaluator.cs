@@ -15,6 +15,7 @@
  */
 
 using System.Globalization;
+using System.Security;
 using System.Text;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
@@ -80,11 +81,7 @@ public static class SshCertificateExpiryEvaluator
             string content = File.ReadAllText(candidate, Encoding.UTF8);
             return EvaluateContent(content, candidate, nowUtc);
         }
-        catch (IOException)
-        {
-            return SshCertificateExpiryAssessment.Empty;
-        }
-        catch (UnauthorizedAccessException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException or SecurityException)
         {
             return SshCertificateExpiryAssessment.Empty;
         }
@@ -138,7 +135,7 @@ public static class SshCertificateExpiryEvaluator
             return null;
         }
 
-        string dateText = validBefore.ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.CurrentCulture);
+        string dateText = validBefore.ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
         return assessment.Status switch
         {
             SshCertificateExpiryStatus.Expired => localizer.Format("SshCertWarningExpired", dateText),

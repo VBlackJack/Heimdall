@@ -297,7 +297,7 @@ internal sealed class SftpHandler : IProtocolHandler
                     string? certWarning = SshCertificateExpiryEvaluator.FormatLocalizedWarning(
                         SshCertificateExpiryEvaluator.Evaluate(server.SshKeyPath, server.SshCertificatePath),
                         _localizer);
-                    string? combinedWarning = (capabilityWarning, certWarning) switch
+                    capabilityWarning = (capabilityWarning, certWarning) switch
                     {
                         (not null, not null) => $"{capabilityWarning} {certWarning}",
                         (not null, null) => capabilityWarning,
@@ -308,7 +308,7 @@ internal sealed class SftpHandler : IProtocolHandler
                         browser,
                         sshParams,
                         server.SessionLoggingOverride),
-                        Warning: combinedWarning);
+                        Warning: capabilityWarning);
                 }
                 catch (HostKeyRejectedException ex)
                 {

@@ -468,6 +468,7 @@ public partial class SshServerAuditView : UserControl, IToolView
         catch (Exception ex)
         {
             FileLogger.Warn($"[SshServerAudit] Copy sshd_config drop-in failed: {ex.Message}");
+            ReportStatusText(ex.Message);
         }
     }
 
@@ -498,8 +499,9 @@ public partial class SshServerAuditView : UserControl, IToolView
         }
     }
 
-    private static void SaveFleetBaseline(string path, IReadOnlyList<SshFleetAuditBaselineEntry> baseline)
+    private void SaveFleetBaseline(string path, IReadOnlyList<SshFleetAuditBaselineEntry> baseline)
     {
+        string tmp = path + ".tmp";
         try
         {
             string? dir = Path.GetDirectoryName(path);
@@ -508,17 +510,37 @@ public partial class SshServerAuditView : UserControl, IToolView
                 Directory.CreateDirectory(dir);
             }
 
-            string tmp = path + ".tmp";
             File.WriteAllText(tmp, SshServerAuditEngine.SerializeBaselineJson(baseline), new UTF8Encoding(false));
             File.Move(tmp, path, overwrite: true);
         }
         catch (IOException ex)
         {
+            TryDeleteTempFile(tmp);
             FileLogger.Warn($"[SshServerAudit] Save fleet baseline failed: {ex.Message}");
+            ReportStatusText(ex.Message);
         }
         catch (UnauthorizedAccessException ex)
         {
+            TryDeleteTempFile(tmp);
             FileLogger.Warn($"[SshServerAudit] Save fleet baseline failed: {ex.Message}");
+            ReportStatusText(ex.Message);
+        }
+    }
+
+    private static void TryDeleteTempFile(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
         }
     }
 

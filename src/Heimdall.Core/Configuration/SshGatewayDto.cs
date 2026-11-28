@@ -150,6 +150,7 @@ public sealed class SshGatewayDto
         SshGatewayDto copy = CloneFaithfully();
         copy.SshPasswordEncrypted = null;
         copy._sshKeyPassphraseEncrypted = null;
+        copy.SshProxyPasswordEncrypted = null;
         return copy;
     }
 }

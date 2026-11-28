@@ -86,6 +86,27 @@ public sealed class ExecutionTrustDescriberPostConnectNoteTests
         Assert.Contains("tool.exe", row, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task Describe_SshWithStartupCommandAndEnvVars_ListsBothPayloads()
+    {
+        LocalizationManager localizer = await CreateLocalizerAsync();
+        ServerProfileDto profile = new()
+        {
+            Id = "profile-ssh-startup",
+            DisplayName = "Imported SSH",
+            ConnectionType = "SSH",
+            RemoteServer = "ops.example.com",
+            SshStartupCommand = "tmux new -As ops",
+            SshEnvironmentVariables = ["APP_ENV=prod"]
+        };
+
+        string[] rows = Rows(ExecutionTrustDescriber.Describe(profile, NoTitles, localizer));
+
+        Assert.Equal(2, rows.Length);
+        Assert.Contains("tmux new -As ops", rows[0], StringComparison.Ordinal);
+        Assert.Contains("APP_ENV=prod", rows[1], StringComparison.Ordinal);
+    }
+
     private static string[] Rows(string described) =>
         described.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
 
