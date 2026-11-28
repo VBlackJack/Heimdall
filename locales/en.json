@@ -6961,5 +6961,17 @@
   "ToolSshServerAuditErrInvalidHost": "Enter a valid SSH hostname or IP address.",
   "ToolSshServerAuditErrInvalidPort": "Port must be between 1 and 65535.",
   "ToolSshServerAuditCancelled": "SSH server audit cancelled.",
-  "ToolSshServerAuditErrProbeFailed": "SSH probe failed: {0}"
+  "ToolSshServerAuditErrProbeFailed": "SSH probe failed: {0}",
+  "HostKeySshfpChecking": "Checking DNS SSHFP records...",
+  "HostKeySshfpSkippedGateway": "DNS SSHFP check skipped for gateway-routed connection.",
+  "HostKeySshfpMatchDnssecLoopback": "DNS SSHFP match (DNSSEC AD flag from local loopback resolver). Still verify manually.",
+  "HostKeySshfpMatchDnssecResolver": "DNS SSHFP match (DNSSEC AD flag reported by network resolver). Still verify manually.",
+  "HostKeySshfpMatchUnsigned": "DNS SSHFP match (unsigned DNS - not DNSSEC validated).",
+  "HostKeySshfpMismatchWarning": "WARNING: Presented host key does NOT match published DNS SSHFP record!",
+  "HostKeySshfpNotFound": "No DNS SSHFP record published for this host.",
+  "SettingsSshConfirmAgentSigningLabel": "Confirm before SSH agent signs authentication",
+  "SettingsSshConfirmAgentSigningHint": "Prompts with target host, key type, and fingerprint before any SSH agent signs an authentication challenge.",
+  "SshAgentSignConfirmTitle": "Confirm SSH agent signing",
+  "SshAgentSignConfirmMessage": "Allow SSH agent to sign authentication for {0}:{1}?\n\nKey type: {2}\nFingerprint: {3}\nComment: {4}",
+  "StatusSshTouchSecurityKey": "Touch your hardware security key to authenticate..."
 }

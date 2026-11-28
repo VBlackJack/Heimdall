@@ -163,5 +163,11 @@ public enum SshFailureCode
     /// validation (expired, wrong principal, invalid signature, or unsupported critical options).
     /// Appended last so that the values of the existing codes do not move.
     /// </summary>
-    HostCertificateInvalid
+    HostCertificateInvalid,
+
+    /// <summary>
+    /// The user declined the interactive SSH agent signing confirmation prompt.
+    /// Appended last so that the values of the existing codes do not move.
+    /// </summary>
+    AgentSigningDeclined
 }

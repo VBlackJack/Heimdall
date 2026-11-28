@@ -85,6 +85,24 @@ public sealed class SshConnectionParams
     /// </summary>
     public string? AgentKeyFingerprint { get; init; }
 
+    /// <summary>
+    /// When true, skips all local SSH agent authentication methods (used by key rotation verification
+    /// so a new key file is validated in strict isolation without falling back to an old agent key).
+    /// </summary>
+    public bool DisableAgentAuthentication { get; init; }
+
+    /// <summary>
+    /// Optional notification invoked right before an SSH agent signs an authentication challenge
+    /// (for example to inform the user to touch a FIDO2 hardware security key).
+    /// </summary>
+    public Action<ISshAgentKey>? OnBeforeAgentSign { get; init; }
+
+    /// <summary>
+    /// Optional confirmation gate invoked before an SSH agent signs an authentication challenge.
+    /// Returning <see langword="false"/> aborts authentication with <see cref="SshAgentSigningDeclinedException"/>.
+    /// </summary>
+    public Func<ISshAgentKey, bool>? ConfirmAgentSign { get; init; }
+
     /// <summary>Whether to enable SSH agent forwarding.</summary>
     public bool AgentForwarding { get; init; }
 

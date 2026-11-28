@@ -21,8 +21,24 @@ namespace Heimdall.Core.Ssh;
 /// </summary>
 public interface ISshAgentKey
 {
+    /// <summary>Extended IPC sign timeout for hardware security keys requiring physical touch (30 s).</summary>
+    public const int SecurityKeySignTimeoutMilliseconds = 30_000;
+
     string Comment { get; }
     string KeyType { get; }
     byte[] PublicKeyBlob { get; }
     byte[] Sign(byte[] data, SshAgentSignFlags flags);
+
+    /// <summary>Signs data with an explicit IPC timeout (used for FIDO2 hardware keys waiting on user touch).</summary>
+    byte[] Sign(byte[] data, SshAgentSignFlags flags, int timeoutMilliseconds) => Sign(data, flags);
+
+    /// <summary>True when this identity is backed by a FIDO2 hardware security key (<c>sk-*</c>).</summary>
+    bool IsSecurityKey => IsSecurityKeyType(KeyType);
+
+    /// <summary>Returns true when <paramref name="keyType"/> is an OpenSSH FIDO2/U2F security key or certificate type.</summary>
+    public static bool IsSecurityKeyType(string? keyType) => keyType is
+        "sk-ssh-ed25519@openssh.com"
+        or "sk-ecdsa-sha2-nistp256@openssh.com"
+        or "sk-ssh-ed25519-cert-v01@openssh.com"
+        or "sk-ecdsa-sha2-nistp256-cert-v01@openssh.com";
 }

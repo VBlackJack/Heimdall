@@ -29,4 +29,11 @@ public interface IPageantClient
     /// <param name="flags">Agent signature flags.</param>
     /// <returns>The full SSH signature blob from the agent.</returns>
     byte[] SignData(byte[] keyBlob, byte[] data, uint flags = 0);
+
+    /// <summary>
+    /// Signs data with an explicit IPC timeout. When <paramref name="allowInteractiveWait"/> is true,
+    /// <c>SMTO_ABORTIFHUNG</c> is omitted so hardware security key touch prompts are not cut off at 5 s.
+    /// </summary>
+    byte[] SignData(byte[] keyBlob, byte[] data, uint flags, uint timeoutMilliseconds, bool allowInteractiveWait)
+        => SignData(keyBlob, data, flags);
 }

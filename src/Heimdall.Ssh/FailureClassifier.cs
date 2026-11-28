@@ -99,6 +99,9 @@ public static class FailureClassifier
             SshAgentKeyNotLoadedException notLoaded =>
                 new SshFailureInfo(SshFailureCode.AgentKeyNotLoaded, notLoaded.Message, true, ex),
 
+            SshAgentSigningDeclinedException declined =>
+                new SshFailureInfo(SshFailureCode.AgentSigningDeclined, declined.Message, true, ex),
+
             SshException sshEx =>
                 ClassifySshException(sshEx, connectionParams),
 

@@ -1083,6 +1083,12 @@ public sealed class TunnelService : ITunnelService
             LegacyCredentialName = hop.LegacyCredentialName,
             SshAgentPreference = hop.SshAgentPreference,
             AgentKeyFingerprint = hop.AgentKeyFingerprint,
+            ConfirmAgentSign = SshAgentSignConfirmHelper.BuildConfirmCallback(
+                _currentSettings,
+                hop.HostKeyVerificationHost,
+                hop.HostKeyVerificationPort,
+                _localizer,
+                ct),
             AgentForwarding = hop.AgentForwarding,
             Compression = hop.Compression,
             CryptoPolicy = hop.CryptoPolicy,

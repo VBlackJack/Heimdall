@@ -33,6 +33,7 @@ public partial class HostKeyPromptDialog : Window
 
     private readonly LocalizationManager? _localizer;
     private HostKeyPromptDialogViewModel? _viewModel;
+    private CancellationTokenSource? _sshfpCts;
 
     public HostKeyPromptDialog()
     {
@@ -58,6 +59,14 @@ public partial class HostKeyPromptDialog : Window
         else
         {
             AcceptButton.Focus();
+        }
+
+        if (_viewModel is not null)
+        {
+            _sshfpCts?.Cancel();
+            _sshfpCts?.Dispose();
+            _sshfpCts = new CancellationTokenSource();
+            _ = _viewModel.RunSshfpLookupAsync(_sshfpCts.Token);
         }
     }
 
@@ -117,6 +126,10 @@ public partial class HostKeyPromptDialog : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        _sshfpCts?.Cancel();
+        _sshfpCts?.Dispose();
+        _sshfpCts = null;
+
         if (_viewModel is not null)
         {
             _viewModel.CloseRequested -= OnCloseRequested;

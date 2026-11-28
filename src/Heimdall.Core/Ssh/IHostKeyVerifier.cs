@@ -52,4 +52,19 @@ public interface IHostKeyVerifier
         string presentedFingerprint,
         string? storedFingerprint,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Requests a trust decision with optional access to the raw host-key blob (for DNS SSHFP
+    /// SHA-1/SHA-256 verification) and gateway routing indicator (to suppress split-horizon DNS leaks).
+    /// </summary>
+    Task<HostKeyDecision> VerifyAsync(
+        string host,
+        int port,
+        string algorithm,
+        string presentedFingerprint,
+        string? storedFingerprint,
+        ReadOnlyMemory<byte> hostKeyBlob,
+        bool isViaGateway = false,
+        CancellationToken ct = default)
+        => VerifyAsync(host, port, algorithm, presentedFingerprint, storedFingerprint, ct);
 }

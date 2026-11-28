@@ -88,6 +88,14 @@ public sealed class PageantClient : IPageantClient
     /// <exception cref="InvalidOperationException">Pageant is not running or signing failed.</exception>
     /// <exception cref="TimeoutException">Pageant did not answer the bounded IPC request.</exception>
     public byte[] SignData(byte[] keyBlob, byte[] data, uint flags = 0)
+        => SignData(keyBlob, data, flags, PageantIpcTimeoutMilliseconds, allowInteractiveWait: false);
+
+    public byte[] SignData(
+        byte[] keyBlob,
+        byte[] data,
+        uint flags,
+        uint timeoutMilliseconds,
+        bool allowInteractiveWait)
     {
         ArgumentNullException.ThrowIfNull(keyBlob);
         ArgumentNullException.ThrowIfNull(data);
@@ -117,7 +125,7 @@ public sealed class PageantClient : IPageantClient
 
         WriteBigEndianUInt32(request, offset, flags);
 
-        var response = SendMessage(request);
+        var response = SendMessage(request, timeoutMilliseconds, allowInteractiveWait);
         return ParseSignResponse(response);
     }
 
@@ -151,7 +159,10 @@ public sealed class PageantClient : IPageantClient
     /// </summary>
     /// <param name="request">Raw SSH agent protocol request bytes.</param>
     /// <returns>Raw response bytes from Pageant.</returns>
-    internal byte[] SendMessage(byte[] request)
+    internal byte[] SendMessage(
+        byte[] request,
+        uint timeoutMilliseconds = PageantIpcTimeoutMilliseconds,
+        bool allowInteractiveWait = false)
     {
         var hwnd = NativeMethods.FindWindow("Pageant", "Pageant");
         if (hwnd == IntPtr.Zero)
@@ -256,7 +267,9 @@ public sealed class PageantClient : IPageantClient
                 SendCopyDataWithTimeout(
                     hwnd,
                     ref copyData,
-                    NativeMethods.SendMessageTimeout);
+                    NativeMethods.SendMessageTimeout,
+                    timeoutMilliseconds,
+                    allowInteractiveWait);
             }
             finally
             {
@@ -289,27 +302,33 @@ public sealed class PageantClient : IPageantClient
     internal static void SendCopyDataWithTimeout(
         IntPtr hwnd,
         ref NativeMethods.COPYDATASTRUCT copyData,
-        PageantMessageSender sender)
+        PageantMessageSender sender,
+        uint timeoutMilliseconds = PageantIpcTimeoutMilliseconds,
+        bool allowInteractiveWait = false)
     {
         ArgumentNullException.ThrowIfNull(sender);
 
-        NativeMethods.SendMessageTimeoutFlags flags =
-            NativeMethods.SendMessageTimeoutFlags.Block |
-            NativeMethods.SendMessageTimeoutFlags.AbortIfHung |
-            NativeMethods.SendMessageTimeoutFlags.ErrorOnExit;
+        // Omit SMTO_ABORTIFHUNG for interactive FIDO2/hardware security key touch waits:
+        // Win32 cuts off SMTO_ABORTIFHUNG at ~5 s even when a 30 s timeout is requested.
+        NativeMethods.SendMessageTimeoutFlags flags = allowInteractiveWait
+            ? NativeMethods.SendMessageTimeoutFlags.Block |
+              NativeMethods.SendMessageTimeoutFlags.ErrorOnExit
+            : NativeMethods.SendMessageTimeoutFlags.Block |
+              NativeMethods.SendMessageTimeoutFlags.AbortIfHung |
+              NativeMethods.SendMessageTimeoutFlags.ErrorOnExit;
         IntPtr sendStatus = sender(
             hwnd,
             WM_COPYDATA,
             IntPtr.Zero,
             ref copyData,
             flags,
-            PageantIpcTimeoutMilliseconds,
+            timeoutMilliseconds,
             out UIntPtr messageResult);
 
         if (sendStatus == IntPtr.Zero)
         {
             throw new TimeoutException(
-                $"Pageant did not respond within {PageantIpcTimeoutMilliseconds} ms or exited before completing the agent request.");
+                $"Pageant did not respond within {timeoutMilliseconds} ms or exited before completing the agent request.");
         }
 
         if (messageResult == UIntPtr.Zero)

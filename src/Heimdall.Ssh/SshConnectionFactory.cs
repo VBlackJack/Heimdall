@@ -429,13 +429,17 @@ public static class SshConnectionFactory
                 cancellationToken)
             .ConfigureAwait(false);
 
+        bool isViaGateway = !string.Equals(connectionParams.Host, verificationHost, StringComparison.OrdinalIgnoreCase)
+            || connectionParams.Port != verificationPort;
+
         return await ResolvePresentedHostKeyAsync(
                 verificationHost,
                 verificationPort,
                 presentation,
                 hostKeyStore,
                 verifier,
-                cancellationToken)
+                cancellationToken,
+                isViaGateway)
             .ConfigureAwait(false);
     }
 
@@ -558,8 +562,18 @@ public static class SshConnectionFactory
     /// <summary>
     /// The timeout SSH.NET applies to every wait of an authenticating client.
     /// </summary>
-    private static TimeSpan ClientTimeout(SshConnectionParams connectionParams) =>
-        connectionParams.AuthenticationTimeout ?? connectionParams.ConnectTimeout;
+    private static readonly TimeSpan InteractiveAgentSignMinTimeout = TimeSpan.FromSeconds(60);
+
+    private static TimeSpan ClientTimeout(SshConnectionParams connectionParams)
+    {
+        var baseTimeout = connectionParams.AuthenticationTimeout ?? connectionParams.ConnectTimeout;
+        if (connectionParams.ConfirmAgentSign is not null && baseTimeout < InteractiveAgentSignMinTimeout)
+        {
+            return InteractiveAgentSignMinTimeout;
+        }
+
+        return baseTimeout;
+    }
 
     /// <summary>
     /// Runs <paramref name="connect"/> for <paramref name="client"/> so that the phase before the
@@ -648,7 +662,8 @@ public static class SshConnectionFactory
         HostKeyPresentation presentation,
         HostKeyStore hostKeyStore,
         IHostKeyVerifier verifier,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        bool isViaGateway = false)
     {
         ArgumentNullException.ThrowIfNull(verificationHost);
         ArgumentNullException.ThrowIfNull(presentation);
@@ -712,6 +727,8 @@ public static class SshConnectionFactory
                 presentation.Algorithm,
                 result.Fingerprint,
                 result.StoredFingerprint,
+                presentation.HostKey,
+                isViaGateway,
                 cancellationToken)
             .ConfigureAwait(false);
 
@@ -849,18 +866,27 @@ public static class SshConnectionFactory
         }
 
         // SSH agent key authentication. Always add agent keys as supplementary
-        // auth methods when available, so SSH.NET can fall back to an agent if
-        // key file or password auth is rejected.
+        // auth methods when available (unless explicitly disabled, e.g. isolated key-rotation verification),
+        // so SSH.NET can fall back to an agent if key file or password auth is rejected.
+        if (!connectionParams.DisableAgentAuthentication)
         {
             var agentMethod = chosenAgentKey is not null
                 ? new PrivateKeyAuthenticationMethod(
                     connectionParams.Username,
-                    SshAgentAlgorithmSource.BuildSources([chosenAgentKey]))
+                    SshAgentAlgorithmSource.BuildSources(
+                        [chosenAgentKey],
+                        onSigned: null,
+                        onBeforeSign: connectionParams.OnBeforeAgentSign,
+                        confirmSign: connectionParams.ConfirmAgentSign,
+                        targetHost: connectionParams.HostKeyVerificationHost,
+                        targetPort: connectionParams.HostKeyVerificationPort))
                 : TryCreateAgentAuth(
                     connectionParams.Username,
                     agentRegistry,
                     connectionParams.HostKeyVerificationHost,
-                    connectionParams.HostKeyVerificationPort);
+                    connectionParams.HostKeyVerificationPort,
+                    connectionParams.OnBeforeAgentSign,
+                    connectionParams.ConfirmAgentSign);
             if (agentMethod is not null)
             {
                 methods.Add(agentMethod);
@@ -1209,7 +1235,9 @@ public static class SshConnectionFactory
         string username,
         SshAgentRegistry agentRegistry,
         string? targetHost = null,
-        int targetPort = 0)
+        int targetPort = 0,
+        Action<ISshAgentKey>? onBeforeSign = null,
+        Func<ISshAgentKey, bool>? confirmSign = null)
     {
         ArgumentNullException.ThrowIfNull(agentRegistry);
 
@@ -1242,7 +1270,13 @@ public static class SshConnectionFactory
 
                 // Algorithm-major order: a refused key costs one attempt per pass, not
                 // three in a row, so a server that counts attempts reaches the later keys.
-                var keySources = SshAgentAlgorithmSource.BuildSources(keys, onSigned);
+                var keySources = SshAgentAlgorithmSource.BuildSources(
+                    keys,
+                    onSigned,
+                    onBeforeSign,
+                    confirmSign,
+                    targetHost,
+                    targetPort > 0 ? targetPort : 22);
 
                 return new PrivateKeyAuthenticationMethod(username, keySources);
             }

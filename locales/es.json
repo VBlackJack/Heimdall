@@ -6961,5 +6961,17 @@
   "ToolSshServerAuditErrInvalidHost": "Introduce un nombre de host o direcci\u00f3n IP SSH v\u00e1lida.",
   "ToolSshServerAuditErrInvalidPort": "El puerto debe estar entre 1 y 65535.",
   "ToolSshServerAuditCancelled": "Auditor\u00eda de servidor SSH cancelada.",
-  "ToolSshServerAuditErrProbeFailed": "Error al sondear SSH: {0}"
+  "ToolSshServerAuditErrProbeFailed": "Error al sondear SSH: {0}",
+  "HostKeySshfpChecking": "Comprobando registros DNS SSHFP...",
+  "HostKeySshfpSkippedGateway": "Comprobaci\u00f3n DNS SSHFP omitida para conexi\u00f3n por pasarela.",
+  "HostKeySshfpMatchDnssecLoopback": "Coincidencia DNS SSHFP (bandera DNSSEC AD del resolvedor local). Verifica igualmente.",
+  "HostKeySshfpMatchDnssecResolver": "Coincidencia DNS SSHFP (bandera DNSSEC AD del resolvedor de red). Verifica igualmente.",
+  "HostKeySshfpMatchUnsigned": "Coincidencia DNS SSHFP (DNS sin firmar - no validado por DNSSEC).",
+  "HostKeySshfpMismatchWarning": "ADVERTENCIA: La clave presentada NO coincide con el registro DNS SSHFP publicado.",
+  "HostKeySshfpNotFound": "No hay registros DNS SSHFP publicados para este host.",
+  "SettingsSshConfirmAgentSigningLabel": "Confirmar antes de que el agente SSH firme la autenticaci\u00f3n",
+  "SettingsSshConfirmAgentSigningHint": "Muestra host destino, tipo de clave y huella antes de permitir que el agente SSH firme.",
+  "SshAgentSignConfirmTitle": "Confirmar firma del agente SSH",
+  "SshAgentSignConfirmMessage": "\u00bfPermitir que el agente SSH firme la autenticaci\u00f3n para {0}:{1}?\n\nTipo de clave: {2}\nHuella: {3}\nComentario: {4}",
+  "StatusSshTouchSecurityKey": "Toca tu llave de seguridad f\u00edsica para autenticarte..."
 }

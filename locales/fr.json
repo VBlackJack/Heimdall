@@ -6961,5 +6961,17 @@
   "ToolSshServerAuditErrInvalidHost": "Saisissez un nom d'h\u00f4te ou une adresse IP SSH valide.",
   "ToolSshServerAuditErrInvalidPort": "Le port doit \u00eatre compris entre 1 et 65535.",
   "ToolSshServerAuditCancelled": "Audit serveur SSH annul\u00e9.",
-  "ToolSshServerAuditErrProbeFailed": "\u00c9chec de la sonde SSH : {0}"
+  "ToolSshServerAuditErrProbeFailed": "\u00c9chec de la sonde SSH : {0}",
+  "HostKeySshfpChecking": "V\u00e9rification des enregistrements DNS SSHFP...",
+  "HostKeySshfpSkippedGateway": "V\u00e9rification DNS SSHFP ignor\u00e9e pour une connexion via passerelle.",
+  "HostKeySshfpMatchDnssecLoopback": "Correspondance DNS SSHFP (drapeau DNSSEC AD du r\u00e9solveur local). V\u00e9rifiez tout de m\u00eame manuellement.",
+  "HostKeySshfpMatchDnssecResolver": "Correspondance DNS SSHFP (drapeau DNSSEC AD du r\u00e9solveur r\u00e9seau). V\u00e9rifiez tout de m\u00eame manuellement.",
+  "HostKeySshfpMatchUnsigned": "Correspondance DNS SSHFP (DNS non sign\u00e9 - sans validation DNSSEC).",
+  "HostKeySshfpMismatchWarning": "ATTENTION : la cl\u00e9 pr\u00e9sent\u00e9e NE correspond PAS \u00e0 l'enregistrement DNS SSHFP publi\u00e9 !",
+  "HostKeySshfpNotFound": "Aucun enregistrement DNS SSHFP publi\u00e9 pour cet h\u00f4te.",
+  "SettingsSshConfirmAgentSigningLabel": "Confirmer avant chaque signature de l'agent SSH",
+  "SettingsSshConfirmAgentSigningHint": "Affiche l'h\u00f4te cible, le type de cl\u00e9 et l'empreinte avant d'autoriser l'agent SSH \u00e0 signer.",
+  "SshAgentSignConfirmTitle": "Confirmer la signature de l'agent SSH",
+  "SshAgentSignConfirmMessage": "Autoriser l'agent SSH \u00e0 signer l'authentification pour {0}:{1} ?\n\nType de cl\u00e9 : {2}\nEmpreinte : {3}\nCommentaire : {4}",
+  "StatusSshTouchSecurityKey": "Touchez votre cl\u00e9 de s\u00e9curit\u00e9 mat\u00e9rielle pour vous authentifier..."
 }

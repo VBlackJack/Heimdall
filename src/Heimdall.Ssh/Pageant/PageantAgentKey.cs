@@ -39,6 +39,28 @@ internal sealed class PageantAgentKey : ISshAgentKey
     public byte[] Sign(byte[] data, SshAgentSignFlags flags)
     {
         IPageantClient client = _clientFactory();
+        if (ISshAgentKey.IsSecurityKeyType(KeyType))
+        {
+            return client.SignData(
+                PublicKeyBlob,
+                data,
+                (uint)flags,
+                ISshAgentKey.SecurityKeySignTimeoutMilliseconds,
+                allowInteractiveWait: true);
+        }
+
         return client.SignData(PublicKeyBlob, data, (uint)flags);
+    }
+
+    public byte[] Sign(byte[] data, SshAgentSignFlags flags, int timeoutMilliseconds)
+    {
+        IPageantClient client = _clientFactory();
+        uint effective = timeoutMilliseconds > 0 ? (uint)timeoutMilliseconds : PageantClient.PageantIpcTimeoutMilliseconds;
+        return client.SignData(
+            PublicKeyBlob,
+            data,
+            (uint)flags,
+            effective,
+            allowInteractiveWait: ISshAgentKey.IsSecurityKeyType(KeyType) || effective > PageantClient.PageantIpcTimeoutMilliseconds);
     }
 }

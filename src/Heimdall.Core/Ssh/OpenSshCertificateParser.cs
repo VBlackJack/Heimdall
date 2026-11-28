@@ -112,9 +112,11 @@ public static class OpenSshCertificateParser
     public const string CertEcdsa256 = "ecdsa-sha2-nistp256-cert-v01@openssh.com";
     public const string CertEcdsa384 = "ecdsa-sha2-nistp384-cert-v01@openssh.com";
     public const string CertEcdsa521 = "ecdsa-sha2-nistp521-cert-v01@openssh.com";
+    public const string CertSkEd25519 = "sk-ssh-ed25519-cert-v01@openssh.com";
+    public const string CertSkEcdsa256 = "sk-ecdsa-sha2-nistp256-cert-v01@openssh.com";
 
     public static bool IsCertificateKeyType(string? keyType) => keyType is
-        CertEd25519 or CertRsa or CertEcdsa256 or CertEcdsa384 or CertEcdsa521;
+        CertEd25519 or CertRsa or CertEcdsa256 or CertEcdsa384 or CertEcdsa521 or CertSkEd25519 or CertSkEcdsa256;
 
     public static bool TryParsePublicLine(string? line, out OpenSshCertificateInfo? certificate)
     {
@@ -179,6 +181,32 @@ public static class OpenSshCertificateParser
                 underlyingKeyType = "ssh-ed25519";
                 keySize = 256;
                 subjectPublicKeyBlob = BuildStandardPublicKeyBlob(underlyingKeyType, pk);
+                break;
+
+            case CertSkEd25519:
+                if (!TryReadBytes(blob, ref offset, out var skPk) || skPk.Length != 32
+                    || !TryReadBytes(blob, ref offset, out var skEdApp))
+                {
+                    return false;
+                }
+
+                underlyingKeyType = "sk-ssh-ed25519@openssh.com";
+                keySize = 256;
+                subjectPublicKeyBlob = BuildStandardPublicKeyBlob(underlyingKeyType, skPk, skEdApp);
+                break;
+
+            case CertSkEcdsa256:
+                if (!TryReadString(blob, ref offset, out var skCurve)
+                    || !string.Equals(skCurve, "nistp256", StringComparison.Ordinal)
+                    || !TryReadBytes(blob, ref offset, out var skQPoint)
+                    || !TryReadBytes(blob, ref offset, out var skEcApp))
+                {
+                    return false;
+                }
+
+                underlyingKeyType = "sk-ecdsa-sha2-nistp256@openssh.com";
+                keySize = 256;
+                subjectPublicKeyBlob = BuildStandardPublicKeyBlob(underlyingKeyType, Encoding.ASCII.GetBytes(skCurve), skQPoint, skEcApp);
                 break;
 
             case CertRsa:

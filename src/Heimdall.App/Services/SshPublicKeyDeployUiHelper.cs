@@ -267,6 +267,12 @@ internal static class SshPublicKeyDeployUiHelper
                 SshAgentPreference = settings.SshAgentPreference,
                 CryptoPolicy = SshCryptoPolicyResolver.Resolve(target.SshCryptoPolicy, settings.SshCryptoPolicy),
                 AgentKeyFingerprint = target.SshAgentKeyFingerprint,
+                ConfirmAgentSign = SshAgentSignConfirmHelper.BuildConfirmCallback(
+                    settings,
+                    target.RemoteServer,
+                    targetPort,
+                    localizer,
+                    cancellationToken),
                 UseLegacyPasswordAsKeyPassphrase = target.UsesLegacySshCredentialMapping,
                 LegacyCredentialName = target.DisplayName,
                 AuthenticationTimeout = TimeSpan.FromMinutes(2),

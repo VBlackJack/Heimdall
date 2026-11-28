@@ -40,6 +40,14 @@ internal sealed class OpenSshAgentKey : ISshAgentKey
 
     public byte[] Sign(byte[] data, SshAgentSignFlags flags)
     {
-        return _agent.Sign(PublicKeyBlob, data, flags);
+        int? timeoutMs = ISshAgentKey.IsSecurityKeyType(KeyType)
+            ? ISshAgentKey.SecurityKeySignTimeoutMilliseconds
+            : null;
+        return _agent.Sign(PublicKeyBlob, data, flags, timeoutMs);
+    }
+
+    public byte[] Sign(byte[] data, SshAgentSignFlags flags, int timeoutMilliseconds)
+    {
+        return _agent.Sign(PublicKeyBlob, data, flags, timeoutMilliseconds > 0 ? timeoutMilliseconds : null);
     }
 }

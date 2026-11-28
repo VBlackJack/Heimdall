@@ -33,12 +33,31 @@ internal sealed class DialogHostKeyVerifier(
     private readonly LocalizationManager _localizer = localizer;
     private readonly TrustPromptCoordinator _coordinator = coordinator;
 
+    public Task<HostKeyDecision> VerifyAsync(
+        string host,
+        int port,
+        string algorithm,
+        string presentedFingerprint,
+        string? storedFingerprint,
+        CancellationToken ct = default)
+        => VerifyAsync(
+            host,
+            port,
+            algorithm,
+            presentedFingerprint,
+            storedFingerprint,
+            ReadOnlyMemory<byte>.Empty,
+            isViaGateway: false,
+            ct);
+
     public async Task<HostKeyDecision> VerifyAsync(
         string host,
         int port,
         string algorithm,
         string presentedFingerprint,
         string? storedFingerprint,
+        ReadOnlyMemory<byte> hostKeyBlob,
+        bool isViaGateway = false,
         CancellationToken ct = default)
     {
         var app = Application.Current;
@@ -66,6 +85,8 @@ internal sealed class DialogHostKeyVerifier(
                 algorithm,
                 presentedFingerprint,
                 storedFingerprint,
+                hostKeyBlob,
+                isViaGateway,
                 ct);
         }
 
@@ -85,6 +106,8 @@ internal sealed class DialogHostKeyVerifier(
                     algorithm,
                     presentedFingerprint,
                     storedFingerprint,
+                    hostKeyBlob,
+                    isViaGateway,
                     displayCt),
                 HostKeyDecision.Reject,
                 ct);
@@ -102,6 +125,8 @@ internal sealed class DialogHostKeyVerifier(
         string algorithm,
         string presentedFingerprint,
         string? storedFingerprint,
+        ReadOnlyMemory<byte> hostKeyBlob,
+        bool isViaGateway,
         CancellationToken ct)
     {
         if (app.Dispatcher.CheckAccess())
@@ -114,6 +139,8 @@ internal sealed class DialogHostKeyVerifier(
                     algorithm,
                     presentedFingerprint,
                     storedFingerprint,
+                    hostKeyBlob,
+                    isViaGateway,
                     ct));
         }
 
@@ -125,6 +152,8 @@ internal sealed class DialogHostKeyVerifier(
                 algorithm,
                 presentedFingerprint,
                 storedFingerprint,
+                hostKeyBlob,
+                isViaGateway,
                 ct),
             System.Windows.Threading.DispatcherPriority.Normal,
             ct).Task;
@@ -137,6 +166,8 @@ internal sealed class DialogHostKeyVerifier(
         string algorithm,
         string presentedFingerprint,
         string? storedFingerprint,
+        ReadOnlyMemory<byte> hostKeyBlob,
+        bool isViaGateway,
         CancellationToken ct)
     {
         if (ct.IsCancellationRequested)
@@ -150,7 +181,10 @@ internal sealed class DialogHostKeyVerifier(
             port,
             algorithm,
             presentedFingerprint,
-            storedFingerprint);
+            storedFingerprint,
+            hostKeyBlob,
+            isViaGateway,
+            new Heimdall.Ssh.SshfpLookupService());
         var dialog = new HostKeyPromptDialog(_localizer)
         {
             DataContext = viewModel

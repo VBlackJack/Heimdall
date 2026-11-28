@@ -4276,6 +4276,13 @@
                                             <TextBlock Text="{loc:Translate SettingsSshAgentLookupTimeoutHint}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                                         </StackPanel>
                                         <StackPanel Margin="{StaticResource SettingsFieldGap}">
+                                            <CheckBox IsChecked="{Binding Settings.SshConfirmAgentSigning}" Content="{loc:Translate SettingsSshConfirmAgentSigningLabel}"
+                                                      AutomationProperties.Name="{loc:Translate SettingsSshConfirmAgentSigningLabel}"
+                                                      AutomationProperties.HelpText="{loc:Translate SettingsSshConfirmAgentSigningHint}"/>
+                                            <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[SshConfirmAgentSigning]}"/>
+                                            <TextBlock Text="{loc:Translate SettingsSshConfirmAgentSigningHint}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="{StaticResource SettingsFieldGap}">
                                             <TextBlock x:Name="Mw_SettingsSshCryptoPolicyLabel" Text="{loc:Translate SettingsSshCryptoPolicyLabel}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                             <ComboBox SelectedValue="{Binding Settings.SshCryptoPolicy}" SelectedValuePath="Tag" MinWidth="260" HorizontalAlignment="Left" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsSshCryptoPolicyLabel}"
                                                       AutomationProperties.HelpText="{loc:Translate SettingsSshCryptoPolicyHint}">

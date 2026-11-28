@@ -548,6 +548,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     partial void OnSshAgentLookupTimeoutMsTextChanged(string value)
         => CommitNumericText(value, parsed => SshAgentLookupTimeoutMs = parsed);
 
+    /// <summary>Whether Heimdall asks for confirmation before an SSH agent signs an auth challenge.</summary>
+    [ObservableProperty]
+    private bool _sshConfirmAgentSigning;
+
     /// <summary>Whether Heimdall imports the OpenSSH known_hosts file each time it starts.</summary>
     [ObservableProperty]
     private bool _syncKnownHostsAtStartup;
@@ -2040,6 +2044,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             SshKeepAliveIntervalSeconds = settings.SshKeepAliveIntervalSeconds;
             SshHealthMonitorIntervalSeconds = settings.SshHealthMonitorIntervalSeconds;
             SshAgentLookupTimeoutMs = settings.SshAgentLookupTimeoutMs;
+            SshConfirmAgentSigning = settings.SshConfirmAgentSigning;
             SyncKnownHostsAtStartup = settings.SyncKnownHostsAtStartup;
             SshAutoReconnect = settings.SshAutoReconnect;
             SshAutoReconnectAttempts = settings.SshAutoReconnectAttempts;
@@ -2554,6 +2559,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         settings.SshKeepAliveIntervalSeconds = SshKeepAliveIntervalSeconds;
         settings.SshHealthMonitorIntervalSeconds = SshHealthMonitorIntervalSeconds;
         settings.SshAgentLookupTimeoutMs = SshAgentLookupTimeoutMs;
+        settings.SshConfirmAgentSigning = SshConfirmAgentSigning;
         settings.SyncKnownHostsAtStartup = SyncKnownHostsAtStartup;
         settings.SshAutoReconnect = SshAutoReconnect;
         settings.SshAutoReconnectAttempts = SshAutoReconnectAttempts;

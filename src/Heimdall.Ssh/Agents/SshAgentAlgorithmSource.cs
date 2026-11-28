@@ -63,11 +63,28 @@ internal sealed class SshAgentAlgorithmSource : IPrivateKeySource
 
     private readonly IReadOnlyCollection<HostAlgorithm> _algorithms;
 
-    public SshAgentAlgorithmSource(SshAgentAttempt attempt, Action<ISshAgentKey>? onSigned = null)
+    public SshAgentAlgorithmSource(
+        SshAgentAttempt attempt,
+        Action<ISshAgentKey>? onSigned = null,
+        Action<ISshAgentKey>? onBeforeSign = null,
+        Func<ISshAgentKey, bool>? confirmSign = null,
+        string? targetHost = null,
+        int targetPort = 22)
     {
         ArgumentNullException.ThrowIfNull(attempt.Key);
         ArgumentException.ThrowIfNullOrEmpty(attempt.Algorithm);
-        _algorithms = [new SshAgentHostAlgorithm(attempt.Algorithm, attempt.Key, attempt.SignFlags, onSigned)];
+        _algorithms =
+        [
+            new SshAgentHostAlgorithm(
+                attempt.Algorithm,
+                attempt.Key,
+                attempt.SignFlags,
+                onSigned,
+                onBeforeSign,
+                confirmSign,
+                targetHost,
+                targetPort)
+        ];
     }
 
     public IReadOnlyCollection<HostAlgorithm> HostKeyAlgorithms => _algorithms;
@@ -105,10 +122,20 @@ internal sealed class SshAgentAlgorithmSource : IPrivateKeySource
     /// <summary>Builds one source per attempt, in <see cref="Order"/> order.</summary>
     internal static IPrivateKeySource[] BuildSources(
         IReadOnlyList<ISshAgentKey> keys,
-        Action<ISshAgentKey>? onSigned = null)
+        Action<ISshAgentKey>? onSigned = null,
+        Action<ISshAgentKey>? onBeforeSign = null,
+        Func<ISshAgentKey, bool>? confirmSign = null,
+        string? targetHost = null,
+        int targetPort = 22)
     {
         return Order(keys)
-            .Select(attempt => (IPrivateKeySource)new SshAgentAlgorithmSource(attempt, onSigned))
+            .Select(attempt => (IPrivateKeySource)new SshAgentAlgorithmSource(
+                attempt,
+                onSigned,
+                onBeforeSign,
+                confirmSign,
+                targetHost,
+                targetPort))
             .ToArray();
     }
 

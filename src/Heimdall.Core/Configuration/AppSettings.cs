@@ -173,6 +173,12 @@ public sealed class AppSettings
     public const int DefaultSshAgentLookupTimeoutMs = 750;
     [SettingRange(250, 15000)]
     public int SshAgentLookupTimeoutMs { get; set; } = DefaultSshAgentLookupTimeoutMs;
+
+    /// <summary>
+    /// When true, prompts the user for interactive confirmation before any SSH agent signs
+    /// an authentication challenge.
+    /// </summary>
+    public bool SshConfirmAgentSigning { get; set; }
     public const int DefaultPlinkPortCheckIntervalMs = 2000;
     [SettingRange(500, 30000)]
     public int PlinkPortCheckIntervalMs { get; set; } = DefaultPlinkPortCheckIntervalMs;

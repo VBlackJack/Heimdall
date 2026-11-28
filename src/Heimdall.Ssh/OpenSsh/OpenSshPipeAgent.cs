@@ -83,10 +83,10 @@ public sealed class OpenSshPipeAgent : IMutableSshAgent
         }
     }
 
-    internal byte[] Sign(byte[] publicKeyBlob, byte[] data, SshAgentSignFlags flags)
+    internal byte[] Sign(byte[] publicKeyBlob, byte[] data, SshAgentSignFlags flags, int? timeoutMs = null)
     {
         var request = OpenSshAgentProtocol.BuildSignRequestMessage(publicKeyBlob, data, flags);
-        var response = SendRequest(request);
+        var response = SendRequest(request, timeoutMs);
         return OpenSshAgentProtocol.ParseSignResponse(response);
     }
 
@@ -112,14 +112,15 @@ public sealed class OpenSshPipeAgent : IMutableSshAgent
         return OpenSshAgentProtocol.ParseSuccessResponse(response);
     }
 
-    internal byte[] SendRequest(byte[] request)
+    internal byte[] SendRequest(byte[] request, int? timeoutMs = null)
     {
-        return SendRequestAsync(request, CancellationToken.None).GetAwaiter().GetResult();
+        return SendRequestAsync(request, CancellationToken.None, timeoutMs).GetAwaiter().GetResult();
     }
 
-    internal async Task<byte[]> SendRequestAsync(byte[] request, CancellationToken cancellationToken)
+    internal async Task<byte[]> SendRequestAsync(byte[] request, CancellationToken cancellationToken, int? timeoutMs = null)
     {
         ArgumentNullException.ThrowIfNull(request);
+        int effectiveTimeoutMs = timeoutMs is > 0 ? timeoutMs.Value : _requestTimeoutMs;
 
         using var pipe = CreatePipe();
 
@@ -130,9 +131,8 @@ public sealed class OpenSshPipeAgent : IMutableSshAgent
 
         // The I/O phase gets a fresh timeout so a slow connect on a loaded
         // CI runner does not eat into the read budget. Each phase therefore
-        // has up to _requestTimeoutMs to complete, matching the per-operation
-        // semantics of the previous synchronous ReadTimeout/WriteTimeout pair.
-        using var ioTimeoutCts = new CancellationTokenSource(_requestTimeoutMs);
+        // has up to effectiveTimeoutMs to complete (extended for FIDO2 touch waits).
+        using var ioTimeoutCts = new CancellationTokenSource(effectiveTimeoutMs);
         using var ioLinkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, ioTimeoutCts.Token);
         var ioToken = ioLinkedCts.Token;
 

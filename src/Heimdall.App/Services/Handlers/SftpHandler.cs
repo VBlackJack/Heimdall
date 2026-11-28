@@ -232,6 +232,12 @@ internal sealed class SftpHandler : IProtocolHandler
             CertificatePath = string.IsNullOrWhiteSpace(server.SshCertificatePath) ? null : server.SshCertificatePath,
             SshAgentPreference = settings.SshAgentPreference,
             AgentKeyFingerprint = server.SshAgentKeyFingerprint,
+            ConfirmAgentSign = SshAgentSignConfirmHelper.BuildConfirmCallback(
+                settings,
+                server.RemoteServer,
+                targetPort,
+                _localizer,
+                ct),
             UseLegacyPasswordAsKeyPassphrase = server.UsesLegacySshCredentialMapping,
             LegacyCredentialName = server.DisplayName,
             AgentForwarding = server.SshAgentForwarding,

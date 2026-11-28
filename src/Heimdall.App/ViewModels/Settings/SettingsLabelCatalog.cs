@@ -61,6 +61,7 @@ internal static class SettingsLabelCatalog
         [nameof(AppSettings.PuttyPath)] = new("SettingsLabelPuttyPath", "SettingsTabSshSftp", "SettingsSshSubTabConnection"),
         [nameof(AppSettings.SshAgentPreference)] = new("SettingsSshAgentPreferenceLabel", "SettingsTabSshSftp", "SettingsSshSubTabConnection"),
         [nameof(AppSettings.SshAgentLookupTimeoutMs)] = new("SettingsLabelSshAgentLookupTimeout", "SettingsTabSshSftp", "SettingsSshSubTabConnection"),
+        [nameof(AppSettings.SshConfirmAgentSigning)] = new("SettingsSshConfirmAgentSigningLabel", "SettingsTabSshSftp", "SettingsSshSubTabConnection"),
         [nameof(AppSettings.SshCryptoPolicy)] = new("SettingsSshCryptoPolicyLabel", "SettingsTabSshSftp", "SettingsSshSubTabConnection"),
         [nameof(AppSettings.SshDefaultMode)] = new("SettingsLabelSshMode", "SettingsTabSshSftp", "SettingsSshSubTabConnection"),
         [nameof(AppSettings.SyncKnownHostsAtStartup)] = new("SettingsLabelSyncKnownHostsAtStartup", "SettingsTabSshSftp", "SettingsSshSubTabHostKeys"),

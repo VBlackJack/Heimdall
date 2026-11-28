@@ -116,6 +116,7 @@ internal static class ToolGatewayConnector
                     KeyPath = target.KeyPath,
                     KeyPassphrase = target.KeyPassphrase,
                     SshAgentPreference = target.SshAgentPreference,
+                    ConfirmAgentSign = target.ConfirmAgentSign,
                     UseLegacyPasswordAsKeyPassphrase = target.UseLegacyPasswordAsKeyPassphrase,
                     LegacyCredentialName = target.LegacyCredentialName,
                     ConnectTimeout = target.ConnectTimeout
