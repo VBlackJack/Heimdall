@@ -49,4 +49,41 @@ public sealed class Osc52AndTerminalHighlightsTests
         Assert.True(ok);
         Assert.Equal(expected, decoded);
     }
+
+    [Fact]
+    public void TryParseCmdDoneMessage_ParsesValidExitCodeAndDuration()
+    {
+        Assert.True(EmbeddedSshView.TryParseCmdDoneMessage("0:12500", out int exitCode, out long durationMs));
+        Assert.Equal(0, exitCode);
+        Assert.Equal(12500L, durationMs);
+
+        Assert.True(EmbeddedSshView.TryParseCmdDoneMessage("130:45000", out int sigExit, out long sigDuration));
+        Assert.Equal(130, sigExit);
+        Assert.Equal(45000L, sigDuration);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("0")]
+    [InlineData(":1000")]
+    [InlineData("0:")]
+    [InlineData("abc:1000")]
+    [InlineData("0:-500")]
+    [InlineData("0:1000:extra")]
+    public void TryParseCmdDoneMessage_RejectsMalformedPayloads(string? payload)
+    {
+        Assert.False(EmbeddedSshView.TryParseCmdDoneMessage(payload, out _, out _));
+    }
+
+    [Theory]
+    [InlineData(-100, "0s")]
+    [InlineData(0, "0s")]
+    [InlineData(14_999, "14s")]
+    [InlineData(65_000, "1m 5s")]
+    [InlineData(3_660_000, "1h 1m")]
+    public void FormatCommandDuration_FormatsReadableIntervals(long durationMs, string expected)
+    {
+        Assert.Equal(expected, EmbeddedSshView.FormatCommandDuration(durationMs));
+    }
 }

@@ -161,6 +161,10 @@ public sealed class ContextMenuFactory
                 vm.Localize("TreeCtxDeploySshKey"),
                 vm.ServerList.DeploySshPublicKeyCommand,
                 server));
+            menu.Items.Add(CreateMenuItem(
+                vm.Localize("TreeCtxManageAuthorizedKeys"),
+                vm.ServerList.ManageAuthorizedKeysCommand,
+                server));
             if (!Heimdall.Core.Configuration.SharedSessionIds.IsShared(server.Id))
             {
                 menu.Items.Add(CreateMenuItem(

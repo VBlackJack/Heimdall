@@ -1047,6 +1047,7 @@
                                     promptMarker: marker,
                                     outputStartMarker: null,
                                     outputEndMarker: null,
+                                    startedAt: null,
                                     exitCode: null,
                                     decoration: null
                                 };
@@ -1057,6 +1058,7 @@
                             }
                         } else if (code === 'C' && activePromptZone) {
                             activePromptZone.outputStartMarker = term.registerMarker(0);
+                            activePromptZone.startedAt = Date.now();
                         } else if (code === 'D' && activePromptZone) {
                             activePromptZone.outputEndMarker = term.registerMarker(0);
                             var exitCode = parts.length > 1 ? parseInt(parts[1], 10) : 0;
@@ -1064,6 +1066,8 @@
                                 exitCode = 0;
                             }
                             activePromptZone.exitCode = exitCode;
+                            var durationMs = activePromptZone.startedAt ? Math.max(0, Date.now() - activePromptZone.startedAt) : 0;
+                            postMessage('cmd-done:' + exitCode + ':' + durationMs);
                             if (typeof term.registerDecoration === 'function' && activePromptZone.promptMarker && !activePromptZone.promptMarker.isDisposed) {
                                 try {
                                     var markerColor = exitCode === 0 ? '#50FA7B' : '#FF5555';

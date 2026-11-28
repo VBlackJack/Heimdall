@@ -67,6 +67,8 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     private const string MsgFileDrop = "file-drop:";
     private const string MsgLastCmdOutput = "last-cmd-output:";
     private const string MsgCopyLastCommandOutput = "copy-last-command-output:";
+    private const string MsgCmdDone = "cmd-done:";
+    internal const long LongCommandAlertThresholdMs = 10_000;
     internal const string MsgOsc52Write = "osc52-write:";
     internal const int MaxOsc52DecodedBytes = 128 * 1024;
     internal const int MaxOsc52Base64Length = ((MaxOsc52DecodedBytes + 2) / 3) * 4;
@@ -1163,6 +1165,38 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             return;
         }
 
+        if (message.StartsWith(MsgCmdDone, StringComparison.Ordinal))
+        {
+            string payload = message[MsgCmdDone.Length..];
+            if (TryParseCmdDoneMessage(payload, out int exitCode, out long durationMs)
+                && durationMs >= LongCommandAlertThresholdMs)
+            {
+                string durationText = FormatCommandDuration(durationMs);
+                _ = Dispatcher.BeginInvoke(() =>
+                {
+                    if (_disposed)
+                    {
+                        return;
+                    }
+
+                    string statusText = exitCode == 0
+                        ? string.Format(System.Globalization.CultureInfo.CurrentCulture, L("Osc133CmdDoneSuccess"), durationText)
+                        : string.Format(System.Globalization.CultureInfo.CurrentCulture, L("Osc133CmdDoneFailed"), exitCode, durationText);
+                    UpdateStatus(
+                        CurrentPaneStatus ?? SessionStatusTokens.Connected,
+                        displayTextOverride: statusText,
+                        forceErrorBrush: exitCode != 0);
+
+                    if (!IsVisible)
+                    {
+                        BellReceived?.Invoke();
+                    }
+                });
+            }
+
+            return;
+        }
+
         // Open URL: terminal requests to open a link in the default browser
         if (message.StartsWith(MsgOpenUrl, StringComparison.Ordinal))
         {
@@ -1576,6 +1610,58 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     private static bool IsTrustedTerminalMessageSource(string? source)
     {
         return string.Equals(source, TerminalPageMessageSource, StringComparison.OrdinalIgnoreCase);
+    }
+
+    internal static bool TryParseCmdDoneMessage(string? payload, out int exitCode, out long durationMs)
+    {
+        exitCode = 0;
+        durationMs = 0;
+        if (string.IsNullOrWhiteSpace(payload))
+        {
+            return false;
+        }
+
+        int sep = payload.IndexOf(':');
+        if (sep <= 0 || sep >= payload.Length - 1)
+        {
+            return false;
+        }
+
+        return int.TryParse(
+                payload.AsSpan(0, sep),
+                System.Globalization.NumberStyles.Integer,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out exitCode)
+            && long.TryParse(
+                payload.AsSpan(sep + 1),
+                System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out durationMs);
+    }
+
+    internal static string FormatCommandDuration(long durationMs)
+    {
+        if (durationMs < 0)
+        {
+            durationMs = 0;
+        }
+
+        long totalSeconds = durationMs / 1000;
+        if (totalSeconds < 60)
+        {
+            return string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{totalSeconds}s");
+        }
+
+        long minutes = totalSeconds / 60;
+        long seconds = totalSeconds % 60;
+        if (minutes < 60)
+        {
+            return string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{minutes}m {seconds}s");
+        }
+
+        long hours = minutes / 60;
+        long remMinutes = minutes % 60;
+        return string.Create(System.Globalization.CultureInfo.InvariantCulture, $"{hours}h {remMinutes}m");
     }
 
     internal static string DescribeWebViewText(string? text)
