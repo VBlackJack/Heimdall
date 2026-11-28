@@ -92,6 +92,7 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
     private readonly NotifyCollectionChangedEventHandler _activeSessionsCollectionChangedHandler;
     private readonly PropertyChangedEventHandler _tabPropertyChangedHandler;
     private readonly HashSet<SessionTabViewModel> _trackedTabs = [];
+    private readonly HashSet<EmbeddedSshView> _trackedSshViews = [];
     private ObservableCollection<SessionTabViewModel>? _activeSessionsSubscription;
     private AppSettings? _settingsSnapshot;
     private long _panelResolveVersion;
@@ -360,8 +361,35 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private async Task CloseAsync(TunnelInfo? tunnel)
     {
-        if (tunnel is null || tunnel.IsSessionBound)
+        if (tunnel is null)
         {
+            return;
+        }
+
+        if (tunnel.IsSessionBound)
+        {
+            if (string.IsNullOrWhiteSpace(tunnel.SessionForwardId))
+            {
+                return;
+            }
+
+            foreach (var tab in _host.Connection.ActiveSessions)
+            {
+                foreach (var pane in SplitTreeHelper.EnumerateLeaves(tab.RootContent))
+                {
+                    if (pane.HostControl is EmbeddedSshView sshView
+                        && sshView.TryRemoveSessionForward(tunnel.SessionForwardId))
+                    {
+                        RefreshList();
+                        int portDisplay = tunnel.IsRemoteOnly && tunnel.RemoteBindPort > 0
+                            ? tunnel.RemoteBindPort
+                            : tunnel.LocalPort;
+                        _host.StatusText = _localizer.Format("HotForwardStatusRemoved", portDisplay);
+                        return;
+                    }
+                }
+            }
+
             return;
         }
 
@@ -855,12 +883,19 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
     public void RefreshList()
     {
         var tunnels = new List<TunnelInfo>(_tunnelManager.GetActiveTunnels());
+        var liveSshViews = new HashSet<EmbeddedSshView>();
         foreach (var tab in _host.Connection.ActiveSessions)
         {
             foreach (var pane in SplitTreeHelper.EnumerateLeaves(tab.RootContent))
             {
                 if (pane.HostControl is EmbeddedSshView sshView)
                 {
+                    liveSshViews.Add(sshView);
+                    if (_trackedSshViews.Add(sshView))
+                    {
+                        sshView.SessionForwardsChanged += OnSessionViewForwardsChanged;
+                    }
+
                     var sessionForwards = sshView.GetActiveSessionForwards();
                     if (sessionForwards.Count > 0)
                     {
@@ -870,8 +905,30 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
             }
         }
 
+        foreach (var staleView in _trackedSshViews.Where(v => !liveSshViews.Contains(v)).ToList())
+        {
+            staleView.SessionForwardsChanged -= OnSessionViewForwardsChanged;
+            _trackedSshViews.Remove(staleView);
+        }
+
         List = new ObservableCollection<TunnelInfo>(tunnels);
         Count = tunnels.Count;
+    }
+
+    private void OnSessionViewForwardsChanged()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _host.RunOnUi(() =>
+        {
+            if (!_disposed)
+            {
+                RefreshList();
+            }
+        });
     }
 
     /// <summary>
@@ -1104,6 +1161,12 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
         foreach (var tab in _trackedTabs.ToList())
         {
             UnsubscribeFromTab(tab);
+        }
+
+        foreach (var sshView in _trackedSshViews.ToList())
+        {
+            sshView.SessionForwardsChanged -= OnSessionViewForwardsChanged;
+            _trackedSshViews.Remove(sshView);
         }
     }
 

@@ -118,4 +118,10 @@ public sealed record TunnelInfo(
 
     /// <summary>True when this entry represents a direct forward owned by an active SSH shell session.</summary>
     public bool IsSessionBound { get; init; }
+
+    /// <summary>
+    /// Unique identifier for a direct forward owned by an active <see cref="SshShellSession"/>.
+    /// Used to remove individual session-bound forwards without disconnecting the session.
+    /// </summary>
+    public string? SessionForwardId { get; init; }
 }

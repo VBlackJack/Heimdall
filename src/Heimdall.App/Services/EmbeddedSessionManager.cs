@@ -153,6 +153,12 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
     public Action<SessionTabViewModel>? CloseRequestedCallback { get; set; }
 
     /// <summary>
+    /// Optional callback invoked when the user drops local files onto a connected SSH terminal.
+    /// Parameters: (SessionTabViewModel tab, EmbeddedSshView view, IReadOnlyList&lt;string&gt; localPaths, string? remoteCwd).
+    /// </summary>
+    public Action<SessionTabViewModel, EmbeddedSshView, IReadOnlyList<string>, string?>? TerminalFilesDroppedCallback { get; set; }
+
+    /// <summary>
     /// Optional callback for cross-tool navigation. Allows tool views to open other tools.
     /// Parameters: (string toolId, string title, ToolContext? context).
     /// Wired by MainViewModel to delegate to <c>OpenToolTabAsync</c>.
@@ -1305,6 +1311,7 @@ public sealed class EmbeddedSessionManager : IEmbeddedSessionManager, IDisposabl
         view.CloseRequested += () => RequestHostClose(tab, TerminalRoutingPane(tab, view.OwningPane));
         view.CurrentDirectoryChanged += path => FollowSftpToCurrentDirectory(tab, path);
         view.BellReceived += () => tab.NotifyBell();
+        view.FilesDroppedRequested += (paths, cwd) => TerminalFilesDroppedCallback?.Invoke(tab, view, paths, cwd);
     }
 
     /// <summary>

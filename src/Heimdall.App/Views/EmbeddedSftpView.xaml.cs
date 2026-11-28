@@ -509,6 +509,17 @@ public partial class EmbeddedSftpView : UserControl, IDisposable, ICloseGuard, I
     /// <summary>The pane's view model, for the session manager to follow the sudo setting.</summary>
     internal EmbeddedSftpViewModel ViewModel => _viewModel;
 
+    /// <summary>Live remote browser used for transfers when the pane is connected.</summary>
+    internal IRemoteBrowser? ActiveBrowser => !_disposed && _browser is { IsConnected: true }
+        ? (_operationsBrowser ?? _browser)
+        : null;
+
+    /// <summary>Refreshes the directory listing when the pane is connected.</summary>
+    internal Task RefreshCurrentDirectoryAsync() =>
+        !_disposed && _browser is { IsConnected: true }
+            ? NavigateToPath(_viewModel.CurrentPath)
+            : Task.CompletedTask;
+
     public void Dispose()
     {
         if (_disposed)

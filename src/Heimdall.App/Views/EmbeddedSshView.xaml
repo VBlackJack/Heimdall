@@ -129,6 +129,16 @@
                             Style="{DynamicResource GhostButtonStyle}"
                             Padding="6,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0"/>
 
+                    <Button x:Name="HotForwardButton"
+                            Content="&#xE8AB;"
+                            FontFamily="{StaticResource FontFamilyIcons}"
+                            Click="OnHotForwardClick"
+                            ToolTip="{loc:Translate TooltipHotPortForward}"
+                            AutomationProperties.Name="{loc:Translate A11yHotPortForward}"
+                            Style="{DynamicResource GhostButtonStyle}"
+                            Padding="6,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0"
+                            Visibility="Collapsed"/>
+
                     <Button x:Name="SessionInfoButton"
                             Content="&#xE946;"
                             FontFamily="{StaticResource FontFamilyIcons}"

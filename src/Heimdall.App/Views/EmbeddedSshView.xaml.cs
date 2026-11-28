@@ -64,6 +64,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     private const string MsgBell = "bell:";
     private const string MsgClipboardWrite = "clipboard-write:";
     private const string MsgClipboardRead = "clipboard-read:";
+    private const string MsgFileDrop = "file-drop:";
     internal const string MsgOsc52Write = "osc52-write:";
     internal const int MaxOsc52DecodedBytes = 128 * 1024;
     internal const int MaxOsc52Base64Length = ((MaxOsc52DecodedBytes + 2) / 3) * 4;
@@ -308,6 +309,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     private string? _sessionLogKey;
     private string _sessionLogDisplayName = string.Empty;
     private string _sessionLogEndpoint = string.Empty;
+    private string? _lastKnownCwd;
     private SshShellSession? _session;
     private Heimdall.Terminal.ITerminalSession? _terminalSession;
     private SessionTabViewModel? _sessionTab;
@@ -437,6 +439,38 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     public event Action<byte[]>? BroadcastInput;
 
     public event Action<string>? CurrentDirectoryChanged;
+
+    /// <summary>Raised when a direct port forward is added to or removed from the active SSH session.</summary>
+    public event Action? SessionForwardsChanged;
+
+    /// <summary>
+    /// Raised when the user drops local files onto a connected SSH terminal surface.
+    /// Carries the validated existing local file paths and the last known OSC 7 working directory.
+    /// </summary>
+    public event Action<IReadOnlyList<string>, string?>? FilesDroppedRequested;
+
+    /// <summary>The currently attached SSH.NET shell session, or <see langword="null"/> for non-SSH.NET transports.</summary>
+    internal SshShellSession? ActiveSshSession => _session;
+
+    /// <summary>The last known remote directory reported via OSC 7 for this session.</summary>
+    internal string? LastKnownRemoteDirectory => _lastKnownCwd;
+
+    /// <summary>Removes a single session-bound port forward without disconnecting the shell.</summary>
+    internal bool TryRemoveSessionForward(string sessionForwardId)
+    {
+        if (_disposed || _session is null)
+        {
+            return false;
+        }
+
+        bool removed = _session.RemoveSessionPortForward(sessionForwardId);
+        if (removed)
+        {
+            BeginInvokeIfAvailable(UpdateSessionCryptoInfo);
+        }
+
+        return removed;
+    }
 
     /// <summary>
     /// Raised with the terminal selection when the user asks to save it to the Command Library
@@ -610,18 +644,21 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         }
 
         _session = session;
+        _lastKnownCwd = null;
         _pipeSizeNotice = null;
         // Stamped before the subscriptions: a disconnect already latched on the session is
         // delivered inside the Disconnected subscription below.
         _shellSessionAttachedAtUtc = DateTimeOffset.UtcNow;
         _shellSessionHasInput = false;
         _winRmEarlyOutputDiagnostic = null;
+        HotForwardButton.Visibility = Visibility.Visible;
         ShowHealthButton(true);
         UpdateSessionCryptoInfo();
 
         _session.DataReceived += OnDataReceived;
         _session.Disconnected += OnDisconnected;
         _session.SecurityEventOccurred += OnSessionSecurityEvent;
+        _session.SessionForwardsChanged += OnSessionForwardsChanged;
 
         // A panel left open across a reconnect is watching a monitor the
         // disconnect stopped; point it at the new session's client.
@@ -683,6 +720,8 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         _pipeSizeNotice = null;
         _autoReconnectOnProcessExit = autoReconnectOnProcessExit;
         _credentialFreeLaunch = credentialFreeLaunch;
+        _lastKnownCwd = null;
+        HotForwardButton.Visibility = Visibility.Collapsed;
         ShowHealthButton(false);
         _terminalSessionHasInput = false;
         _terminalSessionAttachedAtUtc = DateTimeOffset.UtcNow;
@@ -777,6 +816,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
             _session.DataReceived -= OnDataReceived;
             _session.Disconnected -= OnDisconnected;
             _session.SecurityEventOccurred -= OnSessionSecurityEvent;
+            _session.SessionForwardsChanged -= OnSessionForwardsChanged;
 
             try
             {
@@ -1250,9 +1290,16 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
             if (TryDecodeCurrentDirectoryPayload(base64, out string? path))
             {
+                _lastKnownCwd = path;
                 CurrentDirectoryChanged?.Invoke(path);
             }
 
+            return;
+        }
+
+        if (message.StartsWith(MsgFileDrop, StringComparison.Ordinal))
+        {
+            HandleWebViewFileDrop(args);
             return;
         }
 

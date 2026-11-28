@@ -78,6 +78,15 @@ public interface IEmbeddedSessionManager
     Action<SessionTabViewModel>? CloseRequestedCallback { get; set; }
 
     /// <summary>
+    /// Optional callback invoked when the user drops local files onto a connected SSH terminal.
+    /// </summary>
+    Action<SessionTabViewModel, EmbeddedSshView, IReadOnlyList<string>, string?>? TerminalFilesDroppedCallback
+    {
+        get => null;
+        set { }
+    }
+
+    /// <summary>
     /// Optional callback for a host's own Reconnect, given the tab the host was created for and
     /// the pane it sits in, when it knows it. When set, it replaces
     /// <see cref="ReconnectRequestedCallback"/> and <see cref="ReconnectPaneRequestedCallback"/>

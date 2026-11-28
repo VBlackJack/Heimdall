@@ -1,0 +1,163 @@
+<Window x:Class="Heimdall.App.Views.Dialogs.HotPortForwardDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:behaviors="clr-namespace:Heimdall.App.Behaviors"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:loc="clr-namespace:Heimdall.App.Localization"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:Heimdall.App.ViewModels.Dialogs"
+        d:DataContext="{d:DesignInstance Type=vm:HotPortForwardDialogViewModel, IsDesignTimeCreatable=False}"
+        mc:Ignorable="d"
+        Title="{loc:Translate HotForwardDialogTitle}"
+        Width="480"
+        SizeToContent="Height"
+        MinWidth="440"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource BackgroundBrush}"
+        ResizeMode="NoResize"
+        behaviors:DialogChromeBehavior.HideCaptionButtons="True"
+        ShowInTaskbar="False">
+
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Themes/DialogCommonStyles.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+
+            <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+
+            <Style x:Key="HeaderTitleStyle" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="{StaticResource FontSizeTitle}"/>
+                <Setter Property="FontWeight" Value="SemiBold"/>
+                <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
+                <Setter Property="TextWrapping" Value="Wrap"/>
+            </Style>
+
+            <Style x:Key="FormLabelStyle" TargetType="TextBlock" BasedOn="{StaticResource DialogLabelStyle}">
+                <Setter Property="VerticalAlignment" Value="Center"/>
+                <Setter Property="Margin" Value="0,0,12,8"/>
+            </Style>
+
+            <Style x:Key="FormTextBoxStyle" TargetType="TextBox" BasedOn="{StaticResource DialogFormTextBoxStyle}">
+                <Setter Property="Margin" Value="0,0,0,8"/>
+            </Style>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Grid Margin="{StaticResource SpacingLg}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Margin="0,0,0,14">
+            <TextBlock Text="{loc:Translate HotForwardDialogTitle}"
+                       Style="{StaticResource HeaderTitleStyle}"/>
+            <TextBlock Text="{loc:Translate HotForwardDialogDescription}"
+                       TextWrapping="Wrap"
+                       Margin="0,6,0,0"
+                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+        </StackPanel>
+
+        <Border Grid.Row="1" Style="{StaticResource DialogSectionCardStyle}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Grid.Column="0"
+                           Text="{loc:Translate NewTunnelModeLabel}"
+                           Style="{StaticResource FormLabelStyle}"/>
+                <ComboBox x:Name="ModeComboBox"
+                          Grid.Row="0" Grid.Column="1"
+                          ItemsSource="{Binding ForwardModes}"
+                          SelectedItem="{Binding SelectedModeOption}"
+                          DisplayMemberPath="DisplayName"
+                          Margin="0,0,0,8"
+                          AutomationProperties.Name="{loc:Translate NewTunnelModeLabel}"/>
+
+                <TextBlock Grid.Row="1" Grid.Column="0"
+                           Text="{loc:Translate NewTunnelRemoteHostLabel}"
+                           Style="{StaticResource FormLabelStyle}"
+                           Visibility="{Binding ShowRemoteHostField, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                <TextBox Grid.Row="1" Grid.Column="1"
+                         Text="{Binding RemoteHost, UpdateSourceTrigger=PropertyChanged}"
+                         Style="{StaticResource FormTextBoxStyle}"
+                         Visibility="{Binding ShowRemoteHostField, Converter={StaticResource BoolToVisibilityConverter}}"
+                         AutomationProperties.Name="{loc:Translate NewTunnelRemoteHostLabel}"/>
+
+                <TextBlock Grid.Row="2" Grid.Column="0"
+                           Text="{Binding RemotePortLabelText}"
+                           Style="{StaticResource FormLabelStyle}"
+                           Visibility="{Binding ShowRemotePortField, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                <TextBox Grid.Row="2" Grid.Column="1"
+                         Text="{Binding RemotePortText, UpdateSourceTrigger=PropertyChanged}"
+                         Style="{StaticResource FormTextBoxStyle}"
+                         Visibility="{Binding ShowRemotePortField, Converter={StaticResource BoolToVisibilityConverter}}"
+                         AutomationProperties.Name="{Binding RemotePortLabelText}"/>
+
+                <TextBlock Grid.Row="3" Grid.Column="0"
+                           Text="{Binding LocalPortLabelText}"
+                           Style="{StaticResource FormLabelStyle}"/>
+                <TextBox x:Name="LocalPortBox"
+                         Grid.Row="3" Grid.Column="1"
+                         Text="{Binding LocalPortText, UpdateSourceTrigger=PropertyChanged}"
+                         Style="{StaticResource FormTextBoxStyle}"
+                         AutomationProperties.Name="{Binding LocalPortLabelText}"/>
+
+                <TextBlock Grid.Row="4" Grid.Column="0"
+                           Text="{loc:Translate NewTunnelLabelLabel}"
+                           Style="{StaticResource FormLabelStyle}"/>
+                <TextBox Grid.Row="4" Grid.Column="1"
+                         Text="{Binding Label, UpdateSourceTrigger=PropertyChanged}"
+                         Style="{StaticResource DialogFormTextBoxStyle}"
+                         AutomationProperties.Name="{loc:Translate NewTunnelLabelLabel}"/>
+
+                <TextBlock Grid.Row="5" Grid.Column="1"
+                           Text="{loc:Translate HotForwardLoopbackNote}"
+                           FontSize="{StaticResource FontSizeCaption}"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           TextWrapping="Wrap"
+                           Margin="0,8,0,0"/>
+            </Grid>
+        </Border>
+
+        <TextBlock Grid.Row="2"
+                   Text="{Binding ValidationError}"
+                   Foreground="{DynamicResource ErrorTextBrush}"
+                   FontSize="{StaticResource FontSizeCaption}"
+                   TextWrapping="Wrap"
+                   Margin="0,8,0,0"
+                   Visibility="{Binding HasValidationError, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+        <StackPanel Grid.Row="3"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Margin="0,16,0,0">
+            <Button Content="{loc:Translate BtnCancel}"
+                    Command="{Binding CancelCommand}"
+                    IsCancel="True"
+                    Style="{DynamicResource SecondaryButtonStyle}"
+                    MinWidth="90"
+                    Margin="0,0,8,0"
+                    AutomationProperties.Name="{loc:Translate BtnCancel}"/>
+            <Button Content="{loc:Translate HotForwardBtnAdd}"
+                    Command="{Binding ConfirmCommand}"
+                    IsDefault="True"
+                    Style="{DynamicResource PrimaryButtonStyle}"
+                    MinWidth="110"
+                    AutomationProperties.Name="{loc:Translate HotForwardBtnAdd}"/>
+        </StackPanel>
+    </Grid>
+</Window>

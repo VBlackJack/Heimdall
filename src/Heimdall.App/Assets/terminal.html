@@ -1064,6 +1064,28 @@
                     postMessage('clipboard-read:');
                 });
 
+                // ── Drag-and-drop file upload onto SSH terminal ────
+                terminalElement.addEventListener('dragover', function (event) {
+                    if (event.dataTransfer && event.dataTransfer.types && event.dataTransfer.types.indexOf('Files') !== -1) {
+                        event.preventDefault();
+                        event.dataTransfer.dropEffect = 'copy';
+                    }
+                });
+                terminalElement.addEventListener('drop', function (event) {
+                    event.preventDefault();
+                    if (!event.dataTransfer || !event.dataTransfer.files || event.dataTransfer.files.length === 0) {
+                        return;
+                    }
+                    try {
+                        if (window.chrome && window.chrome.webview && typeof window.chrome.webview.postMessageWithAdditionalObjects === 'function') {
+                            var droppedFiles = Array.prototype.slice.call(event.dataTransfer.files);
+                            window.chrome.webview.postMessageWithAdditionalObjects('file-drop:', droppedFiles);
+                        }
+                    } catch (error) {
+                        // Older WebView2 runtime without postMessageWithAdditionalObjects: ignore safely.
+                    }
+                });
+
                 // ── URL detection ───────────────────────────────────
                 registerUrlLinkProvider();
 

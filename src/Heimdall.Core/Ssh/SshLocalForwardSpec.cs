@@ -31,6 +31,21 @@ public sealed record SshLocalForwardSpec(
 {
     private const string DefaultLoopback = "127.0.0.1";
 
+    /// <summary>
+    /// Restricts a requested local bind address to loopback (<c>127.0.0.1</c> or <c>::1</c>).
+    /// Blank, wildcard, or external addresses safely fall back to <c>127.0.0.1</c>.
+    /// </summary>
+    public static string NormalizeLoopbackBindAddress(string? bindAddress)
+    {
+        if (string.IsNullOrWhiteSpace(bindAddress))
+        {
+            return DefaultLoopback;
+        }
+
+        var trimmed = bindAddress.Trim().Trim('[', ']');
+        return string.Equals(trimmed, "::1", StringComparison.Ordinal) ? "::1" : DefaultLoopback;
+    }
+
     /// <summary>Formats as OpenSSH <c>LocalForward</c> directive arguments.</summary>
     public string ToOpenSshDirectiveValue()
         => string.Create(CultureInfo.InvariantCulture, $"{FormatHost(BindAddress)}:{LocalPort} {FormatHost(RemoteHost)}:{RemotePort}");

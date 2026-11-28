@@ -76,6 +76,7 @@ public partial class EmbeddedSshView
         DisconnectButton.ToolTip = L("TooltipDisconnectSession");
         ReconnectButton.ToolTip = L("TooltipReconnectSession");
         SplitButton.ToolTip = L("TooltipSplitSession");
+        HotForwardButton.ToolTip = L("TooltipHotPortForward");
         HealthToggleButton.ToolTip = L("TooltipToggleHealthMonitoring");
         UpdateHighlightsToggleVisual();
         UpdateSessionCryptoInfo();
@@ -85,6 +86,7 @@ public partial class EmbeddedSshView
         System.Windows.Automation.AutomationProperties.SetName(DisconnectButton, L("A11yDisconnectSession"));
         System.Windows.Automation.AutomationProperties.SetName(ReconnectButton, L("A11yReconnectSession"));
         System.Windows.Automation.AutomationProperties.SetName(SplitButton, L("A11ySplitSession"));
+        System.Windows.Automation.AutomationProperties.SetName(HotForwardButton, L("A11yHotPortForward"));
         System.Windows.Automation.AutomationProperties.SetName(HealthToggleButton, L("A11yToggleHealthMonitoring"));
         System.Windows.Automation.AutomationProperties.SetName(HighlightsToggleButton, L("A11yToggleTerminalHighlights"));
         System.Windows.Automation.AutomationProperties.SetName(SessionInfoButton, L("A11ySessionCryptoInfo"));
@@ -274,7 +276,9 @@ public partial class EmbeddedSshView
         // A finished session has nothing left to warn about.
         if (isDisconnected)
         {
+            _lastKnownCwd = null;
             HidePipeSizeBadge();
+            HotForwardButton.Visibility = Visibility.Collapsed;
             SessionInfoButton.Visibility = Visibility.Collapsed;
         }
 
@@ -363,6 +367,95 @@ public partial class EmbeddedSshView
         => string.Equals(clientToServer, serverToClient, StringComparison.OrdinalIgnoreCase)
             ? clientToServer
             : $"{clientToServer} / {serverToClient}";
+
+    private void OnSessionForwardsChanged()
+    {
+        SessionForwardsChanged?.Invoke();
+        BeginInvokeIfAvailable(UpdateSessionCryptoInfo);
+    }
+
+    private void OnHotForwardClick(object sender, RoutedEventArgs e)
+    {
+        if (_disposed || _session is not { IsConnected: true } session || _localizer is null)
+        {
+            return;
+        }
+
+        var vm = new ViewModels.Dialogs.HotPortForwardDialogViewModel(_localizer);
+        var dialog = new Dialogs.HotPortForwardDialog
+        {
+            DataContext = vm,
+            Owner = Window.GetWindow(this)
+        };
+
+        if (dialog.ShowDialog() != true || vm.Result is null)
+        {
+            return;
+        }
+
+        var addResult = session.AddSessionPortForward(vm.Result);
+        if (!addResult.Success)
+        {
+            var errMsg = string.Format(
+                System.Globalization.CultureInfo.CurrentCulture,
+                L("HotForwardErrStartFailed"),
+                addResult.ErrorMessage ?? string.Empty);
+            UpdateStatus(
+                CurrentPaneStatus ?? SessionStatusTokens.Connected,
+                displayTextOverride: errMsg,
+                forceErrorBrush: true);
+            return;
+        }
+
+        UpdateSessionCryptoInfo();
+        var portNum = addResult.Forward is { IsRemoteOnly: true }
+            ? addResult.Forward.RemoteBindPort
+            : addResult.Forward?.LocalPort ?? vm.Result.LocalPort;
+        UpdateStatus(
+            SessionStatusTokens.Connected,
+            displayTextOverride: string.Format(
+                System.Globalization.CultureInfo.CurrentCulture,
+                L("HotForwardStatusAdded"),
+                portNum));
+    }
+
+    private void HandleWebViewFileDrop(Microsoft.Web.WebView2.Core.CoreWebView2WebMessageReceivedEventArgs args)
+    {
+        if (_disposed || _session is not { IsConnected: true })
+        {
+            return;
+        }
+
+        var filePaths = new List<string>();
+        try
+        {
+            var additionalObjects = args.AdditionalObjects;
+            if (additionalObjects is not null)
+            {
+                foreach (var obj in additionalObjects)
+                {
+                    if (obj is Microsoft.Web.WebView2.Core.CoreWebView2File webFile
+                        && !string.IsNullOrWhiteSpace(webFile.Path)
+                        && System.IO.File.Exists(webFile.Path))
+                    {
+                        filePaths.Add(webFile.Path);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"EmbeddedSSH file-drop inspection failed: {ex.Message}");
+            return;
+        }
+
+        if (filePaths.Count == 0)
+        {
+            return;
+        }
+
+        FilesDroppedRequested?.Invoke(filePaths, _lastKnownCwd);
+    }
 
     private void OnSessionInfoClick(object sender, RoutedEventArgs e)
     {

@@ -278,7 +278,7 @@
   "ServerDialogPostConnectInputPlaceholder": "Command to send, for example: sudo -i",
   "SessionTreeRowTooltipHost": "Host: {0}",
   "SessionTreeRowTooltipProtocol": "Protocol: {0}",
-  "SessionTreeSearchContext": "{0} · {1}",
+  "SessionTreeSearchContext": "{0} \u00b7 {1}",
   "SessionTreeProtocolTool": "Tool",
   "SessionTreeRowTooltipGateway": "Gateway: {0}",
   "SessionTreeRowTooltipUser": "User: {0}",
@@ -1312,9 +1312,7 @@
   "A11yServerSshCompression": "SSH compression",
   "A11yServerSshX11Forwarding": "SSH X11 forwarding",
   "A11yServerRdpColorDepth": "Color depth",
-
   "KeyboardShortcutsTitle": "Keyboard Shortcuts",
-
   "SftpCtxEdit": "Edit (integrated)",
   "SftpCtxEditExternal": "Edit with external editor",
   "SftpStatusEditing": "Editing: {0} - save in your editor to auto-upload",
@@ -1332,11 +1330,9 @@
   "SftpStatusEditOpenFailed": "Could not open editor: {0}",
   "SftpStatusEditUnsupportedEntry": "Cannot edit {0}: this entry is not a regular file.",
   "SftpStatusRenameUnsupportedEntry": "Cannot rename a symbolic link over SFTP: the server would rename its target instead.",
-
   "ValidationInlineSshUserRequired": "SSH username is required",
   "ValidationInlineWinRmUserInvalid": "Enter a WinRM user name such as operator, CONTOSO\\operator or operator@contoso.com.",
   "ValidationInlineWinRmPasswordMissing": "Enter the password for this WinRM stored credential.",
-
   "SftpErrorDestinationChanged": "The destination is now occupied and was not replaced. Refresh the folder and retry with a new name or an explicit replacement choice.",
   "SftpErrorExclusiveUploadUnconfirmed": "The upload could not be confirmed without replacing a file. Refresh the destination before retrying. Safe creation requires SFTP with a working SSH command channel; FTP cannot guarantee it.",
   "SftpErrorUnknown": "An unexpected error occurred.",
@@ -1444,9 +1440,7 @@
   "GatewayPasswordClear": "Clear",
   "GatewayDialogClearStoredPassword": "Remove the password saved for this gateway",
   "GatewayDialogClearStoredKeyPassphrase": "Remove the passphrase saved for this gateway",
-
   "CtxWakeOnLan": "Wake on LAN",
-
   "BroadcastModeOn": "Broadcast mode ON - {0}",
   "BroadcastModeOff": "Broadcast mode OFF",
   "BroadcastToggleTooltip": "Toggle Broadcast Mode (send to all terminals)",
@@ -1466,7 +1460,6 @@
   "A11yBroadcastTabTargetSelected": "{0}, selected as a broadcast target",
   "A11yBroadcastTabTargetNotSelected": "{0}, not selected as a broadcast target",
   "A11yBroadcastTabTarget": "Toggle broadcast target for this session",
-
   "DialogSnapshotRestoreTitle": "Restore previous sessions",
   "DialogSnapshotRestoreMessage": "Heimdall found a saved session snapshot from the previous run. Select the sessions to restore.",
   "DialogSnapshotRestoreWarning": "Only top-level session tabs are restored in this version; tool tabs are not.",
@@ -1697,13 +1690,11 @@
   "WarningSnapshotRestorePartial": "Restored {0} saved sessions out of {1}.",
   "WarningSnapshotRestorePartialOne": "Restored {0} saved session out of {1}.",
   "ErrorSnapshotRestoreFailed": "Failed to restore saved sessions: {0}",
-
   "EnvProduction": "Production",
   "EnvStaging": "Staging",
   "EnvLab": "Lab",
   "EnvPersonal": "Personal",
   "EnvNone": "(None)",
-
   "SettingsSessionLogging": "Enable terminal session logging",
   "SettingsSessionLogDir": "Session log directory:",
   "A11yBrowseSessionLogDir": "Browse for session log directory",
@@ -1716,7 +1707,6 @@
   "SessionLogFooter": "===== Session ended {0} | duration {1} =====",
   "LogSessionLogRollover": "Session log reached its size cap, continuing in {0}",
   "LogSessionLogWriteError": "Session log write failed for {0}: {1}",
-
   "ErrorSshAuthFailed": "SSH authentication failed. Check your credentials and that the correct key is loaded in Pageant.",
   "ErrorSshAuthTimeout": "SSH authentication timed out. Check that Pageant is running and the correct key is loaded.",
   "ErrorFtpConnectionFailed": "FTP connection failed.",
@@ -1770,7 +1760,6 @@
   "ErrorWinRmLogonFailed": "The remote host rejected the credentials. Check the user name and password (use the user@domain form for a domain account) and that the account is not locked.",
   "ErrorWinRmSessionNotEntered": "The remote WinRM session could not be opened. Read the PowerShell message above for the cause, then check the host name, the port and the identity of this profile.",
   "ErrorWinRmPreflightTlsFailedNoVerify": "The WinRM TLS connection to '{0}' on port {1} failed even though certificate validation is skipped: the port probably does not answer in TLS. Check that port {1} is the HTTPS WinRM listener (usually 5986).",
-
   "SessionAspectStretch": "Stretch",
   "SessionFullscreen": "Fullscreen",
   "SessionCloseSession": "Close Session",
@@ -1832,7 +1821,6 @@
   "SessionDuplicateTab": "Duplicate session",
   "SessionSaveAsProfile": "Save as profile...",
   "StatusMovedToGroup": "Moved {0} to {1}",
-
   "FileBrowserCtxOpen": "Open",
   "FileBrowserCtxOpenInExplorer": "Open in Explorer",
   "FileBrowserCtxCopyPath": "Copy path",
@@ -1878,13 +1866,11 @@
   "FileBrowserPropertiesModified": "Modified",
   "FileBrowserPropertiesAccessed": "Accessed",
   "FileBrowserPropertiesAttributes": "Attributes",
-
   "NavTabSessions": "Sessions",
   "NavTabTunnels": "Tunnels",
   "NavTabScheduled": "Scheduled",
   "NavTabSettings": "Settings",
   "NavTabAbout": "About",
-
   "SearchPlaceholder": "Search",
   "SearchTooltip": "Search sessions and tools (Ctrl+F)",
   "AddMenuSession": "Add Session",
@@ -1894,7 +1880,6 @@
   "TooltipShowSidebar": "Show sidebar (Ctrl+B)",
   "TooltipAddMenu": "Add session, folder, or gateway (Ctrl+N)",
   "TooltipSidebarOverflow": "More actions",
-
   "DetailLabelGroup": "Folder:",
   "DetailLabelProject": "Project:",
   "DetailLabelOrigin": "Origin:",
@@ -1944,7 +1929,6 @@
   "EmptyStateShortcutHints": "Ctrl+N to add a session \u00b7 Ctrl+K to quick connect \u00b7 F1 for all shortcuts",
   "StatusBarShortcutHint": "F1 for shortcuts",
   "DetailActionHints": "{0} edit \u00b7 {1} delete \u00b7 F1 all shortcuts",
-
   "TunnelsSectionTitle": "Active Tunnels",
   "TunnelsBtnNew": "+ New",
   "TunnelsBtnCloseSelected": "Close Selected",
@@ -1982,7 +1966,6 @@
   "NewTunnelSettingsUnavailable": "Settings are not loaded yet.",
   "StatusManualTunnelOpened": "Tunnel opened on local port {0} \u2192 {1}:{2}.",
   "StatusManualTunnelFailed": "Tunnel creation failed: {0}",
-
   "GatewaysSectionTitle": "SSH Gateways",
   "GatewaysBtnOverview": "Overview",
   "GatewaysBtnAdd": "+ Add",
@@ -2019,7 +2002,6 @@
   "GatewayOverviewClearSuccessOne": "Set {0} session to a direct connection.",
   "GatewayOverviewActionNoOp": "No sessions needed changes.",
   "GatewayOverviewActionFailed": "Could not update gateway references: {0}",
-
   "ScheduledSectionTitle": "Scheduled Connections",
   "ScheduledBtnAdd": "+ Add",
   "ScheduledBtnEdit": "Edit",
@@ -2032,7 +2014,6 @@
   "ScheduledColNextRun": "Next Run",
   "ScheduledEmptyState": "No scheduled tasks configured.",
   "ScheduledEmptyAddButton": "Create Task",
-
   "SettingsSectionAppearance": "Appearance",
   "SettingsSectionOnboarding": "Welcome tour",
   "SettingsOnboardingReplayButton": "Show the tour again",
@@ -2109,7 +2090,6 @@
   "SettingsBtnSaveSettings": "Save settings",
   "SettingsBtnResetDefaults": "Reset defaults",
   "SettingsBtnRevertChanges": "Undo changes",
-
   "AboutLabelAuthor": "Author",
   "AboutLabelLicense": "License",
   "AboutLicenseValue": "Apache License 2.0",
@@ -2128,10 +2108,8 @@
   "AboutBtnOpenConfig": "Open config folder",
   "AboutBtnOpenLogs": "Open logs folder",
   "AboutBtnGitHub": "GitHub",
-
   "StatusBarSeparator": " | ",
   "TooltipExitFullscreenEsc": "Exit fullscreen (Esc or Ctrl+Shift+F11)",
-
   "ServerDialogTabGeneral": "General",
   "ServerDialogTabOptions": "Options",
   "ServerDialogTabNetwork": "Network",
@@ -2141,23 +2119,19 @@
   "ServerDialogSessionLoggingOverrideOn": "On",
   "ServerDialogSessionLoggingOverrideOff": "Off",
   "ServerDialogSessionLoggingOverrideHint": "Inherit follows the global session logging setting. WinRM sessions do not create transcript logs even when this profile is set to On because the local PowerShell host owns the REPL.",
-
   "ServerDialogConnectionBasics": "Connection basics",
   "ServerDialogConnectionBasicsDesc": "Set the destination host and the service port Heimdall should open.",
   "ServerDialogLabelDisplayName": "Display name",
   "ServerDialogLabelServer": "Server",
-
   "ServerDialogGatewayRouting": "Gateway routing",
   "ServerDialogGatewayRoutingDesc": "Use an SSH gateway when the target server is only reachable through a bastion or jump host.",
   "ServerDialogDirectConnect": "Connect directly without an SSH gateway",
   "ServerDialogGatewayDisabledProtocolHint": "Gateways are available for SSH, SFTP, RDP and WinRM.",
   "ServerDialogGatewayDisabledDirectHint": "Direct connection is selected. Clear it to route this session through a gateway.",
-
   "ServerDialogConnectionPath": "Connection path",
   "ServerDialogNodeYourPc": "Your PC",
   "ServerDialogNodeDestination": "Destination",
   "ServerDialogNodeGateway": "Gateway",
-
   "ServerDialogTunnelingTitle": "How tunneling works",
   "ServerDialogTunnelingDesc": "A tunnel listens on a local port on your PC and forwards that traffic to the remote service through the selected SSH gateway.",
   "ServerDialogTunnelingHint": "This is only used when a gateway is selected. Direct connections skip the local tunnel entirely.",
@@ -2181,7 +2155,6 @@
   "ServerDialogTunnelLabelChain": "Gateway chain",
   "ServerDialogTunnelLabelLocal": "Local endpoint",
   "ServerDialogTunnelLabelRemote": "Remote destination",
-
   "ServerDialogRdpCredentials": "RDP credentials",
   "ServerDialogRdpCredentialsDesc": "Credentials used by the Remote Desktop session after routing is complete.",
   "ServerDialogLabelUsername": "Username",
@@ -2209,7 +2182,6 @@
   "ServerDialogGatewayAuth": "Gateway authentication",
   "ServerDialogGatewayAuthDesc": "The selected SSH gateway uses the credentials stored in its own gateway profile.",
   "ServerDialogEditGatewayBtn": "Edit gateway credentials...",
-
   "ServerDialogRdpOptions": "RDP session options",
   "ServerDialogRdpOptionsDesc": "Display, transport, and session mode settings for the Remote Desktop client.",
   "ServerDialogResolutionProfileTitle": "Resolution profile",
@@ -2336,7 +2308,6 @@
   "ServerDialogRdpStrictServerAuth": "Require server identity validation",
   "ServerDialogDynamicResolution": "Allow dynamic resolution updates",
   "ServerDialogAudioCapture": "Capture local microphone",
-
   "ServerDialogRedirectClipboard": "Redirect clipboard",
   "ServerDialogRedirectDrives": "Redirect drives",
   "ServerDialogRedirectPrinters": "Redirect printers",
@@ -2344,14 +2315,12 @@
   "ServerDialogRedirectSmartCards": "Redirect smart cards",
   "ServerDialogRedirectWebcam": "Redirect webcam",
   "ServerDialogRedirectUsb": "Redirect USB devices",
-
   "ServerDialogGlobalDefaults": "Use global RDP defaults",
   "ServerDialogAntiIdle": "Enable anti-idle keepalive",
   "ServerDialogBitmapCaching": "Keep bitmap cache on disk between sessions",
   "ServerDialogRdpCompressionCb": "Enable RDP compression",
   "ServerDialogRdpHardwareAccelerationCb": "Use hardware-accelerated rendering",
   "ServerDialogAutoReconnect": "Automatically reconnect",
-
   "ServerDialogSshOptions": "SSH options",
   "ServerDialogSshOptionsDesc": "Session mode and SSH feature flags used by the shell or file transfer connection.",
   "ServerDialogLabelSshMode": "SSH mode",
@@ -2405,20 +2374,18 @@
   "LogPostConnectResolveBrokenNoTemplate": "Command Library action has no Linux template",
   "LogPostConnectResolveBrokenInvalidParams": "Command Library action parameters are invalid",
   "PostConnectProgressStarting": "Preparing post-connect sequence...",
-  "PostConnectProgressTooltip": "{0} · {1} · {2}",
+  "PostConnectProgressTooltip": "{0} \u00b7 {1} \u00b7 {2}",
   "PostConnectProgressPending": "Pending",
   "PostConnectProgressRunning": "Running",
   "PostConnectProgressCompleted": "Completed",
   "PostConnectProgressFailed": "Failed",
   "PostConnectProgressSkipped": "Skipped",
   "PostConnectProgressCancelled": "Cancelled",
-
   "ServerDialogLocalShell": "Local shell",
   "ServerDialogLocalShellDesc": "Configure the shell executable and startup arguments.",
   "ServerDialogLabelExecutable": "Executable",
   "ServerDialogLabelArguments": "Arguments",
   "ServerDialogLabelWorkingDir": "Working directory",
-
   "ServerDialogOrganization": "Organization",
   "ServerDialogOrganizationDesc": "Use grouping metadata to keep the session list organized.",
   "ServerDialogLabelFolder": "Folder",
@@ -2430,7 +2397,6 @@
   "ServerDialogEnvStaging": "Staging",
   "ServerDialogEnvLab": "Lab",
   "ServerDialogEnvPersonal": "Personal",
-
   "ServerDialogMetadata": "Metadata",
   "ServerDialogMetadataDesc": "Optional tags and Wake-on-LAN metadata for this session entry.",
   "ServerDialogLabelTags": "Tags",
@@ -2438,15 +2404,12 @@
   "ServerDialogLabelVaultEntryName": "Vault entry name",
   "ServerDialogVaultEntryNamePlaceholder": "Leave empty to use the display name",
   "ServerDialogVaultEntryNameHelp": "Optional name of this server's entry in the external password manager. Used for the credential provider's {Title} lookup; when empty, the display name is used.",
-
   "EmbeddedSshFallbackTitle": "Embedded SSH terminal unavailable",
   "EmbeddedSshFallbackMessage": "WebView2 could not be initialized on this machine, so the terminal cannot be displayed. Install Microsoft Edge and restart Heimdall, or download the Self-Contained edition (https://github.com/VBlackJack/Heimdall/releases), which bundles everything it needs.",
   "ErrorServerNotFound": "Session not found in the inventory.",
-
   "SftpColPermissions": "Permissions",
   "SftpColOwner": "Owner",
   "SftpDragDropOverlay": "Drop files to upload",
-
   "TunnelPanelHeader": "Tunnels ({0})",
   "TunnelPanelCollapse": "Collapse tunnel panel",
   "TunnelPanelToggle": "Toggle tunnel panel",
@@ -2480,7 +2443,6 @@
   "RdpMultimonFallbackNonContiguous": "The selected monitors do not sit next to each other, so the session would have to span the screens between them. Falling back to single-monitor mode.",
   "RdpConfirmResolutionReconnectTitle": "Reconnect required",
   "RdpConfirmResolutionReconnectMessage": "Changing resolution to {0}x{1} requires reconnect. Continue?",
-
   "ConnectionTypeCitrix": "Citrix",
   "CitrixStoreFrontUrl": "StoreFront URL",
   "CitrixAppName": "Application Name",
@@ -2518,9 +2480,7 @@
   "CitrixModeStoreFront": "Mode: StoreFront",
   "CitrixAppNameLabel": "Application: {0}",
   "CitrixStoreFrontLabel": "StoreFront: {0}",
-
   "TunnelPanelColLocal": "Local",
-
   "TunnelPanelColRemote": "Remote",
   "TunnelPanelColPort": "Port",
   "TunnelCtxClose": "Close Tunnel",
@@ -2542,7 +2502,6 @@
   "SettingsBtnImportServers": "Import Sessions",
   "QuickConnectNoResults": "No results found. Try a host, ssh user@host, tools, or a command like ping 1.1.1.1.",
   "QuickConnectHints": "Enter = open \u00b7 Ctrl+Enter = split \u00b7 tools = all tools \u00b7 ping 1.1.1.1 = launch a tool \u00b7 Esc = close",
-
   "ServerDialogCitrixWorkspace": "Citrix Workspace",
   "ServerDialogCitrixWorkspaceDesc": "Configure the StoreFront URL and application name, or provide a direct ICA file.",
   "ServerDialogLabelStoreFrontUrl": "StoreFront URL",
@@ -2588,7 +2547,6 @@
   "ServerDialogColor32": "32-bit",
   "ServerDialogBrowseKeyTitle": "Select SSH Key",
   "ServerDialogBrowseKeyFilter": "PPK Files (*.ppk)|*.ppk|PEM Files (*.pem)|*.pem|All Files (*.*)|*.*",
-
   "ServerDialogPortLabelRdp": "Remote RDP port",
   "ServerDialogPortLabelWinRm": "WinRM port",
   "ServerDialogPortLabelVnc": "VNC port",
@@ -2641,7 +2599,6 @@
   "ServerDialogDestinationNode": "Destination server",
   "ServerDialogLabelSshTunnel": "SSH tunnel",
   "ServerDialogLabelDirectTransport": "Direct transport",
-
   "ValidationDisplayNameRequired": "Display name is required.",
   "ValidationDisplayNameEmpty": "Display name cannot be empty.",
   "ValidationServerAddressRequired": "Server address is required.",
@@ -2713,7 +2670,6 @@
   "ErrorPlinkExitedBeforeTunnel": "Plink exited (code {0}) before opening the tunnel: {1}",
   "ErrorPlinkExecutableNotFound": "Plink executable not found: {0}",
   "ErrorUnhandledTitle": "Heimdall Error",
-
   "EditorBtnSave": "Save",
   "EditorBtnClose": "Close",
   "EditorCursorPosition": "Ln {0}, Col {1}",
@@ -2856,7 +2812,6 @@
   "RdpDisconnectRemoteAppError": "A RemoteApp error ended the session. Try connecting again. Contact your administrator if it keeps happening.",
   "RdpDisconnectUnknownCode": "The Remote Desktop session ended with an unknown disconnect code. Try reconnecting; if it keeps happening, copy the error details and contact your administrator.",
   "RdpFatalError": "Remote Desktop reported a fatal error.",
-
   "BtnDisconnectSession": "_Disconnect",
   "BtnCancelConnect": "_Cancel",
   "BtnCancelReconnect": "_Cancel",
@@ -2865,7 +2820,6 @@
   "BtnBringToFront": "Bring to Front",
   "PinEnterLabel": "Enter PIN",
   "BtnUnlock": "Unlock",
-
   "TreeCtxExternalTools": "External Tools",
   "ExternalToolLaunchError": "Failed to launch external tool \"{0}\": {1}",
   "ExternalToolShellTargetBlocked": "Launching shell interpreters or script hosts as external tools is blocked for security reasons.",
@@ -2873,12 +2827,10 @@
   "ExternalToolArgumentLeadingDash": "the value of {0} starts with '-', so the tool would read it as an option. Check the server's fields.",
   "ScreenshotCaptured": "Screenshot copied to clipboard",
   "ScreenshotFailed": "Failed to capture screenshot",
-
   "TreeCtxWakeOnLan": "Wake on LAN",
   "TreeCtxNotes": "Notes",
   "WolSent": "Wake-on-LAN magic packet sent.",
   "WolFailed": "Failed to send Wake-on-LAN packet.",
-
   "SshDisconnectedMessage": "Session disconnected unexpectedly.",
   "SshSessionEndedMessage": "Session ended.",
   "SshTerminalDisconnectMarker": "[Session ended: {0}]",
@@ -2889,7 +2841,6 @@
   "SshConnectingTitleWithName": "Connecting to {0}...",
   "BtnCloseOverlay": "_Close",
   "BtnViewOutputOverlay": "_View output",
-
   "NetworkScannerTitle": "Network Scanner",
   "NetworkScannerCidrPrompt": "Enter CIDR subnet to scan (e.g., 192.168.1.0/24):",
   "NetworkScannerScanning": "Scanning {0}... ({1}/{2})",
@@ -2898,7 +2849,6 @@
   "NetworkScannerNoHosts": "No responsive hosts found on {0}.",
   "NetworkScannerError": "Scan failed: {0}",
   "NetworkScannerAddServer": "Add to Sessions",
-
   "MacroStartRecording": "Start recording",
   "MacroStopRecording": "Stop recording",
   "MacroPlaySubmenu": "Play macro",
@@ -2937,7 +2887,6 @@
   "MacroEditorDeleteMacro": "Delete macro",
   "MacroEditorDeleteConfirmTitle": "Delete macro",
   "MacroEditorDeleteConfirmMessage": "Delete this macro? This cannot be undone.",
-
   "HealthPanelCpu": "CPU",
   "HealthPanelRam": "Memory",
   "HealthPanelDisk": "Disk",
@@ -2945,7 +2894,6 @@
   "HealthPanelCpuFormat": "{0:F1}%",
   "HealthPanelRamFormat": "{0} / {1} MB",
   "HealthPanelDiskFormat": "{0} / {1}",
-
   "CredProvPresetLabel": "Quick setup preset",
   "CredProvCmdHint": "Placeholders: {Host}  {Port}  {User}  {Title}  {Database}  {KeyFile}",
   "SettingsCredProvDisabledHint": "Enable 'Use external credential provider' to configure these options",
@@ -2982,7 +2930,6 @@
   "ErrorCredentialProviderFailed": "External credential provider failed: {0}",
   "ErrorCredentialProviderTimeout": "The external credential provider did not answer within {1} ms for \"{0}\". Raise the timeout in Settings > Security if your vault asks you to confirm each request.",
   "WarnCredentialProviderNoResult": "The external credential provider returned no password for \"{0}\": the command failed or printed nothing. Check the vault entry name, the unlock secret and the command in Settings > Security.",
-
   "ConnectionTypeVnc": "VNC",
   "ConnectionTypeWeb": "Web",
   "StatusVncConnecting": "Connecting to VNC server...",
@@ -3105,11 +3052,9 @@
   "ServerDialogTelnetOptions": "Telnet Options",
   "ServerDialogTelnetOptionsDesc": "Telnet connection settings.",
   "ServerDialogTelnetSecurityWarning": "Warning: Telnet transmits all data including credentials in plaintext. Use SSH whenever possible for secure remote access.",
-
   "VncFallbackTitle": "Embedded VNC viewer unavailable",
   "VncFallbackMessage": "WebView2 could not be initialized on this machine, so the remote screen cannot be displayed. Install Microsoft Edge and restart Heimdall, or download the Self-Contained edition (https://github.com/VBlackJack/Heimdall/releases), which bundles everything it needs.",
   "VncDisconnectedOverlay": "VNC session disconnected unexpectedly",
-
   "VncViewerNotFound": "VNC viewer HTML not found.",
   "VncClipboardSync": "Clipboard",
   "TooltipVncClipboard": "Send the local clipboard to the session",
@@ -3131,7 +3076,6 @@
   "CitrixStatusDisconnected": "Disconnected",
   "CitrixStatusEmbedded": "Embedded",
   "CitrixStatusExternal": "External window",
-
   "GatewayDialogLabelName": "Name",
   "GatewayDialogLabelHost": "Host",
   "GatewayDialogLabelPort": "Port",
@@ -3150,7 +3094,6 @@
   "GatewayHostKeyFingerprintHint": "Auto-populated after the first connection. Used to verify server identity and prevent host key spoofing.",
   "GatewayDialogBtnBrowse": "Browse",
   "GatewayDialogSelectSshKey": "Select SSH Key",
-
   "ProjectDialogColorBlue": "Blue",
   "ProjectDialogColorGreen": "Green",
   "ProjectDialogColorRed": "Red",
@@ -3159,7 +3102,6 @@
   "ProjectDialogColorPink": "Pink",
   "ProjectDialogColorCyan": "Cyan",
   "ProjectDialogColorOrange": "Orange",
-
   "SettingsSectionTerminal": "Terminal Appearance",
   "SettingsLabelTerminalFont": "Font family",
   "SettingsLabelTerminalFontSize": "Font size",
@@ -3170,7 +3112,6 @@
   "SettingsLabelTerminalColorScheme": "Color scheme",
   "SettingsPsExecutionPolicy": "PowerShell Execution Policy",
   "SettingsPsExecutionPolicyHint": "Applied when launching local PowerShell/pwsh sessions",
-
   "SettingsSectionRdpDefaults": "Defaults for new RDP profiles",
   "SettingsSectionRdpDisplay": "Display",
   "SettingsSectionRdpAudio": "Audio",
@@ -3180,7 +3121,6 @@
   "SettingsSectionRdpAdvancedTimeouts": "Advanced timeouts",
   "SettingsLabelRdpWidth": "Width",
   "SettingsLabelRdpHeight": "Height",
-
   "SettingsSectionSessionLogging": "Logging",
   "SettingsLabelSessionLoggingEnabled": "Record session transcripts (what each terminal shows, typed input included)",
   "SettingsSessionLoggingWarning": "Transcripts keep what you type as well as what is shown, including passwords or tokens echoed to the terminal. Keep the log folder private.",
@@ -3191,7 +3131,6 @@
   "SettingsLabelSessionLogRetentionDays": "Delete transcripts older than",
   "SettingsSessionLogRetentionHint": "0 keeps every transcript. Only session transcripts are deleted; the event and file-operation logs are kept.",
   "ValidationSettingsSessionLogRetention": "Transcript retention must be 0 (keep all) or between {0} and {1} days.",
-
   "SettingsSectionCredentialProvider": "External Credential Provider",
   "SettingsLabelCredProviderEnabled": "Use external credential provider",
   "SettingsLabelCredProviderType": "Provider type",
@@ -3213,7 +3152,6 @@
   "SettingsCredProviderTimeoutHint": "How long the password command may run before Heimdall gives up on it. Raise it for a vault that asks for confirmation.",
   "SettingsCredProviderUnlockPlaceholder": "Database master password or GPG passphrase",
   "SettingsCredProviderUnlockHelp": "Sent to the command's standard input for tools that read their unlock secret there (e.g. keepassxc-cli). pass and gopass ask gpg-agent instead, through its own prompt or cache. Stored encrypted; leave empty if not required.",
-
   "SettingsSectionExternalToolsList": "External Tools",
   "SettingsSectionFileSharing": "File sharing",
   "SecurityPostureTitle": "Security overview",
@@ -3260,7 +3198,6 @@
   "SecurityPostureWarningSftpSudoFallback": "A refused SFTP operation is retried as root with no question.",
   "SettingsSectionExternalEditor": "External editor",
   "BtnRemove": "Remove",
-
   "ToolsShareFolder": "Quick File Server",
   "ToolsStopSharing": "Stop File Server",
   "ToolsSharingStopped": "File server stopped",
@@ -3278,12 +3215,10 @@
   "FileServerFooter": "Heimdall Ephemeral File Server",
   "FileServerNotFound": "404 - Not Found",
   "FileServerUnauthorized": "Unauthorized",
-
   "X11ServerNotFound": "No X11 server found. Install VcXsrv or Xming for X11 forwarding support.",
   "X11ServerStarted": "X11 server started: {0}",
   "X11ServerDetected": "X11 server detected: {0}",
   "SettingsX11AutoStart": "Auto-start X11 server",
-
   "ConnectionTypeFtp": "FTP",
   "StatusFtpConnecting": "FTP connection to: {0}...",
   "LogFtpLaunching": "Launching FTP session",
@@ -3291,14 +3226,11 @@
   "ServerDialogFtpPassword": "FTP Password",
   "ValidationFtpPortRange": "FTP port must be between 1 and 65535.",
   "ValidationVncPortRange": "VNC port must be between 1 and 65535.",
-
   "ConnectionTypeTelnet": "Telnet",
   "StatusTelnetConnecting": "Connecting via Telnet...",
   "LogTelnetLaunching": "Launching Telnet session",
-
   "QuickConnectShortcut": "Quick Connect (Ctrl+K)",
   "PaletteSearchPlaceholder": "Search host, IP, or tool... (Ctrl+K)",
-
   "SettingsSshModeEmbedded": "Embedded",
   "SettingsSshModeExternal": "External",
   "SettingsSshAgentPreferenceLabel": "SSH agent preference",
@@ -3391,16 +3323,12 @@
   "LogSplitSwapped": "Swapped split panes for '{0}'.",
   "LogSplitOrientationToggled": "Toggled split orientation for '{0}' to {1}.",
   "RdpDisconnectedMessage": "The Remote Desktop session has ended.",
-
   "HelpShortcutsTitle": "Keyboard Shortcuts",
   "HelpShortcutsContent": "Navigation\n  {0}\tAdd new server\n  {1}\tEdit selected server\n  {2}\tDelete selected server\n  Ctrl+F\tSearch servers\n  Ctrl+B\tToggle sidebar\n  Ctrl+Shift+B\tShow or hide the properties panel\n  F11\tToggle fullscreen\n  Ctrl+Shift+F11\tToggle fullscreen over embedded sessions\n\nConnections\n  Ctrl+K\tQuick Connect\n  Enter\tConnect to selected server\n\nSession\n  Ctrl+W\tClose current tab\n  Ctrl+F4\tClose current tab, from a terminal too\n  Middle click\tClose the tab under the pointer\n  Apps, Shift+F10\tTab menu, from the tab strip\n  Ctrl+Tab\tNext tab\n  Ctrl+Shift+Tab\tPrevious tab\n  Ctrl+PgDn, Ctrl+PgUp\tNext or previous tab, from a terminal too\n  Ctrl+Shift+PgDn, Ctrl+Shift+PgUp\tMove the tab right or left\n  Ctrl+1 to Ctrl+8\tGo to that tab; Ctrl+9 the last one\n  Ctrl+Shift+R\tReopen the tabs of the last close\n  Ctrl+Shift+M\tCopy the output, secrets masked\n  Ctrl+Shift+S\tCapture screenshot\n  Ctrl+Shift+N\tNetwork scanner\n  Ctrl+Shift+O\tToggle split orientation\n  Ctrl+Shift+T\tToggle tools panel\n\nSettings\n  Ctrl+,\tOpen settings\n  Ctrl+S\tSave settings\n\nGeneral\n  F1\tShow this help\n  Esc\tExit fullscreen / close palette",
-
   "BtnYes": "Yes",
   "BtnNo": "No",
-
   "QuickConnectSshTo": "[SSH] Connect to {0}",
   "QuickConnectRdpTo": "[RDP] Connect to {0}",
-
   "ErrorConnectionFailed": "Connection failed.",
   "ErrorConnectionTitle": "Connection Error",
   "ErrorPreflightFailed": "Connection preflight check failed.",
@@ -3586,7 +3514,6 @@
   "SshPipeSessionSizeMismatchNotice": "This session cannot follow the new terminal width ({0} columns); it stays at {1} columns. Reconnect to apply the current size.",
   "SshPipeSessionSizeMismatchBadge": "Width fixed: {0} cols",
   "FileBrowserFilterPlaceholder": "Filter...",
-
   "ToolPwdGenTitle": "Password Generator",
   "ToolPwdGenOutputName": "Generated password",
   "ToolPwdGenStrength": "Strength",
@@ -3699,7 +3626,6 @@
   "ToolPwdGenSpecialsNoneUsable": "None of these can be used: a special character has to be ASCII punctuation, typeable on any keyboard",
   "ToolPwdGenAdvanced": "Advanced",
   "ToolPwdGenMode": "Mode:",
-
   "ToolBase64Title": "Base64 Encoder / Decoder",
   "ToolBase64InputLabel": "Input",
   "ToolBase64OutputLabel": "Output",
@@ -3720,7 +3646,6 @@
   "ToolBase64FileLoaded": "File loaded: {0} ({1} bytes)",
   "ToolBase64ErrorFileTooLarge": "File exceeds the 5 MB size limit.",
   "ToolBase64UrlSafe": "URL-safe (RFC 4648)",
-
   "ToolChmodTitle": "Chmod Calculator",
   "ToolChmodRead": "Read",
   "ToolChmodWrite": "Write",
@@ -3738,7 +3663,6 @@
   "ToolChmodBtnCopyCommand": "Copy command",
   "ToolChmodSymbolicInputPlaceholder": "u+x,g-w,o=r",
   "ToolChmodErrorInvalidSymbolic": "Invalid symbolic notation",
-
   "ToolSubnetCalculatorTitle": "Subnet Calculator",
   "ToolSubnetCidrInputLabel": "IP address / CIDR notation (e.g. 192.168.1.0/24)",
   "ToolSubnetNetworkAddress": "Network Address",
@@ -3750,7 +3674,6 @@
   "ToolSubnetCidrNotation": "CIDR Notation",
   "ToolSubnetWildcardMask": "Wildcard Mask",
   "ToolSubnetErrorInvalidCidr": "Invalid IP address or CIDR notation. Use format: 192.168.1.0/24",
-
   "ToolHashGeneratorTitle": "Hash Generator",
   "ToolHashInputLabel": "Input text",
   "ToolHashBtnCopy": "Copy",
@@ -3766,9 +3689,8 @@
   "ToolHashGenErrorFileNotFound": "File not found.",
   "ToolHashGenErrorFileAccessDenied": "Access denied to file.",
   "ToolHashGenErrorGeneric": "Could not hash the file.",
-  "ToolHashGenVerifyMatchFormat": "✓ Match ({0})",
-  "ToolHashGenVerifyNoMatch": "✗ No match",
-
+  "ToolHashGenVerifyMatchFormat": "\u2713 Match ({0})",
+  "ToolHashGenVerifyNoMatch": "\u2717 No match",
   "ToolRegexTitle": "Regex Tester",
   "ToolRegexPatternLabel": "Pattern",
   "ToolRegexTestTextLabel": "Test text",
@@ -3786,7 +3708,6 @@
   "ToolRegexStatusTimeout": "Regex evaluation timed out (ReDoS protection)",
   "ToolRegexMatchesTruncated": "Showing first {0} of {1} matches",
   "ToolRegexHighlightLabel": "Match highlighting",
-
   "ToolJsonTitle": "JSON Formatter",
   "ToolJsonInputLabel": "Input JSON",
   "ToolJsonOutputLabel": "Output",
@@ -3798,7 +3719,6 @@
   "ToolJsonStatusError": "Invalid JSON: {0}",
   "ToolJsonErrorInputTooLarge": "Input exceeds the 5 MB size limit.",
   "ToolJsonStatusProcessing": "Processing...",
-
   "ToolDateTimeTitle": "DateTime Converter",
   "ToolDateTimeInputLabel": "Unix timestamp (seconds) or ISO 8601 datetime",
   "ToolDateTimeBtnNow": "Now",
@@ -3810,7 +3730,6 @@
   "ToolDateTimeDetectedUnix": "Detected: Unix timestamp",
   "ToolDateTimeDetectedIso": "Detected: ISO 8601 datetime",
   "ToolDateTimeErrorInvalid": "Invalid input. Enter a Unix timestamp or ISO 8601 datetime.",
-
   "ToolUuidTitle": "UUID Generator",
   "ToolUuidResultLabel": "Generated UUID (v4)",
   "ToolUuidResultLabelV7": "Generated UUID (v7)",
@@ -3837,7 +3756,6 @@
   "ToolUlidBtnCopyBatch": "Copy all",
   "ToolUlidResult": "ULID Result",
   "ToolUlidBatchResults": "Batch Results",
-
   "ToolJwtTitle": "JWT Parser",
   "ToolJwtInputLabel": "Paste JWT token",
   "ToolJwtHeaderLabel": "Header",
@@ -3854,7 +3772,6 @@
   "ToolJwtSignatureInvalid": "Signature is invalid",
   "ToolJwtUnsupportedAlg": "RSA/ECDSA verification requires a public key (not supported)",
   "ToolJwtVerifyHmacTitle": "Signature Verification",
-
   "PaletteToolSubnet": "Subnet Calculator",
   "PaletteToolSubnetWith": "Subnet Calculator: {0}",
   "PaletteToolHash": "Hash Generator",
@@ -3911,16 +3828,14 @@
   "PaletteSnippetBtnSendExample": "Send",
   "PaletteSnippetLinksHeader": "Links",
   "PaletteSnippetPreviewHeader": "Command",
-  "PaletteSnippetDetailHints": "Enter: send · Ctrl+Enter: copy · Esc: back",
+  "PaletteSnippetDetailHints": "Enter: send \u00b7 Ctrl+Enter: copy \u00b7 Esc: back",
   "PaletteSnippetOpenInLibrary": "Open in Command Library",
   "PaletteQuickConnectHeader": "Quick Connect",
   "PaletteServersHeader": "Servers",
-
   "PaletteToolIpConv": "IP Address Converter",
   "PaletteToolIpConvWith": "IP Converter: {0}",
   "PaletteToolUrlEnc": "URL Encoder / Decoder",
   "PaletteToolHttp": "HTTP Status Codes",
-
   "ToolIpConvTitle": "IP Address Converter",
   "ToolIpConvInputLabel": "Enter IPv4 address (dotted, integer, hex, or binary)",
   "ToolIpConvDottedDecimal": "Dotted Decimal",
@@ -3929,13 +3844,11 @@
   "ToolIpConvBinary": "Binary",
   "ToolIpConvMappedIpv6": "IPv4-Mapped IPv6",
   "ToolIpConvErrorInvalid": "Invalid input. Enter a valid IPv4 address, integer, hex (0x...), or dotted binary.",
-
   "ToolUrlEncTitle": "URL Encoder / Decoder",
   "ToolUrlEncDecodedLabel": "Decoded",
   "ToolUrlEncEncodedLabel": "Encoded",
   "ToolUrlEncBtnCopy": "Copy",
   "ToolUrlEncComponentMode": "Strict component encoding (encode all reserved characters)",
-
   "ToolHttpTitle": "HTTP Status Codes",
   "ToolHttpFilterPlaceholder": "Filter by code, name, or description...",
   "ToolHttp100": "The server has received the request headers and the client should proceed to send the request body.",
@@ -4005,9 +3918,7 @@
   "ToolHttpCat3xx": "3xx Redirection",
   "ToolHttpCat4xx": "4xx Client Error",
   "ToolHttpCat5xx": "5xx Server Error",
-
   "PaletteToolDiff": "Text Diff",
-
   "ToolDiffTitle": "Text Diff",
   "ToolDiffOriginalLabel": "Original",
   "ToolDiffModifiedLabel": "Modified",
@@ -4022,12 +3933,10 @@
   "ToolDiffChkIgnoreWhitespace": "Ignore whitespace",
   "ToolDiffChkIgnoreCase": "Ignore case",
   "ToolDiffChkAutoCompare": "Auto-compare",
-
   "PaletteToolPing": "Ping Monitor",
   "PaletteToolPingWith": "Ping Monitor: {0}",
   "PaletteToolDns": "DNS Lookup",
   "PaletteToolDnsWith": "DNS Lookup: {0}",
-
   "ToolPingTitle": "Ping Monitor",
   "ToolPingHostLabel": "Target host",
   "ToolPingBtnStart": "Start",
@@ -4046,7 +3955,6 @@
   "ToolPingCountLabel": "Count:",
   "ToolPingBtnClear": "Clear",
   "ToolPingCompleteFormat": "Ping complete: {0} sent, {1} received, {2}% loss",
-
   "ToolDnsTitle": "DNS Lookup",
   "ToolDnsHostnameLabel": "Hostname or IP address",
   "ToolDnsRecordTypeLabel": "Record type",
@@ -4064,17 +3972,14 @@
   "ToolDnsPresetGoogle": "Google (8.8.8.8)",
   "ToolDnsPresetCloudflare": "Cloudflare (1.1.1.1)",
   "ToolDnsPresetQuad9": "Quad9 (9.9.9.9)",
-
   "PaletteToolCert": "Certificate Inspector",
   "PaletteToolCertWith": "Certificate Inspector: {0}",
   "PaletteToolCron": "Crontab Builder",
   "PaletteToolCronWith": "Crontab Builder: {0}",
-
   "ToolCategoryEncoding": "Encoding & Format",
   "ToolCategoryNetwork": "Network",
   "ToolCategorySecurity": "Security",
   "ToolCategorySystem": "System",
-
   "ToolCertTitle": "SSL/TLS Certificate Inspector",
   "ToolCertHostLabel": "Host",
   "ToolCertPortLabel": "Port",
@@ -4131,7 +4036,6 @@
   "ToolCertCsvKeySize": "KeySize",
   "ToolCertCsvHostnameMatch": "HostnameMatch",
   "ToolCertCsvSans": "SANs",
-
   "ToolCronTitle": "Crontab Builder",
   "ToolCronMinute": "Minute",
   "ToolCronHour": "Hour",
@@ -4194,9 +4098,7 @@
   "ToolCronValidationFieldCount": "A cron expression must have exactly 5 fields separated by spaces",
   "ToolCronValidationInvalidField": "Invalid characters in field \"{0}\": {1}",
   "ToolCronValidationOutOfRange": "Field \"{0}\" values must be between {1} and {2}",
-
   "PaletteToolSshKey": "SSH Key Generator",
-
   "ToolSshKeyGenTitle": "SSH Key Generator",
   "ToolSshKeyGenAlgorithm": "Algorithm",
   "ToolSshKeyGenComment": "Comment",
@@ -4259,9 +4161,7 @@
   "NewTunnelRemoteLocalPortLabel": "Local target port",
   "StatusManualSocksTunnelOpened": "SOCKS5 proxy opened on 127.0.0.1:{0}",
   "StatusManualRemoteTunnelOpened": "Reverse tunnel opened: remote:{0} -> 127.0.0.1:{1}",
-
   "PaletteToolSshAudit": "SSH Key Auditor",
-
   "ToolSshAuditTitle": "SSH Key Auditor",
   "ToolSshAuditInput": "Paste SSH key (public or private, OpenSSH or PEM format)",
   "ToolSshAuditBtnBrowse": "Browse...",
@@ -4301,11 +4201,9 @@
   "ToolSshAuditFileReadError": "The key file could not be read: {0}",
   "ToolSshAuditBitsLabel": "{0} bits",
   "ToolHelpSSHAUDIT": "SSH Key Auditor\n\nAnalyzes SSH key security and provides recommendations.\n\nUsage:\n1. Paste an SSH key (public or private) into the text area, OR\n2. Click Browse to load a key file\n\nSupported formats:\n- OpenSSH public keys (ssh-rsa, ssh-ed25519, ecdsa-sha2-*)\n- OpenSSH private keys\n- PEM format (PKCS#1, PKCS#8)\n\nSecurity checks:\n- Algorithm strength (Ed25519 > ECDSA > RSA > DSA)\n- Key size adequacy (RSA: min 2048, recommended 4096)\n- Encryption status (unencrypted private keys flagged)\n- Format security (old PEM encryption vs modern OpenSSH)",
-
   "PaletteToolPortScan": "Port Scanner",
   "PaletteToolPortScanWith": "Port Scanner: {0}",
   "PaletteToolHmac": "HMAC Generator",
-
   "ToolPortScanTitle": "Port Scanner",
   "ToolPortScanHostLabel": "Target host",
   "ToolPortScanPortsLabel": "Port range",
@@ -4329,7 +4227,6 @@
   "ToolPortScanStatusClosed": "Closed",
   "ToolPortScanProgressCount": "{0} / {1} ports",
   "ToolPortScanLargeRangeWarning": "You are about to scan {0} ports. This may take a long time. Continue?",
-
   "ToolHmacTitle": "HMAC Generator",
   "ToolHmacAlgorithmLabel": "Algorithm",
   "ToolHmacKeyLabel": "Secret key",
@@ -4432,7 +4329,6 @@
   "ToolPwdGenCrackForever": "billions of years",
   "ToolsPanelFilterPlaceholder": "Filter tools...",
   "PaletteRecentToolsHeader": "Recent Tools",
-
   "ToolPingJitter": "Jitter:",
   "ToolPingBtnExportCsv": "Export CSV",
   "ToolPingUnitMs": "{0} ms",
@@ -4450,7 +4346,6 @@
   "ToolDateTimeRelativeAgo": "{0} ago",
   "ToolDateTimeRelativeIn": "in {0}",
   "ToolJsonStatusErrorAtPosition": "Error at line {0}, position {1}: {2}",
-
   "PaletteToolTextCase": "Text Case Converter",
   "ToolTextCaseTitle": "Text Case Converter",
   "ToolTextCaseInputLabel": "Input Text",
@@ -4465,7 +4360,6 @@
   "ToolTextCaseLower": "lower case",
   "ToolTextCaseTitle_Case": "Title Case",
   "ToolTextCaseConstant": "CONSTANT_CASE",
-
   "PaletteToolTotp": "TOTP Generator",
   "ToolTotpTitle": "TOTP Generator",
   "ToolTotpSecretLabel": "Secret Key (Base32)",
@@ -4477,7 +4371,6 @@
   "ToolTotpInfo": "Enter a Base32-encoded secret key (as provided by Google Authenticator, Authy, etc.) to generate time-based one-time passwords (TOTP). Codes refresh every 30 seconds.",
   "ToolTotpErrorSecretRequired": "Please enter a secret key.",
   "ToolTotpErrorInvalidBase32": "Invalid Base32 encoding. Use characters A-Z and 2-7 only.",
-
   "PaletteToolWhois": "WHOIS Lookup",
   "PaletteToolWhoisWith": "WHOIS Lookup: {0}",
   "ToolWhoisTitle": "WHOIS Lookup",
@@ -4492,7 +4385,6 @@
   "ToolWhoisErrorTimeout": "WHOIS query timed out. The WHOIS server may be unreachable or rate-limiting requests.",
   "ToolWhoisErrorFailed": "WHOIS query failed: {0}. Try again or use a different domain/IP.",
   "ToolWhoisErrorInvalidDomain": "Invalid domain name or IP address.",
-
   "PaletteToolHttpHeaders": "HTTP Header Analyzer",
   "PaletteToolHttpHeadersWith": "HTTP Header Analyzer: {0}",
   "ToolHttpHeadersTitle": "HTTP Security Headers",
@@ -4542,7 +4434,6 @@
   "ToolHttpHeaderReportSecHeaders": "=== Security Headers ===",
   "ToolHttpHeaderReportInfoDisc": "=== Information Disclosure ===",
   "ToolHttpHeaderReportRawHeaders": "=== Raw Response Headers ===",
-
   "PaletteToolBanner": "Banner Grabber",
   "PaletteToolBannerWith": "Banner Grabber: {0}",
   "ToolBannerTitle": "Banner Grabber",
@@ -4563,7 +4454,6 @@
   "ToolBannerProgress": "{0} / {1} ports",
   "ToolBannerEmptyState": "Enter a host and ports to grab service banners",
   "ToolBannerChkBannerOnly": "Show with banner only",
-
   "PaletteToolSmb": "SMB Enumerator",
   "PaletteToolSmbWith": "SMB Enumerator: {0}",
   "ToolSmbTitle": "SMB Enumerator",
@@ -4600,7 +4490,6 @@
   "ToolSmbReportIdentity": "=== Host Identity ===",
   "ToolSmbReportProtocol": "=== SMB Protocol ===",
   "ToolSmbReportFindings": "=== Security Findings ===",
-
   "PaletteToolSnmp": "SNMP Walker",
   "PaletteToolSnmpWith": "SNMP Walker: {0}",
   "ToolSnmpTitle": "SNMP Walker",
@@ -4627,9 +4516,7 @@
   "ToolSnmpProgress": "{0} OIDs retrieved",
   "ToolSnmpErrorConnection": "SNMP query failed: {0}",
   "ErrorInvalidSnmpOid": "Invalid SNMP OID. Use a numeric OID (1.3.6.1.2.1). Symbolic MIB names (SNMPv2-MIB::sysDescr.0) work only through an SSH gateway.",
-
   "PaletteExternalToolsHeader": "External Tools",
-
   "PaletteToolCertGen": "Certificate Generator",
   "ToolCertGenTitle": "Certificate Generator",
   "ToolCertGenSubjectSection": "Subject",
@@ -4665,7 +4552,6 @@
   "ToolCertGenErrorInvalidValidity": "Please enter a valid number of days (1 or more).",
   "ToolCertGenErrorGeneration": "Certificate generation failed: {0}",
   "ToolCertGenErrorExport": "PFX export failed: {0}",
-
   "PaletteToolLogView": "Log Viewer",
   "ToolLogViewTitle": "Log Viewer / Tail",
   "ToolLogViewBtnBrowse": "Browse",
@@ -4686,11 +4572,9 @@
   "ToolLogViewLoading": "Loading...",
   "ToolLogViewErrorRegexTimeout": "The filter took too long and was stopped. Simplify the expression.",
   "ToolLogViewLineTruncated": " [line truncated]",
-
   "PaletteToolHosts": "Hosts File Editor",
   "PaletteToolSshConfig": "SSH Config Generator",
   "PaletteToolNetCalc": "Network Calculator",
-
   "ToolHostsEditorTitle": "Hosts File Editor",
   "ToolHostsEditorBtnReload": "Reload",
   "ToolHostsEditorBtnSave": "Save",
@@ -4719,7 +4603,6 @@
   "ToolHostsEditorBackupFailed": "The hosts file was not saved: its backup could not be written to {0}. {1}",
   "ToolHostsEditorExternallyModifiedReloadPrompt": "Another program changed the hosts file after it was loaded. Reload it now? The edits made here are discarded.",
   "ToolHostsEditorExternallyModified": "The hosts file was not saved: another program changed it after it was loaded, and saving would have dropped that change.",
-
   "ToolSshConfigTitle": "SSH Config Generator",
   "ToolSshConfigHostAlias": "Host alias",
   "ToolSshConfigHostName": "HostName",
@@ -4735,7 +4618,6 @@
   "ToolSshConfigOutput": "SSH Config Output",
   "ToolSshConfigErrorHostRequired": "HostName is required.",
   "ToolSshConfigGenerateAllHint": "Open this tool from a session context to pre-fill fields.\nUse the form above to generate config blocks manually for each host.",
-
   "ToolNetCalcTitle": "Network Calculator",
   "ToolNetCalcModeLabel": "Mode",
   "ToolNetCalcModeSupernet": "Supernet Calculator",
@@ -4765,7 +4647,6 @@
   "ToolNetCalcVlanUsableHosts": "Usable hosts: {0}",
   "ToolNetCalcVlanRequested": "Requested: {0}",
   "ToolNetCalcVlanUtilization": "Utilization: {0}%",
-
   "PaletteToolCronJob": "Cron Job Manager",
   "ToolCronJobTitle": "Cron Job Manager",
   "ToolCronJobTabPaste": "Paste Crontab",
@@ -4794,7 +4675,6 @@
   "ToolCronJobStatusParsed": "{0} entries parsed.",
   "ToolCronJobStatusTasks": "{0} scheduled tasks found.",
   "ToolCronJobTasksLoading": "Loading scheduled tasks...",
-
   "PaletteToolServices": "Service Status Dashboard",
   "ToolServicesTitle": "Service Status Dashboard",
   "ToolServicesFilterTooltip": "Filter by service name...",
@@ -4862,13 +4742,11 @@
   "ToolDescCVELOOKUP": "CVE vulnerability database search with CVSS scoring",
   "ToolDescSECNUMCLOUD": "SecNumCloud v3.2 compliance audit across network, crypto, access, and operations",
   "ToolDescNOTES": "Markdown notes editor with folder tree, tags, and Confluence export",
-
   "ToolHelpTooltip": "Show help",
   "ToolPwdGenBtnSavePreset": "Save Preset",
   "ToolPwdGenSavePresetTitle": "Save Preset",
   "ToolPwdGenSavePresetPrompt": "Enter a name for this preset:",
   "ToolPwdGenDeletePreset": "Delete Preset",
-
   "ToolHelpPING": "Ping Monitor\n\nContinuously pings a remote host and displays latency in a real-time graph.\n\nUsage:\n1. Enter a hostname or IP address\n2. Click Start or press Enter\n3. Monitor latency, jitter, and packet loss in real time\n\nOptions:\n- Interval: time between pings (0.5s to 10s)\n- Timeout: max wait time per ping in ms\n- Count: stop after N pings (0 = unlimited)\n\nExamples:\n- 8.8.8.8 - Google DNS\n- gateway.local - Local gateway\n- 10.0.0.1 - Specific server\n\nTip: Use Export CSV to save results for later analysis.",
   "ToolHelpDNS": "DNS Lookup\n\nQueries DNS records for a given hostname using system or custom DNS servers.\n\nUsage:\n1. Enter a hostname (e.g. example.com)\n2. Select a record type (A, AAAA, MX, CNAME, TXT, NS, PTR, SOA, ANY)\n3. Optionally select a specific DNS server\n4. Click Lookup or press Enter\n\nRecord types:\n- A: IPv4 address\n- AAAA: IPv6 address\n- MX: Mail exchange servers\n- CNAME: Canonical name (alias)\n- TXT: Text records (SPF, DKIM, etc.)\n- NS: Name servers\n- PTR: Reverse DNS\n- SOA: Start of authority\n- ANY: All available records\n\nVia Tunnel:\nSelect an SSH gateway from the 'Route via' dropdown to perform DNS lookups from the gateway server's network. Uses dig, nslookup, or host on the remote server.\n\nExamples:\n- example.com (A) - Get IP address\n- example.com (MX) - Find mail servers\n- 8.8.8.8 (PTR) - Reverse lookup",
   "ToolHelpCERT": "Certificate Inspector\n\nRetrieves and displays SSL/TLS certificate details for any host.\n\nSingle-port mode:\n1. Enter a hostname (e.g. google.com)\n2. Enter a port number (default: 443)\n3. Click Check or press Enter\n\nScan mode (port discovery):\n1. Enter a hostname\n2. Clear the port field (leave it empty)\n3. Select a scan profile: Quick (12 common TLS ports), Extended (25+ ports), or Custom\n4. Click Scan - all ports presenting a TLS certificate are discovered\n\nDisplayed information:\n- Subject, issuer, validity dates\n- Serial number, SHA-256 thumbprint, signature algorithm\n- Key size and Subject Alternative Names (SANs)\n- TLS protocol version and hostname validation\n- Full certificate chain (expandable in scan mode)\n\nThe expiry status is color-coded:\n- Green: valid for more than 30 days\n- Yellow: expires within 30 days\n- Red: already expired\n\nVia Tunnel:\nSelect an SSH gateway from the 'Route via' dropdown to inspect certificates on internal hosts accessible through the gateway.\n\nExamples:\n- google.com:443 - Check a single certificate\n- server.local (empty port) - Scan for all TLS certificates\n- Custom: 443,8443,993 - Scan specific ports",
@@ -4879,7 +4757,6 @@
   "ToolHelpSUBNET": "Subnet Calculator\n\nCalculates IPv4 and IPv6 network information from CIDR notation.\n\nUsage:\n1. Enter an IP address with CIDR prefix (e.g. 192.168.1.0/24)\n2. Results update automatically\n\nDisplayed information:\n- Network address\n- Broadcast address\n- Subnet mask and wildcard mask\n- First and last usable host\n- Total number of usable hosts\n- CIDR notation\n\nExamples:\n- 192.168.1.0/24 - 254 hosts (Class C)\n- 10.0.0.0/8 - 16,777,214 hosts (Class A)\n- 172.16.0.0/16 - 65,534 hosts (Class B)\n- 192.168.1.64/26 - 62 hosts (subnet)\n- 2001:db8::/32 - IPv6 prefix",
   "ToolHelpREGEX": "Regex Tester\n\nTests regular expressions against sample text with real-time matching.\n\nUsage:\n1. Enter a regex pattern\n2. Enter test text\n3. Matches are highlighted and listed automatically\n\nOptions:\n- Ignore Case: case-insensitive matching\n- Multiline: ^ and $ match line boundaries\n- Singleline: . matches newline characters\n\nFeatures:\n- Real-time highlighting of matches in the test text\n- Numbered match list with capture group details\n- Match count display\n- Copy all matches to clipboard\n\nExamples:\n- \\b\\w+@\\w+\\.\\w+\\b - Match email addresses\n- \\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3} - Match IPv4 addresses\n- ^#.*$ (Multiline) - Match comment lines",
   "ToolHelpJSON": "JSON Formatter\n\nFormats (prettifies) or minifies JSON data.\n\nUsage:\n1. Paste or type JSON in the input field\n2. Click Prettify to format with indentation\n3. Click Minify to compact into a single line\n4. Copy the result to clipboard\n\nFeatures:\n- Syntax validation with error messages\n- Handles large JSON documents (up to 5 MB)\n- Preserves Unicode characters\n\nKeyboard:\n- Ctrl+Enter: Prettify\n- Ctrl+Shift+Enter: Minify\n\nExamples:\n- {\"name\":\"value\"} \u2192 Prettified with 2-space indentation\n- Paste API responses for quick formatting",
-
   "ToolHelpIPCONV": "IP Converter\n\nConverts IP addresses between decimal, hexadecimal, binary, and integer formats.\n\nUsage:\nEnter an IP address in any supported format and all conversions are displayed instantly.",
   "ToolHelpHTTP": "HTTP Status Codes\n\nReference of all standard HTTP status codes with descriptions.\n\nUsage:\nBrowse or search for HTTP status codes. Each entry shows the code, name, and description.",
   "ToolHelpWHOIS": "WHOIS Lookup\n\nQueries WHOIS databases for domain registration information.\n\nUsage:\nEnter a domain name and click Lookup to retrieve registrar, creation date, expiry, and name servers.",
@@ -4918,13 +4795,11 @@
   "TreeCtxOpenToolInTab": "Open in Tab",
   "TreeCtxRemoveTool": "Remove",
   "SessionCloseTab": "Close tab",
-
   "ToolTunnelDirect": "Direct Connection",
   "ToolTunnelRouteVia": "Route via:",
   "ToolTunnelConnecting": "Connecting to gateway...",
   "ToolTunnelFailed": "Gateway connection failed: {0}",
   "ToolTunnelGatewayRemoved": "Gateway \"{0}\" was removed from the settings. This tool now connects directly.",
-
   "PaletteToolNetMap": "Network Cartography",
   "PaletteToolNetMapWith": "Network Cartography: {0}",
   "ToolNetMapTitle": "Network Cartography",
@@ -5041,7 +4916,6 @@
   "ToolSubnetDetectedOne": "{0} subnet detected on {1}",
   "ToolSubnetDetectFailed": "Could not auto-detect remote subnets. Enter the scope manually.",
   "ToolHelpNETMAP": "Network Cartography\n\nDiscovers hosts on a subnet, scans their ports, identifies services, classifies roles, and fingerprints devices.\n\nUsage:\n1. Enter a subnet in CIDR notation (e.g. 192.168.1.0/24)\n2. Select scan depth: Quick (20 ports), Standard (50 ports), or Deep (custom)\n3. Click Start Scan or press Enter\n\nOptions:\n- Skip ping: scan all IPs even if ICMP is blocked\n- Reverse DNS: resolve hostnames for discovered hosts\n\nScan depths:\n- Quick: 20 common ports (SSH, HTTP, RDP, DNS, etc.) - fast reconnaissance\n- Standard: 50 ports covering most enterprise services - recommended\n- Deep: custom port list for thorough analysis\n\nDiscovery capabilities:\n- ICMP ping sweep with TTL-based OS fingerprinting\n- TCP port scanning with banner grabbing\n- HTTP header analysis (Server, X-Powered-By, WWW-Authenticate)\n- TLS certificate inspection (subject, issuer, SANs, expiry)\n- NetBIOS name resolution (computer name, domain/workgroup)\n- SNMPv2c queries (sysDescr, sysName, sysLocation)\n- mDNS/Bonjour service discovery (AirPlay, printers, HomeKit, etc.)\n- MAC address lookup via ARP table (300+ manufacturer database)\n- Heuristic role classification with multi-source evidence\n- Confidence scoring from ports + banners + SNMP + NetBIOS + mDNS\n- Passive VLAN/segment detection\n\nExport:\n- CSV with 20 columns including OS, NetBIOS, SNMP, mDNS data\n- Draw.io visual network topology diagram\n- Historical scan comparison with diff detection\n\nExamples:\n- 192.168.1.0/24 - Scan a /24 subnet (254 hosts)\n- 10.0.0.0/20 - Scan a larger network (4094 hosts)\n- 172.16.0.0/24 with Skip Ping - Scan through firewalls",
-
   "ToolCtxCopyIp": "Copy IP Address",
   "ToolCtxOpenSession": "Connect ({0} to {1})",
   "ToolCtxCopyHostname": "Copy Hostname",
@@ -5060,7 +4934,6 @@
   "ToolCtxAddToServers": "Add to Sessions",
   "ToolHostsEditorCtxEnable": "Enable",
   "ToolHostsEditorCtxDisable": "Disable",
-
   "PaletteToolDiagram": "Diagram Editor",
   "ToolDiagramTitle": "Diagram Editor",
   "ToolDiagramBtnNew": "New",
@@ -5121,7 +4994,6 @@
   "DrawIoExportLabelCert": "Cert: {0}",
   "DrawIoExportSegmentSubnet": "Subnet {0}",
   "DrawIoExportSegmentGateway": "Gateway: {0}",
-
   "ToolEmptyStateDns": "Enter a hostname and click Lookup to see DNS records",
   "ToolEmptyStatePortScan": "Enter a target host and click Scan to discover open ports",
   "ToolEmptyStateNetMap": "Configure a subnet range and click Scan to discover hosts",
@@ -5133,10 +5005,8 @@
   "ToolCronJobEmptyState": "Paste a crontab or scan for Windows scheduled tasks",
   "ToolLogViewEmptyState": "Browse or enter a log file path to start viewing",
   "ToolRegexEmptyState": "Enter a regex pattern and test string above",
-
   "TooltipResolution": "Change display resolution",
   "TooltipElevate": "Elevate to root (sudo)",
-
   "SearchResultCount": "{0} sessions",
   "FilterResultCount": "{0} / {1} sessions",
   "FilterResultCountOne": "{0} / {1} session",
@@ -5187,7 +5057,6 @@
   "PropertiesCopied": "Copied: {0}",
   "PropertiesCopyFailed": "The clipboard is in use by another program; try again.",
   "A11yPropertiesPanelSplitter": "Resize the properties panel",
-
   "AccessDetailConnect": "Connect to selected session",
   "AccessDetailOpen": "Open selected tool",
   "AccessEmptyAddServer": "Add your first session",
@@ -5213,7 +5082,6 @@
   "AccessSettingsCitrix": "Import Citrix applications",
   "AccessSettingsExtToolsAdd": "Add external tool",
   "AccessSettingsExtToolsRemove": "Remove external tool",
-
   "ToolWatermarkHostnameOrIp": "hostname or IP",
   "ToolWatermarkHostsNeeded": "e.g. 50",
   "ToolWatermarkHostname": "hostname",
@@ -5347,7 +5215,6 @@
   "ToolNotesTplValidation": "Validation",
   "ToolNotesTplRollback": "Rollback",
   "ToolNotesTplReferences": "References",
-
   "_comment_ux_tooltips": "",
   "TooltipCollapseTunnelPanel": "Collapse tunnel panel",
   "TooltipSplitSession": "Split session view",
@@ -5392,7 +5259,6 @@
   "TooltipReconnectPane": "Reconnect",
   "TooltipClosePane": "Close pane",
   "TooltipCloseSessionTab": "Close tab",
-
   "_comment_ux_a11y": "",
   "A11ySearchAndFilter": "Search and filter sessions",
   "A11ySearchAndFilterTools": "Search and filter tools",
@@ -5454,7 +5320,6 @@
   "A11yServerDialogExecutionTrustNotice": "Commands waiting for your approval before this session may run them",
   "A11yTxtPath": "Path",
   "A11yTxtSearchFiles": "Search files",
-
   "_comment_ux_combobox": "",
   "TerminalLoadingLabel": "Initializing terminal...",
   "TerminalSearchPlaceholder": "Search...",
@@ -5501,29 +5366,23 @@
   "PingInterval2s": "2s",
   "PingInterval5s": "5s",
   "PingInterval10s": "10s",
-
   "_comment_ux_emptystate": "",
-
   "_comment_ux_palette": "",
   "PaletteModeSplit": "Split Mode",
-
   "_comment_ux_misc": "",
   "ToolNotesUnsaved": "Unsaved changes",
   "ToolNetMapScanProgress": "Scanning: {0}/{1} hosts...",
   "ToolNetMapTunnelPingSweep": "Discovering hosts via ping sweep...",
   "ToolNetMapTunnelDiscovered": "Discovered {0} alive hosts out of {1}",
   "ToolNetMapTunnelScanningHost": "Scanning {0} ({1}/{2})...",
-
   "_comment_dirty_guards": "",
   "DialogUnsavedWarningTitle": "Unsaved Changes",
   "DialogUnsavedWarning": "You have unsaved changes. Discard them and close?",
-
   "_comment_server_dialog_basic_auth": "",
   "ServerDialogLocalShellAdvanced": "Advanced shell options",
   "ServerDialogLocalShellAdvancedDesc": "Working directory and elevation settings.",
   "ServerDialogCitrixAdvanced": "Advanced Citrix options",
   "ServerDialogCitrixAdvancedDesc": "ICA file, seamless mode, and single sign-on settings.",
-
   "PaletteToolCmdLib": "Command Library",
   "PaletteToolCmdLibWith": "Command Library: {0}",
   "ToolDescCMDLIB": "Searchable library of 500+ PowerShell and Bash commands with parameterized generation",
@@ -5828,7 +5687,6 @@
   "ToolCmdLibDuplicateTitleFormat": "{0} (copy)",
   "ToolCmdLibEmptyLibrary": "The command library is empty. Click + to add commands or import a JSON file.",
   "ToolHelpCMDLIB": "Searchable library of PowerShell and Bash commands.\\nFilter by platform, category, or risk level.\\nClick a command to see its template, fill in parameters, and view notes and examples.\\nUse 'Copy' or 'Send to Terminal' to use the generated command.\\nClick + to add commands. Select a command then use the pencil/trash icons to edit or delete.",
-
   "PaletteToolPrivLaunch": "Privilege Launcher",
   "ToolDescPRIVLAUNCH": "Launch processes as SYSTEM or TrustedInstaller with token elevation",
   "ToolPrivLaunchTitle": "Privilege Launcher",
@@ -5849,7 +5707,6 @@
   "ToolPrivLaunchLblQuickLaunch": "Quick Launch",
   "ToolPrivLaunchErrorNoPath": "Please specify an executable path.",
   "ToolHelpPRIVLAUNCH": "Privilege Launcher\\n\\nLaunch any executable under a different security context:\\n\\n\u2022 Current User (Elevated): Standard UAC elevation (Run as Administrator).\\n\u2022 SYSTEM: Runs under NT AUTHORITY\\\\SYSTEM by duplicating the winlogon.exe token.\\n\u2022 TrustedInstaller: Runs under NT SERVICE\\\\TrustedInstaller by starting the Windows Modules Installer service and stealing its token.\\n\\nSYSTEM and TrustedInstaller modes require Heimdall to be running as administrator with SeDebugPrivilege available.",
-
   "PaletteToolPwdAudit": "Password Auditor",
   "ToolPwdAuditTitle": "Password Policy Checker",
   "ToolPwdAuditInput": "Password",
@@ -5884,7 +5741,6 @@
   "ToolPwdAuditNotInCommonList": "Not in common password list",
   "ToolPwdAuditInCommonList": "Found in common password list",
   "ToolHelpPWDAUDIT": "Password Policy Checker\n\nAnalyzes password strength against industry standards.\n\nPolicies:\n- NIST 800-63B: Focuses on length over complexity. Minimum 8 characters, checks against common passwords.\n- ANSSI: French standard requiring 12+ characters with uppercase, lowercase, digits, and symbols.\n- Custom: Configure your own rules.\n\nAnalysis includes:\n- Character class coverage\n- Shannon entropy calculation\n- Common password dictionary check (top 100)\n- Pattern detection (keyboard walks, sequences, repeats)\n- Overall strength score (0-100)",
-
   "_comment_tool_traceroute": "",
   "PaletteToolTrace": "Traceroute",
   "PaletteToolTraceWith": "Traceroute: {0}",
@@ -5909,7 +5765,6 @@
   "ToolTraceComplete": "Trace complete - {0} hops",
   "ToolTraceErrorResolve": "Could not resolve hostname: {0}",
   "ToolHelpTCPTRACE": "TCP Traceroute\n\nTraces the network path to a destination host by sending ICMP packets with incrementing TTL values.\n\nUsage:\n1. Enter a hostname or IP address\n2. Optionally adjust max hops (default: 30)\n3. Click Trace\n\nEach hop is probed 3 times. The response IP, hostname (reverse DNS), and average latency are displayed. Timeouts are shown as *.\n\nVia Tunnel:\nSelect an SSH gateway to trace routes from the gateway's perspective using the traceroute command.",
-
   "PaletteToolDnsSec": "DNS Security Checker",
   "PaletteToolDnsSecWith": "DNS Security Checker: {0}",
   "ToolDnsSecTitle": "DNS Security Checker",
@@ -5950,7 +5805,6 @@
   "ToolDnsSecReportRecord": "Record",
   "ToolDnsSecReportDetail": "Detail",
   "ToolHelpDNSSEC": "DNS Security Checker\n\nVerifies email and DNS security records for a domain.\n\nChecks performed:\n- SPF: Sender Policy Framework - restricts which servers can send email\n- DKIM: DomainKeys Identified Mail - email signature verification\n- DMARC: Domain-based Message Authentication - policy enforcement\n- CAA: Certificate Authority Authorization - restricts certificate issuance\n- DNSSEC: DNS Security Extensions - cryptographic DNS validation\n- MX: Mail Exchanger records\n\nEach check is graded: pass (configured), warning (partial), or fail (missing).\n\nVia Tunnel:\nSelect an SSH gateway to run DNS queries from the gateway's network perspective.",
-
   "PaletteToolArp": "ARP Monitor",
   "ToolArpTitle": "ARP Monitor",
   "ToolArpBtnStart": "Start",
@@ -5982,7 +5836,6 @@
   "ToolArpErrorReadFailed": "Unable to read the local ARP table.",
   "ToolArpA11yLoading": "Loading local ARP table",
   "ToolHelpARPMON": "ARP Monitor\n\nMonitors the local ARP table for changes and anomalies.\n\nUsage:\n1. Click Start to begin periodic monitoring\n2. Choose a refresh interval (5-60 seconds)\n3. Use Scan Now for an immediate refresh\n\nDetections:\n- New hosts appearing on the network (green)\n- MAC address changes for known IPs (amber - possible ARP spoofing)\n- Hosts disappearing from the table (red)\n\nThe vendor column shows the manufacturer based on the MAC OUI prefix.\n\nNote: ARP monitoring is local only (Layer 2) - no gateway routing available.",
-
   "PaletteToolFwTest": "Firewall Tester",
   "ToolFwTitle": "Firewall Rule Tester",
   "ToolFwHostsLabel": "Destinations (one per line)",
@@ -6101,7 +5954,6 @@
   "ToolCveEmptyState": "Enter a software name and version to search for known vulnerabilities",
   "ToolCveDbInfo": "Offline database: {0} CVEs covering {1} products",
   "ToolHelpCVELOOKUP": "CVE Lookup\n\nSearches an offline database of known vulnerabilities for common infrastructure software.\n\nUsage:\n1. Enter a software name and version (e.g. 'OpenSSH 8.9')\n2. Or paste a service banner (e.g. 'SSH-2.0-OpenSSH_8.9p1')\n3. Click Search\n\nThe tool auto-detects software names and versions from common banner formats (HTTP Server headers, SSH banners, FTP greetings, etc.).\n\nCVSS Scoring:\n- Critical (9.0-10.0): Immediate patching required\n- High (7.0-8.9): Patch at next opportunity\n- Medium (4.0-6.9): Schedule patching\n- Low (0.1-3.9): Monitor only\n\nDatabase:\nOffline curated database covering OpenSSH, Apache, nginx, MySQL, PostgreSQL, Redis, ProFTPD, and more. No internet connection required.",
-
   "PaletteToolAudit": "SecNumCloud Audit",
   "ToolAuditTitle": "SecNumCloud v3.2 Compliance Audit",
   "ToolAuditScope": "Audit Scope",
@@ -6349,7 +6201,6 @@
   "ToolPingStatsPercent": "{0}%",
   "ToolDiffOriginalHeader": "--- original",
   "ToolDiffModifiedHeader": "+++ modified",
-
   "NavTabTools": "Tools",
   "ToolsTabTitle": "Tools",
   "ToolsTabSearchPlaceholder": "Search tools...",
@@ -6364,7 +6215,6 @@
   "ToolsNoResultsHint": "Try another term or an alias such as ping, dns, json, or password.",
   "ToolsNetworkContextWith": "Network tools will use the selected target: {0}",
   "ToolsNetworkContextNone": "Network tools will open without an inherited target.",
-
   "OnboardingStep1Title": "Connect to Sessions",
   "OnboardingStep1Desc": "Manage RDP, SSH, SFTP, VNC and more from a single interface. Add your first session or import from MobaXterm, mRemoteNG, or RDCMan.",
   "OnboardingStep2Title": "Built-in Tools",
@@ -6381,7 +6231,6 @@
   "OnboardingBtnNext": "Next",
   "OnboardingBtnGetStarted": "Get Started",
   "OnboardingCompletionSaveFailed": "Heimdall couldn't save setup completion. Check access to the configuration folder, then try again.",
-
   "A11ySessionsTab": "Sessions tab",
   "A11yTunnelsTab": "Tunnels tab",
   "A11yScheduledTab": "Scheduled tab",
@@ -6394,7 +6243,6 @@
   "A11yPinTool": "Pin tool to favorites",
   "A11yUnpinTool": "Unpin tool from favorites",
   "A11yOnboardingOverlay": "Welcome guide",
-
   "_comment_ux_empty_states": "--- Empty state messages for tools ---",
   "ToolPingEmptyState": "Enter a host and click Start to begin pinging.",
   "ToolIpConvEmptyState": "Enter an IP address, integer, hex, or dotted binary to convert.",
@@ -6408,18 +6256,15 @@
   "ToolTextCaseEmptyState": "Enter text and select a case conversion.",
   "ToolDateTimeEmptyState": "Enter a Unix timestamp or ISO 8601 date to convert.",
   "ToolHostsEmptyState": "No entries found in the hosts file.",
-
   "_comment_ux_watermarks": "--- Watermark placeholders ---",
   "ToolWatermarkPassword": "Enter a password",
   "ToolWatermarkSshKey": "Paste an SSH public or private key",
   "ToolWatermarkServiceFilter": "Filter services...",
-
   "_comment_ux_buttons": "--- Async tool buttons ---",
   "ToolSshKeyGenGenerating": "Generating...",
   "ToolSshKeyGenSaveFailed": "The key could not be saved. The existing file was not changed. Check that the file is not open elsewhere or read-only.",
   "ToolCertGenGenerating": "Generating...",
   "ToolTextDiffComparing": "Comparing...",
-
   "_comment_external_tools_category": "--- External / Third-Party Tools ---",
   "ToolCategoryExternal": "External",
   "PaletteToolWol": "Wake-on-LAN",
@@ -6470,7 +6315,6 @@
   "ToolRouteTableStatus": "{0} routes at {1}",
   "ToolRouteTableStatusOne": "{0} route at {1}",
   "ToolHelpROUTES": "Displays the IPv4 routing table by parsing 'route print' output.\n\nShows network destination, netmask, gateway, interface, and metric for each route.\n\nEquivalent to 'route print' or NirSoft NetRouteView.",
-
   "PaletteToolDnsBatch": "DNS Batch Resolver",
   "PaletteToolDnsBatchWith": "DNS Batch Resolver: {0}",
   "ToolDescDNSBATCH": "Resolve multiple hostnames to IP addresses concurrently",
@@ -6486,7 +6330,6 @@
   "ToolDnsBatchStatus": "{0} hosts resolved at {1}",
   "ToolDnsBatchStatusOne": "{0} host resolved at {1}",
   "ToolHelpDNSBATCH": "Resolves multiple hostnames to IP addresses concurrently using System.Net.Dns.\n\nEnter one hostname per line. Results show IPv4, IPv6, resolve time, and status.\n\nEquivalent to NirSoft FastResolver.",
-
   "PaletteToolWifi": "WiFi Networks",
   "PaletteToolWifiWith": "WiFi Networks: {0}",
   "ToolDescWIFI": "Scan nearby WiFi networks with SSID, signal strength, channel, and encryption",
@@ -6503,7 +6346,6 @@
   "ToolWifiStatusOne": "{0} network at {1}",
   "ToolWifiEmptyState": "Click Scan to list the WiFi networks in range.",
   "ToolHelpWIFI": "Scans nearby WiFi networks using 'netsh wlan show networks mode=bssid'.\n\nShows SSID, BSSID (MAC), signal strength, channel, authentication, encryption, and radio type.\n\nEquivalent to NirSoft WifiInfoView.\n\nRequires a wireless adapter.",
-
   "PaletteToolTcpPing": "TCP Ping",
   "PaletteToolTcpPingWith": "TCP Ping: {0}",
   "ToolDescTCPPING": "Measure TCP handshake latency to a host:port with statistics",
@@ -6518,7 +6360,6 @@
   "ToolTcpPingStatus": "{0} pings completed at {1}",
   "ToolTcpPingStatusOne": "{0} ping completed at {1}",
   "ToolHelpTCPPING": "Measures TCP handshake latency by connecting to a host:port.\n\nUnlike ICMP ping, TCP ping verifies that the service is actually listening.\n\nShows per-attempt latency and summary statistics (min/avg/max/lost).\n\nEquivalent to Sysinternals PsPing in TCP mode.",
-
   "ToolHelpNETIF": "Lists all network interfaces on the local machine using .NET NetworkInterface API.\n\nShows name, type, operational status, link speed, MAC address, IPv4 address, subnet mask, default gateway, and DHCP status.\n\nEquivalent to 'ipconfig /all' or NirSoft NetworkInterfacesView.",
   "ToolHelpOPENPORTS": "Lists all open TCP and UDP ports on the local machine using native Windows APIs (GetExtendedTcpTable / GetExtendedUdpTable).\n\nShows the owning process for each connection. Equivalent to 'netstat -ano' or NirSoft CurrPorts.\n\nUse the filter to search by process name, address, port, or state.",
   "ToolWolTitle": "Wake-on-LAN",
@@ -6533,7 +6374,6 @@
   "ToolWolErrorInvalidBroadcast": "Invalid broadcast address",
   "ToolWolErrorSocket": "Socket error: {0}",
   "ToolHelpWOL": "Sends a Wake-on-LAN magic packet (6x 0xFF + 16x MAC) via UDP broadcast.\n\nThe target machine must have WoL enabled in its BIOS/UEFI and network adapter settings.\n\nSupported MAC formats: AA:BB:CC:DD:EE:FF, AA-BB-CC-DD-EE-FF, AABBCCDDEEFF.\n\nDefault port 9 (discard protocol) is standard; port 7 (echo) is also common.",
-
   "_comment_external_tool_provider": "--- External Tool Provider (Sysinternals / NirSoft / NanaRun) ---",
   "SettingsLblSysinternalsPath": "Sysinternals directory",
   "SettingsLblNirSoftPath": "NirSoft directory",
@@ -6568,7 +6408,6 @@
   "ExtToolStatusDetected": "{0} tools detected",
   "ExtToolStatusDetectedOne": "{0} tool detected",
   "ExtToolStatusNone": "No third-party tools detected",
-
   "ExtToolDescPsExec": "Execute processes on remote systems via SMB",
   "ExtToolDescPsInfo": "Remote system information (OS, CPU, hotfixes, disks)",
   "ExtToolDescPsList": "List processes on remote machines",
@@ -6661,7 +6500,7 @@
   "ToolPwdGenFloorSetLeet": "Set to {0} digits and {1} specials, to guarantee {2} bits.",
   "GatewayDiagnosticRouteHop": "{0} ({1}:{2})",
   "GatewayDiagnosticRouteEndpoint": "{0}:{1}",
-  "GatewayDiagnosticRouteSeparator": " → ",
+  "GatewayDiagnosticRouteSeparator": " \u2192 ",
   "GatewayDiagnosticStepLine": "{0}: {1} ({2} ms)",
   "ErrorGatewayRouteEmpty": "A gateway route cannot be empty.",
   "ErrorToolGatewayServicesUnavailable": "The gateway services are unavailable, so the connection was refused rather than opened unverified.",
@@ -7080,5 +6919,25 @@
   "ToolSshAuditAgentInspectorBtnRemove": "Remove",
   "ToolSshAuditAgentInspectorProfilesFormat": "Used by: {0}",
   "ToolSshAuditAgentLoadPassphraseTitle": "Private key passphrase",
-  "ToolSshAuditAgentLoadPassphrasePrompt": "Enter the passphrase to unlock {0}:"
+  "ToolSshAuditAgentLoadPassphrasePrompt": "Enter the passphrase to unlock {0}:",
+  "TooltipHotPortForward": "Add port forward (-L / -D / -R) to this live session",
+  "A11yHotPortForward": "Add port forward to this session",
+  "HotForwardDialogTitle": "Add session port forward",
+  "HotForwardDialogDescription": "Attach a new -L, -D, or -R forward directly to this active SSH session without reconnecting.",
+  "HotForwardLoopbackNote": "Local listeners are restricted to loopback (127.0.0.1) for security.",
+  "HotForwardBtnAdd": "Add forward",
+  "HotForwardErrInvalidPort": "Port must be a number between 1 and 65535.",
+  "HotForwardErrInvalidHost": "Enter a valid remote hostname or IP address.",
+  "HotForwardErrStartFailed": "Port forward failed: {0}",
+  "HotForwardStatusAdded": "Session port forward active on port {0}",
+  "HotForwardStatusRemoved": "Session port forward closed (port {0})",
+  "TerminalDropUploadTitle": "Upload files via SFTP",
+  "TerminalDropUploadConfirmMessage": "Upload {0} file(s) ({1}) to remote directory {2}?",
+  "TerminalDropUploadConnecting": "Connecting SFTP for dropped file upload...",
+  "TerminalDropUploadProgress": "Uploading {0}...",
+  "TerminalDropUploadDone": "Uploaded {0} file(s) to {1}",
+  "TerminalDropUploadFailed": "Upload failed: {0}",
+  "TerminalDropUploadNoProfile": "Cannot upload dropped files: no SSH profile found for this session.",
+  "TerminalDropUploadOverwriteTitle": "Overwrite remote file?",
+  "TerminalDropUploadOverwriteMessage": "Remote file {0} already exists. Overwrite it?"
 }

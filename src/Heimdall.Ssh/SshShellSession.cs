@@ -67,6 +67,7 @@ public sealed class SshShellSession : IDisposable
     private readonly List<ForwardedPort> _sessionForwardedPorts = [];
     private readonly List<TunnelInfo> _sessionForwardInfos = [];
     private readonly List<string> _failedPortForwards = [];
+    private string _sessionForwardServerLabel = string.Empty;
     private CancellationTokenSource? _readCts;
     private Task? _readLoopTask;
     private readonly object _teardownGate = new();
@@ -204,6 +205,11 @@ public sealed class SshShellSession : IDisposable
     /// Raised when a security-relevant failure occurs. Fired in addition to <see cref="Disconnected"/>.
     /// </summary>
     public event Action<SshSessionSecurityEvent>? SecurityEventOccurred;
+
+    /// <summary>
+    /// Raised whenever a session-bound port forward (<c>-L</c>/<c>-D</c>/<c>-R</c>) is added or removed.
+    /// </summary>
+    public event Action? SessionForwardsChanged;
 
     /// <summary>Whether the underlying SSH connection is active.</summary>
     public bool IsConnected => _client?.IsConnected == true && Volatile.Read(ref _stream) is not null;
@@ -784,8 +790,249 @@ public sealed class SshShellSession : IDisposable
         }
     }
 
+    /// <summary>
+    /// Hot-adds a direct port forward (<c>-L</c>, <c>-D</c>, or <c>-R</c>) onto this live SSH session
+    /// without reconnecting. Local bind addresses are strictly restricted to loopback.
+    /// </summary>
+    public SshSessionForwardResult AddSessionPortForward(SshSessionForwardRequest request)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var client = _client;
+        if (_disposed || _teardownStarted || client is null || !client.IsConnected)
+        {
+            return new SshSessionForwardResult(false, ErrorMessage: "SSH session is not connected.");
+        }
+
+        if (!TryBuildSessionForward(request, _sessionForwardServerLabel, out var port, out var info, out var description, out var validationError))
+        {
+            return new SshSessionForwardResult(false, ErrorMessage: validationError);
+        }
+
+        // Start outside _teardownGate so a slow bind or remote request cannot deadlock FinishTeardown.
+        try
+        {
+            port!.Exception += (_, args) =>
+                FileLogger.Warn($"SshShellSession port forward ({description}) runtime error: {args.Exception.Message}");
+            client.AddForwardedPort(port);
+            port.Start();
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Warn($"SshShellSession hot port forward ({description}) failed: {ex.Message}");
+            DisposeForwardedPortSafely(client, port!);
+            return new SshSessionForwardResult(false, ErrorMessage: ex.Message);
+        }
+
+        bool abandoned;
+        lock (_teardownGate)
+        {
+            abandoned = _disposed || _teardownStarted || !ReferenceEquals(_client, client);
+            if (!abandoned)
+            {
+                _sessionForwardedPorts.Add(port);
+                _sessionForwardInfos.Add(info!);
+            }
+        }
+
+        if (abandoned)
+        {
+            DisposeForwardedPortSafely(client, port);
+            return new SshSessionForwardResult(false, ErrorMessage: "SSH session closed while starting port forward.");
+        }
+
+        RaiseSessionForwardsChanged();
+        return new SshSessionForwardResult(true, info);
+    }
+
+    /// <summary>
+    /// Stops and removes a single session-bound port forward by its <see cref="TunnelInfo.SessionForwardId"/>
+    /// without disconnecting the underlying SSH shell session.
+    /// </summary>
+    public bool RemoveSessionPortForward(string sessionForwardId)
+    {
+        if (string.IsNullOrWhiteSpace(sessionForwardId))
+        {
+            return false;
+        }
+
+        ForwardedPort? portToRemove = null;
+        SshClient? client;
+        lock (_teardownGate)
+        {
+            client = _client;
+            int idx = _sessionForwardInfos.FindIndex(i =>
+                string.Equals(i.SessionForwardId, sessionForwardId, StringComparison.Ordinal));
+            if (idx < 0 || idx >= _sessionForwardedPorts.Count)
+            {
+                return false;
+            }
+
+            portToRemove = _sessionForwardedPorts[idx];
+            _sessionForwardedPorts.RemoveAt(idx);
+            _sessionForwardInfos.RemoveAt(idx);
+        }
+
+        if (client is not null)
+        {
+            DisposeForwardedPortSafely(client, portToRemove);
+        }
+        else
+        {
+            try
+            {
+                if (portToRemove.IsStarted)
+                {
+                    portToRemove.Stop();
+                }
+
+                portToRemove.Dispose();
+            }
+            catch (Exception ex)
+            {
+                FileLogger.Debug("SSH shell session hot port forward teardown suppressed", ex);
+            }
+        }
+
+        RaiseSessionForwardsChanged();
+        return true;
+    }
+
+    internal static bool TryBuildSessionForward(
+        SshSessionForwardRequest request,
+        string serverLabel,
+        out ForwardedPort? port,
+        out TunnelInfo? info,
+        out string description,
+        out string? errorMessage)
+    {
+        port = null;
+        info = null;
+        description = string.Empty;
+        errorMessage = null;
+
+        var safeServerLabel = string.IsNullOrWhiteSpace(serverLabel) ? "SSH" : serverLabel;
+        var bindAddress = SshLocalForwardSpec.NormalizeLoopbackBindAddress(request.LocalBindHost);
+        var forwardId = Guid.NewGuid().ToString("N");
+
+        switch (request.Kind)
+        {
+            case SshSessionForwardKind.Local:
+                if (request.LocalPort is < 1 or > 65535)
+                {
+                    errorMessage = "Local port must be between 1 and 65535.";
+                    return false;
+                }
+
+                if (string.IsNullOrWhiteSpace(request.RemoteHost))
+                {
+                    errorMessage = "Remote host is required for local port forwarding.";
+                    return false;
+                }
+
+                if (request.RemotePort is < 1 or > 65535)
+                {
+                    errorMessage = "Remote port must be between 1 and 65535.";
+                    return false;
+                }
+
+                var trimmedHost = request.RemoteHost.Trim();
+                description = $"-L {bindAddress}:{request.LocalPort}:{trimmedHost}:{request.RemotePort}";
+                port = new ForwardedPortLocal(bindAddress, (uint)request.LocalPort, trimmedHost, (uint)request.RemotePort);
+                info = TunnelManager.BuildTunnelInfo(
+                    safeServerLabel,
+                    request.LocalPort,
+                    trimmedHost,
+                    request.RemotePort,
+                    socksProxyPort: 0,
+                    remoteBindPort: 0,
+                    remoteLocalPort: 0,
+                    gatewayRoute: null,
+                    label: string.IsNullOrWhiteSpace(request.Label) ? "Session -L" : request.Label.Trim(),
+                    localBindHost: bindAddress) with
+                {
+                    IsSessionBound = true,
+                    SessionForwardId = forwardId
+                };
+                return true;
+
+            case SshSessionForwardKind.DynamicSocks:
+                if (request.LocalPort is < 1 or > 65535)
+                {
+                    errorMessage = "SOCKS5 port must be between 1 and 65535.";
+                    return false;
+                }
+
+                description = $"-D {bindAddress}:{request.LocalPort}";
+                port = new ForwardedPortDynamic(bindAddress, (uint)request.LocalPort);
+                info = TunnelManager.BuildTunnelInfo(
+                    safeServerLabel,
+                    request.LocalPort,
+                    remoteHost: string.Empty,
+                    remotePort: 0,
+                    socksProxyPort: request.LocalPort,
+                    remoteBindPort: 0,
+                    remoteLocalPort: 0,
+                    gatewayRoute: null,
+                    label: string.IsNullOrWhiteSpace(request.Label) ? "Session SOCKS5" : request.Label.Trim(),
+                    localBindHost: bindAddress) with
+                {
+                    IsSessionBound = true,
+                    SessionForwardId = forwardId
+                };
+                return true;
+
+            case SshSessionForwardKind.Remote:
+                if (request.RemotePort is < 1 or > 65535)
+                {
+                    errorMessage = "Remote bind port must be between 1 and 65535.";
+                    return false;
+                }
+
+                var localTarget = request.LocalPort is >= 1 and <= 65535 ? request.LocalPort : request.RemotePort;
+                description = $"-R {request.RemotePort}->{localTarget}";
+                port = new ForwardedPortRemote(
+                    LoopbackBinding.DefaultHost,
+                    (uint)request.RemotePort,
+                    LoopbackBinding.DefaultHost,
+                    (uint)localTarget);
+                info = TunnelManager.BuildTunnelInfo(
+                    safeServerLabel,
+                    localTarget,
+                    remoteHost: string.Empty,
+                    remotePort: request.RemotePort,
+                    socksProxyPort: 0,
+                    remoteBindPort: request.RemotePort,
+                    remoteLocalPort: localTarget,
+                    gatewayRoute: null,
+                    label: string.IsNullOrWhiteSpace(request.Label) ? $"Session -R :{request.RemotePort}" : request.Label.Trim()) with
+                {
+                    IsSessionBound = true,
+                    SessionForwardId = forwardId
+                };
+                return true;
+
+            default:
+                errorMessage = "Unsupported port forward mode.";
+                return false;
+        }
+    }
+
+    private void RaiseSessionForwardsChanged()
+    {
+        try
+        {
+            SessionForwardsChanged?.Invoke();
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Warn($"[SshShellSession] SessionForwardsChanged subscriber failed: {ex.Message}");
+        }
+    }
+
     private void StartSessionPortForwards(SshClient client, SshConnectionParams connectionParams)
     {
+        _sessionForwardServerLabel = connectionParams.HostKeyVerificationHost;
         if (!client.IsConnected)
         {
             return;
@@ -809,7 +1056,7 @@ public sealed class SshShellSession : IDisposable
                 remoteLocalPort: 0,
                 gatewayRoute: null,
                 label: "Session SOCKS5") with
-            { IsSessionBound = true };
+            { IsSessionBound = true, SessionForwardId = Guid.NewGuid().ToString("N") };
             TryStartPortForward(client, port, desc, info, started, failed);
         }
 
@@ -834,7 +1081,7 @@ public sealed class SshShellSession : IDisposable
                 remoteLocalPort: localTarget,
                 gatewayRoute: null,
                 label: $"Session -R :{connectionParams.RemoteBindPort}") with
-            { IsSessionBound = true };
+            { IsSessionBound = true, SessionForwardId = Guid.NewGuid().ToString("N") };
             TryStartPortForward(client, port, desc, info, started, failed);
         }
 
@@ -864,7 +1111,7 @@ public sealed class SshShellSession : IDisposable
                     gatewayRoute: null,
                     label: "Session -L",
                     localBindHost: spec.BindAddress) with
-                { IsSessionBound = true };
+                { IsSessionBound = true, SessionForwardId = Guid.NewGuid().ToString("N") };
                 TryStartPortForward(client, port, desc, info, started, failed);
             }
         }
@@ -899,6 +1146,10 @@ public sealed class SshShellSession : IDisposable
             {
                 DisposeForwardedPortSafely(client, item.Port);
             }
+        }
+        else if (started.Count > 0)
+        {
+            RaiseSessionForwardsChanged();
         }
     }
 
@@ -990,6 +1241,8 @@ public sealed class SshShellSession : IDisposable
                 FileLogger.Debug("SSH shell session port forward teardown suppressed", ex);
             }
         }
+
+        RaiseSessionForwardsChanged();
     }
 
     private void FinishTeardown(bool notifyDisconnected)

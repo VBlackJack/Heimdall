@@ -276,6 +276,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         _embeddedSessionManager.CloseRequestedCallback = OnCloseRequested;
         _embeddedSessionManager.HostReconnectRequestedCallback = OnHostReconnectRequested;
         _embeddedSessionManager.HostCloseRequestedCallback = OnHostCloseRequested;
+        _embeddedSessionManager.TerminalFilesDroppedCallback = OnTerminalFilesDropped;
 
         // Subscribe to ServerList session lifecycle events to materialize session tabs.
         _main.ServerList.SessionStarting += OnSessionStarting;
@@ -2803,6 +2804,151 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
         // in place on shutdown - clearing them could break other teardown
         // paths that still reference them. No harm in leaving the delegate
         // references since the owning services are themselves disposed.
+    }
+
+    private void OnTerminalFilesDropped(
+        SessionTabViewModel tab,
+        EmbeddedSshView sshView,
+        IReadOnlyList<string> localPaths,
+        string? remoteCwd)
+    {
+        if (localPaths.Count == 0 || sshView.ActiveSshSession is not { IsConnected: true })
+        {
+            return;
+        }
+
+        _ = UploadDroppedFilesToTerminalAsync(tab, sshView, localPaths, remoteCwd);
+    }
+
+    private async Task UploadDroppedFilesToTerminalAsync(
+        SessionTabViewModel tab,
+        EmbeddedSshView sshView,
+        IReadOnlyList<string> localPaths,
+        string? remoteCwd)
+    {
+        try
+        {
+            var profileId = sshView.OwningPane?.ProfileLookupServerId ?? tab.ProfileLookupServerId;
+            var companionView = SplitTreeHelper.EnumerateLeaves(tab.RootContent)
+                .Where(p => string.Equals(p.ConnectionType, "SFTP", StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(p.ProfileLookupServerId, profileId, StringComparison.Ordinal))
+                .Select(p => p.HostControl as EmbeddedSftpView)
+                .FirstOrDefault(v => v?.ActiveBrowser is not null);
+
+            string sanitizedDir = Heimdall.Core.Ssh.TerminalDropPathValidator.SanitizeRemoteDirectory(remoteCwd);
+            if (string.Equals(sanitizedDir, Heimdall.Core.Ssh.TerminalDropPathValidator.DefaultRemoteDirectory, StringComparison.Ordinal)
+                && companionView is not null
+                && !string.IsNullOrWhiteSpace(companionView.CurrentPath))
+            {
+                sanitizedDir = Heimdall.Core.Ssh.TerminalDropPathValidator.SanitizeRemoteDirectory(companionView.CurrentPath);
+            }
+
+            string previewNames = string.Join(
+                ", ",
+                localPaths.Take(3).Select(System.IO.Path.GetFileName));
+            if (localPaths.Count > 3)
+            {
+                previewNames += $" (+{localPaths.Count - 3})";
+            }
+
+            string targetLabel = string.Equals(sanitizedDir, Heimdall.Core.Ssh.TerminalDropPathValidator.DefaultRemoteDirectory, StringComparison.Ordinal)
+                ? "~"
+                : sanitizedDir;
+
+            bool confirmed = await _main.DialogService.ShowConfirmAsync(
+                _localizer["TerminalDropUploadTitle"],
+                _localizer.Format("TerminalDropUploadConfirmMessage", localPaths.Count, previewNames, targetLabel));
+            if (!confirmed)
+            {
+                return;
+            }
+
+            Heimdall.Sftp.IRemoteBrowser? browser = companionView?.ActiveBrowser;
+            ISessionResult? transientSession = null;
+            try
+            {
+                if (browser is null)
+                {
+                    IProfileLookup lookup = _main.ServerList.ProfileLookup;
+                    var server = await lookup.FindAsync(profileId);
+                    if (server is null || string.IsNullOrWhiteSpace(server.SshUsername))
+                    {
+                        InvokeOnUi(() => _main.StatusText = _localizer["TerminalDropUploadNoProfile"]);
+                        return;
+                    }
+
+                    var sftpProfile = CreateCompanionSftpProfile(server, $"drop-sftp-{Guid.NewGuid():N}");
+                    AppSettings settings = lookup.EffectiveSettingsFor(server, _main.CurrentSettings!);
+
+                    InvokeOnUi(() => _main.StatusText = _localizer["TerminalDropUploadConnecting"]);
+                    var connectResult = await _main.ServerList.ConnectionService
+                        .ConnectSftpAsync(sftpProfile, settings, sshView.ActiveSshSession?.ResolvedHostKeyVerifier, CancellationToken.None)
+                        .ConfigureAwait(false);
+
+                    if (!connectResult.Success || connectResult.Session is not SftpSessionBundle bundle)
+                    {
+                        InvokeOnUi(() => _main.StatusText = _localizer.Format(
+                            "TerminalDropUploadFailed",
+                            connectResult.ErrorMessage ?? string.Empty));
+                        return;
+                    }
+
+                    transientSession = bundle;
+                    browser = bundle.Browser;
+                }
+
+                int uploaded = 0;
+                foreach (string localPath in localPaths)
+                {
+                    string fileName = System.IO.Path.GetFileName(localPath);
+                    if (!Heimdall.Core.Ssh.TerminalDropPathValidator.TryCombineRemoteFilePath(
+                            sanitizedDir,
+                            fileName,
+                            out string remotePath))
+                    {
+                        continue;
+                    }
+
+                    InvokeOnUi(() => _main.StatusText = _localizer.Format("TerminalDropUploadProgress", fileName));
+                    try
+                    {
+                        await browser.UploadFileAsync(localPath, remotePath, overwrite: false, CancellationToken.None)
+                            .ConfigureAwait(false);
+                        uploaded++;
+                    }
+                    catch (Heimdall.Sftp.RemoteDestinationExistsException)
+                    {
+                        bool overwrite = await _main.DialogService.ShowConfirmAsync(
+                            _localizer["TerminalDropUploadOverwriteTitle"],
+                            _localizer.Format("TerminalDropUploadOverwriteMessage", remotePath));
+                        if (!overwrite)
+                        {
+                            continue;
+                        }
+
+                        await browser.UploadFileAsync(localPath, remotePath, overwrite: true, CancellationToken.None)
+                            .ConfigureAwait(false);
+                        uploaded++;
+                    }
+                }
+
+                if (companionView is not null && uploaded > 0)
+                {
+                    InvokeOnUi(() => _ = companionView.RefreshCurrentDirectoryAsync());
+                }
+
+                InvokeOnUi(() => _main.StatusText = _localizer.Format("TerminalDropUploadDone", uploaded, targetLabel));
+            }
+            finally
+            {
+                SafeDisposeSessionResult(transientSession);
+            }
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Warn($"[SessionCoordinator] Terminal drag-drop upload failed: {ex.Message}");
+            InvokeOnUi(() => _main.StatusText = _localizer.Format("TerminalDropUploadFailed", ex.Message));
+        }
     }
 
     private sealed class ConnectingSessionCancellation(
