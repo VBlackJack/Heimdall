@@ -59,7 +59,7 @@ public sealed class RecipeToolRegistryTests
         Assert.Null(descriptor.ExternalProviderName);
         Assert.Equal(["acme.ping"], descriptor.CommandPrefixes);
         Assert.False(descriptor.IsNetworkTool);
-        Assert.Equal(58 + 1, registry.All.Count);
+        Assert.Equal(59 + 1, registry.All.Count);
     }
 
     [Fact]
@@ -120,7 +120,7 @@ public sealed class RecipeToolRegistryTests
         Assert.Equal(["RCP:acme.ping"], RecipeIds(registry));
         Assert.NotNull(registry.GetById("RCP:acme.ping"));
         Assert.NotNull(registry.GetById("EXT:SYSINTERNALS:PSEXEC"));
-        Assert.Equal(58 + 2, registry.All.Count);
+        Assert.Equal(59 + 2, registry.All.Count);
     }
 
     [Fact]
@@ -133,7 +133,7 @@ public sealed class RecipeToolRegistryTests
 
         Assert.NotNull(registry.GetById("EXT:SYSINTERNALS:PSEXEC"));
         Assert.Equal(["RCP:acme.ping"], RecipeIds(registry));
-        Assert.Equal(58 + 2, registry.All.Count);
+        Assert.Equal(59 + 2, registry.All.Count);
     }
 
     [Fact]
@@ -149,7 +149,7 @@ public sealed class RecipeToolRegistryTests
         Assert.Equal(
             recipesLast.All.Select(descriptor => descriptor.Id),
             recipesFirst.All.Select(descriptor => descriptor.Id));
-        Assert.Equal(["EXT:SYSINTERNALS:PSEXEC", "RCP:acme.ping"], recipesLast.All.Skip(58).Select(descriptor => descriptor.Id));
+        Assert.Equal(["EXT:SYSINTERNALS:PSEXEC", "RCP:acme.ping"], recipesLast.All.Skip(59).Select(descriptor => descriptor.Id));
     }
 
     [Fact]
@@ -164,7 +164,7 @@ public sealed class RecipeToolRegistryTests
         Assert.Null(registry.GetById("RCP:acme.one"));
         registry.RegisterRecipeTools([], NoView);
         Assert.Empty(RecipeIds(registry));
-        Assert.Equal(58, registry.All.Count);
+        Assert.Equal(59, registry.All.Count);
     }
 
     [Fact]
@@ -256,7 +256,7 @@ public sealed class RecipeToolRegistryTests
                 }
 
                 Assert.NotNull(registry.GetById("PING"));
-                Assert.True(registry.All.Count >= 58);
+                Assert.True(registry.All.Count >= 59);
             }
         }))];
 

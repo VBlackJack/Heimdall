@@ -240,9 +240,9 @@ public class ToolRegistryLocaleCoherenceTests
     [Fact]
     public void Registry_HasExpectedToolCount()
     {
-        // 58 built-in tools. External provider tools are not in this count: they live
+        // 59 built-in tools. External provider tools are not in this count: they live
         // in the runtime overlay and are appended only after a startup scan.
-        Assert.Equal(58, Registry.All.Count);
+        Assert.Equal(59, Registry.All.Count);
     }
 
     [Fact]

@@ -43,7 +43,7 @@ public sealed class ToolRegistryPackTests
         [ToolPack.Administration] = ["LOGVIEW", "HOSTS", "CRONJOB", "SERVICES", "DIAGRAM"],
         [ToolPack.Audit] =
         [
-            "PORTSCAN", "BANNER", "SNMPWALK", "FWTEST", "NETMAP", "TLSAUDIT", "SMBENUM", "DEFAULTCREDS",
+            "PORTSCAN", "BANNER", "SNMPWALK", "FWTEST", "NETMAP", "SSHSERVERAUDIT", "TLSAUDIT", "SMBENUM", "DEFAULTCREDS",
             "SECNUMCLOUD", "PRIVLAUNCH",
         ],
         [ToolPack.Recipes] = [],
@@ -61,7 +61,7 @@ public sealed class ToolRegistryPackTests
     {
         ToolRegistry registry = new();
 
-        Assert.Equal(58, registry.All.Count);
+        Assert.Equal(59, registry.All.Count);
         Assert.All(registry.All, descriptor => Assert.NotNull(descriptor.Pack));
     }
 
@@ -70,7 +70,7 @@ public sealed class ToolRegistryPackTests
     [InlineData(ToolPack.Essentials, 26)]
     [InlineData(ToolPack.NetworkDiagnostics, 15)]
     [InlineData(ToolPack.Administration, 5)]
-    [InlineData(ToolPack.Audit, 10)]
+    [InlineData(ToolPack.Audit, 11)]
     public void EachPackHasTheAgreedNumberOfTools(ToolPack pack, int expectedCount)
         => Assert.Equal(expectedCount, IdsOf(new ToolRegistry(), pack).Length);
 
