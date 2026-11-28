@@ -197,6 +197,7 @@ sélecteur de route `CmbRouteVia` sont les suivantes :
 - `SecNumCloudAuditView`
 - `SmbEnumeratorView`
 - `SnmpWalkerView`
+- `SshServerAuditView`
 - `TcpTracerouteView`
 - `TlsAuditView`
 - `WhoisLookupView`

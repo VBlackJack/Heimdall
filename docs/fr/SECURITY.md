@@ -1341,15 +1341,24 @@ d'éviter toute fuite DNS split-horizon.
   voisin `-cert.pub` à la connexion (refus des chemins UNC/périphériques, plafond
   64 Ko) et affiche un avertissement non bloquant s'il est expiré ou expire sous
   30 jours. Les champs proxy HTTP CONNECT / SOCKS4 / SOCKS5 sur profils SSH et
-  passerelles sont validés par `ImportedProfileValidator`, routés via
+  passerelles sont validés par `ImportedProfileValidator` et les fenêtres de
+  profil/passerelle, conservés dans les tunnels multi-sauts, les passerelles
+  d'outils et le relais SFTP compagnon, routés via
   `SshConnectionFactory.BuildConnectionInfo` (sonde de clé d'hôte comprise),
   inclus dans la clé de réutilisation des tunnels et retirés des profils partagés.
+  `SshProxyPasswordEncrypted` est migré par `VaultMigrationEngine`, retiré à
+  l'export, à l'import et dans `SshGatewayDto.CloneWithoutSecrets()`, vérifié
+  lors du précontrôle des identifiants de passerelle, effacé des champs à
+  l'enregistrement et couvert par `SensitiveLoggingGuardTests`.
   `SshStartupCommandPolicy` impose des noms POSIX valides et un échappement par
   guillemets simples pour `SetEnv`, rejette les caractères de contrôle, s'intègre
-  dans `ProfileExecutionTrust.CarriesPostConnectPayload` afin qu'aucun profil
-  importé n'exécute de commande sans `ExecutionConfirmed`, et est retiré des
-  profils partagés. `AsciinemaCastPlayerEngine` relit les fichiers `.cast` v2 en
-  lecture seule sous plafonds stricts (`50 Mio`, `500 000` événements).
+  dans `ProfileExecutionTrust.CarriesPostConnectPayload` et
+  `ExecutionTrustDescriber` afin que les profils importés affichent visiblement
+  leur commande et leurs variables et n'exécutent rien sans `ExecutionConfirmed`,
+  et est retiré des profils partagés. `AsciinemaCastPlayerEngine` relit les
+  fichiers `.cast` v2 en lecture seule sous plafonds stricts (`50 Mio`,
+  `500 000` événements), et `AsciinemaPlayerDialog` verrouille son hôte WebView2
+  via `WebView2Lockdown.Apply` avec blocage de toute navigation après chargement.
 
 ### Comparaison des empreintes de clé d'hôte
 

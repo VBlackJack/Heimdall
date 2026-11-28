@@ -189,6 +189,7 @@ requires a pinned gateway host key before connecting. Current views with a
 - `SecNumCloudAuditView`
 - `SmbEnumeratorView`
 - `SnmpWalkerView`
+- `SshServerAuditView`
 - `TcpTracerouteView`
 - `TlsAuditView`
 - `WhoisLookupView`

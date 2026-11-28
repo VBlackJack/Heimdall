@@ -1196,15 +1196,24 @@ reached through an SSH gateway to prevent split-horizon DNS leaks.
   certificates on connect (blocking UNC/device paths, bounded to 64 KiB) and
   surfaces a non-blocking warning when expired or expiring within 30 days.
   Outbound HTTP CONNECT / SOCKS4 / SOCKS5 proxy fields on SSH profiles and
-  gateways are validated by `ImportedProfileValidator`, routed through
-  `SshConnectionFactory.BuildConnectionInfo` (including pre-auth host-key probes),
-  included in gateway tunnel reuse keys, and stripped from shared profiles.
-  `SshStartupCommandPolicy` enforces POSIX identifier names and single-quote
-  escaping for `SetEnv`, rejects control characters/newlines, integrates with
-  `ProfileExecutionTrust.CarriesPostConnectPayload` so imported profiles never
-  auto-execute until `ExecutionConfirmed` is granted, and is stripped from shared
-  profiles. `AsciinemaCastPlayerEngine` parses `.cast` v2 files read-only within
-  hard size (`50 MiB`) and event (`500 000`) bounds.
+  gateways are validated by `ImportedProfileValidator` and the profile/gateway
+  dialogs, preserved across multi-hop tunnels, tool gateways, and companion SFTP
+  handoffs, routed through `SshConnectionFactory.BuildConnectionInfo` (including
+  pre-auth host-key probes), included in gateway tunnel reuse keys, and stripped
+  from shared profiles. `SshProxyPasswordEncrypted` is migrated by
+  `VaultMigrationEngine`, stripped on settings export, import, and
+  `SshGatewayDto.CloneWithoutSecrets()`, checked during gateway credential
+  preflight, wiped from dialog inputs on save, and covered by
+  `SensitiveLoggingGuardTests`. `SshStartupCommandPolicy` enforces POSIX
+  identifier names and single-quote escaping for `SetEnv`, rejects control
+  characters/newlines, integrates with
+  `ProfileExecutionTrust.CarriesPostConnectPayload` and `ExecutionTrustDescriber`
+  so imported profiles display their startup command and variables visibly and
+  never auto-execute until `ExecutionConfirmed` is granted, and is stripped from
+  shared profiles. `AsciinemaCastPlayerEngine` parses `.cast` v2 files read-only
+  within hard size (`50 MiB`) and event (`500 000`) bounds, and
+  `AsciinemaPlayerDialog` hardens its WebView2 host via `WebView2Lockdown.Apply`
+  with post-load navigation blocked.
 
 ### Host-key fingerprint comparison
 
