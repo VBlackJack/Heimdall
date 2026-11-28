@@ -318,6 +318,8 @@ public sealed class ServerProfileDto : IJsonOnDeserialized
     public int RemoteBindPort { get; set; }
     public int RemoteLocalPort { get; set; }
     public List<string> SshLocalForwards { get; set; } = [];
+    public string? SshStartupCommand { get; set; }
+    public List<string> SshEnvironmentVariables { get; set; } = [];
     public List<PostConnectStep> PostConnectSteps { get; set; } = [];
     public string PostConnectCommand { get; set; } = "";
     public int PostConnectDelayMs { get; set; } = 800;

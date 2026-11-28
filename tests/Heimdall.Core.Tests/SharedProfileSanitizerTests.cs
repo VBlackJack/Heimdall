@@ -64,6 +64,8 @@ public sealed class SharedProfileSanitizerTests
         nameof(ServerProfileDto.SocksProxyPort),
         nameof(ServerProfileDto.RemoteBindPort), nameof(ServerProfileDto.RemoteLocalPort),
         nameof(ServerProfileDto.SshLocalForwards),
+        nameof(ServerProfileDto.SshStartupCommand),
+        nameof(ServerProfileDto.SshEnvironmentVariables),
         nameof(ServerProfileDto.PostConnectCommand), nameof(ServerProfileDto.PostConnectDelayMs),
         nameof(ServerProfileDto.RdpAntiIdle), nameof(ServerProfileDto.RdpAspectRatio),
         // Obsolete setter-only migration shims: named as text, and checked through the

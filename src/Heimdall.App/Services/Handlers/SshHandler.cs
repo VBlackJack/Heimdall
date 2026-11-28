@@ -276,6 +276,12 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
             RemoteBindPort = usesTunnel ? 0 : server.RemoteBindPort,
             RemoteLocalPort = usesTunnel ? 0 : server.RemoteLocalPort,
             LocalForwards = server.SshLocalForwards,
+            StartupCommand = !SharedSessionIds.IsSharedProfile(server) && server.ExecutionConfirmed
+                ? server.SshStartupCommand
+                : null,
+            EnvironmentVariables = !SharedSessionIds.IsSharedProfile(server) && server.ExecutionConfirmed
+                ? server.SshEnvironmentVariables
+                : [],
             AuthenticationTimeout = InteractiveAuthenticationTimeout,
             KeyboardInteractiveResponder = request =>
             {

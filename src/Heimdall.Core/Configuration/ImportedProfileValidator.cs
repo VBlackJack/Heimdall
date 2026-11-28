@@ -62,6 +62,24 @@ public static class ImportedProfileValidator
             errors.Add($"{nameof(profile.SshProxyHost)}: not a usable host '{profile.SshProxyHost}'.");
         }
 
+        if (!string.IsNullOrWhiteSpace(profile.SshStartupCommand)
+            && !Ssh.SshStartupCommandPolicy.TryNormalizeStartupCommand(profile.SshStartupCommand, out _))
+        {
+            errors.Add($"{nameof(profile.SshStartupCommand)}: invalid startup command.");
+        }
+
+        if (profile.SshEnvironmentVariables is { Count: > 0 })
+        {
+            foreach (string rawEnv in profile.SshEnvironmentVariables)
+            {
+                if (!Ssh.SshStartupCommandPolicy.TryParseEnvAssignment(rawEnv, out _, out _))
+                {
+                    errors.Add($"{nameof(profile.SshEnvironmentVariables)}: invalid KEY=VALUE assignment.");
+                    break;
+                }
+            }
+        }
+
         if (!Enum.IsDefined(profile.WinRmIdentityMode))
         {
             errors.Add(

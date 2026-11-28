@@ -83,6 +83,13 @@ public static class ProfileExecutionTrust
     {
         ArgumentNullException.ThrowIfNull(profile);
 
+        if (string.Equals(profile.ConnectionType, "SSH", StringComparison.OrdinalIgnoreCase)
+            && (!string.IsNullOrWhiteSpace(profile.SshStartupCommand)
+                || profile.SshEnvironmentVariables is { Count: > 0 }))
+        {
+            return true;
+        }
+
         if (profile.PostConnectSteps is null)
         {
             return false;

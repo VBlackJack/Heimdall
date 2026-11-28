@@ -7103,5 +7103,9 @@
   "SshProxyPortLabel": "Port du proxy",
   "SshProxyUsernameLabel": "Utilisateur proxy (facultatif)",
   "SshProxyPasswordLabel": "Mot de passe proxy (facultatif)",
-  "SshProxyClearStoredPassword": "Effacer le mot de passe proxy enregistr\u00e9"
+  "SshProxyClearStoredPassword": "Effacer le mot de passe proxy enregistr\u00e9",
+  "ServerDialogSshStartupCommandLabel": "Commande de d\u00e9marrage (RemoteCommand)",
+  "ServerDialogSshStartupCommandHint": "Commande sur une ligne envoy\u00e9e \u00e0 l'ouverture du shell SSH (ex. : tmux new -As ops). Les profils import\u00e9s exigent une confirmation.",
+  "ServerDialogSshEnvVarsLabel": "Variables d'environnement (SetEnv, un CLE=VALEUR par ligne)",
+  "ServerDialogSshEnvVarsInvalid": "Chaque ligne doit respecter CLE=VALEUR avec un nom POSIX valide."
 }

@@ -7103,5 +7103,9 @@
   "SshProxyPortLabel": "Puerto del proxy",
   "SshProxyUsernameLabel": "Usuario del proxy (opcional)",
   "SshProxyPasswordLabel": "Contrase\u00f1a del proxy (opcional)",
-  "SshProxyClearStoredPassword": "Borrar contrase\u00f1a del proxy guardada"
+  "SshProxyClearStoredPassword": "Borrar contrase\u00f1a del proxy guardada",
+  "ServerDialogSshStartupCommandLabel": "Comando de inicio (RemoteCommand)",
+  "ServerDialogSshStartupCommandHint": "Comando de una l\u00ednea enviado al abrir el shell SSH (por ejemplo: tmux new -As ops). Los perfiles importados requieren confirmaci\u00f3n.",
+  "ServerDialogSshEnvVarsLabel": "Variables de entorno (SetEnv, una CLAVE=VALOR por l\u00ednea)",
+  "ServerDialogSshEnvVarsInvalid": "Cada l\u00ednea debe usar CLAVE=VALOR con un nombre POSIX v\u00e1lido."
 }

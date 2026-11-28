@@ -142,6 +142,12 @@ public sealed class SshConnectionParams
     /// <summary>Optional local port forward specs (-L) attached directly to this SSH session.</summary>
     public IReadOnlyList<string> LocalForwards { get; init; } = [];
 
+    /// <summary>Optional single-line startup command (<c>RemoteCommand</c>) sent once the interactive shell opens.</summary>
+    public string? StartupCommand { get; init; }
+
+    /// <summary>Optional validated <c>KEY=VALUE</c> environment assignments (<c>SetEnv</c>) exported on shell start.</summary>
+    public IReadOnlyList<string> EnvironmentVariables { get; init; } = [];
+
     /// <summary>
     /// When true and <see cref="HostKeyStore"/> already holds an effective trusted entry for
     /// <see cref="HostKeyVerificationHost"/>:<see cref="HostKeyVerificationPort"/>, skips the

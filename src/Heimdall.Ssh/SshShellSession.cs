@@ -349,6 +349,21 @@ public sealed class SshShellSession : IDisposable
         CancellationTokenSource readCts = new CancellationTokenSource();
         _readCts = readCts;
         _readLoopTask = Task.Run(() => ReadLoopAsync(readCts.Token), readCts.Token);
+
+        string? initialInput = SshStartupCommandPolicy.BuildInitialShellInput(
+            connectionParams.EnvironmentVariables,
+            connectionParams.StartupCommand);
+        if (!string.IsNullOrEmpty(initialInput))
+        {
+            try
+            {
+                Write(initialInput);
+            }
+            catch (Exception ex)
+            {
+                FileLogger.Warn($"[SshShellSession] initial startup command/env write failed: {ex.Message}");
+            }
+        }
     }
 
     /// <summary>Writes raw bytes to the shell's standard input.</summary>

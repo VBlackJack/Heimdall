@@ -38,7 +38,9 @@ public sealed record SshConfigHostEntry(
     int RemoteLocalPort = 0,
     int ServerAliveInterval = 0,
     IReadOnlyList<string>? LocalForwards = null,
-    string? CertificateFile = null);
+    string? CertificateFile = null,
+    IReadOnlyList<string>? EnvironmentVariables = null,
+    string? StartupCommand = null);
 
 /// <summary>
 /// Pure OpenSSH <c>~/.ssh/config</c> exporter for single hosts and full Heimdall inventories.
@@ -156,6 +158,27 @@ public static class SshConfigExporter
                 .AppendLine(entry.ServerAliveInterval.ToString(System.Globalization.CultureInfo.InvariantCulture));
         }
 
+        if (entry.EnvironmentVariables is { Count: > 0 })
+        {
+            foreach (var rawEnv in entry.EnvironmentVariables)
+            {
+                if (SshStartupCommandPolicy.TryParseEnvAssignment(rawEnv, out string envName, out string envVal))
+                {
+                    string pair = $"{envName}={envVal}";
+                    sb.Append(ConfigIndent)
+                        .Append("SetEnv ")
+                        .AppendLine(FormatDirectiveValue(pair));
+                }
+            }
+        }
+
+        if (SshStartupCommandPolicy.TryNormalizeStartupCommand(entry.StartupCommand, out string startupCmd))
+        {
+            sb.Append(ConfigIndent)
+                .Append("RemoteCommand ")
+                .AppendLine(startupCmd);
+        }
+
         return sb.ToString().TrimEnd();
     }
 
@@ -258,7 +281,9 @@ public static class SshConfigExporter
                 RemoteLocalPort: server.RemoteLocalPort,
                 ServerAliveInterval: defaultServerAliveInterval,
                 LocalForwards: server.SshLocalForwards,
-                CertificateFile: server.SshCertificatePath));
+                CertificateFile: server.SshCertificatePath,
+                EnvironmentVariables: server.SshEnvironmentVariables,
+                StartupCommand: server.SshStartupCommand));
 
             if (!string.IsNullOrWhiteSpace(block))
             {

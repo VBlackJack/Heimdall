@@ -7103,5 +7103,9 @@
   "SshProxyPortLabel": "Proxy Port",
   "SshProxyUsernameLabel": "Proxy Username (optional)",
   "SshProxyPasswordLabel": "Proxy Password (optional)",
-  "SshProxyClearStoredPassword": "Clear stored proxy password"
+  "SshProxyClearStoredPassword": "Clear stored proxy password",
+  "ServerDialogSshStartupCommandLabel": "Startup command (RemoteCommand)",
+  "ServerDialogSshStartupCommandHint": "Optional single-line command sent when the SSH shell opens (for example: tmux new -As ops). Imported profiles require confirmation.",
+  "ServerDialogSshEnvVarsLabel": "Environment variables (SetEnv, one KEY=VALUE per line)",
+  "ServerDialogSshEnvVarsInvalid": "Each line must use KEY=VALUE with a valid POSIX variable name."
 }

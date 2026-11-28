@@ -2242,6 +2242,31 @@
                                             <TextBlock Text="{Binding SshLocalForwardsError}"
                                                        Style="{StaticResource FieldValidationErrorStyle}"
                                                        Visibility="{Binding SshLocalForwardsError, Converter={StaticResource NullToVisibilityConverter}}"/>
+                                            <TextBlock Style="{StaticResource LabelStyle}"
+                                                       Text="{loc:Translate ServerDialogSshStartupCommandLabel}"
+                                                       Margin="0,12,0,4"/>
+                                            <TextBox x:Name="DlgSrv_SshStartupCommandBox"
+                                                     Text="{Binding SshStartupCommand, UpdateSourceTrigger=PropertyChanged}"
+                                                     AutomationProperties.Name="{loc:Translate ServerDialogSshStartupCommandLabel}"
+                                                     Style="{StaticResource DialogFormTextBoxStyle}"/>
+                                            <TextBlock Style="{StaticResource DialogHintTextStyle}"
+                                                       Text="{loc:Translate ServerDialogSshStartupCommandHint}"
+                                                       TextWrapping="Wrap"
+                                                       Margin="0,4,0,0"/>
+                                            <TextBlock Style="{StaticResource LabelStyle}"
+                                                       Text="{loc:Translate ServerDialogSshEnvVarsLabel}"
+                                                       Margin="0,12,0,4"/>
+                                            <TextBox x:Name="DlgSrv_SshEnvVarsBox"
+                                                     Text="{Binding SshEnvironmentVariablesText, UpdateSourceTrigger=PropertyChanged}"
+                                                     AcceptsReturn="True"
+                                                     VerticalScrollBarVisibility="Auto"
+                                                     MinHeight="56"
+                                                     MaxHeight="110"
+                                                     AutomationProperties.Name="{loc:Translate ServerDialogSshEnvVarsLabel}"
+                                                     Style="{StaticResource DialogFormTextBoxStyle}"/>
+                                            <TextBlock Text="{Binding SshEnvironmentVariablesError}"
+                                                       Style="{StaticResource FieldValidationErrorStyle}"
+                                                       Visibility="{Binding SshEnvironmentVariablesError, Converter={StaticResource NullToVisibilityConverter}}"/>
                                         </StackPanel>
                                         <StackPanel Margin="0,14,0,0">
                                             <StackPanel.Style>

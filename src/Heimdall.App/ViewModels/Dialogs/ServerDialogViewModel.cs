@@ -707,6 +707,71 @@ public partial class ServerDialogViewModel : ObservableValidator
     [ObservableProperty]
     private string? _sshLocalForwardsError;
 
+    [ObservableProperty]
+    private string _sshStartupCommand = "";
+
+    [ObservableProperty]
+    private string _sshEnvironmentVariablesText = "";
+
+    [ObservableProperty]
+    private string? _sshEnvironmentVariablesError;
+
+    partial void OnSshEnvironmentVariablesTextChanged(string value)
+    {
+        if (SshEnvironmentVariablesError is not null)
+        {
+            ValidateSshEnvironmentVariables();
+            RefreshValidationSummary();
+        }
+    }
+
+    private bool ValidateSshEnvironmentVariables()
+    {
+        SshEnvironmentVariablesError = null;
+        if (!string.Equals(ConnectionType, "SSH", StringComparison.OrdinalIgnoreCase)
+            || string.IsNullOrWhiteSpace(SshEnvironmentVariablesText))
+        {
+            return true;
+        }
+
+        foreach (string line in SshEnvironmentVariablesText.Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries))
+        {
+            string trimmed = line.Trim();
+            if (trimmed.Length == 0)
+            {
+                continue;
+            }
+
+            if (!Heimdall.Core.Ssh.SshStartupCommandPolicy.TryParseEnvAssignment(trimmed, out _, out _))
+            {
+                SshEnvironmentVariablesError = _localizer?["ServerDialogSshEnvVarsInvalid"] ?? "Invalid KEY=VALUE line.";
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static List<string> ParseValidSshEnvironmentVariables(string? rawText)
+    {
+        var list = new List<string>();
+        if (string.IsNullOrWhiteSpace(rawText))
+        {
+            return list;
+        }
+
+        foreach (string line in rawText.Split(["\r\n", "\n"], StringSplitOptions.RemoveEmptyEntries))
+        {
+            string trimmed = line.Trim();
+            if (Heimdall.Core.Ssh.SshStartupCommandPolicy.TryParseEnvAssignment(trimmed, out string name, out string value))
+            {
+                list.Add($"{name}={value}");
+            }
+        }
+
+        return list;
+    }
+
     partial void OnSshLocalForwardsTextChanged(string value)
     {
         if (SshLocalForwardsError is not null)
@@ -1896,6 +1961,7 @@ public partial class ServerDialogViewModel : ObservableValidator
         nameof(RdpResizeEnableDelayMsError),
         nameof(RdpGatewayError),
         nameof(SshLocalForwardsError),
+        nameof(SshEnvironmentVariablesError),
         nameof(GeneralTabErrorCount),
         nameof(NetworkTabErrorCount),
         nameof(OptionsTabErrorCount),
@@ -2378,6 +2444,7 @@ public partial class ServerDialogViewModel : ObservableValidator
         RdpResizeEnableDelayMsError = null;
         RdpGatewayError = null;
         SshLocalForwardsError = null;
+        SshEnvironmentVariablesError = null;
         GeneralTabErrorCount = 0;
         NetworkTabErrorCount = 0;
         OptionsTabErrorCount = 0;
@@ -2389,7 +2456,8 @@ public partial class ServerDialogViewModel : ObservableValidator
     {
         ValidationError = DisplayNameError ?? RemoteServerError ?? SshUsernameError ?? WinRmUsernameError ?? WinRmPasswordError ?? EndpointPortError
             ?? LocalPortError ?? RdpGatewayError ?? AudioModeError ?? ColorDepthError
-            ?? RdpFixedWidthError ?? RdpFixedHeightError ?? RdpResizeEnableDelayMsError ?? SshLocalForwardsError;
+            ?? RdpFixedWidthError ?? RdpFixedHeightError ?? RdpResizeEnableDelayMsError ?? SshLocalForwardsError
+            ?? SshEnvironmentVariablesError;
         GeneralTabErrorCount = (DisplayNameError is not null ? 1 : 0)
             + (RemoteServerError is not null ? 1 : 0)
             + (SshUsernameError is not null ? 1 : 0)
@@ -2403,7 +2471,8 @@ public partial class ServerDialogViewModel : ObservableValidator
             + (RdpFixedWidthError is not null ? 1 : 0)
             + (RdpFixedHeightError is not null ? 1 : 0)
             + (RdpResizeEnableDelayMsError is not null ? 1 : 0)
-            + (SshLocalForwardsError is not null ? 1 : 0);
+            + (SshLocalForwardsError is not null ? 1 : 0)
+            + (SshEnvironmentVariablesError is not null ? 1 : 0);
     }
 
     [RelayCommand]
@@ -2483,6 +2552,7 @@ public partial class ServerDialogViewModel : ObservableValidator
                     L("ValidationSshLocalForwardInvalid"),
                     invalidForward ?? string.Empty)
                 : null;
+        ValidateSshEnvironmentVariables();
 
         // Tab error counts
         GeneralTabErrorCount = (DisplayNameError is not null ? 1 : 0)
@@ -2498,7 +2568,8 @@ public partial class ServerDialogViewModel : ObservableValidator
             + (RdpFixedWidthError is not null ? 1 : 0)
             + (RdpFixedHeightError is not null ? 1 : 0)
             + (RdpResizeEnableDelayMsError is not null ? 1 : 0)
-            + (SshLocalForwardsError is not null ? 1 : 0);
+            + (SshLocalForwardsError is not null ? 1 : 0)
+            + (SshEnvironmentVariablesError is not null ? 1 : 0);
 
         // First invalid field for auto-focus. The order mirrors ValidationError below so the
         // summary line and the focused box always name the same error, and every name here needs
@@ -2523,7 +2594,8 @@ public partial class ServerDialogViewModel : ObservableValidator
         // Aggregate summary
         ValidationError = DisplayNameError ?? RemoteServerError ?? SshUsernameError ?? WinRmUsernameError ?? WinRmPasswordError ?? EndpointPortError
             ?? LocalPortError ?? RdpGatewayError ?? AudioModeError ?? ColorDepthError
-            ?? RdpFixedWidthError ?? RdpFixedHeightError ?? RdpResizeEnableDelayMsError ?? SshLocalForwardsError;
+            ?? RdpFixedWidthError ?? RdpFixedHeightError ?? RdpResizeEnableDelayMsError ?? SshLocalForwardsError
+            ?? SshEnvironmentVariablesError;
     }
 
     internal static bool TryParseSshLocalForwards(
@@ -2980,6 +3052,16 @@ public partial class ServerDialogViewModel : ObservableValidator
                 : _seed?.SshLocalForwards is { Count: > 0 } preservedForwards
                     ? [.. preservedForwards]
                     : [],
+            SshStartupCommand = string.Equals(ConnectionType, "SSH", StringComparison.OrdinalIgnoreCase)
+                ? (Heimdall.Core.Ssh.SshStartupCommandPolicy.TryNormalizeStartupCommand(SshStartupCommand, out var normalizedCmd)
+                    ? normalizedCmd
+                    : null)
+                : _seed?.SshStartupCommand,
+            SshEnvironmentVariables = string.Equals(ConnectionType, "SSH", StringComparison.OrdinalIgnoreCase)
+                ? ParseValidSshEnvironmentVariables(SshEnvironmentVariablesText)
+                : _seed?.SshEnvironmentVariables is { Count: > 0 } preservedEnvVars
+                    ? [.. preservedEnvVars]
+                    : [],
             SshMode = SshMode,
             PostConnectSteps = [.. PostConnectSteps.Select(step => step.ToModel())],
             PostConnectCommand = PostConnectCommand,
@@ -3215,6 +3297,10 @@ public partial class ServerDialogViewModel : ObservableValidator
         vm.RemoteBindPort = dto.RemoteBindPort;
         vm.RemoteLocalPort = dto.RemoteLocalPort;
         vm.SshLocalForwardsText = FormatSshLocalForwards(dto.SshLocalForwards);
+        vm.SshStartupCommand = dto.SshStartupCommand ?? "";
+        vm.SshEnvironmentVariablesText = dto.SshEnvironmentVariables is { Count: > 0 }
+            ? string.Join(System.Environment.NewLine, dto.SshEnvironmentVariables)
+            : "";
         vm.SshMode = dto.SshMode;
         vm.PostConnectCommand = dto.PostConnectCommand;
         vm.PostConnectDelayMs = dto.PostConnectDelayMs;
