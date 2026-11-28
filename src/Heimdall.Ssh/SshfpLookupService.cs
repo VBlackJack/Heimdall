@@ -30,7 +30,7 @@ namespace Heimdall.Ssh;
 public sealed class SshfpLookupService : ISshfpResolver
 {
     private const int DnsPort = 53;
-    private static readonly TimeSpan DefaultTimeout = TimeSpan.FromMilliseconds(2500);
+    private static readonly TimeSpan PerServerTimeout = TimeSpan.FromMilliseconds(1500);
 
     public async Task<SshfpVerificationResult> VerifyHostKeyAsync(
         string host,
@@ -50,10 +50,6 @@ public sealed class SshfpLookupService : ISshfpResolver
             return new SshfpVerificationResult(SshfpVerificationStatus.Error, Detail: "No system DNS server found.");
         }
 
-        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutCts.CancelAfter(DefaultTimeout);
-        var ct = timeoutCts.Token;
-
         ushort txId = (ushort)RandomNumberGenerator.GetInt32(1, ushort.MaxValue);
         byte[] query;
         try
@@ -65,21 +61,26 @@ public sealed class SshfpLookupService : ISshfpResolver
             return new SshfpVerificationResult(SshfpVerificationStatus.Skipped);
         }
 
+        bool sawTimeout = false;
         foreach (var server in dnsServers.Take(2))
         {
             bool isLoopback = IPAddress.IsLoopback(server);
+            using var serverCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            serverCts.CancelAfter(PerServerTimeout);
+            CancellationToken serverCt = serverCts.Token;
+
             try
             {
-                byte[] response = await QueryUdpAsync(server, query, ct).ConfigureAwait(false);
-                if (!SshfpMatcher.TryParseSshfpResponse(response, txId, out var records, out bool ad, out bool truncated))
+                byte[] response = await QueryUdpAsync(server, query, serverCt).ConfigureAwait(false);
+                if (!SshfpMatcher.TryParseSshfpResponse(response, txId, host, out var records, out bool ad, out bool truncated))
                 {
                     continue;
                 }
 
                 if (truncated)
                 {
-                    byte[] tcpResponse = await QueryTcpAsync(server, query, ct).ConfigureAwait(false);
-                    if (!SshfpMatcher.TryParseSshfpResponse(tcpResponse, txId, out records, out ad, out _))
+                    byte[] tcpResponse = await QueryTcpAsync(server, query, serverCt).ConfigureAwait(false);
+                    if (!SshfpMatcher.TryParseSshfpResponse(tcpResponse, txId, host, out records, out ad, out _))
                     {
                         continue;
                     }
@@ -95,7 +96,8 @@ public sealed class SshfpLookupService : ISshfpResolver
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
-                return new SshfpVerificationResult(SshfpVerificationStatus.Error, Detail: "DNS lookup timed out.");
+                // Per-server timeout: fall through and try the next configured DNS server.
+                sawTimeout = true;
             }
             catch (OperationCanceledException)
             {
@@ -107,7 +109,9 @@ public sealed class SshfpLookupService : ISshfpResolver
             }
         }
 
-        return new SshfpVerificationResult(SshfpVerificationStatus.Error, Detail: "DNS query failed.");
+        return new SshfpVerificationResult(
+            SshfpVerificationStatus.Error,
+            Detail: sawTimeout ? "DNS lookup timed out." : "DNS query failed.");
     }
 
     internal static bool ShouldQueryHost(string? host)

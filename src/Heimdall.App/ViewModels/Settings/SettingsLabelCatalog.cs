@@ -64,6 +64,7 @@ internal static class SettingsLabelCatalog
         [nameof(AppSettings.SshConfirmAgentSigning)] = new("SettingsSshConfirmAgentSigningLabel", "SettingsTabSshSftp", "SettingsSshSubTabConnection"),
         [nameof(AppSettings.SshCryptoPolicy)] = new("SettingsSshCryptoPolicyLabel", "SettingsTabSshSftp", "SettingsSshSubTabConnection"),
         [nameof(AppSettings.SshDefaultMode)] = new("SettingsLabelSshMode", "SettingsTabSshSftp", "SettingsSshSubTabConnection"),
+        [nameof(AppSettings.SshVerifyHostKeyDnsSshfp)] = new("SettingsLabelSshVerifyHostKeyDnsSshfp", "SettingsTabSshSftp", "SettingsSshSubTabHostKeys"),
         [nameof(AppSettings.SyncKnownHostsAtStartup)] = new("SettingsLabelSyncKnownHostsAtStartup", "SettingsTabSshSftp", "SettingsSshSubTabHostKeys"),
         [nameof(AppSettings.AntiIdleIntervalSeconds)] = new("SettingsLabelAntiIdleInterval", "SettingsTabSshSftp", "SettingsSshSubTabSession"),
         [nameof(AppSettings.SshAutoReconnect)] = new("SettingsSshAutoReconnectEnable", "SettingsTabSshSftp", "SettingsSshSubTabSession"),

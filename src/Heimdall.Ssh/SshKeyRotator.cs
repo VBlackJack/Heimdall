@@ -33,8 +33,24 @@ public enum SshKeyRotationPhase
     Failed
 }
 
+/// <summary>Structured error categories returned by <see cref="SshKeyRotator"/> steps.</summary>
+public enum SshKeyRotationErrorCode
+{
+    None,
+    InvalidParameters,
+    VerificationFailed,
+    SymlinkRefused,
+    InvariantFailed,
+    RemoteCommandFailed,
+    ConnectionFailed
+}
+
 /// <summary>Outcome of verifying a newly deployed SSH key or removing an old key.</summary>
-public sealed record SshKeyRotationStepResult(bool Success, string? ErrorMessage = null);
+public sealed record SshKeyRotationStepResult(
+    bool Success,
+    string? ErrorMessage = null,
+    SshKeyRotationErrorCode ErrorCode = SshKeyRotationErrorCode.None,
+    int? ExitStatus = null);
 
 /// <summary>
 /// Safe transactional primitives for guided SSH key rotation:
@@ -81,9 +97,9 @@ public static class SshKeyRotator
             $"if [ -L \"$ak\" ]; then echo {SymlinkRefusedMarker}; exit 1; fi && " +
             "[ -f \"$ak\" ] && " +
             "tmp=$(mktemp \"$HOME/.ssh/.authorized_keys.heimdall.XXXXXX\") && " +
-            "chmod 600 \"$tmp\" && " +
+            "if chmod 600 \"$tmp\" && " +
             "(grep -Fv -- \"$old_id\" \"$ak\" > \"$tmp\"; rc=$?; [ \"$rc\" -le 1 ]) && " +
-            $"if [ -s \"$tmp\" ] && grep -Fq -- \"$new_id\" \"$tmp\"; then " +
+            "[ -s \"$tmp\" ] && grep -Fq -- \"$new_id\" \"$tmp\"; then " +
             $"mv -f \"$tmp\" \"$ak\" && chmod 600 \"$ak\" && echo {OldKeyRemovedMarker}; " +
             $"else rm -f \"$tmp\"; echo {InvariantFailedMarker}; exit 1; fi";
     }
@@ -155,7 +171,10 @@ public static class SshKeyRotator
         if (!isolatedNewKeyParams.DisableAgentAuthentication
             || !string.IsNullOrEmpty(isolatedNewKeyParams.Password))
         {
-            return new SshKeyRotationStepResult(false, "Verification parameters must disable agent and password fallback.");
+            return new SshKeyRotationStepResult(
+                false,
+                "Verification parameters must disable agent and password fallback.",
+                SshKeyRotationErrorCode.InvalidParameters);
         }
 
         try
@@ -193,7 +212,11 @@ public static class SshKeyRotator
                 return new SshKeyRotationStepResult(true);
             }
 
-            return new SshKeyRotationStepResult(false, $"New-key verification failed (exit {cmd.ExitStatus}).");
+            return new SshKeyRotationStepResult(
+                false,
+                $"New-key verification failed (exit {cmd.ExitStatus}).",
+                SshKeyRotationErrorCode.VerificationFailed,
+                cmd.ExitStatus);
         }
         catch (OperationCanceledException)
         {
@@ -201,7 +224,7 @@ public static class SshKeyRotator
         }
         catch (Exception ex)
         {
-            return new SshKeyRotationStepResult(false, ex.Message);
+            return new SshKeyRotationStepResult(false, ex.Message, SshKeyRotationErrorCode.ConnectionFailed);
         }
     }
 
@@ -228,7 +251,7 @@ public static class SshKeyRotator
         }
         catch (ArgumentException ex)
         {
-            return new SshKeyRotationStepResult(false, ex.Message);
+            return new SshKeyRotationStepResult(false, ex.Message, SshKeyRotationErrorCode.InvalidParameters);
         }
 
         try
@@ -263,12 +286,18 @@ public static class SshKeyRotator
 
             if (output.Contains(SymlinkRefusedMarker, StringComparison.Ordinal))
             {
-                return new SshKeyRotationStepResult(false, "Remote authorized_keys is a symbolic link; left untouched.");
+                return new SshKeyRotationStepResult(
+                    false,
+                    "Remote authorized_keys is a symbolic link; left untouched.",
+                    SshKeyRotationErrorCode.SymlinkRefused);
             }
 
             if (output.Contains(InvariantFailedMarker, StringComparison.Ordinal))
             {
-                return new SshKeyRotationStepResult(false, "Safety check failed: new key not confirmed in staged authorized_keys.");
+                return new SshKeyRotationStepResult(
+                    false,
+                    "Safety check failed: new key not confirmed in staged authorized_keys.",
+                    SshKeyRotationErrorCode.InvariantFailed);
             }
 
             if (cmd.ExitStatus == 0 && output.Contains(OldKeyRemovedMarker, StringComparison.Ordinal))
@@ -279,7 +308,11 @@ public static class SshKeyRotator
             string err = string.IsNullOrWhiteSpace(cmd.Error)
                 ? $"Old-key removal exited with status {cmd.ExitStatus}."
                 : cmd.Error.Trim();
-            return new SshKeyRotationStepResult(false, err);
+            return new SshKeyRotationStepResult(
+                false,
+                err,
+                SshKeyRotationErrorCode.RemoteCommandFailed,
+                cmd.ExitStatus);
         }
         catch (OperationCanceledException)
         {
@@ -287,7 +320,7 @@ public static class SshKeyRotator
         }
         catch (Exception ex)
         {
-            return new SshKeyRotationStepResult(false, ex.Message);
+            return new SshKeyRotationStepResult(false, ex.Message, SshKeyRotationErrorCode.ConnectionFailed);
         }
     }
 }

@@ -882,7 +882,10 @@ public partial class App : System.Windows.Application
         services.AddSingleton<KnownHostsStartupSync>();
         services.AddSingleton(provider => new HostKeyPersistenceCoalescer(provider.GetRequiredService<IConfigManager>()));
         services.AddSingleton<TrustPromptCoordinator>();
-        services.AddSingleton<IHostKeyVerifier, DialogHostKeyVerifier>();
+        services.AddSingleton<IHostKeyVerifier>(sp => new DialogHostKeyVerifier(
+            sp.GetRequiredService<LocalizationManager>(),
+            sp.GetRequiredService<TrustPromptCoordinator>(),
+            () => sp.GetService<ConfigManager>()?.CurrentSettings?.SshVerifyHostKeyDnsSshfp ?? true));
         services.AddSingleton<FtpsCertificateStore>();
         services.AddSingleton<WebCertificateTrust>();
         services.AddSingleton<WebZoomMemory>();

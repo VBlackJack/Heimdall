@@ -280,6 +280,26 @@ public static class SshfpMatcher
         ushort expectedTransactionId,
         out IReadOnlyList<SshfpRecord> records,
         out bool authenticatedData,
+        out bool truncated) =>
+        TryParseSshfpResponse(
+            packet,
+            expectedTransactionId,
+            expectedHostname: null,
+            out records,
+            out authenticatedData,
+            out truncated);
+
+    /// <summary>
+    /// Parses a raw DNS wire response for SSHFP records, validating question echo
+    /// (<c>QDCOUNT == 1</c>, QNAME, QTYPE=44, QCLASS=1) and Answer RR owner name matching
+    /// (including bounded CNAME chains) while guarding against compression pointer loops.
+    /// </summary>
+    public static bool TryParseSshfpResponse(
+        ReadOnlySpan<byte> packet,
+        ushort expectedTransactionId,
+        string? expectedHostname,
+        out IReadOnlyList<SshfpRecord> records,
+        out bool authenticatedData,
         out bool truncated)
     {
         records = [];
@@ -314,22 +334,44 @@ public static class SshfpMatcher
 
         ushort qdCount = BinaryPrimitives.ReadUInt16BigEndian(packet.Slice(4, 2));
         ushort anCount = BinaryPrimitives.ReadUInt16BigEndian(packet.Slice(6, 2));
-        int offset = 12;
-
-        for (int q = 0; q < qdCount; q++)
+        if (qdCount != 1)
         {
-            if (!TrySkipDnsName(packet, ref offset) || offset + 4 > packet.Length)
+            return false;
+        }
+
+        int offset = 12;
+        if (!TryReadDnsName(packet, ref offset, out string questionName) || offset + 4 > packet.Length)
+        {
+            return false;
+        }
+
+        ushort qType = BinaryPrimitives.ReadUInt16BigEndian(packet.Slice(offset, 2));
+        ushort qClass = BinaryPrimitives.ReadUInt16BigEndian(packet.Slice(offset + 2, 2));
+        offset += 4;
+        if (qType != DnsTypeSshfp || qClass != 1)
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(expectedHostname))
+        {
+            string normalizedExpected = expectedHostname.Trim().TrimEnd('.');
+            if (!string.Equals(questionName, normalizedExpected, StringComparison.OrdinalIgnoreCase))
             {
                 return false;
             }
-
-            offset += 4;
         }
+
+        const ushort dnsTypeCname = 5;
+        const int maxCnameHops = 8;
+        string acceptedOwner = questionName;
+        var seenCnameTargets = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { acceptedOwner };
+        int cnameHops = 0;
 
         var parsed = new List<SshfpRecord>();
         for (int a = 0; a < anCount; a++)
         {
-            if (!TrySkipDnsName(packet, ref offset) || offset + 10 > packet.Length)
+            if (!TryReadDnsName(packet, ref offset, out string ownerName) || offset + 10 > packet.Length)
             {
                 return false;
             }
@@ -344,7 +386,25 @@ public static class SshfpMatcher
                 return false;
             }
 
-            if (rrType == DnsTypeSshfp && rrClass == 1 && rdLength > 2)
+            if (rrType == dnsTypeCname
+                && rrClass == 1
+                && string.Equals(ownerName, acceptedOwner, StringComparison.OrdinalIgnoreCase)
+                && cnameHops < maxCnameHops)
+            {
+                int cnameOffset = offset;
+                if (TryReadDnsName(packet, ref cnameOffset, out string cnameTarget)
+                    && cnameOffset <= offset + rdLength
+                    && !string.IsNullOrEmpty(cnameTarget)
+                    && seenCnameTargets.Add(cnameTarget))
+                {
+                    acceptedOwner = cnameTarget;
+                    cnameHops++;
+                }
+            }
+            else if (rrType == DnsTypeSshfp
+                && rrClass == 1
+                && rdLength > 2
+                && string.Equals(ownerName, acceptedOwner, StringComparison.OrdinalIgnoreCase))
             {
                 byte alg = packet[offset];
                 byte fpType = packet[offset + 1];
@@ -359,11 +419,13 @@ public static class SshfpMatcher
         return true;
     }
 
-    private static bool TrySkipDnsName(ReadOnlySpan<byte> packet, ref int offset)
+    private static bool TryReadDnsName(ReadOnlySpan<byte> packet, ref int offset, out string name)
     {
+        name = string.Empty;
         int cursor = offset;
         int hops = 0;
         bool jumped = false;
+        var sb = new StringBuilder(64);
 
         while (true)
         {
@@ -380,6 +442,7 @@ public static class SshfpMatcher
                     offset = cursor + 1;
                 }
 
+                name = sb.ToString();
                 return true;
             }
 
@@ -416,11 +479,33 @@ public static class SshfpMatcher
                 return false;
             }
 
-            cursor += 1 + len;
-            if (cursor > packet.Length)
+            if (cursor + 1 + len > packet.Length)
             {
                 return false;
             }
+
+            if (sb.Length > 0)
+            {
+                sb.Append('.');
+            }
+
+            if (sb.Length + len > 255)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < len; i++)
+            {
+                byte b = packet[cursor + 1 + i];
+                if (b < 0x20 || b > 0x7E)
+                {
+                    return false;
+                }
+
+                sb.Append((char)b);
+            }
+
+            cursor += 1 + len;
         }
     }
 }

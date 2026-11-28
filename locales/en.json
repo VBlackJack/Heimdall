@@ -7017,5 +7017,15 @@
   "ToolSshAuditFleetClean": "No compliance issues found across your local SSH fleet.",
   "ToolSshAuditFleetError": "Fleet compliance scan failed: {0}",
   "ErrorSshAgentSigningDeclined": "SSH agent signing was declined by the user.",
-  "SshKeyRotateErrOutputExists": "Output key file already exists. Choose a new file path so the existing key is never overwritten."
+  "SshKeyRotateErrOutputExists": "Output key file already exists. Choose a new file path so the existing key is never overwritten.",
+  "SettingsLabelSshVerifyHostKeyDnsSshfp": "Verify SSH host keys with DNS SSHFP (RFC 4255)",
+  "SettingsSshVerifyHostKeyDnsSshfpHint": "Performs a non-blocking advisory DNS SSHFP lookup on direct SSH host-key prompts (always skipped behind gateways). Turn off on air-gapped or split-horizon networks.",
+  "SshKeyRotateAlgoEd25519Recommended": "Ed25519 (recommended)",
+  "SshKeyRotateErrInvalidPath": "The chosen private key file path is not valid.",
+  "SshKeyRotateErrNetworkPath": "Network share or device paths cannot be used to store a new SSH private key.",
+  "SshKeyRotateErrVerifyFailed": "Isolated authentication verification with the new key failed.",
+  "SshKeyRotateErrProfileSaveFailed": "The saved server profile could not be updated.",
+  "SshKeyRotateErrSymlinkRefused": "Remote authorized_keys is a symbolic link and was left untouched.",
+  "SshKeyRotateErrInvariantFailed": "Safety check failed: the new public key was not confirmed in the staged authorized_keys file.",
+  "SshKeyRotateErrRemoteExit": "Remote old-key cleanup command exited with status {0}."
 }

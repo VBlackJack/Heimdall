@@ -4524,6 +4524,14 @@
                                                   AutomationProperties.HelpText="{loc:Translate SettingsSyncKnownHostsAtStartupHint}"/>
                                         <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[SyncKnownHostsAtStartup]}"/>
                                         <TextBlock Text="{loc:Translate SettingsSyncKnownHostsAtStartupHint}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="20,4,0,12" TextWrapping="Wrap"/>
+                                        <CheckBox x:Name="Mw_SettingsSshVerifyHostKeyDnsSshfp"
+                                                  Content="{loc:Translate SettingsLabelSshVerifyHostKeyDnsSshfp}"
+                                                  IsChecked="{Binding Settings.SshVerifyHostKeyDnsSshfp}"
+                                                  Foreground="{DynamicResource TextPrimaryBrush}"
+                                                  AutomationProperties.Name="{loc:Translate SettingsLabelSshVerifyHostKeyDnsSshfp}"
+                                                  AutomationProperties.HelpText="{loc:Translate SettingsSshVerifyHostKeyDnsSshfpHint}"/>
+                                        <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[SshVerifyHostKeyDnsSshfp]}"/>
+                                        <TextBlock Text="{loc:Translate SettingsSshVerifyHostKeyDnsSshfpHint}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="20,4,0,12" TextWrapping="Wrap"/>
                                         <Expander Background="{DynamicResource SurfaceBrush}"
                                                   BorderBrush="{DynamicResource BorderBrush}"
                                                   BorderThickness="1"

@@ -7017,5 +7017,15 @@
   "ToolSshAuditFleetClean": "No se encontraron problemas de cumplimiento en tu flota SSH local.",
   "ToolSshAuditFleetError": "Error al analizar la flota SSH: {0}",
   "ErrorSshAgentSigningDeclined": "La firma del agente SSH fue rechazada por el usuario.",
-  "SshKeyRotateErrOutputExists": "El archivo de clave destino ya existe. Elige una nueva ruta para no sobrescribir una clave existente."
+  "SshKeyRotateErrOutputExists": "El archivo de clave destino ya existe. Elige una nueva ruta para no sobrescribir una clave existente.",
+  "SettingsLabelSshVerifyHostKeyDnsSshfp": "Verificar claves de host SSH con DNS SSHFP (RFC 4255)",
+  "SettingsSshVerifyHostKeyDnsSshfpHint": "Realiza una consulta informativa DNS SSHFP no bloqueante en avisos de clave de host en conexiones directas (siempre omitida tras pasarelas). Desact\u00edvalo en redes aisladas o DNS dividido.",
+  "SshKeyRotateAlgoEd25519Recommended": "Ed25519 (recomendado)",
+  "SshKeyRotateErrInvalidPath": "La ruta seleccionada para la nueva clave privada no es v\u00e1lida.",
+  "SshKeyRotateErrNetworkPath": "No se pueden usar rutas de red ni de dispositivo para guardar una nueva clave privada SSH.",
+  "SshKeyRotateErrVerifyFailed": "Fall\u00f3 la verificaci\u00f3n aislada de autenticaci\u00f3n con la nueva clave.",
+  "SshKeyRotateErrProfileSaveFailed": "No se pudo actualizar el perfil de servidor guardado.",
+  "SshKeyRotateErrSymlinkRefused": "El archivo remoto authorized_keys es un enlace simb\u00f3lico y no se modific\u00f3.",
+  "SshKeyRotateErrInvariantFailed": "Fall\u00f3 la comprobaci\u00f3n de seguridad: no se confirm\u00f3 la nueva clave p\u00fablica en el archivo temporal authorized_keys.",
+  "SshKeyRotateErrRemoteExit": "El comando remoto de limpieza de la clave anterior finaliz\u00f3 con estado {0}."
 }

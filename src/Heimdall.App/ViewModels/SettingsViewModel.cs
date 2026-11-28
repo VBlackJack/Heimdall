@@ -552,6 +552,10 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     [ObservableProperty]
     private bool _sshConfirmAgentSigning;
 
+    /// <summary>Whether Heimdall performs advisory DNS SSHFP lookups on direct SSH host-key prompts.</summary>
+    [ObservableProperty]
+    private bool _sshVerifyHostKeyDnsSshfp = true;
+
     /// <summary>Whether Heimdall imports the OpenSSH known_hosts file each time it starts.</summary>
     [ObservableProperty]
     private bool _syncKnownHostsAtStartup;
@@ -2045,6 +2049,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             SshHealthMonitorIntervalSeconds = settings.SshHealthMonitorIntervalSeconds;
             SshAgentLookupTimeoutMs = settings.SshAgentLookupTimeoutMs;
             SshConfirmAgentSigning = settings.SshConfirmAgentSigning;
+            SshVerifyHostKeyDnsSshfp = settings.SshVerifyHostKeyDnsSshfp;
             SyncKnownHostsAtStartup = settings.SyncKnownHostsAtStartup;
             SshAutoReconnect = settings.SshAutoReconnect;
             SshAutoReconnectAttempts = settings.SshAutoReconnectAttempts;
@@ -2560,6 +2565,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         settings.SshHealthMonitorIntervalSeconds = SshHealthMonitorIntervalSeconds;
         settings.SshAgentLookupTimeoutMs = SshAgentLookupTimeoutMs;
         settings.SshConfirmAgentSigning = SshConfirmAgentSigning;
+        settings.SshVerifyHostKeyDnsSshfp = SshVerifyHostKeyDnsSshfp;
         settings.SyncKnownHostsAtStartup = SyncKnownHostsAtStartup;
         settings.SshAutoReconnect = SshAutoReconnect;
         settings.SshAutoReconnectAttempts = SshAutoReconnectAttempts;

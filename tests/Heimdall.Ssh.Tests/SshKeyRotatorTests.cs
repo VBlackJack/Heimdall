@@ -35,6 +35,8 @@ public sealed class SshKeyRotatorTests
         Assert.Contains("[ -s \"$tmp\" ] && grep -Fq -- \"$new_id\" \"$tmp\"", cmd, StringComparison.Ordinal);
         Assert.Contains(SshKeyRotator.InvariantFailedMarker, cmd, StringComparison.Ordinal);
         Assert.Contains(SshKeyRotator.OldKeyRemovedMarker, cmd, StringComparison.Ordinal);
+        Assert.Contains("if chmod 600 \"$tmp\" &&", cmd, StringComparison.Ordinal);
+        Assert.Contains("else rm -f \"$tmp\";", cmd, StringComparison.Ordinal);
     }
 
     [Fact]

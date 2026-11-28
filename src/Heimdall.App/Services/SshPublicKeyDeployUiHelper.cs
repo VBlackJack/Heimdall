@@ -21,6 +21,7 @@ using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Logging;
 using Heimdall.Core.Models;
+using Heimdall.Core.Security;
 using Heimdall.Core.Ssh;
 using Heimdall.Ssh;
 using Heimdall.Ssh.Agents;
@@ -90,7 +91,7 @@ internal static class SshPublicKeyDeployUiHelper
         var sshServers = servers
             .Where(s => string.Equals(s.ConnectionType, "SSH", StringComparison.OrdinalIgnoreCase)
                 && !string.IsNullOrWhiteSpace(s.RemoteServer)
-                && (s.UseDirectConnection || string.IsNullOrWhiteSpace(s.SshGatewayId) || tunnelService is not null))
+                && (SshGatewayRoute.GatewayIdFor(s, settings.GroupDefaults) is null || tunnelService is not null))
             .ToList();
 
         if (sshServers.Count == 0)
@@ -165,6 +166,16 @@ internal static class SshPublicKeyDeployUiHelper
         var password = ConnectionHelpers.DecryptPassword(target.SshPasswordEncrypted);
         var keyPassphrase = ConnectionHelpers.DecryptPassword(target.SshKeyPassphraseEncrypted);
 
+        if (string.IsNullOrEmpty(password))
+        {
+            password = await TryResolveExternalSshPasswordAsync(
+                services,
+                target,
+                settings,
+                targetPort,
+                cancellationToken).ConfigureAwait(true);
+        }
+
         // If the profile has no stored password or key file and no agent holds a key, prompt for a password
         // so password-only servers can accept their first public key deployment cleanly.
         if (string.IsNullOrEmpty(password)
@@ -209,7 +220,7 @@ internal static class SshPublicKeyDeployUiHelper
         int? logicalPort = null;
 
         var tunnelService = services?.GetService<ITunnelService>();
-        bool needsTunnel = !target.UseDirectConnection && !string.IsNullOrWhiteSpace(target.SshGatewayId);
+        bool needsTunnel = SshGatewayRoute.GatewayIdFor(target, settings.GroupDefaults) is not null;
         TunnelLease? tunnelLease = null;
 
         try
@@ -267,6 +278,7 @@ internal static class SshPublicKeyDeployUiHelper
                 SshAgentPreference = settings.SshAgentPreference,
                 CryptoPolicy = SshCryptoPolicyResolver.Resolve(target.SshCryptoPolicy, settings.SshCryptoPolicy),
                 AgentKeyFingerprint = target.SshAgentKeyFingerprint,
+                OnBeforeAgentSign = SshAgentSignConfirmHelper.BuildBeforeSignNotification(localizer, reportStatus: null),
                 ConfirmAgentSign = SshAgentSignConfirmHelper.BuildConfirmCallback(
                     settings,
                     target.RemoteServer,
@@ -314,6 +326,61 @@ internal static class SshPublicKeyDeployUiHelper
         finally
         {
             tunnelLease?.Dispose();
+        }
+    }
+
+    internal static async Task<string?> TryResolveExternalSshPasswordAsync(
+        IServiceProvider? services,
+        ServerProfileDto target,
+        AppSettings settings,
+        int targetPort,
+        CancellationToken cancellationToken)
+    {
+        if (!settings.UseExternalCredentialProvider)
+        {
+            return null;
+        }
+
+        if (!target.CredentialLookupConfirmed && !SharedSessionIds.IsSharedProfile(target))
+        {
+            return null;
+        }
+
+        var factory = services?.GetService<ICredentialProviderFactory>();
+        if (factory is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            var provider = factory.Create(settings);
+            if (!provider.IsAvailable)
+            {
+                return null;
+            }
+
+            string vaultTitle = string.IsNullOrWhiteSpace(target.VaultEntryName)
+                ? target.DisplayName
+                : target.VaultEntryName;
+            var credential = await provider.GetCredentialAsync(
+                    target.RemoteServer,
+                    targetPort,
+                    target.SshUsername ?? string.Empty,
+                    vaultTitle,
+                    cancellationToken)
+                .ConfigureAwait(true);
+
+            return string.IsNullOrEmpty(credential?.Password) ? null : credential.Password;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Warn($"External credential lookup for SSH helper failed on {target.DisplayName}: {ex.Message}");
+            return null;
         }
     }
 }

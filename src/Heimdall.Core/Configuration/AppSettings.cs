@@ -179,6 +179,12 @@ public sealed class AppSettings
     /// an authentication challenge.
     /// </summary>
     public bool SshConfirmAgentSigning { get; set; }
+
+    /// <summary>
+    /// When true, performs an advisory DNS SSHFP (RFC 4255) lookup on direct SSH host-key prompts.
+    /// Disable in air-gapped or strictly split-horizon environments to avoid outbound port 53 lookups.
+    /// </summary>
+    public bool SshVerifyHostKeyDnsSshfp { get; set; } = true;
     public const int DefaultPlinkPortCheckIntervalMs = 2000;
     [SettingRange(500, 30000)]
     public int PlinkPortCheckIntervalMs { get; set; } = DefaultPlinkPortCheckIntervalMs;

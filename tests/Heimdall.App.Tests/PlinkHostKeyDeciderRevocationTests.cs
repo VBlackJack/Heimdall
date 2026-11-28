@@ -120,4 +120,93 @@ public sealed class PlinkHostKeyDeciderRevocationTests
         Assert.Equal(SshFailureCode.HostKeyRevoked, mismatchDecision.FailureCode);
         Assert.Equal(0, verifier.Calls);
     }
+
+    private sealed class RecordingGatewayVerifier : IHostKeyVerifier
+    {
+        public int Calls { get; private set; }
+        public bool? LastIsViaGateway { get; private set; }
+
+        public Task<HostKeyDecision> VerifyAsync(
+            string host,
+            int port,
+            string algorithm,
+            string presentedFingerprint,
+            string? storedFingerprint,
+            CancellationToken ct = default)
+        {
+            Calls++;
+            LastIsViaGateway = false;
+            return Task.FromResult(HostKeyDecision.Accept);
+        }
+
+        public Task<HostKeyDecision> VerifyAsync(
+            string host,
+            int port,
+            string algorithm,
+            string presentedFingerprint,
+            string? storedFingerprint,
+            ReadOnlyMemory<byte> hostKeyBlob,
+            bool isViaGateway = false,
+            CancellationToken ct = default)
+        {
+            Calls++;
+            LastIsViaGateway = isViaGateway;
+            return Task.FromResult(HostKeyDecision.Accept);
+        }
+    }
+
+    [Fact]
+    public async Task DecideAsync_MatchesAdditionalAlgorithmPinnedKeyWithoutMismatchPrompt()
+    {
+        var store = new HostKeyStore();
+        var trustService = new HostKeyTrustService(store);
+        const string ed25519Fp = "SHA256:PrimaryEd25519Key1234567890123456789012345";
+        const string rsaFp = "SHA256:AdditionalRsaKey12345678901234567890123456";
+        trustService.Trust("dual.example.com", 22, ed25519Fp, "ssh-ed25519", HostKeySource.UserConfirmed);
+        trustService.Trust("dual.example.com", 22, rsaFp, "rsa-sha2-512", HostKeySource.UserConfirmed);
+
+        var verifier = new RecordingGatewayVerifier();
+        var decision = await PlinkHostKeyDecider.DecideAsync(
+            "dual.example.com",
+            22,
+            "ops",
+            plinkPath: "plink.exe",
+            probeTimeoutMs: 5000,
+            storedFingerprint: ed25519Fp,
+            new StubProbe(new PlinkHostKeyPresentation("rsa-sha2-512", rsaFp, null)),
+            verifier,
+            trustService,
+            CancellationToken.None);
+
+        Assert.True(decision.ShouldProceed);
+        Assert.Equal(rsaFp, decision.Fingerprint);
+        Assert.Equal(0, verifier.Calls);
+    }
+
+    [Fact]
+    public async Task DecideAsync_ViaGatewayTunnel_PropagatesIsViaGatewayTrueToVerifier()
+    {
+        var store = new HostKeyStore();
+        var trustService = new HostKeyTrustService(store);
+        const string presentedFp = "SHA256:InternalHostKey123456789012345678901234567";
+
+        var verifier = new RecordingGatewayVerifier();
+        var decision = await PlinkHostKeyDecider.DecideAsync(
+            transportHost: "127.0.0.1",
+            transportPort: 54321,
+            verificationHost: "internal.corp.lan",
+            verificationPort: 22,
+            username: "ops",
+            plinkPath: "plink.exe",
+            probeTimeoutMs: 5000,
+            storedFingerprint: null,
+            new StubProbe(new PlinkHostKeyPresentation("ssh-ed25519", presentedFp, null)),
+            verifier,
+            trustService,
+            CancellationToken.None);
+
+        Assert.True(decision.ShouldProceed);
+        Assert.Equal(1, verifier.Calls);
+        Assert.True(verifier.LastIsViaGateway);
+    }
 }

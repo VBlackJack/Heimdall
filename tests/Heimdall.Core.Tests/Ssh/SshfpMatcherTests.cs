@@ -91,4 +91,51 @@ public sealed class SshfpMatcherTests
         byte[] loopPacket = [0x12, 0x34, 0x81, 0x80, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xC0, 0x0C, 0, 44, 0, 1];
         Assert.False(SshfpMatcher.TryParseSshfpResponse(loopPacket, txId, out _, out _, out _));
     }
+
+    [Fact]
+    public void TryParseSshfpResponse_RejectsMismatchedQuestionAndForeignAnswerOwner_AcceptsCnameChain()
+    {
+        ushort txId = 0x5678;
+        byte[] digest = SHA256.HashData([9, 8, 7, 6]);
+
+        // Mismatched QNAME when expectedHostname is supplied must be rejected.
+        using (var ms = new MemoryStream())
+        {
+            ms.Write([0x56, 0x78, 0x81, 0xA0, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00]);
+            ms.Write([4, (byte)'e', (byte)'v', (byte)'i', (byte)'l', 3, (byte)'c', (byte)'o', (byte)'m', 0, 0, 44, 0, 1]);
+            ms.Write([0xC0, 0x0C, 0, 44, 0, 1, 0, 0, 1, 44, 0, 34, 4, 2]);
+            ms.Write(digest);
+            Assert.False(SshfpMatcher.TryParseSshfpResponse(ms.ToArray(), txId, "srv.example.com", out _, out _, out _));
+        }
+
+        // Foreign Answer RR owner name (not matching question or CNAME) must be ignored.
+        using (var ms = new MemoryStream())
+        {
+            ms.Write([0x56, 0x78, 0x81, 0xA0, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00]);
+            ms.Write([3, (byte)'s', (byte)'r', (byte)'v', 7, (byte)'e', (byte)'x', (byte)'a', (byte)'m', (byte)'p', (byte)'l', (byte)'e', 3, (byte)'c', (byte)'o', (byte)'m', 0, 0, 44, 0, 1]);
+            ms.Write([5, (byte)'o', (byte)'t', (byte)'h', (byte)'e', (byte)'r', 3, (byte)'c', (byte)'o', (byte)'m', 0, 0, 44, 0, 1, 0, 0, 1, 44, 0, 34, 4, 2]);
+            ms.Write(digest);
+            Assert.True(SshfpMatcher.TryParseSshfpResponse(ms.ToArray(), txId, "srv.example.com", out var records, out _, out _));
+            Assert.Empty(records);
+        }
+
+        // Valid CNAME -> SSHFP chain must be accepted.
+        using (var ms = new MemoryStream())
+        {
+            ms.Write([0x56, 0x78, 0x81, 0xA0, 0x00, 0x01, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00]);
+            // Question: alias.example.com
+            ms.Write([5, (byte)'a', (byte)'l', (byte)'i', (byte)'a', (byte)'s', 7, (byte)'e', (byte)'x', (byte)'a', (byte)'m', (byte)'p', (byte)'l', (byte)'e', 3, (byte)'c', (byte)'o', (byte)'m', 0, 0, 44, 0, 1]);
+            // Answer 1: CNAME alias.example.com -> real.example.com
+            byte[] targetName = [4, (byte)'r', (byte)'e', (byte)'a', (byte)'l', 7, (byte)'e', (byte)'x', (byte)'a', (byte)'m', (byte)'p', (byte)'l', (byte)'e', 3, (byte)'c', (byte)'o', (byte)'m', 0];
+            ms.Write([0xC0, 0x0C, 0, 5, 0, 1, 0, 0, 1, 44, 0, (byte)targetName.Length]);
+            ms.Write(targetName);
+            // Answer 2: SSHFP for real.example.com
+            ms.Write(targetName);
+            ms.Write([0, 44, 0, 1, 0, 0, 1, 44, 0, 34, 4, 2]);
+            ms.Write(digest);
+            Assert.True(SshfpMatcher.TryParseSshfpResponse(ms.ToArray(), txId, "alias.example.com", out var records, out _, out _));
+            Assert.Single(records);
+            Assert.Equal(Convert.ToHexString(digest), records[0].FingerprintHex);
+        }
+    }
 }

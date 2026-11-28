@@ -7017,5 +7017,15 @@
   "ToolSshAuditFleetClean": "Aucun probl\u00e8me de conformit\u00e9 d\u00e9tect\u00e9 sur votre parc SSH local.",
   "ToolSshAuditFleetError": "\u00c9chec de l'analyse de conformit\u00e9 du parc : {0}",
   "ErrorSshAgentSigningDeclined": "La signature par l'agent SSH a \u00e9t\u00e9 refus\u00e9e par l'utilisateur.",
-  "SshKeyRotateErrOutputExists": "Le fichier de cl\u00e9 de destination existe d\u00e9j\u00e0. Choisissez un nouveau chemin pour ne jamais \u00e9craser une cl\u00e9 existante."
+  "SshKeyRotateErrOutputExists": "Le fichier de cl\u00e9 de destination existe d\u00e9j\u00e0. Choisissez un nouveau chemin pour ne jamais \u00e9craser une cl\u00e9 existante.",
+  "SettingsLabelSshVerifyHostKeyDnsSshfp": "V\u00e9rifier les cl\u00e9s d'h\u00f4te SSH via DNS SSHFP (RFC 4255)",
+  "SettingsSshVerifyHostKeyDnsSshfpHint": "Effectue une v\u00e9rification consultative DNS SSHFP non bloquante lors des invites de cl\u00e9 d'h\u00f4te en connexion directe (toujours ignor\u00e9e derri\u00e8re une passerelle). D\u00e9sactivez sur r\u00e9seau isol\u00e9 ou DNS interne.",
+  "SshKeyRotateAlgoEd25519Recommended": "Ed25519 (recommand\u00e9)",
+  "SshKeyRotateErrInvalidPath": "Le chemin choisi pour la nouvelle cl\u00e9 priv\u00e9e n'est pas valide.",
+  "SshKeyRotateErrNetworkPath": "Un partage r\u00e9seau ou chemin de p\u00e9riph\u00e9rique ne peut pas stocker une nouvelle cl\u00e9 priv\u00e9e SSH.",
+  "SshKeyRotateErrVerifyFailed": "La v\u00e9rification isol\u00e9e de l'authentification avec la nouvelle cl\u00e9 a \u00e9chou\u00e9.",
+  "SshKeyRotateErrProfileSaveFailed": "Le profil de serveur enregistr\u00e9 n'a pas pu \u00eatre mis \u00e0 jour.",
+  "SshKeyRotateErrSymlinkRefused": "Le fichier distant authorized_keys est un lien symbolique et n'a pas \u00e9t\u00e9 modifi\u00e9.",
+  "SshKeyRotateErrInvariantFailed": "\u00c9chec de la garde de s\u00e9curit\u00e9 : la nouvelle cl\u00e9 publique n'a pas \u00e9t\u00e9 confirm\u00e9e dans le fichier temporaire authorized_keys.",
+  "SshKeyRotateErrRemoteExit": "La commande distante de suppression de l'ancienne cl\u00e9 a retourn\u00e9 le code {0}."
 }

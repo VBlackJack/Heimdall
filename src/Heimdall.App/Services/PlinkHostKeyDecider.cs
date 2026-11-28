@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+using System.Security.Cryptography;
+using System.Text;
 using Heimdall.App.Localization;
 using Heimdall.Core.Ssh;
 using Heimdall.Ssh;
@@ -93,6 +95,8 @@ internal static class PlinkHostKeyDecider
         string? normalizedStored = string.IsNullOrWhiteSpace(storedFingerprint)
             ? null
             : storedFingerprint;
+        bool isViaGateway = !string.Equals(transportHost, verificationHost, StringComparison.OrdinalIgnoreCase)
+            || transportPort != verificationPort;
         PlinkHostKeyPresentation? presentation = string.IsNullOrWhiteSpace(plinkPath)
             ? null
             : await probe.ProbeAsync(
@@ -111,6 +115,7 @@ internal static class PlinkHostKeyDecider
                     verificationPort,
                     normalizedStored,
                     presentation,
+                    isViaGateway,
                     verifier,
                     trustService,
                     ct)
@@ -121,6 +126,7 @@ internal static class PlinkHostKeyDecider
                 verificationHost,
                 verificationPort,
                 presentation,
+                isViaGateway,
                 verifier,
                 trustService,
                 ct)
@@ -132,6 +138,7 @@ internal static class PlinkHostKeyDecider
         int port,
         string storedFingerprint,
         PlinkHostKeyPresentation? presentation,
+        bool isViaGateway,
         IHostKeyVerifier verifier,
         IHostKeyTrustService trustService,
         CancellationToken ct)
@@ -161,9 +168,19 @@ internal static class PlinkHostKeyDecider
                 presentation.Fingerprint);
         }
 
-        if (string.Equals(presentation.Fingerprint, storedFingerprint, StringComparison.Ordinal))
+        if (ConstantTimeEquals(presentation.Fingerprint, storedFingerprint))
         {
             return Proceed(storedFingerprint);
+        }
+
+        // Multi-algorithm match: if Heimdall already pinned a key for this host under the exact
+        // algorithm presented by Plink (e.g. ssh-ed25519 vs rsa-sha2-512), accept without a
+        // false-positive MITM mismatch prompt.
+        string? algorithmStored = trustService.GetEntry(host, port, presentation.Algorithm)?.Fingerprint;
+        if (!string.IsNullOrWhiteSpace(algorithmStored)
+            && ConstantTimeEquals(presentation.Fingerprint, algorithmStored))
+        {
+            return Proceed(algorithmStored);
         }
 
         HostKeyDecision decision = await verifier.VerifyAsync(
@@ -172,6 +189,8 @@ internal static class PlinkHostKeyDecider
                 presentation.Algorithm,
                 presentation.Fingerprint,
                 storedFingerprint,
+                ReadOnlyMemory<byte>.Empty,
+                isViaGateway,
                 ct)
             .ConfigureAwait(false);
 
@@ -188,6 +207,7 @@ internal static class PlinkHostKeyDecider
         string host,
         int port,
         PlinkHostKeyPresentation? presentation,
+        bool isViaGateway,
         IHostKeyVerifier verifier,
         IHostKeyTrustService trustService,
         CancellationToken ct)
@@ -216,6 +236,8 @@ internal static class PlinkHostKeyDecider
                 presentation.Algorithm,
                 presentation.Fingerprint,
                 storedFingerprint: null,
+                ReadOnlyMemory<byte>.Empty,
+                isViaGateway,
                 ct)
             .ConfigureAwait(false);
 
@@ -270,6 +292,13 @@ internal static class PlinkHostKeyDecider
                 SshLocalizationKeys.ErrorHostKeyMismatch,
                 storedFingerprint,
                 presentation.Fingerprint);
+    }
+
+    private static bool ConstantTimeEquals(string a, string b)
+    {
+        byte[] aBytes = Encoding.UTF8.GetBytes(a);
+        byte[] bBytes = Encoding.UTF8.GetBytes(b);
+        return CryptographicOperations.FixedTimeEquals(aBytes, bBytes);
     }
 
     private static PlinkHostKeyDecision Proceed(

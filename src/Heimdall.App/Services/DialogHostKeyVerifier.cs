@@ -28,10 +28,12 @@ namespace Heimdall.App.Services;
 /// </summary>
 internal sealed class DialogHostKeyVerifier(
     LocalizationManager localizer,
-    TrustPromptCoordinator coordinator) : IHostKeyVerifier
+    TrustPromptCoordinator coordinator,
+    Func<bool>? isSshfpEnabled = null) : IHostKeyVerifier
 {
     private readonly LocalizationManager _localizer = localizer;
     private readonly TrustPromptCoordinator _coordinator = coordinator;
+    private readonly Func<bool> _isSshfpEnabled = isSshfpEnabled ?? (static () => true);
 
     public Task<HostKeyDecision> VerifyAsync(
         string host,
@@ -184,7 +186,7 @@ internal sealed class DialogHostKeyVerifier(
             storedFingerprint,
             hostKeyBlob,
             isViaGateway,
-            new Heimdall.Ssh.SshfpLookupService());
+            _isSshfpEnabled() ? new Heimdall.Ssh.SshfpLookupService() : null);
         var dialog = new HostKeyPromptDialog(_localizer)
         {
             DataContext = viewModel

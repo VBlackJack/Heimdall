@@ -30,6 +30,7 @@ using Heimdall.Core.Security;
 using Heimdall.Core.Security.Vault;
 using Heimdall.Core.Ssh;
 using Heimdall.Ssh;
+using Heimdall.Ssh.Agents;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Heimdall.App.ViewModels.Dialogs;
@@ -62,7 +63,7 @@ public sealed partial class SshKeyRotationDialogViewModel : ObservableObject
 
         Algorithms =
         [
-            new AlgorithmOption(SshKeyAlgorithm.Ed25519, "Ed25519 (recommended)"),
+            new AlgorithmOption(SshKeyAlgorithm.Ed25519, _localizer["SshKeyRotateAlgoEd25519Recommended"]),
             new AlgorithmOption(SshKeyAlgorithm.EcdsaP256, "ECDSA P-256"),
             new AlgorithmOption(SshKeyAlgorithm.EcdsaP384, "ECDSA P-384"),
             new AlgorithmOption(SshKeyAlgorithm.Rsa4096, "RSA 4096")
@@ -187,11 +188,28 @@ public sealed partial class SshKeyRotationDialogViewModel : ObservableObject
             return;
         }
 
+        if (ImportedPathPolicy.IsNetworkOrDevicePath(privateKeyPath))
+        {
+            ReportError(_localizer["SshKeyRotateErrNetworkPath"]);
+            return;
+        }
+
         string publicKeyPath = privateKeyPath + ".pub";
-        string fullNewPrivatePath = Path.GetFullPath(privateKeyPath);
-        string? fullCurrentKeyPath = string.IsNullOrWhiteSpace(_target.SshKeyPath)
-            ? null
-            : Path.GetFullPath(_target.SshKeyPath);
+        string fullNewPrivatePath;
+        string? fullCurrentKeyPath;
+        try
+        {
+            fullNewPrivatePath = Path.GetFullPath(privateKeyPath);
+            fullCurrentKeyPath = string.IsNullOrWhiteSpace(_target.SshKeyPath)
+                ? null
+                : Path.GetFullPath(_target.SshKeyPath);
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            ReportError(_localizer["SshKeyRotateErrInvalidPath"]);
+            return;
+        }
+
         if (File.Exists(fullNewPrivatePath)
             || File.Exists(publicKeyPath)
             || (fullCurrentKeyPath is not null
@@ -245,7 +263,7 @@ public sealed partial class SshKeyRotationDialogViewModel : ObservableObject
             string? logicalHost = null;
             int? logicalPort = null;
 
-            if (!_target.UseDirectConnection && !string.IsNullOrWhiteSpace(_target.SshGatewayId))
+            if (SshGatewayRoute.GatewayIdFor(_target, _settings.GroupDefaults) is not null)
             {
                 if (tunnelService is null)
                 {
@@ -282,6 +300,48 @@ public sealed partial class SshKeyRotationDialogViewModel : ObservableObject
             AppendStep(_localizer["SshKeyRotateStepDeploy"]);
             var currentPassword = ConnectionHelpers.DecryptPassword(_target.SshPasswordEncrypted);
             var currentPassphrase = ConnectionHelpers.DecryptPassword(_target.SshKeyPassphraseEncrypted);
+            if (string.IsNullOrEmpty(currentPassword))
+            {
+                currentPassword = await SshPublicKeyDeployUiHelper.TryResolveExternalSshPasswordAsync(
+                    _services,
+                    _target,
+                    _settings,
+                    targetPort,
+                    ct).ConfigureAwait(true);
+            }
+
+            if (string.IsNullOrEmpty(currentPassword)
+                && string.IsNullOrWhiteSpace(_target.SshKeyPath)
+                && string.IsNullOrWhiteSpace(_target.SshAgentKeyFingerprint))
+            {
+                bool hasAgentKeys = false;
+                try
+                {
+                    hasAgentKeys = SshAgentRegistry.CreateDefault(_settings.SshAgentPreference)
+                        .Observe().OfferableIdentityCount > 0;
+                }
+                catch (Exception)
+                {
+                    hasAgentKeys = false;
+                }
+
+                if (!hasAgentKeys)
+                {
+                    var endpoint = string.IsNullOrWhiteSpace(_target.SshUsername)
+                        ? _target.RemoteServer
+                        : $"{_target.SshUsername}@{_target.RemoteServer}";
+                    currentPassword = await dialogService.ShowPasswordInputAsync(
+                        _localizer["DialogSshPasswordPromptTitle"],
+                        _localizer.Format("DialogSshPasswordPromptMessage", endpoint),
+                        ct).ConfigureAwait(true);
+                    if (currentPassword is null)
+                    {
+                        ReportError(_localizer["SshKeyRotateCancelled"]);
+                        return;
+                    }
+                }
+            }
+
             var deployParams = new SshConnectionParams
             {
                 Host = connectHost,
@@ -298,6 +358,7 @@ public sealed partial class SshKeyRotationDialogViewModel : ObservableObject
                 UseLegacyPasswordAsKeyPassphrase = _target.UsesLegacySshCredentialMapping,
                 LegacyCredentialName = _target.DisplayName,
                 CryptoPolicy = SshCryptoPolicyResolver.Resolve(_target.SshCryptoPolicy, _settings.SshCryptoPolicy),
+                OnBeforeAgentSign = SshAgentSignConfirmHelper.BuildBeforeSignNotification(_localizer, reportStatus: null),
                 ConfirmAgentSign = SshAgentSignConfirmHelper.BuildConfirmCallback(
                     _settings,
                     _target.RemoteServer,
@@ -346,7 +407,7 @@ public sealed partial class SshKeyRotationDialogViewModel : ObservableObject
 
             if (!verifyResult.Success)
             {
-                ReportError(verifyResult.ErrorMessage ?? "Verification failed.");
+                ReportError(FormatRotationStepError(verifyResult));
                 return;
             }
 
@@ -374,7 +435,7 @@ public sealed partial class SshKeyRotationDialogViewModel : ObservableObject
 
             if (!saved)
             {
-                ReportError("Saved server profile could not be updated.");
+                ReportError(_localizer["SshKeyRotateErrProfileSaveFailed"]);
                 return;
             }
 
@@ -401,7 +462,7 @@ public sealed partial class SshKeyRotationDialogViewModel : ObservableObject
                     StatusMessage = string.Format(
                         CultureInfo.CurrentCulture,
                         _localizer["SshKeyRotatePartialSuccess"],
-                        removeResult.ErrorMessage ?? string.Empty);
+                        FormatRotationStepError(removeResult));
                     return;
                 }
             }
@@ -467,6 +528,18 @@ public sealed partial class SshKeyRotationDialogViewModel : ObservableObject
             _localizer["SshKeyRotateFailed"],
             error);
     }
+
+    private string FormatRotationStepError(SshKeyRotationStepResult result) => result.ErrorCode switch
+    {
+        SshKeyRotationErrorCode.SymlinkRefused => _localizer["SshKeyRotateErrSymlinkRefused"],
+        SshKeyRotationErrorCode.InvariantFailed => _localizer["SshKeyRotateErrInvariantFailed"],
+        SshKeyRotationErrorCode.VerificationFailed => _localizer["SshKeyRotateErrVerifyFailed"],
+        SshKeyRotationErrorCode.RemoteCommandFailed when result.ExitStatus is { } exitCode =>
+            string.Format(CultureInfo.CurrentCulture, _localizer["SshKeyRotateErrRemoteExit"], exitCode),
+        _ => string.IsNullOrWhiteSpace(result.ErrorMessage)
+            ? _localizer["SshKeyRotateErrVerifyFailed"]
+            : result.ErrorMessage
+    };
 
     private static string? TryReadOldPublicKeyLine(string? privateKeyPath)
     {
