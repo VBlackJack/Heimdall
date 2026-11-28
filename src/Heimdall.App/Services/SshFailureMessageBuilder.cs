@@ -50,6 +50,16 @@ internal static class SshFailureMessageBuilder
         return localizer.Format(SshLocalizationKeys.ErrorSshHostKeyRejected, host, port);
     }
 
+    public static string HostKeyRevoked(LocalizationManager localizer)
+    {
+        return localizer[SshLocalizationKeys.ErrorSshHostKeyRevoked];
+    }
+
+    public static string HostCertificateInvalid(LocalizationManager localizer)
+    {
+        return localizer[SshLocalizationKeys.ErrorSshHostCertificateInvalid];
+    }
+
     public static string Cancelled(LocalizationManager localizer)
     {
         string message = localizer[SshLocalizationKeys.ErrorSshCancelled];

@@ -25,13 +25,21 @@ namespace Heimdall.Core.Ssh;
 public sealed class PinnedFingerprintVerifier(
     string host,
     int port,
-    string fingerprint) : IHostKeyVerifier
+    string fingerprint,
+    byte[]? hostKeyBlob = null) : IHostKeyVerifier
 {
     public string Host { get; } = host ?? throw new ArgumentNullException(nameof(host));
 
     public int Port { get; } = port;
 
     public string Fingerprint { get; } = fingerprint ?? throw new ArgumentNullException(nameof(fingerprint));
+
+    /// <summary>
+    /// Optional raw SSH wire-format host key or certificate blob captured when this pin was created.
+    /// Used by companion sessions (such as SFTP) to re-validate certificate expiration and revocation
+    /// before reusing a pre-resolved pin.
+    /// </summary>
+    public byte[]? HostKeyBlob { get; } = hostKeyBlob is { Length: > 0 } ? hostKeyBlob.ToArray() : null;
 
     public bool Matches(string host, int port, string fingerprint)
     {

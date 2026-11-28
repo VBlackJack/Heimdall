@@ -119,6 +119,8 @@
   "ErrorSshAgentKeyPlinkKeyType": "La cl\u00e9 d'agent choisie pour cette session ({0}) est d'un type auquel Plink ne peut pas \u00eatre limit\u00e9, et cette connexion passe par Plink. D\u00e9sactivez le transfert d'agent, ou choisissez une autre cl\u00e9.",
   "ErrorSshAgentKeyPlinkNotBundled": "Cette session d\u00e9signe une cl\u00e9 d'agent, et le programme Plink utilis\u00e9 n'est pas celui fourni avec Heimdall : rien ne garantit qu'il ne propose que cette cl\u00e9. Utilisez le Plink fourni, ou retirez le choix de cl\u00e9 d'agent.",
   "ErrorSshHostKeyMismatch": "La cl\u00e9 d'h\u00f4te du serveur a chang\u00e9. Ceci pourrait indiquer un probl\u00e8me de s\u00e9curit\u00e9. V\u00e9rifiez avec votre administrateur.",
+  "ErrorSshHostKeyRevoked": "La cl\u00e9 d'h\u00f4te du serveur est explicitement r\u00e9voqu\u00e9e par votre politique @revoked. La connexion a \u00e9t\u00e9 bloqu\u00e9e.",
+  "ErrorSshHostCertificateInvalid": "Le certificat d'h\u00f4te pr\u00e9sent\u00e9 par le serveur est invalide, expir\u00e9 ou ne correspond pas au nom d'h\u00f4te pour une autorit\u00e9 de certification approuv\u00e9e. La connexion a \u00e9t\u00e9 bloqu\u00e9e.",
   "ErrorSshHostKeyUnavailable": "Heimdall n'a pas pu v\u00e9rifier la cl\u00e9 du serveur passerelle. Le repli sur le cache local de plink est refus\u00e9.",
   "ErrorSshNetworkUnreachable": "H\u00f4te ou r\u00e9seau inaccessible. V\u00e9rifiez le DNS et le routage.",
   "ErrorSshPortInUse": "Le port local est d\u00e9j\u00e0 utilis\u00e9. Fermez l'application en conflit ou choisissez un autre port.",

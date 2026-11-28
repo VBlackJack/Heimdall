@@ -138,9 +138,27 @@ internal static class PlinkHostKeyDecider
     {
         if (presentation is null)
         {
+            if (trustService.IsRevoked(host, port, storedFingerprint))
+            {
+                return Reject(
+                    SshFailureCode.HostKeyRevoked,
+                    SshLocalizationKeys.ErrorSshHostKeyRevoked,
+                    storedFingerprint,
+                    storedFingerprint);
+            }
+
             Core.Logging.FileLogger.Warn(
                 $"Plink host-key probe returned no presentation for {host}:{port}; proceeding with stored Heimdall fingerprint.");
             return Proceed(storedFingerprint);
+        }
+
+        if (trustService.IsRevoked(host, port, presentation.Fingerprint))
+        {
+            return Reject(
+                SshFailureCode.HostKeyRevoked,
+                SshLocalizationKeys.ErrorSshHostKeyRevoked,
+                storedFingerprint,
+                presentation.Fingerprint);
         }
 
         if (string.Equals(presentation.Fingerprint, storedFingerprint, StringComparison.Ordinal))
@@ -181,6 +199,15 @@ internal static class PlinkHostKeyDecider
                 SshLocalizationKeys.ErrorSshHostKeyUnavailable,
                 null,
                 null);
+        }
+
+        if (trustService.IsRevoked(host, port, presentation.Fingerprint))
+        {
+            return Reject(
+                SshFailureCode.HostKeyRevoked,
+                SshLocalizationKeys.ErrorSshHostKeyRevoked,
+                null,
+                presentation.Fingerprint);
         }
 
         HostKeyDecision decision = await verifier.VerifyAsync(

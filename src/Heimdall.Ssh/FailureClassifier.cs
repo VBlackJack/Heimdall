@@ -240,9 +240,17 @@ public static class FailureClassifier
 
     private static SshFailureInfo ClassifyHostKeyRejected(HostKeyRejectedException ex)
     {
-        return ex.IsMismatch
-            ? new SshFailureInfo(SshFailureCode.HostKeyMismatch, ex.Message, true, ex)
-            : new SshFailureInfo(SshFailureCode.Cancelled, "Connection was cancelled.", false, ex);
+        return ex.Reason switch
+        {
+            HostKeyRejectionReason.Revoked =>
+                new SshFailureInfo(SshFailureCode.HostKeyRevoked, ex.Message, true, ex),
+            HostKeyRejectionReason.CertificateInvalid =>
+                new SshFailureInfo(SshFailureCode.HostCertificateInvalid, ex.Message, true, ex),
+            HostKeyRejectionReason.Mismatch =>
+                new SshFailureInfo(SshFailureCode.HostKeyMismatch, ex.Message, true, ex),
+            _ =>
+                new SshFailureInfo(SshFailureCode.Cancelled, "Connection was cancelled.", false, ex)
+        };
     }
 
     private static SshFailureInfo ClassifySshException(

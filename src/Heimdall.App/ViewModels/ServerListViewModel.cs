@@ -1205,7 +1205,10 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
             return;
         }
 
-        if (parsed.Entries.Count == 0 && parsed.Diagnostics.Count == 0)
+        if (parsed.Entries.Count == 0
+            && parsed.Diagnostics.Count == 0
+            && (parsed.PolicyEntries?.CertAuthorities.Count ?? 0) == 0
+            && (parsed.PolicyEntries?.RevokedKeys.Count ?? 0) == 0)
         {
             _dialogService.ShowInfo(
                 _localizer["DialogTitleImportKnownHosts"],

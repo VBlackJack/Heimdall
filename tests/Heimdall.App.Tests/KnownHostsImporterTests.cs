@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.IO;
 using Heimdall.App.Services.Import;
 using Heimdall.Core.Ssh;
 using Heimdall.Ssh;
@@ -198,6 +199,48 @@ public sealed class KnownHostsImporterTests
         Assert.Equal(1, outcome.SkippedConflict);
         Assert.Equal(storedFingerprint, new HostKeyTrustService(store).GetEntry("host", 22)?.Fingerprint);
         Assert.False((await config.LoadSettingsAsync()).TrustedHostKeys.ContainsKey("host:22"));
+    }
+
+    [Fact]
+    public async Task ParseFileAsync_DoesNotMutateTrustPolicies_UntilConfirmedImport()
+    {
+        var importer = CreateImporter(out var config, out var store);
+        var keyBytes = Enumerable.Range(1, 32).Select(i => (byte)i).ToArray();
+        var keyBase64 = Convert.ToBase64String(keyBytes);
+        var tempFile = Path.Combine(Path.GetTempPath(), $"heimdall-kh-policy-{Guid.NewGuid():N}");
+        await File.WriteAllTextAsync(
+            tempFile,
+            $"@cert-authority *.corp.example ssh-ed25519 {keyBase64}\n" +
+            $"@revoked bad.corp.example ssh-ed25519 {keyBase64}\n");
+
+        try
+        {
+            var parsed = await importer.ParseFileAsync(tempFile);
+            var preview = await importer.BuildPreviewAsync(parsed);
+
+            // Preview MUST NOT mutate the live trust store or persisted settings.
+            Assert.Empty(store.GetCertAuthorities());
+            Assert.Empty(store.GetRevokedKeys());
+            Assert.NotNull(preview.PolicyEntries);
+            Assert.Single(preview.PolicyEntries!.CertAuthorities);
+            Assert.Single(preview.PolicyEntries.RevokedKeys);
+
+            // Confirming import applies and persists the policies.
+            await importer.ImportSelectedAsync([], preview.PolicyEntries);
+
+            Assert.Single(store.GetCertAuthorities());
+            Assert.Single(store.GetRevokedKeys());
+            var saved = await config.LoadSettingsAsync();
+            Assert.Single(saved.TrustedCertAuthorities);
+            Assert.Single(saved.RevokedHostKeys);
+        }
+        finally
+        {
+            if (File.Exists(tempFile))
+            {
+                File.Delete(tempFile);
+            }
+        }
     }
 
     private static string CreateHashedHost(string host, byte[] salt)

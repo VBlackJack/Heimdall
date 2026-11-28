@@ -150,5 +150,18 @@ public enum SshFailureCode
     /// The session names one agent key and no reachable agent holds it. Appended last so that
     /// the values of the existing codes do not move.
     /// </summary>
-    AgentKeyNotLoaded
+    AgentKeyNotLoaded,
+
+    /// <summary>
+    /// The host key or certificate presented by the server is explicitly revoked by a local
+    /// <c>@revoked</c> policy. Appended last so that the values of the existing codes do not move.
+    /// </summary>
+    HostKeyRevoked,
+
+    /// <summary>
+    /// The server presented an OpenSSH host certificate signed by a trusted CA that failed
+    /// validation (expired, wrong principal, invalid signature, or unsupported critical options).
+    /// Appended last so that the values of the existing codes do not move.
+    /// </summary>
+    HostCertificateInvalid
 }

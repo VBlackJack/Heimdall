@@ -31,6 +31,13 @@ public sealed record KnownHostsRevokedEntry(
     string Fingerprint,
     int SourceLineNumber);
 
+/// <summary>
+/// Persisted representation of an OpenSSH <c>@cert-authority</c> or <c>@revoked</c> rule.
+/// </summary>
+public sealed record KnownHostsPolicyRuleDto(
+    string HostPatterns,
+    string Fingerprint);
+
 /// <summary>Certificate authority and revocation rules extracted from <c>known_hosts</c>.</summary>
 public sealed record KnownHostsPolicyEntries(
     IReadOnlyList<KnownHostsCertAuthorityEntry> CertAuthorities,

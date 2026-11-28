@@ -75,7 +75,8 @@ public sealed record OpenSshCertificateInfo(
 
     /// <summary>
     /// Returns true when <paramref name="principal"/> is allowed by <see cref="ValidPrincipals"/>.
-    /// Per OpenSSH PROTOCOL.certkeys, an empty principals list acts as a wildcard matching any principal.
+    /// Per OpenSSH PROTOCOL.certkeys, principals are matched literally (case-insensitive for DNS hostnames),
+    /// and an empty principals list acts as a wildcard matching any principal.
     /// </summary>
     public bool MatchesPrincipal(string principal)
     {
@@ -91,7 +92,7 @@ public sealed record OpenSshCertificateInfo(
 
         foreach (var candidate in ValidPrincipals)
         {
-            if (OpenSshHostPatternMatcher.MatchesWildcard(candidate, principal))
+            if (string.Equals(candidate, principal, StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }
@@ -476,11 +477,15 @@ public static class OpenSshHostPatternMatcher
                 continue;
             }
 
-            var tokenMatches = pattern.StartsWith('[')
-                ? MatchesWildcard(pattern, candidateWithPort)
-                : port == 22
-                    ? MatchesWildcard(pattern, candidateDefault) || MatchesWildcard(pattern, candidateWithPort)
-                    : string.Equals(pattern, "*", StringComparison.Ordinal);
+            var tokenMatches = KnownHostsHash.IsHashedToken(pattern)
+                ? (port == 22
+                    ? KnownHostsHash.TryMatches(pattern, candidateDefault) || KnownHostsHash.TryMatches(pattern, candidateWithPort)
+                    : KnownHostsHash.TryMatches(pattern, candidateWithPort))
+                : pattern.StartsWith('[')
+                    ? MatchesWildcard(pattern, candidateWithPort)
+                    : port == 22
+                        ? MatchesWildcard(pattern, candidateDefault) || MatchesWildcard(pattern, candidateWithPort)
+                        : string.Equals(pattern, "*", StringComparison.Ordinal);
 
             if (tokenMatches)
             {

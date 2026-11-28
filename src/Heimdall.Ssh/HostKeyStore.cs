@@ -50,6 +50,11 @@ public sealed class HostKeyStore
     public event Action<string>? KeyRemoved;
 
     /// <summary>
+    /// Raised when <c>@cert-authority</c> or <c>@revoked</c> policy rules change via user action or import.
+    /// </summary>
+    public event Action? PolicyChanged;
+
+    /// <summary>
     /// Compare two fingerprint strings without leaking the position of any
     /// differing byte through timing variations. Inputs are OpenSSH-style
     /// fingerprints (<c>SHA256:&lt;base64&gt;</c>) and so are ASCII in practice;
@@ -393,12 +398,70 @@ public sealed class HostKeyStore
         }
     }
 
+    /// <summary>Loads persisted <c>@cert-authority</c> and <c>@revoked</c> rules at startup without emitting <see cref="PolicyChanged"/>.</summary>
+    public void LoadPoliciesFromConfig(
+        IEnumerable<KnownHostsPolicyRuleDto>? certAuthorities,
+        IEnumerable<KnownHostsPolicyRuleDto>? revokedKeys)
+    {
+        if (certAuthorities is not null)
+        {
+            foreach (var rule in certAuthorities)
+            {
+                if (!string.IsNullOrWhiteSpace(rule.HostPatterns)
+                    && !string.IsNullOrWhiteSpace(rule.Fingerprint))
+                {
+                    var patterns = rule.HostPatterns.Trim();
+                    var fp = rule.Fingerprint.Trim();
+                    _certAuthorities[$"{patterns}|{fp}"] = (patterns, fp);
+                }
+            }
+        }
+
+        if (revokedKeys is not null)
+        {
+            foreach (var rule in revokedKeys)
+            {
+                if (!string.IsNullOrWhiteSpace(rule.HostPatterns)
+                    && !string.IsNullOrWhiteSpace(rule.Fingerprint))
+                {
+                    var patterns = rule.HostPatterns.Trim();
+                    var fp = rule.Fingerprint.Trim();
+                    _revokedKeys[$"{patterns}|{fp}"] = (patterns, fp);
+                }
+            }
+        }
+    }
+
     /// <summary>Registers a trusted OpenSSH <c>@cert-authority</c> rule.</summary>
     public void AddCertAuthority(string hostPatterns, string caFingerprint)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(hostPatterns);
         ArgumentException.ThrowIfNullOrWhiteSpace(caFingerprint);
-        _certAuthorities[$"{hostPatterns}|{caFingerprint}"] = (hostPatterns, caFingerprint);
+        var patterns = hostPatterns.Trim();
+        var fp = caFingerprint.Trim();
+        var key = $"{patterns}|{fp}";
+        if (_certAuthorities.TryAdd(key, (patterns, fp)))
+        {
+            PolicyChanged?.Invoke();
+        }
+    }
+
+    /// <summary>Removes a trusted OpenSSH <c>@cert-authority</c> rule.</summary>
+    public bool RemoveCertAuthority(string hostPatterns, string caFingerprint)
+    {
+        if (string.IsNullOrWhiteSpace(hostPatterns) || string.IsNullOrWhiteSpace(caFingerprint))
+        {
+            return false;
+        }
+
+        var key = $"{hostPatterns.Trim()}|{caFingerprint.Trim()}";
+        if (_certAuthorities.TryRemove(key, out _))
+        {
+            PolicyChanged?.Invoke();
+            return true;
+        }
+
+        return false;
     }
 
     /// <summary>Registers an OpenSSH <c>@revoked</c> host key or CA rule.</summary>
@@ -406,21 +469,65 @@ public sealed class HostKeyStore
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(hostPatterns);
         ArgumentException.ThrowIfNullOrWhiteSpace(fingerprint);
-        _revokedKeys[$"{hostPatterns}|{fingerprint}"] = (hostPatterns, fingerprint);
+        var patterns = hostPatterns.Trim();
+        var fp = fingerprint.Trim();
+        var key = $"{patterns}|{fp}";
+        if (_revokedKeys.TryAdd(key, (patterns, fp)))
+        {
+            PolicyChanged?.Invoke();
+        }
+    }
+
+    /// <summary>Removes an OpenSSH <c>@revoked</c> host key or CA rule.</summary>
+    public bool RemoveRevokedKey(string hostPatterns, string fingerprint)
+    {
+        if (string.IsNullOrWhiteSpace(hostPatterns) || string.IsNullOrWhiteSpace(fingerprint))
+        {
+            return false;
+        }
+
+        var key = $"{hostPatterns.Trim()}|{fingerprint.Trim()}";
+        if (_revokedKeys.TryRemove(key, out _))
+        {
+            PolicyChanged?.Invoke();
+            return true;
+        }
+
+        return false;
     }
 
     /// <summary>Loads <c>@cert-authority</c> and <c>@revoked</c> rules from an OpenSSH <c>known_hosts</c> document.</summary>
     public KnownHostsPolicyEntries LoadPolicyFromKnownHosts(string knownHostsContent)
+        => LoadPolicyFromKnownHosts(knownHostsContent, raiseEvent: true);
+
+    /// <summary>Loads <c>@cert-authority</c> and <c>@revoked</c> rules from an OpenSSH <c>known_hosts</c> document.</summary>
+    public KnownHostsPolicyEntries LoadPolicyFromKnownHosts(string knownHostsContent, bool raiseEvent)
     {
         var policy = KnownHostsParser.ParsePolicyEntries(knownHostsContent);
+        var changed = false;
         foreach (var ca in policy.CertAuthorities)
         {
-            AddCertAuthority(ca.HostPatterns, ca.CaFingerprint);
+            var patterns = ca.HostPatterns.Trim();
+            var fp = ca.CaFingerprint.Trim();
+            if (_certAuthorities.TryAdd($"{patterns}|{fp}", (patterns, fp)))
+            {
+                changed = true;
+            }
         }
 
         foreach (var revoked in policy.RevokedKeys)
         {
-            AddRevokedKey(revoked.HostPatterns, revoked.Fingerprint);
+            var patterns = revoked.HostPatterns.Trim();
+            var fp = revoked.Fingerprint.Trim();
+            if (_revokedKeys.TryAdd($"{patterns}|{fp}", (patterns, fp)))
+            {
+                changed = true;
+            }
+        }
+
+        if (changed && raiseEvent)
+        {
+            PolicyChanged?.Invoke();
         }
 
         return policy;

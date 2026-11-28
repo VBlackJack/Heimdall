@@ -71,6 +71,8 @@ internal static class SshLocalizationKeys
     /// <summary>A connection started without a password (Kerberos or a Pageant key) did not sign in.</summary>
     public const string ErrorSshPasswordlessSignInFailed = "ErrorSshPasswordlessSignInFailed";
     public const string ErrorSshHostKeyRejected = "ErrorSshHostKeyRejected";
+    public const string ErrorSshHostKeyRevoked = "ErrorSshHostKeyRevoked";
+    public const string ErrorSshHostCertificateInvalid = "ErrorSshHostCertificateInvalid";
 
     /// <summary>Title of the password prompt the SFTP handler raises after a refused connection.</summary>
     public const string DialogSftpPasswordPromptTitle = "DialogSftpPasswordPromptTitle";

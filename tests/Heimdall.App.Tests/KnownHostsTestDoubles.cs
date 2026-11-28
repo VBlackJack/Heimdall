@@ -112,7 +112,9 @@ internal sealed class InMemoryConfigManager : IConfigManager
         return new AppSettings
         {
             TrustedHostKeys = new Dictionary<string, string>(settings.TrustedHostKeys, StringComparer.Ordinal),
-            TrustedHostKeysV2 = new Dictionary<string, HostKeyEntry>(settings.TrustedHostKeysV2, StringComparer.Ordinal)
+            TrustedHostKeysV2 = new Dictionary<string, HostKeyEntry>(settings.TrustedHostKeysV2, StringComparer.Ordinal),
+            TrustedCertAuthorities = new List<KnownHostsPolicyRuleDto>(settings.TrustedCertAuthorities),
+            RevokedHostKeys = new List<KnownHostsPolicyRuleDto>(settings.RevokedHostKeys)
         };
     }
 }

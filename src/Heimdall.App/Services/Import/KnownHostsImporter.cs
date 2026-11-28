@@ -48,10 +48,10 @@ public sealed class KnownHostsImporter
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
 
-        return await Task.Run(() => ParseFileStreaming(filePath, _hostKeyTrustService), ct).ConfigureAwait(false);
+        return await Task.Run(() => ParseFileStreaming(filePath), ct).ConfigureAwait(false);
     }
 
-    private static KnownHostsParseResult ParseFileStreaming(string filePath, IHostKeyTrustService trustService)
+    private static KnownHostsParseResult ParseFileStreaming(string filePath)
     {
         try
         {
@@ -76,8 +76,9 @@ public sealed class KnownHostsImporter
             using var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
             using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
             var content = reader.ReadToEnd();
-            trustService.LoadPolicyFromKnownHosts(content);
-            return KnownHostsParser.Parse(content);
+            var parsed = KnownHostsParser.Parse(content);
+            var policyEntries = KnownHostsParser.ParsePolicyEntries(content);
+            return parsed with { PolicyEntries = policyEntries };
         }
         catch (IOException ex)
         {
@@ -189,11 +190,17 @@ public sealed class KnownHostsImporter
             }
         }
 
-        return new KnownHostsImportPreview(rows, diagnostics);
+        return new KnownHostsImportPreview(rows, diagnostics, parseResult.PolicyEntries);
     }
+
+    public Task<KnownHostsImportOutcome> ImportSelectedAsync(
+        IReadOnlyList<KnownHostsImportCandidate> selected,
+        CancellationToken ct = default)
+        => ImportSelectedAsync(selected, policyEntries: null, ct);
 
     public async Task<KnownHostsImportOutcome> ImportSelectedAsync(
         IReadOnlyList<KnownHostsImportCandidate> selected,
+        KnownHostsPolicyEntries? policyEntries,
         CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(selected);
@@ -294,6 +301,33 @@ public sealed class KnownHostsImporter
             }
         }
 
+        if (policyEntries is not null
+            && (policyEntries.CertAuthorities.Count > 0 || policyEntries.RevokedKeys.Count > 0))
+        {
+            foreach (var ca in policyEntries.CertAuthorities)
+            {
+                _hostKeyTrustService.AddCertAuthority(ca.HostPatterns, ca.CaFingerprint);
+            }
+
+            foreach (var revoked in policyEntries.RevokedKeys)
+            {
+                _hostKeyTrustService.AddRevokedKey(revoked.HostPatterns, revoked.Fingerprint);
+            }
+
+            var caRules = _hostKeyTrustService.GetCertAuthorities()
+                .Select(static r => new KnownHostsPolicyRuleDto(r.HostPatterns, r.Fingerprint))
+                .ToList();
+            var revokedRules = _hostKeyTrustService.GetRevokedKeys()
+                .Select(static r => new KnownHostsPolicyRuleDto(r.HostPatterns, r.Fingerprint))
+                .ToList();
+
+            await _config.MergeSettingAsync(s =>
+            {
+                s.TrustedCertAuthorities = caRules;
+                s.RevokedHostKeys = revokedRules;
+            }).ConfigureAwait(false);
+        }
+
         return new KnownHostsImportOutcome(imported, skippedExisting, skippedConflict);
     }
 
@@ -330,7 +364,8 @@ public sealed record KnownHostsPreviewRow(
 
 public sealed record KnownHostsImportPreview(
     IReadOnlyList<KnownHostsPreviewRow> Rows,
-    IReadOnlyList<KnownHostsImportDiagnostic> Diagnostics);
+    IReadOnlyList<KnownHostsImportDiagnostic> Diagnostics,
+    KnownHostsPolicyEntries? PolicyEntries = null);
 
 public sealed record KnownHostsImportOutcome(
     int Imported,

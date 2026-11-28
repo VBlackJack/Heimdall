@@ -147,6 +147,27 @@ public sealed class HostKeyPersistenceCoalescerTests
         Assert.Equal("SHA256:late", (await config.LoadSettingsAsync()).TrustedHostKeys["late:22"]);
     }
 
+    [Fact]
+    public async Task UpdatePolicies_PersistsCertAuthoritiesAndRevokedKeysInBatch()
+    {
+        CountingConfigManager config = new();
+        FakeTimeProvider clock = new();
+        using HostKeyPersistenceCoalescer coalescer = new(config, clock, QuietWindow);
+
+        coalescer.UpdatePolicies(
+            [("*.corp.example", "SHA256:caFp1")],
+            [("compromised.example", "SHA256:revokedFp1")]);
+        await coalescer.FlushAsync();
+
+        var settings = await config.LoadSettingsAsync();
+        Assert.Single(settings.TrustedCertAuthorities);
+        Assert.Equal("*.corp.example", settings.TrustedCertAuthorities[0].HostPatterns);
+        Assert.Equal("SHA256:caFp1", settings.TrustedCertAuthorities[0].Fingerprint);
+        Assert.Single(settings.RevokedHostKeys);
+        Assert.Equal("compromised.example", settings.RevokedHostKeys[0].HostPatterns);
+        Assert.Equal("SHA256:revokedFp1", settings.RevokedHostKeys[0].Fingerprint);
+    }
+
     private static HostKeyEntry Entry(string fingerprint) =>
         new(fingerprint, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "ssh-ed25519", HostKeySource.ImportedKnownHosts);
 

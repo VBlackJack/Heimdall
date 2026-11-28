@@ -573,6 +573,12 @@ public sealed class AppSettings
     // Key: "host:port" or "[ipv6]:port"; Value: fingerprint + provenance.
     public Dictionary<string, HostKeyEntry> TrustedHostKeysV2 { get; set; } = new();
 
+    // Persisted OpenSSH @cert-authority rules (host patterns + CA SHA256 fingerprint).
+    public List<KnownHostsPolicyRuleDto> TrustedCertAuthorities { get; set; } = new();
+
+    // Persisted OpenSSH @revoked rules (host patterns + revoked key/CA SHA256 fingerprint).
+    public List<KnownHostsPolicyRuleDto> RevokedHostKeys { get; set; } = new();
+
     // FTPS certificate trust store with metadata.
     // Key: "host:port" or "[ipv6]:port"; Value: certificate fingerprint + provenance.
     public Dictionary<string, FtpsCertificateEntry> TrustedFtpsCertificates { get; set; } = new();

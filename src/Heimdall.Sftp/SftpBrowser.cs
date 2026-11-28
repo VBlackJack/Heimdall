@@ -489,6 +489,20 @@ public sealed class SftpBrowser : IRemoteBrowser, IRemoteNoClobberPublisher, IRe
             && !string.IsNullOrEmpty(preResolved.Fingerprint)
             && !hostKeyStore.IsRevoked(verifyHost, verifyPort, preResolved.Fingerprint))
         {
+            if (preResolved.HostKeyBlob is { Length: > 0 } certBlob
+                && OpenSshCertificateParser.TryParseBlob(certBlob, out _))
+            {
+                var certStatus = OpenSshCertificateVerifier.VerifyHostCertificate(
+                    certBlob,
+                    verifyHost,
+                    verifyPort,
+                    hostKeyStore);
+                if (certStatus != HostCertificateVerificationStatus.TrustedByCertAuthority)
+                {
+                    return null;
+                }
+            }
+
             return preResolved;
         }
 

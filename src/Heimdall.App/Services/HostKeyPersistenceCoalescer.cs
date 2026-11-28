@@ -38,6 +38,7 @@ public sealed class HostKeyPersistenceCoalescer : IDisposable, IAsyncDisposable
     private readonly TimeSpan _quietWindow;
     private readonly object _gate = new();
     private readonly Dictionary<string, PendingChange> _pending = new(StringComparer.Ordinal);
+    private PendingPolicySnapshot? _pendingPolicies;
     private ITimer? _timer;
     private Task _flush = Task.CompletedTask;
     private bool _disposed;
@@ -87,11 +88,34 @@ public sealed class HostKeyPersistenceCoalescer : IDisposable, IAsyncDisposable
         Enqueue(key, new PendingChange(Entry: null, Fingerprint: null, Remove: true));
     }
 
+    /// <summary>Records an updated snapshot of <c>@cert-authority</c> and <c>@revoked</c> rules to persist.</summary>
+    public void UpdatePolicies(
+        IReadOnlyList<(string HostPatterns, string Fingerprint)> certAuthorities,
+        IReadOnlyList<(string HostPatterns, string Fingerprint)> revokedKeys)
+    {
+        ArgumentNullException.ThrowIfNull(certAuthorities);
+        ArgumentNullException.ThrowIfNull(revokedKeys);
+
+        var caList = certAuthorities
+            .Select(static r => new KnownHostsPolicyRuleDto(r.HostPatterns, r.Fingerprint))
+            .ToList();
+        var revokedList = revokedKeys
+            .Select(static r => new KnownHostsPolicyRuleDto(r.HostPatterns, r.Fingerprint))
+            .ToList();
+
+        lock (_gate)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            _pendingPolicies = new PendingPolicySnapshot(caList, revokedList);
+            ArmTimerLocked();
+        }
+    }
+
     /// <summary>Writes whatever is pending now instead of waiting for the quiet window.</summary>
     public Task FlushAsync()
     {
-        Dictionary<string, PendingChange>? batch = TakeBatch();
-        return batch is null ? LastFlush : WriteAsync(batch);
+        var (batch, policies) = TakeBatch();
+        return batch is null && policies is null ? LastFlush : WriteAsync(batch, policies);
     }
 
     /// <summary>
@@ -134,56 +158,67 @@ public sealed class HostKeyPersistenceCoalescer : IDisposable, IAsyncDisposable
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
             _pending[key] = change;
-            if (_timer is null)
-            {
-                _timer = _timeProvider.CreateTimer(_ => OnQuietWindowElapsed(), null, _quietWindow, Timeout.InfiniteTimeSpan);
-            }
-            else
-            {
-                _timer.Change(_quietWindow, Timeout.InfiniteTimeSpan);
-            }
+            ArmTimerLocked();
+        }
+    }
+
+    private void ArmTimerLocked()
+    {
+        if (_timer is null)
+        {
+            _timer = _timeProvider.CreateTimer(_ => OnQuietWindowElapsed(), null, _quietWindow, Timeout.InfiniteTimeSpan);
+        }
+        else
+        {
+            _timer.Change(_quietWindow, Timeout.InfiniteTimeSpan);
         }
     }
 
     private void OnQuietWindowElapsed()
     {
-        Dictionary<string, PendingChange>? batch = TakeBatch();
-        if (batch is not null)
+        var (batch, policies) = TakeBatch();
+        if (batch is not null || policies is not null)
         {
-            _ = WriteAsync(batch);
+            _ = WriteAsync(batch, policies);
         }
     }
 
-    private Dictionary<string, PendingChange>? TakeBatch()
+    private (Dictionary<string, PendingChange>? Batch, PendingPolicySnapshot? Policies) TakeBatch()
     {
         lock (_gate)
         {
-            if (_pending.Count == 0)
+            Dictionary<string, PendingChange>? batch = null;
+            if (_pending.Count > 0)
             {
-                return null;
+                batch = new Dictionary<string, PendingChange>(_pending, StringComparer.Ordinal);
+                _pending.Clear();
             }
 
-            Dictionary<string, PendingChange> batch = new(_pending, StringComparer.Ordinal);
-            _pending.Clear();
-            return batch;
+            PendingPolicySnapshot? policies = _pendingPolicies;
+            _pendingPolicies = null;
+
+            return (batch, policies);
         }
     }
 
-    private Task WriteAsync(Dictionary<string, PendingChange> batch)
+    private Task WriteAsync(Dictionary<string, PendingChange>? batch, PendingPolicySnapshot? policies)
     {
         Task previous;
         Task write;
         lock (_gate)
         {
             previous = _flush;
-            write = WriteAfterAsync(previous, batch);
+            write = WriteAfterAsync(previous, batch, policies);
             _flush = write;
         }
 
         return write;
     }
 
-    private async Task WriteAfterAsync(Task previous, Dictionary<string, PendingChange> batch)
+    private async Task WriteAfterAsync(
+        Task previous,
+        Dictionary<string, PendingChange>? batch,
+        PendingPolicySnapshot? policies)
     {
         try
         {
@@ -194,20 +229,30 @@ public sealed class HostKeyPersistenceCoalescer : IDisposable, IAsyncDisposable
             // The previous write already logged its own failure.
         }
 
+        int changeCount = (batch?.Count ?? 0) + (policies is null ? 0 : 1);
         try
         {
             await _configManager.MergeSettingAsync(settings =>
             {
-                foreach (KeyValuePair<string, PendingChange> item in batch)
+                if (batch is not null)
                 {
-                    Apply(settings, item.Key, item.Value);
+                    foreach (KeyValuePair<string, PendingChange> item in batch)
+                    {
+                        Apply(settings, item.Key, item.Value);
+                    }
+                }
+
+                if (policies is not null)
+                {
+                    settings.TrustedCertAuthorities = policies.CertAuthorities;
+                    settings.RevokedHostKeys = policies.RevokedKeys;
                 }
             }).ConfigureAwait(false);
-            FileLogger.Info($"Persisted {batch.Count} trusted host key change(s) in one write.");
+            FileLogger.Info($"Persisted {changeCount} trusted host key change(s) in one write.");
         }
         catch (Exception ex)
         {
-            FileLogger.Warn($"Failed to persist {batch.Count} trusted host key change(s): {ex.Message}");
+            FileLogger.Warn($"Failed to persist {changeCount} trusted host key change(s): {ex.Message}");
         }
     }
 
@@ -235,4 +280,8 @@ public sealed class HostKeyPersistenceCoalescer : IDisposable, IAsyncDisposable
     }
 
     private sealed record PendingChange(HostKeyEntry? Entry, string? Fingerprint, bool Remove);
+
+    private sealed record PendingPolicySnapshot(
+        List<KnownHostsPolicyRuleDto> CertAuthorities,
+        List<KnownHostsPolicyRuleDto> RevokedKeys);
 }

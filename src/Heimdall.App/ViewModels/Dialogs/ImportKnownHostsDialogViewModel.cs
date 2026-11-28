@@ -33,6 +33,7 @@ public partial class ImportKnownHostsDialogViewModel(
 {
     private readonly KnownHostsImporter _importer = importer;
     private readonly LocalizationManager _localizer = localizer;
+    private KnownHostsPolicyEntries? _policyEntries;
     private bool _syncingSelection;
     private bool _allSelected;
 
@@ -98,13 +99,18 @@ public partial class ImportKnownHostsDialogViewModel(
         }
     }
 
-    public bool CanConfirm => Items.Any(item => item.IsSelectable && item.IsSelected);
+    private bool HasPolicyEntries =>
+        (_policyEntries?.CertAuthorities.Count ?? 0) > 0
+        || (_policyEntries?.RevokedKeys.Count ?? 0) > 0;
+
+    public bool CanConfirm => Items.Any(item => item.IsSelectable && item.IsSelected) || HasPolicyEntries;
 
     public async Task InitializeAsync(KnownHostsImportPreview preview, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(preview);
 
         ct.ThrowIfCancellationRequested();
+        _policyEntries = preview.PolicyEntries;
         foreach (var item in Items)
         {
             item.PropertyChanged -= OnItemPropertyChanged;
@@ -156,12 +162,12 @@ public partial class ImportKnownHostsDialogViewModel(
             .Where(item => item.IsSelectable && item.IsSelected)
             .Select(item => item.Candidate)
             .ToList();
-        if (selected.Count == 0)
+        if (selected.Count == 0 && !HasPolicyEntries)
         {
             return;
         }
 
-        Result = await _importer.ImportSelectedAsync(selected).ConfigureAwait(true);
+        Result = await _importer.ImportSelectedAsync(selected, _policyEntries).ConfigureAwait(true);
         CloseRequested?.Invoke(true);
     }
 

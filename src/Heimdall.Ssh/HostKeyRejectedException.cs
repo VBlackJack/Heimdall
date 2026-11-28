@@ -17,7 +17,18 @@
 namespace Heimdall.Ssh;
 
 /// <summary>
-/// Raised when an SSH host key is explicitly rejected by the verifier.
+/// Categorizes why a presented SSH host key or certificate was rejected.
+/// </summary>
+public enum HostKeyRejectionReason
+{
+    UserRejected,
+    Mismatch,
+    Revoked,
+    CertificateInvalid
+}
+
+/// <summary>
+/// Raised when an SSH host key is explicitly rejected by the verifier or policy.
 /// </summary>
 public sealed class HostKeyRejectedException : Exception
 {
@@ -26,14 +37,21 @@ public sealed class HostKeyRejectedException : Exception
         int port,
         string algorithm,
         string presentedFingerprint,
-        string? storedFingerprint)
-        : base(CreateMessage(host, port, presentedFingerprint, storedFingerprint))
+        string? storedFingerprint,
+        HostKeyRejectionReason? reason = null)
+        : base(CreateMessage(
+            host,
+            port,
+            presentedFingerprint,
+            storedFingerprint,
+            ResolveReason(storedFingerprint, reason)))
     {
         Host = host;
         Port = port;
         Algorithm = algorithm;
         PresentedFingerprint = presentedFingerprint;
         StoredFingerprint = storedFingerprint;
+        Reason = ResolveReason(storedFingerprint, reason);
     }
 
     public string Host { get; }
@@ -46,16 +64,36 @@ public sealed class HostKeyRejectedException : Exception
 
     public string? StoredFingerprint { get; }
 
-    public bool IsMismatch => !string.IsNullOrWhiteSpace(StoredFingerprint);
+    public HostKeyRejectionReason Reason { get; }
+
+    public bool IsMismatch => Reason == HostKeyRejectionReason.Mismatch;
+
+    private static HostKeyRejectionReason ResolveReason(
+        string? storedFingerprint,
+        HostKeyRejectionReason? reason)
+    {
+        return reason ?? (!string.IsNullOrWhiteSpace(storedFingerprint)
+            ? HostKeyRejectionReason.Mismatch
+            : HostKeyRejectionReason.UserRejected);
+    }
 
     private static string CreateMessage(
         string host,
         int port,
         string presentedFingerprint,
-        string? storedFingerprint)
+        string? storedFingerprint,
+        HostKeyRejectionReason reason)
     {
-        return storedFingerprint is null
-            ? $"SSH host key was rejected for {host}:{port}. Presented fingerprint: {presentedFingerprint}."
-            : $"SSH host key mismatch for {host}:{port}. Stored fingerprint {storedFingerprint} differs from presented fingerprint {presentedFingerprint}.";
+        return reason switch
+        {
+            HostKeyRejectionReason.Revoked =>
+                $"SSH host key for {host}:{port} is explicitly revoked by policy. Presented fingerprint: {presentedFingerprint}.",
+            HostKeyRejectionReason.CertificateInvalid =>
+                $"SSH host certificate for {host}:{port} failed validation for a trusted CA. Presented fingerprint: {presentedFingerprint}.",
+            HostKeyRejectionReason.Mismatch =>
+                $"SSH host key mismatch for {host}:{port}. Stored fingerprint {storedFingerprint} differs from presented fingerprint {presentedFingerprint}.",
+            _ =>
+                $"SSH host key was rejected for {host}:{port}. Presented fingerprint: {presentedFingerprint}."
+        };
     }
 }

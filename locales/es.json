@@ -119,6 +119,8 @@
   "ErrorSshAgentKeyPlinkKeyType": "La clave de agente elegida para esta sesión ({0}) es de un tipo al que Plink no se puede limitar, y esta conexión pasa por Plink. Desactiva el reenvío de agente o elige otra clave.",
   "ErrorSshAgentKeyPlinkNotBundled": "Esta sesión designa una clave de agente, y el programa Plink en uso no es el incluido con Heimdall, por lo que no se puede garantizar que ofrezca solo esa clave. Usa el Plink incluido o quita la clave de agente elegida.",
   "ErrorSshHostKeyMismatch": "La clave de host del servidor ha cambiado. Esto podría indicar un problema de seguridad (ataque de intermediario). Verifícalo con tu administrador.",
+  "ErrorSshHostKeyRevoked": "La clave de host del servidor est\u00e1 revocada expl\u00edcitamente por tu pol\u00edtica @revoked. La conexi\u00f3n ha sido bloqueada.",
+  "ErrorSshHostCertificateInvalid": "El certificado de host presentado por el servidor no es v\u00e1lido, ha caducado o no coincide con el nombre de host para una autoridad certificadora de confianza. La conexi\u00f3n ha sido bloqueada.",
   "ErrorSshHostKeyUnavailable": "Heimdall no pudo verificar la clave de host de la pasarela. Se niega a recurrir a la caché local de plink.",
   "ErrorSshNetworkUnreachable": "El host o la red no son accesibles. Comprueba el DNS y el enrutamiento.",
   "ErrorSshPortInUse": "El puerto local ya está en uso. Cierra la aplicación en conflicto o elige otro puerto.",

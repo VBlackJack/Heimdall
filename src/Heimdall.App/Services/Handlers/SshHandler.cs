@@ -391,6 +391,34 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
         {
             session.Dispose();
 
+            if (ex.Reason == HostKeyRejectionReason.Revoked)
+            {
+                string revokedMessage = SshFailureMessageBuilder.HostKeyRevoked(_localizer);
+                _connectionSm.SetError(server.Id, revokedMessage);
+                return new ConnectionResult(
+                    false,
+                    revokedMessage,
+                    null,
+                    SshSessionDiagnosticFactory.CreateHostKeyRevokedFailure(
+                        ex.PresentedFingerprint,
+                        ex.Host,
+                        ex.Port));
+            }
+
+            if (ex.Reason == HostKeyRejectionReason.CertificateInvalid)
+            {
+                string certMessage = SshFailureMessageBuilder.HostCertificateInvalid(_localizer);
+                _connectionSm.SetError(server.Id, certMessage);
+                return new ConnectionResult(
+                    false,
+                    certMessage,
+                    null,
+                    SshSessionDiagnosticFactory.CreateHostCertificateInvalidFailure(
+                        ex.PresentedFingerprint,
+                        ex.Host,
+                        ex.Port));
+            }
+
             if (ex.IsMismatch && !string.IsNullOrWhiteSpace(ex.StoredFingerprint))
             {
                 string message = SshFailureMessageBuilder.HostKeyMismatch(

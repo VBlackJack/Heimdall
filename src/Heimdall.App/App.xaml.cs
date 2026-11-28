@@ -401,14 +401,19 @@ public partial class App : System.Windows.Application
                 hostKeyStore.LoadFromConfig(entries);
             }
 
-            // Load OpenSSH @cert-authority and @revoked policy markers from default known_hosts when present.
+            // Load persisted @cert-authority and @revoked policy rules first, then merge
+            // any rules present in default ~/.ssh/known_hosts without triggering a rewrite.
+            hostKeyStore.LoadPoliciesFromConfig(
+                settings.TrustedCertAuthorities,
+                settings.RevokedHostKeys);
+
             try
             {
                 var defaultKnownHosts = Heimdall.Ssh.KnownHostsImporter.GetDefaultKnownHostsPath();
                 if (File.Exists(defaultKnownHosts)
                     && new FileInfo(defaultKnownHosts).Length <= Heimdall.Core.Ssh.KnownHostsParser.MaxFileSizeBytes)
                 {
-                    hostKeyStore.LoadPolicyFromKnownHosts(File.ReadAllText(defaultKnownHosts));
+                    hostKeyStore.LoadPolicyFromKnownHosts(File.ReadAllText(defaultKnownHosts), raiseEvent: false);
                 }
             }
             catch (Exception ex)
@@ -425,6 +430,9 @@ public partial class App : System.Windows.Application
             hostKeyTrustService.EntryTrusted += (key, entry) => hostKeyPersistence.Upsert(key, entry);
             hostKeyTrustService.EntryReplaced += (key, oldEntry, entry) => hostKeyPersistence.Upsert(key, entry);
             hostKeyTrustService.EntryRemoved += key => hostKeyPersistence.Remove(key);
+            hostKeyStore.PolicyChanged += () => hostKeyPersistence.UpdatePolicies(
+                hostKeyStore.GetCertAuthorities(),
+                hostKeyStore.GetRevokedKeys());
 
             // Removal of a hashed entry by a detached trust service (connection factory) reaches
             // persistence only through the store. A second Remove of the same key is a no-op: the

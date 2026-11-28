@@ -131,6 +131,38 @@ internal static class SshSessionDiagnosticFactory
             diagnosticDetail);
     }
 
+    internal static SessionDiagnostic CreateHostKeyRevokedFailure(
+        string presentedFingerprint,
+        string host,
+        int port)
+    {
+        var detail =
+            $"SSH host key revoked by policy for {host}:{port}. " +
+            $"Presented={presentedFingerprint}.";
+
+        return new SessionDiagnostic(
+            SessionFailureStage.SshHostKey,
+            "ErrorSshHostKeyRevoked",
+            (int)SshFailureCode.HostKeyRevoked,
+            detail);
+    }
+
+    internal static SessionDiagnostic CreateHostCertificateInvalidFailure(
+        string presentedFingerprint,
+        string host,
+        int port)
+    {
+        var detail =
+            $"SSH host certificate invalid for trusted CA on {host}:{port}. " +
+            $"Presented={presentedFingerprint}.";
+
+        return new SessionDiagnostic(
+            SessionFailureStage.SshHostKey,
+            "ErrorSshHostCertificateInvalid",
+            (int)SshFailureCode.HostCertificateInvalid,
+            detail);
+    }
+
     internal static SessionDiagnostic CreateGenericFailure(string messageKey, string? detail)
     {
         return new SessionDiagnostic(
@@ -159,6 +191,8 @@ internal static class SshSessionDiagnosticFactory
 
             SshFailureCode.HostKeyMismatch
                 or SshFailureCode.HostKeyUnavailable
+                or SshFailureCode.HostKeyRevoked
+                or SshFailureCode.HostCertificateInvalid
                 => SessionFailureStage.SshHostKey,
 
             SshFailureCode.NetworkRefused

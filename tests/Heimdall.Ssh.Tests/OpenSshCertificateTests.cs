@@ -306,6 +306,149 @@ public sealed class OpenSshCertificateTests
         Assert.Equal(spec, fromDirective);
     }
 
+    [Fact]
+    public void OpenSshCertificate_WildcardPrincipal_DoesNotMatchArbitraryHostname()
+    {
+        var (caPriv, caPubBlob) = GenerateEd25519KeyPair();
+        var (_, hostPubRaw) = GenerateEd25519RawKeyPair();
+        var certBlob = BuildEd25519Certificate(
+            OpenSshCertificateType.Host,
+            hostPubRaw,
+            "wildcard-attempt",
+            ["*.corp.example.com"],
+            DateTimeOffset.UtcNow.AddMinutes(-5),
+            DateTimeOffset.UtcNow.AddHours(1),
+            caPriv,
+            caPubBlob);
+
+        Assert.True(OpenSshCertificateParser.TryParseBlob(certBlob, out var cert));
+        Assert.NotNull(cert);
+        Assert.False(cert.MatchesPrincipal("web01.corp.example.com"));
+        Assert.True(cert.MatchesPrincipal("*.corp.example.com"));
+
+        var store = new HostKeyStore();
+        store.LoadPolicyFromKnownHosts($"@cert-authority *.corp.example.com ssh-ed25519 {Convert.ToBase64String(caPubBlob)}\n");
+        Assert.Equal(
+            HostCertificateVerificationStatus.InvalidForTrustedCertAuthority,
+            OpenSshCertificateVerifier.VerifyHostCertificate(certBlob, "web01.corp.example.com", 22, store));
+    }
+
+    [Fact]
+    public void HostKeyStore_HashedRevokedEntry_BlocksPlainHostOnDefaultAndCustomPorts()
+    {
+        var (_, hostPubBlob) = GenerateEd25519KeyPair();
+        var fp = HostKeyFormats.ComputeSha256Fingerprint(hostPubBlob);
+        var hashedDefault = CreateHashedHostToken("revoked.example.com", RandomNumberGenerator.GetBytes(20));
+        var hashedCustom = CreateHashedHostToken("[revoked.example.com]:2222", RandomNumberGenerator.GetBytes(20));
+
+        var store = new HostKeyStore();
+        store.LoadPolicyFromKnownHosts(
+            $"@revoked {hashedDefault} ssh-ed25519 {Convert.ToBase64String(hostPubBlob)}\n" +
+            $"@revoked {hashedCustom} ssh-ed25519 {Convert.ToBase64String(hostPubBlob)}\n");
+
+        Assert.True(store.IsRevoked("revoked.example.com", 22, fp));
+        Assert.True(store.IsRevoked("revoked.example.com", 2222, fp));
+        Assert.False(store.IsRevoked("revoked.example.com", 2200, fp));
+        Assert.False(store.IsRevoked("other.example.com", 22, fp));
+    }
+
+    private static string CreateHashedHostToken(string hostToken, byte[] salt)
+    {
+        using var hmac = new HMACSHA1(salt);
+        var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(hostToken));
+        return $"|1|{Convert.ToBase64String(salt)}|{Convert.ToBase64String(hash)}";
+    }
+
+    [Fact]
+    public async Task ResolvePresentedHostKeyAsync_RevokedAndInvalidCert_ThrowTypedFatalReasons()
+    {
+        var (caPriv, caPubBlob) = GenerateEd25519KeyPair();
+        var (_, hostPubRaw) = GenerateEd25519RawKeyPair();
+        var (_, revokedPubBlob) = GenerateEd25519KeyPair();
+
+        var expiredCertBlob = BuildEd25519Certificate(
+            OpenSshCertificateType.Host,
+            hostPubRaw,
+            "expired-host",
+            ["web01.corp.example.com"],
+            DateTimeOffset.UtcNow.AddHours(-2),
+            DateTimeOffset.UtcNow.AddHours(-1),
+            caPriv,
+            caPubBlob);
+
+        var store = new HostKeyStore();
+        store.LoadPolicyFromKnownHosts(
+            $"@cert-authority *.corp.example.com ssh-ed25519 {Convert.ToBase64String(caPubBlob)}\n" +
+            $"@revoked revoked.corp.example.com ssh-ed25519 {Convert.ToBase64String(revokedPubBlob)}\n");
+
+        var verifier = new AlwaysAcceptVerifier();
+
+        var revokedPresentation = new SshConnectionFactory.HostKeyPresentation(
+            "revoked.corp.example.com",
+            22,
+            "ssh-ed25519",
+            HostKeyFormats.ComputeSha256Fingerprint(revokedPubBlob),
+            revokedPubBlob);
+        var revokedEx = await Assert.ThrowsAsync<HostKeyRejectedException>(() =>
+            SshConnectionFactory.ResolvePresentedHostKeyAsync(
+                "revoked.corp.example.com", 22, revokedPresentation, store, verifier));
+        Assert.Equal(HostKeyRejectionReason.Revoked, revokedEx.Reason);
+        var revokedFailure = FailureClassifier.Classify(revokedEx);
+        Assert.Equal(SshFailureCode.HostKeyRevoked, revokedFailure.Code);
+        Assert.True(revokedFailure.IsFatal);
+        Assert.False(SshReconnectPolicy.AllowsAutoReconnect(revokedFailure.Code));
+
+        var certPresentation = new SshConnectionFactory.HostKeyPresentation(
+            "web01.corp.example.com",
+            22,
+            OpenSshCertificateParser.CertEd25519,
+            HostKeyFormats.ComputeSha256Fingerprint(expiredCertBlob),
+            expiredCertBlob);
+        var certEx = await Assert.ThrowsAsync<HostKeyRejectedException>(() =>
+            SshConnectionFactory.ResolvePresentedHostKeyAsync(
+                "web01.corp.example.com", 22, certPresentation, store, verifier));
+        Assert.Equal(HostKeyRejectionReason.CertificateInvalid, certEx.Reason);
+        var certFailure = FailureClassifier.Classify(certEx);
+        Assert.Equal(SshFailureCode.HostCertificateInvalid, certFailure.Code);
+        Assert.True(certFailure.IsFatal);
+        Assert.False(SshReconnectPolicy.AllowsAutoReconnect(certFailure.Code));
+        Assert.Equal(0, verifier.Calls);
+    }
+
+    [Fact]
+    public async Task ResolvePresentedHostKeyAsync_TrustedCertAuthority_PopulatesHostKeyBlob()
+    {
+        var (caPriv, caPubBlob) = GenerateEd25519KeyPair();
+        var (_, hostPubRaw) = GenerateEd25519RawKeyPair();
+        var certBlob = BuildEd25519Certificate(
+            OpenSshCertificateType.Host,
+            hostPubRaw,
+            "web-ca-blob",
+            ["blob.internal.example"],
+            DateTimeOffset.UtcNow.AddMinutes(-5),
+            DateTimeOffset.UtcNow.AddHours(1),
+            caPriv,
+            caPubBlob);
+
+        var store = new HostKeyStore();
+        store.LoadPolicyFromKnownHosts(
+            $"@cert-authority *.internal.example ssh-ed25519 {Convert.ToBase64String(caPubBlob)}");
+
+        var presentation = new SshConnectionFactory.HostKeyPresentation(
+            "blob.internal.example",
+            22,
+            OpenSshCertificateParser.CertEd25519,
+            HostKeyFormats.ComputeSha256Fingerprint(certBlob),
+            certBlob);
+        var verifier = new AlwaysAcceptVerifier();
+
+        var pinned = await SshConnectionFactory.ResolvePresentedHostKeyAsync(
+            "blob.internal.example", 22, presentation, store, verifier);
+
+        Assert.NotNull(pinned.HostKeyBlob);
+        Assert.Equal(certBlob, pinned.HostKeyBlob);
+    }
+
     private static (Ed25519PrivateKeyParameters Priv, byte[] PubBlob) GenerateEd25519KeyPair()
     {
         var (priv, pubRaw) = GenerateEd25519RawKeyPair();

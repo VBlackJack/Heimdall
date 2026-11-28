@@ -594,6 +594,20 @@ internal sealed partial class SshHandler
         int targetPort,
         PlinkHostKeyDecision decision)
     {
+        if (decision.FailureCode == SshFailureCode.HostKeyRevoked)
+        {
+            string revokedMessage = SshFailureMessageBuilder.HostKeyRevoked(_localizer);
+            _connectionSm.SetError(serverId, revokedMessage);
+            return new ConnectionResult(
+                false,
+                revokedMessage,
+                null,
+                SshSessionDiagnosticFactory.CreateHostKeyRevokedFailure(
+                    decision.PresentedFingerprint ?? string.Empty,
+                    targetHost,
+                    targetPort));
+        }
+
         if (decision.FailureCode == SshFailureCode.HostKeyMismatch
             && decision.StoredFingerprint is not null
             && decision.PresentedFingerprint is not null)

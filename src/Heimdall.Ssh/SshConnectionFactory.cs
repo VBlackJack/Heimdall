@@ -599,7 +599,8 @@ public static class SshConnectionFactory
                 verificationPort,
                 presentation.Algorithm,
                 presentation.Fingerprint,
-                storedFingerprint: null);
+                storedFingerprint: null,
+                HostKeyRejectionReason.Revoked);
         }
 
         var certStatus = OpenSshCertificateVerifier.VerifyHostCertificate(
@@ -610,17 +611,25 @@ public static class SshConnectionFactory
         if (certStatus is HostCertificateVerificationStatus.Revoked
             or HostCertificateVerificationStatus.InvalidForTrustedCertAuthority)
         {
+            var reason = certStatus == HostCertificateVerificationStatus.Revoked
+                ? HostKeyRejectionReason.Revoked
+                : HostKeyRejectionReason.CertificateInvalid;
             throw new HostKeyRejectedException(
                 verificationHost,
                 verificationPort,
                 presentation.Algorithm,
                 presentation.Fingerprint,
-                storedFingerprint: null);
+                storedFingerprint: null,
+                reason);
         }
 
         if (certStatus == HostCertificateVerificationStatus.TrustedByCertAuthority)
         {
-            return new PinnedFingerprintVerifier(verificationHost, verificationPort, presentation.Fingerprint);
+            return new PinnedFingerprintVerifier(
+                verificationHost,
+                verificationPort,
+                presentation.Fingerprint,
+                presentation.HostKey);
         }
 
         var trustService = new HostKeyTrustService(hostKeyStore);

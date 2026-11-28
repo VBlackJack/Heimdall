@@ -1023,6 +1023,11 @@ public sealed class TunnelService : ITunnelService
 
     private string BuildPlinkHostKeyFailureMessage(PlinkHostKeyDecision decision)
     {
+        if (decision.FailureCode == SshFailureCode.HostKeyRevoked)
+        {
+            return SshFailureMessageBuilder.HostKeyRevoked(_localizer);
+        }
+
         if (decision.FailureCode == SshFailureCode.HostKeyMismatch
             && decision.StoredFingerprint is not null
             && decision.PresentedFingerprint is not null)

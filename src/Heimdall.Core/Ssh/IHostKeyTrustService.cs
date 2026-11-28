@@ -57,9 +57,26 @@ public interface IHostKeyTrustService
     /// <summary>Returns all active <c>@revoked</c> rules.</summary>
     IReadOnlyList<(string HostPatterns, string Fingerprint)> GetRevokedKeys() => [];
 
+    /// <summary>Returns true if <paramref name="fingerprint"/> is explicitly revoked for <paramref name="host"/>:<paramref name="port"/>.</summary>
+    bool IsRevoked(string host, int port, string fingerprint) => false;
+
+    /// <summary>Registers a trusted OpenSSH <c>@cert-authority</c> rule.</summary>
+    void AddCertAuthority(string hostPatterns, string caFingerprint) { }
+
+    /// <summary>Removes a trusted OpenSSH <c>@cert-authority</c> rule.</summary>
+    bool RemoveCertAuthority(string hostPatterns, string caFingerprint) => false;
+
+    /// <summary>Registers an OpenSSH <c>@revoked</c> host key or CA rule.</summary>
+    void AddRevokedKey(string hostPatterns, string fingerprint) { }
+
+    /// <summary>Removes an OpenSSH <c>@revoked</c> host key or CA rule.</summary>
+    bool RemoveRevokedKey(string hostPatterns, string fingerprint) => false;
+
     event Action<string, HostKeyEntry>? EntryTrusted;
 
     event Action<string>? EntryRemoved;
 
     event Action<string, HostKeyEntry, HostKeyEntry>? EntryReplaced;
+
+    event Action? PolicyChanged { add { } remove { } }
 }

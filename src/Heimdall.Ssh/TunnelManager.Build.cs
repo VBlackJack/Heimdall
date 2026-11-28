@@ -352,7 +352,7 @@ public sealed partial class TunnelManager
                 false,
                 null,
                 rejectedHostKey.Message,
-                rejectedHostKey.IsMismatch ? SshFailureCode.HostKeyMismatch : SshFailureCode.Cancelled);
+                MapHostKeyRejectionCode(rejectedHostKey));
         }
 
         return ex switch
@@ -371,7 +371,7 @@ public sealed partial class TunnelManager
                 false,
                 null,
                 directHostKeyRejected.Message,
-                directHostKeyRejected.IsMismatch ? SshFailureCode.HostKeyMismatch : SshFailureCode.Cancelled),
+                MapHostKeyRejectionCode(directHostKeyRejected)),
             SshAuthenticationException authEx => new TunnelResult(
                 false,
                 null,
@@ -383,6 +383,17 @@ public sealed partial class TunnelManager
                 socketEx.Message,
                 SshFailureCode.PortInUse),
             _ => new TunnelResult(false, null, ex.Message, FailureClassifier.Classify(ex, connectionParams).Code)
+        };
+    }
+
+    private static SshFailureCode MapHostKeyRejectionCode(HostKeyRejectedException ex)
+    {
+        return ex.Reason switch
+        {
+            HostKeyRejectionReason.Revoked => SshFailureCode.HostKeyRevoked,
+            HostKeyRejectionReason.CertificateInvalid => SshFailureCode.HostCertificateInvalid,
+            HostKeyRejectionReason.Mismatch => SshFailureCode.HostKeyMismatch,
+            _ => SshFailureCode.Cancelled
         };
     }
 

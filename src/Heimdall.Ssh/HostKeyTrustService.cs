@@ -30,6 +30,12 @@ public sealed class HostKeyTrustService(HostKeyStore store) : IHostKeyTrustServi
 
     public event Action<string, HostKeyEntry, HostKeyEntry>? EntryReplaced;
 
+    public event Action? PolicyChanged
+    {
+        add => _store.PolicyChanged += value;
+        remove => _store.PolicyChanged -= value;
+    }
+
     public HostKeyEntry? GetEntry(string host, int port)
         => TryFindStoredEntry(host, port, out _, out var entry) ? entry : null;
 
@@ -376,6 +382,21 @@ public sealed class HostKeyTrustService(HostKeyStore store) : IHostKeyTrustServi
 
     public IReadOnlyList<(string HostPatterns, string Fingerprint)> GetRevokedKeys()
         => _store.GetRevokedKeys();
+
+    public bool IsRevoked(string host, int port, string fingerprint)
+        => _store.IsRevoked(host, port, fingerprint);
+
+    public void AddCertAuthority(string hostPatterns, string caFingerprint)
+        => _store.AddCertAuthority(hostPatterns, caFingerprint);
+
+    public bool RemoveCertAuthority(string hostPatterns, string caFingerprint)
+        => _store.RemoveCertAuthority(hostPatterns, caFingerprint);
+
+    public void AddRevokedKey(string hostPatterns, string fingerprint)
+        => _store.AddRevokedKey(hostPatterns, fingerprint);
+
+    public bool RemoveRevokedKey(string hostPatterns, string fingerprint)
+        => _store.RemoveRevokedKey(hostPatterns, fingerprint);
 
     private static string NormalizeAlgorithm(string? candidate, string? fallback = null)
     {

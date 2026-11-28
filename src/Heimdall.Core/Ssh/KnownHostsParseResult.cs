@@ -21,4 +21,5 @@ namespace Heimdall.Core.Ssh;
 /// </summary>
 public sealed record KnownHostsParseResult(
     IReadOnlyList<KnownHostsRawEntry> Entries,
-    IReadOnlyList<KnownHostsImportDiagnostic> Diagnostics);
+    IReadOnlyList<KnownHostsImportDiagnostic> Diagnostics,
+    KnownHostsPolicyEntries? PolicyEntries = null);
