@@ -2513,6 +2513,60 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         return html;
     }
 
+    /// <summary>
+    /// Builds an offline xterm.js HTML document configured with the current user's terminal
+    /// appearance settings for read-only surfaces such as <see cref="Dialogs.AsciinemaPlayerDialog"/>.
+    /// </summary>
+    internal static string BuildReadOnlyTerminalHtml(AppSettings? settings, Core.Localization.LocalizationManager? localizer)
+    {
+        string html = TerminalAssetsLoader.TerminalHtml;
+        foreach ((string Tag, Func<string> ContentFactory, string WrapperStart, string WrapperEnd) asset in InlineAssets)
+        {
+            html = html.Replace(
+                asset.Tag,
+                asset.WrapperStart + asset.ContentFactory() + asset.WrapperEnd,
+                StringComparison.Ordinal);
+        }
+
+        string fontFamily = settings?.TerminalFontFamily ?? AppSettings.DefaultTerminalFontFamily;
+        int safeFontSize = Math.Clamp(
+            settings?.TerminalFontSize ?? AppSettings.DefaultTerminalFontSize,
+            TerminalFontSizeMin,
+            TerminalFontSizeMax);
+        int safeScrollback = Math.Clamp(
+            settings?.TerminalScrollbackLines ?? AppSettings.DefaultTerminalScrollbackLines,
+            AppSettings.MinTerminalScrollbackLines,
+            AppSettings.MaxTerminalScrollbackLines);
+        string schemeName = settings?.TerminalColorScheme ?? AppSettings.DefaultTerminalColorScheme;
+        string themeJson = ColorSchemes.TryGetValue(schemeName, out string? configuredTheme) && configuredTheme is not null
+            ? configuredTheme
+            : ColorSchemes["Dracula"];
+
+        html = TerminalFontFamilyFormatter.Apply(html, fontFamily);
+        html = html.Replace("/*{{TERMINAL_FONT_SIZE}}*/", safeFontSize.ToString(System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal);
+        html = html.Replace("/*{{TERMINAL_FONT_MIN}}*/", TerminalFontSizeMin.ToString(System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal);
+        html = html.Replace("/*{{TERMINAL_FONT_MAX}}*/", TerminalFontSizeMax.ToString(System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal);
+        html = html.Replace("/*{{TERMINAL_SCROLLBACK}}*/", safeScrollback.ToString(System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal);
+        html = html.Replace("/*{{TERMINAL_HIGHLIGHTS}}*/", "false", StringComparison.Ordinal);
+        html = html.Replace("/*{{TERMINAL_HIGHLIGHT_RULES}}*/", "[]", StringComparison.Ordinal);
+        html = html.Replace("/*{{TERMINAL_THEME}}*/", themeJson, StringComparison.Ordinal);
+        html = html.Replace("/*{{TERMINAL_CONVERT_EOL}}*/", "false", StringComparison.Ordinal);
+        html = html.Replace("/*{{CSS_BG}}*/", ExtractThemeColor(themeJson, "background", "#282A36"), StringComparison.Ordinal);
+        html = html.Replace("/*{{CSS_FG}}*/", ExtractThemeColor(themeJson, "foreground", "#F8F8F2"), StringComparison.Ordinal);
+        html = html.Replace("/*{{CSS_CURSOR}}*/", ExtractThemeColor(themeJson, "cursor", "#BD93F9"), StringComparison.Ordinal);
+        html = html.Replace("/*{{CSS_SELECTION}}*/", ExtractThemeColor(themeJson, "selectionBackground", "rgba(68, 71, 90, 0.7)"), StringComparison.Ordinal);
+        foreach ((string placeholder, string colour) in TerminalSearchChrome.CssVariables(themeJson, XtermDefaultColours))
+        {
+            html = html.Replace(placeholder, colour, StringComparison.Ordinal);
+        }
+
+        html = html.Replace(
+            "/*{{TERMINAL_MIN_CONTRAST}}*/",
+            ThemeTextColours.MinimumContrast.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            StringComparison.Ordinal);
+        return TerminalHtmlLocalizer.Localize(html, key => localizer?[key]);
+    }
+
     /// <summary>Extracts a color value from the xterm.js theme JS object literal.</summary>
     private static string ExtractThemeColor(string themeJson, string key, string fallback)
     {

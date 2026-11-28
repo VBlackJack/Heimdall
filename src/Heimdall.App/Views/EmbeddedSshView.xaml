@@ -138,6 +138,15 @@
                             Style="{DynamicResource GhostButtonStyle}"
                             Padding="6,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0"/>
 
+                    <Button x:Name="PlayCastButton"
+                            Content="&#xE768;"
+                            FontFamily="{StaticResource FontFamilyIcons}"
+                            Click="OnPlayCastClick"
+                            ToolTip="{loc:Translate TooltipPlayAsciinemaCast}"
+                            AutomationProperties.Name="{loc:Translate A11yPlayAsciinemaCast}"
+                            Style="{DynamicResource GhostButtonStyle}"
+                            Padding="6,2" FontSize="{StaticResource FontSizeBody}" Margin="4,0"/>
+
                     <Button x:Name="HotForwardButton"
                             Content="&#xE8AB;"
                             FontFamily="{StaticResource FontFamilyIcons}"

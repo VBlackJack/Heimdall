@@ -7107,5 +7107,21 @@
   "ServerDialogSshStartupCommandLabel": "Comando de inicio (RemoteCommand)",
   "ServerDialogSshStartupCommandHint": "Comando de una l\u00ednea enviado al abrir el shell SSH (por ejemplo: tmux new -As ops). Los perfiles importados requieren confirmaci\u00f3n.",
   "ServerDialogSshEnvVarsLabel": "Variables de entorno (SetEnv, una CLAVE=VALOR por l\u00ednea)",
-  "ServerDialogSshEnvVarsInvalid": "Cada l\u00ednea debe usar CLAVE=VALOR con un nombre POSIX v\u00e1lido."
+  "ServerDialogSshEnvVarsInvalid": "Cada l\u00ednea debe usar CLAVE=VALOR con un nombre POSIX v\u00e1lido.",
+  "TooltipPlayAsciinemaCast": "Reproducir una grabaci\u00f3n asciinema (.cast v2)",
+  "A11yPlayAsciinemaCast": "Reproducir grabaci\u00f3n asciinema",
+  "CastPlayerDialogTitle": "Reproductor de sesi\u00f3n Asciinema (.cast v2)",
+  "CastPlayerBtnOpen": "Abrir .cast...",
+  "CastPlayerBtnPlay": "Reproducir",
+  "CastPlayerBtnPause": "Pausa",
+  "CastPlayerBtnRestart": "Reiniciar",
+  "CastPlayerSpeedLabel": "Velocidad de reproducci\u00f3n",
+  "CastPlayerIdleCapLabel": "Limitar pausas (<= 2s)",
+  "CastPlayerTimelineA11y": "Posici\u00f3n de la l\u00ednea de tiempo",
+  "CastPlayerEmptyHint": "Abre un archivo asciinema (.cast v2) para reproducirlo en el terminal.",
+  "CastPlayerFileFilter": "Grabaciones asciinema (*.cast)|*.cast|Todos los archivos (*.*)|*.*",
+  "CastPlayerLoadFailed": "No se pudo cargar la grabaci\u00f3n .cast: {0}",
+  "CastPlayerMetaFormat": "{0} ({1}x{2}, {3})",
+  "CastPlayerEventCountOne": "{0} evento",
+  "CastPlayerEventCount": "{0} eventos"
 }

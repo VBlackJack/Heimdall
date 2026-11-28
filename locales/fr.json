@@ -7107,5 +7107,21 @@
   "ServerDialogSshStartupCommandLabel": "Commande de d\u00e9marrage (RemoteCommand)",
   "ServerDialogSshStartupCommandHint": "Commande sur une ligne envoy\u00e9e \u00e0 l'ouverture du shell SSH (ex. : tmux new -As ops). Les profils import\u00e9s exigent une confirmation.",
   "ServerDialogSshEnvVarsLabel": "Variables d'environnement (SetEnv, un CLE=VALEUR par ligne)",
-  "ServerDialogSshEnvVarsInvalid": "Chaque ligne doit respecter CLE=VALEUR avec un nom POSIX valide."
+  "ServerDialogSshEnvVarsInvalid": "Chaque ligne doit respecter CLE=VALEUR avec un nom POSIX valide.",
+  "TooltipPlayAsciinemaCast": "Relire un enregistrement asciinema (.cast v2)",
+  "A11yPlayAsciinemaCast": "Relire un enregistrement asciinema",
+  "CastPlayerDialogTitle": "Lecture de session Asciinema (.cast v2)",
+  "CastPlayerBtnOpen": "Ouvrir .cast...",
+  "CastPlayerBtnPlay": "Lecture",
+  "CastPlayerBtnPause": "Pause",
+  "CastPlayerBtnRestart": "Rejouer",
+  "CastPlayerSpeedLabel": "Vitesse de lecture",
+  "CastPlayerIdleCapLabel": "Limiter pauses (<= 2s)",
+  "CastPlayerTimelineA11y": "Position sur la ligne de temps",
+  "CastPlayerEmptyHint": "Ouvrez un fichier asciinema (.cast v2) pour le relire dans le terminal.",
+  "CastPlayerFileFilter": "Enregistrements asciinema (*.cast)|*.cast|Tous les fichiers (*.*)|*.*",
+  "CastPlayerLoadFailed": "\u00c9chec du chargement du fichier .cast : {0}",
+  "CastPlayerMetaFormat": "{0} ({1}x{2}, {3})",
+  "CastPlayerEventCountOne": "{0} \u00e9v\u00e9nement",
+  "CastPlayerEventCount": "{0} \u00e9v\u00e9nements"
 }

@@ -45,6 +45,7 @@ public sealed class WindowMinimumSizeContractTests
     /// </summary>
     private static readonly string[] OptedIn =
     [
+        "AsciinemaPlayerDialog.xaml",
         "CommandLibraryPickerDialog.xaml",
         "FileConflictDialog.xaml",
         "FtpsCertificatePromptDialog.xaml",
@@ -68,10 +69,10 @@ public sealed class WindowMinimumSizeContractTests
     {
         IReadOnlyList<(string File, double MinWidth)> atRisk = FindAtRiskWindows();
 
-        // Sixteen: the fifteen existing clamped windows plus SshAuthorizedKeysDialog, which
+        // Seventeen: the sixteen existing clamped windows plus AsciinemaPlayerDialog, which
         // opts in from the start. Anything else means the population moved and the lot that
         // wires them needs re-scoping rather than a quietly updated number.
-        Assert.Equal(16, atRisk.Count);
+        Assert.Equal(17, atRisk.Count);
 
         string[] optedInFound = [.. atRisk
             .Where(window => ReadXaml(window.File).Contains(

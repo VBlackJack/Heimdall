@@ -7107,5 +7107,21 @@
   "ServerDialogSshStartupCommandLabel": "Startup command (RemoteCommand)",
   "ServerDialogSshStartupCommandHint": "Optional single-line command sent when the SSH shell opens (for example: tmux new -As ops). Imported profiles require confirmation.",
   "ServerDialogSshEnvVarsLabel": "Environment variables (SetEnv, one KEY=VALUE per line)",
-  "ServerDialogSshEnvVarsInvalid": "Each line must use KEY=VALUE with a valid POSIX variable name."
+  "ServerDialogSshEnvVarsInvalid": "Each line must use KEY=VALUE with a valid POSIX variable name.",
+  "TooltipPlayAsciinemaCast": "Replay an asciinema (.cast v2) recording",
+  "A11yPlayAsciinemaCast": "Replay asciinema cast recording",
+  "CastPlayerDialogTitle": "Asciinema Session Replay (.cast v2)",
+  "CastPlayerBtnOpen": "Open .cast...",
+  "CastPlayerBtnPlay": "Play",
+  "CastPlayerBtnPause": "Pause",
+  "CastPlayerBtnRestart": "Restart",
+  "CastPlayerSpeedLabel": "Playback speed",
+  "CastPlayerIdleCapLabel": "Cap pauses (<= 2s)",
+  "CastPlayerTimelineA11y": "Playback timeline position",
+  "CastPlayerEmptyHint": "Open an asciinema (.cast v2) file to replay it inside the terminal.",
+  "CastPlayerFileFilter": "Asciinema recordings (*.cast)|*.cast|All Files (*.*)|*.*",
+  "CastPlayerLoadFailed": "Failed to load .cast recording: {0}",
+  "CastPlayerMetaFormat": "{0} ({1}x{2}, {3})",
+  "CastPlayerEventCountOne": "{0} event",
+  "CastPlayerEventCount": "{0} events"
 }

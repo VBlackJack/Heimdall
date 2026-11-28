@@ -74,6 +74,20 @@ public partial class EmbeddedSshView
             : L("TooltipRecordAsciinemaCast");
     }
 
+    private void OnPlayCastClick(object sender, System.Windows.RoutedEventArgs e)
+    {
+        if (_disposed || _localizer is null)
+        {
+            return;
+        }
+
+        var dialog = new Dialogs.AsciinemaPlayerDialog(_localizer, TerminalSettings)
+        {
+            Owner = System.Windows.Window.GetWindow(this)
+        };
+        dialog.ShowDialog();
+    }
+
     private void OnRecordCastClick(object sender, System.Windows.RoutedEventArgs e)
     {
         if (_disposed)
