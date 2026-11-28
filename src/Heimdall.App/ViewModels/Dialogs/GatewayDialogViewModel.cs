@@ -77,6 +77,15 @@ public partial class GatewayDialogViewModel : ObservableValidator
     private string _keyPath = "";
 
     [ObservableProperty]
+    private string _sshCertificatePath = "";
+
+    /// <summary>
+    /// Selected crypto policy tag: empty for global default, or <c>Standard</c> / <c>StrictModern</c> / <c>LegacyCompatible</c>.
+    /// </summary>
+    [ObservableProperty]
+    private string _sshCryptoPolicySelection = "";
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasChosenSshAgentKey))]
     private string? _sshAgentKeyFingerprint;
 
@@ -334,7 +343,8 @@ public partial class GatewayDialogViewModel : ObservableValidator
 
         // Mark dirty when any user-editable property changes
         if (e.PropertyName is nameof(Name) or nameof(Host) or nameof(Port)
-            or nameof(User) or nameof(KeyPath) or nameof(Password) or nameof(KeyPassphrase)
+            or nameof(User) or nameof(KeyPath) or nameof(SshCertificatePath) or nameof(SshCryptoPolicySelection)
+            or nameof(Password) or nameof(KeyPassphrase)
             or nameof(SelectedParentGatewayId))
         {
             IsDirty = true;
@@ -483,6 +493,10 @@ public partial class GatewayDialogViewModel : ObservableValidator
             Port = Port,
             User = User,
             KeyPath = keyPath,
+            SshCertificatePath = string.IsNullOrWhiteSpace(SshCertificatePath) ? null : SshCertificatePath.Trim(),
+            SshCryptoPolicy = Enum.TryParse<Heimdall.Core.Ssh.SshCryptoPolicy>(SshCryptoPolicySelection, out var parsedCryptoPolicy)
+                ? parsedCryptoPolicy
+                : null,
             SshAgentKeyFingerprint = string.IsNullOrWhiteSpace(SshAgentKeyFingerprint)
                 ? null
                 : SshAgentKeyFingerprint,
@@ -541,6 +555,8 @@ public partial class GatewayDialogViewModel : ObservableValidator
         vm.Port = dto.Port;
         vm.User = dto.User;
         vm.KeyPath = dto.KeyPath ?? "";
+        vm.SshCertificatePath = dto.SshCertificatePath ?? "";
+        vm.SshCryptoPolicySelection = dto.SshCryptoPolicy?.ToString() ?? "";
         vm.SshAgentKeyFingerprint = dto.SshAgentKeyFingerprint;
         vm.SelectedParentGatewayId = dto.ParentGatewayId ?? "";
         vm.HostKeyFingerprint = dto.HostKeyFingerprint ?? "";

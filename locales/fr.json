@@ -7040,5 +7040,21 @@
   "ToolSshAuditFleetFindingUnencryptedKey": "La cl\u00e9 priv\u00e9e SSH est stock\u00e9e sans phrase secr\u00e8te.",
   "ToolSshAuditFleetFindingCertMissing": "Le certificat utilisateur OpenSSH configur\u00e9 est introuvable ou illisible.",
   "ToolSshAuditFleetFindingCertInvalid": "Le certificat utilisateur OpenSSH n'a pas pu \u00eatre analys\u00e9.",
-  "ToolSshAuditFleetFindingHostKeyRevoked": "La cl\u00e9 d'h\u00f4te \u00e9pingl\u00e9e correspond \u00e0 une r\u00e8gle locale @revoked."
+  "ToolSshAuditFleetFindingHostKeyRevoked": "La cl\u00e9 d'h\u00f4te \u00e9pingl\u00e9e correspond \u00e0 une r\u00e8gle locale @revoked.",
+  "GatewayDialogSelectSshCertificate": "S\u00e9lectionner un certificat utilisateur SSH",
+  "ToolSshServerAuditBtnAuditFleet": "Auditer le parc SSH",
+  "ToolSshServerAuditFleetTitle": "Audit cryptographique du parc SSH",
+  "ToolSshServerAuditFleetNoServers": "Aucun serveur SSH enregistr\u00e9 \u00e0 auditer.",
+  "ToolSshServerAuditFleetSummaryOne": "{0} h\u00f4te analys\u00e9 | ANSSI OK : {1} | Post-quantique : {2} | Erreurs : {3}",
+  "ToolSshServerAuditFleetSummary": "{0} h\u00f4tes analys\u00e9s | ANSSI OK : {1} | Post-quantique : {2} | Erreurs : {3}",
+  "ToolSshServerAuditFleetColName": "Serveur",
+  "ToolSshServerAuditFleetColEndpoint": "H\u00f4te:Port",
+  "ToolSshServerAuditFleetColGateway": "Passerelle",
+  "ToolSshServerAuditFleetColGrade": "Note",
+  "ToolSshServerAuditFleetColAnssi": "ANSSI",
+  "ToolSshServerAuditFleetColPq": "KEX PQ",
+  "ToolSshServerAuditFleetColStrictKex": "Strict KEX",
+  "ToolSshServerAuditFleetColStatus": "Banni\u00e8re / Statut",
+  "ToolSshServerAuditFleetBtnExportHtml": "Exporter parc HTML",
+  "ToolSshServerAuditFleetBtnExportCsv": "Exporter parc CSV"
 }

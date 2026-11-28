@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -21,6 +22,7 @@ using Heimdall.App.Services;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Logging;
+using Heimdall.Core.Models;
 using Heimdall.Core.Security;
 using Heimdall.Ssh;
 using Renci.SshNet;
@@ -72,8 +74,151 @@ public sealed partial class SshServerAuditViewModel : ObservableObject, IDisposa
     [ObservableProperty]
     private bool _showResults;
 
+    private const int MaxFleetAuditConcurrency = 4;
+
     [ObservableProperty]
     private SshServerAuditReport? _report;
+
+    [ObservableProperty]
+    private bool _showFleetResults;
+
+    [ObservableProperty]
+    private string _fleetSummaryText = string.Empty;
+
+    public ObservableCollection<SshFleetServerAuditEntry> FleetResults { get; } = [];
+
+    /// <summary>
+    /// Audits all saved SSH profiles concurrently (bounded to 4 simultaneous probes),
+    /// automatically routing each server through its configured or inherited SSH gateway.
+    /// </summary>
+    public async Task RunFleetAuditAsync(IReadOnlyList<ServerProfileDto> servers, AppSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(servers);
+        ArgumentNullException.ThrowIfNull(settings);
+
+        if (IsAuditing)
+        {
+            return;
+        }
+
+        var sshTargets = servers
+            .Where(s => string.Equals(s.ConnectionType, "SSH", StringComparison.OrdinalIgnoreCase)
+                && !string.IsNullOrWhiteSpace(s.RemoteServer)
+                && InputValidator.IsValidSshHost(s.RemoteServer.Trim()))
+            .ToList();
+
+        if (sshTargets.Count == 0)
+        {
+            ShowErrorMessage(L("ToolSshServerAuditFleetNoServers"));
+            return;
+        }
+
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = new CancellationTokenSource();
+        CancellationToken ct = _cts.Token;
+
+        IsAuditing = true;
+        ShowError = false;
+        ErrorMessage = string.Empty;
+        FleetResults.Clear();
+        ShowFleetResults = true;
+        ShowEmptyState = false;
+
+        try
+        {
+            var gatewayLookup = settings.SshGateways
+                .Where(g => !string.IsNullOrWhiteSpace(g.Id))
+                .ToDictionary(g => g.Id, StringComparer.OrdinalIgnoreCase);
+
+            var ordered = new SshFleetServerAuditEntry?[sshTargets.Count];
+            using var gate = new SemaphoreSlim(MaxFleetAuditConcurrency, MaxFleetAuditConcurrency);
+
+            var tasks = sshTargets.Select(async (server, index) =>
+            {
+                await gate.WaitAsync(ct).ConfigureAwait(false);
+                try
+                {
+                    ct.ThrowIfCancellationRequested();
+                    string host = server.RemoteServer.Trim();
+                    int port = server.SshPort > 0 && InputValidator.ValidatePortRange(server.SshPort)
+                        ? server.SshPort
+                        : DefaultPorts.Ssh;
+                    string displayName = string.IsNullOrWhiteSpace(server.DisplayName) ? host : server.DisplayName;
+                    string? gatewayId = SshGatewayRoute.GatewayIdFor(server, settings.GroupDefaults);
+                    SshGatewayDto? gw = gatewayId is not null && gatewayLookup.TryGetValue(gatewayId, out var resolved)
+                        ? resolved
+                        : null;
+                    string? gwName = gw is null ? null : (string.IsNullOrWhiteSpace(gw.Name) ? gw.Host : gw.Name);
+
+                    try
+                    {
+                        SshKexInitSnapshot snapshot = await _probeRunner(host, port, gw, ct).ConfigureAwait(false);
+                        SshServerAuditReport report = SshServerAuditEngine.Evaluate(snapshot);
+                        ordered[index] = new SshFleetServerAuditEntry(displayName, host, port, gwName, report);
+                    }
+                    catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                    {
+                        throw;
+                    }
+                    catch (Exception ex)
+                    {
+                        ordered[index] = new SshFleetServerAuditEntry(displayName, host, port, gwName, null, ex.Message);
+                    }
+                }
+                finally
+                {
+                    gate.Release();
+                }
+            }).ToList();
+
+            await Task.WhenAll(tasks).ConfigureAwait(true);
+
+            foreach (var entry in ordered)
+            {
+                if (entry is not null)
+                {
+                    FleetResults.Add(entry);
+                }
+            }
+
+            int audited = FleetResults.Count(e => e.Report is not null);
+            int anssiPass = FleetResults.Count(e => e.Report?.IsAnssiCompliant == true);
+            int pqCount = FleetResults.Count(e => e.Report?.HasPostQuantumKex == true);
+            int errors = FleetResults.Count - audited;
+            FleetSummaryText = _localizer is not null
+                ? _localizer.FormatCount(
+                    FleetResults.Count,
+                    "ToolSshServerAuditFleetSummaryOne",
+                    "ToolSshServerAuditFleetSummary",
+                    FleetResults.Count,
+                    anssiPass,
+                    pqCount,
+                    errors)
+                : string.Format(
+                    CultureInfo.CurrentCulture,
+                    L("ToolSshServerAuditFleetSummary"),
+                    FleetResults.Count,
+                    anssiPass,
+                    pqCount,
+                    errors);
+
+            var firstReport = FleetResults.FirstOrDefault(e => e.Report is not null)?.Report;
+            if (firstReport is not null)
+            {
+                Report = firstReport;
+                ShowResults = true;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            ShowErrorMessage(L("ToolSshServerAuditCancelled"));
+        }
+        finally
+        {
+            IsAuditing = false;
+        }
+    }
 
     public void Initialize(LocalizationManager? localizer)
     {

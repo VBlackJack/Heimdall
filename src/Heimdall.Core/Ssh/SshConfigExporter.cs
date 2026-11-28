@@ -221,7 +221,8 @@ public static class SshConfigExporter
                 Port: gw.Port,
                 IdentityFile: gw.KeyPath,
                 ProxyJump: parentAlias,
-                ServerAliveInterval: defaultServerAliveInterval));
+                ServerAliveInterval: defaultServerAliveInterval,
+                CertificateFile: gw.SshCertificatePath));
 
             if (!string.IsNullOrWhiteSpace(block))
             {

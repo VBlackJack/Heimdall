@@ -47,6 +47,17 @@ public sealed class SshGatewayDto
     public int Port { get; set; } = DefaultPorts.Ssh;
     public string User { get; set; } = string.Empty;
     public string? KeyPath { get; set; }
+
+    /// <summary>
+    /// Optional explicit OpenSSH user certificate path (<c>-cert.pub</c>) paired with <see cref="KeyPath"/>.
+    /// </summary>
+    public string? SshCertificatePath { get; set; }
+
+    /// <summary>
+    /// Optional per-gateway SSH cryptographic policy override; null inherits <see cref="AppSettings.SshCryptoPolicy"/>.
+    /// </summary>
+    public Ssh.SshCryptoPolicy? SshCryptoPolicy { get; set; }
+
     public string? SshPasswordEncrypted { get; set; }
     public string? SshKeyPassphraseEncrypted
     {

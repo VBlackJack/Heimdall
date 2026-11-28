@@ -1017,6 +1017,15 @@ public sealed class TunnelService : ITunnelService
             WriteLengthPrefixedString(payload, gateway.SshKeyPassphraseEncrypted is null ? "legacy" : "explicit");
             WriteLengthPrefixedString(payload, gateway.SshKeyPassphraseEncrypted ?? string.Empty);
             WriteLengthPrefixedString(payload, gateway.SshAgentKeyFingerprint ?? string.Empty);
+            if (!string.IsNullOrWhiteSpace(gateway.SshCertificatePath))
+            {
+                WriteLengthPrefixedString(payload, "cert:" + gateway.SshCertificatePath);
+            }
+
+            if (gateway.SshCryptoPolicy is { } gwPolicy)
+            {
+                WriteLengthPrefixedString(payload, "policy:" + gwPolicy);
+            }
         }
 
         byte[] hash = SHA256.HashData(payload.ToArray());

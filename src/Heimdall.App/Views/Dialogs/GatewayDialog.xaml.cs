@@ -279,4 +279,20 @@ public partial class GatewayDialog : Window
             vm.KeyPath = dialog.FileName;
         }
     }
+
+    private void OnBrowseCertificateClick(object sender, RoutedEventArgs e)
+    {
+        var localizer = (DataContext as GatewayDialogViewModel)?.Localizer;
+        var dialog = new OpenFileDialog
+        {
+            Title = localizer?["GatewayDialogSelectSshCertificate"] ?? "Select SSH User Certificate",
+            Filter = localizer?["TreeCtxDeploySshKeyPubFilter"] ?? "SSH Public Keys (*.pub)|*.pub|All Files (*.*)|*.*",
+            CheckFileExists = true
+        };
+
+        if (dialog.ShowDialog(this) == true && DataContext is GatewayDialogViewModel vm)
+        {
+            vm.SshCertificatePath = dialog.FileName;
+        }
+    }
 }

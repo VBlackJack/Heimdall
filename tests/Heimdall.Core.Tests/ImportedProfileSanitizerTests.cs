@@ -294,4 +294,24 @@ public sealed class ImportedProfileSanitizerTests
         Assert.Null(profiles[0].SshCryptoPolicy);
         Assert.Equal(Heimdall.Core.Ssh.SshCryptoPolicy.StrictModern, profiles[1].SshCryptoPolicy);
     }
+
+    [Fact]
+    public void SanitizeGatewayPaths_ClearsNetworkCertificatePathAndLegacyCryptoPolicy()
+    {
+        var gw = new SshGatewayDto
+        {
+            Name = "CorpBastion",
+            KeyPath = @"C:\keys\bastion",
+            SshCertificatePath = @"\\share\certs\bastion-cert.pub",
+            SshCryptoPolicy = Heimdall.Core.Ssh.SshCryptoPolicy.LegacyCompatible
+        };
+
+        ImportedItemSanitization? item = ImportedProfileSanitizer.SanitizeGatewayPaths(gw);
+
+        Assert.NotNull(item);
+        Assert.Equal(@"C:\keys\bastion", gw.KeyPath);
+        Assert.Null(gw.SshCertificatePath);
+        Assert.Null(gw.SshCryptoPolicy);
+        Assert.Contains(item.ClearedPaths, p => p.Value == @"\\share\certs\bastion-cert.pub");
+    }
 }

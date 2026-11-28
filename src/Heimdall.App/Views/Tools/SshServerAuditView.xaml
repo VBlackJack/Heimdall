@@ -74,6 +74,11 @@
                            FontSize="{StaticResource FontSizeBody}" Margin="{StaticResource MarginLabelBottom}"
                            Foreground="{DynamicResource TextSecondaryBrush}"/>
                 <DockPanel Margin="{StaticResource MarginStackItem}">
+                    <Button x:Name="BtnAuditFleet" DockPanel.Dock="Right"
+                            Click="OnAuditFleetClick"
+                            Style="{DynamicResource SecondaryButtonStyle}"
+                            Padding="{StaticResource PaddingButtonPrimary}" Margin="{StaticResource MarginInlineControl}"
+                            VerticalAlignment="Center"/>
                     <Button x:Name="BtnAudit" DockPanel.Dock="Right"
                             Click="OnAuditClick"
                             Style="{DynamicResource PrimaryButtonStyle}"
@@ -128,6 +133,53 @@
                     <StackPanel HorizontalAlignment="Center">
                         <TextBlock Text="&#xE72E;" Style="{StaticResource ToolEmptyStateIconStyle}" Focusable="False"/>
                         <TextBlock x:Name="TxtEmptyState" Style="{StaticResource ToolEmptyStateTextStyle}"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Batch Fleet Results -->
+                <Border x:Name="FleetResultsPanel" Visibility="Collapsed"
+                        Padding="{StaticResource SpacingMd}"
+                        Background="{DynamicResource SurfaceBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="1" CornerRadius="{StaticResource CornerRadiusSm}"
+                        Margin="{StaticResource MarginSectionBottom}">
+                    <StackPanel>
+                        <DockPanel Margin="{StaticResource MarginLabelBottom}">
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                <Button x:Name="BtnExportFleetHtml" Click="OnExportFleetHtmlClick"
+                                        Style="{DynamicResource SecondaryButtonStyle}"
+                                        Padding="{StaticResource PaddingButtonCopy}" Margin="0,0,8,0"/>
+                                <Button x:Name="BtnExportFleetCsv" Click="OnExportFleetCsvClick"
+                                        Style="{DynamicResource SecondaryButtonStyle}"
+                                        Padding="{StaticResource PaddingButtonCopy}"/>
+                            </StackPanel>
+                            <StackPanel VerticalAlignment="Center">
+                                <TextBlock x:Name="LblFleetTitle" FontSize="{StaticResource FontSizeBody}" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"/>
+                                <TextBlock x:Name="TxtFleetSummary" FontSize="{StaticResource FontSizeCaption}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}" Margin="0,2,0,0"/>
+                            </StackPanel>
+                        </DockPanel>
+                        <DataGrid x:Name="FleetResultsGrid"
+                                  AutoGenerateColumns="False"
+                                  IsReadOnly="True"
+                                  SelectionMode="Single"
+                                  MaxHeight="240"
+                                  SelectionChanged="OnFleetRowSelectionChanged"
+                                  Style="{DynamicResource ThemedDataGridStyle}"
+                                  ColumnHeaderStyle="{DynamicResource ThemedDataGridColumnHeaderStyle}"
+                                  CellStyle="{DynamicResource ThemedDataGridCellStyle}">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn x:Name="ColFleetName" Binding="{Binding DisplayName}" Width="140"/>
+                                <DataGridTextColumn x:Name="ColFleetEndpoint" Binding="{Binding Endpoint}" Width="150"/>
+                                <DataGridTextColumn x:Name="ColFleetGateway" Binding="{Binding Gateway}" Width="100"/>
+                                <DataGridTextColumn x:Name="ColFleetGrade" Binding="{Binding Grade}" Width="60"/>
+                                <DataGridTextColumn x:Name="ColFleetAnssi" Binding="{Binding Anssi}" Width="68"/>
+                                <DataGridTextColumn x:Name="ColFleetPq" Binding="{Binding PostQuantum}" Width="60"/>
+                                <DataGridTextColumn x:Name="ColFleetStrictKex" Binding="{Binding StrictKex}" Width="74"/>
+                                <DataGridTextColumn x:Name="ColFleetStatus" Binding="{Binding Status}" Width="*"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
                     </StackPanel>
                 </Border>
 

@@ -7040,5 +7040,21 @@
   "ToolSshAuditFleetFindingUnencryptedKey": "La clave privada SSH se guarda sin frase de contrase\u00f1a.",
   "ToolSshAuditFleetFindingCertMissing": "El certificado de usuario OpenSSH configurado no existe o no se puede leer.",
   "ToolSshAuditFleetFindingCertInvalid": "No se pudo analizar el certificado de usuario OpenSSH.",
-  "ToolSshAuditFleetFindingHostKeyRevoked": "La clave de host fijada coincide con una regla local @revoked."
+  "ToolSshAuditFleetFindingHostKeyRevoked": "La clave de host fijada coincide con una regla local @revoked.",
+  "GatewayDialogSelectSshCertificate": "Seleccionar certificado de usuario SSH",
+  "ToolSshServerAuditBtnAuditFleet": "Auditar flota SSH",
+  "ToolSshServerAuditFleetTitle": "Auditor\u00eda criptogr\u00e1fica de flota SSH",
+  "ToolSshServerAuditFleetNoServers": "No se encontraron servidores SSH guardados para auditar.",
+  "ToolSshServerAuditFleetSummaryOne": "{0} host analizado | ANSSI OK: {1} | Poscu\u00e1ntico: {2} | Errores: {3}",
+  "ToolSshServerAuditFleetSummary": "{0} hosts analizados | ANSSI OK: {1} | Poscu\u00e1ntico: {2} | Errores: {3}",
+  "ToolSshServerAuditFleetColName": "Servidor",
+  "ToolSshServerAuditFleetColEndpoint": "Host:Puerto",
+  "ToolSshServerAuditFleetColGateway": "Pasarela",
+  "ToolSshServerAuditFleetColGrade": "Nota",
+  "ToolSshServerAuditFleetColAnssi": "ANSSI",
+  "ToolSshServerAuditFleetColPq": "KEX PQ",
+  "ToolSshServerAuditFleetColStrictKex": "Strict KEX",
+  "ToolSshServerAuditFleetColStatus": "Banner / Estado",
+  "ToolSshServerAuditFleetBtnExportHtml": "Exportar flota HTML",
+  "ToolSshServerAuditFleetBtnExportCsv": "Exportar flota CSV"
 }

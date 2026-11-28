@@ -115,4 +115,38 @@ public sealed class SshServerAuditEngineTests
         Assert.NotEqual(SshAuditGrade.APlus, report.Grade);
         Assert.Equal(SshAuditGrade.A, report.Grade);
     }
+
+    [Fact]
+    public void FormatBatchExports_HtmlEncodesAndNeutralizesCsvFormulasForFleet()
+    {
+        var snap = new SshKexInitSnapshot(
+            "srv1.corp",
+            22,
+            "SSH-2.0-OpenSSH_9.9",
+            ["mlkem768x25519-sha256", "kex-strict-s-v00@openssh.com"],
+            ["ssh-ed25519"],
+            ["aes256-gcm@openssh.com"],
+            ["aes256-gcm@openssh.com"],
+            ["hmac-sha2-512-etm@openssh.com"],
+            ["hmac-sha2-512-etm@openssh.com"],
+            ["none"],
+            ["none"]);
+        var report = SshServerAuditEngine.Evaluate(snap);
+
+        SshFleetServerAuditEntry[] entries =
+        [
+            new("=Prod1", "srv1.corp", 22, "Bastion", report),
+            new("Down<script>", "srv2.corp", 2222, null, null, "Connection refused")
+        ];
+
+        string csv = SshServerAuditEngine.FormatBatchCsvReport(entries);
+        string html = SshServerAuditEngine.FormatBatchHtmlReport(entries);
+
+        Assert.Contains("\"'=Prod1\"", csv, StringComparison.Ordinal);
+        Assert.Contains("\"ERROR\"", csv, StringComparison.Ordinal);
+        Assert.Contains("Connection refused", csv, StringComparison.Ordinal);
+        Assert.DoesNotContain("<script>", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Down&lt;script&gt;", html, StringComparison.Ordinal);
+        Assert.Contains("ANSSI PASS: 1", html, StringComparison.Ordinal);
+    }
 }

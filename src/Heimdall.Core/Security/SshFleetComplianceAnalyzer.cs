@@ -127,6 +127,17 @@ public static class SshFleetComplianceAnalyzer
         foreach (var gw in gateways)
         {
             string label = string.IsNullOrWhiteSpace(gw.Name) ? gw.Host : gw.Name;
+            SshCryptoPolicy effectiveGatewayPolicy = gw.SshCryptoPolicy ?? globalCryptoPolicy;
+            if (effectiveGatewayPolicy == SshCryptoPolicy.LegacyCompatible)
+            {
+                findings.Add(new SshFleetFinding(
+                    SshFleetFindingSeverity.Warning,
+                    label,
+                    "Gateway",
+                    "LEGACY_CRYPTO_POLICY",
+                    "Gateway allows legacy cryptographic algorithms (SHA-1 / CBC / ssh-rsa)."));
+            }
+
             if (!string.IsNullOrWhiteSpace(gw.KeyPath))
             {
                 AuditKeyFile(gw.KeyPath, label, "Gateway", reader, findings);
@@ -139,6 +150,12 @@ public static class SshFleetComplianceAnalyzer
                     "Gateway",
                     "PASSWORD_ONLY_AUTH",
                     "Gateway uses password-only authentication (prefer key or agent authentication)."));
+            }
+
+            string? gwCertPath = ResolveCertificatePath(gw.KeyPath, gw.SshCertificatePath, reader);
+            if (!string.IsNullOrWhiteSpace(gwCertPath))
+            {
+                AuditCertificateFile(gwCertPath, label, "Gateway", reader, now, findings);
             }
         }
 

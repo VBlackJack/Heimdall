@@ -177,10 +177,11 @@ public static class GatewayChainResolver
             Port = gateway.Port,
             Username = gateway.User,
             KeyPath = gateway.KeyPath,
+            CertificatePath = string.IsNullOrWhiteSpace(gateway.SshCertificatePath) ? null : gateway.SshCertificatePath,
             Password = password,
             KeyPassphrase = keyPassphrase,
             SshAgentPreference = sshAgentPreference,
-            CryptoPolicy = sshCryptoPolicy,
+            CryptoPolicy = SshCryptoPolicyResolver.Resolve(gateway.SshCryptoPolicy, sshCryptoPolicy),
             AgentKeyFingerprint = gateway.SshAgentKeyFingerprint,
             UseLegacyPasswordAsKeyPassphrase = gateway.UsesLegacySshCredentialMapping,
             LegacyCredentialName = gateway.Name

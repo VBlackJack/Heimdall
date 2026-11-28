@@ -147,17 +147,28 @@ public static class ImportedProfileSanitizer
         // Agent key fingerprints are machine-local; an imported gateway must not pick a local agent key.
         gateway.SshAgentKeyFingerprint = null;
 
-        string? keyPath = gateway.KeyPath;
-        if (!ImportedPathPolicy.IsNetworkOrDevicePath(keyPath))
+        // An imported gateway must not downgrade a workstation configured for StrictModern SSH crypto.
+        if (gateway.SshCryptoPolicy == Ssh.SshCryptoPolicy.LegacyCompatible)
         {
-            return null;
+            gateway.SshCryptoPolicy = null;
         }
 
-        gateway.KeyPath = null;
-        return new ImportedItemSanitization(
-            gateway.Name,
-            [new ImportedPathRemoval(GatewayKeyPathLabelKey, keyPath!)],
-            []);
+        List<ImportedPathRemoval> cleared = [];
+        if (ImportedPathPolicy.IsNetworkOrDevicePath(gateway.KeyPath))
+        {
+            cleared.Add(new ImportedPathRemoval(GatewayKeyPathLabelKey, gateway.KeyPath!));
+            gateway.KeyPath = null;
+        }
+
+        if (ImportedPathPolicy.IsNetworkOrDevicePath(gateway.SshCertificatePath))
+        {
+            cleared.Add(new ImportedPathRemoval("ServerDialogLabelSshCertificate", gateway.SshCertificatePath!));
+            gateway.SshCertificatePath = null;
+        }
+
+        return cleared.Count == 0
+            ? null
+            : new ImportedItemSanitization(gateway.Name, cleared, []);
     }
 
     private static List<ImportedPathRemoval> ClearNetworkPaths(ServerProfileDto profile)

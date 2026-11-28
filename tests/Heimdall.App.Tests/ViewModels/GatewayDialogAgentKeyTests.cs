@@ -61,6 +61,37 @@ public sealed class GatewayDialogAgentKeyTests
     }
 
     [Fact]
+    public void GatewayDialogViewModel_RoundTripsCertificatePathAndCryptoPolicy()
+    {
+        var dto = new SshGatewayDto
+        {
+            Name = "StrictBastion",
+            Host = "bastion.example.com",
+            Port = 22,
+            User = "ops",
+            KeyPath = @"C:\keys\id_ed25519",
+            SshCertificatePath = @"C:\keys\id_ed25519-cert.pub",
+            SshCryptoPolicy = SshCryptoPolicy.StrictModern
+        };
+
+        var vm = GatewayDialogViewModel.FromDto(dto);
+        Assert.Equal(@"C:\keys\id_ed25519-cert.pub", vm.SshCertificatePath);
+        Assert.Equal("StrictModern", vm.SshCryptoPolicySelection);
+
+        var exported = vm.ToDto();
+        Assert.Equal(@"C:\keys\id_ed25519-cert.pub", exported.SshCertificatePath);
+        Assert.Equal(SshCryptoPolicy.StrictModern, exported.SshCryptoPolicy);
+
+        var chainParams = GatewayChainResolver.ToConnectionParams(
+            [exported],
+            static s => s,
+            SshAgentPreference.AutoOpenSshFirst,
+            SshCryptoPolicy.Standard);
+        Assert.Equal(@"C:\keys\id_ed25519-cert.pub", chainParams[0].CertificatePath);
+        Assert.Equal(SshCryptoPolicy.StrictModern, chainParams[0].CryptoPolicy);
+    }
+
+    [Fact]
     public void HostKeyTrustService_MultiAlgorithmRemoval_PreservesRemainingAlgorithm()
     {
         var store = new HostKeyStore();

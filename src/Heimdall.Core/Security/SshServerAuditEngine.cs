@@ -98,6 +98,15 @@ public sealed record SshServerAuditReport(
     IReadOnlyList<SshAuditFinding> Findings,
     string RecommendedSshdConfig);
 
+/// <summary>Outcome of auditing one saved SSH server during a batch fleet cryptographic scan.</summary>
+public sealed record SshFleetServerAuditEntry(
+    string DisplayName,
+    string Host,
+    int Port,
+    string? GatewayName,
+    SshServerAuditReport? Report,
+    string? ErrorMessage = null);
+
 /// <summary>
 /// Evaluates an SSH server's advertised <c>SSH_MSG_KEXINIT</c> algorithms against modern
 /// cryptographic standards (ANSSI / SecNumCloud / post-quantum readiness / Terrapin CVE-2023-48795)
@@ -483,6 +492,101 @@ public static class SshServerAuditEngine
         sb.AppendLine("</tbody></table><h2>Recommended sshd_config</h2>");
         sb.AppendLine($"<pre>{WebUtility.HtmlEncode(report.RecommendedSshdConfig)}</pre>");
         sb.AppendLine("</body></html>");
+        return sb.ToString();
+    }
+
+    /// <summary>Exports a consolidated multi-host batch SSH audit report to CSV (RFC 4180 + formula-safe).</summary>
+    public static string FormatBatchCsvReport(IReadOnlyList<SshFleetServerAuditEntry> entries)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+
+        var sb = new StringBuilder();
+        sb.AppendLine("Name,Host,Port,Gateway,Status,Grade,AnssiCompliant,PostQuantumKex,StrictKex,Banner,FindingsCount,Error");
+        foreach (var e in entries)
+        {
+            if (e.Report is { } r)
+            {
+                sb.AppendLine(string.Join(",",
+                    SanitizeCsvCell(e.DisplayName),
+                    SanitizeCsvCell(e.Host),
+                    e.Port.ToString(CultureInfo.InvariantCulture),
+                    SanitizeCsvCell(e.GatewayName ?? string.Empty),
+                    SanitizeCsvCell("OK"),
+                    SanitizeCsvCell(GradeToString(r.Grade)),
+                    r.IsAnssiCompliant ? "true" : "false",
+                    r.HasPostQuantumKex ? "true" : "false",
+                    r.HasStrictKex ? "true" : "false",
+                    SanitizeCsvCell(r.Snapshot.ServerBanner),
+                    r.Findings.Count.ToString(CultureInfo.InvariantCulture),
+                    SanitizeCsvCell(string.Empty)));
+            }
+            else
+            {
+                sb.AppendLine(string.Join(",",
+                    SanitizeCsvCell(e.DisplayName),
+                    SanitizeCsvCell(e.Host),
+                    e.Port.ToString(CultureInfo.InvariantCulture),
+                    SanitizeCsvCell(e.GatewayName ?? string.Empty),
+                    SanitizeCsvCell("ERROR"),
+                    SanitizeCsvCell(string.Empty),
+                    "false",
+                    "false",
+                    "false",
+                    SanitizeCsvCell(string.Empty),
+                    "0",
+                    SanitizeCsvCell(e.ErrorMessage ?? string.Empty)));
+            }
+        }
+
+        return sb.ToString();
+    }
+
+    /// <summary>Exports a consolidated multi-host batch SSH audit report to standalone HTML.</summary>
+    public static string FormatBatchHtmlReport(IReadOnlyList<SshFleetServerAuditEntry> entries)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+
+        int succeeded = entries.Count(e => e.Report is not null);
+        int anssiPass = entries.Count(e => e.Report?.IsAnssiCompliant == true);
+        int pqReady = entries.Count(e => e.Report?.HasPostQuantumKex == true);
+        int failed = entries.Count - succeeded;
+
+        var sb = new StringBuilder();
+        sb.AppendLine("<!DOCTYPE html>");
+        sb.AppendLine("<html lang=\"en\"><head><meta charset=\"utf-8\">");
+        sb.AppendLine("<title>SSH Fleet Cryptographic Audit</title>");
+        sb.AppendLine("<style>body{font-family:Segoe UI,Arial,sans-serif;background:#1e1e2e;color:#cdd6f4;margin:24px;}h1{color:#89b4fa;}table{border-collapse:collapse;width:100%;margin:12px 0;}th,td{border:1px solid #45475a;padding:6px 10px;text-align:left;}th{background:#313244;}.badge{display:inline-block;padding:4px 10px;border-radius:4px;font-weight:bold;background:#313244;margin-right:8px;}</style>");
+        sb.AppendLine("</head><body>");
+        sb.AppendLine("<h1>SSH Fleet Cryptographic Audit</h1>");
+        sb.AppendLine($"<p><span class=\"badge\">Hosts: {entries.Count}</span><span class=\"badge\">Audited: {succeeded}</span><span class=\"badge\">ANSSI PASS: {anssiPass}</span><span class=\"badge\">PQ KEX: {pqReady}</span><span class=\"badge\">Errors: {failed}</span></p>");
+        sb.AppendLine("<table><thead><tr><th>Name</th><th>Endpoint</th><th>Gateway</th><th>Grade</th><th>ANSSI</th><th>PQ KEX</th><th>Strict KEX</th><th>Banner / Error</th></tr></thead><tbody>");
+        foreach (var e in entries)
+        {
+            string endpoint = $"{e.Host}:{e.Port}";
+            if (e.Report is { } r)
+            {
+                sb.AppendLine(
+                    $"<tr><td>{WebUtility.HtmlEncode(e.DisplayName)}</td>" +
+                    $"<td><code>{WebUtility.HtmlEncode(endpoint)}</code></td>" +
+                    $"<td>{WebUtility.HtmlEncode(e.GatewayName ?? "-")}</td>" +
+                    $"<td><strong>{WebUtility.HtmlEncode(GradeToString(r.Grade))}</strong></td>" +
+                    $"<td>{(r.IsAnssiCompliant ? "PASS" : "FAIL")}</td>" +
+                    $"<td>{(r.HasPostQuantumKex ? "YES" : "NO")}</td>" +
+                    $"<td>{(r.HasStrictKex ? "YES" : "NO")}</td>" +
+                    $"<td><code>{WebUtility.HtmlEncode(r.Snapshot.ServerBanner)}</code></td></tr>");
+            }
+            else
+            {
+                sb.AppendLine(
+                    $"<tr><td>{WebUtility.HtmlEncode(e.DisplayName)}</td>" +
+                    $"<td><code>{WebUtility.HtmlEncode(endpoint)}</code></td>" +
+                    $"<td>{WebUtility.HtmlEncode(e.GatewayName ?? "-")}</td>" +
+                    $"<td>-</td><td>-</td><td>-</td><td>-</td>" +
+                    $"<td>{WebUtility.HtmlEncode(e.ErrorMessage ?? "Error")}</td></tr>");
+            }
+        }
+
+        sb.AppendLine("</tbody></table></body></html>");
         return sb.ToString();
     }
 

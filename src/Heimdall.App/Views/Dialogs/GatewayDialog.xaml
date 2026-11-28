@@ -97,6 +97,36 @@
                             Click="OnBrowseKeyClick"/>
                 </Grid>
 
+                <TextBlock x:Name="LblCertificatePath" Text="{loc:Translate ServerDialogLabelSshCertificate}" Style="{StaticResource DialogLabelStyle}" Margin="0,12,0,4"/>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBox Grid.Column="0" Text="{Binding SshCertificatePath, UpdateSourceTrigger=PropertyChanged}"
+                             AutomationProperties.Name="{loc:Translate ServerDialogLabelSshCertificate}"
+                             Style="{StaticResource DialogFormTextBoxStyle}"
+                             x:Name="TxtCertificatePath"/>
+                    <Button Grid.Column="1" x:Name="BtnBrowseCertificate"
+                            Content="{loc:Translate GatewayDialogBtnBrowse}"
+                            AutomationProperties.Name="{loc:Translate GatewayDialogSelectSshCertificate}"
+                            Style="{DynamicResource SecondaryButtonStyle}"
+                            Margin="4,0,0,0"
+                            Click="OnBrowseCertificateClick"/>
+                </Grid>
+
+                <TextBlock x:Name="LblCryptoPolicy" Text="{loc:Translate ServerDialogSshCryptoPolicyLabel}" Style="{StaticResource DialogLabelStyle}" Margin="0,12,0,4"/>
+                <ComboBox x:Name="CmbCryptoPolicy"
+                          SelectedValue="{Binding SshCryptoPolicySelection}"
+                          SelectedValuePath="Tag"
+                          AutomationProperties.Name="{loc:Translate ServerDialogSshCryptoPolicyLabel}"
+                          Style="{StaticResource DialogFormComboBoxStyle}">
+                    <ComboBoxItem Content="{loc:Translate ServerDialogSshCryptoPolicyGlobal}" Tag=""/>
+                    <ComboBoxItem Content="{loc:Translate SettingsSshCryptoPolicyStandard}" Tag="Standard"/>
+                    <ComboBoxItem Content="{loc:Translate SettingsSshCryptoPolicyStrictModern}" Tag="StrictModern"/>
+                    <ComboBoxItem Content="{loc:Translate SettingsSshCryptoPolicyLegacy}" Tag="LegacyCompatible"/>
+                </ComboBox>
+
                 <TextBlock x:Name="LblAgentKey" Style="{StaticResource DialogLabelStyle}" Margin="0,12,0,4"/>
                 <Grid>
                     <Grid.ColumnDefinitions>

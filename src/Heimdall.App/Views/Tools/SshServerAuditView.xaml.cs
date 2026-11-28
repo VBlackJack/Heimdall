@@ -57,6 +57,19 @@ public partial class SshServerAuditView : UserControl, IToolView
         public Brush Brush { get; init; } = Brushes.Transparent;
     }
 
+    public sealed class FleetRowDisplayItem
+    {
+        public SshFleetServerAuditEntry Entry { get; init; } = null!;
+        public string DisplayName { get; init; } = string.Empty;
+        public string Endpoint { get; init; } = string.Empty;
+        public string Gateway { get; init; } = string.Empty;
+        public string Grade { get; init; } = string.Empty;
+        public string Anssi { get; init; } = string.Empty;
+        public string PostQuantum { get; init; } = string.Empty;
+        public string StrictKex { get; init; } = string.Empty;
+        public string Status { get; init; } = string.Empty;
+    }
+
     private readonly SshServerAuditViewModel _vm;
     private LocalizationManager? _localizer;
     private HeimdallThemeService? _themeService;
@@ -178,6 +191,18 @@ public partial class SshServerAuditView : UserControl, IToolView
         BtnCopy.Content = L("ToolTlsAuditBtnCopy");
         BtnExportHtml.Content = L("ToolSshServerAuditBtnExportHtml");
         BtnExportCsv.Content = L("ToolSshServerAuditBtnExportCsv");
+        BtnAuditFleet.Content = L("ToolSshServerAuditBtnAuditFleet");
+        LblFleetTitle.Text = L("ToolSshServerAuditFleetTitle");
+        BtnExportFleetHtml.Content = L("ToolSshServerAuditFleetBtnExportHtml");
+        BtnExportFleetCsv.Content = L("ToolSshServerAuditFleetBtnExportCsv");
+        ColFleetName.Header = L("ToolSshServerAuditFleetColName");
+        ColFleetEndpoint.Header = L("ToolSshServerAuditFleetColEndpoint");
+        ColFleetGateway.Header = L("ToolSshServerAuditFleetColGateway");
+        ColFleetGrade.Header = L("ToolSshServerAuditFleetColGrade");
+        ColFleetAnssi.Header = L("ToolSshServerAuditFleetColAnssi");
+        ColFleetPq.Header = L("ToolSshServerAuditFleetColPq");
+        ColFleetStrictKex.Header = L("ToolSshServerAuditFleetColStrictKex");
+        ColFleetStatus.Header = L("ToolSshServerAuditFleetColStatus");
 
         TxtHost.Tag = L("ToolWatermarkHostname");
         TxtPort.Tag = L("ToolTlsAuditPortLabel");
@@ -185,6 +210,10 @@ public partial class SshServerAuditView : UserControl, IToolView
         AutomationProperties.SetName(TxtHost, L("ToolSshServerAuditHostLabel"));
         AutomationProperties.SetName(TxtPort, L("ToolTlsAuditPortLabel"));
         AutomationProperties.SetName(CmbRouteVia, L("ToolTunnelRouteVia"));
+        AutomationProperties.SetName(BtnAuditFleet, L("ToolSshServerAuditBtnAuditFleet"));
+        AutomationProperties.SetName(BtnExportFleetHtml, L("ToolSshServerAuditFleetBtnExportHtml"));
+        AutomationProperties.SetName(BtnExportFleetCsv, L("ToolSshServerAuditFleetBtnExportCsv"));
+        AutomationProperties.SetName(FleetResultsGrid, L("ToolSshServerAuditFleetTitle"));
         AutomationProperties.SetName(BtnCopy, L("ToolTlsAuditBtnCopy"));
         AutomationProperties.SetName(BtnExportHtml, L("ToolSshServerAuditBtnExportHtml"));
         AutomationProperties.SetName(BtnExportCsv, L("ToolSshServerAuditBtnExportCsv"));
@@ -224,6 +253,87 @@ public partial class SshServerAuditView : UserControl, IToolView
         else _ = _vm.RunAuditCommand.ExecuteAsync(null);
     }
 
+    private async void OnAuditFleetClick(object sender, RoutedEventArgs e)
+    {
+        if (_disposed || _vm.IsAuditing) return;
+        var configManager = (Application.Current as App)?.Services?.GetService<IConfigManager>();
+        if (configManager is null)
+        {
+            ReportStatusText(L("ToolSshServerAuditFleetNoServers"));
+            return;
+        }
+
+        try
+        {
+            var servers = await configManager.LoadServersAsync().ConfigureAwait(true);
+            var settings = await configManager.LoadSettingsAsync().ConfigureAwait(true);
+            if (_disposed) return;
+            await _vm.RunFleetAuditAsync(servers, settings).ConfigureAwait(true);
+            if (!_disposed) RefreshUiFromVm();
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Warn($"[SshServerAudit] fleet audit failed: {ex.Message}");
+            if (!_disposed) ReportStatusText(ex.Message);
+        }
+    }
+
+    private void OnFleetRowSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (FleetResultsGrid.SelectedItem is FleetRowDisplayItem { Entry.Report: { } selectedReport })
+        {
+            _vm.Report = selectedReport;
+            _vm.ShowResults = true;
+            RefreshUiFromVm();
+        }
+    }
+
+    private void OnExportFleetHtmlClick(object sender, RoutedEventArgs e)
+    {
+        if (_vm.FleetResults.Count == 0) return;
+        try
+        {
+            var dialog = new Microsoft.Win32.SaveFileDialog
+            {
+                Filter = L("FileDialogHtmlFilter"),
+                FileName = $"ssh-fleet-audit-{DateTime.UtcNow:yyyyMMdd}.html"
+            };
+            if (dialog.ShowDialog() == true)
+            {
+                File.WriteAllText(dialog.FileName, SshServerAuditEngine.FormatBatchHtmlReport(_vm.FleetResults), new UTF8Encoding(false));
+                CopyFeedbackHelper.ShowCopyFeedback(BtnExportFleetHtml);
+            }
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Warn($"[SshServerAudit] Fleet HTML export failed: {ex.Message}");
+            ReportStatusText(ex.Message);
+        }
+    }
+
+    private void OnExportFleetCsvClick(object sender, RoutedEventArgs e)
+    {
+        if (_vm.FleetResults.Count == 0) return;
+        try
+        {
+            var dialog = new Microsoft.Win32.SaveFileDialog
+            {
+                Filter = L("FileDialogCsvFilter"),
+                FileName = $"ssh-fleet-audit-{DateTime.UtcNow:yyyyMMdd}.csv"
+            };
+            if (dialog.ShowDialog() == true)
+            {
+                File.WriteAllText(dialog.FileName, SshServerAuditEngine.FormatBatchCsvReport(_vm.FleetResults), new UTF8Encoding(false));
+                CopyFeedbackHelper.ShowCopyFeedback(BtnExportFleetCsv);
+            }
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Warn($"[SshServerAudit] Fleet CSV export failed: {ex.Message}");
+            ReportStatusText(ex.Message);
+        }
+    }
+
     private void OnGatewaySelected(SshGatewayDto? gateway) => _vm.SetGateway(gateway);
 
     private void ReportStatusText(string message)
@@ -246,6 +356,7 @@ public partial class SshServerAuditView : UserControl, IToolView
         TxtError.Visibility = _vm.ShowError ? Visibility.Visible : Visibility.Collapsed;
 
         EmptyStatePanel.Visibility = _vm.ShowEmptyState ? Visibility.Visible : Visibility.Collapsed;
+        FleetResultsPanel.Visibility = _vm.ShowFleetResults ? Visibility.Visible : Visibility.Collapsed;
         ResultsPanel.Visibility = _vm.ShowResults ? Visibility.Visible : Visibility.Collapsed;
 
         if (_vm.IsAuditing)
@@ -253,6 +364,7 @@ public partial class SshServerAuditView : UserControl, IToolView
             BtnAudit.Content = L("ToolCertBtnStop");
             BtnAudit.Style = (Style)FindResource("SecondaryButtonStyle");
             AutomationProperties.SetName(BtnAudit, L("ToolCertBtnStop"));
+            BtnAuditFleet.IsEnabled = false;
             TxtHost.IsReadOnly = true;
             TxtPort.IsReadOnly = true;
             CmbRouteVia.IsEnabled = false;
@@ -262,9 +374,27 @@ public partial class SshServerAuditView : UserControl, IToolView
             BtnAudit.Content = L("ToolSshServerAuditBtnAudit");
             BtnAudit.Style = (Style)FindResource("PrimaryButtonStyle");
             AutomationProperties.SetName(BtnAudit, L("ToolSshServerAuditBtnAudit"));
+            BtnAuditFleet.IsEnabled = true;
             TxtHost.IsReadOnly = false;
             TxtPort.IsReadOnly = false;
             CmbRouteVia.IsEnabled = true;
+        }
+
+        if (_vm.ShowFleetResults)
+        {
+            TxtFleetSummary.Text = _vm.FleetSummaryText;
+            FleetResultsGrid.ItemsSource = _vm.FleetResults.Select(entry => new FleetRowDisplayItem
+            {
+                Entry = entry,
+                DisplayName = entry.DisplayName,
+                Endpoint = $"{entry.Host}:{entry.Port}",
+                Gateway = entry.GatewayName ?? "-",
+                Grade = entry.Report is { } r ? SshServerAuditEngine.GradeToString(r.Grade) : "-",
+                Anssi = entry.Report is { } r1 ? (r1.IsAnssiCompliant ? "PASS" : "FAIL") : "-",
+                PostQuantum = entry.Report is { } r2 ? (r2.HasPostQuantumKex ? "YES" : "NO") : "-",
+                StrictKex = entry.Report is { } r3 ? (r3.HasStrictKex ? "YES" : "NO") : "-",
+                Status = entry.Report is { } r4 ? r4.Snapshot.ServerBanner : (entry.ErrorMessage ?? "Error")
+            }).ToList();
         }
 
         if (_vm.Report is { } report)

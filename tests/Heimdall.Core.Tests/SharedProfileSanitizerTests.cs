@@ -106,6 +106,7 @@ public sealed class SharedProfileSanitizerTests
     private static readonly string[] ResetGatewayProperties =
     [
         nameof(SshGatewayDto.ExtensionData), nameof(SshGatewayDto.KeyPath),
+        nameof(SshGatewayDto.SshCertificatePath), nameof(SshGatewayDto.SshCryptoPolicy),
         nameof(SshGatewayDto.SshPasswordEncrypted), nameof(SshGatewayDto.SshKeyPassphraseEncrypted),
         nameof(SshGatewayDto.IsDefault), nameof(SshGatewayDto.HostKeyFingerprint),
         nameof(SshGatewayDto.SshAgentKeyFingerprint),
