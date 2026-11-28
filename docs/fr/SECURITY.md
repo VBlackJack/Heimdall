@@ -1266,42 +1266,72 @@ contournement par réflexion.
 
 `HostKeyPromptDialog` lance une requête DNS `SSHFP` RFC 4255/6594/8709 non
 bloquante (`SshfpLookupService`, `SshfpMatcher`) via un codec binaire brut avec
-bit EDNS0 DO, socket UDP connecté (repli TCP sur troncature TC) et validation
-stricte des pointeurs de compression uniquement vers l'arrière
-(`MaxDnsCompressionHops = 16`). Le résultat reste purement consultatif et
-n'approuve jamais automatiquement une clé d'hôte. L'interface distingue la
-validation DNSSEC AD d'un résolveur local loopback, celle d'un résolveur réseau,
-une correspondance DNS non signée et une divergence. La vérification est ignorée
-dès que la cible passe par une passerelle SSH afin d'éviter toute fuite DNS
-split-horizon.
+bit EDNS0 DO, socket UDP connecté (repli TCP sur troncature TC), bascule par
+serveur DNS avec délai dédié (1 500 ms par serveur), validation stricte de
+QNAME/QTYPE/QCLASS et du nom propriétaire des réponses (suivi CNAME borné à 8
+sauts) et validation stricte des pointeurs de compression uniquement vers l'arrière
+(`MaxDnsCompressionHops = 16`). La vérification peut être désactivée globalement
+via `AppSettings.SshVerifyHostKeyDnsSshfp` (`Paramètres > SSH & SFTP > Clés d'hôte
+approuvées`) sur réseau isolé ou DNS interne. Le résultat reste purement
+consultatif et n'approuve jamais automatiquement une clé d'hôte. L'interface
+distingue la validation DNSSEC AD d'un résolveur local loopback, celle d'un
+résolveur réseau, une correspondance DNS non signée et une divergence. La
+vérification est ignorée dès que la cible passe par une passerelle SSH afin
+d'éviter toute fuite DNS split-horizon.
 
-### Rotation guidée de clé SSH, sonde KEXINIT, enregistrements et conformité du parc
+### Rotation guidée de clé SSH, gestionnaire `authorized_keys`, sonde KEXINIT, enregistrements et conformité du parc
 
+- **Confirmation de signature agent fail-closed et assainissement d'import** :
+  `SshAgentSignConfirmHelper` utilise une confirmation modale fail-closed
+  (`primaryIsDefault: false`, retour `false` à l'arrêt du dispatcher) branchée sur
+  les sessions SSH, SFTP, tunnels manuels, outils via passerelle
+  (`ToolGatewayConnector` appliquant aussi `HostKeyStore`, `SshCryptoPolicy` et
+  `@revoked`), déploiement de clé publique, rotation de clé et gestion distante
+  de `authorized_keys`. `ImportedProfileSanitizer` réinitialise
+  `SshCryptoPolicy.LegacyCompatible` sur les profils importés pour empêcher tout
+  affaiblissement silencieux, et `SettingsImportPreview` signale `SshCryptoPolicy`
+  et `SshConfirmAgentSigning` comme changements sensibles. Sous `StrictModern`, un
+  repli vers Plink ou PuTTY externe affiche un avis explicite indiquant que
+  Plink/PuTTY n'applique pas le filtre cryptographique intégré `StrictModern`.
 - **Rotation guidée de clé SSH** (`SshKeyRotator`, `SshKeyRotationDialogViewModel`) :
-  refuse d'écraser tout fichier existant ou la clé actuelle du profil, supprime
-  les fichiers nouvellement générés en cas d'échec ou d'annulation avant la
-  sauvegarde du profil, vérifie la nouvelle clé en isolation stricte
-  (`DisableAgentAuthentication = true`, sans repli mot de passe ni certificat),
-  enregistre le profil avant toute modification de `authorized_keys`, puis retire
-  l'ancienne clé de façon atomique (`mktemp` + `mv -f`) en refusant les liens
-  symboliques (`-L`), en vérifiant le code retour `grep <= 1` et l'invariant
+  refuse d'écraser tout fichier existant ou la clé actuelle du profil, rejette les
+  chemins UNC et périphériques, supprime les fichiers nouvellement générés en cas
+  d'échec ou d'annulation avant la sauvegarde du profil, vérifie la nouvelle clé
+  en isolation stricte (`DisableAgentAuthentication = true`, sans repli mot de
+  passe ni certificat), enregistre le profil avant toute modification de
+  `authorized_keys`, puis retire l'ancienne clé de façon atomique (`mktemp` +
+  `mv -f` avec nettoyage de `$tmp` en cas d'erreur `chmod`/`grep`) en refusant les
+  liens symboliques (`-L`), en vérifiant le code retour `grep <= 1` et l'invariant
   `[ -s "$tmp" ] && grep -Fq -- "$new_id" "$tmp"`.
-- **Audit cryptographique serveur SSH** (`SshKexInitProbe`) : lit uniquement la
-  bannière RFC 4253 et le paquet `SSH_MSG_KEXINIT` sans authentification, avec
-  plafonds stricts anti-DoS (`MaxPreBannerLines`, `MaxBannerBytesTotal`,
-  `MaxKexInitPacketLength = 65 536` octets), encodage HTML de tous les champs et
-  neutralisation des formules CSV.
-- **Enregistrement `.cast` v2 et copie masquée OSC 133** : `AsciinemaCastRecorder`
+- **Gestionnaire distant `authorized_keys`** (`SshAuthorizedKeysService`,
+  `SshAuthorizedKeysDialogViewModel`) : analyse les entrées OpenSSH avec options
+  entre guillemets et empreintes SHA-256, rejette les espaces hors guillemets et
+  caractères de contrôle dans les options, transfère les lignes ajoutées en Base64
+  contre toute injection shell, refuse les liens symboliques (`-L`), écrit de
+  façon atomique (`mktemp` + `chmod 600` + `mv -f`) et empêche par défaut la
+  suppression de la dernière clé restante sans confirmation explicite.
+- **Audit cryptographique serveur SSH** (`SshKexInitProbe`, `SshServerAuditEngine`) :
+  lit uniquement la bannière RFC 4253 et le paquet `SSH_MSG_KEXINIT` sans
+  authentification, avec plafonds stricts anti-DoS (`MaxPreBannerLines`,
+  `MaxBannerBytesTotal`, `MaxKexInitPacketLength = 65 536` octets), exigence que
+  chaque algorithme KEX, HostKey, Encryption et MAC annoncé soit `PostQuantum` ou
+  `Strong` pour `IsAnssiCompliant` et la note `A+`, encodage HTML de tous les
+  champs et neutralisation des formules CSV (rapports de parc inclus).
+- **Enregistrement `.cast` v2, garde ReDoS et OSC 133** : `AsciinemaCastRecorder`
   tamponne les séquences UTF-8 multi-octets à cheval sur n'importe quel découpage
-  de tampon, applique un plafond de caractères et propose un masquage des secrets
-  fail-closed via `TextRedactor` sur toute la transcription (refus d'export si une
-  règle expire). Les messages WebView2 `last-cmd-output:` OSC 133 propagent l'état
-  de troncature vers `MaskedCopyDialogViewModel` et sont journalisés uniquement
-  par leur longueur.
+  de tampon, applique un plafond de caractères et effectue un masquage des secrets
+  fail-closed sensible aux plages via `TextRedactor` tout en préservant les
+  horodatages exacts des événements non modifiés (refus d'export si une règle
+  expire). Les règles de surlignage regex personnalisées
+  (`TerminalHighlightRuleDefaults`) rejettent les motifs ReDoS dangereux
+  (quantificateurs non bornés imbriqués, références arrière `\1..\9`) et bornent
+  l'analyse à 4 096 caractères par segment. Les messages WebView2
+  `last-cmd-output:` OSC 133 propagent l'état de troncature vers
+  `MaskedCopyDialogViewModel` et sont journalisés uniquement par leur longueur.
 - **Conformité hors-ligne du parc SSH** (`SshFleetComplianceAnalyzer`) : aucun
   accès réseau, refus des chemins UNC `\\` et `//`, lecture locale bornée à
-  256 Ko, signalement des fichiers de clés corrompus ou illisibles et
-  neutralisation des cellules CSV.
+  256 Ko, audit des clés OpenSSH, FIDO2 (`sk-*`) et PuTTY PPK v2/v3, signalement
+  des fichiers de clés corrompus ou illisibles et neutralisation des cellules CSV.
 
 ### Comparaison des empreintes de clé d'hôte
 

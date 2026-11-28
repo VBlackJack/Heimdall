@@ -1127,37 +1127,68 @@ forwarding remains on the Plink path rather than using reflection hacks.
 
 `HostKeyPromptDialog` runs a non-blocking RFC 4255/6594/8709 DNS `SSHFP` lookup
 (`SshfpLookupService`, `SshfpMatcher`) using a raw wire codec with EDNS0 DO bit
-enabled, connected UDP sockets (with TCP fallback on TC truncation), and strict
-backward-only compression pointer validation (`MaxDnsCompressionHops = 16`). The
-result is advisory only and never auto-trusts a host key. The UI distinguishes
-local loopback DNSSEC AD validation, network-resolver AD validation, unsigned
-matches, and mismatches. Lookups are skipped whenever the target is reached
-through an SSH gateway to prevent split-horizon DNS leaks.
+enabled, connected UDP sockets (with TCP fallback on TC truncation), per-server
+timeout failover (1 500 ms per configured DNS server), strict QNAME/QTYPE/QCLASS
+and answer-owner validation (following bounded CNAME chains up to 8 hops), and
+strict backward-only compression pointer validation (`MaxDnsCompressionHops = 16`).
+Lookups can be disabled globally via `AppSettings.SshVerifyHostKeyDnsSshfp`
+(`Settings > SSH & SFTP > Trusted host keys`) on air-gapped or split-horizon
+networks. The result is advisory only and never auto-trusts a host key. The UI
+distinguishes local loopback DNSSEC AD validation, network-resolver AD validation,
+unsigned matches, and mismatches. Lookups are skipped whenever the target is
+reached through an SSH gateway to prevent split-horizon DNS leaks.
 
-### Guided SSH key rotation, KEXINIT probe, recordings, and fleet compliance
+### Guided SSH key rotation, remote `authorized_keys`, KEXINIT probe, recordings, and fleet compliance
 
+- **Fail-closed agent signing confirmation & import sanitization**:
+  `SshAgentSignConfirmHelper` uses a fail-closed modal confirmation (`primaryIsDefault: false`,
+  returning `false` on dispatcher shutdown) wired across SSH sessions, SFTP,
+  manual tunnels, tool gateways (`ToolGatewayConnector` also enforcing `HostKeyStore`,
+  `SshCryptoPolicy`, and `@revoked`), public-key deployment, key rotation, and
+  remote `authorized_keys` management. `ImportedProfileSanitizer` strips
+  `SshCryptoPolicy.LegacyCompatible` from imported profiles so an imported file
+  cannot silently downgrade crypto, and `SettingsImportPreview` highlights
+  `SshCryptoPolicy` and `SshConfirmAgentSigning` as sensitive changes. When
+  `StrictModern` is active and a session falls back to Plink or external PuTTY,
+  Heimdall surfaces an explicit notice stating that Plink/PuTTY does not enforce
+  the embedded `StrictModern` algorithm filter.
 - **Guided SSH key rotation** (`SshKeyRotator`, `SshKeyRotationDialogViewModel`):
   refuses to overwrite any existing file or the profile's current key path,
-  deletes newly created key files if rotation fails or is cancelled before profile
-  save, verifies the new key in strict isolation (`DisableAgentAuthentication =
-  true`, no password/certificate fallback), persists the updated profile before
-  touching remote `authorized_keys`, and removes the old key atomically via
-  `mktemp` + `mv -f` while refusing symlinks (`-L`), checking `grep` exit code
+  rejects UNC/device paths, deletes newly created key files if rotation fails or
+  is cancelled before profile save, verifies the new key in strict isolation
+  (`DisableAgentAuthentication = true`, no password/certificate fallback),
+  persists the updated profile before touching remote `authorized_keys`, and
+  removes the old key atomically via `mktemp` + `mv -f` (cleaning up `$tmp` on
+  `chmod`/`grep` error) while refusing symlinks (`-L`), checking `grep` exit code
   `<= 1`, and enforcing `[ -s "$tmp" ] && grep -Fq -- "$new_id" "$tmp"`.
-- **SSH Server Cryptographic Audit** (`SshKexInitProbe`): reads only the RFC 4253
-  banner and `SSH_MSG_KEXINIT` packet without authenticating, enforcing hard DoS
-  bounds (`MaxPreBannerLines`, `MaxBannerBytesTotal`, `MaxKexInitPacketLength =
-  65 536` bytes), HTML-encoding all report fields, and neutralizing CSV formula
-  prefixes.
-- **Session `.cast` v2 recording & OSC 133 masked copy**: `AsciinemaCastRecorder`
+- **Remote `authorized_keys` manager** (`SshAuthorizedKeysService`,
+  `SshAuthorizedKeysDialogViewModel`): parses OpenSSH entries with quoted options
+  and SHA-256 fingerprints, validates option strings against unquoted whitespace
+  or control characters, transfers new lines Base64-encoded to prevent shell
+  injection, refuses symlinks (`-L`), writes atomically via `mktemp` + `chmod 600`
+  + `mv -f`, and blocks last-key removal by default unless explicitly confirmed
+  in the UI.
+- **SSH Server Cryptographic Audit** (`SshKexInitProbe`, `SshServerAuditEngine`):
+  reads only the RFC 4253 banner and `SSH_MSG_KEXINIT` packet without
+  authenticating, enforcing hard DoS bounds (`MaxPreBannerLines`,
+  `MaxBannerBytesTotal`, `MaxKexInitPacketLength = 65 536` bytes), requiring every
+  advertised KEX, HostKey, Encryption, and MAC algorithm to be `PostQuantum` or
+  `Strong` for `IsAnssiCompliant` and `A+` grading, HTML-encoding all report
+  fields, and neutralizing CSV formula prefixes (including batch fleet reports).
+- **Session `.cast` v2 recording, ReDoS guard, & OSC 133**: `AsciinemaCastRecorder`
   buffers multi-byte UTF-8 across arbitrary chunk boundaries, enforces a character
-  cap, and supports fail-closed `TextRedactor` secret masking across chunk
-  boundaries (refusing export if any redaction regex times out). OSC 133
-  `last-cmd-output:` WebView2 messages propagate truncation state into
-  `MaskedCopyDialogViewModel` and are redacted to length-only in diagnostic logs.
+  cap, and performs span-aware fail-closed `TextRedactor` secret masking across
+  chunk boundaries while preserving original timestamps for unaffected events
+  (refusing export if any redaction regex times out). Custom terminal highlight
+  rules (`TerminalHighlightRuleDefaults`) reject unsafe ReDoS constructs (nested
+  unbounded quantifiers, backreferences `\1..\9`) and bound matching per segment
+  (4 096 chars). OSC 133 `last-cmd-output:` WebView2 messages propagate truncation
+  state into `MaskedCopyDialogViewModel` and are redacted to length-only in
+  diagnostic logs.
 - **Offline SSH Fleet Compliance** (`SshFleetComplianceAnalyzer`): performs zero
   network I/O, blocks both `\\` and `//` UNC key paths, bounds local file reads to
-  256 KiB, flags corrupt/unparseable key files, and neutralizes CSV formula cells.
+  256 KiB, audits OpenSSH keys, FIDO2 (`sk-*`) keys/certs, and PuTTY PPK v2/v3
+  files, flags corrupt/unparseable key files, and neutralizes CSV formula cells.
 
 ### Host-key fingerprint comparison
 
