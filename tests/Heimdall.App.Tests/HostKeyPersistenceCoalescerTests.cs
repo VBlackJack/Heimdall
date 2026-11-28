@@ -168,6 +168,29 @@ public sealed class HostKeyPersistenceCoalescerTests
         Assert.Equal("SHA256:revokedFp1", settings.RevokedHostKeys[0].Fingerprint);
     }
 
+    [Fact]
+    public async Task UpsertAdditionalAndRemoveAdditional_PersistsMultiAlgorithmKeys()
+    {
+        CountingConfigManager config = new();
+        FakeTimeProvider clock = new();
+        using HostKeyPersistenceCoalescer coalescer = new(config, clock, QuietWindow);
+
+        coalescer.Upsert("dual:22", Entry("SHA256:ed"));
+        coalescer.UpsertAdditional("dual:22|ssh-rsa", Entry("SHA256:rsa") with { Algorithm = "ssh-rsa" });
+        await coalescer.FlushAsync();
+
+        var saved = await config.LoadSettingsAsync();
+        Assert.Equal("SHA256:ed", saved.TrustedHostKeysV2["dual:22"].Fingerprint);
+        Assert.Equal("SHA256:rsa", saved.TrustedHostKeysAdditional["dual:22|ssh-rsa"].Fingerprint);
+
+        coalescer.RemoveAdditional("dual:22|ssh-rsa");
+        await coalescer.FlushAsync();
+
+        var afterRemove = await config.LoadSettingsAsync();
+        Assert.False(afterRemove.TrustedHostKeysAdditional.ContainsKey("dual:22|ssh-rsa"));
+        Assert.True(afterRemove.TrustedHostKeysV2.ContainsKey("dual:22"));
+    }
+
     private static HostKeyEntry Entry(string fingerprint) =>
         new(fingerprint, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, "ssh-ed25519", HostKeySource.ImportedKnownHosts);
 

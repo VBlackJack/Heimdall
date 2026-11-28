@@ -573,6 +573,10 @@ public sealed class AppSettings
     // Key: "host:port" or "[ipv6]:port"; Value: fingerprint + provenance.
     public Dictionary<string, HostKeyEntry> TrustedHostKeysV2 { get; set; } = new();
 
+    // Additional SSH host key algorithms trusted for multi-key hosts (e.g. RSA + Ed25519).
+    // Key: "host:port|canonicalAlgorithm"; Value: fingerprint + provenance.
+    public Dictionary<string, HostKeyEntry> TrustedHostKeysAdditional { get; set; } = new();
+
     // Persisted OpenSSH @cert-authority rules (host patterns + CA SHA256 fingerprint).
     public List<KnownHostsPolicyRuleDto> TrustedCertAuthorities { get; set; } = new();
 

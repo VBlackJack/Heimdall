@@ -118,7 +118,7 @@ public sealed partial class TunnelManager
         {
             boundLocalPort = socksProxyPort > 0
                 ? socksProxyPort
-                : (localPort > 0 ? localPort : remoteBindPort);
+                : (remoteLocalPort > 0 ? remoteLocalPort : (localPort > 0 ? localPort : remoteBindPort));
         }
         else
         {

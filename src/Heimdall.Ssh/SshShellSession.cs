@@ -65,6 +65,8 @@ public sealed class SshShellSession : IDisposable
     private PinnedFingerprintVerifier? _resolvedHostKeyVerifier;
     private ISshShellStream? _stream;
     private readonly List<ForwardedPort> _sessionForwardedPorts = [];
+    private readonly List<TunnelInfo> _sessionForwardInfos = [];
+    private readonly List<string> _failedPortForwards = [];
     private CancellationTokenSource? _readCts;
     private Task? _readLoopTask;
     private readonly object _teardownGate = new();
@@ -613,6 +615,9 @@ public sealed class SshShellSession : IDisposable
     private void CleanupAfterRemoteDisconnect()
     {
         DisposeReadLoopCancellationSource();
+        Interlocked.Exchange(ref _readLoopTask, null);
+        StopSessionPortForwards();
+        Volatile.Write(ref _resolvedHostKeyVerifier, null);
         CleanupStream();
         DisconnectClient();
     }
@@ -758,6 +763,27 @@ public sealed class SshShellSession : IDisposable
         }
     }
 
+    /// <summary>Descriptions of any configured direct port forwards that failed to start on this session.</summary>
+    public IReadOnlyList<string> FailedPortForwards
+    {
+        get
+        {
+            lock (_teardownGate)
+            {
+                return [.. _failedPortForwards];
+            }
+        }
+    }
+
+    /// <summary>Returns immutable snapshots of active direct port forwards bound to this session.</summary>
+    public IReadOnlyList<TunnelInfo> GetActiveSessionForwards()
+    {
+        lock (_teardownGate)
+        {
+            return [.. _sessionForwardInfos];
+        }
+    }
+
     private void StartSessionPortForwards(SshClient client, SshConnectionParams connectionParams)
     {
         if (!client.IsConnected)
@@ -765,13 +791,26 @@ public sealed class SshShellSession : IDisposable
             return;
         }
 
-        var started = new List<ForwardedPort>();
+        var started = new List<(ForwardedPort Port, TunnelInfo Info)>();
+        var failed = new List<string>();
+        var serverLabel = connectionParams.HostKeyVerificationHost;
+
         if (connectionParams.SocksProxyPort is >= 1 and <= 65535)
         {
-            TryStartPortForward(
-                client,
-                new ForwardedPortDynamic(LoopbackBinding.DefaultHost, (uint)connectionParams.SocksProxyPort),
-                started);
+            var desc = $"-D {LoopbackBinding.DefaultHost}:{connectionParams.SocksProxyPort}";
+            var port = new ForwardedPortDynamic(LoopbackBinding.DefaultHost, (uint)connectionParams.SocksProxyPort);
+            var info = TunnelManager.BuildTunnelInfo(
+                serverLabel,
+                connectionParams.SocksProxyPort,
+                remoteHost: string.Empty,
+                remotePort: 0,
+                socksProxyPort: connectionParams.SocksProxyPort,
+                remoteBindPort: 0,
+                remoteLocalPort: 0,
+                gatewayRoute: null,
+                label: "Session SOCKS5") with
+            { IsSessionBound = true };
+            TryStartPortForward(client, port, desc, info, started, failed);
         }
 
         if (connectionParams.RemoteBindPort is >= 1 and <= 65535)
@@ -779,14 +818,24 @@ public sealed class SshShellSession : IDisposable
             var localTarget = connectionParams.RemoteLocalPort is >= 1 and <= 65535
                 ? connectionParams.RemoteLocalPort
                 : connectionParams.RemoteBindPort;
-            TryStartPortForward(
-                client,
-                new ForwardedPortRemote(
-                    LoopbackBinding.DefaultHost,
-                    (uint)connectionParams.RemoteBindPort,
-                    LoopbackBinding.DefaultHost,
-                    (uint)localTarget),
-                started);
+            var desc = $"-R {connectionParams.RemoteBindPort}->{localTarget}";
+            var port = new ForwardedPortRemote(
+                LoopbackBinding.DefaultHost,
+                (uint)connectionParams.RemoteBindPort,
+                LoopbackBinding.DefaultHost,
+                (uint)localTarget);
+            var info = TunnelManager.BuildTunnelInfo(
+                serverLabel,
+                localTarget,
+                remoteHost: string.Empty,
+                remotePort: connectionParams.RemoteBindPort,
+                socksProxyPort: 0,
+                remoteBindPort: connectionParams.RemoteBindPort,
+                remoteLocalPort: localTarget,
+                gatewayRoute: null,
+                label: $"Session -R :{connectionParams.RemoteBindPort}") with
+            { IsSessionBound = true };
+            TryStartPortForward(client, port, desc, info, started, failed);
         }
 
         if (connectionParams.LocalForwards is { Count: > 0 })
@@ -798,18 +847,29 @@ public sealed class SshShellSession : IDisposable
                     continue;
                 }
 
-                TryStartPortForward(
-                    client,
-                    new ForwardedPortLocal(
-                        spec.BindAddress,
-                        (uint)spec.LocalPort,
-                        spec.RemoteHost,
-                        (uint)spec.RemotePort),
-                    started);
+                var desc = $"-L {spec.ToCanonicalString()}";
+                var port = new ForwardedPortLocal(
+                    spec.BindAddress,
+                    (uint)spec.LocalPort,
+                    spec.RemoteHost,
+                    (uint)spec.RemotePort);
+                var info = TunnelManager.BuildTunnelInfo(
+                    serverLabel,
+                    spec.LocalPort,
+                    spec.RemoteHost,
+                    spec.RemotePort,
+                    socksProxyPort: 0,
+                    remoteBindPort: 0,
+                    remoteLocalPort: 0,
+                    gatewayRoute: null,
+                    label: "Session -L",
+                    localBindHost: spec.BindAddress) with
+                { IsSessionBound = true };
+                TryStartPortForward(client, port, desc, info, started, failed);
             }
         }
 
-        if (started.Count == 0)
+        if (started.Count == 0 && failed.Count == 0)
         {
             return;
         }
@@ -820,30 +880,48 @@ public sealed class SshShellSession : IDisposable
             abandoned = _disposed || _teardownStarted;
             if (!abandoned)
             {
-                _sessionForwardedPorts.AddRange(started);
+                foreach (var item in started)
+                {
+                    _sessionForwardedPorts.Add(item.Port);
+                    _sessionForwardInfos.Add(item.Info);
+                }
+
+                if (failed.Count > 0)
+                {
+                    _failedPortForwards.AddRange(failed);
+                }
             }
         }
 
         if (abandoned)
         {
-            foreach (var port in started)
+            foreach (var item in started)
             {
-                DisposeForwardedPortSafely(client, port);
+                DisposeForwardedPortSafely(client, item.Port);
             }
         }
     }
 
-    private static void TryStartPortForward(SshClient client, ForwardedPort port, List<ForwardedPort> started)
+    private static void TryStartPortForward(
+        SshClient client,
+        ForwardedPort port,
+        string description,
+        TunnelInfo info,
+        List<(ForwardedPort Port, TunnelInfo Info)> started,
+        List<string> failed)
     {
         try
         {
+            port.Exception += (_, args) =>
+                FileLogger.Warn($"SshShellSession port forward ({description}) runtime error: {args.Exception.Message}");
             client.AddForwardedPort(port);
             port.Start();
-            started.Add(port);
+            started.Add((port, info));
         }
         catch (Exception ex)
         {
-            FileLogger.Warn($"SshShellSession direct port forward setup failed: {ex.Message}");
+            FileLogger.Warn($"SshShellSession direct port forward ({description}) setup failed: {ex.Message}");
+            failed.Add($"{description} ({ex.Message})");
             DisposeForwardedPortSafely(client, port);
         }
     }
@@ -886,6 +964,7 @@ public sealed class SshShellSession : IDisposable
         List<ForwardedPort> toStop;
         lock (_teardownGate)
         {
+            _sessionForwardInfos.Clear();
             if (_sessionForwardedPorts.Count == 0)
             {
                 return;

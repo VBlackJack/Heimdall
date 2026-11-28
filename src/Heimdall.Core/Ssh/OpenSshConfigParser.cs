@@ -45,6 +45,15 @@ public static partial class OpenSshConfigParser
         for (var index = 0; index < lines.Length; index++)
         {
             var lineNumber = index + 1;
+            if (string.Equals(lines[index], IncludeScopeResetMarker, StringComparison.Ordinal))
+            {
+                AddCurrentBlock(currentBlock, blocks);
+                currentBlock = null;
+                isInsideMatchBlock = false;
+                isInsideGlobalWildcard = false;
+                continue;
+            }
+
             var trimmedLine = StripComments(lines[index]).Trim();
             if (string.IsNullOrWhiteSpace(trimmedLine))
             {

@@ -54,6 +54,12 @@ public sealed class HostKeyStore
     /// </summary>
     public event Action? PolicyChanged;
 
+    /// <summary>Raised when an additional algorithm entry is added or updated (key: <c>host:port|algorithm</c>).</summary>
+    public event Action<string, HostKeyEntry>? AdditionalKeyTrusted;
+
+    /// <summary>Raised when an additional algorithm entry is removed (key: <c>host:port|algorithm</c>).</summary>
+    public event Action<string>? AdditionalKeyRemoved;
+
     /// <summary>
     /// Compare two fingerprint strings without leaking the position of any
     /// differing byte through timing variations. Inputs are OpenSSH-style
@@ -240,6 +246,38 @@ public sealed class HostKeyStore
     }
 
     /// <summary>
+    /// Loads persisted additional algorithm entries (keyed <c>host:port|algorithm</c>) at startup
+    /// without raising persistence events.
+    /// </summary>
+    public void LoadAdditionalEntriesFromConfig(IEnumerable<KeyValuePair<string, HostKeyEntry>>? entries)
+    {
+        if (entries is null)
+        {
+            return;
+        }
+
+        foreach (var (compositeKey, entry) in entries)
+        {
+            if (string.IsNullOrWhiteSpace(compositeKey)
+                || entry is null
+                || string.IsNullOrWhiteSpace(entry.Fingerprint)
+                || compositeKey.LastIndexOf('|') <= 0)
+            {
+                continue;
+            }
+
+            _additionalAlgorithmKeys[compositeKey] = NormalizeEntry(entry);
+        }
+    }
+
+    /// <summary>Returns all additional algorithm entries keyed by <c>host:port|algorithm</c>.</summary>
+    public IReadOnlyDictionary<string, HostKeyEntry> GetAllAdditionalEntries()
+        => _additionalAlgorithmKeys.ToDictionary(
+            static kvp => kvp.Key,
+            static kvp => kvp.Value,
+            StringComparer.Ordinal);
+
+    /// <summary>
     /// Registers an additional trusted host key for a different algorithm on the same
     /// <c>(host, port)</c> (for servers that serve both RSA and Ed25519 keys) without
     /// replacing the primary entry.
@@ -259,13 +297,15 @@ public sealed class HostKeyStore
         var canonicalAlgorithm = KnownHostsParser.CanonicalizeKeyType(algorithm);
         var compositeKey = MakeAlgorithmKey(HostKeyFormats.MakeKey(host, port), canonicalAlgorithm);
         var now = DateTimeOffset.UtcNow;
-        _additionalAlgorithmKeys[compositeKey] = new HostKeyEntry(
+        var entry = new HostKeyEntry(
             fingerprint,
             now,
             now,
             canonicalAlgorithm,
             source)
         { PublicKeyBase64 = publicKeyBase64 };
+        _additionalAlgorithmKeys[compositeKey] = entry;
+        AdditionalKeyTrusted?.Invoke(compositeKey, entry);
     }
 
     /// <summary>
@@ -325,7 +365,13 @@ public sealed class HostKeyStore
 
         var canonicalAlgorithm = KnownHostsParser.CanonicalizeKeyType(algorithm);
         var compositeKey = MakeAlgorithmKey(HostKeyFormats.MakeKey(host, port), canonicalAlgorithm);
-        return _additionalAlgorithmKeys.TryRemove(compositeKey, out _);
+        var removed = _additionalAlgorithmKeys.TryRemove(compositeKey, out _);
+        if (removed)
+        {
+            AdditionalKeyRemoved?.Invoke(compositeKey);
+        }
+
+        return removed;
     }
 
     /// <summary>
@@ -377,6 +423,7 @@ public sealed class HostKeyStore
 
         if (firstAdditional is { } next && _additionalAlgorithmKeys.TryRemove(next.Key, out var promoted))
         {
+            AdditionalKeyRemoved?.Invoke(next.Key);
             _trustedKeys[hostPort] = promoted;
             promotedPrimary = promoted;
             HostKeyEvent?.Invoke(hostPort, promoted.Fingerprint, true);
@@ -391,9 +438,10 @@ public sealed class HostKeyStore
         var prefix = hostPortKey + "|";
         foreach (var key in _additionalAlgorithmKeys.Keys)
         {
-            if (key.StartsWith(prefix, StringComparison.Ordinal))
+            if (key.StartsWith(prefix, StringComparison.Ordinal)
+                && _additionalAlgorithmKeys.TryRemove(key, out _))
             {
-                _additionalAlgorithmKeys.TryRemove(key, out _);
+                AdditionalKeyRemoved?.Invoke(key);
             }
         }
     }

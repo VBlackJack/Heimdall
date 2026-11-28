@@ -30,6 +30,18 @@ public sealed class HostKeyTrustService(HostKeyStore store) : IHostKeyTrustServi
 
     public event Action<string, HostKeyEntry, HostKeyEntry>? EntryReplaced;
 
+    public event Action<string, HostKeyEntry>? AdditionalEntryTrusted
+    {
+        add => _store.AdditionalKeyTrusted += value;
+        remove => _store.AdditionalKeyTrusted -= value;
+    }
+
+    public event Action<string>? AdditionalEntryRemoved
+    {
+        add => _store.AdditionalKeyRemoved += value;
+        remove => _store.AdditionalKeyRemoved -= value;
+    }
+
     public event Action? PolicyChanged
     {
         add => _store.PolicyChanged += value;
@@ -38,6 +50,29 @@ public sealed class HostKeyTrustService(HostKeyStore store) : IHostKeyTrustServi
 
     public HostKeyEntry? GetEntry(string host, int port)
         => TryFindStoredEntry(host, port, out _, out var entry) ? entry : null;
+
+    public HostKeyEntry? GetEntry(string host, int port, string algorithm)
+    {
+        if (string.IsNullOrWhiteSpace(algorithm))
+        {
+            return GetEntry(host, port);
+        }
+
+        var canonical = KnownHostsParser.CanonicalizeKeyType(algorithm);
+        var primary = GetEntry(host, port);
+        if (primary is not null)
+        {
+            var primaryCanonical = KnownHostsParser.CanonicalizeKeyType(primary.Algorithm);
+            if (string.Equals(primaryCanonical, canonical, StringComparison.Ordinal)
+                || string.Equals(primaryCanonical, "unknown", StringComparison.OrdinalIgnoreCase)
+                || string.IsNullOrWhiteSpace(primaryCanonical))
+            {
+                return primary;
+            }
+        }
+
+        return _store.GetAdditionalEntry(host, port, canonical);
+    }
 
     public HostKeyEntry? GetEffectiveEntry(string host, int port)
         => _store.GetSessionEntry(host, port) ?? GetEntry(host, port);
@@ -255,6 +290,30 @@ public sealed class HostKeyTrustService(HostKeyStore store) : IHostKeyTrustServi
                 NormalizeAlgorithm(algorithm, existing?.Algorithm),
                 HostKeySource.ImportedKnownHosts));
     }
+
+    public void TrustAdditionalAlgorithm(
+        string host,
+        int port,
+        string fingerprint,
+        string algorithm,
+        HostKeySource source,
+        string? publicKeyBase64 = null)
+    {
+        ArgumentNullException.ThrowIfNull(host);
+        ArgumentNullException.ThrowIfNull(fingerprint);
+        ArgumentException.ThrowIfNullOrWhiteSpace(algorithm);
+
+        _store.TrustAdditionalAlgorithm(
+            host,
+            port,
+            fingerprint,
+            NormalizeAlgorithm(algorithm),
+            source,
+            publicKeyBase64);
+    }
+
+    public IReadOnlyDictionary<string, HostKeyEntry> GetAllAdditionalEntries()
+        => _store.GetAllAdditionalEntries();
 
     /// <summary>
     /// Writes a durable entry under the plain <c>host:port</c> key and reconciles it

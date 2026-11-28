@@ -139,7 +139,8 @@ internal sealed partial class SshHandler
         SshAgentIdentityMatch? chosenAgentKey,
         Heimdall.Terminal.PipeModeSession terminalSession,
         bool firstByteProvesConsumption,
-        bool credentialFree)
+        bool credentialFree,
+        bool usesTunnel = false)
     {
         string? passwordFilePath = null;
         string? sizeSessionName = null;
@@ -171,7 +172,11 @@ internal sealed partial class SshHandler
                 passwordFilePath,
                 sizeSessionName,
                 agentKeyFilePath,
-                credentialFree);
+                credentialFree,
+                localForwards: server.SshLocalForwards,
+                socksProxyPort: usesTunnel ? 0 : server.SocksProxyPort,
+                remoteBindPort: usesTunnel ? 0 : server.RemoteBindPort,
+                remoteLocalPort: usesTunnel ? 0 : server.RemoteLocalPort);
 
             if (!string.IsNullOrEmpty(passwordFilePath))
             {
@@ -409,7 +414,11 @@ internal sealed partial class SshHandler
         bool x11Forwarding,
         int port,
         string target,
-        string? hostKeyFingerprint)
+        string? hostKeyFingerprint,
+        IReadOnlyList<string>? localForwards = null,
+        int socksProxyPort = 0,
+        int remoteBindPort = 0,
+        int remoteLocalPort = 0)
     {
         System.Diagnostics.ProcessStartInfo psi = new System.Diagnostics.ProcessStartInfo
         {
@@ -439,6 +448,8 @@ internal sealed partial class SshHandler
             psi.ArgumentList.Add("-X");
         }
 
+        AppendPuttyForwardArguments(psi.ArgumentList, localForwards, socksProxyPort, remoteBindPort, remoteLocalPort);
+
         psi.ArgumentList.Add("-P");
         psi.ArgumentList.Add(port.ToString());
 
@@ -463,7 +474,11 @@ internal sealed partial class SshHandler
         string? passwordFilePath = null,
         string? sizeSessionName = null,
         string? agentPublicKeyFilePath = null,
-        bool batchMode = false)
+        bool batchMode = false,
+        IReadOnlyList<string>? localForwards = null,
+        int socksProxyPort = 0,
+        int remoteBindPort = 0,
+        int remoteLocalPort = 0)
     {
         // Plink takes one identity file. Both set means two things asked for the same slot, which
         // the handler refuses before building: reaching here is a programming error.
@@ -520,6 +535,8 @@ internal sealed partial class SshHandler
             argParts.Add("-X");
         }
 
+        AppendPuttyForwardArguments(argParts, localForwards, socksProxyPort, remoteBindPort, remoteLocalPort);
+
         argParts.Add("-P");
         argParts.Add(port.ToString());
 
@@ -537,6 +554,47 @@ internal sealed partial class SshHandler
 
         argParts.Add(target);
         return string.Join(' ', argParts);
+    }
+
+    private static void AppendPuttyForwardArguments(
+        ICollection<string> args,
+        IReadOnlyList<string>? localForwards,
+        int socksProxyPort,
+        int remoteBindPort,
+        int remoteLocalPort)
+    {
+        if (localForwards is { Count: > 0 })
+        {
+            foreach (var raw in localForwards)
+            {
+                if (!SshLocalForwardSpec.TryParse(raw, out var spec) || spec is null)
+                {
+                    continue;
+                }
+
+                string bindHost = spec.BindAddress.Contains(':', StringComparison.Ordinal)
+                    ? $"[{spec.BindAddress}]"
+                    : spec.BindAddress;
+                string remoteHost = spec.RemoteHost.Contains(':', StringComparison.Ordinal)
+                    ? $"[{spec.RemoteHost}]"
+                    : spec.RemoteHost;
+                args.Add("-L");
+                args.Add($"{bindHost}:{spec.LocalPort}:{remoteHost}:{spec.RemotePort}");
+            }
+        }
+
+        if (socksProxyPort is >= 1 and <= 65535)
+        {
+            args.Add("-D");
+            args.Add($"{LoopbackBinding.DefaultHost}:{socksProxyPort}");
+        }
+
+        if (remoteBindPort is >= 1 and <= 65535)
+        {
+            int localTarget = remoteLocalPort is >= 1 and <= 65535 ? remoteLocalPort : remoteBindPort;
+            args.Add("-R");
+            args.Add($"{LoopbackBinding.DefaultHost}:{remoteBindPort}:{LoopbackBinding.DefaultHost}:{localTarget}");
+        }
     }
 
     internal static bool TryValidateKeyPath(

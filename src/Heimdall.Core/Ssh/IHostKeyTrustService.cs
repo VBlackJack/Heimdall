@@ -20,6 +20,12 @@ public interface IHostKeyTrustService
 {
     HostKeyEntry? GetEntry(string host, int port);
 
+    /// <summary>
+    /// Returns the trusted entry for <c>(host, port)</c> matching <paramref name="algorithm"/>,
+    /// checking both the primary entry and any additional trusted algorithms.
+    /// </summary>
+    HostKeyEntry? GetEntry(string host, int port, string algorithm) => GetEntry(host, port);
+
     HostKeyEntry? GetEffectiveEntry(string host, int port);
 
     IReadOnlyList<(string HostPort, HostKeyEntry Entry)> GetAllEntries();
@@ -37,6 +43,16 @@ public interface IHostKeyTrustService
     void TrustForSession(string host, int port, string fingerprint, string algorithm, string? publicKeyBase64 = null);
 
     void Import(string host, int port, string fingerprint, string algorithm, DateTimeOffset importedAt, string? publicKeyBase64 = null);
+
+    /// <summary>
+    /// Registers an additional trusted host key for a different algorithm on the same
+    /// <c>(host, port)</c> without replacing the primary entry.
+    /// </summary>
+    void TrustAdditionalAlgorithm(string host, int port, string fingerprint, string algorithm, HostKeySource source, string? publicKeyBase64 = null) { }
+
+    /// <summary>Returns all additional algorithm entries keyed by <c>host:port|algorithm</c>.</summary>
+    IReadOnlyDictionary<string, HostKeyEntry> GetAllAdditionalEntries()
+        => new Dictionary<string, HostKeyEntry>(StringComparer.Ordinal);
 
     bool Remove(string host, int port);
 
@@ -77,6 +93,10 @@ public interface IHostKeyTrustService
     event Action<string>? EntryRemoved;
 
     event Action<string, HostKeyEntry, HostKeyEntry>? EntryReplaced;
+
+    event Action<string, HostKeyEntry>? AdditionalEntryTrusted { add { } remove { } }
+
+    event Action<string>? AdditionalEntryRemoved { add { } remove { } }
 
     event Action? PolicyChanged { add { } remove { } }
 }

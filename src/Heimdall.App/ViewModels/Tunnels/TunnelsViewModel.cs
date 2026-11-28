@@ -358,12 +358,13 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private async Task CloseAsync(TunnelInfo? tunnel)
     {
-        if (tunnel is null)
+        if (tunnel is null || tunnel.IsSessionBound)
         {
             return;
         }
 
-        int sessions = CountSessionsOnTunnel(tunnel.LocalPort);
+        int trackingKey = tunnel.EffectiveTrackingKey;
+        int sessions = CountSessionsOnTunnel(trackingKey);
         if (sessions > 0
             && !await _host.ConfirmAsync(
                 _localizer["ConfirmCloseTunnelInUseTitle"],
@@ -379,7 +380,7 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
 
         // The close event reports the result, teardown error included; writing the plain
         // message here as well used to hide that error.
-        _tunnelManager.ForceCloseTunnel(tunnel.LocalPort);
+        _tunnelManager.ForceCloseTunnel(trackingKey);
         RefreshList();
     }
 
@@ -423,8 +424,11 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
 
         try
         {
-            System.Windows.Clipboard.SetText(tunnel.LocalPort.ToString());
-            _host.StatusText = _localizer.Format("StatusPortCopied", tunnel.LocalPort);
+            int portToCopy = tunnel.IsRemoteOnly && tunnel.EffectiveRemoteLocalPort > 0
+                ? tunnel.EffectiveRemoteLocalPort
+                : tunnel.LocalPort;
+            System.Windows.Clipboard.SetText(portToCopy.ToString());
+            _host.StatusText = _localizer.Format("StatusPortCopied", portToCopy);
         }
         catch (Exception ex)
         {
@@ -450,10 +454,16 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
         }
 
         var gateways = settings.SshGateways;
-        var activePorts = _tunnelManager.GetActiveTunnels()
+        var activeTunnels = _tunnelManager.GetActiveTunnels();
+        var activePorts = activeTunnels
+            .Where(t => !t.IsRemoteOnly)
             .Select(t => t.LocalPort)
             .ToHashSet();
-        var vm = new NewTunnelDialogViewModel(gateways, _localizer, activePorts);
+        var activeRemoteBinds = activeTunnels
+            .Where(t => t.RemoteBindPort > 0)
+            .Select(t => (t.ServerName, t.RemoteBindPort))
+            .ToHashSet();
+        var vm = new NewTunnelDialogViewModel(gateways, _localizer, activePorts, activeRemoteBinds);
         var dialog = new NewTunnelDialog
         {
             Owner = Application.Current?.MainWindow,
@@ -542,8 +552,16 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
             return;
         }
 
-        var activePorts = _tunnelManager.GetActiveTunnels().Select(t => t.LocalPort).ToHashSet();
-        var vm = new NewTunnelDialogViewModel(settings.SshGateways, _localizer, activePorts)
+        var activeTunnels = _tunnelManager.GetActiveTunnels();
+        var activePorts = activeTunnels
+            .Where(t => !t.IsRemoteOnly)
+            .Select(t => t.LocalPort)
+            .ToHashSet();
+        var activeRemoteBinds = activeTunnels
+            .Where(t => t.RemoteBindPort > 0)
+            .Select(t => (t.ServerName, t.RemoteBindPort))
+            .ToHashSet();
+        var vm = new NewTunnelDialogViewModel(settings.SshGateways, _localizer, activePorts, activeRemoteBinds)
         {
             SelectedGateway = gateway,
             ForwardMode = preset.Mode switch
@@ -737,7 +755,7 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
 
         var remoteHost = vm.ForwardMode == TunnelForwardMode.Local ? vm.RemoteHost.Trim() : string.Empty;
         var remotePort = vm.ForwardMode == TunnelForwardMode.Local ? vm.RemotePort : 0;
-        var localPort = vm.ForwardMode == TunnelForwardMode.Remote ? vm.RemotePort : vm.LocalPort;
+        var localPort = vm.ForwardMode == TunnelForwardMode.Remote ? 0 : vm.LocalPort;
         var socksProxyPort = vm.ForwardMode == TunnelForwardMode.DynamicSocks5 ? vm.LocalPort : 0;
         var remoteBindPort = vm.ForwardMode == TunnelForwardMode.Remote ? vm.RemotePort : 0;
         var remoteLocalPort = vm.ForwardMode == TunnelForwardMode.Remote ? vm.LocalPort : 0;

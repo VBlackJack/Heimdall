@@ -16,11 +16,14 @@
 
 using System.Globalization;
 using Heimdall.App.Localization;
+using Heimdall.App.Services.Handlers;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Logging;
+using Heimdall.Core.Models;
 using Heimdall.Core.Ssh;
 using Heimdall.Ssh;
+using Heimdall.Ssh.Agents;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Heimdall.App.Services;
@@ -55,7 +58,8 @@ internal static class SshPublicKeyDeployUiHelper
         IServiceProvider? services,
         string publicKeyLine,
         LocalizationManager localizer,
-        Action<string> reportStatus)
+        Action<string> reportStatus,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(localizer);
         ArgumentNullException.ThrowIfNull(reportStatus);
@@ -82,20 +86,25 @@ internal static class SshPublicKeyDeployUiHelper
 
         var servers = await configManager.LoadServersAsync().ConfigureAwait(true);
         var settings = await configManager.LoadSettingsAsync().ConfigureAwait(true);
-        var directSshServers = servers
+        var tunnelService = services?.GetService<ITunnelService>();
+        var sshServers = servers
             .Where(s => string.Equals(s.ConnectionType, "SSH", StringComparison.OrdinalIgnoreCase)
                 && !string.IsNullOrWhiteSpace(s.RemoteServer)
-                && (s.UseDirectConnection || string.IsNullOrWhiteSpace(s.SshGatewayId)))
+                && (s.UseDirectConnection || string.IsNullOrWhiteSpace(s.SshGatewayId) || tunnelService is not null))
             .ToList();
 
-        if (directSshServers.Count == 0)
+        if (sshServers.Count == 0)
         {
             reportStatus(localizer["ToolSshKeyGenDeployNoServers"]);
             return;
         }
 
-        var choices = directSshServers
-            .Select(s => $"{s.DisplayName} ({s.RemoteServer}:{s.SshPort})")
+        var choices = sshServers
+            .Select(s =>
+            {
+                int port = s.SshPort > 0 ? s.SshPort : DefaultPorts.Ssh;
+                return $"{s.DisplayName} ({s.RemoteServer}:{port})";
+            })
             .ToList();
 
         var selected = await dialogService.ShowChoiceAsync(
@@ -105,64 +114,198 @@ internal static class SshPublicKeyDeployUiHelper
             defaultIndex: 0,
             cancelLabel: localizer["BtnCancel"]);
 
-        if (selected is not int index || index < 0 || index >= directSshServers.Count)
+        if (selected is not int index || index < 0 || index >= sshServers.Count)
         {
             return;
         }
 
-        var target = directSshServers[index];
+        await DeployToServerAsync(
+            services,
+            sshServers[index],
+            settings,
+            normalizedKey,
+            localizer,
+            reportStatus,
+            cancellationToken).ConfigureAwait(true);
+    }
+
+    public static async Task DeployToServerAsync(
+        IServiceProvider? services,
+        ServerProfileDto target,
+        AppSettings settings,
+        string publicKeyLine,
+        LocalizationManager localizer,
+        Action<string> reportStatus,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(localizer);
+        ArgumentNullException.ThrowIfNull(reportStatus);
+
+        if (!SshPublicKeyDeployer.TryValidatePublicKeyLine(publicKeyLine, out var normalizedKey))
+        {
+            reportStatus(string.Format(
+                CultureInfo.CurrentCulture,
+                localizer["ToolSshKeyGenDeployFailed"],
+                localizer["ToolSshKeyDeployErrInvalidKey"]));
+            return;
+        }
+
+        var dialogService = services?.GetService<IDialogService>();
+        var hostKeyStore = services?.GetService<HostKeyStore>();
+        var hostKeyVerifier = services?.GetService<IHostKeyVerifier>();
+        if (dialogService is null || hostKeyStore is null || hostKeyVerifier is null)
+        {
+            reportStatus(localizer["ToolSshKeyGenDeployNoServers"]);
+            return;
+        }
+
+        int targetPort = target.SshPort > 0 ? target.SshPort : DefaultPorts.Ssh;
         var password = ConnectionHelpers.DecryptPassword(target.SshPasswordEncrypted);
         var keyPassphrase = ConnectionHelpers.DecryptPassword(target.SshKeyPassphraseEncrypted);
+
+        // If the profile has no stored password or key file and no agent holds a key, prompt for a password
+        // so password-only servers can accept their first public key deployment cleanly.
+        if (string.IsNullOrEmpty(password)
+            && string.IsNullOrWhiteSpace(target.SshKeyPath)
+            && string.IsNullOrWhiteSpace(target.SshAgentKeyFingerprint))
+        {
+            bool hasAgentKeys = false;
+            try
+            {
+                hasAgentKeys = SshAgentRegistry.CreateDefault(settings.SshAgentPreference)
+                    .Observe().OfferableIdentityCount > 0;
+            }
+            catch (Exception)
+            {
+                hasAgentKeys = false;
+            }
+
+            if (!hasAgentKeys)
+            {
+                var endpoint = string.IsNullOrWhiteSpace(target.SshUsername)
+                    ? target.RemoteServer
+                    : $"{target.SshUsername}@{target.RemoteServer}";
+                password = await dialogService.ShowPasswordInputAsync(
+                    localizer["DialogSshPasswordPromptTitle"],
+                    localizer.Format("DialogSshPasswordPromptMessage", endpoint),
+                    cancellationToken).ConfigureAwait(true);
+                if (password is null)
+                {
+                    return;
+                }
+            }
+        }
 
         reportStatus(string.Format(
             CultureInfo.CurrentCulture,
             localizer["ToolSshKeyGenDeployInProgress"],
             target.DisplayName));
 
-        var connParams = new SshConnectionParams
-        {
-            Host = target.RemoteServer,
-            Port = target.SshPort,
-            Username = target.SshUsername ?? string.Empty,
-            KeyPath = string.IsNullOrWhiteSpace(target.SshKeyPath) ? null : target.SshKeyPath,
-            Password = password,
-            KeyPassphrase = keyPassphrase,
-            SshAgentPreference = settings.SshAgentPreference,
-            AgentKeyFingerprint = target.SshAgentKeyFingerprint,
-            UseLegacyPasswordAsKeyPassphrase = target.UsesLegacySshCredentialMapping,
-            LegacyCredentialName = target.DisplayName,
-            AuthenticationTimeout = TimeSpan.FromMinutes(2),
-            KeyboardInteractiveResponder = request => dialogService.ShowPasswordInputAsync(
-                localizer[SshLocalizationKeys.InteractivePromptTitle],
-                string.Format(
-                    CultureInfo.CurrentCulture,
-                    localizer[SshLocalizationKeys.InteractivePromptMessage],
-                    target.RemoteServer,
-                    target.SshUsername ?? string.Empty,
-                    ServerPromptText.Sanitize(request))).GetAwaiter().GetResult()
-        };
+        string connectHost = target.RemoteServer;
+        int connectPort = targetPort;
+        string? logicalHost = null;
+        int? logicalPort = null;
 
-        var result = await SshPublicKeyDeployer.DeployAsync(
-                connParams,
-                normalizedKey,
-                hostKeyStore,
-                hostKeyVerifier)
-            .ConfigureAwait(true);
+        var tunnelService = services?.GetService<ITunnelService>();
+        bool needsTunnel = !target.UseDirectConnection && !string.IsNullOrWhiteSpace(target.SshGatewayId);
+        TunnelLease? tunnelLease = null;
 
-        if (result.Success)
+        try
         {
-            var key = result.AlreadyInstalled
-                ? "ToolSshKeyGenDeployAlreadyInstalled"
-                : "ToolSshKeyGenDeploySuccess";
-            reportStatus(string.Format(CultureInfo.CurrentCulture, localizer[key], target.DisplayName));
-            return;
+            if (needsTunnel)
+            {
+                if (tunnelService is null)
+                {
+                    reportStatus(string.Format(
+                        CultureInfo.CurrentCulture,
+                        localizer["ToolSshKeyGenDeployFailed"],
+                        localizer[SshLocalizationKeys.ErrorTunnelFailed]));
+                    return;
+                }
+
+                var tunnelOutcome = await tunnelService.SetupTunnelIfNeededAsync(
+                    target,
+                    targetPort,
+                    settings,
+                    cancellationToken).ConfigureAwait(true);
+                if (!tunnelOutcome.Success)
+                {
+                    reportStatus(string.Format(
+                        CultureInfo.CurrentCulture,
+                        localizer["ToolSshKeyGenDeployFailed"],
+                        tunnelOutcome.ErrorMessage ?? localizer[SshLocalizationKeys.ErrorTunnelFailed]));
+                    return;
+                }
+
+                if (tunnelOutcome.UsesTunnel && tunnelOutcome.Port > 0)
+                {
+                    tunnelLease = new TunnelLease(
+                        tunnelService,
+                        usesTunnel: true,
+                        localPort: tunnelOutcome.Port,
+                        leaseId: tunnelOutcome.TunnelLeaseId);
+                    connectHost = tunnelOutcome.Host;
+                    connectPort = tunnelOutcome.Port;
+                    logicalHost = target.RemoteServer;
+                    logicalPort = targetPort;
+                }
+            }
+
+            var connParams = new SshConnectionParams
+            {
+                Host = connectHost,
+                Port = connectPort,
+                LogicalHost = logicalHost,
+                LogicalPort = logicalPort,
+                Username = target.SshUsername ?? string.Empty,
+                KeyPath = string.IsNullOrWhiteSpace(target.SshKeyPath) ? null : target.SshKeyPath,
+                Password = password,
+                KeyPassphrase = keyPassphrase,
+                SshAgentPreference = settings.SshAgentPreference,
+                AgentKeyFingerprint = target.SshAgentKeyFingerprint,
+                UseLegacyPasswordAsKeyPassphrase = target.UsesLegacySshCredentialMapping,
+                LegacyCredentialName = target.DisplayName,
+                AuthenticationTimeout = TimeSpan.FromMinutes(2),
+                KeyboardInteractiveResponder = request => dialogService.ShowPasswordInputAsync(
+                    localizer[SshLocalizationKeys.InteractivePromptTitle],
+                    string.Format(
+                        CultureInfo.CurrentCulture,
+                        localizer[SshLocalizationKeys.InteractivePromptMessage],
+                        target.RemoteServer,
+                        target.SshUsername ?? string.Empty,
+                        ServerPromptText.Sanitize(request)),
+                    cancellationToken).GetAwaiter().GetResult()
+            };
+
+            var result = await SshPublicKeyDeployer.DeployAsync(
+                    connParams,
+                    normalizedKey,
+                    hostKeyStore,
+                    hostKeyVerifier,
+                    cancellationToken)
+                .ConfigureAwait(true);
+
+            if (result.Success)
+            {
+                var key = result.AlreadyInstalled
+                    ? "ToolSshKeyGenDeployAlreadyInstalled"
+                    : "ToolSshKeyGenDeploySuccess";
+                reportStatus(string.Format(CultureInfo.CurrentCulture, localizer[key], target.DisplayName));
+                return;
+            }
+
+            var errorText = FormatDeployError(result, localizer);
+            FileLogger.Warn($"SSH public key deployment failed ({result.ErrorCode}): {errorText}");
+            reportStatus(string.Format(
+                CultureInfo.CurrentCulture,
+                localizer["ToolSshKeyGenDeployFailed"],
+                errorText));
         }
-
-        var errorText = FormatDeployError(result, localizer);
-        FileLogger.Warn($"SSH public key deployment failed ({result.ErrorCode}): {errorText}");
-        reportStatus(string.Format(
-            CultureInfo.CurrentCulture,
-            localizer["ToolSshKeyGenDeployFailed"],
-            errorText));
+        finally
+        {
+            tunnelLease?.Dispose();
+        }
     }
 }

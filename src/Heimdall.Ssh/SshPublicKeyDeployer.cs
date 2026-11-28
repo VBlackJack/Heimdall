@@ -52,6 +52,7 @@ public static class SshPublicKeyDeployer
 {
     internal const string MarkerAdded = "HEIMDALL_KEY_ADDED";
     internal const string MarkerExists = "HEIMDALL_KEY_EXISTS";
+    internal static readonly TimeSpan DefaultCommandTimeout = TimeSpan.FromSeconds(30);
 
     private static readonly HashSet<string> SupportedKeyTypes = new(StringComparer.Ordinal)
     {
@@ -118,10 +119,15 @@ public static class SshPublicKeyDeployer
     internal static string BuildDeployCommand(string validatedPublicKeyLine)
     {
         var base64Payload = Convert.ToBase64String(Encoding.UTF8.GetBytes(validatedPublicKeyLine));
+        var parts = validatedPublicKeyLine.Split(' ', 3, StringSplitOptions.RemoveEmptyEntries);
+        var keyIdentity = parts.Length >= 2 ? $"{parts[0]} {parts[1]}" : validatedPublicKeyLine;
+        var base64Identity = Convert.ToBase64String(Encoding.UTF8.GetBytes(keyIdentity));
+
         return $"key=$(printf '%s' '{base64Payload}' | base64 -d) && " +
+               $"key_id=$(printf '%s' '{base64Identity}' | base64 -d) && " +
                "mkdir -p \"$HOME/.ssh\" && chmod 700 \"$HOME/.ssh\" && " +
                "ak=\"$HOME/.ssh/authorized_keys\" && touch \"$ak\" && chmod 600 \"$ak\" && " +
-               $"(grep -Fqx \"$key\" \"$ak\" && echo {MarkerExists} || " +
+               $"(grep -Fq \"$key_id\" \"$ak\" && echo {MarkerExists} || " +
                $"((! [ -s \"$ak\" ] || [ -z \"$(tail -c 1 \"$ak\")\" ] || printf '\\n' >> \"$ak\") && " +
                $"printf '%s\\n' \"$key\" >> \"$ak\" && echo {MarkerAdded}))";
     }
@@ -171,6 +177,7 @@ public static class SshPublicKeyDeployer
 
             var commandText = BuildDeployCommand(normalizedLine);
             using var cmd = client.CreateCommand(commandText);
+            cmd.CommandTimeout = DefaultCommandTimeout;
             var asyncResult = cmd.BeginExecute();
             using var reg = cancellationToken.Register(static state =>
             {

@@ -116,6 +116,7 @@ public partial class EmbeddedSshView
                 DiskDetailText.Text = unsupported;
                 HealthUptimeSection.Visibility = Visibility.Collapsed;
                 HealthLoadSection.Visibility = Visibility.Collapsed;
+                StopHealthMonitor();
                 return;
             }
 

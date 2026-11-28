@@ -99,6 +99,7 @@ public sealed class KnownHostsImporter(IHostKeyTrustService trustService)
         var imported = 0;
         var matched = 0;
         var conflicts = new List<KnownHostsImportConflict>();
+        var importedPrimaryHosts = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var diagnostic in parseResult.Diagnostics)
         {
@@ -108,6 +109,7 @@ public sealed class KnownHostsImporter(IHostKeyTrustService trustService)
         foreach (var entry in parseResult.Entries)
         {
             var fingerprint = HostKeyFormats.ComputeSha256Fingerprint(entry.Base64Key);
+            var hostPortKey = HostKeyFormats.MakeKey(entry.Host, entry.Port);
             var existing = _trustService.GetEntry(entry.Host, entry.Port);
             if (existing is null)
             {
@@ -118,6 +120,7 @@ public sealed class KnownHostsImporter(IHostKeyTrustService trustService)
                     entry.KeyType,
                     importedAt,
                     Convert.ToBase64String(entry.Base64Key));
+                importedPrimaryHosts.Add(hostPortKey);
                 imported++;
                 continue;
             }
@@ -128,6 +131,38 @@ public sealed class KnownHostsImporter(IHostKeyTrustService trustService)
                 matched++;
                 FileLogger.Info($"known_hosts import matched existing trust entry for {entry.Host}:{entry.Port}");
                 continue;
+            }
+
+            // A server in known_hosts often lists multiple distinct algorithms (e.g. ssh-ed25519 + ssh-rsa).
+            // When the host was imported in this batch (or already holds an additional slot for this algorithm),
+            // store distinct algorithms in the multi-algorithm slot instead of flagging a self-conflict.
+            var existingAlgorithm = KnownHostsParser.CanonicalizeKeyType(existing.Algorithm);
+            var incomingAlgorithm = KnownHostsParser.CanonicalizeKeyType(entry.KeyType);
+            if (!string.IsNullOrWhiteSpace(existingAlgorithm)
+                && !string.Equals(existingAlgorithm, "unknown", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(existingAlgorithm, incomingAlgorithm, StringComparison.Ordinal))
+            {
+                var additionalExisting = _trustService.GetEntry(entry.Host, entry.Port, incomingAlgorithm);
+                if (additionalExisting is not null
+                    && string.Equals(additionalExisting.Fingerprint, fingerprint, StringComparison.Ordinal))
+                {
+                    _trustService.Verify(entry.Host, entry.Port, fingerprint, entry.KeyType);
+                    matched++;
+                    continue;
+                }
+
+                if (additionalExisting is null && importedPrimaryHosts.Contains(hostPortKey))
+                {
+                    _trustService.TrustAdditionalAlgorithm(
+                        entry.Host,
+                        entry.Port,
+                        fingerprint,
+                        incomingAlgorithm,
+                        HostKeySource.ImportedKnownHosts,
+                        Convert.ToBase64String(entry.Base64Key));
+                    imported++;
+                    continue;
+                }
             }
 
             conflicts.Add(new KnownHostsImportConflict(

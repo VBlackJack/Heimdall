@@ -47,11 +47,13 @@ public sealed partial class NewTunnelDialogViewModel : ObservableObject
 {
     private readonly LocalizationManager _localizer;
     private readonly HashSet<int> _activeLocalPorts;
+    private readonly HashSet<(string GatewayHost, int RemoteBindPort)> _activeRemoteBinds;
 
     public NewTunnelDialogViewModel(
         IReadOnlyList<SshGatewayDto> gateways,
         LocalizationManager localizer,
-        IReadOnlySet<int>? activeLocalPorts = null)
+        IReadOnlySet<int>? activeLocalPorts = null,
+        IReadOnlySet<(string GatewayHost, int RemoteBindPort)>? activeRemoteBinds = null)
     {
         ArgumentNullException.ThrowIfNull(gateways);
         ArgumentNullException.ThrowIfNull(localizer);
@@ -60,6 +62,10 @@ public sealed partial class NewTunnelDialogViewModel : ObservableObject
         _activeLocalPorts = activeLocalPorts is null
             ? []
             : new HashSet<int>(activeLocalPorts);
+        _activeRemoteBinds = activeRemoteBinds is null
+            ? []
+            : new HashSet<(string GatewayHost, int RemoteBindPort)>(
+                activeRemoteBinds.Select(static x => (x.GatewayHost.ToUpperInvariant(), x.RemoteBindPort)));
 
         Gateways = gateways;
         SelectedGateway = gateways.FirstOrDefault();
@@ -289,13 +295,23 @@ public sealed partial class NewTunnelDialogViewModel : ObservableObject
                 65535);
         }
 
-        int trackedPort = ForwardMode == TunnelForwardMode.Remote ? RemotePort : LocalPort;
-        if (_activeLocalPorts.Contains(trackedPort))
+        if (ForwardMode == TunnelForwardMode.Remote)
+        {
+            if (SelectedGateway is not null
+                && _activeRemoteBinds.Contains((SelectedGateway.Host.ToUpperInvariant(), RemotePort)))
+            {
+                return string.Format(
+                    CultureInfo.CurrentCulture,
+                    _localizer["NewTunnelValidationLocalPortInUse"],
+                    RemotePort);
+            }
+        }
+        else if (_activeLocalPorts.Contains(LocalPort))
         {
             return string.Format(
                 CultureInfo.CurrentCulture,
                 _localizer["NewTunnelValidationLocalPortInUse"],
-                trackedPort);
+                LocalPort);
         }
 
         return null;

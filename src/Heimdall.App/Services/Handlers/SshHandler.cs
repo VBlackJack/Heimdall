@@ -545,7 +545,16 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
 
         _connectionSm.TryTransition(server.Id, ConnectionState.Connected);
         lease.Transfer();
-        return new ConnectionResult(true, null, new SshSessionResult(session, server.SessionLoggingOverride));
+        string? forwardWarning = session.FailedPortForwards.Count > 0
+            ? _localizer.Format(
+                SshLocalizationKeys.StatusSshPortForwardFailed,
+                string.Join(", ", session.FailedPortForwards))
+            : null;
+        return new ConnectionResult(
+            true,
+            null,
+            new SshSessionResult(session, server.SessionLoggingOverride),
+            Warning: forwardWarning);
     }
 
     /// <remarks>
@@ -818,7 +827,11 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
                 x11Forwarding,
                 targetPort,
                 target,
-                hostKeyArg);
+                hostKeyArg,
+                localForwards: server.SshLocalForwards,
+                socksProxyPort: usesTunnel ? 0 : server.SocksProxyPort,
+                remoteBindPort: usesTunnel ? 0 : server.RemoteBindPort,
+                remoteLocalPort: usesTunnel ? 0 : server.RemoteLocalPort);
             Core.Logging.FileLogger.Info($"Launching PuTTY: {puttyPath} for {targetHost}:{targetPort}");
 
             System.Diagnostics.Process startedProcess = new()
@@ -1181,7 +1194,8 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
                     chosenAgentKey,
                     terminalSession,
                     attestation.FirstByteProvesConsumption,
-                    credentialFree);
+                    credentialFree,
+                    usesTunnel);
                 if (preparation.Error is { } prepareError)
                 {
                     Core.Logging.FileLogger.Error("Plink launch preparation failed", prepareError);

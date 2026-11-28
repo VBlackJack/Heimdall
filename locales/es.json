@@ -438,6 +438,7 @@
   "StatusSshDirectCompressionUnavailable": "La ruta directa de SSH.NET resuelta no admite compresión. La conexión continuará sin ella.",
   "StatusSshDirectX11AndCompressionUnavailable": "La ruta directa de SSH.NET resuelta no admite el reenvío X11 ni la compresión. La conexión continuará sin ellos.",
   "StatusSshDirectX11Unavailable": "La ruta directa de SSH.NET resuelta no admite el reenvío X11. La conexión continuará sin él.",
+  "StatusSshPortForwardFailed": "Uno o m\u00e1s reenv\u00edos de puertos SSH configurados no pudieron iniciarse: {0}",
   "StatusSshRetryingViaPlink": "Falló la autenticación de SSH.NET, reintentando a través de Plink...",
   "StatusLaunchingSftp": "Iniciando sesión SFTP...",
   "ErrorSshUsernameEmpty": "El usuario SSH es obligatorio para conexiones SSH/SFTP",

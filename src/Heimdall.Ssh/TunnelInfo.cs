@@ -102,4 +102,20 @@ public sealed record TunnelInfo(
     /// one the registry holds.</para>
     /// </remarks>
     public string? GatewayRoute { get; init; }
+
+    /// <summary>
+    /// Internal tracking key inside <see cref="TunnelManager"/>. Zero means <see cref="LocalPort"/>
+    /// is the tracking key; remote-only (<c>-R</c>) tunnels receive a unique negative tracking key
+    /// so they never collide with local-bound ports or other gateways.
+    /// </summary>
+    public int TrackingKey { get; init; }
+
+    /// <summary>Effective key used for closing or releasing references in <see cref="TunnelManager"/>.</summary>
+    public int EffectiveTrackingKey => TrackingKey != 0 ? TrackingKey : LocalPort;
+
+    /// <summary>True when this tunnel only forwards a remote port (<c>-R</c>) and binds no local listener.</summary>
+    public bool IsRemoteOnly => RemoteBindPort > 0 && string.IsNullOrEmpty(RemoteHost) && SocksProxyPort <= 0;
+
+    /// <summary>True when this entry represents a direct forward owned by an active SSH shell session.</summary>
+    public bool IsSessionBound { get; init; }
 }

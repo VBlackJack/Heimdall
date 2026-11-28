@@ -334,6 +334,35 @@ public sealed class ServerHealthMonitorTests
         }
     }
 
+    [Fact]
+    public void CombinedHealthCommand_UsesEnvPrefixForNonPosixShellCompatibility()
+    {
+        Assert.StartsWith("env LC_ALL=C ", ServerHealthMonitor.CombinedHealthCommandText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task StartAsync_StopsPollingAfterUnsupportedHostResponse()
+    {
+        using var client = new ConnectedTestSshClient();
+        var calls = 0;
+        var unsupportedReceived = new TaskCompletionSource<ServerHealthData>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var runner = new StaticHealthCommandRunner(_ =>
+        {
+            Interlocked.Increment(ref calls);
+            return "not-linux-output";
+        });
+        using var monitor = new ServerHealthMonitor(_ => runner);
+        monitor.HealthUpdated += data => unsupportedReceived.TrySetResult(data);
+
+        await monitor.StartAsync(client);
+        var received = await unsupportedReceived.Task.WaitAsync(SignalBackstop);
+
+        Assert.False(received.IsSupported);
+        await monitor.StopAsync().WaitAsync(SignalBackstop);
+        // Combined + 3 fallback calls on the first cycle only (no second cycle).
+        Assert.InRange(calls, 1, 4);
+    }
+
     private sealed class ConnectedTestSshClient : SshClient
     {
         public ConnectedTestSshClient()

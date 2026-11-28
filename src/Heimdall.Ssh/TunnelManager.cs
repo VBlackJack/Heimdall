@@ -63,6 +63,7 @@ public sealed partial class TunnelManager : IDisposable
     // on. Guarded by _registryLock.
     private readonly Dictionary<long, int> _leasePorts = new();
     private long _lastLeaseId;
+    private int _nextRemoteTrackingKey;
     private readonly HashSet<string> _reservedLoopbackAliases = new(StringComparer.Ordinal);
     private readonly object _registryLock = new();
     private readonly CancellationTokenSource _lifetimeCts = new();
@@ -313,13 +314,24 @@ public sealed partial class TunnelManager : IDisposable
             _lifetimeCts.Token);
         CancellationToken openToken = openCts.Token;
 
-        if (localPort > 0 && IsPortTracked(localPort))
+        bool isRemoteOnly = IsRemoteOnlyRequest(remoteHost, remotePort, socksProxyPort, remoteBindPort);
+        if (!isRemoteOnly && localPort > 0 && IsPortTracked(localPort))
         {
             ReleaseLoopbackAliasReservationIfUnbound(localBindHost);
             return new TunnelResult(false, null, $"Local port {localPort} is already in use by an existing tunnel.", SshFailureCode.PortInUse)
             {
                 MessageKey = TunnelMessageKeys.MessageKeyLocalPortInUse,
                 MessageArguments = [localPort]
+            };
+        }
+
+        if (isRemoteOnly && IsRemoteBindTrackedOnGateway(gatewayParams.Host, gatewayChainKey, remoteBindPort))
+        {
+            ReleaseLoopbackAliasReservationIfUnbound(localBindHost);
+            return new TunnelResult(false, null, $"Remote port {remoteBindPort} is already forwarded on {gatewayParams.Host}.", SshFailureCode.PortInUse)
+            {
+                MessageKey = TunnelMessageKeys.MessageKeyLocalPortInUse,
+                MessageArguments = [remoteBindPort]
             };
         }
 
@@ -383,10 +395,16 @@ public sealed partial class TunnelManager : IDisposable
                 gatewayChainKey,
                 localBindHost);
 
+            int trackingKey = isRemoteOnly ? AllocateRemoteTrackingKey() : boundLocalPort;
+            if (isRemoteOnly)
+            {
+                info = info with { TrackingKey = trackingKey };
+            }
+
             var session = context.CreateSession(info);
 
             openToken.ThrowIfCancellationRequested();
-            return RegisterTunnelSession(session, boundLocalPort, info);
+            return RegisterTunnelSession(session, trackingKey, info);
         }
         catch (Exception ex)
         {
@@ -461,13 +479,24 @@ public sealed partial class TunnelManager : IDisposable
             _lifetimeCts.Token);
         CancellationToken openToken = openCts.Token;
 
-        if (localPort > 0 && IsPortTracked(localPort))
+        bool isRemoteOnly = IsRemoteOnlyRequest(remoteHost, remotePort, socksProxyPort, remoteBindPort);
+        if (!isRemoteOnly && localPort > 0 && IsPortTracked(localPort))
         {
             ReleaseLoopbackAliasReservationIfUnbound(localBindHost);
             return new TunnelResult(false, null, $"Local port {localPort} is already in use by an existing tunnel.", SshFailureCode.PortInUse)
             {
                 MessageKey = TunnelMessageKeys.MessageKeyLocalPortInUse,
                 MessageArguments = [localPort]
+            };
+        }
+
+        if (isRemoteOnly && IsRemoteBindTrackedOnGateway(gatewayChain[^1].Host, gatewayChainKey, remoteBindPort))
+        {
+            ReleaseLoopbackAliasReservationIfUnbound(localBindHost);
+            return new TunnelResult(false, null, $"Remote port {remoteBindPort} is already forwarded on {gatewayChain[^1].Host}.", SshFailureCode.PortInUse)
+            {
+                MessageKey = TunnelMessageKeys.MessageKeyLocalPortInUse,
+                MessageArguments = [remoteBindPort]
             };
         }
 
@@ -605,8 +634,14 @@ public sealed partial class TunnelManager : IDisposable
                 gatewayChainKey,
                 localBindHost);
 
+            int trackingKey = isRemoteOnly ? AllocateRemoteTrackingKey() : boundLocalPort;
+            if (isRemoteOnly)
+            {
+                tunnelInfo = tunnelInfo with { TrackingKey = trackingKey };
+            }
+
             openToken.ThrowIfCancellationRequested();
-            return RegisterTunnelSession(context.CreateSession(tunnelInfo), boundLocalPort, tunnelInfo);
+            return RegisterTunnelSession(context.CreateSession(tunnelInfo), trackingKey, tunnelInfo);
         }
         catch (Exception ex)
         {
@@ -820,17 +855,18 @@ public sealed partial class TunnelManager : IDisposable
 
             lock (_registryLock)
             {
+                int candidateKey = candidate.Info.EffectiveTrackingKey;
                 bool isSameRegistration = candidate.IsExternal
-                    ? _externalTunnels.TryGetValue(candidate.Info.LocalPort, out ExternalTunnelSession? currentExternal)
+                    ? _externalTunnels.TryGetValue(candidateKey, out ExternalTunnelSession? currentExternal)
                         && ReferenceEquals(currentExternal, candidate.RegistryEntry)
-                    : _activeTunnels.TryGetValue(candidate.Info.LocalPort, out TunnelSession? currentActive)
+                    : _activeTunnels.TryGetValue(candidateKey, out TunnelSession? currentActive)
                         && ReferenceEquals(currentActive, candidate.RegistryEntry);
                 if (!isSameRegistration)
                 {
                     continue;
                 }
 
-                long leaseId = AddReferenceUnderLock(candidate.Info.LocalPort);
+                long leaseId = AddReferenceUnderLock(candidateKey);
                 return candidate.Info with { IsAlive = true, LeaseId = leaseId };
             }
         }
@@ -1003,6 +1039,40 @@ public sealed partial class TunnelManager : IDisposable
     private bool IsPortTracked(int localPort)
     {
         return _activeTunnels.ContainsKey(localPort) || _externalTunnels.ContainsKey(localPort);
+    }
+
+    private static bool IsRemoteOnlyRequest(
+        string remoteHost,
+        int remotePort,
+        int socksProxyPort,
+        int remoteBindPort)
+    {
+        return string.IsNullOrWhiteSpace(remoteHost)
+            && remotePort <= 0
+            && socksProxyPort <= 0
+            && remoteBindPort > 0;
+    }
+
+    private int AllocateRemoteTrackingKey() => Interlocked.Decrement(ref _nextRemoteTrackingKey);
+
+    private bool IsRemoteBindTrackedOnGateway(string gatewayHost, string? gatewayChainKey, int remoteBindPort)
+    {
+        if (remoteBindPort <= 0)
+        {
+            return false;
+        }
+
+        foreach (TunnelSession session in _activeTunnels.Values)
+        {
+            if (session.Info.RemoteBindPort == remoteBindPort
+                && string.Equals(session.Info.ServerName, gatewayHost, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(session.Info.GatewayChainKey, gatewayChainKey ?? string.Empty, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static bool MatchesReuseIdentity(

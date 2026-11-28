@@ -163,6 +163,30 @@ public sealed class NewTunnelDialogViewModelTests
         Assert.True(vm.ConfirmCommand.CanExecute(null), vm.ValidationMessage);
     }
 
+    [Fact]
+    public void RemoteReverseMode_DoesNotCollideWithLocalPort_ButRejectsDuplicateGatewayBind()
+    {
+        var gw = CreateGateway();
+        var vm = new NewTunnelDialogViewModel(
+            [gw],
+            new LocalizationManager(),
+            activeLocalPorts: new HashSet<int> { 8080 },
+            activeRemoteBinds: new HashSet<(string, int)> { (gw.Host, 9000) })
+        {
+            ForwardMode = TunnelForwardMode.Remote,
+            RemotePort = 8080,
+            LocalPort = 3000
+        };
+
+        // -R 8080 does not bind local port 8080, so an active -L 8080 must NOT block it.
+        Assert.True(vm.ConfirmCommand.CanExecute(null), vm.ValidationMessage);
+
+        // Duplicate -R 9000 on the same gateway IS rejected.
+        vm.RemotePort = 9000;
+        Assert.False(vm.ConfirmCommand.CanExecute(null));
+        Assert.True(vm.HasValidationMessage);
+    }
+
     private static SshGatewayDto CreateGateway()
     {
         return new SshGatewayDto

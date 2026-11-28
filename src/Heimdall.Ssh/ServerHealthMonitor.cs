@@ -45,12 +45,15 @@ internal interface IHealthCommandRunner
 
 internal sealed class SshHealthCommandRunner(SshClient client) : IHealthCommandRunner
 {
+    internal static readonly TimeSpan DefaultCommandTimeout = TimeSpan.FromSeconds(10);
+
     public async Task<string> RunAsync(string command, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(command);
         cancellationToken.ThrowIfCancellationRequested();
 
         using var sshCommand = client.CreateCommand(command);
+        sshCommand.CommandTimeout = DefaultCommandTimeout;
         var asyncResult = sshCommand.BeginExecute();
         using var cancellationRegistration = cancellationToken.Register(static state =>
         {
@@ -95,16 +98,16 @@ public sealed class ServerHealthMonitor : IDisposable
     internal const string MarkerLoad = "__H_LOAD__";
 
     internal const string CombinedHealthCommandText =
-        "LC_ALL=C sh -c '"
+        "env LC_ALL=C sh -c '"
         + "printf \"" + MarkerCpu + "\\n\"; (top -b -n 1 2>/dev/null | head -5); "
         + "printf \"" + MarkerMem + "\\n\"; (free -m 2>/dev/null | grep -E \"^(Mem|Swap):\" || grep -E \"^(MemTotal|MemFree|MemAvailable|SwapTotal|SwapFree):\" /proc/meminfo 2>/dev/null); "
         + "printf \"" + MarkerDisk + "\\n\"; (df -Ph / 2>/dev/null | tail -1); "
         + "printf \"" + MarkerUptime + "\\n\"; (uptime -p 2>/dev/null || cat /proc/uptime 2>/dev/null); "
         + "printf \"" + MarkerLoad + "\\n\"; (cat /proc/loadavg 2>/dev/null); true'";
 
-    private const string CpuCommandText = "LC_ALL=C top -b -n 1 | head -5";
-    private const string MemoryCommandText = "LC_ALL=C free -m | grep Mem";
-    private const string DiskCommandText = "LC_ALL=C df -Ph / | tail -1";
+    private const string CpuCommandText = "env LC_ALL=C top -b -n 1 | head -5";
+    private const string MemoryCommandText = "env LC_ALL=C free -m | grep Mem";
+    private const string DiskCommandText = "env LC_ALL=C df -Ph / | tail -1";
 
     private static readonly Regex CpuIdleRegex = new(
         @"%?Cpu.*?:\s.*?(\d+[\.,]\d+)\s*id",
@@ -306,6 +309,11 @@ public sealed class ServerHealthMonitor : IDisposable
                 if (data is not null)
                 {
                     HealthUpdated?.Invoke(data);
+                    if (!data.IsSupported)
+                    {
+                        FileLogger.Info("ServerHealthMonitor: remote host does not support health metrics, stopping poll loop");
+                        break;
+                    }
                 }
             }
             catch (OperationCanceledException)

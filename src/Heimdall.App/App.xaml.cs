@@ -401,6 +401,9 @@ public partial class App : System.Windows.Application
                 hostKeyStore.LoadFromConfig(entries);
             }
 
+            // Load persisted additional algorithms for multi-key hosts before wiring persistence events.
+            hostKeyStore.LoadAdditionalEntriesFromConfig(settings.TrustedHostKeysAdditional);
+
             // Load persisted @cert-authority and @revoked policy rules first, then merge
             // any rules present in default ~/.ssh/known_hosts without triggering a rewrite.
             hostKeyStore.LoadPoliciesFromConfig(
@@ -430,6 +433,8 @@ public partial class App : System.Windows.Application
             hostKeyTrustService.EntryTrusted += (key, entry) => hostKeyPersistence.Upsert(key, entry);
             hostKeyTrustService.EntryReplaced += (key, oldEntry, entry) => hostKeyPersistence.Upsert(key, entry);
             hostKeyTrustService.EntryRemoved += key => hostKeyPersistence.Remove(key);
+            hostKeyStore.AdditionalKeyTrusted += (key, entry) => hostKeyPersistence.UpsertAdditional(key, entry);
+            hostKeyStore.AdditionalKeyRemoved += key => hostKeyPersistence.RemoveAdditional(key);
             hostKeyStore.PolicyChanged += () => hostKeyPersistence.UpdatePolicies(
                 hostKeyStore.GetCertAuthorities(),
                 hostKeyStore.GetRevokedKeys());

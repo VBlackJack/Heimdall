@@ -38,6 +38,7 @@ public sealed class HostKeyPersistenceCoalescer : IDisposable, IAsyncDisposable
     private readonly TimeSpan _quietWindow;
     private readonly object _gate = new();
     private readonly Dictionary<string, PendingChange> _pending = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, PendingAdditionalChange> _pendingAdditional = new(StringComparer.Ordinal);
     private PendingPolicySnapshot? _pendingPolicies;
     private ITimer? _timer;
     private Task _flush = Task.CompletedTask;
@@ -88,6 +89,31 @@ public sealed class HostKeyPersistenceCoalescer : IDisposable, IAsyncDisposable
         Enqueue(key, new PendingChange(Entry: null, Fingerprint: null, Remove: true));
     }
 
+    /// <summary>Records an additional algorithm entry (<c>host:port|algorithm</c>) to persist.</summary>
+    public void UpsertAdditional(string compositeKey, HostKeyEntry entry)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(compositeKey);
+        ArgumentNullException.ThrowIfNull(entry);
+        lock (_gate)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            _pendingAdditional[compositeKey] = new PendingAdditionalChange(entry, Remove: false);
+            ArmTimerLocked();
+        }
+    }
+
+    /// <summary>Records the removal of an additional algorithm entry (<c>host:port|algorithm</c>).</summary>
+    public void RemoveAdditional(string compositeKey)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(compositeKey);
+        lock (_gate)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            _pendingAdditional[compositeKey] = new PendingAdditionalChange(Entry: null, Remove: true);
+            ArmTimerLocked();
+        }
+    }
+
     /// <summary>Records an updated snapshot of <c>@cert-authority</c> and <c>@revoked</c> rules to persist.</summary>
     public void UpdatePolicies(
         IReadOnlyList<(string HostPatterns, string Fingerprint)> certAuthorities,
@@ -114,8 +140,10 @@ public sealed class HostKeyPersistenceCoalescer : IDisposable, IAsyncDisposable
     /// <summary>Writes whatever is pending now instead of waiting for the quiet window.</summary>
     public Task FlushAsync()
     {
-        var (batch, policies) = TakeBatch();
-        return batch is null && policies is null ? LastFlush : WriteAsync(batch, policies);
+        var (batch, additional, policies) = TakeBatch();
+        return batch is null && additional is null && policies is null
+            ? LastFlush
+            : WriteAsync(batch, additional, policies);
     }
 
     /// <summary>
@@ -176,14 +204,17 @@ public sealed class HostKeyPersistenceCoalescer : IDisposable, IAsyncDisposable
 
     private void OnQuietWindowElapsed()
     {
-        var (batch, policies) = TakeBatch();
-        if (batch is not null || policies is not null)
+        var (batch, additional, policies) = TakeBatch();
+        if (batch is not null || additional is not null || policies is not null)
         {
-            _ = WriteAsync(batch, policies);
+            _ = WriteAsync(batch, additional, policies);
         }
     }
 
-    private (Dictionary<string, PendingChange>? Batch, PendingPolicySnapshot? Policies) TakeBatch()
+    private (
+        Dictionary<string, PendingChange>? Batch,
+        Dictionary<string, PendingAdditionalChange>? Additional,
+        PendingPolicySnapshot? Policies) TakeBatch()
     {
         lock (_gate)
         {
@@ -194,21 +225,31 @@ public sealed class HostKeyPersistenceCoalescer : IDisposable, IAsyncDisposable
                 _pending.Clear();
             }
 
+            Dictionary<string, PendingAdditionalChange>? additional = null;
+            if (_pendingAdditional.Count > 0)
+            {
+                additional = new Dictionary<string, PendingAdditionalChange>(_pendingAdditional, StringComparer.Ordinal);
+                _pendingAdditional.Clear();
+            }
+
             PendingPolicySnapshot? policies = _pendingPolicies;
             _pendingPolicies = null;
 
-            return (batch, policies);
+            return (batch, additional, policies);
         }
     }
 
-    private Task WriteAsync(Dictionary<string, PendingChange>? batch, PendingPolicySnapshot? policies)
+    private Task WriteAsync(
+        Dictionary<string, PendingChange>? batch,
+        Dictionary<string, PendingAdditionalChange>? additional,
+        PendingPolicySnapshot? policies)
     {
         Task previous;
         Task write;
         lock (_gate)
         {
             previous = _flush;
-            write = WriteAfterAsync(previous, batch, policies);
+            write = WriteAfterAsync(previous, batch, additional, policies);
             _flush = write;
         }
 
@@ -218,6 +259,7 @@ public sealed class HostKeyPersistenceCoalescer : IDisposable, IAsyncDisposable
     private async Task WriteAfterAsync(
         Task previous,
         Dictionary<string, PendingChange>? batch,
+        Dictionary<string, PendingAdditionalChange>? additional,
         PendingPolicySnapshot? policies)
     {
         try
@@ -229,7 +271,7 @@ public sealed class HostKeyPersistenceCoalescer : IDisposable, IAsyncDisposable
             // The previous write already logged its own failure.
         }
 
-        int changeCount = (batch?.Count ?? 0) + (policies is null ? 0 : 1);
+        int changeCount = (batch?.Count ?? 0) + (additional?.Count ?? 0) + (policies is null ? 0 : 1);
         try
         {
             await _configManager.MergeSettingAsync(settings =>
@@ -239,6 +281,21 @@ public sealed class HostKeyPersistenceCoalescer : IDisposable, IAsyncDisposable
                     foreach (KeyValuePair<string, PendingChange> item in batch)
                     {
                         Apply(settings, item.Key, item.Value);
+                    }
+                }
+
+                if (additional is not null)
+                {
+                    foreach (KeyValuePair<string, PendingAdditionalChange> item in additional)
+                    {
+                        if (item.Value.Remove || item.Value.Entry is null)
+                        {
+                            settings.TrustedHostKeysAdditional.Remove(item.Key);
+                        }
+                        else
+                        {
+                            settings.TrustedHostKeysAdditional[item.Key] = item.Value.Entry;
+                        }
                     }
                 }
 
@@ -262,6 +319,12 @@ public sealed class HostKeyPersistenceCoalescer : IDisposable, IAsyncDisposable
         {
             settings.TrustedHostKeys.Remove(key);
             settings.TrustedHostKeysV2.Remove(key);
+            var prefix = key + "|";
+            foreach (var addKey in settings.TrustedHostKeysAdditional.Keys.Where(k => k.StartsWith(prefix, StringComparison.Ordinal)).ToList())
+            {
+                settings.TrustedHostKeysAdditional.Remove(addKey);
+            }
+
             return;
         }
 
@@ -280,6 +343,8 @@ public sealed class HostKeyPersistenceCoalescer : IDisposable, IAsyncDisposable
     }
 
     private sealed record PendingChange(HostKeyEntry? Entry, string? Fingerprint, bool Remove);
+
+    private sealed record PendingAdditionalChange(HostKeyEntry? Entry, bool Remove);
 
     private sealed record PendingPolicySnapshot(
         List<KnownHostsPolicyRuleDto> CertAuthorities,

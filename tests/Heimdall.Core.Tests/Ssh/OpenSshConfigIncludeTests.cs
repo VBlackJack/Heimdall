@@ -151,6 +151,39 @@ public sealed class OpenSshConfigIncludeTests
         }
     }
 
+    [Fact]
+    public void ParseFile_IsolatesTrailingHostAndMatchScopesInIncludedFiles()
+    {
+        var tempRoot = CreateTempDirectory();
+        try
+        {
+            var configD = Path.Combine(tempRoot, "config.d");
+            Directory.CreateDirectory(configD);
+
+            File.WriteAllText(
+                Path.Combine(configD, "01-host.conf"),
+                "Host web01\n    HostName 10.10.0.1\n    User webuser\n");
+            File.WriteAllText(
+                Path.Combine(configD, "02-match.conf"),
+                "Match host *.internal\n    User matchuser\n");
+
+            var mainConfig = Path.Combine(tempRoot, "config");
+            File.WriteAllText(
+                mainConfig,
+                "Host *\n    Include config.d/*.conf\n    User globaldefault\n\nHost app01\n    HostName 10.20.0.2\n");
+
+            var result = OpenSshConfigParser.ParseFile(mainConfig, tempRoot);
+
+            Assert.Equal(["web01", "app01"], result.Candidates.Select(c => c.Alias).ToArray());
+            Assert.Equal("webuser", result.Candidates[0].User);
+            Assert.Equal("globaldefault", result.Candidates[1].User);
+        }
+        finally
+        {
+            TryDeleteDirectory(tempRoot);
+        }
+    }
+
     private static string CreateTempDirectory()
     {
         var dir = Path.Combine(Path.GetTempPath(), "heimdall-ssh-include-" + Guid.NewGuid().ToString("N"));

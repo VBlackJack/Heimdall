@@ -137,8 +137,10 @@ public sealed class KnownHostsImporter
             .ToList();
 
         foreach (var group in indexedCandidates.GroupBy(
-                     candidate => HostKeyFormats.MakeKey(candidate.Candidate.Host, candidate.Candidate.Port),
-                     StringComparer.Ordinal))
+                     candidate => (
+                         HostPort: HostKeyFormats.MakeKey(candidate.Candidate.Host, candidate.Candidate.Port),
+                         Algorithm: KnownHostsParser.CanonicalizeKeyType(candidate.Candidate.Algorithm)),
+                     EqualityComparer<(string HostPort, string Algorithm)>.Default))
         {
             var orderedGroup = group.OrderBy(candidate => candidate.Index).ToList();
             var distinctFingerprints = orderedGroup
@@ -157,7 +159,7 @@ public sealed class KnownHostsImporter
                         KnownHostsDiagnosticCode.DuplicateFingerprintInSourceMerged));
                 }
 
-                var storedFingerprint = ResolveStoredFingerprint(settings, primary.Host, primary.Port);
+                var storedFingerprint = ResolveStoredFingerprint(settings, primary.Host, primary.Port, primary.Algorithm);
                 if (storedFingerprint is not null)
                 {
                     rows.Add(new KnownHostsPreviewRow(
@@ -179,7 +181,7 @@ public sealed class KnownHostsImporter
                 KnownHostsDiagnosticLevel.Warning,
                 orderedGroup[0].Candidate.SourceLineNumber,
                 KnownHostsDiagnosticCode.IntraFileFingerprintConflict,
-                $"{distinctFingerprints.Count} distinct fingerprints for {group.Key}"));
+                $"{distinctFingerprints.Count} distinct fingerprints for {group.Key.HostPort}"));
 
             foreach (var item in orderedGroup)
             {
@@ -208,10 +210,16 @@ public sealed class KnownHostsImporter
         ct.ThrowIfCancellationRequested();
         var settings = await _config.LoadSettingsAsync().ConfigureAwait(false);
         var selectedGroups = selected
-            .GroupBy(candidate => HostKeyFormats.MakeKey(candidate.Host, candidate.Port), StringComparer.Ordinal)
+            .GroupBy(
+                candidate => (
+                    HostPort: HostKeyFormats.MakeKey(candidate.Host, candidate.Port),
+                    Algorithm: KnownHostsParser.CanonicalizeKeyType(candidate.Algorithm)),
+                EqualityComparer<(string HostPort, string Algorithm)>.Default)
             .ToList();
 
-        var toPersist = new List<(string Key, KnownHostsImportCandidate Candidate)>();
+        var toPersistPrimary = new List<(string Key, KnownHostsImportCandidate Candidate)>();
+        var toPersistAdditional = new List<(string CompositeKey, KnownHostsImportCandidate Candidate)>();
+        var claimedPrimaryHosts = new HashSet<string>(StringComparer.Ordinal);
         var skippedExisting = 0;
         var skippedConflict = 0;
 
@@ -230,7 +238,9 @@ public sealed class KnownHostsImporter
             }
 
             var candidate = candidates[0];
-            var storedFingerprint = ResolveStoredFingerprint(settings, candidate.Host, candidate.Port);
+            var hostPortKey = group.Key.HostPort;
+            var canonicalAlgo = group.Key.Algorithm;
+            var storedFingerprint = ResolveStoredFingerprint(settings, candidate.Host, candidate.Port, canonicalAlgo);
             if (storedFingerprint is not null)
             {
                 if (string.Equals(storedFingerprint, candidate.Fingerprint, StringComparison.Ordinal))
@@ -245,19 +255,31 @@ public sealed class KnownHostsImporter
                 continue;
             }
 
-            toPersist.Add((group.Key, candidate));
+            bool hostAlreadyHasPrimary = claimedPrimaryHosts.Contains(hostPortKey)
+                || settings.TrustedHostKeys.ContainsKey(hostPortKey)
+                || _hostKeyTrustService.GetEntry(candidate.Host, candidate.Port) is not null;
+
+            if (hostAlreadyHasPrimary && !string.IsNullOrWhiteSpace(canonicalAlgo))
+            {
+                toPersistAdditional.Add(($"{hostPortKey}|{canonicalAlgo}", candidate));
+            }
+            else
+            {
+                claimedPrimaryHosts.Add(hostPortKey);
+                toPersistPrimary.Add((hostPortKey, candidate));
+            }
         }
 
         var imported = 0;
-        if (toPersist.Count > 0)
+        if (toPersistPrimary.Count > 0)
         {
             imported = await _config.MergeTrustedHostKeysAsync(
-                    toPersist.Select(item => new KeyValuePair<string, string>(item.Key, item.Candidate.Fingerprint)))
+                    toPersistPrimary.Select(item => new KeyValuePair<string, string>(item.Key, item.Candidate.Fingerprint)))
                 .ConfigureAwait(false);
 
             var refreshedSettings = await _config.LoadSettingsAsync().ConfigureAwait(false);
             var importedEntries = new List<(string Key, KnownHostsImportCandidate Candidate, DateTimeOffset ImportedAt)>();
-            foreach (var item in toPersist)
+            foreach (var item in toPersistPrimary)
             {
                 if (refreshedSettings.TrustedHostKeys.TryGetValue(item.Key, out var storedFingerprint))
                 {
@@ -282,11 +304,11 @@ public sealed class KnownHostsImporter
 
             if (importedEntries.Count > 0)
             {
-                await _config.MergeSettingAsync(settings =>
+                await _config.MergeSettingAsync(s =>
                 {
                     foreach (var item in importedEntries)
                     {
-                        settings.TrustedHostKeysV2[item.Key] = new HostKeyEntry(
+                        s.TrustedHostKeysV2[item.Key] = new HostKeyEntry(
                             item.Candidate.Fingerprint,
                             item.ImportedAt,
                             item.ImportedAt,
@@ -295,10 +317,47 @@ public sealed class KnownHostsImporter
                         {
                             PublicKeyBase64 = item.Candidate.PublicKeyBase64
                         };
-                        settings.TrustedHostKeys[item.Key] = item.Candidate.Fingerprint;
+                        s.TrustedHostKeys[item.Key] = item.Candidate.Fingerprint;
                     }
                 }).ConfigureAwait(false);
             }
+        }
+
+        if (toPersistAdditional.Count > 0)
+        {
+            var importedAt = DateTimeOffset.UtcNow;
+            var additionalToSave = new List<(string CompositeKey, HostKeyEntry Entry)>();
+            foreach (var item in toPersistAdditional)
+            {
+                var canonicalAlgo = KnownHostsParser.CanonicalizeKeyType(item.Candidate.Algorithm);
+                _hostKeyTrustService.TrustAdditionalAlgorithm(
+                    item.Candidate.Host,
+                    item.Candidate.Port,
+                    item.Candidate.Fingerprint,
+                    canonicalAlgo,
+                    HostKeySource.ImportedKnownHosts,
+                    item.Candidate.PublicKeyBase64);
+                additionalToSave.Add((
+                    item.CompositeKey,
+                    new HostKeyEntry(
+                        item.Candidate.Fingerprint,
+                        importedAt,
+                        importedAt,
+                        canonicalAlgo,
+                        HostKeySource.ImportedKnownHosts)
+                    {
+                        PublicKeyBase64 = item.Candidate.PublicKeyBase64
+                    }));
+                imported++;
+            }
+
+            await _config.MergeSettingAsync(s =>
+            {
+                foreach (var (compositeKey, entry) in additionalToSave)
+                {
+                    s.TrustedHostKeysAdditional[compositeKey] = entry;
+                }
+            }).ConfigureAwait(false);
         }
 
         if (policyEntries is not null
@@ -337,14 +396,44 @@ public sealed class KnownHostsImporter
     /// hashed known_hosts entries, which would otherwise let a plain import shadow a
     /// hashed one without a conflict.
     /// </summary>
-    private string? ResolveStoredFingerprint(AppSettings settings, string host, int port)
+    private string? ResolveStoredFingerprint(
+        AppSettings settings,
+        string host,
+        int port,
+        string? algorithm = null)
     {
-        if (settings.TrustedHostKeys.TryGetValue(HostKeyFormats.MakeKey(host, port), out var storedFingerprint))
+        var hostPortKey = HostKeyFormats.MakeKey(host, port);
+        var canonicalAlgo = KnownHostsParser.CanonicalizeKeyType(algorithm);
+
+        if (!string.IsNullOrWhiteSpace(canonicalAlgo))
+        {
+            if (settings.TrustedHostKeysV2.TryGetValue(hostPortKey, out var v2Entry))
+            {
+                var storedAlgo = KnownHostsParser.CanonicalizeKeyType(v2Entry.Algorithm);
+                if (string.Equals(storedAlgo, canonicalAlgo, StringComparison.Ordinal)
+                    || string.Equals(storedAlgo, "unknown", StringComparison.OrdinalIgnoreCase)
+                    || string.IsNullOrWhiteSpace(storedAlgo))
+                {
+                    return v2Entry.Fingerprint;
+                }
+
+                if (settings.TrustedHostKeysAdditional.TryGetValue($"{hostPortKey}|{canonicalAlgo}", out var addEntry))
+                {
+                    return addEntry.Fingerprint;
+                }
+
+                return _hostKeyTrustService.GetEntry(host, port, canonicalAlgo)?.Fingerprint;
+            }
+        }
+
+        if (settings.TrustedHostKeys.TryGetValue(hostPortKey, out var storedFingerprint))
         {
             return storedFingerprint;
         }
 
-        return _hostKeyTrustService.GetEntry(host, port)?.Fingerprint;
+        return string.IsNullOrWhiteSpace(canonicalAlgo)
+            ? _hostKeyTrustService.GetEntry(host, port)?.Fingerprint
+            : _hostKeyTrustService.GetEntry(host, port, canonicalAlgo)?.Fingerprint;
     }
 
     private sealed record IndexedCandidate(int Index, KnownHostsImportCandidate Candidate);

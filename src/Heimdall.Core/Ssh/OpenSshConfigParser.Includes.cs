@@ -23,6 +23,7 @@ public static partial class OpenSshConfigParser
     internal const int MaxIncludeDepth = 4;
     internal const int MaxIncludedFiles = 32;
     internal const int MaxTotalExpandedBytes = 2 * 1024 * 1024;
+    internal const string IncludeScopeResetMarker = "\x1E__HEIMDALL_INCLUDE_SCOPE_RESET__";
 
     /// <summary>
     /// Reads and parses an OpenSSH config file from disk, safely expanding top-level and
@@ -113,6 +114,7 @@ public static partial class OpenSshConfigParser
             var lines = rawText.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').Split('\n');
             var inMatchBlock = false;
             var inSpecificHostBlock = false;
+            var inGlobalWildcardBlock = false;
 
             foreach (var line in lines)
             {
@@ -123,6 +125,7 @@ public static partial class OpenSshConfigParser
                     {
                         inMatchBlock = true;
                         inSpecificHostBlock = false;
+                        inGlobalWildcardBlock = false;
                         output.Append(line).Append('\n');
                         continue;
                     }
@@ -131,7 +134,9 @@ public static partial class OpenSshConfigParser
                     {
                         inMatchBlock = false;
                         var hostTokens = SplitTokens(value);
-                        inSpecificHostBlock = !(hostTokens.Count == 1 && hostTokens[0] == "*");
+                        var isGlobalWildcard = hostTokens.Count == 1 && hostTokens[0] == "*";
+                        inSpecificHostBlock = !isGlobalWildcard;
+                        inGlobalWildcardBlock = isGlobalWildcard;
                         output.Append(line).Append('\n');
                         continue;
                     }
@@ -148,6 +153,7 @@ public static partial class OpenSshConfigParser
                         }
 
                         var capReached = false;
+                        var expandedAny = false;
                         foreach (var pattern in SplitTokens(value))
                         {
                             if (state.IncludedFileCount >= MaxIncludedFiles)
@@ -165,12 +171,20 @@ public static partial class OpenSshConfigParser
                                 }
 
                                 ExpandFileRecursive(includedFile, depth + 1, state, output, isRoot: false);
+                                expandedAny = true;
                             }
 
                             if (capReached)
                             {
                                 break;
                             }
+                        }
+
+                        // Isolate trailing Host/Match blocks inside included files so subsequent
+                        // lines in the parent file resume under the parent's active scope.
+                        if (expandedAny)
+                        {
+                            output.Append(inGlobalWildcardBlock ? "Host *" : IncludeScopeResetMarker).Append('\n');
                         }
 
                         continue;

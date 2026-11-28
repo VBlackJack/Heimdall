@@ -420,6 +420,26 @@ public sealed class KnownHostsImportExportTests : IDisposable
         Assert.Equal((byte)'h', bytes[0]);
     }
 
+    [Fact]
+    public void Import_MultiAlgorithmEntriesForNewHost_StoresAdditionalAlgorithmWithoutConflict()
+    {
+        var edBlob = new byte[] { 0x21, 0x22, 0x23, 0x24 };
+        var rsaBlob = new byte[] { 0x31, 0x32, 0x33, 0x34 };
+        var path = WriteKnownHosts(
+            $"multi.example.com ssh-ed25519 {ToKey(edBlob)}\n" +
+            $"multi.example.com ssh-rsa {ToKey(rsaBlob)}\n");
+        var (store, service) = CreateService();
+        var importer = new KnownHostsImporter(service);
+
+        var report = importer.ImportFile(path, DateTimeOffset.Parse("2026-11-28T07:00:00Z"));
+
+        Assert.Equal(2, report.Imported);
+        Assert.Empty(report.Conflicts);
+        Assert.True(service.Verify("multi.example.com", 22, HostKeyFormats.ComputeSha256Fingerprint(edBlob), "ssh-ed25519").Trusted);
+        Assert.True(service.Verify("multi.example.com", 22, HostKeyFormats.ComputeSha256Fingerprint(rsaBlob), "ssh-rsa").Trusted);
+        Assert.Single(store.GetAllAdditionalEntries());
+    }
+
     private string WriteKnownHosts(string content)
     {
         Directory.CreateDirectory(_rootPath);
