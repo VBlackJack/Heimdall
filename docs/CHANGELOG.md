@@ -14,6 +14,8 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased (branch dev): SSH subsystem audit, certificates, active agent management, diagnostics, and hardening
 
+- Documented the native OpenSSH launch rules (Windows-build-only client, `SetEnv` 7.8 gate and value filtering, `StrictModern` algorithm intersection with `ssh -Q`, `IdentitiesOnly`, refused path forms) in the security, architecture and features guides and their French mirrors.
+
 ### Phase 8: Post-Phase-7 SSH audit hardening, native Windows OpenSSH ConPTY backend, fleet `authorized_keys` manager, enriched `.cast` replay, and opt-in tunnel auto-reconnect
 
 - Hardened SSH trust, proxy, certificate, and OpenSSH config/key boundaries following the post-Phase-7 audit: enforced fail-closed outbound HTTP CONNECT / SOCKS proxy routing and suppressed DNS `SSHFP` leaks whenever a proxy is active; enforced `SshCryptoPolicy` and `@revoked` parity in `SshSessionDiagnosticFactory` and `GatewayDialog` preflight checks; carried the startup command / `SetEnv` approval from `ConnectionService` to `SshHandler` via `SshStartupTrustGate`; added single-connection `SshAuthorizedKeysSession` CRUD, option/symlink/lockout guards in `SshAuthorizedKeysService`, `SshKeyRotator`, and key deployment; fixed `-R` remote forward detection in tunnel preset promotion; surfaced `NotYetValid` and gateway user-certificate expiry warnings; imported OpenSSH `ForwardX11` alongside `RemoteCommand`/`SetEnv`; and added async `.cast` loading, WebView2 zoom scaling, and responsive timeline seek in `AsciinemaPlayerDialog`.

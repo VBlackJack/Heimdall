@@ -1386,7 +1386,21 @@ d'éviter toute fuite DNS split-horizon.
   connexion. Seules les clés d'hôte `ssh-ed25519`, `ecdsa-sha2-nistp256/384/521`
   et `ssh-rsa` sont acceptées. Le fichier est supprimé à la fin de la session
   (sortie du processus ou fermeture de l'onglet) et un balayeur nettoie les
-  restes. La
+  restes. `HostKeyAlgorithms` couvre aussi les algorithmes de certificat
+  correspondants quand l'hôte a présenté un certificat. Seule une version
+  Windows d'OpenSSH est utilisée : `ssh -V` doit annoncer `OpenSSH_for_Windows`,
+  les versions MSYS, Cygwin et Git sont refusées, et les entrées de `PATH` qui
+  ne sont pas entièrement qualifiées sont ignorées. Sous `StrictModern`, les
+  listes KEX, chiffrements et MAC sont croisées avec ce que le `ssh.exe`
+  installé prend en charge (`ssh -Q`) et une intersection vide refuse le
+  lancement. `IdentitiesOnly=yes` est ajouté quand un fichier de clé est
+  fourni. Les chemins de clé, de certificat et de `known_hosts` qui contiennent
+  `%`, `${`, un guillemet double ou `\'`, ou qui se terminent par `\`, sont
+  refusés car `ssh` les développerait ou les découperait mal. `SetEnv` exige
+  OpenSSH 7.8 ou plus (le lancement est sinon refusé quand des variables sont
+  définies) ; une valeur contenant un guillemet double, une apostrophe, une
+  barre oblique inverse ou un caractère de contrôle n'est pas envoyée et un avis
+  le signale, et `sshd` ignore les variables absentes de son `AcceptEnv`. La
   révocation de parc `authorized_keys` (`SshFleetAuthorizedKeysService`) réutilise
   les gardes atomiques anti-symlink et anti-verrouillage de dernière clé et
   neutralise les formules CSV à l'export. L'export de transcription `.cast`

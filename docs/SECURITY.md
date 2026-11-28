@@ -1238,7 +1238,19 @@ reached through an SSH gateway to prevent split-horizon DNS leaks.
   a blob refuses the connection. Only `ssh-ed25519`,
   `ecdsa-sha2-nistp256/384/521` and `ssh-rsa` host keys are accepted. The file is
   deleted when the session ends (process exit or tab close) and a janitor sweeps
-  leftovers.
+  leftovers. `HostKeyAlgorithms` also covers the matching certificate algorithms
+  when the host presented a certificate. Only a Windows build of OpenSSH is used:
+  `ssh -V` must report `OpenSSH_for_Windows`, MSYS, Cygwin and Git builds are
+  refused, and `PATH` entries that are not fully qualified are skipped. Under
+  `StrictModern`, the KEX, cipher and MAC lists are intersected with what the
+  installed `ssh.exe` supports (`ssh -Q`) and an empty intersection refuses the
+  launch. `IdentitiesOnly=yes` is added when a key file is given. Key,
+  certificate and `known_hosts` paths that contain `%`, `${`, a double quote or
+  `\'`, or that end with `\`, are refused because `ssh` would expand or
+  mis-tokenize them. `SetEnv` needs OpenSSH 7.8 or later (the launch is refused
+  otherwise when variables are set); a value containing a double quote, a single
+  quote, a backslash or a control character is not sent and a notice says so,
+  and `sshd` ignores variables not listed in its `AcceptEnv`.
   Fleet `authorized_keys` revocation (`SshFleetAuthorizedKeysService`) reuses
   symlink/last-key atomic removal guards and neutralizes CSV formulas on export.
   `.cast` transcript export passes full redaction spans through `TextRedactor`
