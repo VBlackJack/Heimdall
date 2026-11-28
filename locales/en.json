@@ -7165,6 +7165,7 @@
   "ErrorOpenSshNoCommonMac": "The strict cryptography policy cannot be applied: this OpenSSH client supports none of the required MAC algorithms. Update the Windows OpenSSH Client or relax the policy.",
   "ErrorOpenSshLaunchArguments": "Native OpenSSH could not be started because its launch parameters were refused. Check the profile settings.",
   "StatusOpenSshEntriesNotApplied": "Native OpenSSH did not apply {0} port-forward or environment entries (invalid, refused or over the limit).",
+  "StatusOpenSshEntriesNotAppliedOne": "Native OpenSSH did not apply {0} port-forward or environment entry (invalid, refused or over the limit).",
   "StatusOpenSshAcceptEnvOnly": "Environment variables are sent with SetEnv: the server ignores any variable not listed in its AcceptEnv setting.",
   "StatusOpenSshAgentKeyNotHonoured": "Native OpenSSH does not honour the selected agent key: ssh offers the agent keys itself.",
   "StatusOpenSshAcceptEnvAndAgentKey": "Environment variables are sent with SetEnv: the server ignores any variable not listed in its AcceptEnv setting. Native OpenSSH also does not honour the selected agent key.",

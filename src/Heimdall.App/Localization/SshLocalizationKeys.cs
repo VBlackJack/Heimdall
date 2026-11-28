@@ -121,6 +121,7 @@ internal static class SshLocalizationKeys
     public const string ErrorOpenSshNoCommonMac = "ErrorOpenSshNoCommonMac";
     public const string ErrorOpenSshLaunchArguments = "ErrorOpenSshLaunchArguments";
     public const string StatusOpenSshEntriesNotApplied = "StatusOpenSshEntriesNotApplied";
+    public const string StatusOpenSshEntriesNotAppliedOne = "StatusOpenSshEntriesNotAppliedOne";
     public const string StatusOpenSshAcceptEnvOnly = "StatusOpenSshAcceptEnvOnly";
     public const string StatusOpenSshAgentKeyNotHonoured = "StatusOpenSshAgentKeyNotHonoured";
     public const string StatusOpenSshAcceptEnvAndAgentKey = "StatusOpenSshAcceptEnvAndAgentKey";

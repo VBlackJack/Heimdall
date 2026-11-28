@@ -142,20 +142,21 @@ public sealed class OpenSshClientCapabilities
     /// <summary>First version whose configuration tokenizer handles quoted values the new way.</summary>
     public static readonly OpenSshVersion QuotedTokenizerMinimumVersion = new(8, 7, 0);
 
+    /// <summary>First version that offers the <c>rsa-sha2-*-cert-v01@openssh.com</c> host key algorithms.</summary>
+    public static readonly OpenSshVersion RsaSha2CertificateMinimumVersion = new(7, 8, 0);
+
     public OpenSshClientCapabilities(
         string executablePath,
         OpenSshVersion version,
         OpenSshAlgorithmList kex,
         OpenSshAlgorithmList ciphers,
-        OpenSshAlgorithmList macs,
-        OpenSshAlgorithmList keyTypes)
+        OpenSshAlgorithmList macs)
     {
         ExecutablePath = executablePath;
         Version = version;
         Kex = kex;
         Ciphers = ciphers;
         Macs = macs;
-        KeyTypes = keyTypes;
     }
 
     public string ExecutablePath { get; }
@@ -168,19 +169,17 @@ public sealed class OpenSshClientCapabilities
 
     public OpenSshAlgorithmList Macs { get; }
 
-    public OpenSshAlgorithmList KeyTypes { get; }
-
     public bool SupportsSetEnv => Version >= SetEnvMinimumVersion;
 
     public bool UsesQuotedTokenizer => Version >= QuotedTokenizerMinimumVersion;
+
+    public bool SupportsRsaSha2Certificates => Version >= RsaSha2CertificateMinimumVersion;
 
     public OpenSshAlgorithmSelection IntersectKex(IEnumerable<string> requested) => Intersect(requested, Kex);
 
     public OpenSshAlgorithmSelection IntersectCiphers(IEnumerable<string> requested) => Intersect(requested, Ciphers);
 
     public OpenSshAlgorithmSelection IntersectMacs(IEnumerable<string> requested) => Intersect(requested, Macs);
-
-    public OpenSshAlgorithmSelection IntersectKeyTypes(IEnumerable<string> requested) => Intersect(requested, KeyTypes);
 
     private static OpenSshAlgorithmSelection Intersect(IEnumerable<string> requested, OpenSshAlgorithmList supported)
     {
@@ -215,7 +214,6 @@ public sealed partial class OpenSshCapabilitiesReader
     public const string KexQuery = "kex";
     public const string CipherQuery = "cipher";
     public const string MacQuery = "mac";
-    public const string KeyQuery = "key";
 
     /// <summary>Upper bound for each external ssh.exe call.</summary>
     public static readonly TimeSpan ProcessTimeout = TimeSpan.FromSeconds(10);
@@ -302,8 +300,7 @@ public sealed partial class OpenSshCapabilitiesReader
                 version.Value,
                 Query(fullPath, KexQuery),
                 Query(fullPath, CipherQuery),
-                Query(fullPath, MacQuery),
-                Query(fullPath, KeyQuery)),
+                Query(fullPath, MacQuery)),
             null);
     }
 

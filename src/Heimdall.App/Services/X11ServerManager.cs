@@ -29,8 +29,13 @@ namespace Heimdall.App.Services;
 /// </summary>
 public sealed class X11ServerManager : IX11ServerManager, IDisposable
 {
-    /// <summary>The <c>DISPLAY</c> value X11 clients use to reach the local X server.</summary>
-    internal const string DefaultDisplay = "localhost:0.0";
+    private static readonly string DefaultDisplay = "localhost:0.0";
+
+    /// <summary>
+    /// The <c>DISPLAY</c> value given to native ssh.exe. Windows resolves <c>localhost</c> to ::1 first,
+    /// and an IPv4-only X server then costs about two seconds on every X11 channel.
+    /// </summary>
+    internal const string IPv4LoopbackDisplay = "127.0.0.1:0.0";
 
     /// <summary>
     /// Known X server process names to detect.

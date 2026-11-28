@@ -176,7 +176,6 @@ public sealed class OpenSshClientCapabilitiesTests
             new OpenSshVersion(major, minor, 1),
             OpenSshAlgorithmList.Unknown,
             OpenSshAlgorithmList.Unknown,
-            OpenSshAlgorithmList.Unknown,
             OpenSshAlgorithmList.Unknown);
 
         Assert.Equal(setEnv, caps.SupportsSetEnv);

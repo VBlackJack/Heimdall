@@ -71,8 +71,7 @@ public sealed class OpenSshLaunchArgumentTests(ITestOutputHelper output)
             version,
             List(kex, Inbox95Kex),
             List(ciphers, Ciphers),
-            List(macs, Macs),
-            OpenSshAlgorithmList.Unknown);
+            List(macs, Macs));
     }
 
     private static OpenSshLaunchException Refused(OpenSshLaunchSpec spec)

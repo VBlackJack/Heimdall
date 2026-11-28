@@ -1452,12 +1452,34 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
                     typeMessage));
         }
 
+        bool delegatesToPlinkMapping = resolution.Failure switch
+        {
+            OpenSshHostKeyFailure.Revoked => true,
+            OpenSshHostKeyFailure.Cancelled => true,
+            OpenSshHostKeyFailure.Mismatch => resolution.StoredFingerprint is not null
+                && resolution.PresentedFingerprint is not null,
+            _ => false,
+        };
+        if (!delegatesToPlinkMapping)
+        {
+            // The Plink text speaks of a gateway and plink; native OpenSSH has its own wording.
+            string unavailableMessage = _localizer[SshLocalizationKeys.ErrorOpenSshHostKeyUnavailable];
+            _connectionSm.SetError(serverId, unavailableMessage);
+            return new ConnectionResult(
+                false,
+                unavailableMessage,
+                null,
+                SshSessionDiagnosticFactory.CreateHostKeyUnavailableFailure(
+                    unavailableMessage,
+                    host,
+                    port));
+        }
+
         (SshFailureCode code, string messageKey) = resolution.Failure switch
         {
             OpenSshHostKeyFailure.Revoked => (SshFailureCode.HostKeyRevoked, SshLocalizationKeys.ErrorSshHostKeyRevoked),
             OpenSshHostKeyFailure.Mismatch => (SshFailureCode.HostKeyMismatch, SshLocalizationKeys.ErrorHostKeyMismatch),
-            OpenSshHostKeyFailure.Cancelled => (SshFailureCode.Cancelled, SshLocalizationKeys.ErrorSshCancelled),
-            _ => (SshFailureCode.HostKeyUnavailable, SshLocalizationKeys.ErrorOpenSshHostKeyUnavailable),
+            _ => (SshFailureCode.Cancelled, SshLocalizationKeys.ErrorSshCancelled),
         };
         return BuildPlinkHostKeyRejectionResult(
             serverId,
@@ -1531,7 +1553,11 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
                 SshSessionDiagnosticFactory.CreatePreflightFailure(SshLocalizationKeys.ErrorConnectionFailed, keyPathMessage));
         }
 
-        OpenSshResolution sshResolution = OpenSshClientLocator.ResolveAttested(settings.OpenSshPath);
+        // Up to five ssh.exe processes run here, so it stays off the calling thread.
+        string? configuredOpenSshPath = settings.OpenSshPath;
+        OpenSshResolution sshResolution = await Task
+            .Run(() => OpenSshClientLocator.ResolveAttested(configuredOpenSshPath), ct)
+            .ConfigureAwait(false);
         if (sshResolution.Capabilities is not { } sshCapabilities)
         {
             string refusalKey = OpenSshLaunchFailureMessages.KeyFor(sshResolution.Refusal);
@@ -1641,16 +1667,18 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
             string commandLine = OpenSshLaunchBuilder.JoinWindowsCommandLine(launchPlan.Arguments);
             if (launchPlan.DroppedEntryCount > 0)
             {
-                SetStatusText?.Invoke(_localizer.Format(
-                    SshLocalizationKeys.StatusOpenSshEntriesNotApplied,
-                    launchPlan.DroppedEntryCount));
+                // One line: it replaces the capability notice shown above, so it carries it along.
+                SetStatusText?.Invoke(OpenSshLaunchStatusText.Compose(
+                    _localizer,
+                    capabilityNotice,
+                    launchPlan.DroppedEntryCount)!);
             }
 
             if (x11Forwarding)
             {
                 terminalSession.EnvironmentVariables = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                 {
-                    ["DISPLAY"] = X11ServerManager.DefaultDisplay
+                    ["DISPLAY"] = X11ServerManager.IPv4LoopbackDisplay
                 };
             }
 

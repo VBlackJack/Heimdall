@@ -498,6 +498,12 @@ public static class OpenSshLaunchBuilder
             }
         }
 
+        // The RSA SHA-2 certificate algorithms exist from OpenSSH 7.8; an unknown build keeps them.
+        if (spec.Capabilities is { SupportsRsaSha2Certificates: false })
+        {
+            certificates.RemoveAll(OpenSshHostKeyTypes.IsRsaSha2Algorithm);
+        }
+
         IEnumerable<string> ordered = plain.Concat(certificates).Distinct(StringComparer.Ordinal);
         if (strictModern)
         {

@@ -28,8 +28,7 @@ internal sealed record PlinkHostKeyDecision(
     SshFailureCode? FailureCode,
     string? FailureMessageKey,
     string? StoredFingerprint,
-    string? PresentedFingerprint,
-    PlinkHostKeyPresentation? Presentation = null);
+    string? PresentedFingerprint);
 
 internal static class PlinkHostKeyDecider
 {
@@ -204,7 +203,7 @@ internal static class PlinkHostKeyDecider
 
         if (ConstantTimeEquals(presentation.Fingerprint, storedFingerprint))
         {
-            return Proceed(storedFingerprint, presentation: presentation);
+            return Proceed(storedFingerprint);
         }
 
         // Multi-algorithm match: if Heimdall already pinned a key for this host under the exact
@@ -214,7 +213,7 @@ internal static class PlinkHostKeyDecider
         if (!string.IsNullOrWhiteSpace(algorithmStored)
             && ConstantTimeEquals(presentation.Fingerprint, algorithmStored))
         {
-            return Proceed(algorithmStored, presentation: presentation);
+            return Proceed(algorithmStored);
         }
 
         HostKeyDecision decision = await verifier.VerifyAsync(
@@ -301,7 +300,7 @@ internal static class PlinkHostKeyDecider
                 presentation.Algorithm,
                 HostKeySource.UserConfirmed,
                 presentation.PublicKeyBase64);
-            return Proceed(presentation.Fingerprint, storedFingerprint, presentation.Fingerprint, presentation);
+            return Proceed(presentation.Fingerprint, storedFingerprint, presentation.Fingerprint);
         }
 
         if (decision == HostKeyDecision.TrustOnce)
@@ -312,7 +311,7 @@ internal static class PlinkHostKeyDecider
                 presentation.Fingerprint,
                 presentation.Algorithm,
                 presentation.PublicKeyBase64);
-            return Proceed(presentation.Fingerprint, storedFingerprint, presentation.Fingerprint, presentation);
+            return Proceed(presentation.Fingerprint, storedFingerprint, presentation.Fingerprint);
         }
 
         return storedFingerprint is null
@@ -359,8 +358,7 @@ internal static class PlinkHostKeyDecider
     private static PlinkHostKeyDecision Proceed(
         string fingerprint,
         string? storedFingerprint = null,
-        string? presentedFingerprint = null,
-        PlinkHostKeyPresentation? presentation = null)
+        string? presentedFingerprint = null)
     {
         return new PlinkHostKeyDecision(
             ShouldProceed: true,
@@ -368,8 +366,7 @@ internal static class PlinkHostKeyDecider
             FailureCode: null,
             FailureMessageKey: null,
             storedFingerprint,
-            presentedFingerprint,
-            presentation);
+            presentedFingerprint);
     }
 
     private static PlinkHostKeyDecision Reject(

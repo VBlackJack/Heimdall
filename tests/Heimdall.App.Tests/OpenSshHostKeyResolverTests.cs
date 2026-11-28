@@ -620,6 +620,52 @@ public sealed class OpenSshHostKeyResolverTests
         Assert.True(result.CertificatePresented);
     }
 
+    [Fact]
+    public async Task ProbeFailure_StoredCertificatePin_WhoseSubjectKeyIsRevoked_IsRefused_WritingNoKey()
+    {
+        (Ed25519PrivateKeyParameters caPriv, byte[] caPub) = CaKey();
+        byte[] subjectRaw = Ed25519Raw();
+        byte[] certificate = HostCertificate(subjectRaw, Host, caPriv, caPub);
+        Rig rig = new(presentation: null);
+        rig.Trust.Trust(Host, Port, Fp(certificate), "ssh-ed25519-cert-v01@openssh.com", HostKeySource.UserConfirmed, B64(certificate));
+        rig.Store.AddRevokedKey("*", Fp(PlainBlob("ssh-ed25519", subjectRaw)));
+
+        OpenSshHostKeyResolution result = await rig.ResolveDirectAsync();
+
+        Assert.Equal(OpenSshHostKeyFailure.Revoked, result.Failure);
+        Assert.Empty(result.Keys);
+    }
+
+    [Fact]
+    public async Task ProbeFailure_StoredCertificatePin_WhoseCaKeyIsRevoked_IsRefused_WritingNoKey()
+    {
+        (Ed25519PrivateKeyParameters caPriv, byte[] caPub) = CaKey();
+        byte[] certificate = HostCertificate(Ed25519Raw(), Host, caPriv, caPub);
+        Rig rig = new(presentation: null);
+        rig.Trust.Trust(Host, Port, Fp(certificate), "ssh-ed25519-cert-v01@openssh.com", HostKeySource.UserConfirmed, B64(certificate));
+        rig.Store.AddRevokedKey("*", Fp(caPub));
+
+        OpenSshHostKeyResolution result = await rig.ResolveDirectAsync();
+
+        Assert.Equal(OpenSshHostKeyFailure.Revoked, result.Failure);
+        Assert.Empty(result.Keys);
+    }
+
+    [Fact]
+    public async Task ProbeFailure_StoredCertificatePin_ExpiredUnderATrustedCa_IsRefusedAsInvalid()
+    {
+        (Ed25519PrivateKeyParameters caPriv, byte[] caPub) = CaKey();
+        byte[] certificate = HostCertificate(Ed25519Raw(), Host, caPriv, caPub, DateTimeOffset.UtcNow.AddMinutes(-1));
+        Rig rig = new(presentation: null);
+        TrustCa(rig, caPub);
+        rig.Trust.Trust(Host, Port, Fp(certificate), "ssh-ed25519-cert-v01@openssh.com", HostKeySource.UserConfirmed, B64(certificate));
+
+        OpenSshHostKeyResolution result = await rig.ResolveDirectAsync();
+
+        Assert.Equal(OpenSshHostKeyFailure.CertificateInvalid, result.Failure);
+        Assert.Empty(result.Keys);
+    }
+
     // ----- gateway, probe wiring -----------------------------------------------------------
 
     [Fact]

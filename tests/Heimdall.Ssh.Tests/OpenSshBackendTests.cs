@@ -302,6 +302,24 @@ public sealed class OpenSshBackendTests : IDisposable
             HostKeyAlgorithmValues(rsa));
     }
 
+    [Theory]
+    [InlineData(7, 7, "HostKeyAlgorithms=rsa-sha2-512,rsa-sha2-256,ssh-rsa,ssh-rsa-cert-v01@openssh.com")]
+    [InlineData(7, 8, "HostKeyAlgorithms=rsa-sha2-512,rsa-sha2-256,ssh-rsa,rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com,ssh-rsa-cert-v01@openssh.com")]
+    public void LaunchBuilder_OffersTheRsaSha2CertificateAlgorithmsOnlyFromOpenSsh78(int major, int minor, string expected)
+    {
+        var capabilities = new OpenSshClientCapabilities(
+            @"C:\Windows\System32\OpenSSH\ssh.exe",
+            new OpenSshVersion(major, minor, 1),
+            OpenSshAlgorithmList.Unknown,
+            OpenSshAlgorithmList.Unknown,
+            OpenSshAlgorithmList.Unknown);
+
+        IReadOnlyList<string> args = OpenSshLaunchBuilder.BuildArguments(
+            PinnedSpec(["ssh-rsa"], certificate: true) with { Capabilities = capabilities });
+
+        Assert.Equal([expected], HostKeyAlgorithmValues(args));
+    }
+
     [Fact]
     public void LaunchBuilder_StrictModern_ReplacesItsHostKeyListWithTheFilteredPinnedOne_EmittedOnce()
     {

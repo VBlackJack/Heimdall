@@ -28,7 +28,6 @@ namespace Heimdall.App.Tests;
 public sealed class OpenSshLaunchReportingTests
 {
     private const string ConnectMethod = "private async Task<ConnectionResult> ConnectSshOpenSshAsync(";
-    private const string RejectionMethod = "private ConnectionResult BuildOpenSshHostKeyRejectionResult(";
 
     [Fact]
     public void EveryLaunchFailureAndRefusalMapsToAKeyPresentInAllThreeLocales()
@@ -39,6 +38,7 @@ public sealed class OpenSshLaunchReportingTests
             .. Enum.GetValues<OpenSshRefusalReason>().Select(r => OpenSshLaunchFailureMessages.KeyFor(r)),
             SshLocalizationKeys.ErrorOpenSshHostKeyUnavailable,
             SshLocalizationKeys.StatusOpenSshEntriesNotApplied,
+            SshLocalizationKeys.StatusOpenSshEntriesNotAppliedOne,
             SshLocalizationKeys.StatusOpenSshAcceptEnvOnly,
             SshLocalizationKeys.StatusOpenSshAgentKeyNotHonoured,
             SshLocalizationKeys.StatusOpenSshAcceptEnvAndAgentKey,
@@ -96,14 +96,6 @@ public sealed class OpenSshLaunchReportingTests
         Assert.DoesNotContain("= server.RemoteLocalPort", method.Replace("usesTunnel ? 0 : server.RemoteLocalPort", string.Empty, StringComparison.Ordinal), StringComparison.Ordinal);
         Assert.DoesNotContain("127.0.0.1:0.0", method, StringComparison.Ordinal);
         Assert.DoesNotContain("ex.Message", method, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void TheNativeHostKeyUnavailableCase_DoesNotUseThePlinkText()
-    {
-        string rejection = SliceFrom(RejectionMethod, ConnectMethod);
-
-        Assert.DoesNotContain("SshLocalizationKeys.ErrorSshHostKeyUnavailable", rejection, StringComparison.Ordinal);
     }
 
     private static string SliceFrom(string startSignature, string? endSignature)

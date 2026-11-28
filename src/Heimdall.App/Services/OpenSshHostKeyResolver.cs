@@ -318,6 +318,23 @@ internal sealed class OpenSshHostKeyResolver
                 return OpenSshHostKeyResolution.Rejected(OpenSshHostKeyFailure.Unavailable);
             }
 
+            // A stored certificate is held to the same rules as a presented one: its subject key
+            // and its signing CA key may have been revoked, or the CA made it invalid, since it was pinned.
+            HostCertificateVerificationStatus certStatus = OpenSshCertificateVerifier.VerifyHostCertificate(
+                blob,
+                host,
+                port,
+                _hostKeyStore);
+            if (certStatus == HostCertificateVerificationStatus.Revoked)
+            {
+                return OpenSshHostKeyResolution.Rejected(OpenSshHostKeyFailure.Revoked);
+            }
+
+            if (certStatus == HostCertificateVerificationStatus.InvalidForTrustedCertAuthority)
+            {
+                return OpenSshHostKeyResolution.Rejected(OpenSshHostKeyFailure.CertificateInvalid);
+            }
+
             KeyBuild build = TryBuildKey(blob, entry.Fingerprint);
             if (build.Failure == OpenSshHostKeyFailure.UnsupportedKeyType && !isDecided)
             {

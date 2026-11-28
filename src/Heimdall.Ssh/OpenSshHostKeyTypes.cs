@@ -98,6 +98,11 @@ public static class OpenSshHostKeyTypes
             : [keyType];
     }
 
+    /// <summary>True for the <c>rsa-sha2-256</c> and <c>rsa-sha2-512</c> algorithm names, plain or certificate.</summary>
+    public static bool IsRsaSha2Algorithm(string algorithm)
+        => algorithm.StartsWith(RsaSha512, StringComparison.Ordinal)
+            || algorithm.StartsWith(RsaSha256, StringComparison.Ordinal);
+
     /// <summary>The certificate algorithm names matching <see cref="PlainAlgorithms"/>.</summary>
     public static IReadOnlyList<string> CertificateAlgorithms(string keyType, bool allowSha1Rsa)
     {
