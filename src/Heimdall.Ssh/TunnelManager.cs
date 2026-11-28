@@ -712,13 +712,24 @@ public sealed partial class TunnelManager : IDisposable
     {
         if (_activeTunnels.TryGetValue(localPort, out var session))
         {
-            // Return a fresh snapshot with current alive status
-            return session.Info with { IsAlive = IsSessionAlive(session) };
+            bool isAlive = IsSessionAlive(session);
+            return session.Info with
+            {
+                IsAlive = isAlive,
+                State = isAlive ? TunnelLifecycleState.Active : TunnelLifecycleState.Degraded,
+                TotalConnections = session.TotalConnections,
+                LastActivityUtc = session.LastActivityUtc
+            };
         }
 
         if (_externalTunnels.TryGetValue(localPort, out var externalSession))
         {
-            return externalSession.Info with { IsAlive = externalSession.IsAlive };
+            bool isAlive = externalSession.IsAlive;
+            return externalSession.Info with
+            {
+                IsAlive = isAlive,
+                State = isAlive ? TunnelLifecycleState.Active : TunnelLifecycleState.Degraded
+            };
         }
 
         return null;
@@ -728,9 +739,27 @@ public sealed partial class TunnelManager : IDisposable
     public IReadOnlyList<TunnelInfo> GetActiveTunnels()
     {
         return _activeTunnels.Values
-            .Select(s => s.Info with { IsAlive = IsSessionAlive(s) })
+            .Select(s =>
+            {
+                bool isAlive = IsSessionAlive(s);
+                return s.Info with
+                {
+                    IsAlive = isAlive,
+                    State = isAlive ? TunnelLifecycleState.Active : TunnelLifecycleState.Degraded,
+                    TotalConnections = s.TotalConnections,
+                    LastActivityUtc = s.LastActivityUtc
+                };
+            })
             .Concat(_externalTunnels.Values.Select(
-                s => s.Info with { IsAlive = s.IsAlive }))
+                s =>
+                {
+                    bool isAlive = s.IsAlive;
+                    return s.Info with
+                    {
+                        IsAlive = isAlive,
+                        State = isAlive ? TunnelLifecycleState.Active : TunnelLifecycleState.Degraded
+                    };
+                }))
             .ToList()
             .AsReadOnly();
     }

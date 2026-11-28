@@ -87,6 +87,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
                 <TextBlock Grid.Row="0" Grid.Column="0"
@@ -175,6 +176,12 @@
                           IsChecked="{Binding SaveAsPreset}"
                           Margin="0,8,0,0"
                           AutomationProperties.Name="{loc:Translate NewTunnelSaveAsPresetLabel}"/>
+
+                <CheckBox Grid.Row="7" Grid.Column="1"
+                          Content="{loc:Translate NewTunnelAutoReconnectLabel}"
+                          IsChecked="{Binding AutoReconnect}"
+                          Margin="0,6,0,0"
+                          AutomationProperties.Name="{loc:Translate NewTunnelAutoReconnectLabel}"/>
             </Grid>
         </Border>
 

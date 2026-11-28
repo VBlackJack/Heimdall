@@ -7183,5 +7183,15 @@
   "CastPlayerChaptersCount": "Chapitres ({0})",
   "CastPlayerBtnExportTranscript": "Exporter transcription masqu\u00e9e",
   "CastPlayerExportRefused": "Export refus\u00e9 (fail-closed) : la r\u00e8gle de masquage '{0}' a expir\u00e9.",
-  "CastPlayerExportSuccess": "Transcription masqu\u00e9e export\u00e9e vers '{0}' ({1} secret(s) masqu\u00e9(s))."
+  "CastPlayerExportSuccess": "Transcription masqu\u00e9e export\u00e9e vers '{0}' ({1} secret(s) masqu\u00e9(s)).",
+  "NewTunnelAutoReconnectLabel": "Reconnexion automatique en cas de coupure (backoff born\u00e9)",
+  "SettingsLabelTunnelAutoReconnectMaxAttempts": "Tentatives max de reconnexion de tunnel",
+  "ValidationSettingsTunnelAutoReconnectMaxAttempts": "Le nombre max de reconnexions de tunnel doit \u00eatre entre 1 et 20.",
+  "TunnelStatusReconnecting": "Reconnexion...",
+  "TunnelsColState": "\u00c9tat",
+  "TunnelsColConnections": "Conn.",
+  "StatusTunnelReconnecting": "Tunnel sur le port {0} perdu ; reconnexion (tentative {1}/{2})...",
+  "StatusTunnelReconnected": "Tunnel sur le port {0} reconnect\u00e9.",
+  "StatusTunnelReconnectAbortedSecurity": "Reconnexion automatique du tunnel sur le port {0} interrompue par s\u00e9curit\u00e9/auth : {1}",
+  "StatusTunnelReconnectExhausted": "Le tunnel sur le port {0} n'a pas pu se reconnecter apr\u00e8s {1} tentative(s)."
 }

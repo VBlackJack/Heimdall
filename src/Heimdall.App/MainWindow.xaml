@@ -8,6 +8,7 @@
         xmlns:services="clr-namespace:Heimdall.App.Services"
         xmlns:views="clr-namespace:Heimdall.App.Views"
         xmlns:models="clr-namespace:Heimdall.Core.Models;assembly=Heimdall.Core"
+        xmlns:ssh="clr-namespace:Heimdall.Ssh;assembly=Heimdall.Ssh"
         xmlns:loc="clr-namespace:Heimdall.App.Localization"
         xmlns:theming="clr-namespace:Heimdall.App.Theming"
         xmlns:tunnels="clr-namespace:Heimdall.App.ViewModels.Tunnels"
@@ -2598,6 +2599,12 @@
                                                                 <Setter Property="ToolTip" Value="{loc:Translate TunnelStatusActive}"/>
                                                                 <Setter Property="AutomationProperties.Name" Value="{loc:Translate TunnelStatusActive}"/>
                                                                 <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding State}" Value="{x:Static ssh:TunnelLifecycleState.Reconnecting}">
+                                                                        <Setter Property="Text" Value="~"/>
+                                                                        <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}"/>
+                                                                        <Setter Property="ToolTip" Value="{loc:Translate TunnelStatusReconnecting}"/>
+                                                                        <Setter Property="AutomationProperties.Name" Value="{loc:Translate TunnelStatusReconnecting}"/>
+                                                                    </DataTrigger>
                                                                     <DataTrigger Binding="{Binding IsAlive}" Value="False">
                                                                         <Setter Property="Text" Value="&#x2716;"/>
                                                                         <Setter Property="Foreground" Value="{DynamicResource ErrorTextBrush}"/>
@@ -2616,6 +2623,7 @@
                                         <DataGridTextColumn x:Name="Mw_TpColLocal" Header="{loc:Translate TunnelPanelColLocal}" Binding="{Binding LocalPort}" Width="60"/>
                                         <DataGridTextColumn x:Name="Mw_TpColRemote" Header="{loc:Translate TunnelPanelColRemote}" Binding="{Binding RemoteHost}" Width="*"/>
                                         <DataGridTextColumn x:Name="Mw_TpColPort" Header="{loc:Translate TunnelPanelColPort}" Binding="{Binding RemotePort}" Width="64"/>
+                                        <DataGridTextColumn x:Name="Mw_TpColConnections" Header="{loc:Translate TunnelsColConnections}" Binding="{Binding TotalConnections}" Width="64"/>
                                         <DataGridTemplateColumn Header="" Width="28">
                                             <DataGridTemplateColumn.CellTemplate>
                                                 <DataTemplate>
@@ -2792,6 +2800,12 @@
                                                     <Setter Property="ToolTip" Value="{loc:Translate TunnelStatusActive}"/>
                                                     <Setter Property="AutomationProperties.Name" Value="{loc:Translate TunnelStatusActive}"/>
                                                     <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding State}" Value="{x:Static ssh:TunnelLifecycleState.Reconnecting}">
+                                                            <Setter Property="Text" Value="~"/>
+                                                            <Setter Property="Foreground" Value="{DynamicResource WarningTextBrush}"/>
+                                                            <Setter Property="ToolTip" Value="{loc:Translate TunnelStatusReconnecting}"/>
+                                                            <Setter Property="AutomationProperties.Name" Value="{loc:Translate TunnelStatusReconnecting}"/>
+                                                        </DataTrigger>
                                                         <DataTrigger Binding="{Binding IsAlive}" Value="False">
                                                             <Setter Property="Text" Value="&#x2716;"/>
                                                             <Setter Property="Foreground" Value="{DynamicResource ErrorTextBrush}"/>
@@ -2810,6 +2824,8 @@
                             <DataGridTextColumn x:Name="Mw_TunnelsColLocalPort" Header="{loc:Translate TunnelsColLocalPort}" Binding="{Binding LocalPort}" Width="90"/>
                             <DataGridTextColumn x:Name="Mw_TunnelsColRemoteHost" Header="{loc:Translate TunnelsColRemoteHost}" Binding="{Binding RemoteHost}" Width="*"/>
                             <DataGridTextColumn x:Name="Mw_TunnelsColRemotePort" Header="{loc:Translate TunnelsColRemotePort}" Binding="{Binding RemotePort}" Width="90"/>
+                            <DataGridTextColumn x:Name="Mw_TunnelsColState" Header="{loc:Translate TunnelsColState}" Binding="{Binding State}" Width="96"/>
+                            <DataGridTextColumn x:Name="Mw_TunnelsColConnections" Header="{loc:Translate TunnelsColConnections}" Binding="{Binding TotalConnections}" Width="88"/>
                             <DataGridTextColumn x:Name="Mw_TunnelsColStarted" Header="{loc:Translate TunnelsColStarted}" Binding="{Binding StartedAt, StringFormat=HH:mm:ss}" Width="80"/>
                             <DataGridTemplateColumn Header="" Width="28">
                                 <DataGridTemplateColumn.CellTemplate>
@@ -4405,6 +4421,18 @@
                                                          AutomationProperties.LabeledBy="{x:Reference Mw_SettingsSshAutoReconnectAttemptsLabel}"/>
                                             </StackPanel>
                                             <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[SshAutoReconnectAttempts]}"/>
+                                            <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                                                <TextBlock x:Name="Mw_SettingsTunnelAutoReconnectAttemptsLabel"
+                                                           Text="{loc:Translate SettingsLabelTunnelAutoReconnectMaxAttempts}"
+                                                           VerticalAlignment="Center"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                           FontSize="{StaticResource FontSizeCaption}"
+                                                           Margin="0,0,8,0"/>
+                                                <TextBox Text="{Binding Settings.TunnelAutoReconnectMaxAttemptsText, UpdateSourceTrigger=PropertyChanged}"
+                                                         Width="64"
+                                                         AutomationProperties.LabeledBy="{x:Reference Mw_SettingsTunnelAutoReconnectAttemptsLabel}"/>
+                                            </StackPanel>
+                                            <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[TunnelAutoReconnectMaxAttempts]}"/>
                                         </StackPanel>
                                             </StackPanel>
                                         </Border>

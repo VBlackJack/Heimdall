@@ -203,6 +203,18 @@ public class SchemaValidatorTests
         Assert.Contains(rdpResult.Errors, e => e.Contains("RdpDefaultMode"));
     }
 
+    [Theory]
+    [InlineData(0, false)]
+    [InlineData(1, true)]
+    [InlineData(20, true)]
+    [InlineData(21, false)]
+    public void ValidateSettings_TunnelAutoReconnectMaxAttempts_EnforcesRange(int attempts, bool expectedValid)
+    {
+        var settings = new AppSettings { TunnelAutoReconnectMaxAttempts = attempts };
+        var result = SchemaValidator.ValidateSettings(settings);
+        Assert.Equal(expectedValid, result.IsValid);
+    }
+
     [Fact]
     public void ValidateSettings_InvalidRdpDefaultMode_ReturnsError()
     {

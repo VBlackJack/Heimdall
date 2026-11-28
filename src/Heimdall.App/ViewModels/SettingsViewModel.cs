@@ -583,6 +583,20 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         => CommitNumericText(value, parsed => SshAutoReconnectAttempts = parsed);
 
     [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [SettingRangeOf(nameof(AppSettings.TunnelAutoReconnectMaxAttempts))]
+    private int _tunnelAutoReconnectMaxAttempts = 5;
+
+    /// <summary>Text of the field that edits <see cref="TunnelAutoReconnectMaxAttempts"/>.</summary>
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [CustomValidation(typeof(SettingsViewModel), nameof(ValidateWholeNumberText))]
+    private string _tunnelAutoReconnectMaxAttemptsText = string.Empty;
+
+    partial void OnTunnelAutoReconnectMaxAttemptsTextChanged(string value)
+        => CommitNumericText(value, parsed => TunnelAutoReconnectMaxAttempts = parsed);
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsSftpCompanionWidthEditable))]
     private bool _sftpBrowserEnabled = true;
 
@@ -2066,6 +2080,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             SyncKnownHostsAtStartup = settings.SyncKnownHostsAtStartup;
             SshAutoReconnect = settings.SshAutoReconnect;
             SshAutoReconnectAttempts = settings.SshAutoReconnectAttempts;
+            TunnelAutoReconnectMaxAttempts = settings.TunnelAutoReconnectMaxAttempts;
             SftpBrowserEnabled = settings.SftpBrowserEnabled;
             SftpAutoOpenOnSsh = settings.SftpAutoOpenOnSsh;
             SftpCompanionWidthPercent = settings.SftpCompanionWidthPercent;
@@ -2326,6 +2341,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         AntiIdleIntervalText = AntiIdleInterval.ToString(CultureInfo.InvariantCulture);
         SshTmoutResetIntervalText = SshTmoutResetInterval.ToString(CultureInfo.InvariantCulture);
         SshAutoReconnectAttemptsText = SshAutoReconnectAttempts.ToString(CultureInfo.InvariantCulture);
+        TunnelAutoReconnectMaxAttemptsText = TunnelAutoReconnectMaxAttempts.ToString(CultureInfo.InvariantCulture);
         SshKeepAliveIntervalSecondsText = SshKeepAliveIntervalSeconds.ToString(CultureInfo.InvariantCulture);
         SshHealthMonitorIntervalSecondsText = SshHealthMonitorIntervalSeconds.ToString(CultureInfo.InvariantCulture);
         SshAgentLookupTimeoutMsText = SshAgentLookupTimeoutMs.ToString(CultureInfo.InvariantCulture);
@@ -2583,6 +2599,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         settings.SyncKnownHostsAtStartup = SyncKnownHostsAtStartup;
         settings.SshAutoReconnect = SshAutoReconnect;
         settings.SshAutoReconnectAttempts = SshAutoReconnectAttempts;
+        settings.TunnelAutoReconnectMaxAttempts = TunnelAutoReconnectMaxAttempts;
         settings.SftpBrowserEnabled = SftpBrowserEnabled;
         settings.SftpAutoOpenOnSsh = SftpAutoOpenOnSsh;
         settings.SftpCompanionWidthPercent = SftpCompanionWidthPercent;
@@ -5193,6 +5210,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         [nameof(AppSettings.AntiIdleIntervalSeconds)] = "ValidationSettingsAntiIdle",
         [nameof(AppSettings.SshTmoutResetIntervalSeconds)] = "ValidationSettingsTmoutReset",
         [nameof(AppSettings.SshAutoReconnectAttempts)] = "ValidationSettingsSshAutoReconnectAttempts",
+        [nameof(AppSettings.TunnelAutoReconnectMaxAttempts)] = "ValidationSettingsTunnelAutoReconnectMaxAttempts",
         [nameof(AppSettings.TunnelEstablishmentDelayMs)] = "ValidationSettingsTunnelDelay",
         [nameof(AppSettings.RdpConnectWatchdogTimeoutMs)] = "ValidationSettingsRdpTimeout",
         [nameof(AppSettings.RdpResizeEnableDelayMs)] = "ValidationSettingsRdpResizeDelay",
@@ -5231,6 +5249,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         [nameof(AntiIdleInterval)] = "SettingsLabelAntiIdleInterval",
         [nameof(SshTmoutResetInterval)] = "SettingsLabelSshTmoutReset",
         [nameof(SshAutoReconnectAttempts)] = "SettingsSshAutoReconnectMaxAttempts",
+        [nameof(TunnelAutoReconnectMaxAttempts)] = "SettingsLabelTunnelAutoReconnectMaxAttempts",
         [nameof(TunnelEstablishmentDelayMs)] = "SettingsLabelTunnelDelay",
         [nameof(RdpConnectWatchdogTimeoutMs)] = "SettingsLabelRdpTimeout",
         [nameof(ExternalToolTimeoutMs)] = "SettingsLabelExtToolTimeout",
@@ -5281,6 +5300,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         nameof(SshTmoutResetIntervalText),
         nameof(SshAutoReconnectAttempts),
         nameof(SshAutoReconnectAttemptsText),
+        nameof(TunnelAutoReconnectMaxAttempts),
+        nameof(TunnelAutoReconnectMaxAttemptsText),
         nameof(SshKeepAliveIntervalSeconds),
         nameof(SshKeepAliveIntervalSecondsText),
         nameof(SshHealthMonitorIntervalSeconds),

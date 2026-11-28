@@ -827,6 +827,41 @@ public sealed class TunnelsViewModelTests
         Assert.Equal(5432, saved.RemotePort);
     }
 
+    [Fact]
+    public async Task BuildPresetFromDialog_PreservesAutoReconnect_AndUserCloseCancelsSupervision()
+    {
+        var gateway = new SshGatewayDto { Id = "gw-1", Name = "Jump", Host = "jump.internal", Port = 22 };
+        var settings = new AppSettings { SshGateways = [gateway] };
+        var host = new TestTunnelsHost(settings);
+        var config = new FakeConfigManager(settings);
+        using var vm = CreateViewModel(host, config);
+
+        var dialogVm = new Heimdall.App.ViewModels.Dialogs.NewTunnelDialogViewModel(settings.SshGateways, new LocalizationManager())
+        {
+            SelectedGateway = gateway,
+            ForwardMode = Heimdall.App.ViewModels.Dialogs.TunnelForwardMode.Local,
+            RemoteHost = "app.internal",
+            RemotePort = 8443,
+            LocalPort = 18443,
+            Label = "Resilient App",
+            AutoReconnect = true
+        };
+
+        var preset = TunnelsViewModel.BuildPresetFromDialog(dialogVm);
+        Assert.True(preset.AutoReconnect);
+
+        var tunnel = new TunnelInfo("Jump", 18443, "app.internal", 8443, DateTime.UnixEpoch, IsAlive: true)
+        {
+            Label = "Resilient App",
+            AutoReconnect = true
+        };
+        vm.RegisterSupervision(dialogVm, tunnel);
+        Assert.Equal(1, vm.SupervisedTunnelCount);
+
+        await vm.CloseCommand.ExecuteAsync(tunnel);
+        Assert.Equal(0, vm.SupervisedTunnelCount);
+    }
+
     private sealed class DummyTunnelHandle : IDisposable
     {
         public void Dispose()

@@ -16,6 +16,7 @@
 
 using Heimdall.Core.Logging;
 using Renci.SshNet;
+using Renci.SshNet.Common;
 
 namespace Heimdall.Ssh;
 
@@ -27,6 +28,11 @@ namespace Heimdall.Ssh;
 public sealed class TunnelSession : IDisposable
 {
     private int _disposed;
+    private long _totalConnections;
+    private long _lastActivityUtcTicks;
+    private readonly EventHandler<PortForwardEventArgs> _requestReceivedHandler;
+    private ForwardedPortDynamic? _dynamicPort;
+    private ForwardedPortRemote? _remotePort;
 
     /// <summary>The SSH client connection to the gateway.</summary>
     public SshClient Client { get; }
@@ -35,13 +41,68 @@ public sealed class TunnelSession : IDisposable
     public ForwardedPortLocal? ForwardedPort { get; }
 
     /// <summary>Optional SOCKS5 dynamic proxy port bound to this session.</summary>
-    public ForwardedPortDynamic? DynamicPort { get; set; }
+    public ForwardedPortDynamic? DynamicPort
+    {
+        get => _dynamicPort;
+        set
+        {
+            if (ReferenceEquals(_dynamicPort, value))
+            {
+                return;
+            }
+
+            if (_dynamicPort is not null)
+            {
+                _dynamicPort.RequestReceived -= _requestReceivedHandler;
+            }
+
+            _dynamicPort = value;
+            if (_dynamicPort is not null)
+            {
+                _dynamicPort.RequestReceived += _requestReceivedHandler;
+            }
+        }
+    }
 
     /// <summary>Optional remote (reverse) port forward bound to this session.</summary>
-    public ForwardedPortRemote? RemotePort { get; set; }
+    public ForwardedPortRemote? RemotePort
+    {
+        get => _remotePort;
+        set
+        {
+            if (ReferenceEquals(_remotePort, value))
+            {
+                return;
+            }
+
+            if (_remotePort is not null)
+            {
+                _remotePort.RequestReceived -= _requestReceivedHandler;
+            }
+
+            _remotePort = value;
+            if (_remotePort is not null)
+            {
+                _remotePort.RequestReceived += _requestReceivedHandler;
+            }
+        }
+    }
 
     /// <summary>Descriptive metadata about this tunnel.</summary>
     public TunnelInfo Info { get; }
+
+    /// <summary>Total forwarded request events recorded across this tunnel session.</summary>
+    public long TotalConnections => Interlocked.Read(ref _totalConnections);
+
+    /// <summary>UTC timestamp of the most recent forwarded request event, or null if none.</summary>
+    public DateTime? LastActivityUtc
+    {
+        get
+        {
+            long ticks = Interlocked.Read(ref _lastActivityUtcTicks);
+            return ticks > 0 ? new DateTime(ticks, DateTimeKind.Utc) : null;
+        }
+    }
 
     /// <summary>
     /// Intermediate SSH clients used in a chained (multi-hop) tunnel.
@@ -69,6 +130,18 @@ public sealed class TunnelSession : IDisposable
         Info = info ?? throw new ArgumentNullException(nameof(info));
         IntermediateClients = intermediateClients ?? Array.Empty<SshClient>();
         IntermediatePorts = intermediatePorts ?? Array.Empty<ForwardedPortLocal>();
+
+        _requestReceivedHandler = (_, _) => RecordConnectionActivity();
+        if (ForwardedPort is not null)
+        {
+            ForwardedPort.RequestReceived += _requestReceivedHandler;
+        }
+    }
+
+    internal void RecordConnectionActivity()
+    {
+        Interlocked.Increment(ref _totalConnections);
+        Interlocked.Exchange(ref _lastActivityUtcTicks, DateTime.UtcNow.Ticks);
     }
 
     public void Dispose()
@@ -76,6 +149,21 @@ public sealed class TunnelSession : IDisposable
         if (Interlocked.Exchange(ref _disposed, 1) != 0)
         {
             return;
+        }
+
+        if (ForwardedPort is not null)
+        {
+            ForwardedPort.RequestReceived -= _requestReceivedHandler;
+        }
+
+        if (_dynamicPort is not null)
+        {
+            _dynamicPort.RequestReceived -= _requestReceivedHandler;
+        }
+
+        if (_remotePort is not null)
+        {
+            _remotePort.RequestReceived -= _requestReceivedHandler;
         }
 
         // Stop and dispose the final forwarded port when present

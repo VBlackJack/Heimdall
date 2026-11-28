@@ -70,6 +70,7 @@ internal static class SettingsLabelCatalog
         [nameof(AppSettings.AntiIdleIntervalSeconds)] = new("SettingsLabelAntiIdleInterval", "SettingsTabSshSftp", "SettingsSshSubTabSession"),
         [nameof(AppSettings.SshAutoReconnect)] = new("SettingsSshAutoReconnectEnable", "SettingsTabSshSftp", "SettingsSshSubTabSession"),
         [nameof(AppSettings.SshAutoReconnectAttempts)] = new("SettingsSshAutoReconnectMaxAttempts", "SettingsTabSshSftp", "SettingsSshSubTabSession"),
+        [nameof(AppSettings.TunnelAutoReconnectMaxAttempts)] = new("SettingsLabelTunnelAutoReconnectMaxAttempts", "SettingsTabSshSftp", "SettingsSshSubTabSession"),
         [nameof(AppSettings.SshKeepAliveIntervalSeconds)] = new("SettingsLabelSshKeepAliveInterval", "SettingsTabSshSftp", "SettingsSshSubTabSession"),
         [nameof(AppSettings.SshHealthMonitorIntervalSeconds)] = new("SettingsLabelSshHealthMonitorInterval", "SettingsTabSshSftp", "SettingsSshSubTabSession"),
         [nameof(AppSettings.SshTmoutResetIntervalSeconds)] = new("SettingsLabelSshTmoutReset", "SettingsTabSshSftp", "SettingsSshSubTabSession"),

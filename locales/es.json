@@ -7183,5 +7183,15 @@
   "CastPlayerChaptersCount": "Cap\u00edtulos ({0})",
   "CastPlayerBtnExportTranscript": "Exportar transcripci\u00f3n enmascarada",
   "CastPlayerExportRefused": "Exportaci\u00f3n rechazada (fail-closed): expir\u00f3 la regla de enmascarado '{0}'.",
-  "CastPlayerExportSuccess": "Transcripci\u00f3n enmascarada exportada a '{0}' ({1} secreto(s) ocultado(s))."
+  "CastPlayerExportSuccess": "Transcripci\u00f3n enmascarada exportada a '{0}' ({1} secreto(s) ocultado(s)).",
+  "NewTunnelAutoReconnectLabel": "Reconexi\u00f3n autom\u00e1tica ante corte inesperado (backoff limitado)",
+  "SettingsLabelTunnelAutoReconnectMaxAttempts": "Intentos m\u00e1x. de reconexi\u00f3n de t\u00fanel",
+  "ValidationSettingsTunnelAutoReconnectMaxAttempts": "Los intentos m\u00e1x. de reconexi\u00f3n de t\u00fanel deben estar entre 1 y 20.",
+  "TunnelStatusReconnecting": "Reconectando...",
+  "TunnelsColState": "Estado",
+  "TunnelsColConnections": "Conex.",
+  "StatusTunnelReconnecting": "T\u00fanel en el puerto {0} ca\u00eddo; reconectando (intento {1}/{2})...",
+  "StatusTunnelReconnected": "T\u00fanel en el puerto {0} reconectado.",
+  "StatusTunnelReconnectAbortedSecurity": "Reconexi\u00f3n autom\u00e1tica del t\u00fanel en el puerto {0} detenida por pol\u00edtica de seguridad/auth: {1}",
+  "StatusTunnelReconnectExhausted": "El t\u00fanel en el puerto {0} no pudo reconectarse tras {1} intento(s)."
 }

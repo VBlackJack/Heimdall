@@ -13,6 +13,7 @@
     "openSshPath": "",
     "tunnelEstablishmentDelayMs": 2500,
     "tunnelRetryDelayMs": 1500,
+    "tunnelAutoReconnectMaxAttempts": 5,
     "processKillTimeoutMs": 2000,
     "externalToolTimeoutMs": 60000,
     "hostKeyProbeTimeoutMs": 8000,

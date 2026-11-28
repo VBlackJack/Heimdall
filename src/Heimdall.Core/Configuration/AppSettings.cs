@@ -285,6 +285,8 @@ public sealed class AppSettings
     public int SshAutoReconnectSubsequentDelaySeconds { get; set; } = DefaultSshAutoReconnectSubsequentDelaySeconds;
     [SettingRange(0, 600)]
     public int SshConnectTimeExitWindowSeconds { get; set; } = 15;
+    [SettingRange(1, 20)]
+    public int TunnelAutoReconnectMaxAttempts { get; set; } = 5;
 
     // RDP defaults
     public string RdpDefaultMode { get; set; } = "Embedded";

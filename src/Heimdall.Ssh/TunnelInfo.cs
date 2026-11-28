@@ -16,6 +16,15 @@
 
 namespace Heimdall.Ssh;
 
+/// <summary>Lifecycle state reported on an active or supervised SSH tunnel snapshot.</summary>
+public enum TunnelLifecycleState
+{
+    Active,
+    Reconnecting,
+    Degraded,
+    Stopped
+}
+
 /// <summary>
 /// Immutable snapshot describing an active SSH port-forwarding tunnel.
 /// </summary>
@@ -124,4 +133,22 @@ public sealed record TunnelInfo(
     /// Used to remove individual session-bound forwards without disconnecting the session.
     /// </summary>
     public string? SessionForwardId { get; init; }
+
+    /// <summary>Current lifecycle state of the tunnel.</summary>
+    public TunnelLifecycleState State { get; init; } = TunnelLifecycleState.Active;
+
+    /// <summary>Cumulative forwarded request count observed on this tunnel since launch.</summary>
+    public long TotalConnections { get; init; }
+
+    /// <summary>UTC timestamp of the most recent forwarded request, or null if idle.</summary>
+    public DateTime? LastActivityUtc { get; init; }
+
+    /// <summary>Number of reconnection attempts already performed by opt-in supervision.</summary>
+    public int ReconnectAttempts { get; init; }
+
+    /// <summary>Whether opt-in bounded automatic reconnection is enabled for this manual tunnel.</summary>
+    public bool AutoReconnect { get; init; }
+
+    /// <summary>Last sanitized lifecycle error message, when degraded or reconnecting.</summary>
+    public string? LastError { get; init; }
 }

@@ -48,6 +48,8 @@ public sealed class SavedTunnelPresetDto
 
     public int RemoteLocalPort { get; set; }
 
+    public bool AutoReconnect { get; set; }
+
     [JsonIgnore]
     public string DisplaySummary => Mode switch
     {

@@ -158,6 +158,9 @@ public sealed partial class NewTunnelDialogViewModel : ObservableObject
     private bool _saveAsPreset;
 
     [ObservableProperty]
+    private bool _autoReconnect;
+
+    [ObservableProperty]
     private string? _validationMessage;
 
     public bool? Decision { get; private set; }

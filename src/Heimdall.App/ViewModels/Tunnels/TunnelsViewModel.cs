@@ -93,7 +93,25 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
     private readonly PropertyChangedEventHandler _tabPropertyChangedHandler;
     private readonly HashSet<SessionTabViewModel> _trackedTabs = [];
     private readonly HashSet<EmbeddedSshView> _trackedSshViews = [];
+    private readonly Dictionary<int, SupervisedTunnelEntry> _supervisedTunnels = new();
     private ObservableCollection<SessionTabViewModel>? _activeSessionsSubscription;
+
+    private sealed class SupervisedTunnelEntry
+    {
+        public int TrackingKey { get; set; }
+        public required string GatewayId { get; init; }
+        public required string GatewayName { get; init; }
+        public TunnelForwardMode Mode { get; init; }
+        public required string RemoteHost { get; init; }
+        public int RemotePort { get; init; }
+        public int LocalPort { get; init; }
+        public required string Label { get; init; }
+        public CancellationTokenSource? ReconnectCts { get; set; }
+        public TunnelLifecycleState State { get; set; } = TunnelLifecycleState.Active;
+        public int Attempts { get; set; }
+        public string? LastError { get; set; }
+        public DateTime StartedAt { get; set; } = DateTime.UtcNow;
+    }
     private AppSettings? _settingsSnapshot;
     private long _panelResolveVersion;
     private bool _disposed;
@@ -408,6 +426,9 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
             return;
         }
 
+        // User-initiated close disables any opt-in auto-reconnect supervision for this tunnel.
+        CancelAndRemoveSupervision(trackingKey);
+
         // The close event reports the result, teardown error included; writing the plain
         // message here as well used to hide that error.
         _tunnelManager.ForceCloseTunnel(trackingKey);
@@ -434,6 +455,7 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
             return;
         }
 
+        CancelAllSupervisions();
         _tunnelManager.CloseAllTunnels();
         Count = 0;
         RefreshList();
@@ -743,7 +765,8 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
             RemoteHost = vm.ForwardMode == TunnelForwardMode.Local ? vm.RemoteHost.Trim() : string.Empty,
             RemotePort = vm.ForwardMode == TunnelForwardMode.Local ? vm.RemotePort : 0,
             RemoteBindPort = vm.ForwardMode == TunnelForwardMode.Remote ? vm.RemotePort : 0,
-            RemoteLocalPort = vm.ForwardMode == TunnelForwardMode.Remote ? vm.LocalPort : 0
+            RemoteLocalPort = vm.ForwardMode == TunnelForwardMode.Remote ? vm.LocalPort : 0,
+            AutoReconnect = vm.AutoReconnect
         };
     }
 
@@ -812,7 +835,8 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
                 SavedTunnelPresetDto.ModeRemote => TunnelForwardMode.Remote,
                 _ => TunnelForwardMode.Local
             },
-            Label = preset.Name
+            Label = preset.Name,
+            AutoReconnect = preset.AutoReconnect
         };
 
         if (vm.ForwardMode == TunnelForwardMode.Remote)
@@ -876,6 +900,12 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
                     _localizer["StatusManualTunnelFailed"],
                     result.ErrorMessage ?? _localizer[SshLocalizationKeys.ErrorTunnelFailed]);
                 return;
+            }
+
+            if (vm.AutoReconnect && vm.SelectedGateway is not null && result.Tunnel is { } opened)
+            {
+                RegisterSupervision(vm, opened);
+                RefreshList();
             }
 
             _host.StatusText = vm.ForwardMode switch
@@ -1106,7 +1136,33 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
     /// </summary>
     public void RefreshList()
     {
-        var tunnels = new List<TunnelInfo>(_tunnelManager.GetActiveTunnels());
+        var rawActive = _tunnelManager.GetActiveTunnels();
+        var activeKeys = new HashSet<int>();
+        var tunnels = new List<TunnelInfo>(rawActive.Count + _supervisedTunnels.Count);
+        foreach (TunnelInfo t in rawActive)
+        {
+            int key = t.EffectiveTrackingKey;
+            activeKeys.Add(key);
+            if (_supervisedTunnels.TryGetValue(key, out var sup) && sup.State == TunnelLifecycleState.Active)
+            {
+                tunnels.Add(t with { AutoReconnect = true });
+            }
+            else
+            {
+                tunnels.Add(t);
+            }
+        }
+
+        foreach (SupervisedTunnelEntry sup in _supervisedTunnels.Values)
+        {
+            if (activeKeys.Contains(sup.TrackingKey)
+                || sup.State is not (TunnelLifecycleState.Reconnecting or TunnelLifecycleState.Degraded))
+            {
+                continue;
+            }
+
+            tunnels.Add(BuildSupervisedSnapshot(sup));
+        }
         var liveSshViews = new HashSet<EmbeddedSshView>();
         foreach (var tab in _host.Connection.ActiveSessions)
         {
@@ -1264,11 +1320,205 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
     {
         _host.RunOnUi(() =>
         {
-            if (!_disposed)
+            if (_disposed)
             {
-                _host.StatusText = _localizer.Format("StatusTunnelLost", localPort);
+                return;
             }
+
+            if (_supervisedTunnels.TryGetValue(localPort, out var entry)
+                && entry.State == TunnelLifecycleState.Active)
+            {
+                _ = SuperviseReconnectAsync(entry);
+                return;
+            }
+
+            _host.StatusText = _localizer.Format("StatusTunnelLost", localPort);
         });
+    }
+
+    internal int SupervisedTunnelCount => _supervisedTunnels.Count;
+
+    internal void RegisterSupervision(NewTunnelDialogViewModel vm, TunnelInfo opened)
+    {
+        int key = opened.EffectiveTrackingKey;
+        CancelAndRemoveSupervision(key);
+        _supervisedTunnels[key] = new SupervisedTunnelEntry
+        {
+            TrackingKey = key,
+            GatewayId = vm.SelectedGateway?.Id ?? string.Empty,
+            GatewayName = vm.SelectedGateway?.Name ?? opened.ServerName,
+            Mode = vm.ForwardMode,
+            RemoteHost = vm.ForwardMode == TunnelForwardMode.Local ? vm.RemoteHost.Trim() : string.Empty,
+            RemotePort = vm.RemotePort,
+            LocalPort = vm.LocalPort,
+            Label = vm.Label?.Trim() ?? string.Empty,
+            State = TunnelLifecycleState.Active,
+            StartedAt = opened.StartedAt
+        };
+    }
+
+    private void CancelAndRemoveSupervision(int trackingKey)
+    {
+        if (_supervisedTunnels.Remove(trackingKey, out var entry))
+        {
+            try { entry.ReconnectCts?.Cancel(); }
+            catch (ObjectDisposedException) { }
+            entry.ReconnectCts?.Dispose();
+            entry.ReconnectCts = null;
+        }
+    }
+
+    private void CancelAllSupervisions()
+    {
+        foreach (SupervisedTunnelEntry entry in _supervisedTunnels.Values)
+        {
+            try { entry.ReconnectCts?.Cancel(); }
+            catch (ObjectDisposedException) { }
+            entry.ReconnectCts?.Dispose();
+            entry.ReconnectCts = null;
+        }
+
+        _supervisedTunnels.Clear();
+    }
+
+    private static TunnelInfo BuildSupervisedSnapshot(SupervisedTunnelEntry sup)
+        => new(
+            sup.GatewayName,
+            sup.LocalPort,
+            sup.Mode == TunnelForwardMode.Local ? sup.RemoteHost : string.Empty,
+            sup.RemotePort,
+            sup.StartedAt,
+            IsAlive: false)
+        {
+            TrackingKey = sup.TrackingKey,
+            Label = string.IsNullOrWhiteSpace(sup.Label) ? null : sup.Label,
+            SocksProxyPort = sup.Mode == TunnelForwardMode.DynamicSocks5 ? sup.LocalPort : 0,
+            RemoteBindPort = sup.Mode == TunnelForwardMode.Remote ? sup.RemotePort : 0,
+            EffectiveRemoteLocalPort = sup.Mode == TunnelForwardMode.Remote ? sup.LocalPort : 0,
+            State = sup.State,
+            ReconnectAttempts = sup.Attempts,
+            AutoReconnect = true,
+            LastError = sup.LastError
+        };
+
+    private async Task SuperviseReconnectAsync(SupervisedTunnelEntry entry)
+    {
+        AppSettings? settings = _settingsSnapshot ?? _host.CurrentSettings;
+        if (settings is null)
+        {
+            entry.State = TunnelLifecycleState.Degraded;
+            RefreshList();
+            return;
+        }
+
+        SshGatewayDto? gateway = settings.SshGateways.FirstOrDefault(
+            g => string.Equals(g.Id, entry.GatewayId, StringComparison.OrdinalIgnoreCase));
+        if (gateway is null)
+        {
+            entry.State = TunnelLifecycleState.Degraded;
+            entry.LastError = _localizer["StatusTunnelPresetGatewayMissing"];
+            RefreshList();
+            return;
+        }
+
+        entry.ReconnectCts?.Cancel();
+        entry.ReconnectCts?.Dispose();
+        entry.ReconnectCts = new CancellationTokenSource();
+        CancellationToken ct = entry.ReconnectCts.Token;
+
+        int maxAttempts = Math.Clamp(settings.TunnelAutoReconnectMaxAttempts, 1, 20);
+        entry.State = TunnelLifecycleState.Reconnecting;
+        entry.Attempts = 0;
+        entry.LastError = null;
+        RefreshList();
+
+        for (int attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            if (_disposed || ct.IsCancellationRequested || !_supervisedTunnels.ContainsKey(entry.TrackingKey))
+            {
+                return;
+            }
+
+            entry.Attempts = attempt;
+            _host.StatusText = _localizer.Format("StatusTunnelReconnecting", entry.LocalPort, attempt, maxAttempts);
+            RefreshList();
+
+            TimeSpan delay = TunnelReconnectPolicy.GetBackoffDelay(attempt);
+            try
+            {
+                await Task.Delay(delay, ct).ConfigureAwait(true);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+
+            var vm = new NewTunnelDialogViewModel(settings.SshGateways, _localizer)
+            {
+                SelectedGateway = gateway,
+                ForwardMode = entry.Mode,
+                RemoteHost = entry.RemoteHost,
+                RemotePort = entry.RemotePort,
+                LocalPort = entry.LocalPort,
+                Label = entry.Label,
+                AutoReconnect = true
+            };
+
+            try
+            {
+                TunnelResult result = await OpenManualTunnelAsync(vm, settings, ct).ConfigureAwait(true);
+                if (result.Success && result.Tunnel is { } reopened)
+                {
+                    int oldKey = entry.TrackingKey;
+                    int newKey = reopened.EffectiveTrackingKey;
+                    if (newKey != oldKey)
+                    {
+                        _supervisedTunnels.Remove(oldKey);
+                        entry.TrackingKey = newKey;
+                        _supervisedTunnels[newKey] = entry;
+                    }
+
+                    entry.State = TunnelLifecycleState.Active;
+                    entry.Attempts = attempt;
+                    entry.LastError = null;
+                    entry.StartedAt = reopened.StartedAt;
+                    _host.StatusText = _localizer.Format("StatusTunnelReconnected", reopened.LocalPort);
+                    RefreshList();
+                    return;
+                }
+
+                entry.LastError = result.ErrorMessage;
+                if (!TunnelReconnectPolicy.ShouldRetry(null, result.FailureCode))
+                {
+                    entry.State = TunnelLifecycleState.Degraded;
+                    _host.StatusText = _localizer.Format(
+                        "StatusTunnelReconnectAbortedSecurity",
+                        entry.LocalPort,
+                        result.ErrorMessage ?? _localizer[SshLocalizationKeys.ErrorTunnelFailed]);
+                    RefreshList();
+                    return;
+                }
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception ex)
+            {
+                entry.LastError = ex.Message;
+                if (!TunnelReconnectPolicy.ShouldRetry(ex))
+                {
+                    entry.State = TunnelLifecycleState.Degraded;
+                    _host.StatusText = _localizer.Format("StatusTunnelReconnectAbortedSecurity", entry.LocalPort, ex.Message);
+                    RefreshList();
+                    return;
+                }
+            }
+        }
+
+        entry.State = TunnelLifecycleState.Degraded;
+        _host.StatusText = _localizer.Format("StatusTunnelReconnectExhausted", entry.LocalPort, maxAttempts);
+        RefreshList();
     }
 
     private void OnLocaleChanged(string _)
@@ -1492,6 +1742,7 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
         if (_disposed) return;
         _disposed = true;
 
+        CancelAllSupervisions();
         _tunnelManager.TunnelOpened -= OnTunnelOpened;
         _tunnelManager.TunnelClosed -= OnTunnelClosed;
         _tunnelManager.TunnelLost -= OnTunnelLost;
