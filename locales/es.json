@@ -7083,5 +7083,8 @@
   "StatusHotForwardSavedToProfile": "Redirecci\u00f3n guardada en el perfil de servidor '{0}'.",
   "StatusTunnelPromoteUnsupported": "Este t\u00fanel no se puede guardar como preajuste ni en un perfil local.",
   "A11ySshFleetAuditRow": "{0}, {1}, nota {2}",
-  "A11ySshAuthKeyRow": "{0}, {1}, {2}"
+  "A11ySshAuthKeyRow": "{0}, {1}, {2}",
+  "SshCertWarningExpired": "El certificado de usuario SSH expir\u00f3 el {0}.",
+  "SshCertWarningExpiringSoonOne": "El certificado de usuario SSH expira en {0} d\u00eda ({1}).",
+  "SshCertWarningExpiringSoon": "El certificado de usuario SSH expira en {0} d\u00edas ({1})."
 }

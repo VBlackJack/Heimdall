@@ -7083,5 +7083,8 @@
   "StatusHotForwardSavedToProfile": "Port forward saved to server profile '{0}'.",
   "StatusTunnelPromoteUnsupported": "This tunnel cannot be saved as a preset or local profile forward.",
   "A11ySshFleetAuditRow": "{0}, {1}, grade {2}",
-  "A11ySshAuthKeyRow": "{0}, {1}, {2}"
+  "A11ySshAuthKeyRow": "{0}, {1}, {2}",
+  "SshCertWarningExpired": "SSH user certificate expired on {0}.",
+  "SshCertWarningExpiringSoonOne": "SSH user certificate expires in {0} day ({1}).",
+  "SshCertWarningExpiringSoon": "SSH user certificate expires in {0} days ({1})."
 }

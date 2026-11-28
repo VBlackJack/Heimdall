@@ -559,11 +559,21 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
                 SshLocalizationKeys.StatusSshPortForwardFailed,
                 string.Join(", ", session.FailedPortForwards))
             : null;
+        string? certWarning = SshCertificateExpiryEvaluator.FormatLocalizedWarning(
+            SshCertificateExpiryEvaluator.Evaluate(server.SshKeyPath, server.SshCertificatePath),
+            _localizer);
+        string? combinedWarning = (forwardWarning, certWarning) switch
+        {
+            (not null, not null) => $"{forwardWarning} {certWarning}",
+            (not null, null) => forwardWarning,
+            (null, not null) => certWarning,
+            _ => null
+        };
         return new ConnectionResult(
             true,
             null,
             new SshSessionResult(session, server.SessionLoggingOverride),
-            Warning: forwardWarning);
+            Warning: combinedWarning);
     }
 
     /// <remarks>

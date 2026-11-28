@@ -7083,5 +7083,8 @@
   "StatusHotForwardSavedToProfile": "Redirection enregistr\u00e9e dans le profil serveur '{0}'.",
   "StatusTunnelPromoteUnsupported": "Ce tunnel ne peut pas \u00eatre enregistr\u00e9 en pr\u00e9r\u00e9glage ni dans un profil local.",
   "A11ySshFleetAuditRow": "{0}, {1}, note {2}",
-  "A11ySshAuthKeyRow": "{0}, {1}, {2}"
+  "A11ySshAuthKeyRow": "{0}, {1}, {2}",
+  "SshCertWarningExpired": "Le certificat utilisateur SSH a expir\u00e9 le {0}.",
+  "SshCertWarningExpiringSoonOne": "Le certificat utilisateur SSH expire dans {0} jour ({1}).",
+  "SshCertWarningExpiringSoon": "Le certificat utilisateur SSH expire dans {0} jours ({1})."
 }

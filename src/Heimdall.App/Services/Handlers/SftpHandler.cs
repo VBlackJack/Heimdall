@@ -289,11 +289,21 @@ internal sealed class SftpHandler : IProtocolHandler
 
                     // The session takes ownership of the tunnel from here.
                     releaseTunnel = false;
+                    string? certWarning = SshCertificateExpiryEvaluator.FormatLocalizedWarning(
+                        SshCertificateExpiryEvaluator.Evaluate(server.SshKeyPath, server.SshCertificatePath),
+                        _localizer);
+                    string? combinedWarning = (capabilityWarning, certWarning) switch
+                    {
+                        (not null, not null) => $"{capabilityWarning} {certWarning}",
+                        (not null, null) => capabilityWarning,
+                        (null, not null) => certWarning,
+                        _ => null
+                    };
                     return new ConnectionResult(true, null, new SftpSessionBundle(
                         browser,
                         sshParams,
                         server.SessionLoggingOverride),
-                        Warning: capabilityWarning);
+                        Warning: combinedWarning);
                 }
                 catch (HostKeyRejectedException ex)
                 {
