@@ -64,6 +64,7 @@ public partial class SshServerAuditView : UserControl, IToolView
         public string Endpoint { get; init; } = string.Empty;
         public string Gateway { get; init; } = string.Empty;
         public string Grade { get; init; } = string.Empty;
+        public string Drift { get; init; } = string.Empty;
         public string Anssi { get; init; } = string.Empty;
         public string PostQuantum { get; init; } = string.Empty;
         public string StrictKex { get; init; } = string.Empty;
@@ -191,6 +192,7 @@ public partial class SshServerAuditView : UserControl, IToolView
         BtnCopy.Content = L("ToolTlsAuditBtnCopy");
         BtnExportHtml.Content = L("ToolSshServerAuditBtnExportHtml");
         BtnExportCsv.Content = L("ToolSshServerAuditBtnExportCsv");
+        BtnCopyDropIn.Content = L("ToolSshServerAuditBtnCopyDropIn");
         BtnAuditFleet.Content = L("ToolSshServerAuditBtnAuditFleet");
         LblFleetTitle.Text = L("ToolSshServerAuditFleetTitle");
         BtnExportFleetHtml.Content = L("ToolSshServerAuditFleetBtnExportHtml");
@@ -199,6 +201,7 @@ public partial class SshServerAuditView : UserControl, IToolView
         ColFleetEndpoint.Header = L("ToolSshServerAuditFleetColEndpoint");
         ColFleetGateway.Header = L("ToolSshServerAuditFleetColGateway");
         ColFleetGrade.Header = L("ToolSshServerAuditFleetColGrade");
+        ColFleetDrift.Header = L("ToolSshServerAuditFleetColDrift");
         ColFleetAnssi.Header = L("ToolSshServerAuditFleetColAnssi");
         ColFleetPq.Header = L("ToolSshServerAuditFleetColPq");
         ColFleetStrictKex.Header = L("ToolSshServerAuditFleetColStrictKex");
@@ -217,6 +220,7 @@ public partial class SshServerAuditView : UserControl, IToolView
         AutomationProperties.SetName(BtnCopy, L("ToolTlsAuditBtnCopy"));
         AutomationProperties.SetName(BtnExportHtml, L("ToolSshServerAuditBtnExportHtml"));
         AutomationProperties.SetName(BtnExportCsv, L("ToolSshServerAuditBtnExportCsv"));
+        AutomationProperties.SetName(BtnCopyDropIn, L("ToolSshServerAuditBtnCopyDropIn"));
         AutomationProperties.SetName(TxtRecommendation, L("ToolSshServerAuditRecommendation"));
         AutomationProperties.SetName(BtnHelp, L("ToolHelpTooltip"));
         AutomationProperties.SetName(BtnCloseHelp, L("BtnClose"));
@@ -273,12 +277,21 @@ public partial class SshServerAuditView : UserControl, IToolView
             var servers = await configManager.LoadServersAsync().ConfigureAwait(true);
             var settings = await configManager.LoadSettingsAsync().ConfigureAwait(true);
             if (_disposed) return;
-            await _vm.RunFleetAuditAsync(servers, settings).ConfigureAwait(true);
-            if (!_disposed)
+
+            string baselinePath = Path.Combine(configManager.ConfigPath, "ssh-fleet-audit-baseline.json");
+            IReadOnlyList<SshFleetAuditBaselineEntry> previousBaseline = LoadFleetBaseline(baselinePath);
+
+            await _vm.RunFleetAuditAsync(servers, settings, previousBaseline).ConfigureAwait(true);
+            if (_disposed) return;
+
+            var newBaseline = SshServerAuditEngine.BuildBaseline(_vm.FleetResults);
+            if (newBaseline.Count > 0)
             {
-                RefreshFleetGrid();
-                RefreshUiFromVm();
+                SaveFleetBaseline(baselinePath, newBaseline);
             }
+
+            RefreshFleetGrid();
+            RefreshUiFromVm();
         }
         catch (Exception ex)
         {
@@ -390,7 +403,7 @@ public partial class SshServerAuditView : UserControl, IToolView
 
         if (_vm.ShowFleetResults)
         {
-            TxtFleetSummary.Text = _vm.FleetSummaryText;
+            TxtFleetSummary.Text = FormatFleetSummaryWithDrift();
         }
 
         if (_vm.Report is { } report)
@@ -401,19 +414,112 @@ public partial class SshServerAuditView : UserControl, IToolView
 
     private void RefreshFleetGrid()
     {
-        TxtFleetSummary.Text = _vm.FleetSummaryText;
-        FleetResultsGrid.ItemsSource = _vm.FleetResults.Select(entry => new FleetRowDisplayItem
+        TxtFleetSummary.Text = FormatFleetSummaryWithDrift();
+        var driftByEndpoint = _vm.LastFleetDrift?.ByEndpoint;
+        FleetResultsGrid.ItemsSource = _vm.FleetResults.Select(entry =>
         {
-            Entry = entry,
-            DisplayName = entry.DisplayName,
-            Endpoint = $"{entry.Host}:{entry.Port}",
-            Gateway = entry.GatewayName ?? "-",
-            Grade = entry.Report is { } r ? SshServerAuditEngine.GradeToString(r.Grade) : "-",
-            Anssi = entry.Report is { } r1 ? (r1.IsAnssiCompliant ? "PASS" : "FAIL") : "-",
-            PostQuantum = entry.Report is { } r2 ? (r2.HasPostQuantumKex ? "YES" : "NO") : "-",
-            StrictKex = entry.Report is { } r3 ? (r3.HasStrictKex ? "YES" : "NO") : "-",
-            Status = entry.Report is { } r4 ? r4.Snapshot.ServerBanner : (entry.ErrorMessage ?? L("SshSessionStatusError"))
+            string endpointKey = SshServerAuditEngine.FormatEndpointKey(entry.Host, entry.Port);
+            string driftLabel = "-";
+            if (driftByEndpoint is not null && driftByEndpoint.TryGetValue(endpointKey, out var status))
+            {
+                driftLabel = status switch
+                {
+                    SshFleetAuditDriftStatus.Improved => L("ToolSshServerAuditDriftImproved"),
+                    SshFleetAuditDriftStatus.Regressed => L("ToolSshServerAuditDriftRegressed"),
+                    SshFleetAuditDriftStatus.Unchanged => L("ToolSshServerAuditDriftUnchanged"),
+                    SshFleetAuditDriftStatus.New => L("ToolSshServerAuditDriftNew"),
+                    _ => "-"
+                };
+            }
+
+            return new FleetRowDisplayItem
+            {
+                Entry = entry,
+                DisplayName = entry.DisplayName,
+                Endpoint = endpointKey,
+                Gateway = entry.GatewayName ?? "-",
+                Grade = entry.Report is { } r ? SshServerAuditEngine.GradeToString(r.Grade) : "-",
+                Drift = driftLabel,
+                Anssi = entry.Report is { } r1 ? (r1.IsAnssiCompliant ? "PASS" : "FAIL") : "-",
+                PostQuantum = entry.Report is { } r2 ? (r2.HasPostQuantumKex ? "YES" : "NO") : "-",
+                StrictKex = entry.Report is { } r3 ? (r3.HasStrictKex ? "YES" : "NO") : "-",
+                Status = entry.Report is { } r4 ? r4.Snapshot.ServerBanner : (entry.ErrorMessage ?? L("SshSessionStatusError"))
+            };
         }).ToList();
+    }
+
+    private string FormatFleetSummaryWithDrift()
+        => string.IsNullOrWhiteSpace(_vm.FleetDriftSummaryText)
+            ? _vm.FleetSummaryText
+            : $"{_vm.FleetSummaryText} | {_vm.FleetDriftSummaryText}";
+
+    private void OnCopyDropInClick(object sender, RoutedEventArgs e)
+    {
+        if (_vm.Report is not { } report)
+        {
+            return;
+        }
+
+        try
+        {
+            Clipboard.SetText(SshServerAuditEngine.GenerateHardeningDropIn(report));
+            CopyFeedbackHelper.ShowCopyFeedback(BtnCopyDropIn);
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Warn($"[SshServerAudit] Copy sshd_config drop-in failed: {ex.Message}");
+        }
+    }
+
+    private static IReadOnlyList<SshFleetAuditBaselineEntry> LoadFleetBaseline(string path)
+    {
+        try
+        {
+            if (!File.Exists(path))
+            {
+                return [];
+            }
+
+            var info = new FileInfo(path);
+            if (info.Length <= 0 || info.Length > 256 * 1024)
+            {
+                return [];
+            }
+
+            return SshServerAuditEngine.DeserializeBaselineJson(File.ReadAllText(path, Encoding.UTF8));
+        }
+        catch (IOException)
+        {
+            return [];
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return [];
+        }
+    }
+
+    private static void SaveFleetBaseline(string path, IReadOnlyList<SshFleetAuditBaselineEntry> baseline)
+    {
+        try
+        {
+            string? dir = Path.GetDirectoryName(path);
+            if (!string.IsNullOrWhiteSpace(dir))
+            {
+                Directory.CreateDirectory(dir);
+            }
+
+            string tmp = path + ".tmp";
+            File.WriteAllText(tmp, SshServerAuditEngine.SerializeBaselineJson(baseline), new UTF8Encoding(false));
+            File.Move(tmp, path, overwrite: true);
+        }
+        catch (IOException ex)
+        {
+            FileLogger.Warn($"[SshServerAudit] Save fleet baseline failed: {ex.Message}");
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            FileLogger.Warn($"[SshServerAudit] Save fleet baseline failed: {ex.Message}");
+        }
     }
 
     private void ProjectReport(SshServerAuditReport report)

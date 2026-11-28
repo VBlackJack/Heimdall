@@ -85,13 +85,22 @@ public sealed partial class SshServerAuditViewModel : ObservableObject, IDisposa
     [ObservableProperty]
     private string _fleetSummaryText = string.Empty;
 
+    [ObservableProperty]
+    private SshFleetAuditDriftSummary? _lastFleetDrift;
+
+    [ObservableProperty]
+    private string _fleetDriftSummaryText = string.Empty;
+
     public ObservableCollection<SshFleetServerAuditEntry> FleetResults { get; } = [];
 
     /// <summary>
     /// Audits all saved SSH profiles concurrently (bounded to 4 simultaneous probes),
     /// automatically routing each server through its configured or inherited SSH gateway.
     /// </summary>
-    public async Task RunFleetAuditAsync(IReadOnlyList<ServerProfileDto> servers, AppSettings settings)
+    public async Task RunFleetAuditAsync(
+        IReadOnlyList<ServerProfileDto> servers,
+        AppSettings settings,
+        IReadOnlyList<SshFleetAuditBaselineEntry>? previousBaseline = null)
     {
         ArgumentNullException.ThrowIfNull(servers);
         ArgumentNullException.ThrowIfNull(settings);
@@ -122,6 +131,8 @@ public sealed partial class SshServerAuditViewModel : ObservableObject, IDisposa
         ShowError = false;
         ErrorMessage = string.Empty;
         FleetResults.Clear();
+        LastFleetDrift = null;
+        FleetDriftSummaryText = string.Empty;
         ShowFleetResults = true;
         ShowEmptyState = false;
 
@@ -218,6 +229,19 @@ public sealed partial class SshServerAuditViewModel : ObservableObject, IDisposa
             {
                 Report = firstReport;
                 ShowResults = true;
+            }
+
+            if (previousBaseline is { Count: > 0 })
+            {
+                var drift = SshServerAuditEngine.CompareAgainstBaseline(FleetResults, previousBaseline);
+                LastFleetDrift = drift;
+                FleetDriftSummaryText = string.Format(
+                    CultureInfo.CurrentCulture,
+                    L("ToolSshServerAuditFleetDriftSummary"),
+                    drift.Improved,
+                    drift.Regressed,
+                    drift.Unchanged,
+                    drift.NewHosts);
             }
         }
         catch (OperationCanceledException)

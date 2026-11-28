@@ -149,4 +149,90 @@ public sealed class SshServerAuditEngineTests
         Assert.Contains("Down&lt;script&gt;", html, StringComparison.Ordinal);
         Assert.Contains("ANSSI PASS: 1", html, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void GenerateHardeningDropIn_IncludesValidationHeaderAndSanitizesBanner()
+    {
+        var snap = new SshKexInitSnapshot(
+            "srv.corp\r\nPermitRootLogin yes",
+            22,
+            "SSH-2.0-OpenSSH_9.9\nInjected",
+            ["curve25519-sha256"],
+            ["ssh-ed25519"],
+            ["aes256-gcm@openssh.com"],
+            ["aes256-gcm@openssh.com"],
+            ["hmac-sha2-512-etm@openssh.com"],
+            ["hmac-sha2-512-etm@openssh.com"],
+            ["none"],
+            ["none"]);
+        var report = SshServerAuditEngine.Evaluate(snap);
+
+        string dropIn = SshServerAuditEngine.GenerateHardeningDropIn(report);
+
+        Assert.Contains("sudo sshd -t -f /etc/ssh/sshd_config", dropIn, StringComparison.Ordinal);
+        Assert.Contains("KexAlgorithms mlkem768x25519-sha256", dropIn, StringComparison.Ordinal);
+        Assert.DoesNotContain("\nPermitRootLogin yes", dropIn, StringComparison.Ordinal);
+        Assert.DoesNotContain("\nInjected", dropIn, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void CompareAgainstBaseline_ClassifiesImprovedRegressedUnchangedAndNew()
+    {
+        var strongSnap = new SshKexInitSnapshot(
+            "host-a",
+            22,
+            "SSH-2.0-OpenSSH_9.9",
+            ["mlkem768x25519-sha256", "kex-strict-s-v00@openssh.com"],
+            ["ssh-ed25519"],
+            ["aes256-gcm@openssh.com"],
+            ["aes256-gcm@openssh.com"],
+            ["hmac-sha2-512-etm@openssh.com"],
+            ["hmac-sha2-512-etm@openssh.com"],
+            ["none"],
+            ["none"]);
+        var weakSnap = new SshKexInitSnapshot(
+            "host-b",
+            22,
+            "SSH-2.0-OpenSSH_7.4",
+            ["diffie-hellman-group1-sha1"],
+            ["ssh-dss"],
+            ["3des-cbc"],
+            ["3des-cbc"],
+            ["hmac-sha1"],
+            ["hmac-sha1"],
+            ["none"],
+            ["none"]);
+
+        var strongReport = SshServerAuditEngine.Evaluate(strongSnap);
+        var weakReport = SshServerAuditEngine.Evaluate(weakSnap);
+
+        var previous = SshServerAuditEngine.DeserializeBaselineJson(
+            SshServerAuditEngine.SerializeBaselineJson(
+            [
+                new SshFleetAuditBaselineEntry("host-a:22", "B", false, false, false, DateTimeOffset.UtcNow),
+                new SshFleetAuditBaselineEntry("host-b:22", "A", true, false, true, DateTimeOffset.UtcNow),
+                new SshFleetAuditBaselineEntry("host-c:22", "A+", true, true, true, DateTimeOffset.UtcNow)
+            ]));
+
+        SshFleetServerAuditEntry[] current =
+        [
+            new("A", "host-a", 22, null, strongReport),
+            new("B", "host-b", 22, null, weakReport),
+            new("C", "host-c", 22, null, strongReport),
+            new("D", "host-d", 22, null, strongReport),
+            new("E", "host-e", 22, null, null, "Timeout")
+        ];
+
+        var drift = SshServerAuditEngine.CompareAgainstBaseline(current, previous);
+
+        Assert.Equal(1, drift.Improved);
+        Assert.Equal(1, drift.Regressed);
+        Assert.Equal(1, drift.Unchanged);
+        Assert.Equal(1, drift.NewHosts);
+        Assert.Equal(SshFleetAuditDriftStatus.Improved, drift.ByEndpoint["host-a:22"]);
+        Assert.Equal(SshFleetAuditDriftStatus.Regressed, drift.ByEndpoint["host-b:22"]);
+        Assert.Equal(SshFleetAuditDriftStatus.Unchanged, drift.ByEndpoint["host-c:22"]);
+        Assert.Equal(SshFleetAuditDriftStatus.New, drift.ByEndpoint["host-d:22"]);
+        Assert.Equal(SshFleetAuditDriftStatus.Error, drift.ByEndpoint["host-e:22"]);
+    }
 }

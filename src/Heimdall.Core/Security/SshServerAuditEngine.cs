@@ -17,6 +17,7 @@
 using System.Globalization;
 using System.Net;
 using System.Text;
+using System.Text.Json;
 
 namespace Heimdall.Core.Security;
 
@@ -86,6 +87,33 @@ public sealed record SshAuditFinding(
     SshAuditFindingSeverity Severity,
     string Code,
     string Message);
+
+/// <summary>Non-sensitive snapshot persisted between fleet SSH audits to detect compliance drift.</summary>
+public sealed record SshFleetAuditBaselineEntry(
+    string Endpoint,
+    string Grade,
+    bool IsAnssiCompliant,
+    bool HasPostQuantumKex,
+    bool HasStrictKex,
+    DateTimeOffset AuditedAtUtc);
+
+/// <summary>Per-host comparison status between the current fleet audit and the previous baseline.</summary>
+public enum SshFleetAuditDriftStatus
+{
+    New = 0,
+    Unchanged = 1,
+    Improved = 2,
+    Regressed = 3,
+    Error = 4
+}
+
+/// <summary>Summary of compliance drift between a current fleet audit and a previous baseline.</summary>
+public sealed record SshFleetAuditDriftSummary(
+    int Improved,
+    int Regressed,
+    int Unchanged,
+    int NewHosts,
+    IReadOnlyDictionary<string, SshFleetAuditDriftStatus> ByEndpoint);
 
 /// <summary>Complete SSH server cryptographic audit report.</summary>
 public sealed record SshServerAuditReport(
@@ -588,6 +616,217 @@ public static class SshServerAuditEngine
 
         sb.AppendLine("</tbody></table></body></html>");
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// Generates a ready-to-deploy <c>/etc/ssh/sshd_config.d/99-heimdall-hardening.conf</c> drop-in file
+    /// targeting ANSSI/SecNumCloud and post-quantum readiness, with a safe <c>sshd -t</c> validation header.
+    /// </summary>
+    public static string GenerateHardeningDropIn(SshServerAuditReport report)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+
+        string safeHost = SanitizeSingleLineComment(report.Snapshot.Host);
+        string safeBanner = SanitizeSingleLineComment(report.Snapshot.ServerBanner);
+
+        var sb = new StringBuilder();
+        sb.AppendLine("# /etc/ssh/sshd_config.d/99-heimdall-hardening.conf");
+        sb.AppendLine($"# Target audited: {safeHost}:{report.Snapshot.Port} (Current grade: {GradeToString(report.Grade)})");
+        sb.AppendLine($"# Server banner: {safeBanner}");
+        sb.AppendLine("# Validate before reload: sudo sshd -t -f /etc/ssh/sshd_config && sudo systemctl reload sshd");
+        sb.AppendLine();
+        sb.AppendLine("KexAlgorithms mlkem768x25519-sha256,sntrup761x25519-sha512@openssh.com,curve25519-sha256,curve25519-sha256@libssh.org,diffie-hellman-group16-sha512,diffie-hellman-group18-sha512");
+        sb.AppendLine("HostKeyAlgorithms ssh-ed25519,rsa-sha2-512,rsa-sha2-256");
+        sb.AppendLine("PubkeyAcceptedAlgorithms ssh-ed25519,ssh-ed25519-cert-v01@openssh.com,sk-ssh-ed25519@openssh.com,sk-ssh-ed25519-cert-v01@openssh.com,rsa-sha2-512,rsa-sha2-256");
+        sb.AppendLine("Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr");
+        sb.AppendLine("MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,umac-128-etm@openssh.com");
+        sb.AppendLine("Compression delayed");
+        return sb.ToString();
+    }
+
+    public static int GradeRank(SshAuditGrade grade) => grade switch
+    {
+        SshAuditGrade.F => 0,
+        SshAuditGrade.D => 1,
+        SshAuditGrade.C => 2,
+        SshAuditGrade.B => 3,
+        SshAuditGrade.A => 4,
+        SshAuditGrade.APlus => 5,
+        _ => 0
+    };
+
+    public static bool TryParseGrade(string? text, out SshAuditGrade grade)
+    {
+        grade = SshAuditGrade.F;
+        switch (text?.Trim().ToUpperInvariant())
+        {
+            case "A+":
+                grade = SshAuditGrade.APlus;
+                return true;
+            case "A":
+                grade = SshAuditGrade.A;
+                return true;
+            case "B":
+                grade = SshAuditGrade.B;
+                return true;
+            case "C":
+                grade = SshAuditGrade.C;
+                return true;
+            case "D":
+                grade = SshAuditGrade.D;
+                return true;
+            case "F":
+                grade = SshAuditGrade.F;
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>Builds a normalized baseline snapshot from all succeeded entries of a fleet audit.</summary>
+    public static IReadOnlyList<SshFleetAuditBaselineEntry> BuildBaseline(
+        IReadOnlyList<SshFleetServerAuditEntry> entries,
+        DateTimeOffset? auditedAtUtc = null)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+        DateTimeOffset timestamp = auditedAtUtc ?? DateTimeOffset.UtcNow;
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var result = new List<SshFleetAuditBaselineEntry>();
+
+        foreach (var e in entries)
+        {
+            if (e.Report is not { } r)
+            {
+                continue;
+            }
+
+            string endpoint = FormatEndpointKey(e.Host, e.Port);
+            if (!seen.Add(endpoint))
+            {
+                continue;
+            }
+
+            result.Add(new SshFleetAuditBaselineEntry(
+                endpoint,
+                GradeToString(r.Grade),
+                r.IsAnssiCompliant,
+                r.HasPostQuantumKex,
+                r.HasStrictKex,
+                timestamp));
+        }
+
+        return result;
+    }
+
+    /// <summary>Compares the current fleet audit against a previous baseline to classify per-host drift.</summary>
+    public static SshFleetAuditDriftSummary CompareAgainstBaseline(
+        IReadOnlyList<SshFleetServerAuditEntry> current,
+        IReadOnlyList<SshFleetAuditBaselineEntry>? previous)
+    {
+        ArgumentNullException.ThrowIfNull(current);
+
+        var prevByEndpoint = (previous ?? [])
+            .Where(p => !string.IsNullOrWhiteSpace(p.Endpoint))
+            .DistinctBy(p => p.Endpoint, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(p => p.Endpoint, StringComparer.OrdinalIgnoreCase);
+
+        var byEndpoint = new Dictionary<string, SshFleetAuditDriftStatus>(StringComparer.OrdinalIgnoreCase);
+        int improved = 0;
+        int regressed = 0;
+        int unchanged = 0;
+        int newHosts = 0;
+
+        foreach (var entry in current)
+        {
+            string endpoint = FormatEndpointKey(entry.Host, entry.Port);
+            if (entry.Report is not { } report)
+            {
+                byEndpoint[endpoint] = SshFleetAuditDriftStatus.Error;
+                continue;
+            }
+
+            if (!prevByEndpoint.TryGetValue(endpoint, out var prev) || !TryParseGrade(prev.Grade, out var prevGrade))
+            {
+                byEndpoint[endpoint] = SshFleetAuditDriftStatus.New;
+                newHosts++;
+                continue;
+            }
+
+            int delta = GradeRank(report.Grade) - GradeRank(prevGrade);
+            if (delta == 0)
+            {
+                int prevScore = (prev.IsAnssiCompliant ? 2 : 0) + (prev.HasPostQuantumKex ? 1 : 0) + (prev.HasStrictKex ? 1 : 0);
+                int currScore = (report.IsAnssiCompliant ? 2 : 0) + (report.HasPostQuantumKex ? 1 : 0) + (report.HasStrictKex ? 1 : 0);
+                delta = currScore - prevScore;
+            }
+
+            if (delta > 0)
+            {
+                byEndpoint[endpoint] = SshFleetAuditDriftStatus.Improved;
+                improved++;
+            }
+            else if (delta < 0)
+            {
+                byEndpoint[endpoint] = SshFleetAuditDriftStatus.Regressed;
+                regressed++;
+            }
+            else
+            {
+                byEndpoint[endpoint] = SshFleetAuditDriftStatus.Unchanged;
+                unchanged++;
+            }
+        }
+
+        return new SshFleetAuditDriftSummary(improved, regressed, unchanged, newHosts, byEndpoint);
+    }
+
+    public static string SerializeBaselineJson(IReadOnlyList<SshFleetAuditBaselineEntry> entries)
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+        return JsonSerializer.Serialize(entries, new JsonSerializerOptions { WriteIndented = true });
+    }
+
+    public static IReadOnlyList<SshFleetAuditBaselineEntry> DeserializeBaselineJson(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json) || json.Length > 256 * 1024)
+        {
+            return [];
+        }
+
+        try
+        {
+            return JsonSerializer.Deserialize<List<SshFleetAuditBaselineEntry>>(json) ?? [];
+        }
+        catch (JsonException)
+        {
+            return [];
+        }
+    }
+
+    public static string FormatEndpointKey(string host, int port)
+        => $"{host.Trim()}:{port.ToString(CultureInfo.InvariantCulture)}";
+
+    private static string SanitizeSingleLineComment(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "-";
+        }
+
+        var sb = new StringBuilder(value.Length);
+        foreach (char c in value)
+        {
+            if (c is '\r' or '\n' || char.IsControl(c))
+            {
+                sb.Append(' ');
+            }
+            else
+            {
+                sb.Append(c);
+            }
+        }
+
+        return sb.ToString().Trim();
     }
 
     private static SshAuditGrade ComputeGrade(

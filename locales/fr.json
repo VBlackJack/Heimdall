@@ -7086,5 +7086,12 @@
   "A11ySshAuthKeyRow": "{0}, {1}, {2}",
   "SshCertWarningExpired": "Le certificat utilisateur SSH a expir\u00e9 le {0}.",
   "SshCertWarningExpiringSoonOne": "Le certificat utilisateur SSH expire dans {0} jour ({1}).",
-  "SshCertWarningExpiringSoon": "Le certificat utilisateur SSH expire dans {0} jours ({1})."
+  "SshCertWarningExpiringSoon": "Le certificat utilisateur SSH expire dans {0} jours ({1}).",
+  "ToolSshServerAuditBtnCopyDropIn": "Copier drop-in sshd_config.d",
+  "ToolSshServerAuditFleetColDrift": "D\u00e9rive",
+  "ToolSshServerAuditFleetDriftSummary": "D\u00e9rive vs dernier audit : +{0} am\u00e9lior\u00e9s, -{1} r\u00e9gressions, {2} stables, {3} nouveaux",
+  "ToolSshServerAuditDriftImproved": "+ Am\u00e9lior\u00e9",
+  "ToolSshServerAuditDriftRegressed": "- R\u00e9gression",
+  "ToolSshServerAuditDriftUnchanged": "= Stable",
+  "ToolSshServerAuditDriftNew": "Nouveau"
 }
