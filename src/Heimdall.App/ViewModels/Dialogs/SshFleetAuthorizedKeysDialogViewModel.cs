@@ -298,10 +298,20 @@ public sealed partial class SshFleetAuthorizedKeysDialogViewModel : ObservableOb
             .GroupBy(static r => r.ServerId, StringComparer.OrdinalIgnoreCase)
             .Any(g => g.Any(r => r.IsLastKeyOnHost) || g.Count() >= g.First().TotalKeysOnHost);
 
+        string entrySummary = _localizer.FormatCount(
+            selectedRows.Count,
+            "SshFleetAuthKeysEntryCountOne",
+            "SshFleetAuthKeysEntryCount",
+            selectedRows.Count);
+        string serverSummary = _localizer.FormatCount(
+            distinctHosts,
+            "SshFleetAuthKeysServerCountOne",
+            "SshFleetAuthKeysServerCount",
+            distinctHosts);
         string confirmBody = _localizer.Format(
             "SshFleetAuthKeysConfirmRevoke",
-            selectedRows.Count,
-            distinctHosts);
+            entrySummary,
+            serverSummary);
 
         bool confirmed = await _dialogService.ShowConfirmAsync(
                 _localizer["SshFleetAuthKeysDialogTitle"],
@@ -393,19 +403,47 @@ public sealed partial class SshFleetAuthorizedKeysDialogViewModel : ObservableOb
 
             if (failedCount == 0)
             {
-                ReportStatus(_localizer.Format("SshFleetAuthKeysRevokeDone", revokedCount), isError: false);
-            }
-            else if (lockoutBlocked > 0)
-            {
                 ReportStatus(
-                    _localizer.Format("SshFleetAuthKeysRevokePartialLockout", revokedCount, failedCount, lockoutBlocked),
-                    isError: true);
+                    _localizer.FormatCount(
+                        revokedCount,
+                        "SshFleetAuthKeysRevokeDoneOne",
+                        "SshFleetAuthKeysRevokeDone",
+                        revokedCount),
+                    isError: false);
             }
             else
             {
-                ReportStatus(
-                    _localizer.Format("SshFleetAuthKeysRevokePartial", revokedCount, failedCount),
-                    isError: true);
+                string revokedSummary = _localizer.FormatCount(
+                    revokedCount,
+                    "SshFleetAuthKeysRevokedCountOne",
+                    "SshFleetAuthKeysRevokedCount",
+                    revokedCount);
+                string failedSummary = _localizer.FormatCount(
+                    failedCount,
+                    "SshFleetAuthKeysFailedCountOne",
+                    "SshFleetAuthKeysFailedCount",
+                    failedCount);
+                if (lockoutBlocked > 0)
+                {
+                    string lockoutSummary = _localizer.FormatCount(
+                        lockoutBlocked,
+                        "SshFleetAuthKeysLockoutBlockedCountOne",
+                        "SshFleetAuthKeysLockoutBlockedCount",
+                        lockoutBlocked);
+                    ReportStatus(
+                        _localizer.Format(
+                            "SshFleetAuthKeysRevokePartialLockout",
+                            revokedSummary,
+                            failedSummary,
+                            lockoutSummary),
+                        isError: true);
+                }
+                else
+                {
+                    ReportStatus(
+                        _localizer.Format("SshFleetAuthKeysRevokePartial", revokedSummary, failedSummary),
+                        isError: true);
+                }
             }
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -473,7 +511,13 @@ public sealed partial class SshFleetAuthorizedKeysDialogViewModel : ObservableOb
         }
         else if (errors > 0)
         {
-            ReportStatus(_localizer.Format("SshFleetAuthKeysScanWithErrors", errors), isError: true);
+            ReportStatus(
+                _localizer.FormatCount(
+                    errors,
+                    "SshFleetAuthKeysScanWithErrorsOne",
+                    "SshFleetAuthKeysScanWithErrors",
+                    errors),
+                isError: true);
         }
     }
 

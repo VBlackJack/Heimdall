@@ -1517,7 +1517,12 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
         }
 
         entry.State = TunnelLifecycleState.Degraded;
-        _host.StatusText = _localizer.Format("StatusTunnelReconnectExhausted", entry.LocalPort, maxAttempts);
+        _host.StatusText = _localizer.FormatCount(
+            maxAttempts,
+            "StatusTunnelReconnectExhaustedOne",
+            "StatusTunnelReconnectExhausted",
+            entry.LocalPort,
+            maxAttempts);
         RefreshList();
     }
 

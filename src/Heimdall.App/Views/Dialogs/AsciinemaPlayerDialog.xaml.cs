@@ -436,7 +436,12 @@ public partial class AsciinemaPlayerDialog : Window, IDisposable
         {
             File.WriteAllText(dlg.FileName, redacted.Text, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
             int maskedCount = redacted.Counts.Values.Sum();
-            TxtMeta.Text = _localizer.Format("CastPlayerExportSuccess", Path.GetFileName(dlg.FileName), maskedCount);
+            TxtMeta.Text = _localizer.FormatCount(
+                maskedCount,
+                "CastPlayerExportSuccessOne",
+                "CastPlayerExportSuccess",
+                Path.GetFileName(dlg.FileName),
+                maskedCount);
         }
         catch (IOException ex)
         {
