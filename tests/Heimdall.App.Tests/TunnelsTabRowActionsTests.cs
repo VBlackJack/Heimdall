@@ -37,6 +37,7 @@ public sealed class TunnelsTabRowActionsTests
             [
                 ("Tunnels.CloseCommand", "{Binding Tunnels.SelectedItem}"),
                 ("Tunnels.CopyPortCommand", "{Binding Tunnels.SelectedItem}"),
+                ("Tunnels.SaveAsPresetCommand", "{Binding Tunnels.SelectedItem}"),
                 ("Tunnels.CloseAllCommand", null),
             ],
             MenuCommands(TabGrid()));

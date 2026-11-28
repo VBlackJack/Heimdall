@@ -467,6 +467,214 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
+    /// Promotes an active tunnel to a persistent favorite: session-bound hot forwards are saved
+    /// onto their owning local SSH server profile, while gateway tunnels are saved as reusable
+    /// <see cref="SavedTunnelPresetDto"/> entries.
+    /// </summary>
+    [RelayCommand]
+    private async Task SaveAsPresetAsync(TunnelInfo? tunnel)
+    {
+        if (tunnel is null)
+        {
+            return;
+        }
+
+        if (tunnel.IsSessionBound || !string.IsNullOrWhiteSpace(tunnel.SessionForwardId))
+        {
+            await SaveSessionForwardToProfileAsync(tunnel).ConfigureAwait(true);
+            return;
+        }
+
+        var settings = _settingsSnapshot ?? _host.CurrentSettings;
+        var preset = TryBuildPresetFromTunnel(tunnel, settings?.SshGateways ?? []);
+        if (preset is null)
+        {
+            _host.StatusText = _localizer["StatusTunnelPromoteUnsupported"];
+            return;
+        }
+
+        await SaveTunnelPresetAsync(preset).ConfigureAwait(true);
+    }
+
+    internal static SavedTunnelPresetDto? TryBuildPresetFromTunnel(
+        TunnelInfo tunnel,
+        IReadOnlyList<SshGatewayDto> gateways)
+    {
+        ArgumentNullException.ThrowIfNull(tunnel);
+        ArgumentNullException.ThrowIfNull(gateways);
+
+        if (tunnel.IsSessionBound || !string.IsNullOrWhiteSpace(tunnel.SessionForwardId)
+            || gateways.Count == 0 || string.IsNullOrWhiteSpace(tunnel.ServerName))
+        {
+            return null;
+        }
+
+        var gateway = gateways.FirstOrDefault(g =>
+            string.Equals(g.Name, tunnel.ServerName, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(g.Host, tunnel.ServerName, StringComparison.OrdinalIgnoreCase));
+        if (gateway is null)
+        {
+            return null;
+        }
+
+        var name = !string.IsNullOrWhiteSpace(tunnel.Label) ? tunnel.Label.Trim() : gateway.Name;
+
+        if (tunnel.RemoteBindPort > 0 && tunnel.SocksProxyPort <= 0 && tunnel.RemotePort <= 0)
+        {
+            int localTarget = tunnel.EffectiveRemoteLocalPort > 0 ? tunnel.EffectiveRemoteLocalPort : tunnel.LocalPort;
+            if (localTarget <= 0)
+            {
+                return null;
+            }
+
+            return new SavedTunnelPresetDto
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                Name = name,
+                GatewayId = gateway.Id,
+                Mode = SavedTunnelPresetDto.ModeRemote,
+                LocalPort = localTarget,
+                RemoteBindPort = tunnel.RemoteBindPort,
+                RemoteLocalPort = localTarget
+            };
+        }
+
+        if (tunnel.SocksProxyPort > 0)
+        {
+            return new SavedTunnelPresetDto
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                Name = name,
+                GatewayId = gateway.Id,
+                Mode = SavedTunnelPresetDto.ModeDynamicSocks5,
+                LocalPort = tunnel.SocksProxyPort
+            };
+        }
+
+        if (tunnel.LocalPort > 0 && !string.IsNullOrWhiteSpace(tunnel.RemoteHost) && tunnel.RemotePort > 0)
+        {
+            return new SavedTunnelPresetDto
+            {
+                Id = Guid.NewGuid().ToString("N"),
+                Name = name,
+                GatewayId = gateway.Id,
+                Mode = SavedTunnelPresetDto.ModeLocal,
+                LocalPort = tunnel.LocalPort,
+                RemoteHost = tunnel.RemoteHost.Trim(),
+                RemotePort = tunnel.RemotePort
+            };
+        }
+
+        return null;
+    }
+
+    internal static bool ApplyTunnelToServerProfile(ServerProfileDto profile, TunnelInfo tunnel)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+        ArgumentNullException.ThrowIfNull(tunnel);
+
+        if (tunnel.RemoteBindPort > 0 && tunnel.SocksProxyPort <= 0 && tunnel.RemotePort <= 0)
+        {
+            int localTarget = tunnel.EffectiveRemoteLocalPort > 0 ? tunnel.EffectiveRemoteLocalPort : tunnel.LocalPort;
+            if (localTarget <= 0)
+            {
+                return false;
+            }
+
+            profile.RemoteBindPort = tunnel.RemoteBindPort;
+            profile.RemoteLocalPort = localTarget;
+            return true;
+        }
+
+        if (tunnel.SocksProxyPort > 0)
+        {
+            profile.SocksProxyPort = tunnel.SocksProxyPort;
+            return true;
+        }
+
+        if (tunnel.LocalPort > 0 && !string.IsNullOrWhiteSpace(tunnel.RemoteHost) && tunnel.RemotePort > 0)
+        {
+            var spec = new SshLocalForwardSpec("127.0.0.1", tunnel.LocalPort, tunnel.RemoteHost.Trim(), tunnel.RemotePort);
+            var canonical = spec.ToCanonicalString();
+            profile.SshLocalForwards ??= [];
+            bool alreadyExists = profile.SshLocalForwards.Any(existing =>
+                (SshLocalForwardSpec.TryParse(existing, out var parsed) && parsed is not null
+                    && string.Equals(parsed.ToCanonicalString(), canonical, StringComparison.OrdinalIgnoreCase))
+                || string.Equals(existing?.Trim(), canonical, StringComparison.OrdinalIgnoreCase));
+            if (!alreadyExists)
+            {
+                profile.SshLocalForwards.Add(canonical);
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private async Task SaveSessionForwardToProfileAsync(TunnelInfo tunnel)
+    {
+        string? profileId = null;
+        foreach (var tab in _host.Connection.ActiveSessions)
+        {
+            if (tab.IsAdHoc)
+            {
+                continue;
+            }
+
+            foreach (var pane in SplitTreeHelper.EnumerateLeaves(tab.RootContent))
+            {
+                if (pane.HostControl is EmbeddedSshView sshView
+                    && sshView.GetActiveSessionForwards().Any(f =>
+                        string.Equals(f.SessionForwardId, tunnel.SessionForwardId, StringComparison.Ordinal)))
+                {
+                    profileId = tab.ProfileLookupServerIdFor(pane);
+                    break;
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(profileId))
+            {
+                break;
+            }
+        }
+
+        if (string.IsNullOrWhiteSpace(profileId))
+        {
+            _host.StatusText = _localizer["StatusTunnelPromoteUnsupported"];
+            return;
+        }
+
+        try
+        {
+            string? savedDisplayName = await _configManager.MutateServersAsync(servers =>
+            {
+                var profile = servers.FirstOrDefault(s =>
+                    string.Equals(s.Id, profileId, StringComparison.Ordinal));
+                if (profile is null || !ApplyTunnelToServerProfile(profile, tunnel))
+                {
+                    return null;
+                }
+
+                return string.IsNullOrWhiteSpace(profile.DisplayName) ? profile.RemoteServer : profile.DisplayName;
+            }).ConfigureAwait(true);
+
+            if (string.IsNullOrWhiteSpace(savedDisplayName))
+            {
+                _host.StatusText = _localizer["StatusTunnelPromoteUnsupported"];
+                return;
+            }
+
+            _host.StatusText = _localizer.Format("StatusHotForwardSavedToProfile", savedDisplayName);
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Warn($"[TunnelsViewModel] promote hot forward to profile failed: {ex.Message}");
+            _host.StatusText = _localizer["StatusTunnelPromoteUnsupported"];
+        }
+    }
+
+    /// <summary>
     /// Opens a user-requested local-forward tunnel without creating a
     /// synthetic server profile.
     /// </summary>

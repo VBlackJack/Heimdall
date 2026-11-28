@@ -7078,5 +7078,8 @@
   "SshAuthKeysErrInvalidOptions": "Invalid authorized_keys options: use comma-separated options without unquoted spaces or control characters.",
   "SshAuthKeysErrLastKeyProtected": "Refused to remove the last remaining key in remote authorized_keys.",
   "Osc133CmdDoneSuccess": "Command finished in {0}",
-  "Osc133CmdDoneFailed": "Command exited ({0}) in {1}"
+  "Osc133CmdDoneFailed": "Command exited ({0}) in {1}",
+  "TunnelCtxSaveAsPreset": "Save as preset / profile",
+  "StatusHotForwardSavedToProfile": "Port forward saved to server profile '{0}'.",
+  "StatusTunnelPromoteUnsupported": "This tunnel cannot be saved as a preset or local profile forward."
 }

@@ -678,6 +678,155 @@ public sealed class TunnelsViewModelTests
         Assert.False(viewModel.HasNoTunnels);
     }
 
+    [Fact]
+    public void TryBuildPresetFromTunnel_BuildsLocalSocksAndRemotePresets()
+    {
+        var gateways = new List<SshGatewayDto>
+        {
+            new() { Id = "gw-1", Name = "Corp Bastion", Host = "bastion.example.test", Port = 22 }
+        };
+
+        var local = new TunnelInfo(
+            "Corp Bastion",
+            LocalPort: 8080,
+            RemoteHost: "db.internal",
+            RemotePort: 5432,
+            StartedAt: DateTime.UnixEpoch,
+            IsAlive: true)
+        {
+            Label = "Prod DB"
+        };
+        var localPreset = TunnelsViewModel.TryBuildPresetFromTunnel(local, gateways);
+        Assert.NotNull(localPreset);
+        Assert.Equal("gw-1", localPreset.GatewayId);
+        Assert.Equal("Prod DB", localPreset.Name);
+        Assert.Equal(SavedTunnelPresetDto.ModeLocal, localPreset.Mode);
+        Assert.Equal(8080, localPreset.LocalPort);
+        Assert.Equal("db.internal", localPreset.RemoteHost);
+        Assert.Equal(5432, localPreset.RemotePort);
+
+        var socks = new TunnelInfo(
+            "bastion.example.test",
+            LocalPort: 1080,
+            RemoteHost: string.Empty,
+            RemotePort: 0,
+            StartedAt: DateTime.UnixEpoch,
+            IsAlive: true)
+        {
+            SocksProxyPort = 1080
+        };
+        var socksPreset = TunnelsViewModel.TryBuildPresetFromTunnel(socks, gateways);
+        Assert.NotNull(socksPreset);
+        Assert.Equal(SavedTunnelPresetDto.ModeDynamicSocks5, socksPreset.Mode);
+        Assert.Equal(1080, socksPreset.LocalPort);
+
+        var remote = new TunnelInfo(
+            "Corp Bastion",
+            LocalPort: 0,
+            RemoteHost: "127.0.0.1",
+            RemotePort: 0,
+            StartedAt: DateTime.UnixEpoch,
+            IsAlive: true)
+        {
+            RemoteBindPort = 9000,
+            EffectiveRemoteLocalPort = 3000
+        };
+        var remotePreset = TunnelsViewModel.TryBuildPresetFromTunnel(remote, gateways);
+        Assert.NotNull(remotePreset);
+        Assert.Equal(SavedTunnelPresetDto.ModeRemote, remotePreset.Mode);
+        Assert.Equal(9000, remotePreset.RemoteBindPort);
+        Assert.Equal(3000, remotePreset.RemoteLocalPort);
+
+        var sessionBound = local with { IsSessionBound = true, SessionForwardId = "fwd-1" };
+        Assert.Null(TunnelsViewModel.TryBuildPresetFromTunnel(sessionBound, gateways));
+    }
+
+    [Fact]
+    public void ApplyTunnelToServerProfile_PersistsAndDeduplicatesLocalSocksAndRemoteForwards()
+    {
+        var profile = new ServerProfileDto { Id = "srv-1", DisplayName = "App" };
+
+        var local = new TunnelInfo(
+            "App",
+            LocalPort: 8443,
+            RemoteHost: "api.internal",
+            RemotePort: 443,
+            StartedAt: DateTime.UnixEpoch,
+            IsAlive: true)
+        {
+            SessionForwardId = "fwd-local"
+        };
+        Assert.True(TunnelsViewModel.ApplyTunnelToServerProfile(profile, local));
+        Assert.True(TunnelsViewModel.ApplyTunnelToServerProfile(profile, local));
+        Assert.Single(profile.SshLocalForwards);
+        Assert.Equal("8443:api.internal:443", profile.SshLocalForwards[0]);
+
+        var socks = new TunnelInfo(
+            "App",
+            LocalPort: 1085,
+            RemoteHost: string.Empty,
+            RemotePort: 0,
+            StartedAt: DateTime.UnixEpoch,
+            IsAlive: true)
+        {
+            SocksProxyPort = 1085,
+            SessionForwardId = "fwd-socks"
+        };
+        Assert.True(TunnelsViewModel.ApplyTunnelToServerProfile(profile, socks));
+        Assert.Equal(1085, profile.SocksProxyPort);
+
+        var remote = new TunnelInfo(
+            "App",
+            LocalPort: 0,
+            RemoteHost: "127.0.0.1",
+            RemotePort: 0,
+            StartedAt: DateTime.UnixEpoch,
+            IsAlive: true)
+        {
+            RemoteBindPort = 9090,
+            EffectiveRemoteLocalPort = 5000,
+            SessionForwardId = "fwd-remote"
+        };
+        Assert.True(TunnelsViewModel.ApplyTunnelToServerProfile(profile, remote));
+        Assert.Equal(9090, profile.RemoteBindPort);
+        Assert.Equal(5000, profile.RemoteLocalPort);
+    }
+
+    [Fact]
+    public async Task SaveAsPresetCommand_GatewayTunnel_SavesPresetAndUpdatesSavedPresets()
+    {
+        var settings = new AppSettings
+        {
+            SshGateways =
+            [
+                new SshGatewayDto { Id = "gw-prod", Name = "Prod Bastion", Host = "bastion.prod.test", Port = 22 }
+            ]
+        };
+        var host = new TestTunnelsHost(settings);
+        var config = new FakeConfigManager(settings);
+        using var vm = CreateViewModel(host, config);
+
+        var tunnel = new TunnelInfo(
+            "Prod Bastion",
+            LocalPort: 15432,
+            RemoteHost: "pg.internal",
+            RemotePort: 5432,
+            StartedAt: DateTime.UnixEpoch,
+            IsAlive: true)
+        {
+            Label = "PG Tunnel"
+        };
+
+        await vm.SaveAsPresetCommand.ExecuteAsync(tunnel);
+
+        var saved = Assert.Single(vm.SavedPresets);
+        Assert.Equal("gw-prod", saved.GatewayId);
+        Assert.Equal("PG Tunnel", saved.Name);
+        Assert.Equal(15432, saved.LocalPort);
+        Assert.Equal("pg.internal", saved.RemoteHost);
+        Assert.Equal(5432, saved.RemotePort);
+    }
+
     private sealed class DummyTunnelHandle : IDisposable
     {
         public void Dispose()
@@ -822,7 +971,9 @@ public sealed class TunnelsViewModelTests
         {
             return new AppSettings
             {
-                CollapseTunnelsPanelByDefault = settings.CollapseTunnelsPanelByDefault
+                CollapseTunnelsPanelByDefault = settings.CollapseTunnelsPanelByDefault,
+                SshGateways = settings.SshGateways.ToList(),
+                SavedTunnelPresets = settings.SavedTunnelPresets.ToList()
             };
         }
 

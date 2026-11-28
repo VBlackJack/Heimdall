@@ -2574,6 +2574,10 @@
                                                       Header="{loc:Translate TunnelCtxCopyPort}"
                                                       Command="{Binding Tunnels.CopyPortCommand}"
                                                       CommandParameter="{Binding Tunnels.SelectedItem}"/>
+                                            <MenuItem x:Name="Mw_TpCtxSaveAsPreset"
+                                                      Header="{loc:Translate TunnelCtxSaveAsPreset}"
+                                                      Command="{Binding Tunnels.SaveAsPresetCommand}"
+                                                      CommandParameter="{Binding Tunnels.SelectedItem}"/>
                                             <Separator/>
                                             <MenuItem x:Name="Mw_TpCtxCloseAll"
                                                       Header="{loc:Translate TunnelCtxCloseAll}"
@@ -2765,6 +2769,9 @@
                                           CommandParameter="{Binding Tunnels.SelectedItem}"/>
                                 <MenuItem Header="{loc:Translate TunnelCtxCopyPort}"
                                           Command="{Binding Tunnels.CopyPortCommand}"
+                                          CommandParameter="{Binding Tunnels.SelectedItem}"/>
+                                <MenuItem Header="{loc:Translate TunnelCtxSaveAsPreset}"
+                                          Command="{Binding Tunnels.SaveAsPresetCommand}"
                                           CommandParameter="{Binding Tunnels.SelectedItem}"/>
                                 <Separator/>
                                 <MenuItem Header="{loc:Translate TunnelCtxCloseAll}"

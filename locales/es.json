@@ -7078,5 +7078,8 @@
   "SshAuthKeysErrInvalidOptions": "Opciones de authorized_keys no v\u00e1lidas: usa opciones separadas por comas sin espacios sin comillas ni caracteres de control.",
   "SshAuthKeysErrLastKeyProtected": "Se rechaz\u00f3 eliminar la \u00faltima clave restante en authorized_keys.",
   "Osc133CmdDoneSuccess": "Comando finalizado en {0}",
-  "Osc133CmdDoneFailed": "Comando finalizado con error ({0}) en {1}"
+  "Osc133CmdDoneFailed": "Comando finalizado con error ({0}) en {1}",
+  "TunnelCtxSaveAsPreset": "Guardar como preajuste / perfil",
+  "StatusHotForwardSavedToProfile": "Redirecci\u00f3n guardada en el perfil de servidor '{0}'.",
+  "StatusTunnelPromoteUnsupported": "Este t\u00fanel no se puede guardar como preajuste ni en un perfil local."
 }
