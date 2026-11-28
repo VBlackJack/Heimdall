@@ -228,7 +228,7 @@ public sealed class TunnelService : ITunnelService
                     settings.SshAgentPreference,
                     settings.SshCryptoPolicy),
                 ct);
-            gatewayChainKey = BuildGatewayChainKey(chainDtos, settings.SshAgentPreference);
+            gatewayChainKey = BuildGatewayChainKey(chainDtos, settings.SshAgentPreference, settings.SshCryptoPolicy);
         }
         catch (GatewayChainException chainEx)
         {
@@ -981,8 +981,10 @@ public sealed class TunnelService : ITunnelService
             (remoteBindPort <= 0 ? 0 : remoteLocalPort > 0 ? remoteLocalPort : remoteBindPort)
                 .ToString(System.Globalization.CultureInfo.InvariantCulture));
 
-    internal static string BuildGatewayChainKey(IReadOnlyList<SshGatewayDto> chainDtos,
-        SshAgentPreference agentPreference = SshAgentPreference.AutoOpenSshFirst)
+    internal static string BuildGatewayChainKey(
+        IReadOnlyList<SshGatewayDto> chainDtos,
+        SshAgentPreference agentPreference = SshAgentPreference.AutoOpenSshFirst,
+        SshCryptoPolicy cryptoPolicy = SshCryptoPolicy.Standard)
     {
         ArgumentNullException.ThrowIfNull(chainDtos);
         if (chainDtos.Count == 0)
@@ -992,6 +994,10 @@ public sealed class TunnelService : ITunnelService
 
         using MemoryStream payload = new MemoryStream();
         WriteLengthPrefixedString(payload, agentPreference.ToString());
+        if (cryptoPolicy != SshCryptoPolicy.Standard)
+        {
+            WriteLengthPrefixedString(payload, cryptoPolicy.ToString());
+        }
         foreach (SshGatewayDto gateway in chainDtos)
         {
             WriteLengthPrefixedString(payload, gateway.Id ?? string.Empty);

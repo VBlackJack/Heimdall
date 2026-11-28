@@ -153,7 +153,6 @@ public static partial class OpenSshConfigParser
                         }
 
                         var capReached = false;
-                        var expandedAny = false;
                         foreach (var pattern in SplitTokens(value))
                         {
                             if (state.IncludedFileCount >= MaxIncludedFiles)
@@ -171,20 +170,17 @@ public static partial class OpenSshConfigParser
                                 }
 
                                 ExpandFileRecursive(includedFile, depth + 1, state, output, isRoot: false);
-                                expandedAny = true;
+
+                                // Isolate trailing Host/Match blocks after EACH included file so neither
+                                // sibling files in a glob/multi-pattern Include nor subsequent lines in
+                                // the parent file inherit a leaked Host/Match block.
+                                output.Append(inGlobalWildcardBlock ? "Host *" : IncludeScopeResetMarker).Append('\n');
                             }
 
                             if (capReached)
                             {
                                 break;
                             }
-                        }
-
-                        // Isolate trailing Host/Match blocks inside included files so subsequent
-                        // lines in the parent file resume under the parent's active scope.
-                        if (expandedAny)
-                        {
-                            output.Append(inGlobalWildcardBlock ? "Host *" : IncludeScopeResetMarker).Append('\n');
                         }
 
                         continue;

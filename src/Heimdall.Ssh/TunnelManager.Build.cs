@@ -277,7 +277,9 @@ public sealed partial class TunnelManager
                 rejectedBecauseDisposed = true;
                 ReleaseLoopbackAliasReservationIfUnboundUnderLock(info.LocalBindHost);
             }
-            else if (!IsPortTracked(localPort) && _activeTunnels.TryAdd(localPort, session))
+            else if (!IsPortTracked(localPort)
+                && (!info.IsRemoteOnly || !IsRemoteBindTrackedOnGateway(info.ServerName, info.GatewayChainKey, info.RemoteBindPort))
+                && _activeTunnels.TryAdd(localPort, session))
             {
                 leaseId = AddReferenceUnderLock(localPort);
                 registered = true;

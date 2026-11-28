@@ -110,6 +110,10 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
     /// <summary>Outbound message: updates compiled regex highlight rules at runtime.</summary>
     private const string MsgSetHighlightRules = "set-highlight-rules:";
 
+    /// <summary>Pushes updated regex highlight rules to the running xterm.js surface.</summary>
+    internal void ApplyHighlightRules(IReadOnlyList<TerminalHighlightRuleDto>? rules)
+        => PostTerminalMessage(MsgSetHighlightRules + TerminalHighlightRuleDefaults.SerializeForTerminalJs(rules));
+
     /// <summary>Returns active direct session-bound forwards (-L/-D/-R) owned by this SSH view.</summary>
     internal IReadOnlyList<TunnelInfo> GetActiveSessionForwards()
         => _session?.GetActiveSessionForwards() ?? [];

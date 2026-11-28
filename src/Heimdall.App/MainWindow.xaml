@@ -4025,9 +4025,9 @@
                                                                 <Grid Margin="0,0,0,4">
                                                                     <Grid.ColumnDefinitions>
                                                                         <ColumnDefinition Width="Auto"/>
-                                                                        <ColumnDefinition Width="110"/>
+                                                                        <ColumnDefinition Width="Auto"/>
                                                                         <ColumnDefinition Width="*"/>
-                                                                        <ColumnDefinition Width="70"/>
+                                                                        <ColumnDefinition Width="Auto"/>
                                                                         <ColumnDefinition Width="Auto"/>
                                                                     </Grid.ColumnDefinitions>
                                                                     <CheckBox Grid.Column="0"
@@ -4070,13 +4070,14 @@
                                                     </ItemsControl>
                                                     <Grid Margin="0,6,0,0">
                                                         <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="110"/>
+                                                            <ColumnDefinition Width="Auto"/>
                                                             <ColumnDefinition Width="*"/>
-                                                            <ColumnDefinition Width="95"/>
+                                                            <ColumnDefinition Width="Auto"/>
                                                             <ColumnDefinition Width="Auto"/>
                                                             <ColumnDefinition Width="Auto"/>
                                                         </Grid.ColumnDefinitions>
                                                         <TextBox Grid.Column="0"
+                                                                 MinWidth="110"
                                                                  Text="{Binding Settings.NewHighlightRuleName, UpdateSourceTrigger=PropertyChanged}"
                                                                  Style="{StaticResource WatermarkTextBoxStyle}"
                                                                  Tag="{loc:Translate SettingsTerminalHighlightNameHint}"
@@ -4269,7 +4270,7 @@
                                             <TextBlock x:Name="Mw_SettingsSshAgentTimeoutLabel" Text="{loc:Translate SettingsLabelSshAgentLookupTimeout}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                             <StackPanel Orientation="Horizontal">
                                                 <TextBox Text="{Binding Settings.SshAgentLookupTimeoutMsText, UpdateSourceTrigger=PropertyChanged}" Width="{StaticResource SettingsNumericFieldWidth}" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsSshAgentTimeoutLabel}"/>
-                                                <TextBlock Text="{loc:Translate SettingsUnitMs}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
+                                                <TextBlock Text="{loc:Translate SettingsUnitMilliseconds}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
                                             </StackPanel>
                                             <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[SshAgentLookupTimeoutMs]}"/>
                                             <TextBlock Text="{loc:Translate SettingsSshAgentLookupTimeoutHint}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,4,0,0" TextWrapping="Wrap"/>
@@ -4282,6 +4283,7 @@
                                                 <ComboBoxItem Content="{loc:Translate SettingsSshCryptoPolicyStrictModern}" Tag="StrictModern" AutomationProperties.Name="{loc:Translate SettingsSshCryptoPolicyStrictModern}"/>
                                                 <ComboBoxItem Content="{loc:Translate SettingsSshCryptoPolicyLegacy}" Tag="LegacyCompatible" AutomationProperties.Name="{loc:Translate SettingsSshCryptoPolicyLegacy}"/>
                                             </ComboBox>
+                                            <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[SshCryptoPolicy]}"/>
                                             <TextBlock Text="{loc:Translate SettingsSshCryptoPolicyHint}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                                         </StackPanel>
                                             </StackPanel>
@@ -4545,12 +4547,13 @@
                                             <StackPanel Margin="0,8,0,0">
                                                 <Grid Margin="0,0,0,8">
                                                     <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="160"/>
+                                                        <ColumnDefinition Width="Auto"/>
                                                         <ColumnDefinition Width="*"/>
                                                         <ColumnDefinition Width="Auto"/>
                                                         <ColumnDefinition Width="Auto"/>
                                                     </Grid.ColumnDefinitions>
                                                     <TextBox Grid.Column="0"
+                                                             MinWidth="140"
                                                              Text="{Binding Settings.TrustedHostKeys.NewPolicyHostPatterns, UpdateSourceTrigger=PropertyChanged}"
                                                              Style="{StaticResource WatermarkTextBoxStyle}"
                                                              Tag="{loc:Translate TrustedHostKeysPolicyHostHint}"
@@ -4592,8 +4595,8 @@
                                                                     Margin="0,0,0,4">
                                                                 <Grid>
                                                                     <Grid.ColumnDefinitions>
-                                                                        <ColumnDefinition Width="120"/>
-                                                                        <ColumnDefinition Width="160"/>
+                                                                        <ColumnDefinition Width="Auto"/>
+                                                                        <ColumnDefinition Width="Auto"/>
                                                                         <ColumnDefinition Width="*"/>
                                                                         <ColumnDefinition Width="Auto"/>
                                                                     </Grid.ColumnDefinitions>
@@ -4602,12 +4605,14 @@
                                                                                FontSize="{StaticResource FontSizeCaption}"
                                                                                FontWeight="SemiBold"
                                                                                Foreground="{DynamicResource AccentTextBrush}"
+                                                                               Margin="0,0,8,0"
                                                                                VerticalAlignment="Center"/>
                                                                     <TextBlock Grid.Column="1"
                                                                                Text="{Binding HostPatterns}"
                                                                                FontFamily="{StaticResource FontFamilyMonospace}"
                                                                                FontSize="{StaticResource FontSizeCaption}"
                                                                                Foreground="{DynamicResource TextPrimaryBrush}"
+                                                                               MaxWidth="180"
                                                                                VerticalAlignment="Center"
                                                                                TextTrimming="CharacterEllipsis"
                                                                                ToolTip="{Binding HostPatterns}"/>

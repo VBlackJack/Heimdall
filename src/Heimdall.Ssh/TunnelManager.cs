@@ -1207,8 +1207,11 @@ public sealed partial class TunnelManager : IDisposable
         }
     }
 
-    private void DisposeAndNotifyClosed(int localPort, IDisposable session)
+    private void DisposeAndNotifyClosed(int trackingKey, IDisposable session)
     {
+        int reportedPort = session is TunnelSession tunnelSession && tunnelSession.Info.IsRemoteOnly
+            ? tunnelSession.Info.RemoteBindPort
+            : trackingKey;
         string? error = null;
         try
         {
@@ -1219,7 +1222,7 @@ public sealed partial class TunnelManager : IDisposable
             error = ex.Message;
         }
 
-        RaiseTunnelClosed(localPort, error);
+        RaiseTunnelClosed(reportedPort, error);
     }
 
     internal (int Active, int External, int References, int Reservations) GetRegistryCounts()
@@ -1363,10 +1366,13 @@ public sealed partial class TunnelManager : IDisposable
                 continue;
             }
 
+            int reportedPort = detached is TunnelSession lostTunnel && lostTunnel.Info.IsRemoteOnly
+                ? lostTunnel.Info.RemoteBindPort
+                : localPort;
             Core.Logging.FileLogger.Warn(
-                $"[TunnelManager] Tunnel on port {localPort} lost its connection and was closed.");
+                $"[TunnelManager] Tunnel on port {reportedPort} lost its connection and was closed.");
             DisposeAndNotifyClosed(localPort, detached);
-            RaiseTunnelLost(localPort);
+            RaiseTunnelLost(reportedPort);
             closed++;
         }
 

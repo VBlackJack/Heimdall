@@ -462,6 +462,7 @@ public static class SshConnectionFactory
         {
             Timeout = connectionParams.ConnectTimeout
         };
+        ApplyCryptoPolicy(connectionInfo, connectionParams.CryptoPolicy);
 
         HostKeyPresentation? presentation = null;
         Exception? connectFailure = null;

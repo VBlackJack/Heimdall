@@ -479,14 +479,25 @@ public static class SshKeyPairGenerator
         byte[] rawPrivatePlaintext;
         using (var privStream = new MemoryStream())
         {
-            writePrivateKeyFields(privStream);
-            rawPrivatePlaintext = privStream.ToArray();
+            try
+            {
+                writePrivateKeyFields(privStream);
+                rawPrivatePlaintext = privStream.ToArray();
+            }
+            finally
+            {
+                if (privStream.TryGetBuffer(out var privSegment) && privSegment.Array is not null)
+                {
+                    CryptographicOperations.ZeroMemory(privSegment.Array);
+                }
+            }
         }
 
         byte[] paddedPrivatePlaintext = rawPrivatePlaintext;
         byte[]? derived = null;
         byte[]? salt = null;
         byte[]? passphraseBytes = null;
+        byte[] macKey = [];
         try
         {
             if (encrypt)
@@ -501,7 +512,6 @@ public static class SshKeyPairGenerator
             }
 
             byte[] privateWireBytes;
-            byte[] macKey;
             if (encrypt)
             {
                 salt = RandomNumberGenerator.GetBytes(PpkArgon2SaltLength);
@@ -537,33 +547,34 @@ public static class SshKeyPairGenerator
             else
             {
                 privateWireBytes = paddedPrivatePlaintext;
-                macKey = [];
             }
 
             byte[] mac;
-            try
+            using (var macStream = new MemoryStream())
             {
-                using var macStream = new MemoryStream();
-                WriteOpenSshString(macStream, algorithmName);
-                WriteOpenSshString(macStream, encryptionName);
-                WriteOpenSshBytes(macStream, Encoding.UTF8.GetBytes(sanitizedComment));
-                WriteOpenSshBytes(macStream, publicKeyBlob);
-                WriteOpenSshBytes(macStream, paddedPrivatePlaintext);
-                var macInput = macStream.ToArray();
                 try
                 {
-                    mac = HMACSHA256.HashData(macKey, macInput);
+                    WriteOpenSshString(macStream, algorithmName);
+                    WriteOpenSshString(macStream, encryptionName);
+                    WriteOpenSshBytes(macStream, Encoding.UTF8.GetBytes(sanitizedComment));
+                    WriteOpenSshBytes(macStream, publicKeyBlob);
+                    WriteOpenSshBytes(macStream, paddedPrivatePlaintext);
+                    var macInput = macStream.ToArray();
+                    try
+                    {
+                        mac = HMACSHA256.HashData(macKey, macInput);
+                    }
+                    finally
+                    {
+                        CryptographicOperations.ZeroMemory(macInput);
+                    }
                 }
                 finally
                 {
-                    CryptographicOperations.ZeroMemory(macInput);
-                }
-            }
-            finally
-            {
-                if (macKey.Length > 0)
-                {
-                    CryptographicOperations.ZeroMemory(macKey);
+                    if (macStream.TryGetBuffer(out var macSegment) && macSegment.Array is not null)
+                    {
+                        CryptographicOperations.ZeroMemory(macSegment.Array);
+                    }
                 }
             }
 
@@ -604,6 +615,11 @@ public static class SshKeyPairGenerator
             if (!ReferenceEquals(paddedPrivatePlaintext, rawPrivatePlaintext))
             {
                 CryptographicOperations.ZeroMemory(paddedPrivatePlaintext);
+            }
+
+            if (macKey.Length > 0)
+            {
+                CryptographicOperations.ZeroMemory(macKey);
             }
 
             if (derived is not null)
