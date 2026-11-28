@@ -18,6 +18,8 @@ using System.Globalization;
 using System.Security;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
+using Heimdall.Core.Redaction;
 
 namespace Heimdall.Terminal.Logging;
 
@@ -56,6 +58,20 @@ public sealed record AsciinemaCastRecording(
     IReadOnlyList<AsciinemaCastEvent> Events,
     double TotalDurationSeconds,
     double CompressedDurationSeconds);
+
+/// <summary>One shell-integration command chapter extracted from OSC 133 markers inside a recording.</summary>
+public sealed record AsciinemaCommandChapter(
+    int Index,
+    double ElapsedSeconds,
+    double CompressedSeconds,
+    string Label);
+
+/// <summary>One stripped plain-text search hit inside a recording with event timestamp and snippet.</summary>
+public sealed record AsciinemaSearchMatch(
+    int EventIndex,
+    double ElapsedSeconds,
+    double CompressedSeconds,
+    string Snippet);
 
 /// <summary>
 /// Pure parser and replay timeline engine for asciinema v2 (<c>.cast</c> NDJSON) recordings.
@@ -269,6 +285,216 @@ public static class AsciinemaCastPlayerEngine
         }
 
         return (sb.ToString(), lastIdx, width, height);
+    }
+
+    /// <summary>
+    /// Extracts OSC 133 command chapters from output events. Uses command text between
+    /// <c>ESC ] 133;B</c> and <c>ESC ] 133;C</c> when present, or falls back to <c>133;A</c> prompts.
+    /// </summary>
+    public static IReadOnlyList<AsciinemaCommandChapter> ExtractCommandChapters(AsciinemaCastRecording recording)
+    {
+        ArgumentNullException.ThrowIfNull(recording);
+
+        const string marker133C = "\x1b]133;C";
+        const string marker133B = "\x1b]133;B";
+        const string marker133A = "\x1b]133;A";
+
+        var chapters = new List<AsciinemaCommandChapter>();
+        var promptChapters = new List<AsciinemaCommandChapter>();
+        var pendingCommandBuf = new StringBuilder();
+        var stripper = new StreamingAnsiStripper();
+        bool capturingCommand = false;
+        int cmdIndex = 0;
+        int promptIndex = 0;
+
+        foreach (var evt in recording.Events)
+        {
+            if (evt.Type != "o" || evt.Data.Length == 0)
+            {
+                continue;
+            }
+
+            string data = evt.Data;
+            int idxB = data.LastIndexOf(marker133B, StringComparison.Ordinal);
+            int idxC = data.IndexOf(marker133C, StringComparison.Ordinal);
+
+            if (idxB >= 0 && (idxC < 0 || idxB < idxC))
+            {
+                capturingCommand = true;
+                pendingCommandBuf.Clear();
+                int afterB = SkipOscTerminator(data, idxB + marker133B.Length);
+                int sliceEnd = idxC > afterB ? idxC : data.Length;
+                pendingCommandBuf.Append(stripper.Strip(data[afterB..sliceEnd]));
+            }
+            else if (capturingCommand && idxC < 0)
+            {
+                if (pendingCommandBuf.Length < 256)
+                {
+                    pendingCommandBuf.Append(stripper.Strip(data));
+                }
+            }
+            else if (capturingCommand && idxC >= 0)
+            {
+                pendingCommandBuf.Append(stripper.Strip(data[..idxC]));
+            }
+
+            if (idxC >= 0)
+            {
+                cmdIndex++;
+                string label = NormalizeChapterLabel(pendingCommandBuf.ToString(), $"Command #{cmdIndex}");
+                chapters.Add(new AsciinemaCommandChapter(cmdIndex, evt.ElapsedSeconds, evt.CompressedSeconds, label));
+                pendingCommandBuf.Clear();
+                capturingCommand = false;
+                stripper.Reset();
+            }
+
+            if (data.Contains(marker133A, StringComparison.Ordinal))
+            {
+                promptIndex++;
+                promptChapters.Add(new AsciinemaCommandChapter(
+                    promptIndex,
+                    evt.ElapsedSeconds,
+                    evt.CompressedSeconds,
+                    $"Prompt #{promptIndex}"));
+            }
+        }
+
+        return chapters.Count > 0 ? chapters : promptChapters;
+    }
+
+    /// <summary>
+    /// Searches stripped terminal output events case-insensitively for <paramref name="query"/>.
+    /// </summary>
+    public static IReadOnlyList<AsciinemaSearchMatch> Search(
+        AsciinemaCastRecording recording,
+        string? query,
+        int maxMatches = 200)
+    {
+        ArgumentNullException.ThrowIfNull(recording);
+
+        if (string.IsNullOrWhiteSpace(query) || maxMatches <= 0)
+        {
+            return [];
+        }
+
+        string needle = query.Trim();
+        var matches = new List<AsciinemaSearchMatch>();
+        var stripper = new StreamingAnsiStripper();
+
+        for (int i = 0; i < recording.Events.Count && matches.Count < maxMatches; i++)
+        {
+            var evt = recording.Events[i];
+            if (evt.Type != "o" || evt.Data.Length == 0)
+            {
+                continue;
+            }
+
+            string plain = stripper.Strip(evt.Data);
+            if (string.IsNullOrEmpty(plain))
+            {
+                continue;
+            }
+
+            int pos = 0;
+            while (matches.Count < maxMatches &&
+                (pos = plain.IndexOf(needle, pos, StringComparison.OrdinalIgnoreCase)) >= 0)
+            {
+                string snippet = BuildSnippet(plain, pos, needle.Length);
+                matches.Add(new AsciinemaSearchMatch(i, evt.ElapsedSeconds, evt.CompressedSeconds, snippet));
+                pos += needle.Length;
+            }
+        }
+
+        return matches;
+    }
+
+    /// <summary>
+    /// Renders an ANSI-stripped plain-text transcript redacted via <see cref="TextRedactor"/>.
+    /// Fail-closed: when <see cref="RedactionResult.Refused"/> is true, <see cref="RedactionResult.Text"/> is empty.
+    /// </summary>
+    public static RedactionResult ExportMaskedTranscript(
+        AsciinemaCastRecording recording,
+        RedactionOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(recording);
+
+        var stripper = new StreamingAnsiStripper();
+        var sb = new StringBuilder();
+        foreach (var evt in recording.Events)
+        {
+            if (evt.Type == "o" && evt.Data.Length > 0)
+            {
+                sb.Append(stripper.Strip(evt.Data));
+            }
+        }
+
+        string normalized = sb.ToString()
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace('\r', '\n');
+
+        return TextRedactor.Redact(normalized, options ?? new RedactionOptions());
+    }
+
+    private static int SkipOscTerminator(string text, int start)
+    {
+        int i = start;
+        while (i < text.Length)
+        {
+            char c = text[i];
+            if (c == '\x07')
+            {
+                return i + 1;
+            }
+
+            if (c == '\x1b' && i + 1 < text.Length && text[i + 1] == '\\')
+            {
+                return i + 2;
+            }
+
+            if (char.IsControl(c))
+            {
+                break;
+            }
+
+            i++;
+        }
+
+        return i;
+    }
+
+    private static string NormalizeChapterLabel(string raw, string fallback)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return fallback;
+        }
+
+        string collapsed = Regex.Replace(raw.Trim(), @"\s+", " ");
+        if (collapsed.Length == 0)
+        {
+            return fallback;
+        }
+
+        return collapsed.Length <= 80 ? collapsed : collapsed[..77] + "...";
+    }
+
+    private static string BuildSnippet(string plain, int matchIndex, int matchLength)
+    {
+        const int radius = 30;
+        int start = Math.Max(0, matchIndex - radius);
+        int end = Math.Min(plain.Length, matchIndex + matchLength + radius);
+        string slice = Regex.Replace(plain[start..end], @"[\r\n\t]+", " ").Trim();
+        if (start > 0)
+        {
+            slice = "..." + slice;
+        }
+
+        if (end < plain.Length)
+        {
+            slice += "...";
+        }
+
+        return slice;
     }
 
     /// <summary>Parses an asciinema v2 <c>"r"</c> resize event payload (<c>COLSxROWS</c>).</summary>

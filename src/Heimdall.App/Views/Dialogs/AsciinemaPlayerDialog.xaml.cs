@@ -26,7 +26,9 @@ using Heimdall.App.Theming;
 using Heimdall.Core.Configuration;
 using Heimdall.Core.Localization;
 using Heimdall.Core.Logging;
+using Heimdall.Core.Redaction;
 using Heimdall.Terminal.Logging;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Heimdall.App.Views.Dialogs;
 
@@ -60,6 +62,11 @@ public partial class AsciinemaPlayerDialog : Window, IDisposable
     private double _pendingSeekSeconds;
     private bool _hasPendingSeek;
     private bool _disposed;
+    private IReadOnlyList<AsciinemaCommandChapter> _chapters = [];
+    private IReadOnlyList<AsciinemaSearchMatch> _searchMatches = [];
+    private int _currentSearchMatchIndex = -1;
+    private string _lastSearchQuery = string.Empty;
+    private bool _updatingChapterCombo;
 
     public AsciinemaPlayerDialog(
         LocalizationManager localizer,
@@ -245,10 +252,200 @@ public partial class AsciinemaPlayerDialog : Window, IDisposable
         BtnPlayPause.IsEnabled = true;
         BtnRestart.IsEnabled = true;
         TimelineSlider.IsEnabled = true;
+        TxtSearch.IsEnabled = true;
+        BtnExportTranscript.IsEnabled = true;
+        PopulateChaptersAndResetSearch(recording);
 
         SyncTimelineBounds();
         RenderSeekState(0);
         StartPlayback();
+    }
+
+    private void PopulateChaptersAndResetSearch(AsciinemaCastRecording recording)
+    {
+        _searchMatches = [];
+        _currentSearchMatchIndex = -1;
+        _lastSearchQuery = string.Empty;
+        TxtSearchCount.Text = string.Empty;
+        BtnSearchPrev.IsEnabled = false;
+        BtnSearchNext.IsEnabled = false;
+
+        _chapters = AsciinemaCastPlayerEngine.ExtractCommandChapters(recording);
+        _updatingChapterCombo = true;
+        try
+        {
+            CmbChapters.Items.Clear();
+            if (_chapters.Count == 0)
+            {
+                CmbChapters.Items.Add(new ComboBoxItem { Content = _localizer["CastPlayerChaptersNone"], Tag = null });
+                CmbChapters.SelectedIndex = 0;
+                CmbChapters.IsEnabled = false;
+            }
+            else
+            {
+                CmbChapters.Items.Add(new ComboBoxItem
+                {
+                    Content = _localizer.Format("CastPlayerChaptersCount", _chapters.Count),
+                    Tag = null
+                });
+                foreach (var chapter in _chapters)
+                {
+                    string ts = AsciinemaCastPlayerEngine.FormatTimestamp(
+                        UseIdleCap() ? chapter.CompressedSeconds : chapter.ElapsedSeconds);
+                    CmbChapters.Items.Add(new ComboBoxItem
+                    {
+                        Content = $"[{ts}] {chapter.Label}",
+                        Tag = chapter
+                    });
+                }
+
+                CmbChapters.SelectedIndex = 0;
+                CmbChapters.IsEnabled = true;
+            }
+        }
+        finally
+        {
+            _updatingChapterCombo = false;
+        }
+    }
+
+    private void OnChapterSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_updatingChapterCombo || _recording is null)
+        {
+            return;
+        }
+
+        if (CmbChapters.SelectedItem is ComboBoxItem { Tag: AsciinemaCommandChapter chapter })
+        {
+            SeekToEventTimestamps(chapter.ElapsedSeconds, chapter.CompressedSeconds);
+        }
+    }
+
+    private void OnSearchKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key == System.Windows.Input.Key.Enter)
+        {
+            e.Handled = true;
+            NavigateSearchMatch(forward: true);
+        }
+    }
+
+    private void OnSearchPrevClick(object sender, RoutedEventArgs e)
+        => NavigateSearchMatch(forward: false);
+
+    private void OnSearchNextClick(object sender, RoutedEventArgs e)
+        => NavigateSearchMatch(forward: true);
+
+    private void NavigateSearchMatch(bool forward)
+    {
+        if (_recording is null)
+        {
+            return;
+        }
+
+        string query = TxtSearch.Text?.Trim() ?? string.Empty;
+        if (!string.Equals(query, _lastSearchQuery, StringComparison.Ordinal))
+        {
+            _lastSearchQuery = query;
+            _searchMatches = AsciinemaCastPlayerEngine.Search(_recording, query);
+            _currentSearchMatchIndex = -1;
+        }
+
+        if (_searchMatches.Count == 0)
+        {
+            TxtSearchCount.Text = string.IsNullOrEmpty(query) ? string.Empty : "0 / 0";
+            BtnSearchPrev.IsEnabled = false;
+            BtnSearchNext.IsEnabled = false;
+            return;
+        }
+
+        BtnSearchPrev.IsEnabled = true;
+        BtnSearchNext.IsEnabled = true;
+
+        if (_currentSearchMatchIndex < 0)
+        {
+            _currentSearchMatchIndex = forward ? 0 : _searchMatches.Count - 1;
+        }
+        else if (forward)
+        {
+            _currentSearchMatchIndex = (_currentSearchMatchIndex + 1) % _searchMatches.Count;
+        }
+        else
+        {
+            _currentSearchMatchIndex = (_currentSearchMatchIndex - 1 + _searchMatches.Count) % _searchMatches.Count;
+        }
+
+        AsciinemaSearchMatch match = _searchMatches[_currentSearchMatchIndex];
+        TxtSearchCount.Text = string.Create(
+            CultureInfo.InvariantCulture,
+            $"{_currentSearchMatchIndex + 1} / {_searchMatches.Count}");
+        SeekToEventTimestamps(match.ElapsedSeconds, match.CompressedSeconds);
+    }
+
+    private void SeekToEventTimestamps(double elapsedSeconds, double compressedSeconds)
+    {
+        if (_recording is null)
+        {
+            return;
+        }
+
+        _seekThrottleTimer.Stop();
+        _hasPendingSeek = false;
+        _currentSeconds = Math.Clamp(
+            UseIdleCap() ? compressedSeconds : elapsedSeconds,
+            0,
+            CurrentDuration());
+        RenderSeekState(_currentSeconds);
+    }
+
+    private void OnExportTranscriptClick(object sender, RoutedEventArgs e)
+    {
+        if (_recording is null)
+        {
+            return;
+        }
+
+        RedactionResult redacted = AsciinemaCastPlayerEngine.ExportMaskedTranscript(_recording);
+        if (redacted.Refused)
+        {
+            string msg = _localizer.Format(
+                "CastPlayerExportRefused",
+                redacted.RefusedRuleId ?? "redaction-timeout");
+            TxtMeta.Text = msg;
+            if ((Application.Current as App)?.Services is { } sp)
+            {
+                sp.GetService<IDialogService>()?
+                    .ShowError(_localizer["CastPlayerDialogTitle"], msg);
+            }
+            return;
+        }
+
+        var dlg = new Microsoft.Win32.SaveFileDialog
+        {
+            Filter = "Text (*.txt)|*.txt",
+            FileName = $"session-transcript-{DateTime.UtcNow:yyyyMMdd-HHmm}.txt",
+            DefaultExt = ".txt"
+        };
+        if (dlg.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        try
+        {
+            File.WriteAllText(dlg.FileName, redacted.Text, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            int maskedCount = redacted.Counts.Values.Sum();
+            TxtMeta.Text = _localizer.Format("CastPlayerExportSuccess", Path.GetFileName(dlg.FileName), maskedCount);
+        }
+        catch (IOException ex)
+        {
+            TxtMeta.Text = ex.Message;
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            TxtMeta.Text = ex.Message;
+        }
     }
 
     private void OnPlayPauseClick(object sender, RoutedEventArgs e)

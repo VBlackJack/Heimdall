@@ -42,6 +42,7 @@
     <Grid Margin="{StaticResource SpacingMd}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
@@ -78,8 +79,67 @@
             </StackPanel>
         </DockPanel>
 
+        <!-- Search, OSC 133 Chapters & Masked Transcript Export Toolbar -->
+        <DockPanel Grid.Row="1" Margin="0,0,0,8">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                <ComboBox x:Name="CmbChapters"
+                          MinWidth="180"
+                          MaxWidth="320"
+                          IsEnabled="False"
+                          SelectionChanged="OnChapterSelectionChanged"
+                          Margin="8,0,8,0"
+                          AutomationProperties.Name="{loc:Translate CastPlayerChaptersLabel}"
+                          ToolTip="{loc:Translate CastPlayerChaptersLabel}"/>
+                <Button x:Name="BtnExportTranscript"
+                        Content="{loc:Translate CastPlayerBtnExportTranscript}"
+                        Click="OnExportTranscriptClick"
+                        IsEnabled="False"
+                        Style="{DynamicResource SecondaryButtonStyle}"
+                        AutomationProperties.Name="{loc:Translate CastPlayerBtnExportTranscript}"/>
+            </StackPanel>
+            <Grid VerticalAlignment="Center">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBox x:Name="TxtSearch"
+                         Grid.Column="0"
+                         IsEnabled="False"
+                         KeyDown="OnSearchKeyDown"
+                         Style="{StaticResource DialogFormTextBoxStyle}"
+                         Margin="0,0,6,0"
+                         AutomationProperties.Name="{loc:Translate CastPlayerSearchPlaceholder}"
+                         ToolTip="{loc:Translate CastPlayerSearchPlaceholder}"/>
+                <Button x:Name="BtnSearchPrev"
+                        Grid.Column="1"
+                        Content="{loc:Translate CastPlayerBtnPrevMatch}"
+                        Click="OnSearchPrevClick"
+                        IsEnabled="False"
+                        Style="{DynamicResource SecondaryButtonStyle}"
+                        Margin="0,0,4,0"
+                        AutomationProperties.Name="{loc:Translate CastPlayerBtnPrevMatch}"/>
+                <Button x:Name="BtnSearchNext"
+                        Grid.Column="2"
+                        Content="{loc:Translate CastPlayerBtnNextMatch}"
+                        Click="OnSearchNextClick"
+                        IsEnabled="False"
+                        Style="{DynamicResource SecondaryButtonStyle}"
+                        Margin="0,0,8,0"
+                        AutomationProperties.Name="{loc:Translate CastPlayerBtnNextMatch}"/>
+                <TextBlock x:Name="TxtSearchCount"
+                           Grid.Column="3"
+                           Text=""
+                           FontFamily="{StaticResource FontFamilyMonospace}"
+                           FontSize="{StaticResource FontSizeCaption}"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           VerticalAlignment="Center"/>
+            </Grid>
+        </DockPanel>
+
         <!-- Embedded xterm.js WebView2 surface -->
-        <Border Grid.Row="1"
+        <Border Grid.Row="2"
                 BorderBrush="{DynamicResource BorderBrush}"
                 BorderThickness="1"
                 CornerRadius="{StaticResource CornerRadiusSm}"
@@ -88,7 +148,7 @@
         </Border>
 
         <!-- Transport controls -->
-        <Border Grid.Row="2" Style="{StaticResource DialogSectionCardStyle}" Margin="0,10,0,0" Padding="10,8">
+        <Border Grid.Row="3" Style="{StaticResource DialogSectionCardStyle}" Margin="0,10,0,0" Padding="10,8">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>

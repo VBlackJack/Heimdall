@@ -7174,5 +7174,14 @@
   "SshFleetAuthKeysRevokeDone": "{0} entrada(s) revocada(s).",
   "SshFleetAuthKeysRevokePartial": "{0} entrada(s) revocada(s); {1} fallo(s).",
   "SshFleetAuthKeysRevokePartialLockout": "{0} entrada(s) revocada(s); {1} fallo(s) ({2} bloqueados por protecci\u00f3n de \u00faltima clave).",
-  "A11ySshFleetAuthKeyRow": "{0}, {1}, {2}, {3}"
+  "A11ySshFleetAuthKeyRow": "{0}, {1}, {2}, {3}",
+  "CastPlayerSearchPlaceholder": "Buscar en la salida (Intro para siguiente)...",
+  "CastPlayerBtnPrevMatch": "Ant.",
+  "CastPlayerBtnNextMatch": "Sig.",
+  "CastPlayerChaptersLabel": "Cap\u00edtulos de comandos (OSC 133)",
+  "CastPlayerChaptersNone": "Sin cap\u00edtulos OSC 133",
+  "CastPlayerChaptersCount": "Cap\u00edtulos ({0})",
+  "CastPlayerBtnExportTranscript": "Exportar transcripci\u00f3n enmascarada",
+  "CastPlayerExportRefused": "Exportaci\u00f3n rechazada (fail-closed): expir\u00f3 la regla de enmascarado '{0}'.",
+  "CastPlayerExportSuccess": "Transcripci\u00f3n enmascarada exportada a '{0}' ({1} secreto(s) ocultado(s))."
 }

@@ -131,6 +131,35 @@ public sealed class AsciinemaCastPlayerEngineTests
         Assert.Equal(43, rows);
     }
 
+    [Fact]
+    public void ExtractCommandChapters_SearchAndExportMaskedTranscript_WorkCleanlyWithRedaction()
+    {
+        string cast = string.Join('\n',
+            "{\"version\":2,\"width\":80,\"height\":24}",
+            "[0.5,\"o\",\"\\u001b]133;A\\u0007ops@host:~$ \\u001b]133;B\\u0007uname -a\\u001b]133;C\\u0007\"]",
+            "[1.0,\"o\",\"\\u001b[32mLinux\\u001b[0m srv1\\r\\n\"]",
+            "[2.0,\"o\",\"\\u001b]133;A\\u0007ops@host:~$ \\u001b]133;B\\u0007cat token\\u001b]133;C\\u0007\"]",
+            "[2.5,\"o\",\"Authorization: Bearer super-secret-jwt-token-value-12345\\r\\n\"]");
+
+        Assert.True(AsciinemaCastPlayerEngine.TryParse(cast, out var recording, out _));
+        Assert.NotNull(recording);
+
+        var chapters = AsciinemaCastPlayerEngine.ExtractCommandChapters(recording);
+        Assert.Equal(2, chapters.Count);
+        Assert.Equal("uname -a", chapters[0].Label);
+        Assert.Equal("cat token", chapters[1].Label);
+
+        var hits = AsciinemaCastPlayerEngine.Search(recording, "linux");
+        var hit = Assert.Single(hits);
+        Assert.Equal(1, hit.EventIndex);
+        Assert.Contains("Linux", hit.Snippet, StringComparison.Ordinal);
+
+        var exported = AsciinemaCastPlayerEngine.ExportMaskedTranscript(recording);
+        Assert.False(exported.Refused);
+        Assert.DoesNotContain("super-secret-jwt-token-value-12345", exported.Text, StringComparison.Ordinal);
+        Assert.Contains("Linux srv1", exported.Text, StringComparison.Ordinal);
+    }
+
     private sealed class ManualTimeProvider(DateTimeOffset startUtc) : TimeProvider
     {
         private DateTimeOffset _now = startUtc;

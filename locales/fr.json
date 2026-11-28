@@ -7174,5 +7174,14 @@
   "SshFleetAuthKeysRevokeDone": "{0} entr\u00e9e(s) r\u00e9voqu\u00e9e(s).",
   "SshFleetAuthKeysRevokePartial": "{0} entr\u00e9e(s) r\u00e9voqu\u00e9e(s) ; {1} \u00e9chec(s).",
   "SshFleetAuthKeysRevokePartialLockout": "{0} entr\u00e9e(s) r\u00e9voqu\u00e9e(s) ; {1} \u00e9chec(s) (dont {2} bloqu\u00e9s par la protection derni\u00e8re cl\u00e9).",
-  "A11ySshFleetAuthKeyRow": "{0}, {1}, {2}, {3}"
+  "A11ySshFleetAuthKeyRow": "{0}, {1}, {2}, {3}",
+  "CastPlayerSearchPlaceholder": "Rechercher dans la sortie (Entr\u00e9e pour suivant)...",
+  "CastPlayerBtnPrevMatch": "Pr\u00e9c.",
+  "CastPlayerBtnNextMatch": "Suiv.",
+  "CastPlayerChaptersLabel": "Chapitres de commandes (OSC 133)",
+  "CastPlayerChaptersNone": "Aucun chapitre OSC 133",
+  "CastPlayerChaptersCount": "Chapitres ({0})",
+  "CastPlayerBtnExportTranscript": "Exporter transcription masqu\u00e9e",
+  "CastPlayerExportRefused": "Export refus\u00e9 (fail-closed) : la r\u00e8gle de masquage '{0}' a expir\u00e9.",
+  "CastPlayerExportSuccess": "Transcription masqu\u00e9e export\u00e9e vers '{0}' ({1} secret(s) masqu\u00e9(s))."
 }

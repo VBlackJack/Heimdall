@@ -7174,5 +7174,14 @@
   "SshFleetAuthKeysRevokeDone": "Revoked {0} key entry(ies) cleanly.",
   "SshFleetAuthKeysRevokePartial": "Revoked {0} entry(ies); {1} failed.",
   "SshFleetAuthKeysRevokePartialLockout": "Revoked {0} entry(ies); {1} failed ({2} blocked by last-key lockout protection).",
-  "A11ySshFleetAuthKeyRow": "{0}, {1}, {2}, {3}"
+  "A11ySshFleetAuthKeyRow": "{0}, {1}, {2}, {3}",
+  "CastPlayerSearchPlaceholder": "Search output (Enter for next)...",
+  "CastPlayerBtnPrevMatch": "Prev",
+  "CastPlayerBtnNextMatch": "Next",
+  "CastPlayerChaptersLabel": "Command chapters (OSC 133)",
+  "CastPlayerChaptersNone": "No OSC 133 chapters",
+  "CastPlayerChaptersCount": "Chapters ({0})",
+  "CastPlayerBtnExportTranscript": "Export Masked Transcript",
+  "CastPlayerExportRefused": "Export refused fail-closed: redaction rule '{0}' timed out.",
+  "CastPlayerExportSuccess": "Exported masked transcript '{0}' ({1} secret(s) redacted)."
 }
