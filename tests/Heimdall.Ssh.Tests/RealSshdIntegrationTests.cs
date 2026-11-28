@@ -19,6 +19,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
+using Heimdall.Core.Security;
 using Heimdall.Core.Ssh;
 
 namespace Heimdall.Ssh.Tests;
@@ -241,6 +242,245 @@ public sealed class RealSshdIntegrationTests
             SshConnectionFactory.ResolveHostKeyAsync(parameters, revokedStore, countingVerifier, cts.Token));
 
         Assert.Equal(0, promptCount);
+    }
+
+    [SshdLabFact]
+    public async Task SshKexInitProbe_ProbesLiveSshd_AndAuditEngineGradesAlgorithms()
+    {
+        using var cts = new CancellationTokenSource(TestTimeout);
+
+        SshKexInitSnapshot snapshot = await SshKexInitProbe.ProbeAsync(
+            Host,
+            Port,
+            displayHost: Host,
+            displayPort: Port,
+            cancellationToken: cts.Token);
+
+        Assert.StartsWith("SSH-2.0-", snapshot.ServerBanner, StringComparison.Ordinal);
+        Assert.NotEmpty(snapshot.KeyExchange);
+        Assert.NotEmpty(snapshot.HostKeys);
+        Assert.NotEmpty(snapshot.EncryptionC2S);
+        Assert.NotEmpty(snapshot.MacC2S);
+
+        SshServerAuditReport report = SshServerAuditEngine.Evaluate(snapshot);
+        Assert.NotEmpty(report.Algorithms);
+
+        string dropIn = SshServerAuditEngine.GenerateHardeningDropIn(report);
+        Assert.Contains("sudo sshd -t", dropIn, StringComparison.Ordinal);
+        Assert.Contains("KexAlgorithms", dropIn, StringComparison.Ordinal);
+    }
+
+    [SshdLabFact]
+    public async Task SshAuthorizedKeysService_AddsWithOptionsListsDeduplicatesAndRemoves_AgainstLiveSshd()
+    {
+        using var cts = new CancellationTokenSource(TestTimeout);
+        var hostKeyStore = new HostKeyStore();
+        var verifier = new TrustOnceHostKeyVerifier();
+        var parameters = new SshConnectionParams
+        {
+            Host = Host,
+            Port = Port,
+            Username = Username,
+            Password = Password
+        };
+
+        string comment = $"heimdall-ak-lab-{Guid.NewGuid():N}";
+        var keyPair = SshKeyPairGenerator.Generate(
+            SshKeyAlgorithm.Ed25519,
+            comment: comment,
+            passphrase: null,
+            format: SshPrivateKeyFormat.OpenSsh);
+
+        var addFirst = await SshAuthorizedKeysService.AddKeyAsync(
+            parameters,
+            keyPair.PublicKeyOpenSsh,
+            options: "restrict,no-port-forwarding",
+            hostKeyStore,
+            verifier,
+            cts.Token);
+        Assert.True(addFirst.Success, addFirst.ErrorMessage);
+        Assert.False(addFirst.AlreadyPresent);
+
+        try
+        {
+            var addDuplicate = await SshAuthorizedKeysService.AddKeyAsync(
+                parameters,
+                keyPair.PublicKeyOpenSsh,
+                options: "restrict,no-port-forwarding",
+                hostKeyStore,
+                verifier,
+                cts.Token);
+            Assert.True(addDuplicate.Success, addDuplicate.ErrorMessage);
+            Assert.True(addDuplicate.AlreadyPresent);
+
+            var list = await SshAuthorizedKeysService.ListAsync(parameters, hostKeyStore, verifier, cts.Token);
+            Assert.True(list.Success, list.ErrorMessage);
+            AuthorizedKeyEntry? match = list.Entries.FirstOrDefault(
+                e => string.Equals(e.Comment, comment, StringComparison.Ordinal));
+            Assert.NotNull(match);
+            Assert.Equal("restrict,no-port-forwarding", match.Options);
+
+            var removed = await SshAuthorizedKeysService.RemoveKeyAsync(
+                parameters,
+                match.KeyType,
+                match.KeyBase64,
+                allowRemoveLastKey: list.Entries.Count <= 1,
+                hostKeyStore,
+                verifier,
+                cts.Token);
+            Assert.True(removed.Success, removed.ErrorMessage);
+
+            var afterList = await SshAuthorizedKeysService.ListAsync(parameters, hostKeyStore, verifier, cts.Token);
+            Assert.True(afterList.Success, afterList.ErrorMessage);
+            Assert.DoesNotContain(afterList.Entries, e => string.Equals(e.Comment, comment, StringComparison.Ordinal));
+        }
+        finally
+        {
+            // Best-effort cleanup if an assertion failed mid-test.
+            string[] parts = keyPair.PublicKeyOpenSsh.Split(' ', 3, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length >= 2)
+            {
+                _ = await SshAuthorizedKeysService.RemoveKeyAsync(
+                    parameters,
+                    parts[0],
+                    parts[1],
+                    allowRemoveLastKey: true,
+                    hostKeyStore,
+                    verifier,
+                    CancellationToken.None);
+            }
+        }
+    }
+
+    [SshdLabFact]
+    public async Task SshKeyRotator_RotatesKeyEndToEnd_VerifiesIsolatedAuthAndRemovesOldKey()
+    {
+        using var cts = new CancellationTokenSource(TestTimeout);
+        string tempDir = CreateTempDirectory();
+        var hostKeyStore = new HostKeyStore();
+        var verifier = new TrustOnceHostKeyVerifier();
+        var baseParams = new SshConnectionParams
+        {
+            Host = Host,
+            Port = Port,
+            Username = Username,
+            Password = Password
+        };
+
+        var oldPair = SshKeyPairGenerator.Generate(
+            SshKeyAlgorithm.Ed25519,
+            comment: $"heimdall-rot-old-{Guid.NewGuid():N}",
+            passphrase: null,
+            format: SshPrivateKeyFormat.OpenSsh);
+
+        string newKeyPath = Path.Combine(tempDir, "id_ed25519_rotated");
+        string newPassphrase = Convert.ToHexString(RandomNumberGenerator.GetBytes(12));
+        var newPair = SshKeyPairGenerator.Generate(
+            SshKeyAlgorithm.Ed25519,
+            comment: $"heimdall-rot-new-{Guid.NewGuid():N}",
+            passphrase: newPassphrase,
+            format: SshPrivateKeyFormat.OpenSsh);
+
+        try
+        {
+            var deployOld = await SshPublicKeyDeployer.DeployAsync(
+                baseParams, oldPair.PublicKeyOpenSsh, hostKeyStore, verifier, cts.Token);
+            Assert.True(deployOld.Success, deployOld.ErrorMessage);
+
+            await File.WriteAllTextAsync(newKeyPath, newPair.PrivateKey, new UTF8Encoding(false), cts.Token);
+            var deployNew = await SshPublicKeyDeployer.DeployAsync(
+                baseParams, newPair.PublicKeyOpenSsh, hostKeyStore, verifier, cts.Token);
+            Assert.True(deployNew.Success, deployNew.ErrorMessage);
+
+            var isolatedParams = SshKeyRotator.BuildIsolatedVerificationParams(baseParams, newKeyPath, newPassphrase);
+            var verifyResult = await SshKeyRotator.VerifyNewKeyAsync(isolatedParams, hostKeyStore, verifier, cts.Token);
+            Assert.True(verifyResult.Success, verifyResult.ErrorMessage);
+
+            var removeOld = await SshKeyRotator.RemoveOldKeyAsync(
+                isolatedParams,
+                oldPair.PublicKeyOpenSsh,
+                newPair.PublicKeyOpenSsh,
+                hostKeyStore,
+                verifier,
+                cts.Token);
+            Assert.True(removeOld.Success, removeOld.ErrorMessage);
+        }
+        finally
+        {
+            foreach (string pubLine in new[] { oldPair.PublicKeyOpenSsh, newPair.PublicKeyOpenSsh })
+            {
+                string[] parts = pubLine.Split(' ', 3, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length >= 2)
+                {
+                    _ = await SshAuthorizedKeysService.RemoveKeyAsync(
+                        baseParams, parts[0], parts[1], allowRemoveLastKey: true, hostKeyStore, verifier, CancellationToken.None);
+                }
+            }
+
+            TryDeleteDirectory(tempDir);
+        }
+    }
+
+    [SshdLabFact]
+    public async Task SshShellSession_HotAddsAndRemovesLocalForward_AndExecutesSetEnvStartupCommand()
+    {
+        using var cts = new CancellationTokenSource(TestTimeout);
+        var hostKeyStore = new HostKeyStore();
+        var verifier = new TrustOnceHostKeyVerifier();
+        const string EnvToken = "HEIMDALL_LAB_SETENV_OK_42";
+
+        var parameters = new SshConnectionParams
+        {
+            Host = Host,
+            Port = Port,
+            Username = Username,
+            Password = Password,
+            CryptoPolicy = SshCryptoPolicy.StrictModern,
+            EnvironmentVariables = [$"HEIMDALL_LAB_VAR={EnvToken}"],
+            StartupCommand = "printf 'ENV=%s\\n' \"$HEIMDALL_LAB_VAR\""
+        };
+
+        using var session = new SshShellSession();
+        var outputBuffer = new StringBuilder();
+        var envSeen = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        session.DataReceived += chunk =>
+        {
+            lock (outputBuffer)
+            {
+                outputBuffer.Append(Encoding.UTF8.GetString(chunk));
+                if (outputBuffer.ToString().Contains($"ENV={EnvToken}", StringComparison.Ordinal))
+                {
+                    envSeen.TrySetResult(true);
+                }
+            }
+        };
+
+        await session.ConnectAsync(parameters, hostKeyStore, verifier, 100, 30, cts.Token);
+        Assert.True(session.IsConnected);
+        Assert.True(await envSeen.Task.WaitAsync(cts.Token));
+
+        var diag = session.GetDiagnostics();
+        Assert.NotNull(diag);
+        Assert.False(diag.HasWeakCrypto);
+
+        int freeLocalPort = FindUnusedLoopbackPort();
+        var addResult = session.AddSessionPortForward(new SshSessionForwardRequest(
+            SshSessionForwardKind.Local,
+            LocalPort: freeLocalPort,
+            RemoteHost: "127.0.0.1",
+            RemotePort: Port,
+            Label: "lab-hot-fwd"));
+        Assert.True(addResult.Success, addResult.ErrorMessage);
+        Assert.NotNull(addResult.Forward?.SessionForwardId);
+        Assert.Equal(1, session.ActiveForwardedPortCount);
+
+        bool removed = session.RemoveSessionPortForward(addResult.Forward.SessionForwardId);
+        Assert.True(removed);
+        Assert.Equal(0, session.ActiveForwardedPortCount);
+        Assert.True(session.IsConnected);
+
+        session.Disconnect();
     }
 
     private static int FindUnusedLoopbackPort()
