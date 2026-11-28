@@ -146,6 +146,9 @@ public partial class SshKeyAuditView : UserControl, IToolView
             case nameof(SshKeyAuditViewModel.Findings):
                 ProjectFindings();
                 break;
+            case nameof(SshKeyAuditViewModel.IsStatusError):
+                UpdateStatusBrush();
+                break;
             case nameof(SshKeyAuditViewModel.ShowResults):
                 if (_vm.ShowResults)
                 {
@@ -155,6 +158,13 @@ public partial class SshKeyAuditView : UserControl, IToolView
                 UpdateDeployButtonVisibility();
                 break;
         }
+    }
+
+    private void UpdateStatusBrush()
+    {
+        FileError.SetResourceReference(
+            TextBlock.ForegroundProperty,
+            _vm.IsStatusError ? "ErrorTextBrush" : "SuccessTextBrush");
     }
 
     private void UpdateDeployButtonVisibility()
@@ -182,19 +192,22 @@ public partial class SshKeyAuditView : UserControl, IToolView
                     _localizer,
                     status =>
                     {
-                        _vm.FileErrorMessage = status;
-                        _vm.ShowFileError = !string.IsNullOrWhiteSpace(status);
+                        bool isErr = status.StartsWith(
+                            L("ToolSshKeyGenDeployFailed").Split('{')[0],
+                            StringComparison.OrdinalIgnoreCase);
+                        _vm.ShowStatus(status, isErr);
                     })
                 .ConfigureAwait(true);
         }
         catch (Exception ex)
         {
             Core.Logging.FileLogger.Warn($"SSH public key deployment failed: {ex.Message}");
-            _vm.FileErrorMessage = string.Format(
-                CultureInfo.CurrentCulture,
-                L("ToolSshKeyGenDeployFailed"),
-                ex.Message);
-            _vm.ShowFileError = true;
+            _vm.ShowStatus(
+                string.Format(
+                    CultureInfo.CurrentCulture,
+                    L("ToolSshKeyGenDeployFailed"),
+                    ex.Message),
+                isError: true);
         }
         finally
         {
@@ -268,54 +281,59 @@ public partial class SshKeyAuditView : UserControl, IToolView
         var configManager = services?.GetService<IConfigManager>();
         var dialogService = services?.GetService<IDialogService>();
 
-        var preference = await ResolveAgentPreferenceAsync(configManager).ConfigureAwait(true);
-
-        IReadOnlyList<SshAgentKeyInfo> loadedKeys;
+        BtnLoadFromAgent.IsEnabled = false;
         try
         {
-            loadedKeys = await Task.Run(() =>
-                SshAgentInspector.ListLoadedKeys(SshAgentRegistry.CreateDefault(preference)));
+            var preference = await ResolveAgentPreferenceAsync(configManager).ConfigureAwait(true);
+
+            IReadOnlyList<SshAgentKeyInfo> loadedKeys;
+            try
+            {
+                loadedKeys = await Task.Run(() =>
+                    SshAgentInspector.ListLoadedKeys(SshAgentRegistry.CreateDefault(preference)));
+            }
+            catch (Exception ex)
+            {
+                Core.Logging.FileLogger.Warn($"SSH agent inspector failed: {ex.Message}");
+                _vm.ShowStatus(ex.Message, isError: true);
+                return;
+            }
+
+            if (loadedKeys.Count == 0)
+            {
+                _vm.ShowStatus(L("ToolSshAuditAgentEmpty"), isError: true);
+                return;
+            }
+
+            _vm.ShowStatus(string.Empty, isError: false);
+
+            if (loadedKeys.Count == 1 || dialogService is null)
+            {
+                _vm.KeyText = loadedKeys[0].PublicKeyOpenSsh;
+                return;
+            }
+
+            var choices = loadedKeys
+                .Select(k => string.IsNullOrWhiteSpace(k.Comment)
+                    ? $"{k.AgentName}: {k.KeyType} ({k.Fingerprint})"
+                    : $"{k.AgentName}: {k.KeyType} - {k.Comment} ({k.Fingerprint})")
+                .ToList();
+
+            var selectedIndex = await dialogService.ShowChoiceAsync(
+                L("ToolSshAuditAgentTitle"),
+                L("ToolSshAuditAgentPrompt"),
+                choices,
+                defaultIndex: 0,
+                cancelLabel: L("BtnCancel"));
+
+            if (selectedIndex is int index && index >= 0 && index < loadedKeys.Count)
+            {
+                _vm.KeyText = loadedKeys[index].PublicKeyOpenSsh;
+            }
         }
-        catch (Exception ex)
+        finally
         {
-            Core.Logging.FileLogger.Warn($"SSH agent inspector failed: {ex.Message}");
-            _vm.FileErrorMessage = ex.Message;
-            _vm.ShowFileError = true;
-            return;
-        }
-
-        if (loadedKeys.Count == 0)
-        {
-            _vm.FileErrorMessage = L("ToolSshAuditAgentEmpty");
-            _vm.ShowFileError = true;
-            return;
-        }
-
-        _vm.FileErrorMessage = string.Empty;
-        _vm.ShowFileError = false;
-
-        if (loadedKeys.Count == 1 || dialogService is null)
-        {
-            _vm.KeyText = loadedKeys[0].PublicKeyOpenSsh;
-            return;
-        }
-
-        var choices = loadedKeys
-            .Select(k => string.IsNullOrWhiteSpace(k.Comment)
-                ? $"{k.AgentName}: {k.KeyType} ({k.Fingerprint})"
-                : $"{k.AgentName}: {k.KeyType} - {k.Comment} ({k.Fingerprint})")
-            .ToList();
-
-        var selectedIndex = await dialogService.ShowChoiceAsync(
-            L("ToolSshAuditAgentTitle"),
-            L("ToolSshAuditAgentPrompt"),
-            choices,
-            defaultIndex: 0,
-            cancelLabel: L("BtnCancel"));
-
-        if (selectedIndex is int index && index >= 0 && index < loadedKeys.Count)
-        {
-            _vm.KeyText = loadedKeys[index].PublicKeyOpenSsh;
+            BtnLoadFromAgent.IsEnabled = true;
         }
     }
 
@@ -369,19 +387,18 @@ public partial class SshKeyAuditView : UserControl, IToolView
                 chosen.Fingerprint,
                 chosen.AgentName)).ConfigureAwait(true);
 
-            _vm.FileErrorMessage = result.Success
-                ? string.Format(CultureInfo.CurrentCulture, L("ToolSshAgentRemoveSuccess"), chosen.Fingerprint)
-                : string.Format(CultureInfo.CurrentCulture, L("ToolSshAgentRemoveFailed"), FormatAgentOperationError(result));
-            _vm.ShowFileError = true;
+            _vm.ShowStatus(
+                result.Success
+                    ? string.Format(CultureInfo.CurrentCulture, L("ToolSshAgentRemoveSuccess"), chosen.Fingerprint)
+                    : string.Format(CultureInfo.CurrentCulture, L("ToolSshAgentRemoveFailed"), SshAgentErrorLocalizer.Format(result, _localizer)),
+                isError: !result.Success);
         }
         catch (Exception ex)
         {
             Core.Logging.FileLogger.Warn($"SSH agent remove failed: {ex.Message}");
-            _vm.FileErrorMessage = string.Format(
-                CultureInfo.CurrentCulture,
-                L("ToolSshAgentRemoveFailed"),
-                ex.Message);
-            _vm.ShowFileError = true;
+            _vm.ShowStatus(
+                string.Format(CultureInfo.CurrentCulture, L("ToolSshAgentRemoveFailed"), ex.Message),
+                isError: true);
         }
         finally
         {
@@ -417,37 +434,23 @@ public partial class SshKeyAuditView : UserControl, IToolView
             var result = await Task.Run(() => SshAgentManager.RemoveAllKeys(
                 SshAgentRegistry.CreateDefault(preference))).ConfigureAwait(true);
 
-            _vm.FileErrorMessage = result.Success
-                ? L("ToolSshAgentClearSuccess")
-                : string.Format(CultureInfo.CurrentCulture, L("ToolSshAgentClearFailed"), FormatAgentOperationError(result));
-            _vm.ShowFileError = true;
+            _vm.ShowStatus(
+                result.Success
+                    ? L("ToolSshAgentClearSuccess")
+                    : string.Format(CultureInfo.CurrentCulture, L("ToolSshAgentClearFailed"), SshAgentErrorLocalizer.Format(result, _localizer)),
+                isError: !result.Success);
         }
         catch (Exception ex)
         {
             Core.Logging.FileLogger.Warn($"SSH agent clear failed: {ex.Message}");
-            _vm.FileErrorMessage = string.Format(
-                CultureInfo.CurrentCulture,
-                L("ToolSshAgentClearFailed"),
-                ex.Message);
-            _vm.ShowFileError = true;
+            _vm.ShowStatus(
+                string.Format(CultureInfo.CurrentCulture, L("ToolSshAgentClearFailed"), ex.Message),
+                isError: true);
         }
         finally
         {
             BtnClearAgent.IsEnabled = true;
         }
-    }
-
-    private string FormatAgentOperationError(SshAgentOperationResult result)
-    {
-        return result.ErrorCode switch
-        {
-            SshAgentOperationErrorCode.NoWritableAgent => L("ToolSshAgentErrNoWritableAgent"),
-            SshAgentOperationErrorCode.LifetimeNotSupported => L("ToolSshAgentErrLifetimeNotSupported"),
-            SshAgentOperationErrorCode.KeyRefused => L("ToolSshAgentErrKeyRefused"),
-            SshAgentOperationErrorCode.RemoveRefused => L("ToolSshAgentErrRemoveRefused"),
-            SshAgentOperationErrorCode.KeyNotFound => L("ToolSshAgentErrKeyNotFound"),
-            _ => result.ErrorMessage ?? string.Empty
-        };
     }
 
     private static async Task<Core.Ssh.SshAgentPreference> ResolveAgentPreferenceAsync(IConfigManager? configManager)

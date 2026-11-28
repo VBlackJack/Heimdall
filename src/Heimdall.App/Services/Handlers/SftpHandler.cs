@@ -234,6 +234,7 @@ internal sealed class SftpHandler : IProtocolHandler
             LegacyCredentialName = server.DisplayName,
             AgentForwarding = server.SshAgentForwarding,
             Compression = server.SshCompression,
+            CryptoPolicy = SshCryptoPolicyResolver.Resolve(server.SshCryptoPolicy, settings.SshCryptoPolicy),
             KeepAliveIntervalSeconds = settings.SshKeepAliveIntervalSeconds,
             SkipHostKeyProbeIfTrusted = isCompanionSession,
             PreResolvedHostKeyVerifier = preResolvedHostKeyVerifier,

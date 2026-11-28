@@ -257,6 +257,7 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
             LegacyCredentialName = server.DisplayName,
             AgentForwarding = server.SshAgentForwarding,
             Compression = server.SshCompression,
+            CryptoPolicy = SshCryptoPolicyResolver.Resolve(server.SshCryptoPolicy, settings.SshCryptoPolicy),
             X11Forwarding = server.SshX11Forwarding,
             SocksProxyPort = usesTunnel ? 0 : server.SocksProxyPort,
             RemoteBindPort = usesTunnel ? 0 : server.RemoteBindPort,

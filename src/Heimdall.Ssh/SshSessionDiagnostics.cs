@@ -40,6 +40,26 @@ public sealed record SshSessionDiagnostics(
     private const string UnknownToken = "-";
 
     /// <summary>
+    /// True when the negotiated key exchange uses a post-quantum hybrid algorithm
+    /// (such as <c>mlkem768x25519-sha256</c> or <c>sntrup761x25519-sha512</c>).
+    /// </summary>
+    public bool IsPostQuantumKeyExchange => IsPostQuantumKex(KeyExchangeAlgorithm);
+
+    /// <summary>
+    /// Returns true when <paramref name="kex"/> identifies a hybrid post-quantum key exchange algorithm.
+    /// </summary>
+    public static bool IsPostQuantumKex(string? kex)
+    {
+        if (string.IsNullOrWhiteSpace(kex) || kex == UnknownToken)
+        {
+            return false;
+        }
+
+        return kex.StartsWith("mlkem", StringComparison.OrdinalIgnoreCase)
+            || kex.StartsWith("sntrup", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
     /// Captures negotiated transport metadata from a connected SSH.NET <see cref="ConnectionInfo"/>.
     /// </summary>
     public static SshSessionDiagnostics FromConnectionInfo(
@@ -103,7 +123,7 @@ public sealed record SshSessionDiagnostics(
         return false;
     }
 
-    private static bool IsWeakKex(string? kex)
+    internal static bool IsWeakKex(string? kex)
     {
         if (string.IsNullOrWhiteSpace(kex) || kex == UnknownToken)
         {
@@ -114,7 +134,7 @@ public sealed record SshSessionDiagnostics(
             || kex.Contains("group1-", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool IsWeakHostKey(string? hostKey)
+    internal static bool IsWeakHostKey(string? hostKey)
     {
         if (string.IsNullOrWhiteSpace(hostKey) || hostKey == UnknownToken)
         {
@@ -122,10 +142,11 @@ public sealed record SshSessionDiagnostics(
         }
 
         return hostKey.StartsWith("ssh-dss", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(hostKey, "ssh-rsa", StringComparison.OrdinalIgnoreCase);
+            || string.Equals(hostKey, "ssh-rsa", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(hostKey, "ssh-rsa-cert-v01@openssh.com", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool IsWeakCipher(string? cipher)
+    internal static bool IsWeakCipher(string? cipher)
     {
         if (string.IsNullOrWhiteSpace(cipher) || cipher == UnknownToken)
         {
@@ -150,7 +171,7 @@ public sealed record SshSessionDiagnostics(
             || cipher.Contains("poly1305", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool IsWeakMac(string? mac)
+    internal static bool IsWeakMac(string? mac)
     {
         if (string.IsNullOrWhiteSpace(mac) || mac == UnknownToken)
         {

@@ -322,7 +322,11 @@ public partial class EmbeddedSshView
         SessionInfoButton.Visibility = Visibility.Visible;
         SessionInfoButton.SetResourceReference(
             System.Windows.Controls.Control.ForegroundProperty,
-            diag.HasWeakCrypto ? "WarningTextBrush" : "TextSecondaryBrush");
+            diag.HasWeakCrypto
+                ? "WarningTextBrush"
+                : diag.IsPostQuantumKeyExchange
+                    ? "SuccessTextBrush"
+                    : "TextSecondaryBrush");
         SessionInfoButton.ToolTip = L("TooltipSessionCryptoInfo")
             + Environment.NewLine
             + FormatSessionCryptoInfoSummary(diag);
@@ -344,6 +348,11 @@ public partial class EmbeddedSshView
             macDisplay,
             compressionDisplay,
             diag.ActiveForwardedPorts);
+
+        if (diag.IsPostQuantumKeyExchange)
+        {
+            summary += Environment.NewLine + L("SessionCryptoInfoPostQuantum");
+        }
 
         return diag.HasWeakCrypto
             ? summary + Environment.NewLine + L("SessionCryptoInfoWeakWarning")

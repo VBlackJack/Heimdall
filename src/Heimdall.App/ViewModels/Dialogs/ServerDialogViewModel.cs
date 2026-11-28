@@ -660,6 +660,9 @@ public partial class ServerDialogViewModel : ObservableValidator
     private bool _sshX11Forwarding;
 
     [ObservableProperty]
+    private string _sshCryptoPolicySelection = "";
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowAgentKeyForwardingWarning))]
     [NotifyPropertyChangedFor(nameof(AgentKeyForwardingWarningText))]
     private bool _sshAgentForwarding;
@@ -2903,6 +2906,9 @@ public partial class ServerDialogViewModel : ObservableValidator
                 : Heimdall.Core.Security.CredentialProtector.Protect(SshPassword),
             SshCompression = SshCompression,
             SshX11Forwarding = SshX11Forwarding,
+            SshCryptoPolicy = Enum.TryParse<Heimdall.Core.Ssh.SshCryptoPolicy>(SshCryptoPolicySelection, out var parsedCryptoPolicy)
+                ? parsedCryptoPolicy
+                : null,
             SshAgentForwarding = SshAgentForwarding,
             SshAgentKeyFingerprint = SshAgentKeyFingerprint,
             SocksProxyPort = SocksProxyPort,
@@ -3135,6 +3141,7 @@ public partial class ServerDialogViewModel : ObservableValidator
         vm.SshKeyPath = dto.SshKeyPath ?? "";
         vm.SshCompression = dto.SshCompression;
         vm.SshX11Forwarding = dto.SshX11Forwarding;
+        vm.SshCryptoPolicySelection = dto.SshCryptoPolicy?.ToString() ?? "";
         vm.SshAgentForwarding = dto.SshAgentForwarding;
         vm.SshAgentKeyFingerprint = dto.SshAgentKeyFingerprint;
         vm.SocksProxyPort = dto.SocksProxyPort;

@@ -52,12 +52,13 @@ public static class GatewayChainResolver
         IReadOnlyList<SshGatewayDto> allGateways,
         Func<string, string?> decryptPassword,
         int maxDepth = DefaultMaxDepth,
-        SshAgentPreference sshAgentPreference = SshAgentPreference.AutoOpenSshFirst)
+        SshAgentPreference sshAgentPreference = SshAgentPreference.AutoOpenSshFirst,
+        SshCryptoPolicy sshCryptoPolicy = SshCryptoPolicy.Standard)
     {
         ArgumentNullException.ThrowIfNull(decryptPassword);
 
         var chain = ResolveChainDtos(targetGatewayId, allGateways, maxDepth);
-        return ToConnectionParams(chain, decryptPassword, sshAgentPreference);
+        return ToConnectionParams(chain, decryptPassword, sshAgentPreference, sshCryptoPolicy);
     }
 
     /// <summary>
@@ -139,12 +140,13 @@ public static class GatewayChainResolver
     public static List<SshConnectionParams> ToConnectionParams(
         IReadOnlyList<SshGatewayDto> gatewayChain,
         Func<string, string?> decryptPassword,
-        SshAgentPreference sshAgentPreference = SshAgentPreference.AutoOpenSshFirst)
+        SshAgentPreference sshAgentPreference = SshAgentPreference.AutoOpenSshFirst,
+        SshCryptoPolicy sshCryptoPolicy = SshCryptoPolicy.Standard)
     {
         ArgumentNullException.ThrowIfNull(gatewayChain);
         ArgumentNullException.ThrowIfNull(decryptPassword);
 
-        return gatewayChain.Select(gw => ToConnectionParams(gw, decryptPassword, sshAgentPreference)).ToList();
+        return gatewayChain.Select(gw => ToConnectionParams(gw, decryptPassword, sshAgentPreference, sshCryptoPolicy)).ToList();
     }
 
     /// <summary>
@@ -154,7 +156,8 @@ public static class GatewayChainResolver
     private static SshConnectionParams ToConnectionParams(
         SshGatewayDto gateway,
         Func<string, string?> decryptPassword,
-        SshAgentPreference sshAgentPreference)
+        SshAgentPreference sshAgentPreference,
+        SshCryptoPolicy sshCryptoPolicy)
     {
         string? password = null;
         if (!string.IsNullOrEmpty(gateway.SshPasswordEncrypted))
@@ -177,6 +180,7 @@ public static class GatewayChainResolver
             Password = password,
             KeyPassphrase = keyPassphrase,
             SshAgentPreference = sshAgentPreference,
+            CryptoPolicy = sshCryptoPolicy,
             AgentKeyFingerprint = gateway.SshAgentKeyFingerprint,
             UseLegacyPasswordAsKeyPassphrase = gateway.UsesLegacySshCredentialMapping,
             LegacyCredentialName = gateway.Name

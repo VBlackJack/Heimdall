@@ -232,6 +232,8 @@ public sealed class AppSettings
     public string SshDefaultMode { get; set; } = "Embedded";
     [JsonConverter(typeof(SshAgentPreferenceJsonConverter))]
     public SshAgentPreference SshAgentPreference { get; set; } = SshAgentPreference.AutoOpenSshFirst;
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public SshCryptoPolicy SshCryptoPolicy { get; set; } = SshCryptoPolicy.Standard;
     public bool SyncKnownHostsAtStartup { get; set; }
     [SettingRange(10, 3600, ZeroMeansOff = true)]
     public int AntiIdleIntervalSeconds { get; set; } = 60;

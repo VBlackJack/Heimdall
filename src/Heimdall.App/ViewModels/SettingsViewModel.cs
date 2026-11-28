@@ -399,6 +399,9 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     private string _sshAgentPreference = "AutoOpenSshFirst";
 
     [ObservableProperty]
+    private string _sshCryptoPolicy = "Standard";
+
+    [ObservableProperty]
     [NotifyDataErrorInfo]
     [SettingRangeOf(nameof(AppSettings.AntiIdleIntervalSeconds))]
     private int _antiIdleInterval = 60;
@@ -1909,6 +1912,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             PuttyPath = settings.PuttyPath ?? "";
             SshDefaultMode = settings.SshDefaultMode;
             SshAgentPreference = settings.SshAgentPreference.ToString();
+            SshCryptoPolicy = settings.SshCryptoPolicy.ToString();
             AntiIdleInterval = settings.AntiIdleIntervalSeconds;
             SshTmoutResetInterval = settings.SshTmoutResetIntervalSeconds;
             SshKeepAliveIntervalSeconds = settings.SshKeepAliveIntervalSeconds;
@@ -2361,6 +2365,12 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
                 out SshAgentPreferenceEnum sshAgentPreference)
                 ? sshAgentPreference
                 : SshAgentPreferenceEnum.AutoOpenSshFirst;
+        Heimdall.Core.Ssh.SshCryptoPolicy parsedSshCryptoPolicy = Enum.TryParse<Heimdall.Core.Ssh.SshCryptoPolicy>(
+                SshCryptoPolicy,
+                ignoreCase: false,
+                out Heimdall.Core.Ssh.SshCryptoPolicy sshCryptoPolicy)
+                ? sshCryptoPolicy
+                : Heimdall.Core.Ssh.SshCryptoPolicy.Standard;
         List<ExternalToolDefinition> externalTools = ExternalTools.Select(tool => new ExternalToolDefinition
         {
             Name = tool.Name.Trim(),
@@ -2402,6 +2412,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         settings.PuttyPath = string.IsNullOrWhiteSpace(PuttyPath) ? null : PuttyPath;
         settings.SshDefaultMode = SshDefaultMode;
         settings.SshAgentPreference = parsedSshAgentPreference;
+        settings.SshCryptoPolicy = parsedSshCryptoPolicy;
         settings.AntiIdleIntervalSeconds = AntiIdleInterval;
         settings.SshTmoutResetIntervalSeconds = SshTmoutResetInterval;
         settings.SshKeepAliveIntervalSeconds = SshKeepAliveIntervalSeconds;

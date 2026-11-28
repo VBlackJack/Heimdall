@@ -687,7 +687,8 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
                 vm.SelectedGateway!.Id,
                 settings.SshGateways,
                 ConnectionHelpers.DecryptPassword,
-                sshAgentPreference: settings.SshAgentPreference);
+                sshAgentPreference: settings.SshAgentPreference,
+                sshCryptoPolicy: settings.SshCryptoPolicy);
             if (_dialogService is not null)
             {
                 chain = chain.Select(hop => new SshConnectionParams
@@ -706,6 +707,7 @@ public sealed partial class TunnelsViewModel : ObservableObject, IDisposable
                     AgentKeyFingerprint = hop.AgentKeyFingerprint,
                     AgentForwarding = hop.AgentForwarding,
                     Compression = hop.Compression,
+                    CryptoPolicy = hop.CryptoPolicy,
                     X11Forwarding = hop.X11Forwarding,
                     ConnectTimeout = hop.ConnectTimeout,
                     AuthenticationTimeout = InteractiveGatewayAuthTimeout,

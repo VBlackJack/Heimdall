@@ -225,7 +225,8 @@ public sealed class TunnelService : ITunnelService
                 GatewayChainResolver.ToConnectionParams(
                     chainDtos,
                     ConnectionHelpers.DecryptPassword,
-                    settings.SshAgentPreference),
+                    settings.SshAgentPreference,
+                    settings.SshCryptoPolicy),
                 ct);
             gatewayChainKey = BuildGatewayChainKey(chainDtos, settings.SshAgentPreference);
         }
@@ -1078,6 +1079,7 @@ public sealed class TunnelService : ITunnelService
             AgentKeyFingerprint = hop.AgentKeyFingerprint,
             AgentForwarding = hop.AgentForwarding,
             Compression = hop.Compression,
+            CryptoPolicy = hop.CryptoPolicy,
             X11Forwarding = hop.X11Forwarding,
             ConnectTimeout = hop.ConnectTimeout,
             AuthenticationTimeout = InteractiveGatewayAuthTimeout,

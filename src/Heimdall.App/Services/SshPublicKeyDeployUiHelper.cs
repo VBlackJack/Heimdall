@@ -264,6 +264,7 @@ internal static class SshPublicKeyDeployUiHelper
                 Password = password,
                 KeyPassphrase = keyPassphrase,
                 SshAgentPreference = settings.SshAgentPreference,
+                CryptoPolicy = SshCryptoPolicyResolver.Resolve(target.SshCryptoPolicy, settings.SshCryptoPolicy),
                 AgentKeyFingerprint = target.SshAgentKeyFingerprint,
                 UseLegacyPasswordAsKeyPassphrase = target.UsesLegacySshCredentialMapping,
                 LegacyCredentialName = target.DisplayName,

@@ -2088,6 +2088,23 @@
                                                 <ComboBoxItem x:Name="DlgSrv_SshModeExternal" Content="" Tag="External"/>
                                             </ComboBox>
                                         </Grid>
+                                        <Grid Margin="0,10,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="150"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock x:Name="DlgSrv_SshCryptoPolicyLabel" Grid.Column="0" Text="{loc:Translate ServerDialogSshCryptoPolicyLabel}" Style="{StaticResource LabelStyle}" Margin="0,6,0,0"/>
+                                            <ComboBox Grid.Column="1"
+                                                      AutomationProperties.Name="{loc:Translate ServerDialogSshCryptoPolicyLabel}"
+                                                      SelectedValue="{Binding SshCryptoPolicySelection}"
+                                                      SelectedValuePath="Tag"
+                                                      Style="{StaticResource DialogFormComboBoxStyle}">
+                                                <ComboBoxItem Content="{loc:Translate ServerDialogSshCryptoPolicyGlobal}" Tag=""/>
+                                                <ComboBoxItem Content="{loc:Translate SettingsSshCryptoPolicyStandard}" Tag="Standard"/>
+                                                <ComboBoxItem Content="{loc:Translate SettingsSshCryptoPolicyStrictModern}" Tag="StrictModern"/>
+                                                <ComboBoxItem Content="{loc:Translate SettingsSshCryptoPolicyLegacy}" Tag="LegacyCompatible"/>
+                                            </ComboBox>
+                                        </Grid>
                                         <StackPanel Margin="0,14,0,0">
                                             <CheckBox x:Name="DlgSrv_SshCompressionCb" TabIndex="81" AutomationProperties.Name="{loc:Translate A11yServerSshCompression}" IsChecked="{Binding SshCompression}" Style="{StaticResource DialogFormCheckBoxStyle}"/>
                                             <CheckBox x:Name="DlgSrv_SshAgentFwdCb" TabIndex="82" AutomationProperties.Name="{loc:Translate A11yServerSshAgentForwarding}" IsChecked="{Binding SshAgentForwarding}" Style="{StaticResource DialogFormCheckBoxStyle}" Margin="0,6,0,0"/>

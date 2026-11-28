@@ -116,11 +116,8 @@ internal static class SshCapabilityScope
             unavailableCapabilities |= SshUnavailableCapability.X11Forwarding;
         }
 
-        if (compression)
-        {
-            unavailableCapabilities |= SshUnavailableCapability.Compression;
-        }
-
+        // Direct SSH.NET transport natively negotiates delayed zlib@openssh.com compression
+        // via SshConnectionFactory.ConfigureTransportOptions; only X11 remains unavailable.
         return unavailableCapabilities == 0
             ? null
             : new SshCapabilityNotice(unavailableCapabilities);

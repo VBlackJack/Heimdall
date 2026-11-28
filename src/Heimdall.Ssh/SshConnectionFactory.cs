@@ -140,6 +140,7 @@ public static class SshConnectionFactory
             Timeout = ClientTimeout(connectionParams)
         };
 
+        ConfigureTransportOptions(info, connectionParams);
         return info;
     }
 
@@ -244,12 +245,73 @@ public static class SshConnectionFactory
                 Timeout = ClientTimeout(connectionParams)
             };
 
+            ConfigureTransportOptions(info, connectionParams);
             return new OwnedConnectionInfo(info, ownedResources);
         }
         catch
         {
             DisposeOwnedResources(ownedResources);
             throw;
+        }
+    }
+
+    private const string DelayedZlibCompression = "zlib@openssh.com";
+
+    /// <summary>
+    /// Applies transport-level compression preference (<c>zlib@openssh.com</c>) and
+    /// <see cref="SshCryptoPolicy"/> algorithm filtering onto an SSH.NET <see cref="ConnectionInfo"/>.
+    /// </summary>
+    internal static void ConfigureTransportOptions(ConnectionInfo info, SshConnectionParams connectionParams)
+    {
+        ArgumentNullException.ThrowIfNull(info);
+        ArgumentNullException.ThrowIfNull(connectionParams);
+
+        if (connectionParams.Compression
+            && info.CompressionAlgorithms.TryGetValue(DelayedZlibCompression, out var zlibFactory))
+        {
+            var existing = info.CompressionAlgorithms.ToList();
+            info.CompressionAlgorithms.Clear();
+            info.CompressionAlgorithms[DelayedZlibCompression] = zlibFactory;
+            foreach (var kvp in existing)
+            {
+                if (!string.Equals(kvp.Key, DelayedZlibCompression, StringComparison.Ordinal))
+                {
+                    info.CompressionAlgorithms[kvp.Key] = kvp.Value;
+                }
+            }
+        }
+
+        ApplyCryptoPolicy(info, connectionParams.CryptoPolicy);
+    }
+
+    /// <summary>
+    /// Filters the negotiated algorithm lists of <paramref name="info"/> according to <paramref name="policy"/>.
+    /// In <see cref="SshCryptoPolicy.StrictModern"/>, every deprecated/weak KEX, host key, cipher, and MAC
+    /// is removed so the handshake refuses downgrade to SHA-1, CBC, 3DES, RC4, Blowfish, DSS, or legacy ssh-rsa.
+    /// </summary>
+    internal static void ApplyCryptoPolicy(ConnectionInfo info, SshCryptoPolicy policy)
+    {
+        ArgumentNullException.ThrowIfNull(info);
+
+        if (policy != SshCryptoPolicy.StrictModern)
+        {
+            return;
+        }
+
+        RemoveKeysMatching(info.KeyExchangeAlgorithms, SshSessionDiagnostics.IsWeakKex);
+        RemoveKeysMatching(info.HostKeyAlgorithms, SshSessionDiagnostics.IsWeakHostKey);
+        RemoveKeysMatching(info.Encryptions, SshSessionDiagnostics.IsWeakCipher);
+        RemoveKeysMatching(info.HmacAlgorithms, SshSessionDiagnostics.IsWeakMac);
+    }
+
+    private static void RemoveKeysMatching<TValue>(
+        IDictionary<string, TValue> algorithms,
+        Func<string?, bool> predicate)
+    {
+        var toRemove = algorithms.Keys.Where(key => predicate(key)).ToList();
+        foreach (var key in toRemove)
+        {
+            algorithms.Remove(key);
         }
     }
 

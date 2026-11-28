@@ -4142,6 +4142,16 @@
                                             <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[SshAgentPreference]}"/>
                                             <TextBlock Text="{loc:Translate SettingsSshAgentPreferenceHint}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                                         </StackPanel>
+                                        <StackPanel Margin="{StaticResource SettingsFieldGap}">
+                                            <TextBlock x:Name="Mw_SettingsSshCryptoPolicyLabel" Text="{loc:Translate SettingsSshCryptoPolicyLabel}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
+                                            <ComboBox SelectedValue="{Binding Settings.SshCryptoPolicy}" SelectedValuePath="Tag" MinWidth="260" HorizontalAlignment="Left" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsSshCryptoPolicyLabel}"
+                                                      AutomationProperties.HelpText="{loc:Translate SettingsSshCryptoPolicyHint}">
+                                                <ComboBoxItem Content="{loc:Translate SettingsSshCryptoPolicyStandard}" Tag="Standard" AutomationProperties.Name="{loc:Translate SettingsSshCryptoPolicyStandard}"/>
+                                                <ComboBoxItem Content="{loc:Translate SettingsSshCryptoPolicyStrictModern}" Tag="StrictModern" AutomationProperties.Name="{loc:Translate SettingsSshCryptoPolicyStrictModern}"/>
+                                                <ComboBoxItem Content="{loc:Translate SettingsSshCryptoPolicyLegacy}" Tag="LegacyCompatible" AutomationProperties.Name="{loc:Translate SettingsSshCryptoPolicyLegacy}"/>
+                                            </ComboBox>
+                                            <TextBlock Text="{loc:Translate SettingsSshCryptoPolicyHint}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                        </StackPanel>
                                             </StackPanel>
                                         </Border>
                                     </StackPanel>

@@ -415,6 +415,7 @@ public sealed partial class TunnelManager
             LegacyCredentialName = nextGateway.LegacyCredentialName,
             AgentForwarding = nextGateway.AgentForwarding,
             Compression = nextGateway.Compression,
+            CryptoPolicy = nextGateway.CryptoPolicy,
             ConnectTimeout = nextGateway.ConnectTimeout,
 
             // The rest of the hop's own settings travel too: the copy used to stop at the

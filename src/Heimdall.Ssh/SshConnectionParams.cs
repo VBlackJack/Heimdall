@@ -85,6 +85,9 @@ public sealed class SshConnectionParams
     /// <summary>Whether to enable zlib compression on the SSH transport.</summary>
     public bool Compression { get; init; }
 
+    /// <summary>Cryptographic algorithm policy applied during the SSH handshake.</summary>
+    public SshCryptoPolicy CryptoPolicy { get; init; } = SshCryptoPolicy.Standard;
+
     /// <summary>Whether to request X11 forwarding from the server.</summary>
     public bool X11Forwarding { get; init; }
 

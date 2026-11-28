@@ -306,6 +306,8 @@ public sealed class ServerProfileDto : IJsonOnDeserialized
 
     public bool SshCompression { get; set; }
     public bool SshX11Forwarding { get; set; }
+    [JsonConverter(typeof(JsonStringEnumConverter))]
+    public Ssh.SshCryptoPolicy? SshCryptoPolicy { get; set; }
     public int SocksProxyPort { get; set; }
     public int RemoteBindPort { get; set; }
     public int RemoteLocalPort { get; set; }

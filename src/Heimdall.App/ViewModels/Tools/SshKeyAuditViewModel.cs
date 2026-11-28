@@ -54,6 +54,14 @@ public sealed partial class SshKeyAuditViewModel : ObservableObject
 
     [ObservableProperty] private string _fileErrorMessage = string.Empty;
     [ObservableProperty] private bool _showFileError;
+    [ObservableProperty] private bool _isStatusError = true;
+
+    public void ShowStatus(string message, bool isError)
+    {
+        IsStatusError = isError;
+        FileErrorMessage = message;
+        ShowFileError = !string.IsNullOrWhiteSpace(message);
+    }
 
     public void Initialize(LocalizationManager? localizer)
     {
@@ -95,14 +103,12 @@ public sealed partial class SshKeyAuditViewModel : ObservableObject
 
     private void ShowFileErrorMessage(string message)
     {
-        FileErrorMessage = message;
-        ShowFileError = true;
+        ShowStatus(message, isError: true);
     }
 
     private void ClearFileError()
     {
-        FileErrorMessage = string.Empty;
-        ShowFileError = false;
+        ShowStatus(string.Empty, isError: true);
     }
 
     private string Localize(string key, params object[] arguments)

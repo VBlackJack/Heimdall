@@ -33,19 +33,18 @@ public sealed class SshCapabilityScopeTests
     }
 
     [Fact]
-    public void Evaluate_ReturnsCompressionNotice_WhenDirectPathRequestsCompression()
+    public void Evaluate_ReturnsNull_WhenDirectPathRequestsCompressionOnly()
     {
         SshCapabilityNotice? notice = SshCapabilityScope.Evaluate(
             SshResolvedPath.Direct,
             x11Forwarding: false,
             compression: true);
 
-        Assert.NotNull(notice);
-        Assert.Equal(SshUnavailableCapability.Compression, notice.UnavailableCapabilities);
+        Assert.Null(notice);
     }
 
     [Fact]
-    public void Evaluate_ReturnsOneCombinedNotice_WhenDirectPathRequestsBothCapabilities()
+    public void Evaluate_ReturnsX11OnlyNotice_WhenDirectPathRequestsBothCapabilities()
     {
         SshCapabilityNotice? notice = SshCapabilityScope.Evaluate(
             SshResolvedPath.Direct,
@@ -54,7 +53,7 @@ public sealed class SshCapabilityScopeTests
 
         Assert.NotNull(notice);
         Assert.Equal(
-            SshUnavailableCapability.X11Forwarding | SshUnavailableCapability.Compression,
+            SshUnavailableCapability.X11Forwarding,
             notice.UnavailableCapabilities);
     }
 
