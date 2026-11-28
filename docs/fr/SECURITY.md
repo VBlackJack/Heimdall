@@ -1336,6 +1336,20 @@ d'éviter toute fuite DNS split-horizon.
   accès réseau, refus des chemins UNC `\\` et `//`, lecture locale bornée à
   256 Ko, audit des clés OpenSSH, FIDO2 (`sk-*`) et PuTTY PPK v2/v3, signalement
   des fichiers de clés corrompus ou illisibles et neutralisation des cellules CSV.
+- **Alertes proactives de certificat SSH, proxies sortants, `RemoteCommand`/`SetEnv` et lecteur `.cast`** :
+  `SshCertificateExpiryEvaluator` vérifie le certificat utilisateur explicite ou
+  voisin `-cert.pub` à la connexion (refus des chemins UNC/périphériques, plafond
+  64 Ko) et affiche un avertissement non bloquant s'il est expiré ou expire sous
+  30 jours. Les champs proxy HTTP CONNECT / SOCKS4 / SOCKS5 sur profils SSH et
+  passerelles sont validés par `ImportedProfileValidator`, routés via
+  `SshConnectionFactory.BuildConnectionInfo` (sonde de clé d'hôte comprise),
+  inclus dans la clé de réutilisation des tunnels et retirés des profils partagés.
+  `SshStartupCommandPolicy` impose des noms POSIX valides et un échappement par
+  guillemets simples pour `SetEnv`, rejette les caractères de contrôle, s'intègre
+  dans `ProfileExecutionTrust.CarriesPostConnectPayload` afin qu'aucun profil
+  importé n'exécute de commande sans `ExecutionConfirmed`, et est retiré des
+  profils partagés. `AsciinemaCastPlayerEngine` relit les fichiers `.cast` v2 en
+  lecture seule sous plafonds stricts (`50 Mio`, `500 000` événements).
 
 ### Comparaison des empreintes de clé d'hôte
 

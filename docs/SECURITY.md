@@ -1191,6 +1191,20 @@ reached through an SSH gateway to prevent split-horizon DNS leaks.
   network I/O, blocks both `\\` and `//` UNC key paths, bounds local file reads to
   256 KiB, audits OpenSSH keys, FIDO2 (`sk-*`) keys/certs, and PuTTY PPK v2/v3
   files, flags corrupt/unparseable key files, and neutralizes CSV formula cells.
+- **Proactive SSH user certificate alerts, outbound proxies, `RemoteCommand`/`SetEnv`, and `.cast` replay**:
+  `SshCertificateExpiryEvaluator` checks explicit or sibling `-cert.pub` user
+  certificates on connect (blocking UNC/device paths, bounded to 64 KiB) and
+  surfaces a non-blocking warning when expired or expiring within 30 days.
+  Outbound HTTP CONNECT / SOCKS4 / SOCKS5 proxy fields on SSH profiles and
+  gateways are validated by `ImportedProfileValidator`, routed through
+  `SshConnectionFactory.BuildConnectionInfo` (including pre-auth host-key probes),
+  included in gateway tunnel reuse keys, and stripped from shared profiles.
+  `SshStartupCommandPolicy` enforces POSIX identifier names and single-quote
+  escaping for `SetEnv`, rejects control characters/newlines, integrates with
+  `ProfileExecutionTrust.CarriesPostConnectPayload` so imported profiles never
+  auto-execute until `ExecutionConfirmed` is granted, and is stripped from shared
+  profiles. `AsciinemaCastPlayerEngine` parses `.cast` v2 files read-only within
+  hard size (`50 MiB`) and event (`500 000`) bounds.
 
 ### Host-key fingerprint comparison
 
