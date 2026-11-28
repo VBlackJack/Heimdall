@@ -7003,5 +7003,12 @@
   "CastRecordSavedStatus": "Asciinema recording saved ({0} events).",
   "CastRecordSaveFailed": "Failed to save asciinema recording: {0}",
   "MenuCopyLastCommandOutput": "Copy last command output (secrets masked)",
-  "Osc133NoLastCommand": "No completed OSC 133 command output captured yet."
+  "Osc133NoLastCommand": "No completed OSC 133 command output captured yet.",
+  "ToolSshAuditFleetTitle": "SSH Fleet Compliance (Local Profiles)",
+  "ToolSshAuditFleetBtnScan": "Scan Fleet",
+  "ToolSshAuditFleetBtnExportCsv": "Export CSV",
+  "ToolSshAuditFleetEmpty": "Click Scan Fleet to audit local SSH profiles, gateways, certificates, and pinned host keys offline.",
+  "ToolSshAuditFleetSummary": "Score: {0}/100 ({1} profiles, {2} gateways, {3} host keys, {4} finding(s))",
+  "ToolSshAuditFleetClean": "No compliance issues found across your local SSH fleet.",
+  "ToolSshAuditFleetError": "Fleet compliance scan failed: {0}"
 }

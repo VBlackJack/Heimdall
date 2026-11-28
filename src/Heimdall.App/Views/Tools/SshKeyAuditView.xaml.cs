@@ -47,6 +47,7 @@ public partial class SshKeyAuditView : UserControl, IToolView
     private HeimdallThemeService? _themeService;
     private readonly SshKeyAuditViewModel _vm;
     private DispatcherTimer? _debounceTimer;
+    private SshFleetComplianceReport? _lastFleetReport;
 
     private sealed class FindingDisplayItem
     {
@@ -113,6 +114,13 @@ public partial class SshKeyAuditView : UserControl, IToolView
         BtnRefreshAgentInspector.Content = L("ToolSshAuditAgentInspectorRefresh");
         BtnLoadKeyFileToAgent.Content = L("ToolSshAuditAgentInspectorLoadFile");
         AgentInspectorEmptyText.Text = L("ToolSshAuditAgentInspectorEmpty");
+        FleetComplianceTitle.Text = L("ToolSshAuditFleetTitle");
+        BtnScanFleet.Content = L("ToolSshAuditFleetBtnScan");
+        BtnExportFleetCsv.Content = L("ToolSshAuditFleetBtnExportCsv");
+        if (_lastFleetReport is null)
+        {
+            FleetComplianceStatusText.Text = L("ToolSshAuditFleetEmpty");
+        }
         EmptyState.Text = L("ToolSshAuditEmptyState");
         ParseError.Text = L("ToolSshAuditParseError");
         BtnCopyFingerprint.Content = L("ToolSshAuditBtnCopy");
@@ -133,6 +141,8 @@ public partial class SshKeyAuditView : UserControl, IToolView
         System.Windows.Automation.AutomationProperties.SetName(BtnDeployKey, L("ToolSshKeyGenBtnDeploy"));
         System.Windows.Automation.AutomationProperties.SetName(BtnRefreshAgentInspector, L("ToolSshAuditAgentInspectorRefresh"));
         System.Windows.Automation.AutomationProperties.SetName(BtnLoadKeyFileToAgent, L("ToolSshAuditAgentInspectorLoadFile"));
+        System.Windows.Automation.AutomationProperties.SetName(BtnScanFleet, L("ToolSshAuditFleetBtnScan"));
+        System.Windows.Automation.AutomationProperties.SetName(BtnExportFleetCsv, L("ToolSshAuditFleetBtnExportCsv"));
         System.Windows.Automation.AutomationProperties.SetName(BtnCopyFingerprint, L("ToolSshAuditBtnCopy"));
         System.Windows.Automation.AutomationProperties.SetName(KeyInput, L("ToolSshAuditInput"));
         System.Windows.Automation.AutomationProperties.SetName(DetailFingerprintValue, L("ToolSshAuditFingerprint"));
@@ -826,6 +836,145 @@ public partial class SshKeyAuditView : UserControl, IToolView
     };
 
     private string L(string key) => _localizer?[key] ?? key;
+
+    private async void OnScanFleetClick(object sender, RoutedEventArgs e)
+    {
+        BtnScanFleet.IsEnabled = false;
+        try
+        {
+            var services = (Application.Current as App)?.Services;
+            var configManager = services?.GetService<IConfigManager>();
+            var hostKeyStore = services?.GetService<HostKeyStore>();
+            if (configManager is null)
+            {
+                FleetComplianceStatusText.Text = L("ToolSshAuditFleetEmpty");
+                return;
+            }
+
+            var servers = await configManager.LoadServersAsync().ConfigureAwait(true);
+            var settings = await configManager.LoadSettingsAsync().ConfigureAwait(true);
+            var hostKeys = hostKeyStore is null
+                ? []
+                : hostKeyStore.GetAllAlgorithmEntries()
+                    .Select(item =>
+                    {
+                        (string host, int port) = ParseHostPortKey(item.HostPort);
+                        return new SshFleetHostKeySnapshot(
+                            host,
+                            port,
+                            item.Entry.Algorithm,
+                            item.Entry.Fingerprint,
+                            hostKeyStore.IsRevoked(host, port, item.Entry.Fingerprint));
+                    })
+                    .ToList();
+
+            var report = await Task.Run(() => SshFleetComplianceAnalyzer.Analyze(
+                servers,
+                settings.SshGateways,
+                hostKeys,
+                settings.SshCryptoPolicy)).ConfigureAwait(true);
+
+            _lastFleetReport = report;
+            FleetComplianceSummary.Text = string.Format(
+                CultureInfo.CurrentCulture,
+                L("ToolSshAuditFleetSummary"),
+                report.ScorePercent,
+                report.ProfilesAudited,
+                report.GatewaysAudited,
+                report.HostKeysAudited,
+                report.Findings.Count);
+            BtnExportFleetCsv.Visibility = Visibility.Visible;
+
+            if (report.Findings.Count == 0)
+            {
+                FleetComplianceStatusText.Text = L("ToolSshAuditFleetClean");
+                FleetFindingsList.ItemsSource = null;
+            }
+            else
+            {
+                FleetComplianceStatusText.Text = string.Empty;
+                FleetFindingsList.ItemsSource = report.Findings.Select(f => new FindingDisplayItem
+                {
+                    Icon = f.Severity switch
+                    {
+                        SshFleetFindingSeverity.Critical => "\u2716",
+                        SshFleetFindingSeverity.Warning => "\u26A0",
+                        _ => "\u2139"
+                    },
+                    Text = $"[{f.TargetKind}] {f.TargetName}: {f.Summary}",
+                    IconBrush = (Brush)FindResource(f.Severity switch
+                    {
+                        SshFleetFindingSeverity.Critical => "ErrorTextBrush",
+                        SshFleetFindingSeverity.Warning => "WarningTextBrush",
+                        _ => "TextSecondaryBrush"
+                    })
+                }).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Heimdall.Core.Logging.FileLogger.Warn($"[SshKeyAudit] Fleet compliance scan failed: {ex.Message}");
+            FleetComplianceStatusText.Text = string.Format(
+                CultureInfo.CurrentCulture,
+                L("ToolSshAuditFleetError"),
+                ex.Message);
+        }
+        finally
+        {
+            BtnScanFleet.IsEnabled = true;
+        }
+    }
+
+    private static (string Host, int Port) ParseHostPortKey(string hostPort)
+    {
+        if (string.IsNullOrWhiteSpace(hostPort))
+        {
+            return (string.Empty, DefaultPorts.Ssh);
+        }
+
+        int lastColon = hostPort.LastIndexOf(':');
+        if (lastColon > 0
+            && int.TryParse(hostPort[(lastColon + 1)..], NumberStyles.None, CultureInfo.InvariantCulture, out int port)
+            && port is >= 1 and <= 65535)
+        {
+            return (hostPort[..lastColon].Trim('[', ']'), port);
+        }
+
+        return (hostPort.Trim('[', ']'), DefaultPorts.Ssh);
+    }
+
+    private void OnExportFleetCsvClick(object sender, RoutedEventArgs e)
+    {
+        if (_lastFleetReport is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var dlg = new Microsoft.Win32.SaveFileDialog
+            {
+                Filter = "CSV (*.csv)|*.csv",
+                FileName = $"ssh-fleet-compliance-{DateTime.UtcNow:yyyyMMdd}.csv"
+            };
+            if (dlg.ShowDialog() == true)
+            {
+                System.IO.File.WriteAllText(
+                    dlg.FileName,
+                    SshFleetComplianceAnalyzer.FormatCsvReport(_lastFleetReport),
+                    new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+                CopyFeedbackHelper.ShowCopyFeedback(BtnExportFleetCsv);
+            }
+        }
+        catch (Exception ex)
+        {
+            Heimdall.Core.Logging.FileLogger.Warn($"[SshKeyAudit] Fleet CSV export failed: {ex.Message}");
+            FleetComplianceStatusText.Text = string.Format(
+                CultureInfo.CurrentCulture,
+                L("ToolSshAuditFleetError"),
+                ex.Message);
+        }
+    }
 
     private void OnLocaleChanged(string _)
     {

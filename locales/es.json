@@ -7003,5 +7003,12 @@
   "CastRecordSavedStatus": "Grabaci\u00f3n asciinema guardada ({0} eventos).",
   "CastRecordSaveFailed": "Error al guardar la grabaci\u00f3n asciinema: {0}",
   "MenuCopyLastCommandOutput": "Copiar salida del \u00faltimo comando (secretos ocultos)",
-  "Osc133NoLastCommand": "A\u00fan no se captur\u00f3 la salida de ning\u00fan comando OSC 133."
+  "Osc133NoLastCommand": "A\u00fan no se captur\u00f3 la salida de ning\u00fan comando OSC 133.",
+  "ToolSshAuditFleetTitle": "Cumplimiento de flota SSH (perfiles locales)",
+  "ToolSshAuditFleetBtnScan": "Analizar flota",
+  "ToolSshAuditFleetBtnExportCsv": "Exportar CSV",
+  "ToolSshAuditFleetEmpty": "Haz clic en Analizar flota para auditar sin conexi\u00f3n perfiles SSH locales, pasarelas, certificados y claves de host.",
+  "ToolSshAuditFleetSummary": "Puntuaci\u00f3n: {0}/100 ({1} perfiles, {2} pasarelas, {3} claves de host, {4} hallazgo(s))",
+  "ToolSshAuditFleetClean": "No se encontraron problemas de cumplimiento en tu flota SSH local.",
+  "ToolSshAuditFleetError": "Error al analizar la flota SSH: {0}"
 }

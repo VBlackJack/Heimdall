@@ -73,6 +73,7 @@
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
                 <!-- Input section -->
@@ -405,6 +406,56 @@
                                             </StackPanel>
                                         </Grid>
                                     </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <!-- SSH Fleet Compliance (offline local profile & host-key audit) -->
+                <Border x:Name="FleetCompliancePanel" Grid.Row="6"
+                        Padding="{StaticResource SpacingMd}"
+                        Background="{DynamicResource SurfaceBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="1" CornerRadius="{StaticResource CornerRadiusSm}"
+                        Margin="{StaticResource MarginSectionBottom}">
+                    <StackPanel>
+                        <DockPanel Margin="{StaticResource MarginStackItem}">
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                <Button x:Name="BtnScanFleet"
+                                        Click="OnScanFleetClick"
+                                        Style="{DynamicResource SecondaryButtonStyle}"
+                                        Padding="{StaticResource PaddingButtonCopy}" Margin="{StaticResource MarginInlineControl}"/>
+                                <Button x:Name="BtnExportFleetCsv"
+                                        Click="OnExportFleetCsvClick"
+                                        Style="{DynamicResource SecondaryButtonStyle}"
+                                        Padding="{StaticResource PaddingButtonCopy}" Margin="{StaticResource MarginInlineControl}"
+                                        Visibility="Collapsed"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock x:Name="FleetComplianceTitle"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"
+                                           FontWeight="SemiBold"
+                                           VerticalAlignment="Center"/>
+                                <TextBlock x:Name="FleetComplianceSummary"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           FontSize="{StaticResource FontSizeCaption}"
+                                           Margin="8,0,0,0"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </DockPanel>
+                        <TextBlock x:Name="FleetComplianceStatusText"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   FontSize="{StaticResource FontSizeCaption}"
+                                   Margin="0,4,0,0"
+                                   TextWrapping="Wrap"/>
+                        <ItemsControl x:Name="FleetFindingsList" Margin="0,6,0,0">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <DockPanel Margin="0,2">
+                                        <TextBlock DockPanel.Dock="Left" Text="{Binding Icon}" Foreground="{Binding IconBrush}" Margin="0,0,6,0" FontWeight="Bold"/>
+                                        <TextBlock Text="{Binding Text}" Foreground="{Binding IconBrush}" FontSize="{StaticResource FontSizeCaption}" TextWrapping="Wrap"/>
+                                    </DockPanel>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>

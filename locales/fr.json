@@ -7003,5 +7003,12 @@
   "CastRecordSavedStatus": "Enregistrement asciinema sauvegard\u00e9 ({0} \u00e9v\u00e9nements).",
   "CastRecordSaveFailed": "\u00c9chec de l'enregistrement asciinema : {0}",
   "MenuCopyLastCommandOutput": "Copier la sortie de la derni\u00e8re commande (secrets masqu\u00e9s)",
-  "Osc133NoLastCommand": "Aucune sortie de commande OSC 133 termin\u00e9e n'a \u00e9t\u00e9 captur\u00e9e."
+  "Osc133NoLastCommand": "Aucune sortie de commande OSC 133 termin\u00e9e n'a \u00e9t\u00e9 captur\u00e9e.",
+  "ToolSshAuditFleetTitle": "Conformit\u00e9 du parc SSH (profils locaux)",
+  "ToolSshAuditFleetBtnScan": "Analyser le parc",
+  "ToolSshAuditFleetBtnExportCsv": "Exporter CSV",
+  "ToolSshAuditFleetEmpty": "Cliquez sur Analyser le parc pour auditer hors-ligne les profils SSH locaux, passerelles, certificats et cl\u00e9s d'h\u00f4te.",
+  "ToolSshAuditFleetSummary": "Score : {0}/100 ({1} profils, {2} passerelles, {3} cl\u00e9s d'h\u00f4te, {4} constat(s))",
+  "ToolSshAuditFleetClean": "Aucun probl\u00e8me de conformit\u00e9 d\u00e9tect\u00e9 sur votre parc SSH local.",
+  "ToolSshAuditFleetError": "\u00c9chec de l'analyse de conformit\u00e9 du parc : {0}"
 }

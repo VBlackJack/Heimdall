@@ -17,7 +17,7 @@ d'outils externes et l'infrastructure d'hébergement des outils.
 
 ## Vue d'ensemble
 
-Heimdall embarque 58 outils intégrés enregistrés par `ToolRegistry`. Le jeton
+Heimdall embarque 59 outils intégrés enregistrés par `ToolRegistry`. Le jeton
 brut `Entry(` apparaît plus souvent dans `ToolRegistry.cs` parce qu'il
 correspond aussi au record interne `ToolEntry`, au chemin d'enregistrement
 dynamique des outils externes et à la méthode d'aide privée. Le nombre effectif
@@ -25,14 +25,14 @@ d'outils intégrés correspond à l'ensemble des entrées de registre déclarée
 le constructeur :
 
 - Réseau : 17
-- Sécurité : 15
+- Sécurité : 16
 - Encodage : 6
 - Système : 14
 - Outils natifs externes : 6
 
 Les outils issus des fournisseurs externes sont détectés à l'exécution et
 ajoutés au registre après les scans de démarrage. Ils ne font pas partie du
-décompte des 58 outils intégrés.
+décompte des 59 outils intégrés.
 
 ## Catalogue des outils intégrés
 
@@ -75,6 +75,7 @@ panneaux divisés et la recherche d'outils.
 | `TOTP` | TOTP Generator | Essentiels |
 | `PWDAUDIT` | Password Auditor | Essentiels |
 | `SSHAUDIT` | SSH Key Auditor | Essentiels |
+| `SSHSERVERAUDIT` | Audit serveur SSH | Audit et reconnaissance |
 | `TLSAUDIT` | TLS Auditor | Audit et reconnaissance |
 | `DNSSEC` | DNS Security Checker | Diagnostic réseau |
 | `SMBENUM` | SMB Enumerator | Audit et reconnaissance |

@@ -31,7 +31,7 @@ Heimdall.slnx (14 projects)
 │       ├── Views: MainWindow, SessionPaneControl, SplitContainerControl,
 │       │          EmbeddedRdpView, EmbeddedSshView, EmbeddedSftpView,
 │       │          EmbeddedCitrixView, EmbeddedVncView, FloatingSessionWindow
-│       ├── Views/Tools: 58 built-in sysops tools (IToolView interface)
+│       ├── Views/Tools: 59 built-in sysops tools (IToolView interface)
 │       └── Services: ConnectionService (dispatches to the handlers in Services/Handlers),
 │                     SplitService, SessionWindowService, EmbeddedSessionManager, ToolRegistry,
 │                     TaskSchedulerService, MacroService, EphemeralFileServer, FileShareService,
@@ -815,7 +815,7 @@ Before the version bump, a Release checks that the whole tree is clean, the bran
 
 ### ToolRegistry (Single Source of Truth)
 
-All 58 built-in tools are registered in `ToolRegistry` (singleton). Each tool is described by a `ToolDescriptor` record:
+All 59 built-in tools are registered in `ToolRegistry` (singleton). Each tool is described by a `ToolDescriptor` record:
 
 ```csharp
 public record ToolDescriptor(

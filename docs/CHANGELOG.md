@@ -14,6 +14,15 @@ All notable changes to Heimdall are documented in this file.
 
 ## Unreleased (branch dev): SSH subsystem audit, certificates, active agent management, diagnostics, and hardening
 
+### Phase 4: Hot forwarding, terminal drop upload, SSH Server Audit, DNS SSHFP, FIDO2 UX, key rotation, OSC 133, asciinema `.cast` v2, and fleet compliance
+
+- Added runtime hot port forwarding (`-L`/`-D`/`-R`) on live `SshShellSession` connections (`HotPortForwardDialog`, `SessionForwardsChanged`, individual close from `TunnelsViewModel`) and confirmed drag-and-drop SFTP file upload onto connected SSH terminals with OSC 7 path validation (`TerminalDropPathValidator`).
+- Added the 59th built-in tool: **SSH Server Cryptographic Audit** (`SSHSERVERAUDIT`, `ToolPack.Audit`) performing an unauthenticated RFC 4253 banner and `SSH_MSG_KEXINIT` probe (`SshKexInitProbe`, `SshServerAuditEngine`), ANSSI/SecNumCloud/Terrapin strict-KEX/post-quantum grading, `sshd_config` hardening guidance, gateway routing, and HTML/CSV export.
+- Added non-blocking advisory DNS `SSHFP` verification (RFC 4255/6594/8709 wire codec with EDNS0 DO bit and AD flag display) in `HostKeyPromptDialog` (skipped for gateway-routed sessions to prevent split-horizon DNS leaks), full FIDO2 (`sk-*`) hardware-key and certificate UX with 30 s timeouts (omitting Win32 `SMTO_ABORTIFHUNG` on Pageant), and opt-in SSH agent signing confirmation (`AppSettings.SshConfirmAgentSigning`, `SshAgentSigningDeclinedException`).
+- Added a 5-phase **Guided SSH Key Rotation Wizard** (`SshKeyRotator`, `SshKeyRotationDialog`) from the SSH server context menu: generates a new key pair to a non-clobbering path, deploys via `SshPublicKeyDeployer` (with gateway support), verifies isolated authentication with ONLY the new key (`DisableAgentAuthentication`), persists the updated profile before cleanup, and atomically removes the old key from `~/.ssh/authorized_keys` with symlink and non-empty invariants.
+- Added `OSC 133` shell integration prompt marks (green/red status markers, `Ctrl+Shift+Up`/`Down` navigation, Shift+right-click masked copy of the last command's output) and thread-safe asciinema v2 (`.cast`) session recording (`AsciinemaCastRecorder`) with optional fail-closed `TextRedactor` secret masking across chunk boundaries.
+- Added an offline **SSH Fleet Compliance** panel (`SshFleetComplianceAnalyzer`) inside `SshKeyAuditView` auditing local SSH profiles, gateways, certificates (explicit and sibling `-cert.pub`), local key files, and pinned/revoked host keys with sanitized CSV export.
+
 ### Phase 1: Core SSH hardening, key generation, agents, tunnels, and terminal UX
 
 - Removed SSH username logging across connection paths and added a static logging guard test; hardened Plink host-key probing and temporary `PlinkSizeSession` cleanup.

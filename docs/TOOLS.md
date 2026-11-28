@@ -17,20 +17,20 @@ providers, and tool-hosting infrastructure.
 
 ## Overview
 
-Heimdall ships 58 built-in tools registered by `ToolRegistry`. The raw
+Heimdall ships 59 built-in tools registered by `ToolRegistry`. The raw
 `Entry(` token appears more often in `ToolRegistry.cs` because it also matches
 the internal `ToolEntry` record, the dynamic external-tool registration path,
 and the private helper method. The effective built-in count is the set of
 registry entries in the constructor:
 
 - Network: 17
-- Security: 15
+- Security: 16
 - Encoding: 6
 - System: 14
 - External native tools: 6
 
 External provider tools are detected at runtime and appended to the registry
-after startup scans. They are not part of the 58 built-in count.
+after startup scans. They are not part of the 59 built-in count.
 
 ## Built-In Tool Catalog
 
@@ -72,6 +72,7 @@ keys used by command palette, tabs, split panes, and tool lookup.
 | `TOTP` | TOTP Generator | Essentials |
 | `PWDAUDIT` | Password Auditor | Essentials |
 | `SSHAUDIT` | SSH Key Auditor | Essentials |
+| `SSHSERVERAUDIT` | SSH Server Audit | Audit and reconnaissance |
 | `TLSAUDIT` | TLS Auditor | Audit and reconnaissance |
 | `DNSSEC` | DNS Security Checker | Network diagnostics |
 | `SMBENUM` | SMB Enumerator | Audit and reconnaissance |
