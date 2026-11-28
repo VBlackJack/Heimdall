@@ -410,18 +410,21 @@ public partial class App : System.Windows.Application
                 settings.TrustedCertAuthorities,
                 settings.RevokedHostKeys);
 
-            try
+            if (!settings.KnownHostsPoliciesManagedByHeimdall || settings.SyncKnownHostsAtStartup)
             {
-                var defaultKnownHosts = Heimdall.Ssh.KnownHostsImporter.GetDefaultKnownHostsPath();
-                if (File.Exists(defaultKnownHosts)
-                    && new FileInfo(defaultKnownHosts).Length <= Heimdall.Core.Ssh.KnownHostsParser.MaxFileSizeBytes)
+                try
                 {
-                    hostKeyStore.LoadPolicyFromKnownHosts(File.ReadAllText(defaultKnownHosts), raiseEvent: false);
+                    var defaultKnownHosts = Heimdall.Ssh.KnownHostsImporter.GetDefaultKnownHostsPath();
+                    if (File.Exists(defaultKnownHosts)
+                        && new FileInfo(defaultKnownHosts).Length <= Heimdall.Core.Ssh.KnownHostsParser.MaxFileSizeBytes)
+                    {
+                        hostKeyStore.LoadPolicyFromKnownHosts(File.ReadAllText(defaultKnownHosts), raiseEvent: false);
+                    }
                 }
-            }
-            catch (Exception ex)
-            {
-                Heimdall.Core.Logging.FileLogger.Warn($"Startup known_hosts policy load skipped: {ex.Message}");
+                catch (Exception ex)
+                {
+                    Heimdall.Core.Logging.FileLogger.Warn($"Startup known_hosts policy load skipped: {ex.Message}");
+                }
             }
 
             // Persist newly trusted host keys back to settings via transactional merge.

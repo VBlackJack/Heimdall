@@ -7027,5 +7027,18 @@
   "SshKeyRotateErrProfileSaveFailed": "No se pudo actualizar el perfil de servidor guardado.",
   "SshKeyRotateErrSymlinkRefused": "El archivo remoto authorized_keys es un enlace simb\u00f3lico y no se modific\u00f3.",
   "SshKeyRotateErrInvariantFailed": "Fall\u00f3 la comprobaci\u00f3n de seguridad: no se confirm\u00f3 la nueva clave p\u00fablica en el archivo temporal authorized_keys.",
-  "SshKeyRotateErrRemoteExit": "El comando remoto de limpieza de la clave anterior finaliz\u00f3 con estado {0}."
+  "SshKeyRotateErrRemoteExit": "El comando remoto de limpieza de la clave anterior finaliz\u00f3 con estado {0}.",
+  "ToolSshAuditFindingFido2": "Clave de seguridad por hardware FIDO2 (moderna y resistente al phishing).",
+  "TerminalDropUploadPlinkUnsupported": "La carga de archivos al arrastrar y soltar solo est\u00e1 disponible en sesiones SSH nativas integradas, no en Plink.",
+  "ToolSshAuditFleetTargetProfile": "Perfil",
+  "ToolSshAuditFleetTargetGateway": "Pasarela",
+  "ToolSshAuditFleetTargetHostKey": "Clave de host",
+  "ToolSshAuditFleetFindingLegacyCrypto": "Permite algoritmos criptogr\u00e1ficos heredados (SHA-1 / CBC / ssh-rsa).",
+  "ToolSshAuditFleetFindingPasswordOnly": "Solo usa contrase\u00f1a guardada (sin clave SSH ni clave de agente configurada).",
+  "ToolSshAuditFleetFindingKeyMissing": "El archivo de clave SSH configurado no existe o no se puede leer.",
+  "ToolSshAuditFleetFindingKeyUnparseable": "El archivo de clave SSH configurado est\u00e1 da\u00f1ado o en un formato no reconocido.",
+  "ToolSshAuditFleetFindingUnencryptedKey": "La clave privada SSH se guarda sin frase de contrase\u00f1a.",
+  "ToolSshAuditFleetFindingCertMissing": "El certificado de usuario OpenSSH configurado no existe o no se puede leer.",
+  "ToolSshAuditFleetFindingCertInvalid": "No se pudo analizar el certificado de usuario OpenSSH.",
+  "ToolSshAuditFleetFindingHostKeyRevoked": "La clave de host fijada coincide con una regla local @revoked."
 }

@@ -86,6 +86,11 @@ public static class SshKeyAuditEngine
     private const string OpenSshEcdsaNistp256Prefix = "ecdsa-sha2-nistp256";
     private const string OpenSshEcdsaNistp384Prefix = "ecdsa-sha2-nistp384";
     private const string OpenSshEcdsaNistp521Prefix = "ecdsa-sha2-nistp521";
+    private const string OpenSshSkEd25519Prefix = "sk-ssh-ed25519@openssh.com";
+    private const string OpenSshSkEcdsaNistp256Prefix = "sk-ecdsa-sha2-nistp256@openssh.com";
+
+    private const string PpkV2HeaderPrefix = "PuTTY-User-Key-File-2:";
+    private const string PpkV3HeaderPrefix = "PuTTY-User-Key-File-3:";
 
     private const string PemBeginOpenSshPrivate = "-----BEGIN OPENSSH PRIVATE KEY-----";
     private const string PemBeginRsaPrivate = "-----BEGIN RSA PRIVATE KEY-----";
@@ -125,12 +130,20 @@ public static class SshKeyAuditEngine
             return BuildCertificateAuditResult(cert, localize);
         }
 
+        if (firstLine.StartsWith(PpkV2HeaderPrefix, StringComparison.Ordinal)
+            || firstLine.StartsWith(PpkV3HeaderPrefix, StringComparison.Ordinal))
+        {
+            return ParsePuttyPpkKey(keyText, localize);
+        }
+
         if (firstLine.StartsWith(OpenSshRsaPrefix + " ", StringComparison.Ordinal) ||
             firstLine.StartsWith(OpenSshDsaPrefix + " ", StringComparison.Ordinal) ||
             firstLine.StartsWith(OpenSshEd25519Prefix + " ", StringComparison.Ordinal) ||
             firstLine.StartsWith(OpenSshEcdsaNistp256Prefix + " ", StringComparison.Ordinal) ||
             firstLine.StartsWith(OpenSshEcdsaNistp384Prefix + " ", StringComparison.Ordinal) ||
-            firstLine.StartsWith(OpenSshEcdsaNistp521Prefix + " ", StringComparison.Ordinal))
+            firstLine.StartsWith(OpenSshEcdsaNistp521Prefix + " ", StringComparison.Ordinal) ||
+            firstLine.StartsWith(OpenSshSkEd25519Prefix + " ", StringComparison.Ordinal) ||
+            firstLine.StartsWith(OpenSshSkEcdsaNistp256Prefix + " ", StringComparison.Ordinal))
         {
             return ParseOpenSshPublicKey(firstLine, localize);
         }
@@ -282,13 +295,99 @@ public static class SshKeyAuditEngine
         };
     }
 
+    private static SshKeyAuditResult? ParsePuttyPpkKey(string keyText, Func<string, string>? localize)
+    {
+        try
+        {
+            string[] lines = keyText.Replace("\r\n", "\n", StringComparison.Ordinal).Split('\n');
+            if (lines.Length < 4)
+            {
+                return null;
+            }
+
+            string headerLine = lines[0].Trim();
+            bool isPpkV2;
+            string algorithmTag;
+            if (headerLine.StartsWith(PpkV3HeaderPrefix, StringComparison.Ordinal))
+            {
+                isPpkV2 = false;
+                algorithmTag = headerLine[PpkV3HeaderPrefix.Length..].Trim();
+            }
+            else if (headerLine.StartsWith(PpkV2HeaderPrefix, StringComparison.Ordinal))
+            {
+                isPpkV2 = true;
+                algorithmTag = headerLine[PpkV2HeaderPrefix.Length..].Trim();
+            }
+            else
+            {
+                return null;
+            }
+
+            string? encryption = null;
+            int publicLineCount = -1;
+            int publicLinesStart = -1;
+
+            for (int i = 1; i < lines.Length; i++)
+            {
+                string line = lines[i].Trim();
+                if (line.StartsWith("Encryption:", StringComparison.OrdinalIgnoreCase))
+                {
+                    encryption = line["Encryption:".Length..].Trim();
+                }
+                else if (line.StartsWith("Public-Lines:", StringComparison.OrdinalIgnoreCase))
+                {
+                    string countText = line["Public-Lines:".Length..].Trim();
+                    if (!int.TryParse(countText, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out publicLineCount)
+                        || publicLineCount <= 0
+                        || publicLineCount > 256)
+                    {
+                        return null;
+                    }
+
+                    publicLinesStart = i + 1;
+                    break;
+                }
+            }
+
+            if (publicLinesStart < 0 || publicLinesStart + publicLineCount > lines.Length)
+            {
+                return null;
+            }
+
+            var b64 = new StringBuilder();
+            for (int i = 0; i < publicLineCount; i++)
+            {
+                b64.Append(lines[publicLinesStart + i].Trim());
+            }
+
+            byte[] blob = Convert.FromBase64String(b64.ToString());
+            bool isEncrypted = !string.IsNullOrWhiteSpace(encryption)
+                && !string.Equals(encryption, "none", StringComparison.OrdinalIgnoreCase);
+            string format = isPpkV2 ? "PuTTY PPK v2" : "PuTTY PPK v3";
+
+            return ParseOpenSshBlob(
+                blob,
+                algorithmTag,
+                isPrivate: true,
+                isEncrypted: isEncrypted,
+                format: format,
+                localize: localize,
+                isOldFormat: isPpkV2);
+        }
+        catch (Exception ex) when (IsExpectedParseException(ex))
+        {
+            return null;
+        }
+    }
+
     private static SshKeyAuditResult? ParseOpenSshBlob(
         byte[] blob,
         string algorithmTag,
         bool isPrivate,
         bool isEncrypted,
         string format,
-        Func<string, string>? localize)
+        Func<string, string>? localize,
+        bool isOldFormat = false)
     {
         try
         {
@@ -332,6 +431,21 @@ public static class SshKeyAuditEngine
                 algorithm = "Ed25519";
                 keySize = Ed25519KeySize;
             }
+            else if (blobAlgorithm == OpenSshSkEd25519Prefix)
+            {
+                algorithm = "Ed25519 (FIDO2)";
+                keySize = Ed25519KeySize;
+            }
+            else if (blobAlgorithm == OpenSshSkEcdsaNistp256Prefix)
+            {
+                algorithm = "ECDSA (FIDO2)";
+                var curve = ReadOpenSshString(ms);
+                keySize = curve == "nistp256" ? 256 : 0;
+                if (keySize == 0)
+                {
+                    return null;
+                }
+            }
             else if (blobAlgorithm.StartsWith("ecdsa-sha2-", StringComparison.Ordinal))
             {
                 algorithm = "ECDSA";
@@ -355,7 +469,7 @@ public static class SshKeyAuditEngine
             }
 
             var fingerprint = ComputeSha256Fingerprint(publicKeyBlob);
-            var findings = BuildFindings(algorithm, keySize, isPrivate, isEncrypted, false, localize);
+            var findings = BuildFindings(algorithm, keySize, isPrivate, isEncrypted, isOldFormat, localize);
             var rating = DetermineRating(algorithm, keySize);
 
             return new SshKeyAuditResult
@@ -900,6 +1014,8 @@ public static class SshKeyAuditEngine
     {
         "DSA" => SecurityRating.Deprecated,
         "Ed25519" => SecurityRating.Strong,
+        "Ed25519 (FIDO2)" => SecurityRating.Strong,
+        "ECDSA (FIDO2)" => SecurityRating.Strong,
         "RSA" when keySize > 0 && keySize < MinRsaKeySize => SecurityRating.Weak,
         "RSA" when keySize >= StrongRsaKeySize => SecurityRating.Strong,
         "RSA" when keySize >= MinRsaKeySize => SecurityRating.Acceptable,
@@ -926,6 +1042,15 @@ public static class SshKeyAuditEngine
                 {
                     Severity = FindingSeverity.Pass,
                     Text = L(localize, "ToolSshAuditFindingEd25519")
+                });
+                break;
+
+            case "Ed25519 (FIDO2)":
+            case "ECDSA (FIDO2)":
+                findings.Add(new SshKeyAuditFinding
+                {
+                    Severity = FindingSeverity.Pass,
+                    Text = L(localize, "ToolSshAuditFindingFido2")
                 });
                 break;
 

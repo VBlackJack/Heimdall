@@ -299,8 +299,78 @@ public sealed class AsciinemaCastRecorder
 
         if (crossChunkSecretDetected || parts.Length != outputIndices.Count)
         {
-            // A secret spanned a chunk boundary: emit the safely redacted contiguous output at the
-            // first output timestamp while keeping all resize events intact (never leak split secret).
+            // A secret spanned a chunk boundary. Keep exact timestamps for all unaffected
+            // leading and trailing chunks, and collapse ONLY the minimal middle span that
+            // overlaps the cross-chunk redaction so timestamps outside the secret are preserved
+            // while guaranteeing concat(emitted "o") == contiguousResult.Text (zero leakage).
+            if (parts.Length == outputIndices.Count)
+            {
+                string sentinelStripped = string.Concat(parts);
+                string target = contiguousResult.Text;
+
+                int commonPrefix = 0;
+                int minLen = Math.Min(sentinelStripped.Length, target.Length);
+                while (commonPrefix < minLen && sentinelStripped[commonPrefix] == target[commonPrefix])
+                {
+                    commonPrefix++;
+                }
+
+                int commonSuffix = 0;
+                int maxSuffix = minLen - commonPrefix;
+                while (commonSuffix < maxSuffix
+                    && sentinelStripped[sentinelStripped.Length - 1 - commonSuffix] == target[target.Length - 1 - commonSuffix])
+                {
+                    commonSuffix++;
+                }
+
+                int firstAffected = 0;
+                int prefixKeptLen = 0;
+                while (firstAffected < parts.Length
+                    && prefixKeptLen + parts[firstAffected].Length <= commonPrefix)
+                {
+                    prefixKeptLen += parts[firstAffected].Length;
+                    firstAffected++;
+                }
+
+                int lastAffected = parts.Length - 1;
+                int suffixKeptLen = 0;
+                while (lastAffected > firstAffected
+                    && suffixKeptLen + parts[lastAffected].Length <= commonSuffix
+                    && prefixKeptLen + suffixKeptLen + parts[lastAffected].Length <= target.Length)
+                {
+                    suffixKeptLen += parts[lastAffected].Length;
+                    lastAffected--;
+                }
+
+                int middleLength = target.Length - prefixKeptLen - suffixKeptLen;
+                string middleText = middleLength > 0
+                    ? target.Substring(prefixKeptLen, middleLength)
+                    : string.Empty;
+
+                int outIdx = 0;
+                for (int i = 0; i < events.Count; i++)
+                {
+                    if (events[i].Type != "o")
+                    {
+                        result.Add(events[i]);
+                        continue;
+                    }
+
+                    if (outIdx < firstAffected || outIdx > lastAffected)
+                    {
+                        result.Add(events[i] with { Data = parts[outIdx] });
+                    }
+                    else if (outIdx == firstAffected && middleText.Length > 0)
+                    {
+                        result.Add(events[i] with { Data = middleText });
+                    }
+
+                    outIdx++;
+                }
+
+                return true;
+            }
+
             bool emitted = false;
             foreach (var evt in events)
             {

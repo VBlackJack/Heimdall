@@ -127,16 +127,174 @@ public static class TerminalHighlightRuleDefaults
             return false;
         }
 
+        if (HasUnsafeRegexConstruct(pattern))
+        {
+            errorMessage = "Pattern contains nested quantifiers or backreferences that may stall terminal rendering.";
+            return false;
+        }
+
         try
         {
-            _ = new Regex(pattern, RegexOptions.None, ValidationTimeout);
+            var regex = new Regex(pattern, RegexOptions.None, ValidationTimeout);
+            _ = regex.IsMatch("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!");
             return true;
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            errorMessage = "Pattern exceeded the validation timeout and may stall terminal rendering.";
+            return false;
         }
         catch (ArgumentException ex)
         {
             errorMessage = ex.Message;
             return false;
         }
+    }
+
+    private static bool HasUnsafeRegexConstruct(string pattern)
+    {
+        // Reject backreferences (\1..\9) and nested repeating quantifiers such as (a+)+, (a*)*, (\w+){2,}.
+        var groupHasQuantifier = new Stack<bool>();
+        bool escaped = false;
+        bool inCharClass = false;
+
+        for (int i = 0; i < pattern.Length; i++)
+        {
+            char c = pattern[i];
+            if (escaped)
+            {
+                if (!inCharClass && c is >= '1' and <= '9')
+                {
+                    return true;
+                }
+
+                escaped = false;
+                continue;
+            }
+
+            if (c == '\\')
+            {
+                escaped = true;
+                continue;
+            }
+
+            if (c == '[' && !inCharClass)
+            {
+                inCharClass = true;
+                continue;
+            }
+
+            if (c == ']' && inCharClass)
+            {
+                inCharClass = false;
+                continue;
+            }
+
+            if (inCharClass)
+            {
+                continue;
+            }
+
+            if (c == '(')
+            {
+                groupHasQuantifier.Push(false);
+                continue;
+            }
+
+            if (c == ')')
+            {
+                if (groupHasQuantifier.Count > 0)
+                {
+                    bool innerQuantified = groupHasQuantifier.Pop();
+                    if (innerQuantified && IsOuterDangerousQuantifierAt(pattern, i + 1))
+                    {
+                        return true;
+                    }
+
+                    if (innerQuantified && groupHasQuantifier.Count > 0)
+                    {
+                        _ = groupHasQuantifier.Pop();
+                        groupHasQuantifier.Push(true);
+                    }
+                }
+
+                continue;
+            }
+
+            if (IsInnerUnboundedQuantifierAt(pattern, i) && groupHasQuantifier.Count > 0)
+            {
+                _ = groupHasQuantifier.Pop();
+                groupHasQuantifier.Push(true);
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsInnerUnboundedQuantifierAt(string pattern, int index)
+    {
+        if (index < 0 || index >= pattern.Length)
+        {
+            return false;
+        }
+
+        char c = pattern[index];
+        if (c is '+' or '*')
+        {
+            return true;
+        }
+
+        if (c == '{')
+        {
+            int close = pattern.IndexOf('}', index + 1);
+            if (close > index + 1)
+            {
+                string body = pattern[(index + 1)..close];
+                int comma = body.IndexOf(',');
+                if (comma >= 0)
+                {
+                    string upper = body[(comma + 1)..].Trim();
+                    return upper.Length == 0 || (int.TryParse(upper, out int max) && max > 16);
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsOuterDangerousQuantifierAt(string pattern, int index)
+    {
+        if (index < 0 || index >= pattern.Length)
+        {
+            return false;
+        }
+
+        char c = pattern[index];
+        if (c is '+' or '*')
+        {
+            return true;
+        }
+
+        if (c == '{')
+        {
+            int close = pattern.IndexOf('}', index + 1);
+            if (close > index + 1)
+            {
+                string body = pattern[(index + 1)..close];
+                int comma = body.IndexOf(',');
+                if (comma >= 0)
+                {
+                    return true;
+                }
+
+                if (int.TryParse(body, out int exact) && exact > 1)
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /// <summary>

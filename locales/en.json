@@ -7027,5 +7027,18 @@
   "SshKeyRotateErrProfileSaveFailed": "The saved server profile could not be updated.",
   "SshKeyRotateErrSymlinkRefused": "Remote authorized_keys is a symbolic link and was left untouched.",
   "SshKeyRotateErrInvariantFailed": "Safety check failed: the new public key was not confirmed in the staged authorized_keys file.",
-  "SshKeyRotateErrRemoteExit": "Remote old-key cleanup command exited with status {0}."
+  "SshKeyRotateErrRemoteExit": "Remote old-key cleanup command exited with status {0}.",
+  "ToolSshAuditFindingFido2": "Hardware-backed FIDO2 security key (modern, phishing-resistant).",
+  "TerminalDropUploadPlinkUnsupported": "Drag-and-drop file upload is only available on native embedded SSH sessions, not Plink sessions.",
+  "ToolSshAuditFleetTargetProfile": "Profile",
+  "ToolSshAuditFleetTargetGateway": "Gateway",
+  "ToolSshAuditFleetTargetHostKey": "HostKey",
+  "ToolSshAuditFleetFindingLegacyCrypto": "Allows legacy cryptographic algorithms (SHA-1 / CBC / ssh-rsa).",
+  "ToolSshAuditFleetFindingPasswordOnly": "Authenticates with a stored password only (no SSH key or agent key configured).",
+  "ToolSshAuditFleetFindingKeyMissing": "Configured SSH key file is missing or unreadable.",
+  "ToolSshAuditFleetFindingKeyUnparseable": "Configured SSH key file is corrupt or not a recognized SSH key format.",
+  "ToolSshAuditFleetFindingUnencryptedKey": "Private SSH key file is stored without a passphrase.",
+  "ToolSshAuditFleetFindingCertMissing": "Configured OpenSSH user certificate file is missing or unreadable.",
+  "ToolSshAuditFleetFindingCertInvalid": "OpenSSH user certificate file could not be parsed.",
+  "ToolSshAuditFleetFindingHostKeyRevoked": "Pinned host key matches a local @revoked rule."
 }

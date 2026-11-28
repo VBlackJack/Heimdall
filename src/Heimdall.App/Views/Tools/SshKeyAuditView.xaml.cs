@@ -223,13 +223,7 @@ public partial class SshKeyAuditView : UserControl, IToolView
                     services,
                     publicKeyLine,
                     _localizer,
-                    status =>
-                    {
-                        bool isErr = status.StartsWith(
-                            L("ToolSshKeyGenDeployFailed").Split('{')[0],
-                            StringComparison.OrdinalIgnoreCase);
-                        _vm.ShowStatus(status, isErr);
-                    })
+                    (status, isErr) => _vm.ShowStatus(status, isErr))
                 .ConfigureAwait(true);
         }
         catch (Exception ex)
@@ -386,8 +380,7 @@ public partial class SshKeyAuditView : UserControl, IToolView
 
             if (loadedKeys.Count == 0)
             {
-                _vm.FileErrorMessage = L("ToolSshAuditAgentEmpty");
-                _vm.ShowFileError = true;
+                _vm.ShowStatus(L("ToolSshAuditAgentEmpty"), isError: true);
                 return;
             }
 
@@ -610,13 +603,7 @@ public partial class SshKeyAuditView : UserControl, IToolView
                     services,
                     row.Key.PublicKeyOpenSsh,
                     _localizer,
-                    status =>
-                    {
-                        bool isErr = status.StartsWith(
-                            L("ToolSshKeyGenDeployFailed").Split('{')[0],
-                            StringComparison.OrdinalIgnoreCase);
-                        _vm.ShowStatus(status, isErr);
-                    })
+                    (status, isErr) => _vm.ShowStatus(status, isErr))
                 .ConfigureAwait(true);
         }
         catch (Exception ex)
@@ -677,6 +664,18 @@ public partial class SshKeyAuditView : UserControl, IToolView
         BtnLoadKeyFileToAgent.IsEnabled = false;
         try
         {
+            var fileInfo = new System.IO.FileInfo(openDialog.FileName);
+            if (fileInfo.Length > SshKeyAuditEngine.MaxKeyFileSize)
+            {
+                _vm.ShowStatus(
+                    string.Format(
+                        CultureInfo.CurrentCulture,
+                        L(SshKeyAuditViewModel.FileTooLargeKey),
+                        SshKeyAuditEngine.MaxKeyFileSize),
+                    isError: true);
+                return;
+            }
+
             var keyContent = await System.IO.File.ReadAllTextAsync(openDialog.FileName).ConfigureAwait(true);
             uint? lifetimeSeconds = null;
             if (dialogService is not null)
@@ -812,9 +811,9 @@ public partial class SshKeyAuditView : UserControl, IToolView
 
     private Brush GetAlgorithmBrush(string algorithm) => algorithm switch
     {
-        "Ed25519" => (Brush)FindResource("SuccessTextBrush"),
+        "Ed25519" or "Ed25519 (FIDO2)" => (Brush)FindResource("SuccessTextBrush"),
         "RSA" => (Brush)FindResource("InfoBrush"),
-        "ECDSA" => (Brush)FindResource("AccentBrush"),
+        "ECDSA" or "ECDSA (FIDO2)" => (Brush)FindResource("AccentBrush"),
         "DSA" => (Brush)FindResource("ErrorTextBrush"),
         _ => (Brush)FindResource("TextSecondaryBrush")
     };
@@ -902,48 +901,7 @@ public partial class SshKeyAuditView : UserControl, IToolView
             }
 
             _lastFleetReport = report;
-            string findingsFragment = _localizer is not null
-                ? _localizer.FormatCount(
-                    report.Findings.Count,
-                    "ToolSshAuditFleetFindingsOne",
-                    "ToolSshAuditFleetFindings",
-                    report.Findings.Count)
-                : report.Findings.Count.ToString(CultureInfo.CurrentCulture);
-            FleetComplianceSummary.Text = string.Format(
-                CultureInfo.CurrentCulture,
-                L("ToolSshAuditFleetSummary"),
-                report.ScorePercent,
-                report.ProfilesAudited,
-                report.GatewaysAudited,
-                report.HostKeysAudited,
-                findingsFragment);
-            BtnExportFleetCsv.Visibility = Visibility.Visible;
-
-            if (report.Findings.Count == 0)
-            {
-                FleetComplianceStatusText.Text = L("ToolSshAuditFleetClean");
-                FleetFindingsList.ItemsSource = null;
-            }
-            else
-            {
-                FleetComplianceStatusText.Text = string.Empty;
-                FleetFindingsList.ItemsSource = report.Findings.Select(f => new FindingDisplayItem
-                {
-                    Icon = f.Severity switch
-                    {
-                        SshFleetFindingSeverity.Critical => "\u2716",
-                        SshFleetFindingSeverity.Warning => "\u26A0",
-                        _ => "\u2139"
-                    },
-                    Text = $"[{f.TargetKind}] {f.TargetName}: {f.Summary}",
-                    IconBrush = (Brush)FindResource(f.Severity switch
-                    {
-                        SshFleetFindingSeverity.Critical => "ErrorTextBrush",
-                        SshFleetFindingSeverity.Warning => "WarningTextBrush",
-                        _ => "TextSecondaryBrush"
-                    })
-                }).ToList();
-            }
+            RenderFleetReport(report);
         }
         catch (OperationCanceledException)
         {
@@ -1020,6 +978,72 @@ public partial class SshKeyAuditView : UserControl, IToolView
         }
     }
 
+    private void RenderFleetReport(SshFleetComplianceReport report)
+    {
+        string findingsFragment = _localizer is not null
+            ? _localizer.FormatCount(
+                report.Findings.Count,
+                "ToolSshAuditFleetFindingsOne",
+                "ToolSshAuditFleetFindings",
+                report.Findings.Count)
+            : report.Findings.Count.ToString(CultureInfo.CurrentCulture);
+        FleetComplianceSummary.Text = string.Format(
+            CultureInfo.CurrentCulture,
+            L("ToolSshAuditFleetSummary"),
+            report.ScorePercent,
+            report.ProfilesAudited,
+            report.GatewaysAudited,
+            report.HostKeysAudited,
+            findingsFragment);
+        BtnExportFleetCsv.Visibility = Visibility.Visible;
+
+        if (report.Findings.Count == 0)
+        {
+            FleetComplianceStatusText.Text = L("ToolSshAuditFleetClean");
+            FleetFindingsList.ItemsSource = null;
+            return;
+        }
+
+        FleetComplianceStatusText.Text = string.Empty;
+        FleetFindingsList.ItemsSource = report.Findings.Select(f => new FindingDisplayItem
+        {
+            Icon = f.Severity switch
+            {
+                SshFleetFindingSeverity.Critical => "\u2716",
+                SshFleetFindingSeverity.Warning => "\u26A0",
+                _ => "\u2139"
+            },
+            Text = $"[{LocalizeFleetTargetKind(f.TargetKind)}] {f.TargetName}: {LocalizeFleetFindingSummary(f)}",
+            IconBrush = (Brush)FindResource(f.Severity switch
+            {
+                SshFleetFindingSeverity.Critical => "ErrorTextBrush",
+                SshFleetFindingSeverity.Warning => "WarningTextBrush",
+                _ => "TextSecondaryBrush"
+            })
+        }).ToList();
+    }
+
+    private string LocalizeFleetTargetKind(string targetKind) => targetKind switch
+    {
+        "Profile" => L("ToolSshAuditFleetTargetProfile"),
+        "Gateway" => L("ToolSshAuditFleetTargetGateway"),
+        "HostKey" => L("ToolSshAuditFleetTargetHostKey"),
+        _ => targetKind
+    };
+
+    private string LocalizeFleetFindingSummary(SshFleetFinding finding) => finding.Code switch
+    {
+        "LEGACY_CRYPTO_POLICY" => L("ToolSshAuditFleetFindingLegacyCrypto"),
+        "PASSWORD_ONLY_AUTH" => L("ToolSshAuditFleetFindingPasswordOnly"),
+        "KEY_FILE_MISSING" => L("ToolSshAuditFleetFindingKeyMissing"),
+        "KEY_FILE_UNPARSEABLE" => L("ToolSshAuditFleetFindingKeyUnparseable"),
+        "UNENCRYPTED_PRIVATE_KEY" => L("ToolSshAuditFleetFindingUnencryptedKey"),
+        "CERT_FILE_MISSING" => L("ToolSshAuditFleetFindingCertMissing"),
+        "CERT_INVALID" => L("ToolSshAuditFleetFindingCertInvalid"),
+        "HOSTKEY_REVOKED" => L("ToolSshAuditFleetFindingHostKeyRevoked"),
+        _ => finding.Summary
+    };
+
     private void OnLocaleChanged(string _)
     {
         ApplyLocalization();
@@ -1033,6 +1057,10 @@ public partial class SshKeyAuditView : UserControl, IToolView
             UpdateResultDisplay();
             ProjectFindings();
         }
+        if (_lastFleetReport is not null)
+        {
+            RenderFleetReport(_lastFleetReport);
+        }
     }
 
     private void OnThemeChanged(string _)
@@ -1041,6 +1069,10 @@ public partial class SshKeyAuditView : UserControl, IToolView
         {
             UpdateBadgeBrushes();
             ProjectFindings();
+        }
+        if (_lastFleetReport is not null)
+        {
+            RenderFleetReport(_lastFleetReport);
         }
     }
 

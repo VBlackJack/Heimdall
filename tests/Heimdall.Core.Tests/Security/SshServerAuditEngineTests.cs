@@ -92,4 +92,27 @@ public sealed class SshServerAuditEngineTests
         Assert.Contains("&lt;script&gt;", html, StringComparison.Ordinal);
         Assert.Contains("\"'=evil.host\"", csv, StringComparison.Ordinal);
     }
+
+    [Fact]
+    public void Evaluate_ServerWithNonEtmMacOrDhGroup14_IsNotAnssiCompliantAndCannotEarnAPlus()
+    {
+        var snap = new SshKexInitSnapshot(
+            "mixed.corp.local",
+            22,
+            "SSH-2.0-OpenSSH_9.9",
+            ["mlkem768x25519-sha256", "diffie-hellman-group14-sha256", "kex-strict-s-v00@openssh.com"],
+            ["ssh-ed25519"],
+            ["aes256-gcm@openssh.com"],
+            ["aes256-gcm@openssh.com"],
+            ["hmac-sha2-512-etm@openssh.com", "hmac-sha2-256"],
+            ["hmac-sha2-512-etm@openssh.com", "hmac-sha2-256"],
+            ["none"],
+            ["none"]);
+
+        var report = SshServerAuditEngine.Evaluate(snap);
+
+        Assert.False(report.IsAnssiCompliant);
+        Assert.NotEqual(SshAuditGrade.APlus, report.Grade);
+        Assert.Equal(SshAuditGrade.A, report.Grade);
+    }
 }

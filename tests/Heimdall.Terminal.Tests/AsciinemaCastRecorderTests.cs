@@ -108,6 +108,45 @@ public sealed class AsciinemaCastRecorderTests
     }
 
     [Fact]
+    public void SerializeToCastV2_WithCrossChunkSecret_PreservesTimestampsOfUnaffectedSurroundingEvents()
+    {
+        var clock = new SteppingTimeProvider();
+        var recorder = new AsciinemaCastRecorder(80, 24, timeProvider: clock);
+        recorder.WriteOutput(Encoding.UTF8.GetBytes("step 1\r\n"));
+        clock.Advance(TimeSpan.FromSeconds(5));
+        recorder.WriteOutput(Encoding.UTF8.GetBytes("key=AKIAIOSFODNN"));
+        clock.Advance(TimeSpan.FromSeconds(1));
+        recorder.WriteOutput(Encoding.UTF8.GetBytes("7EXAMPLE\r\n"));
+        clock.Advance(TimeSpan.FromSeconds(10));
+        recorder.WriteOutput(Encoding.UTF8.GetBytes("step 2 done\r\n"));
+        recorder.Stop();
+
+        string cast = recorder.SerializeToCastV2(maskSecrets: true, out bool refused, out _);
+        Assert.False(refused);
+        Assert.DoesNotContain("AKIAIOSFODNN", cast, StringComparison.Ordinal);
+        Assert.DoesNotContain("7EXAMPLE", cast, StringComparison.Ordinal);
+
+        string[] lines = cast.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        Assert.Equal(4, lines.Length); // header + step1 + redacted middle + step2
+        using var evt1 = JsonDocument.Parse(lines[1]);
+        using var evt2 = JsonDocument.Parse(lines[2]);
+        using var evt3 = JsonDocument.Parse(lines[3]);
+        Assert.Equal("step 1\r\n", evt1.RootElement[2].GetString());
+        Assert.Equal(5.0, evt2.RootElement[0].GetDouble(), precision: 2);
+        Assert.Contains("[masked:", evt2.RootElement[2].GetString(), StringComparison.Ordinal);
+        Assert.Equal(16.0, evt3.RootElement[0].GetDouble(), precision: 2);
+        Assert.Equal("step 2 done\r\n", evt3.RootElement[2].GetString());
+    }
+
+    private sealed class SteppingTimeProvider : TimeProvider
+    {
+        private long _ticks = TimeSpan.TicksPerSecond * 100;
+        public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+        public override long GetTimestamp() => _ticks;
+        public void Advance(TimeSpan delta) => _ticks += delta.Ticks;
+    }
+
+    [Fact]
     public void WriteOutput_EnforcesMaxRecordedCharsCap()
     {
         var recorder = new AsciinemaCastRecorder(80, 24, maxRecordedChars: 1024);

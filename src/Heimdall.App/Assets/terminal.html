@@ -1262,7 +1262,7 @@
                 registerUrlLinkProvider();
 
                 function highlightPlainSegment(segment) {
-                    if (compiledHighlightRules.length === 0) {
+                    if (compiledHighlightRules.length === 0 || segment.length > 4096) {
                         return null;
                     }
                     var cursor = 0;

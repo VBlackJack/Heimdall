@@ -185,6 +185,13 @@ public sealed class AppSettings
     /// Disable in air-gapped or strictly split-horizon environments to avoid outbound port 53 lookups.
     /// </summary>
     public bool SshVerifyHostKeyDnsSshfp { get; set; } = true;
+
+    /// <summary>
+    /// Internal marker set once the user has modified <c>@cert-authority</c> or <c>@revoked</c>
+    /// host-key policies inside Heimdall, preventing deleted rules from resurfacing on restart
+    /// when <see cref="SyncKnownHostsAtStartup"/> is off.
+    /// </summary>
+    public bool KnownHostsPoliciesManagedByHeimdall { get; set; }
     public const int DefaultPlinkPortCheckIntervalMs = 2000;
     [SettingRange(500, 30000)]
     public int PlinkPortCheckIntervalMs { get; set; } = DefaultPlinkPortCheckIntervalMs;

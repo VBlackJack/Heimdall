@@ -55,11 +55,24 @@ internal static class SshPublicKeyDeployUiHelper
         };
     }
 
-    public static async Task DeployInteractivelyAsync(
+    public static Task DeployInteractivelyAsync(
         IServiceProvider? services,
         string publicKeyLine,
         LocalizationManager localizer,
         Action<string> reportStatus,
+        CancellationToken cancellationToken = default) =>
+        DeployInteractivelyAsync(
+            services,
+            publicKeyLine,
+            localizer,
+            (msg, _) => reportStatus(msg),
+            cancellationToken);
+
+    public static async Task DeployInteractivelyAsync(
+        IServiceProvider? services,
+        string publicKeyLine,
+        LocalizationManager localizer,
+        Action<string, bool> reportStatus,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(localizer);
@@ -67,10 +80,12 @@ internal static class SshPublicKeyDeployUiHelper
 
         if (!SshPublicKeyDeployer.TryValidatePublicKeyLine(publicKeyLine, out var normalizedKey))
         {
-            reportStatus(string.Format(
-                CultureInfo.CurrentCulture,
-                localizer["ToolSshKeyGenDeployFailed"],
-                localizer["ToolSshKeyDeployErrInvalidKey"]));
+            reportStatus(
+                string.Format(
+                    CultureInfo.CurrentCulture,
+                    localizer["ToolSshKeyGenDeployFailed"],
+                    localizer["ToolSshKeyDeployErrInvalidKey"]),
+                true);
             return;
         }
 
@@ -81,7 +96,7 @@ internal static class SshPublicKeyDeployUiHelper
 
         if (configManager is null || dialogService is null || hostKeyStore is null || hostKeyVerifier is null)
         {
-            reportStatus(localizer["ToolSshKeyGenDeployNoServers"]);
+            reportStatus(localizer["ToolSshKeyGenDeployNoServers"], true);
             return;
         }
 
@@ -96,7 +111,7 @@ internal static class SshPublicKeyDeployUiHelper
 
         if (sshServers.Count == 0)
         {
-            reportStatus(localizer["ToolSshKeyGenDeployNoServers"]);
+            reportStatus(localizer["ToolSshKeyGenDeployNoServers"], true);
             return;
         }
 
@@ -130,13 +145,30 @@ internal static class SshPublicKeyDeployUiHelper
             cancellationToken).ConfigureAwait(true);
     }
 
-    public static async Task DeployToServerAsync(
+    public static Task DeployToServerAsync(
         IServiceProvider? services,
         ServerProfileDto target,
         AppSettings settings,
         string publicKeyLine,
         LocalizationManager localizer,
         Action<string> reportStatus,
+        CancellationToken cancellationToken = default) =>
+        DeployToServerAsync(
+            services,
+            target,
+            settings,
+            publicKeyLine,
+            localizer,
+            (msg, _) => reportStatus(msg),
+            cancellationToken);
+
+    public static async Task DeployToServerAsync(
+        IServiceProvider? services,
+        ServerProfileDto target,
+        AppSettings settings,
+        string publicKeyLine,
+        LocalizationManager localizer,
+        Action<string, bool> reportStatus,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(target);
@@ -146,10 +178,12 @@ internal static class SshPublicKeyDeployUiHelper
 
         if (!SshPublicKeyDeployer.TryValidatePublicKeyLine(publicKeyLine, out var normalizedKey))
         {
-            reportStatus(string.Format(
-                CultureInfo.CurrentCulture,
-                localizer["ToolSshKeyGenDeployFailed"],
-                localizer["ToolSshKeyDeployErrInvalidKey"]));
+            reportStatus(
+                string.Format(
+                    CultureInfo.CurrentCulture,
+                    localizer["ToolSshKeyGenDeployFailed"],
+                    localizer["ToolSshKeyDeployErrInvalidKey"]),
+                true);
             return;
         }
 
@@ -158,7 +192,7 @@ internal static class SshPublicKeyDeployUiHelper
         var hostKeyVerifier = services?.GetService<IHostKeyVerifier>();
         if (dialogService is null || hostKeyStore is null || hostKeyVerifier is null)
         {
-            reportStatus(localizer["ToolSshKeyGenDeployNoServers"]);
+            reportStatus(localizer["ToolSshKeyGenDeployNoServers"], true);
             return;
         }
 
@@ -209,10 +243,12 @@ internal static class SshPublicKeyDeployUiHelper
             }
         }
 
-        reportStatus(string.Format(
-            CultureInfo.CurrentCulture,
-            localizer["ToolSshKeyGenDeployInProgress"],
-            target.DisplayName));
+        reportStatus(
+            string.Format(
+                CultureInfo.CurrentCulture,
+                localizer["ToolSshKeyGenDeployInProgress"],
+                target.DisplayName),
+            false);
 
         string connectHost = target.RemoteServer;
         int connectPort = targetPort;
@@ -229,10 +265,12 @@ internal static class SshPublicKeyDeployUiHelper
             {
                 if (tunnelService is null)
                 {
-                    reportStatus(string.Format(
-                        CultureInfo.CurrentCulture,
-                        localizer["ToolSshKeyGenDeployFailed"],
-                        localizer[SshLocalizationKeys.ErrorTunnelFailed]));
+                    reportStatus(
+                        string.Format(
+                            CultureInfo.CurrentCulture,
+                            localizer["ToolSshKeyGenDeployFailed"],
+                            localizer[SshLocalizationKeys.ErrorTunnelFailed]),
+                        true);
                     return;
                 }
 
@@ -243,10 +281,12 @@ internal static class SshPublicKeyDeployUiHelper
                     cancellationToken).ConfigureAwait(true);
                 if (!tunnelOutcome.Success)
                 {
-                    reportStatus(string.Format(
-                        CultureInfo.CurrentCulture,
-                        localizer["ToolSshKeyGenDeployFailed"],
-                        tunnelOutcome.ErrorMessage ?? localizer[SshLocalizationKeys.ErrorTunnelFailed]));
+                    reportStatus(
+                        string.Format(
+                            CultureInfo.CurrentCulture,
+                            localizer["ToolSshKeyGenDeployFailed"],
+                            tunnelOutcome.ErrorMessage ?? localizer[SshLocalizationKeys.ErrorTunnelFailed]),
+                        true);
                     return;
                 }
 
@@ -312,16 +352,18 @@ internal static class SshPublicKeyDeployUiHelper
                 var key = result.AlreadyInstalled
                     ? "ToolSshKeyGenDeployAlreadyInstalled"
                     : "ToolSshKeyGenDeploySuccess";
-                reportStatus(string.Format(CultureInfo.CurrentCulture, localizer[key], target.DisplayName));
+                reportStatus(string.Format(CultureInfo.CurrentCulture, localizer[key], target.DisplayName), false);
                 return;
             }
 
             var errorText = FormatDeployError(result, localizer);
             FileLogger.Warn($"SSH public key deployment failed ({result.ErrorCode}): {errorText}");
-            reportStatus(string.Format(
-                CultureInfo.CurrentCulture,
-                localizer["ToolSshKeyGenDeployFailed"],
-                errorText));
+            reportStatus(
+                string.Format(
+                    CultureInfo.CurrentCulture,
+                    localizer["ToolSshKeyGenDeployFailed"],
+                    errorText),
+                true);
         }
         finally
         {

@@ -7027,5 +7027,18 @@
   "SshKeyRotateErrProfileSaveFailed": "Le profil de serveur enregistr\u00e9 n'a pas pu \u00eatre mis \u00e0 jour.",
   "SshKeyRotateErrSymlinkRefused": "Le fichier distant authorized_keys est un lien symbolique et n'a pas \u00e9t\u00e9 modifi\u00e9.",
   "SshKeyRotateErrInvariantFailed": "\u00c9chec de la garde de s\u00e9curit\u00e9 : la nouvelle cl\u00e9 publique n'a pas \u00e9t\u00e9 confirm\u00e9e dans le fichier temporaire authorized_keys.",
-  "SshKeyRotateErrRemoteExit": "La commande distante de suppression de l'ancienne cl\u00e9 a retourn\u00e9 le code {0}."
+  "SshKeyRotateErrRemoteExit": "La commande distante de suppression de l'ancienne cl\u00e9 a retourn\u00e9 le code {0}.",
+  "ToolSshAuditFindingFido2": "Cl\u00e9 de s\u00e9curit\u00e9 mat\u00e9rielle FIDO2 (moderne et r\u00e9sistante au phishing).",
+  "TerminalDropUploadPlinkUnsupported": "Le t\u00e9l\u00e9versement par glisser-d\u00e9poser n'est disponible que sur les sessions SSH int\u00e9gr\u00e9es natives, pas via Plink.",
+  "ToolSshAuditFleetTargetProfile": "Profil",
+  "ToolSshAuditFleetTargetGateway": "Passerelle",
+  "ToolSshAuditFleetTargetHostKey": "Cl\u00e9 d'h\u00f4te",
+  "ToolSshAuditFleetFindingLegacyCrypto": "Autorise des algorithmes cryptographiques anciens (SHA-1 / CBC / ssh-rsa).",
+  "ToolSshAuditFleetFindingPasswordOnly": "S'authentifie uniquement par mot de passe enregistr\u00e9 (aucune cl\u00e9 SSH ou cl\u00e9 d'agent configur\u00e9e).",
+  "ToolSshAuditFleetFindingKeyMissing": "Le fichier de cl\u00e9 SSH configur\u00e9 est introuvable ou illisible.",
+  "ToolSshAuditFleetFindingKeyUnparseable": "Le fichier de cl\u00e9 SSH configur\u00e9 est corrompu ou dans un format non reconnu.",
+  "ToolSshAuditFleetFindingUnencryptedKey": "La cl\u00e9 priv\u00e9e SSH est stock\u00e9e sans phrase secr\u00e8te.",
+  "ToolSshAuditFleetFindingCertMissing": "Le certificat utilisateur OpenSSH configur\u00e9 est introuvable ou illisible.",
+  "ToolSshAuditFleetFindingCertInvalid": "Le certificat utilisateur OpenSSH n'a pas pu \u00eatre analys\u00e9.",
+  "ToolSshAuditFleetFindingHostKeyRevoked": "La cl\u00e9 d'h\u00f4te \u00e9pingl\u00e9e correspond \u00e0 une r\u00e8gle locale @revoked."
 }

@@ -324,11 +324,20 @@ public static class SshServerAuditEngine
                 $"{weakCount} weak or deprecated algorithm(s) advertised (CBC ciphers, non-EtM/short MACs, or pre-auth zlib)."));
         }
 
+        bool allCoreCategoriesStrong =
+            assessments.Any(a => a.Category == SshAlgorithmCategory.KeyExchange)
+            && assessments.Any(a => a.Category == SshAlgorithmCategory.HostKey)
+            && assessments.Any(a => a.Category == SshAlgorithmCategory.Encryption)
+            && assessments.Any(a => a.Category == SshAlgorithmCategory.Mac)
+            && assessments
+                .Where(a => a.Category != SshAlgorithmCategory.Compression)
+                .All(a => a.Rating is SshAlgorithmRating.PostQuantum or SshAlgorithmRating.Strong);
+
         bool isAnssiCompliant = !snapshot.ServerBanner.StartsWith("SSH-1.", StringComparison.OrdinalIgnoreCase)
             && insecureCount == 0
             && weakCount == 0
             && !terrapinExposed
-            && assessments.Any(a => a.Category == SshAlgorithmCategory.KeyExchange && a.Rating is SshAlgorithmRating.PostQuantum or SshAlgorithmRating.Strong);
+            && allCoreCategoriesStrong;
 
         if (isAnssiCompliant)
         {
@@ -344,7 +353,8 @@ public static class SshServerAuditEngine
             weakCount,
             terrapinExposed,
             hasPostQuantumKex,
-            hasStrictKex);
+            hasStrictKex,
+            allCoreCategoriesStrong);
 
         string recommendedConfig = BuildRecommendedSshdConfig();
         return new SshServerAuditReport(
@@ -482,7 +492,8 @@ public static class SshServerAuditEngine
         int weakCount,
         bool terrapinExposed,
         bool hasPostQuantumKex,
-        bool hasStrictKex)
+        bool hasStrictKex,
+        bool allCoreCategoriesStrong)
     {
         if (isSsh1 || insecureCount >= 3)
         {
@@ -504,7 +515,9 @@ public static class SshServerAuditEngine
             return SshAuditGrade.B;
         }
 
-        return hasPostQuantumKex && hasStrictKex ? SshAuditGrade.APlus : SshAuditGrade.A;
+        return hasPostQuantumKex && hasStrictKex && allCoreCategoriesStrong
+            ? SshAuditGrade.APlus
+            : SshAuditGrade.A;
     }
 
     private static SshAlgorithmAssessment AssessKex(string name)

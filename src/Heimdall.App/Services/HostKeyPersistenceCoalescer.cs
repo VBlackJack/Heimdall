@@ -303,6 +303,7 @@ public sealed class HostKeyPersistenceCoalescer : IDisposable, IAsyncDisposable
                 {
                     settings.TrustedCertAuthorities = policies.CertAuthorities;
                     settings.RevokedHostKeys = policies.RevokedKeys;
+                    settings.KnownHostsPoliciesManagedByHeimdall = true;
                 }
             }).ConfigureAwait(false);
             FileLogger.Info($"Persisted {changeCount} trusted host key change(s) in one write.");

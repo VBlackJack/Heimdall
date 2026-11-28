@@ -60,6 +60,85 @@ public class SshKeyAuditEngineTests
     }
 
     [Fact]
+    public void Audit_Fido2SkEd25519PublicKey_ReturnsStrongFido2Result()
+    {
+        using var ms = new MemoryStream();
+        WriteTestString(ms, "sk-ssh-ed25519@openssh.com");
+        byte[] pub = new byte[32];
+        pub[0] = 0x42;
+        WriteTestBytes(ms, pub);
+        WriteTestString(ms, "ssh:");
+        string line = $"sk-ssh-ed25519@openssh.com {Convert.ToBase64String(ms.ToArray())} yubikey@corp";
+
+        var result = SshKeyAuditEngine.Audit(line);
+
+        Assert.NotNull(result);
+        Assert.Equal("Ed25519 (FIDO2)", result.Algorithm);
+        Assert.Equal(256, result.KeySize);
+        Assert.Equal(SecurityRating.Strong, result.Rating);
+        Assert.StartsWith("SHA256:", result.Fingerprint);
+        Assert.Contains(result.Findings, f => f.Severity == FindingSeverity.Pass);
+    }
+
+    [Fact]
+    public void Audit_PuttyPpkV3AndV2PrivateKeys_ParsesAlgorithmFingerprintAndEncryption()
+    {
+        using var ms = new MemoryStream();
+        WriteTestString(ms, "ssh-ed25519");
+        byte[] pub = new byte[32];
+        pub[0] = 0x77;
+        WriteTestBytes(ms, pub);
+        string pubB64 = Convert.ToBase64String(ms.ToArray());
+
+        string ppkV3 = $"""
+            PuTTY-User-Key-File-3: ssh-ed25519
+            Encryption: aes256-cbc
+            Comment: ops@bastion
+            Public-Lines: 1
+            {pubB64}
+            Key-Derivation: Argon2id
+            Private-Lines: 1
+            AAAA
+            Private-MAC: 0000
+            """;
+
+        var v3 = SshKeyAuditEngine.Audit(ppkV3);
+        Assert.NotNull(v3);
+        Assert.Equal("Ed25519", v3.Algorithm);
+        Assert.Equal(256, v3.KeySize);
+        Assert.Equal("PuTTY PPK v3", v3.Format);
+        Assert.True(v3.IsPrivateKey);
+        Assert.True(v3.IsEncrypted);
+        Assert.Equal(SecurityRating.Strong, v3.Rating);
+        Assert.StartsWith("SHA256:", v3.Fingerprint);
+
+        string ppkV2 = $"""
+            PuTTY-User-Key-File-2: ssh-ed25519
+            Encryption: none
+            Comment: legacy@bastion
+            Public-Lines: 1
+            {pubB64}
+            Private-Lines: 1
+            AAAA
+            Private-MAC: 0000
+            """;
+
+        var v2 = SshKeyAuditEngine.Audit(ppkV2);
+        Assert.NotNull(v2);
+        Assert.Equal("PuTTY PPK v2", v2.Format);
+        Assert.False(v2.IsEncrypted);
+        Assert.Contains(v2.Findings, f => f.Text == "ToolSshAuditFindingOldFormat");
+    }
+
+    private static void WriteTestBytes(Stream stream, byte[] bytes)
+    {
+        Span<byte> len = stackalloc byte[4];
+        BinaryPrimitives.WriteInt32BigEndian(len, bytes.Length);
+        stream.Write(len);
+        stream.Write(bytes);
+    }
+
+    [Fact]
     public void Audit_OpenSshRsaPublicKey_ReturnsCorrectKeySize()
     {
         using var rsa = RSA.Create(2048);

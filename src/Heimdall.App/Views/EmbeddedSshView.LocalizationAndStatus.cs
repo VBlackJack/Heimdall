@@ -429,8 +429,20 @@ public partial class EmbeddedSshView
 
     private void HandleWebViewFileDrop(Microsoft.Web.WebView2.Core.CoreWebView2WebMessageReceivedEventArgs args)
     {
-        if (_disposed || _session is not { IsConnected: true })
+        if (_disposed)
         {
+            return;
+        }
+
+        if (_session is not { IsConnected: true })
+        {
+            if (_terminalSession is Heimdall.Terminal.PipeModeSession)
+            {
+                UpdateStatus(
+                    CurrentPaneStatus ?? SessionStatusTokens.Connected,
+                    displayTextOverride: L("TerminalDropUploadPlinkUnsupported"));
+            }
+
             return;
         }
 

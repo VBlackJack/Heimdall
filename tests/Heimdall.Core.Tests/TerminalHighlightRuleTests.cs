@@ -36,6 +36,9 @@ public sealed class TerminalHighlightRuleTests
         Assert.False(TerminalHighlightRuleDefaults.TryValidateRule("[unterminated", out _));
         Assert.False(TerminalHighlightRuleDefaults.TryValidateRule(new string('a', TerminalHighlightRuleDefaults.MaxPatternLength + 1), out _));
         Assert.True(TerminalHighlightRuleDefaults.TryValidateRule(@"\bERROR\b", out _));
+        Assert.False(TerminalHighlightRuleDefaults.TryValidateRule("(a+)+$", out _));
+        Assert.False(TerminalHighlightRuleDefaults.TryValidateRule(@"(\w+)*x", out _));
+        Assert.False(TerminalHighlightRuleDefaults.TryValidateRule(@"(foo)\1", out _));
     }
 
     [Fact]
