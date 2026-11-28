@@ -4266,6 +4266,15 @@
                                             <TextBlock Text="{loc:Translate SettingsSshAgentPreferenceHint}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,4,0,0" TextWrapping="Wrap"/>
                                         </StackPanel>
                                         <StackPanel Margin="{StaticResource SettingsFieldGap}">
+                                            <TextBlock x:Name="Mw_SettingsSshAgentTimeoutLabel" Text="{loc:Translate SettingsLabelSshAgentLookupTimeout}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBox Text="{Binding Settings.SshAgentLookupTimeoutMsText, UpdateSourceTrigger=PropertyChanged}" Width="{StaticResource SettingsNumericFieldWidth}" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsSshAgentTimeoutLabel}"/>
+                                                <TextBlock Text="{loc:Translate SettingsUnitMs}" VerticalAlignment="Center" Margin="6,0,0,0" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" IsHitTestVisible="False"/>
+                                            </StackPanel>
+                                            <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[SshAgentLookupTimeoutMs]}"/>
+                                            <TextBlock Text="{loc:Translate SettingsSshAgentLookupTimeoutHint}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                        <StackPanel Margin="{StaticResource SettingsFieldGap}">
                                             <TextBlock x:Name="Mw_SettingsSshCryptoPolicyLabel" Text="{loc:Translate SettingsSshCryptoPolicyLabel}" Foreground="{DynamicResource TextSecondaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="0,0,0,4"/>
                                             <ComboBox SelectedValue="{Binding Settings.SshCryptoPolicy}" SelectedValuePath="Tag" MinWidth="260" HorizontalAlignment="Left" AutomationProperties.LabeledBy="{x:Reference Mw_SettingsSshCryptoPolicyLabel}"
                                                       AutomationProperties.HelpText="{loc:Translate SettingsSshCryptoPolicyHint}">

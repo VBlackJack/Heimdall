@@ -534,6 +534,20 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
     partial void OnSshHealthMonitorIntervalSecondsTextChanged(string value)
         => CommitNumericText(value, parsed => SshHealthMonitorIntervalSeconds = parsed);
 
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [SettingRangeOf(nameof(AppSettings.SshAgentLookupTimeoutMs))]
+    private int _sshAgentLookupTimeoutMs = AppSettings.DefaultSshAgentLookupTimeoutMs;
+
+    /// <summary>Text of the field that edits <see cref="SshAgentLookupTimeoutMs"/>.</summary>
+    [ObservableProperty]
+    [NotifyDataErrorInfo]
+    [CustomValidation(typeof(SettingsViewModel), nameof(ValidateWholeNumberText))]
+    private string _sshAgentLookupTimeoutMsText = string.Empty;
+
+    partial void OnSshAgentLookupTimeoutMsTextChanged(string value)
+        => CommitNumericText(value, parsed => SshAgentLookupTimeoutMs = parsed);
+
     /// <summary>Whether Heimdall imports the OpenSSH known_hosts file each time it starts.</summary>
     [ObservableProperty]
     private bool _syncKnownHostsAtStartup;
@@ -2025,6 +2039,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
             SshTmoutResetInterval = settings.SshTmoutResetIntervalSeconds;
             SshKeepAliveIntervalSeconds = settings.SshKeepAliveIntervalSeconds;
             SshHealthMonitorIntervalSeconds = settings.SshHealthMonitorIntervalSeconds;
+            SshAgentLookupTimeoutMs = settings.SshAgentLookupTimeoutMs;
             SyncKnownHostsAtStartup = settings.SyncKnownHostsAtStartup;
             SshAutoReconnect = settings.SshAutoReconnect;
             SshAutoReconnectAttempts = settings.SshAutoReconnectAttempts;
@@ -2290,6 +2305,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         SshAutoReconnectAttemptsText = SshAutoReconnectAttempts.ToString(CultureInfo.InvariantCulture);
         SshKeepAliveIntervalSecondsText = SshKeepAliveIntervalSeconds.ToString(CultureInfo.InvariantCulture);
         SshHealthMonitorIntervalSecondsText = SshHealthMonitorIntervalSeconds.ToString(CultureInfo.InvariantCulture);
+        SshAgentLookupTimeoutMsText = SshAgentLookupTimeoutMs.ToString(CultureInfo.InvariantCulture);
         SftpCompanionWidthPercentText = SftpCompanionWidthPercent.ToString(CultureInfo.InvariantCulture);
         CredentialProviderTimeoutMsText = CredentialProviderTimeoutMs.ToString(CultureInfo.InvariantCulture);
         VaultHelloMaxDaysBeforeMasterPasswordText = VaultHelloMaxDaysBeforeMasterPassword.ToString(CultureInfo.InvariantCulture);
@@ -2537,6 +2553,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         settings.SshTmoutResetIntervalSeconds = SshTmoutResetInterval;
         settings.SshKeepAliveIntervalSeconds = SshKeepAliveIntervalSeconds;
         settings.SshHealthMonitorIntervalSeconds = SshHealthMonitorIntervalSeconds;
+        settings.SshAgentLookupTimeoutMs = SshAgentLookupTimeoutMs;
         settings.SyncKnownHostsAtStartup = SyncKnownHostsAtStartup;
         settings.SshAutoReconnect = SshAutoReconnect;
         settings.SshAutoReconnectAttempts = SshAutoReconnectAttempts;
@@ -5169,6 +5186,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         [nameof(AppSettings.SessionHealthMaxConcurrent)] = "ValidationSettingsHealthMaxConcurrent",
         [nameof(AppSettings.SshKeepAliveIntervalSeconds)] = "ValidationSettingsSshKeepAlive",
         [nameof(AppSettings.SshHealthMonitorIntervalSeconds)] = "ValidationSettingsSshHealthMonitorInterval",
+        [nameof(AppSettings.SshAgentLookupTimeoutMs)] = "ValidationSettingsSshAgentLookupTimeout",
         [nameof(AppSettings.SftpCompanionWidthPercent)] = "ValidationSettingsSftpCompanionWidth",
         [nameof(AppSettings.CredentialProviderTimeoutMs)] = "ValidationSettingsCredProviderTimeout",
         [nameof(AppSettings.VaultHelloMaxDaysBeforeMasterPassword)] = "ValidationSettingsVaultHelloMaxDays",
@@ -5207,6 +5225,7 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         [nameof(AutoLockIdleMinutes)] = "SettingsAutoLockLabel",
         [nameof(SshKeepAliveIntervalSeconds)] = "SettingsLabelSshKeepAliveInterval",
         [nameof(SshHealthMonitorIntervalSeconds)] = "SettingsLabelSshHealthMonitorInterval",
+        [nameof(SshAgentLookupTimeoutMs)] = "SettingsLabelSshAgentLookupTimeout",
         [nameof(SftpCompanionWidthPercent)] = "SettingsLabelSftpCompanionWidth",
         [nameof(CredentialProviderTimeoutMs)] = "SettingsLabelCredProviderTimeout",
         [nameof(VaultHelloMaxDaysBeforeMasterPassword)] = "SettingsLabelVaultHelloMaxDays",
@@ -5240,6 +5259,8 @@ public partial class SettingsViewModel : ObservableValidator, IDisposable
         nameof(SshKeepAliveIntervalSecondsText),
         nameof(SshHealthMonitorIntervalSeconds),
         nameof(SshHealthMonitorIntervalSecondsText),
+        nameof(SshAgentLookupTimeoutMs),
+        nameof(SshAgentLookupTimeoutMsText),
         nameof(SftpCompanionWidthPercent),
         nameof(SftpCompanionWidthPercentText),
     ];

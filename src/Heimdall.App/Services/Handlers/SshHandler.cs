@@ -989,8 +989,9 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
             if (server.SshAgentKeyFingerprint is { } chosenFingerprint)
             {
                 SshAgentRegistry chosenRegistry = _agentRegistryFactory(settings.SshAgentPreference);
+                TimeSpan agentLookupTimeout = TimeSpan.FromMilliseconds(settings.SshAgentLookupTimeoutMs);
                 SshAgentKeyRefusal refusal;
-                if (await SshAgentKeyPreflight.LocateAsync(chosenFingerprint, chosenRegistry, ct: ct)
+                if (await SshAgentKeyPreflight.LocateAsync(chosenFingerprint, chosenRegistry, timeout: agentLookupTimeout, ct: ct)
                         .ConfigureAwait(false) is null)
                 {
                     refusal = SshAgentKeyRefusal.NotLoaded;
@@ -1001,6 +1002,7 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
                             chosenFingerprint,
                             chosenRegistry,
                             PageantAgent.AgentName,
+                            timeout: agentLookupTimeout,
                             ct: ct)
                         .ConfigureAwait(false);
                     refusal = SshAgentKeyPreflight.RefusalForPlink(

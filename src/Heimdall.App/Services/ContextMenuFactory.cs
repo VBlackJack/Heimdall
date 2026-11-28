@@ -157,6 +157,10 @@ public sealed class ContextMenuFactory
                 vm.Localize("TreeCtxCopySshCommand"),
                 vm.ServerList.CopySshCommandCommand,
                 server));
+            menu.Items.Add(CreateMenuItem(
+                vm.Localize("TreeCtxDeploySshKey"),
+                vm.ServerList.DeploySshPublicKeyCommand,
+                server));
         }
         menu.Items.Add(CreateMenuItem(
             vm.Localize("TreeCtxTestReachability"),

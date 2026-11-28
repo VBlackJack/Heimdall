@@ -54,8 +54,9 @@ internal sealed partial class SshHandler
         }
 
         SshAgentRegistry registry = _agentRegistryFactory(settings.SshAgentPreference);
+        TimeSpan agentLookupTimeout = TimeSpan.FromMilliseconds(settings.SshAgentLookupTimeoutMs);
         SshAgentIdentityMatch? chosen = await SshAgentKeyPreflight
-            .LocateAsync(fingerprint, registry, ct: ct)
+            .LocateAsync(fingerprint, registry, timeout: agentLookupTimeout, ct: ct)
             .ConfigureAwait(false);
         if (chosen is null)
         {
@@ -68,7 +69,7 @@ internal sealed partial class SshHandler
         if (server.SshAgentForwarding && registry.HasPlinkCompatibleAgent())
         {
             SshAgentIdentityMatch? pageantKey = await SshAgentKeyPreflight
-                .LocateAsync(fingerprint, registry, PageantAgent.AgentName, ct: ct)
+                .LocateAsync(fingerprint, registry, PageantAgent.AgentName, timeout: agentLookupTimeout, ct: ct)
                 .ConfigureAwait(false);
             SshAgentKeyRefusal refusal = SshAgentKeyPreflight.RefusalForPlink(
                 pageantKey,
@@ -102,6 +103,7 @@ internal sealed partial class SshHandler
                 server.SshAgentKeyFingerprint,
                 _agentRegistryFactory(settings.SshAgentPreference),
                 PageantAgent.AgentName,
+                timeout: TimeSpan.FromMilliseconds(settings.SshAgentLookupTimeoutMs),
                 ct: ct)
             .ConfigureAwait(false);
         return SshAgentKeyPreflight.RefusalForPlink(

@@ -175,6 +175,7 @@ internal sealed class SftpHandler : IProtocolHandler
             && await SshAgentKeyPreflight.LocateAsync(
                     chosenFingerprint,
                     _agentRegistryFactory(settings.SshAgentPreference),
+                    timeout: TimeSpan.FromMilliseconds(settings.SshAgentLookupTimeoutMs),
                     ct: ct)
                 .ConfigureAwait(false) is null)
         {

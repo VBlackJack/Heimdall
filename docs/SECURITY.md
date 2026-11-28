@@ -187,19 +187,31 @@ V2 path.
 
 OpenSSH v01 host certificates are parsed (`OpenSshCertificateParser`) and
 cryptographically verified (`OpenSshCertificateVerifier`) against
-`@cert-authority` and `@revoked` policy entries loaded from `known_hosts`
-(on import and during opt-in startup sync, and summarized via an active policy
-badge in `Settings > SSH & SFTP > Trusted host keys`). Verification checks the
-CA signature, principal matching, validity window, ECDSA curve and `mpint`
-encodings, and rejects unsupported `CriticalOptions`. A valid certificate signed
-by a trusted `@cert-authority` is auto-trusted without a TOFU prompt; conversely,
-an invalid, expired, or tampered certificate signed by a trusted `@cert-authority`
-is hard-rejected with no TOFU fallback. `@revoked` entries are checked against
-the presented certificate, its signing CA, and its subject key fingerprint.
+`@cert-authority` and `@revoked` policy entries persisted in `settings.json`
+(`trustedCertAuthorities` / `revokedHostKeys`), loaded from `known_hosts`
+(on confirmed import and during opt-in startup sync), and managed directly in
+`Settings > SSH & SFTP > Trusted host keys`. Verification checks the CA
+signature, exact case-insensitive principal matching per OpenSSH
+`PROTOCOL.certkeys`, validity window, ECDSA curve and `mpint` encodings, and
+rejects unsupported `CriticalOptions`. A valid certificate signed by a trusted
+`@cert-authority` is auto-trusted without a TOFU prompt; conversely, an
+invalid, expired, or tampered certificate signed by a trusted `@cert-authority`
+is hard-rejected with `SshFailureCode.HostCertificateInvalid` and no TOFU
+fallback or auto-reconnect. `@revoked` entries are enforced fail-closed across
+the presented certificate, its signing CA, its subject key fingerprint, hashed
+`known_hosts` tokens, and Plink host-key decisions (`SshFailureCode.HostKeyRevoked`,
+suppressing prompts and auto-reconnect).
 
-Companion SFTP panes reuse the sibling SSH session's verified host-key trust via
-`PreResolvedHostKeyVerifier` instead of running a redundant network probe, while
-still enforcing `@revoked` checks.
+Companion SFTP panes reuse the sibling SSH session's verified host-key trust
+(including CA-trusted `HostKeyBlob` pinning) via `PreResolvedHostKeyVerifier`
+instead of running a redundant network probe, while still enforcing `@revoked`
+checks.
+
+SSH transport cryptography can be hardened globally or per profile via
+`SshCryptoPolicy` (`Standard`, `StrictModern` stripping weak SHA-1/CBC/3DES/RC4/Blowfish/DSS/`ssh-rsa`
+algorithms, or `LegacyCompatible`). Optional remote-to-local OSC 52 clipboard
+writes in the embedded terminal are disabled by default (`TerminalAllowOsc52Clipboard`),
+strictly refuse clipboard read queries (`?`), and cap decoded payloads at 128 KiB.
 
 When importing OpenSSH configuration files, `OpenSshConfigParser.ParseFile`
 expands recursive `Include` directives (with globbing) under strict security

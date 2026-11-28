@@ -170,6 +170,9 @@ public sealed class AppSettings
     public const int DefaultSshHealthMonitorIntervalSeconds = 15;
     [SettingRange(5, 300)]
     public int SshHealthMonitorIntervalSeconds { get; set; } = DefaultSshHealthMonitorIntervalSeconds;
+    public const int DefaultSshAgentLookupTimeoutMs = 750;
+    [SettingRange(250, 15000)]
+    public int SshAgentLookupTimeoutMs { get; set; } = DefaultSshAgentLookupTimeoutMs;
     public const int DefaultPlinkPortCheckIntervalMs = 2000;
     [SettingRange(500, 30000)]
     public int PlinkPortCheckIntervalMs { get; set; } = DefaultPlinkPortCheckIntervalMs;

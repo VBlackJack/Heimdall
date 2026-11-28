@@ -305,6 +305,114 @@
                         </ItemsControl>
                     </StackPanel>
                 </Border>
+
+                <!-- Live SSH Agent Inspector -->
+                <Border x:Name="AgentInspectorPanel" Grid.Row="5"
+                        Padding="{StaticResource SpacingMd}"
+                        Background="{DynamicResource SurfaceBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="1" CornerRadius="{StaticResource CornerRadiusSm}"
+                        Margin="{StaticResource MarginSectionBottom}">
+                    <StackPanel>
+                        <DockPanel Margin="{StaticResource MarginStackItem}">
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                <Button x:Name="BtnLoadKeyFileToAgent"
+                                        Click="OnLoadKeyFileToAgentClick"
+                                        Style="{DynamicResource SecondaryButtonStyle}"
+                                        Padding="{StaticResource PaddingButtonCopy}" Margin="{StaticResource MarginInlineControl}"/>
+                                <Button x:Name="BtnRefreshAgentInspector"
+                                        Click="OnRefreshAgentInspectorClick"
+                                        Style="{DynamicResource SecondaryButtonStyle}"
+                                        Padding="{StaticResource PaddingButtonCopy}" Margin="{StaticResource MarginInlineControl}"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock x:Name="AgentInspectorTitle"
+                                           Foreground="{DynamicResource TextPrimaryBrush}"
+                                           FontWeight="SemiBold"
+                                           VerticalAlignment="Center"/>
+                                <TextBlock x:Name="AgentInspectorSummary"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           FontSize="{StaticResource FontSizeCaption}"
+                                           Margin="8,0,0,0"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </DockPanel>
+                        <TextBlock x:Name="AgentInspectorEmptyText"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                   FontSize="{StaticResource FontSizeCaption}"
+                                   Margin="0,4,0,0"
+                                   TextWrapping="Wrap"/>
+                        <ItemsControl x:Name="AgentKeysList" Margin="0,6,0,0">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="{DynamicResource CardBrush}"
+                                            BorderBrush="{DynamicResource BorderBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="{StaticResource CornerRadiusSm}"
+                                            Padding="8,6"
+                                            Margin="0,0,0,6">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding AgentName}"
+                                                               FontSize="{StaticResource FontSizeCaption}"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource AccentTextBrush}"
+                                                               Margin="0,0,8,0"/>
+                                                    <TextBlock Text="{Binding KeyType}"
+                                                               FontFamily="{StaticResource FontFamilyMonospace}"
+                                                               FontSize="{StaticResource FontSizeCaption}"
+                                                               Foreground="{DynamicResource TextPrimaryBrush}"
+                                                               Margin="0,0,8,0"/>
+                                                    <TextBlock Text="{Binding Comment}"
+                                                               FontSize="{StaticResource FontSizeCaption}"
+                                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                                               TextTrimming="CharacterEllipsis"/>
+                                                </StackPanel>
+                                                <TextBlock Text="{Binding Fingerprint}"
+                                                           FontFamily="{StaticResource FontFamilyMonospace}"
+                                                           FontSize="{StaticResource FontSizeCaption}"
+                                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                                           Margin="0,2,0,0"/>
+                                                <TextBlock Text="{Binding MatchedProfilesText}"
+                                                           FontSize="{StaticResource FontSizeCaption}"
+                                                           Foreground="{DynamicResource TextTertiaryBrush}"
+                                                           Margin="0,2,0,0"
+                                                           Visibility="{Binding HasMatchedProfiles, Converter={StaticResource BoolToVisibilityConverter}}"/>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0,0,0">
+                                                <Button Content="{Binding AuditLabel}"
+                                                        Tag="{Binding}"
+                                                        Click="OnAgentRowAuditClick"
+                                                        Style="{DynamicResource SecondaryButtonStyle}"
+                                                        Padding="6,2"
+                                                        FontSize="{StaticResource FontSizeCaption}"
+                                                        Margin="0,0,4,0"/>
+                                                <Button Content="{Binding DeployLabel}"
+                                                        Tag="{Binding}"
+                                                        Click="OnAgentRowDeployClick"
+                                                        Style="{DynamicResource SecondaryButtonStyle}"
+                                                        Padding="6,2"
+                                                        FontSize="{StaticResource FontSizeCaption}"
+                                                        Margin="0,0,4,0"/>
+                                                <Button Content="{Binding RemoveLabel}"
+                                                        Tag="{Binding}"
+                                                        Click="OnAgentRowRemoveClick"
+                                                        Style="{StaticResource GhostButtonStyle}"
+                                                        Padding="6,2"
+                                                        FontSize="{StaticResource FontSizeCaption}"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
             </Grid>
         </ScrollViewer>
     </Grid>

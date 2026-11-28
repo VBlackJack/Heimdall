@@ -40,6 +40,8 @@ using Heimdall.Core.SessionHealth;
 using Heimdall.Core.Ssh;
 using Heimdall.Core.StateMachine;
 using Heimdall.Core.Utilities;
+using Heimdall.Ssh;
+using Heimdall.Ssh.Agents;
 using Microsoft.Win32;
 using KnownHostsImporter = Heimdall.App.Services.Import.KnownHostsImporter;
 
@@ -2695,6 +2697,106 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         Clipboard.SetText(command);
         StatusMessageRequested?.Invoke(
             _localizer.Format("StatusCopiedToClipboard", command));
+    }
+
+    [RelayCommand]
+    private async Task DeploySshPublicKeyAsync(ServerItemViewModel? server)
+    {
+        if (server is null
+            || !string.Equals(server.ConnectionType, "SSH", StringComparison.OrdinalIgnoreCase)
+            || string.IsNullOrWhiteSpace(server.RemoteServer))
+        {
+            return;
+        }
+
+        try
+        {
+            var settings = await _configManager.LoadSettingsAsync().ConfigureAwait(true);
+            var targetDto = await _profileLookup.FindAsync(server.Id).ConfigureAwait(true);
+            if (targetDto is null)
+            {
+                return;
+            }
+
+            settings = _profileLookup.EffectiveSettingsFor(targetDto, settings);
+
+            var loadedKeys = await Task.Run(() =>
+                SshAgentInspector.ListLoadedKeys(SshAgentRegistry.CreateDefault(settings.SshAgentPreference)))
+                .ConfigureAwait(true);
+
+            var choices = new List<string> { _localizer["TreeCtxDeploySshKeyBrowsePubFile"] };
+            foreach (var key in loadedKeys)
+            {
+                choices.Add(string.IsNullOrWhiteSpace(key.Comment)
+                    ? $"{key.AgentName}: {key.KeyType} ({key.Fingerprint})"
+                    : $"{key.AgentName}: {key.KeyType} - {key.Comment} ({key.Fingerprint})");
+            }
+
+            string? publicKeyLine = null;
+            if (choices.Count == 1)
+            {
+                publicKeyLine = PromptForPublicKeyFile();
+            }
+            else
+            {
+                var picked = await _dialogService.ShowChoiceAsync(
+                    _localizer["TreeCtxDeploySshKeyPickTitle"],
+                    _localizer.Format("TreeCtxDeploySshKeyPickPrompt", targetDto.DisplayName),
+                    choices,
+                    defaultIndex: 0,
+                    cancelLabel: _localizer["BtnCancel"]).ConfigureAwait(true);
+
+                if (picked is not int choiceIndex || choiceIndex < 0)
+                {
+                    return;
+                }
+
+                publicKeyLine = choiceIndex == 0
+                    ? PromptForPublicKeyFile()
+                    : loadedKeys[choiceIndex - 1].PublicKeyOpenSsh;
+            }
+
+            if (string.IsNullOrWhiteSpace(publicKeyLine))
+            {
+                return;
+            }
+
+            var services = (Application.Current as App)?.Services;
+            await SshPublicKeyDeployUiHelper.DeployToServerAsync(
+                    services,
+                    targetDto,
+                    settings,
+                    publicKeyLine,
+                    _localizer,
+                    status => StatusMessageRequested?.Invoke(status))
+                .ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Warn($"Context-menu SSH public key deploy failed: {ex.Message}");
+            StatusMessageRequested?.Invoke(_localizer.Format("ToolSshKeyGenDeployFailed", ex.Message));
+        }
+    }
+
+    private string? PromptForPublicKeyFile()
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = _localizer["TreeCtxDeploySshKeyPickTitle"],
+            Filter = _localizer["TreeCtxDeploySshKeyPubFilter"],
+            CheckFileExists = true
+        };
+
+        if (dialog.ShowDialog() != true)
+        {
+            return null;
+        }
+
+        var content = File.ReadAllText(dialog.FileName).Trim();
+        var firstNonEmptyLine = content
+            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
+            .FirstOrDefault(static line => !string.IsNullOrWhiteSpace(line));
+        return firstNonEmptyLine?.Trim();
     }
 
     [RelayCommand]

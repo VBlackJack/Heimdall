@@ -207,22 +207,33 @@ le chemin V2.
 
 Les certificats d'hôte OpenSSH v01 sont analysés (`OpenSshCertificateParser`) et
 vérifiés cryptographiquement (`OpenSshCertificateVerifier`) au regard des
-entrées de politique `@cert-authority` et `@revoked` chargées depuis
-`known_hosts` (à l'import et lors de la synchronisation optionnelle au
-démarrage, puis synthétisées par un badge de politique active dans
-`Settings > SSH & SFTP > Trusted host keys`). La vérification contrôle la
-signature de l'AC, la correspondance des principaux, la fenêtre de validité, la
+entrées de politique `@cert-authority` et `@revoked` persistées dans
+`settings.json` (`trustedCertAuthorities` / `revokedHostKeys`), chargées depuis
+`known_hosts` (à l'import confirmé et lors de la synchronisation optionnelle au
+démarrage), et gérées directement dans `Settings > SSH & SFTP > Trusted host keys`.
+La vérification contrôle la signature de l'AC, la correspondance exacte insensible
+à la casse des principaux selon `PROTOCOL.certkeys`, la fenêtre de validité, la
 courbe ECDSA et l'encodage `mpint`, et rejette les `CriticalOptions` non pris en
 charge. Un certificat valide signé par une `@cert-authority` approuvée est
 accepté automatiquement sans invite TOFU ; à l'inverse, un certificat invalide,
 expiré ou altéré signé par une `@cert-authority` approuvée est rejeté strictement
-sans repli TOFU. Les entrées `@revoked` sont vérifiées sur les empreintes du
-certificat présenté, de son AC signataire et de sa clé de sujet.
+avec `SshFailureCode.HostCertificateInvalid`, sans repli TOFU ni reconnexion
+automatique. Les entrées `@revoked` sont appliquées en mode fail-closed sur le
+certificat présenté, son AC signataire, l'empreinte de la clé du sujet, les jetons
+`known_hosts` hachés et les décisions Plink (`SshFailureCode.HostKeyRevoked`,
+sans invite ni reconnexion automatique).
 
 Les volets SFTP compagnons réutilisent la confiance de clé d'hôte vérifiée par
-la session SSH voisine via `PreResolvedHostKeyVerifier` au lieu d'exécuter une
-sonde réseau redondante, tout en continuant d'appliquer les vérifications
-`@revoked`.
+la session SSH voisine (y compris l'épinglage `HostKeyBlob` des certificats CA)
+via `PreResolvedHostKeyVerifier` au lieu d'exécuter une sonde réseau redondante,
+tout en continuant d'appliquer les vérifications `@revoked`.
+
+La cryptographie du transport SSH peut être durcie globalement ou par profil via
+`SshCryptoPolicy` (`Standard`, `StrictModern` retirant les algorithmes faibles
+SHA-1/CBC/3DES/RC4/Blowfish/DSS/`ssh-rsa`, ou `LegacyCompatible`). L'écriture
+presse-papiers distante OSC 52 dans le terminal embarqué est désactivée par défaut
+(`TerminalAllowOsc52Clipboard`), refuse strictement les requêtes de lecture (`?`)
+et plafonne les charges décodées à 128 Kio.
 
 Lors de l'import de fichiers de configuration OpenSSH,
 `OpenSshConfigParser.ParseFile` développe les directives `Include` récursives

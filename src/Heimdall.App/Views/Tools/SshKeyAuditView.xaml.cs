@@ -55,6 +55,20 @@ public partial class SshKeyAuditView : UserControl, IToolView
         public Brush IconBrush { get; init; } = Brushes.Transparent;
     }
 
+    private sealed class AgentKeyRowItem
+    {
+        public required SshAgentKeyInfo Key { get; init; }
+        public string AgentName => Key.AgentName;
+        public string KeyType => Key.KeyType;
+        public string Fingerprint => Key.Fingerprint;
+        public string Comment => Key.Comment;
+        public string MatchedProfilesText { get; init; } = string.Empty;
+        public bool HasMatchedProfiles => !string.IsNullOrWhiteSpace(MatchedProfilesText);
+        public string AuditLabel { get; init; } = string.Empty;
+        public string DeployLabel { get; init; } = string.Empty;
+        public string RemoveLabel { get; init; } = string.Empty;
+    }
+
     public SshKeyAuditView()
     {
         InitializeComponent();
@@ -77,6 +91,7 @@ public partial class SshKeyAuditView : UserControl, IToolView
 
         _vm.Initialize(localizer);
         ApplyLocalization();
+        _ = RefreshAgentInspectorAsync();
 
         Dispatcher.BeginInvoke(DispatcherPriority.Loaded, () =>
         {
@@ -94,6 +109,10 @@ public partial class SshKeyAuditView : UserControl, IToolView
         BtnRemoveFromAgent.Content = L("ToolSshAuditBtnRemoveAgent");
         BtnClearAgent.Content = L("ToolSshAuditBtnClearAgent");
         BtnDeployKey.Content = L("ToolSshKeyGenBtnDeploy");
+        AgentInspectorTitle.Text = L("ToolSshAuditAgentInspectorTitle");
+        BtnRefreshAgentInspector.Content = L("ToolSshAuditAgentInspectorRefresh");
+        BtnLoadKeyFileToAgent.Content = L("ToolSshAuditAgentInspectorLoadFile");
+        AgentInspectorEmptyText.Text = L("ToolSshAuditAgentInspectorEmpty");
         EmptyState.Text = L("ToolSshAuditEmptyState");
         ParseError.Text = L("ToolSshAuditParseError");
         BtnCopyFingerprint.Content = L("ToolSshAuditBtnCopy");
@@ -112,6 +131,8 @@ public partial class SshKeyAuditView : UserControl, IToolView
         System.Windows.Automation.AutomationProperties.SetName(BtnRemoveFromAgent, L("ToolSshAuditBtnRemoveAgent"));
         System.Windows.Automation.AutomationProperties.SetName(BtnClearAgent, L("ToolSshAuditBtnClearAgent"));
         System.Windows.Automation.AutomationProperties.SetName(BtnDeployKey, L("ToolSshKeyGenBtnDeploy"));
+        System.Windows.Automation.AutomationProperties.SetName(BtnRefreshAgentInspector, L("ToolSshAuditAgentInspectorRefresh"));
+        System.Windows.Automation.AutomationProperties.SetName(BtnLoadKeyFileToAgent, L("ToolSshAuditAgentInspectorLoadFile"));
         System.Windows.Automation.AutomationProperties.SetName(BtnCopyFingerprint, L("ToolSshAuditBtnCopy"));
         System.Windows.Automation.AutomationProperties.SetName(KeyInput, L("ToolSshAuditInput"));
         System.Windows.Automation.AutomationProperties.SetName(DetailFingerprintValue, L("ToolSshAuditFingerprint"));
@@ -392,6 +413,7 @@ public partial class SshKeyAuditView : UserControl, IToolView
                     ? string.Format(CultureInfo.CurrentCulture, L("ToolSshAgentRemoveSuccess"), chosen.Fingerprint)
                     : string.Format(CultureInfo.CurrentCulture, L("ToolSshAgentRemoveFailed"), SshAgentErrorLocalizer.Format(result, _localizer)),
                 isError: !result.Success);
+            await RefreshAgentInspectorAsync().ConfigureAwait(true);
         }
         catch (Exception ex)
         {
@@ -439,6 +461,7 @@ public partial class SshKeyAuditView : UserControl, IToolView
                     ? L("ToolSshAgentClearSuccess")
                     : string.Format(CultureInfo.CurrentCulture, L("ToolSshAgentClearFailed"), SshAgentErrorLocalizer.Format(result, _localizer)),
                 isError: !result.Success);
+            await RefreshAgentInspectorAsync().ConfigureAwait(true);
         }
         catch (Exception ex)
         {
@@ -450,6 +473,275 @@ public partial class SshKeyAuditView : UserControl, IToolView
         finally
         {
             BtnClearAgent.IsEnabled = true;
+        }
+    }
+
+    private async void OnRefreshAgentInspectorClick(object sender, RoutedEventArgs e)
+    {
+        await RefreshAgentInspectorAsync().ConfigureAwait(true);
+    }
+
+    private async Task RefreshAgentInspectorAsync()
+    {
+        var services = (Application.Current as App)?.Services;
+        var configManager = services?.GetService<IConfigManager>();
+
+        BtnRefreshAgentInspector.IsEnabled = false;
+        try
+        {
+            var preference = await ResolveAgentPreferenceAsync(configManager).ConfigureAwait(true);
+            var loadedKeys = await Task.Run(() =>
+                SshAgentInspector.ListLoadedKeys(SshAgentRegistry.CreateDefault(preference))).ConfigureAwait(true);
+
+            var profileNamesByFp = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+            if (configManager is not null)
+            {
+                try
+                {
+                    var servers = await configManager.LoadServersAsync().ConfigureAwait(true);
+                    var settings = await configManager.LoadSettingsAsync().ConfigureAwait(true);
+                    foreach (var s in servers)
+                    {
+                        if (!string.IsNullOrWhiteSpace(s.SshAgentKeyFingerprint))
+                        {
+                            if (!profileNamesByFp.TryGetValue(s.SshAgentKeyFingerprint, out var list))
+                            {
+                                list = [];
+                                profileNamesByFp[s.SshAgentKeyFingerprint] = list;
+                            }
+
+                            list.Add(s.DisplayName);
+                        }
+                    }
+
+                    foreach (var gw in settings.SshGateways)
+                    {
+                        if (!string.IsNullOrWhiteSpace(gw.SshAgentKeyFingerprint))
+                        {
+                            if (!profileNamesByFp.TryGetValue(gw.SshAgentKeyFingerprint, out var list))
+                            {
+                                list = [];
+                                profileNamesByFp[gw.SshAgentKeyFingerprint] = list;
+                            }
+
+                            list.Add(string.IsNullOrWhiteSpace(gw.Name) ? gw.Host : gw.Name);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Core.Logging.FileLogger.Debug($"SSH agent inspector profile correlation failed: {ex.Message}");
+                }
+            }
+
+            var auditLabel = L("ToolSshAuditAgentInspectorBtnAudit");
+            var deployLabel = L("ToolSshAuditAgentInspectorBtnDeploy");
+            var removeLabel = L("ToolSshAuditAgentInspectorBtnRemove");
+
+            var rows = loadedKeys.Select(k =>
+            {
+                var matchedText = profileNamesByFp.TryGetValue(k.Fingerprint, out var names) && names.Count > 0
+                    ? string.Format(
+                        CultureInfo.CurrentCulture,
+                        L("ToolSshAuditAgentInspectorProfilesFormat"),
+                        string.Join(", ", names.Distinct(StringComparer.OrdinalIgnoreCase).Take(6)))
+                    : string.Empty;
+
+                return new AgentKeyRowItem
+                {
+                    Key = k,
+                    MatchedProfilesText = matchedText,
+                    AuditLabel = auditLabel,
+                    DeployLabel = deployLabel,
+                    RemoveLabel = removeLabel
+                };
+            }).ToList();
+
+            AgentKeysList.ItemsSource = rows;
+            AgentInspectorSummary.Text = string.Format(
+                CultureInfo.CurrentCulture,
+                L("ToolSshAuditAgentInspectorSummary"),
+                rows.Count);
+            AgentInspectorEmptyText.Visibility = rows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"SSH agent inspector refresh failed: {ex.Message}");
+            AgentKeysList.ItemsSource = Array.Empty<AgentKeyRowItem>();
+            AgentInspectorEmptyText.Visibility = Visibility.Visible;
+        }
+        finally
+        {
+            BtnRefreshAgentInspector.IsEnabled = true;
+        }
+    }
+
+    private void OnAgentRowAuditClick(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.Tag is AgentKeyRowItem row)
+        {
+            _vm.KeyText = row.Key.PublicKeyOpenSsh;
+        }
+    }
+
+    private async void OnAgentRowDeployClick(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.Tag is not AgentKeyRowItem row || _localizer is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var services = (Application.Current as App)?.Services;
+            await SshPublicKeyDeployUiHelper.DeployInteractivelyAsync(
+                    services,
+                    row.Key.PublicKeyOpenSsh,
+                    _localizer,
+                    status =>
+                    {
+                        bool isErr = status.StartsWith(
+                            L("ToolSshKeyGenDeployFailed").Split('{')[0],
+                            StringComparison.OrdinalIgnoreCase);
+                        _vm.ShowStatus(status, isErr);
+                    })
+                .ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"SSH agent key deploy failed: {ex.Message}");
+            _vm.ShowStatus(string.Format(CultureInfo.CurrentCulture, L("ToolSshKeyGenDeployFailed"), ex.Message), isError: true);
+        }
+    }
+
+    private async void OnAgentRowRemoveClick(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.Tag is not AgentKeyRowItem row)
+        {
+            return;
+        }
+
+        var services = (Application.Current as App)?.Services;
+        var configManager = services?.GetService<IConfigManager>();
+        try
+        {
+            var preference = await ResolveAgentPreferenceAsync(configManager).ConfigureAwait(true);
+            var result = await Task.Run(() => SshAgentManager.RemoveKeyByFingerprint(
+                SshAgentRegistry.CreateDefault(preference),
+                row.Key.Fingerprint,
+                row.Key.AgentName)).ConfigureAwait(true);
+
+            _vm.ShowStatus(
+                result.Success
+                    ? string.Format(CultureInfo.CurrentCulture, L("ToolSshAgentRemoveSuccess"), row.Key.Fingerprint)
+                    : string.Format(CultureInfo.CurrentCulture, L("ToolSshAgentRemoveFailed"), SshAgentErrorLocalizer.Format(result, _localizer)),
+                isError: !result.Success);
+            await RefreshAgentInspectorAsync().ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"SSH agent key removal failed: {ex.Message}");
+            _vm.ShowStatus(string.Format(CultureInfo.CurrentCulture, L("ToolSshAgentRemoveFailed"), ex.Message), isError: true);
+        }
+    }
+
+    private async void OnLoadKeyFileToAgentClick(object sender, RoutedEventArgs e)
+    {
+        var services = (Application.Current as App)?.Services;
+        var configManager = services?.GetService<IConfigManager>();
+        var dialogService = services?.GetService<IDialogService>();
+
+        var openDialog = new OpenFileDialog
+        {
+            Filter = L(KeyFileFilterKey),
+            CheckFileExists = true
+        };
+
+        if (openDialog.ShowDialog(Window.GetWindow(this)) != true)
+        {
+            return;
+        }
+
+        BtnLoadKeyFileToAgent.IsEnabled = false;
+        try
+        {
+            var keyContent = await System.IO.File.ReadAllTextAsync(openDialog.FileName).ConfigureAwait(true);
+            uint? lifetimeSeconds = null;
+            if (dialogService is not null)
+            {
+                var ttlChoices = new List<string>
+                {
+                    L("ToolSshAgentTtlSession"),
+                    L("ToolSshAgentTtl1h"),
+                    L("ToolSshAgentTtl4h"),
+                    L("ToolSshAgentTtl8h")
+                };
+
+                var picked = await dialogService.ShowChoiceAsync(
+                    L("ToolSshAuditAgentInspectorLoadFile"),
+                    L("ToolSshAgentTtlPrompt"),
+                    ttlChoices,
+                    defaultIndex: 0,
+                    cancelLabel: L("BtnCancel")).ConfigureAwait(true);
+
+                if (picked is not int choiceIndex)
+                {
+                    return;
+                }
+
+                lifetimeSeconds = choiceIndex switch
+                {
+                    1 => 3600u,
+                    2 => 14400u,
+                    3 => 28800u,
+                    _ => null
+                };
+            }
+
+            var preference = await ResolveAgentPreferenceAsync(configManager).ConfigureAwait(true);
+            var comment = System.IO.Path.GetFileName(openDialog.FileName);
+            var result = await Task.Run(() => SshAgentManager.AddKey(
+                SshAgentRegistry.CreateDefault(preference),
+                keyContent,
+                passphrase: null,
+                comment,
+                lifetimeSeconds)).ConfigureAwait(true);
+
+            if (!result.Success && dialogService is not null && result.ErrorCode == SshAgentOperationErrorCode.Exception)
+            {
+                var passphrase = await dialogService.ShowPasswordInputAsync(
+                    L("ToolSshAuditAgentLoadPassphraseTitle"),
+                    string.Format(CultureInfo.CurrentCulture, L("ToolSshAuditAgentLoadPassphrasePrompt"), comment))
+                    .ConfigureAwait(true);
+
+                if (passphrase is null)
+                {
+                    return;
+                }
+
+                result = await Task.Run(() => SshAgentManager.AddKey(
+                    SshAgentRegistry.CreateDefault(preference),
+                    keyContent,
+                    passphrase,
+                    comment,
+                    lifetimeSeconds)).ConfigureAwait(true);
+            }
+
+            _vm.ShowStatus(
+                result.Success
+                    ? string.Format(CultureInfo.CurrentCulture, L("ToolSshAgentAddSuccess"), result.AgentName ?? string.Empty)
+                    : string.Format(CultureInfo.CurrentCulture, L("ToolSshAgentAddFailed"), SshAgentErrorLocalizer.Format(result, _localizer)),
+                isError: !result.Success);
+            await RefreshAgentInspectorAsync().ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            Core.Logging.FileLogger.Warn($"SSH agent load key file failed: {ex.Message}");
+            _vm.ShowStatus(string.Format(CultureInfo.CurrentCulture, L("ToolSshAgentAddFailed"), ex.Message), isError: true);
+        }
+        finally
+        {
+            BtnLoadKeyFileToAgent.IsEnabled = true;
         }
     }
 

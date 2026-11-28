@@ -40,6 +40,15 @@ All notable changes to Heimdall are documented in this file.
 - Added safe recursive `Include` expansion (`OpenSshConfigParser.ParseFile` in `OpenSshConfigParser.Includes.cs`) with globbing and depth, file-count, size, cycle, traversal, ancestor-reparse-point, UNC (`\\` and `//`), and `Match`-scope guards.
 - Added a confirmed **Clear Agent** action in `SshKeyAuditView` and classified Pageant TTL refusals distinctly (`LifetimeNotSupported`).
 
+### Phase 4: Audit remediation, crypto policies, PKI management, user certificates, PPK v3, OSC 52, and live agent inspector
+
+- Enforced fail-closed `@revoked` checks on Plink host-key decisions and hashed `known_hosts` tokens (`IHostKeyTrustService.IsRevoked`, `OpenSshHostPatternMatcher`), tightened OpenSSH certificate principal matching to exact case-insensitive comparison, added non-reconnectable `HostKeyRevoked` and `HostCertificateInvalid` failure codes, persisted `@cert-authority`/`@revoked` policy rules and multi-algorithm additional host keys in `AppSettings`, removed parse-time trust mutation from `KnownHostsImporter`, and pinned CA-trusted `HostKeyBlob` across companion SFTP handoffs.
+- Scoped `OpenSshConfigParser` `Include` directives so trailing `Host`/`Match` blocks cannot leak into parent directives, wired direct `-L`/`-D`/`-R` arguments on Plink/PuTTY sessions, isolated remote-only `-R` tunnel tracking keys in `TunnelManager`, tore down session port forwards on remote disconnect with failure warnings, added `CommandTimeout` and `csh`/`tcsh`-safe `env LC_ALL=C` execution to `ServerHealthMonitor` and `SshPublicKeyDeployer` (with gateway tunnel support and `<keyType> <keyBlob>` deduplication).
+- Enabled native SSH.NET `zlib@openssh.com` compression, added configurable `SshCryptoPolicy` (`Standard`, `StrictModern` SecNumCloud/ANSSI, `LegacyCompatible`) globally and per profile, surfaced a post-quantum hybrid KEX badge in the SSH toolbar, and unified SSH agent error localization.
+- Added interactive `@cert-authority` and `@revoked` PKI management in `Settings > SSH & SFTP > Trusted host keys`, OpenSSH user certificate (`-cert.pub` / `CertificateFile`) authentication with auto-discovery and config import/export, and PuTTY PPK v3 (`Argon2id` + `aes256-cbc` + `HMAC-SHA-256`) export in `SshKeyPairGenerator`.
+- Added configurable terminal regex highlight rules (`TerminalHighlightRuleDto`) in Settings, opt-in write-only OSC 52 clipboard bridging (strictly blocking `?` read queries and capping payload at 128 KiB), session-bound direct forwards visibility in the Tunnels panel, and `/proc/net/dev` network RX/TX rates plus configurable poll interval in `ServerHealthMonitor`.
+- Added configurable SSH agent lookup timeout (`SshAgentLookupTimeoutMs`), context-menu **Deploy SSH public key...** on SSH profiles, and a live **Loaded SSH Agents** inspector panel in `SshKeyAuditView`.
+
 ## 2026-11-27: Reused RDP controls, keyboard after a tab close, self-update relaunch waits on the application (v2026.112701)
 
 Merged as #906 to #909. The user-facing summary is in the release notes.
