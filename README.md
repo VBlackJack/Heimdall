@@ -64,8 +64,9 @@ It is free, open source, and runs on Windows 10 and 11.
   a tree that opens where you left it. Remove active filters individually, act on several
   sessions from the selection toolbar, and undo the latest move, inline rename or reorder.
 - **Trust you can audit.** SSH host keys are pinned the first time you connect and shown for you
-  to compare; a key that changes is refused by default, and your `~/.ssh/known_hosts` can be
-  imported and exported so OpenSSH and Heimdall agree on who is who.
+  to compare; a key that changes is refused by default, OpenSSH host certificates (`@cert-authority`
+  and `@revoked`) are verified cryptographically, and your `~/.ssh/known_hosts` can be imported and
+  exported so OpenSSH and Heimdall agree on who is who.
 - **Nothing to install alongside it.** Both downloads are self-contained.
 - **Understand a failed connection.** Test each SSH gateway hop before connecting, edit a
   disconnected SSH or SFTP profile from its tab, and copy an anonymized RDP diagnostic for support.

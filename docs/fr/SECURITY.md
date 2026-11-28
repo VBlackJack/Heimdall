@@ -105,7 +105,9 @@ Les chemins de code RDP, SSH, SFTP et de gestion d'identifiants ne journalisent
 jamais les noms d'utilisateur, les domaines, la présence d'un mot de passe, la
 longueur d'un mot de passe, les mots de passe, les phrases secrètes ni le
 contenu des champs de saisie d'identifiants. Les lignes de journal de connexion
-peuvent identifier uniquement l'hôte cible et le protocole.
+peuvent identifier uniquement l'hôte cible et le protocole. Côté SSH, un test
+de garde statique dédié vérifie que les chemins de connexion SSH n'interpolent
+ni ne journalisent jamais de nom d'utilisateur.
 
 `CredentialAutofill.cs` est l'exemple RDP canonique. Depuis `1d7c78c`, les
 diagnostics d'énumération des brokers sont émis sous la forme d'une entrée
@@ -195,11 +197,40 @@ mener une session SSH interactive normale afin que la clé d'hôte soit capturé
 dans `HostKeyStore` par le chemin de confiance confirmée.
 
 Les entrées de confiance portent des métadonnées (`FirstSeen`, `LastSeen`,
-`Algorithm`, `Source`, `PublicKeyBase64`) via `HostKeyEntry`. La persistance
-est additive : `trustedHostKeysV2` dans `settings.json` contient les entrées
-enrichies ; l'ancien dictionnaire de chaînes `trustedHostKeys` reste lisible
-pour la sûreté en cas de retour arrière et n'est jamais réécrit depuis le
-chemin V2.
+`Algorithm`, `Source`, `PublicKeyBase64`) via `HostKeyEntry`. Un même hôte peut
+épingler plusieurs algorithmes de clé d'hôte simultanément, et les Paramètres
+permettent de révoquer un algorithme précis sans effacer les autres. La
+persistance est additive : `trustedHostKeysV2` dans `settings.json` contient les
+entrées enrichies ; l'ancien dictionnaire de chaînes `trustedHostKeys` reste
+lisible pour la sûreté en cas de retour arrière et n'est jamais réécrit depuis
+le chemin V2.
+
+Les certificats d'hôte OpenSSH v01 sont analysés (`OpenSshCertificateParser`) et
+vérifiés cryptographiquement (`OpenSshCertificateVerifier`) au regard des
+entrées de politique `@cert-authority` et `@revoked` chargées depuis
+`known_hosts` (à l'import et lors de la synchronisation optionnelle au
+démarrage, puis synthétisées par un badge de politique active dans
+`Settings > SSH & SFTP > Trusted host keys`). La vérification contrôle la
+signature de l'AC, la correspondance des principaux, la fenêtre de validité, la
+courbe ECDSA et l'encodage `mpint`, et rejette les `CriticalOptions` non pris en
+charge. Un certificat valide signé par une `@cert-authority` approuvée est
+accepté automatiquement sans invite TOFU ; à l'inverse, un certificat invalide,
+expiré ou altéré signé par une `@cert-authority` approuvée est rejeté strictement
+sans repli TOFU. Les entrées `@revoked` sont vérifiées sur les empreintes du
+certificat présenté, de son AC signataire et de sa clé de sujet.
+
+Les volets SFTP compagnons réutilisent la confiance de clé d'hôte vérifiée par
+la session SSH voisine via `PreResolvedHostKeyVerifier` au lieu d'exécuter une
+sonde réseau redondante, tout en continuant d'appliquer les vérifications
+`@revoked`.
+
+Lors de l'import de fichiers de configuration OpenSSH,
+`OpenSshConfigParser.ParseFile` développe les directives `Include` récursives
+(avec motifs glob) sous des bornes de sécurité strictes : plafonds sur la
+profondeur de récursion, le nombre de fichiers inclus et leur taille ; détection
+de cycles ; rejet des directives incluses sous portée `Match`, des traversées de
+chemins hors des racines autorisées, des liens symboliques ou points d'analyse
+ancêtres et des chemins UNC (aussi bien `\\server\share` que `//server/share`).
 
 Sur une clé qui a changé, l'invite met par défaut et en focus **Refuser** : le
 réflexe Entrée appris sur l'invite de première utilisation, où Entrée accepte,
@@ -1162,35 +1193,44 @@ l'identité du canal de données n'est pas vérifiée.
 
 ### Énumération des identités par l'agent SSH
 
-Les implémentations d'`ISshAgent` (`PageantAgent`, `OpenSshPipeAgent`) ne
-conservent jamais de handle IPC d'une requête à l'autre. Chaque appel à
-`GetIdentities` et `Sign` ouvre un nouveau mapping de mémoire partagée
-(Pageant) ou une nouvelle connexion de tube nommé (agent OpenSSH), puis le
-libère avant de retourner. Les sondes de disponibilité ont un délai de 250 ms ;
-les requêtes réelles ont un délai de 5 s. Un tube introuvable comme un
+Les implémentations d'`ISshAgent` (`PageantAgent`, `OpenSshPipeAgent`, ainsi que
+`gpg-agent` lorsqu'il est activé avec la compatibilité Pageant) ne conservent
+jamais de handle IPC d'une requête à l'autre. Chaque appel à `GetIdentities`,
+`Sign` ou à la gestion active des clés ouvre un nouveau mapping de mémoire
+partagée (Pageant) ou une nouvelle connexion de tube nommé (agent OpenSSH), puis
+le libère avant de retourner. Les sondes de disponibilité ont un délai de
+250 ms ; les requêtes réelles ont un délai de 5 s. Un tube introuvable comme un
 dépassement de délai retournent "indisponible" sans lever d'exception. La
 préférence de l'utilisateur entre les agents est un réglage d'exécution
 (`AppSettings.SshAgentPreference`) ; les changements prennent effet à la
 prochaine tentative de connexion, sans redémarrage de l'application.
 
-Une session peut désigner la seule clé d'agent qu'elle présente
-(`ServerProfileDto.SshAgentKeyFingerprint`, une empreinte `SHA256:`). La clé est
-cherchée dans les agents que Heimdall est réglé pour utiliser avant tout tunnel ou
-toute demande, avec une attente bornée hors du thread appelant ; un agent qui ne
-répond pas à temps ne détient rien qui puisse être présenté. Une clé trouvée dans
-aucun agent est refusée, sans repli sur les autres clés. Le choix limite les clés
-d'agent seulement : il n'agit ni sur un mot de passe enregistré, ni sur un fichier de
-clé, ni sur l'authentification interactive au clavier. Les sauts de passerelle et les
-tunnels ne le reçoivent pas et présentent toujours toutes les clés de l'agent. La
-valeur est locale à la machine : l'assainisseur des profils partagés la retire, tout
-import l'efface et l'export des réglages la supprime. Avec le transfert d'agent activé,
-l'hôte distant peut quand même utiliser toutes les clés de l'agent, quelle que soit la
-clé désignée par la session. Sur le chemin Plink (transfert d'agent avec Pageant, nouvel
-essai après un échec du client intégré), la clé est remise à Plink sous la forme d'un
-fichier de clé publique d'une ligne, seulement si la clé est dans Pageant, d'un type que
-Plink sait lire, si aucun fichier de clé n'est configuré et si Plink est la version
-fournie ; sinon la session est refusée. Le mode PuTTY externe avec une clé choisie est
-refusé.
+La gestion active des agents (`IMutableSshAgent` via `SshAgentManager`) prend en
+charge l'ajout de clés (avec TTL optionnel), la suppression d'une clé précise et
+la suppression de toutes les clés sur l'agent OpenSSH et sur Pageant. Les
+tampons réseau de clé privée dans `OpenSshAgentProtocol` et les vues de mémoire
+partagée dans `PageantClient` sont explicitement remis à zéro avant libération,
+et le refus des contraintes de durée de vie par Pageant est classifié
+distinctement (`LifetimeNotSupported`) au lieu d'une erreur générique.
+
+Une session ou une passerelle SSH (`ServerProfileDto.SshAgentKeyFingerprint` /
+dialogue de passerelle) peut désigner la seule clé d'agent qu'elle présente (une
+empreinte `SHA256:`). La clé est cherchée dans les agents que Heimdall est réglé
+pour utiliser avant tout tunnel ou toute demande, avec une attente bornée hors
+du thread appelant ; un agent qui ne répond pas à temps ne détient rien qui
+puisse être présenté. Une clé trouvée dans aucun agent est refusée, sans repli
+sur les autres clés. Le choix limite les clés d'agent seulement : il n'agit ni
+sur un mot de passe enregistré, ni sur un fichier de clé, ni sur
+l'authentification interactive au clavier. La valeur est locale à la machine :
+l'assainisseur des profils partagés la retire, tout import l'efface et l'export
+des réglages la supprime. Avec le transfert d'agent activé, l'hôte distant peut
+quand même utiliser toutes les clés de l'agent, quelle que soit la clé désignée
+par la session. Sur le chemin Plink (transfert d'agent avec Pageant, nouvel
+essai après un échec du client intégré), la clé est remise à Plink sous la forme
+d'un fichier de clé publique d'une ligne, seulement si la clé est dans Pageant,
+d'un type que Plink sait lire, si aucun fichier de clé n'est configuré et si
+Plink est la version fournie ; sinon la session est refusée. Le mode PuTTY
+externe avec une clé choisie est refusé.
 
 `OpenSshPipeAgent.SendRequest` repose sur des entrées/sorties de tube
 asynchrones (`NamedPipeClientStream` ouvert avec `PipeOptions.Asynchronous`) et

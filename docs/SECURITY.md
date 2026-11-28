@@ -97,7 +97,8 @@ window-class spoofing.
 RDP, SSH, SFTP, and credential-handling code paths never log usernames,
 domains, password presence, password length, passwords, passphrases, or
 credential edit-field contents. Connect log lines may identify the target host
-and protocol only.
+and protocol only. On the SSH side, a dedicated static logging guard test
+enforces that SSH connection paths never interpolate or log usernames.
 
 `CredentialAutofill.cs` is the canonical RDP example. Since `1d7c78c`, broker
 enumeration diagnostics are emitted as one Debug entry per autofill attempt,
@@ -177,10 +178,35 @@ SSH session first so the host key is captured into `HostKeyStore` via the
 confirmed-trust path.
 
 Trust entries carry metadata (`FirstSeen`, `LastSeen`, `Algorithm`, `Source`,
-`PublicKeyBase64`) via `HostKeyEntry`. Persistence is additive:
-`trustedHostKeysV2` in `settings.json` holds the enriched entries; the
-legacy `trustedHostKeys` string dictionary remains readable for downgrade
-safety and is never rewritten from the V2 path.
+`PublicKeyBase64`) via `HostKeyEntry`. A single host may pin multiple host-key
+algorithms concurrently, and Settings allows revoking a specific algorithm entry
+without clearing the others. Persistence is additive: `trustedHostKeysV2` in
+`settings.json` holds the enriched entries; the legacy `trustedHostKeys` string
+dictionary remains readable for downgrade safety and is never rewritten from the
+V2 path.
+
+OpenSSH v01 host certificates are parsed (`OpenSshCertificateParser`) and
+cryptographically verified (`OpenSshCertificateVerifier`) against
+`@cert-authority` and `@revoked` policy entries loaded from `known_hosts`
+(on import and during opt-in startup sync, and summarized via an active policy
+badge in `Settings > SSH & SFTP > Trusted host keys`). Verification checks the
+CA signature, principal matching, validity window, ECDSA curve and `mpint`
+encodings, and rejects unsupported `CriticalOptions`. A valid certificate signed
+by a trusted `@cert-authority` is auto-trusted without a TOFU prompt; conversely,
+an invalid, expired, or tampered certificate signed by a trusted `@cert-authority`
+is hard-rejected with no TOFU fallback. `@revoked` entries are checked against
+the presented certificate, its signing CA, and its subject key fingerprint.
+
+Companion SFTP panes reuse the sibling SSH session's verified host-key trust via
+`PreResolvedHostKeyVerifier` instead of running a redundant network probe, while
+still enforcing `@revoked` checks.
+
+When importing OpenSSH configuration files, `OpenSshConfigParser.ParseFile`
+expands recursive `Include` directives (with globbing) under strict security
+bounds: hard caps on recursion depth, included file count, and file size; cycle
+detection; rejection of `Match`-scoped includes, path traversal outside allowed
+roots, ancestor symlinks/reparse points, and UNC paths (both `\\server\share`
+and `//server/share`).
 
 On a changed key the prompt defaults to and focuses **Reject**: the Enter
 reflex trained by the first-use prompt, where Enter accepts, must not connect
@@ -1035,29 +1061,38 @@ verified.
 
 ### SSH agent identity enumeration
 
-`ISshAgent` implementations (`PageantAgent`, `OpenSshPipeAgent`) never hold
-IPC handles across requests. Every `GetIdentities` and `Sign` call opens a
-new shared-memory mapping (Pageant) or named-pipe connection (OpenSSH Agent)
-and disposes it before returning. Availability probes have a 250 ms timeout;
-real requests have a 5 s timeout. Pipe-not-found and timeout both return
+`ISshAgent` implementations (`PageantAgent`, `OpenSshPipeAgent`, plus `gpg-agent`
+when enabled with Pageant compatibility) never hold IPC handles across requests.
+Every `GetIdentities`, `Sign`, and mutable key-management call opens a new
+shared-memory mapping (Pageant) or named-pipe connection (OpenSSH Agent) and
+disposes it before returning. Availability probes have a 250 ms timeout; real
+requests have a 5 s timeout. Pipe-not-found and timeout both return
 "unavailable" without raising. User preference between agents is a runtime
 setting (`AppSettings.SshAgentPreference`); changes take effect on the next
 connection attempt without app restart.
 
-A session can name the one agent key it offers (`ServerProfileDto.SshAgentKeyFingerprint`,
-a `SHA256:` fingerprint). The key is looked up in the agents Heimdall is set to use before
-any tunnel or prompt, with a bounded wait off the calling thread; an agent that does not
-answer in time holds nothing that can be offered. A key found in no agent is refused with
-no fallback to the other keys. The choice limits agent keys only: it does not affect a
-stored password, a key file or keyboard-interactive sign-in. Gateway hops and tunnels do not
-receive it and still offer every agent key. The value is local to the machine: the shared
-profile sanitizer drops it, every import clears it and the settings export strips it. With
-agent forwarding on, the remote host can still use every key of the agent, whatever key the
-session names. On the Plink path (agent forwarding with Pageant, retry after an embedded
-client failure) the key is handed to Plink as a one-line public key file, only when the key
-is in Pageant, of a type Plink can parse, no key file is configured and Plink is the
-bundled build; otherwise the session is refused. External PuTTY mode with a chosen key is
-refused.
+Active agent management (`IMutableSshAgent` via `SshAgentManager`) supports
+adding keys (with optional TTL), removing an individual key, and removing all
+keys on OpenSSH Agent and Pageant. Private-key wire buffers in
+`OpenSshAgentProtocol` and shared-memory views in `PageantClient` are explicitly
+zeroed before release, and Pageant's refusal of lifetime constraints is
+classified distinctly (`LifetimeNotSupported`) instead of a generic failure.
+
+A session or SSH gateway (`ServerProfileDto.SshAgentKeyFingerprint` / gateway
+dialog) can name the one agent key it offers (a `SHA256:` fingerprint). The key
+is looked up in the agents Heimdall is set to use before any tunnel or prompt,
+with a bounded wait off the calling thread; an agent that does not answer in
+time holds nothing that can be offered. A key found in no agent is refused with
+no fallback to the other keys. The choice limits agent keys only: it does not
+affect a stored password, a key file or keyboard-interactive sign-in. The value
+is local to the machine: the shared profile sanitizer drops it, every import
+clears it and the settings export strips it. With agent forwarding on, the
+remote host can still use every key of the agent, whatever key the session
+names. On the Plink path (agent forwarding with Pageant, retry after an embedded
+client failure) the key is handed to Plink as a one-line public key file, only
+when the key is in Pageant, of a type Plink can parse, no key file is configured
+and Plink is the bundled build; otherwise the session is refused. External PuTTY
+mode with a chosen key is refused.
 
 `OpenSshPipeAgent.SendRequest` is built on async pipe I/O
 (`NamedPipeClientStream` opened with `PipeOptions.Asynchronous`) and a

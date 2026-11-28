@@ -71,8 +71,9 @@ C'est gratuit, open source, et cela tourne sur Windows 10 et 11.
   le dernier déplacement, renommage dans l'arbre ou changement d'ordre.
 - **Une confiance que vous pouvez auditer.** Les clés d'hôte SSH sont épinglées à la première
   connexion et affichées pour que vous les compariez ; une clé qui change est refusée par défaut,
-  et votre `~/.ssh/known_hosts` s'importe et s'exporte pour que OpenSSH et Heimdall soient
-  d'accord sur qui est qui.
+  les certificats d'hôte OpenSSH (`@cert-authority` et `@revoked`) sont vérifiés
+  cryptographiquement, et votre `~/.ssh/known_hosts` s'importe et s'exporte pour que OpenSSH et
+  Heimdall soient d'accord sur qui est qui.
 - **Rien à installer à côté.** Les deux téléchargements sont autonomes.
 - **Comprendre un échec de connexion.** Testez chaque passerelle SSH, modifiez le profil d'une
   session SSH ou SFTP déconnectée depuis son onglet et copiez un diagnostic RDP anonymisé.

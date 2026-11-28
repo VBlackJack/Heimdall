@@ -81,7 +81,7 @@ Heimdall.slnx (14 projects)
 
 **Solution**: Two-pronged approach:
 
-1. **SSH.NET (primary)**: Programmatic auth with password, private key file, or keyboard-interactive. Custom `PageantClient` communicates with Pageant via Win32 shared memory (`CreateFileMapping` + `WM_COPYDATA`) and wraps keys as `IPrivateKeySource` for SSH.NET.
+1. **SSH.NET (primary)**: Programmatic auth with password, private key file, keyboard-interactive, or SSH agent (`OpenSshPipeAgent`, `PageantAgent`, and `gpg-agent` when Pageant compatibility is enabled). Custom `PageantClient` communicates with Pageant via Win32 shared memory (`CreateFileMapping` + `WM_COPYDATA`) and wraps keys as `IPrivateKeySource` for SSH.NET; `SshAgentManager` coordinates active key management (`IMutableSshAgent`) across mutable agents. `OpenSshCertificateVerifier` handles OpenSSH v01 host certificates (`@cert-authority` / `@revoked`), `SshSessionDiagnostics` inspects live negotiated session cryptography, and the embedded SSH terminal UI is decomposed into focused partials (`EmbeddedSshView.Health.cs`, `EmbeddedSshView.Reconnect.cs`, `EmbeddedSshView.Broadcast.cs`, `EmbeddedSshView.LocalizationAndStatus.cs`, `EmbeddedSshView.WebViewMessaging.cs`, `EmbeddedSshView.MacrosAndLog.cs`).
 
 2. **Plink fallback**: When `SshConnectionFactory.RequiresPlinkFallback()` is true (agent forwarding enabled on the profile and a Plink-compatible agent, Pageant, running), or when `SshPlinkRetryPolicy` retries through Plink after a refused SSH.NET sign-in, `PlinkTunnelRunner` handles tunnels and `PipeModeSession` handles interactive SSH. Plink communicates with Pageant natively, but Heimdall still owns host-key trust. `PlinkHostKeyDecider` accepts a stored fingerprint, or uses injectable `IPlinkHostKeyProbe` plus `IHostKeyVerifier` to resolve first-use trust before launch. If no Heimdall-trusted fingerprint can be resolved, the path fails with `SshFailureCode.HostKeyUnavailable` instead of falling back to PuTTY/Plink's cache.
 
@@ -443,7 +443,7 @@ A complementary **Windows Hello gate** (`IWindowsHelloService` over `UserConsent
 
 **Problem**: Sysadmins want at-a-glance health data (CPU, RAM, disk) for connected servers without opening a separate monitoring tool.
 
-**Solution**: `ServerHealthMonitor` in `Heimdall.Ssh` reuses the existing `SshClient` from an active shell session to run lightweight monitoring commands (`top -bn1`, `free -m`, `df -h /`) on multiplexed SSH channels at a configurable interval (default 15 seconds). Commands execute through SSH.NET's APM surface (`BeginExecute`/`EndExecute`) wrapped with `Task.Factory.FromAsync`, and the three probes run concurrently with `Task.WhenAll`. Results are parsed via compiled regex into a `ServerHealthData` record and surfaced in the UI.
+**Solution**: `ServerHealthMonitor` in `Heimdall.Ssh` reuses the existing `SshClient` from an active shell session to run a single multiplexed `LC_ALL=C` shell command on an SSH exec channel at a configurable interval (default 15 seconds). The single probe gathers CPU (`/proc/stat` or `top`), memory and swap (`/proc/meminfo`), disk (`df -Ph /`), uptime (`/proc/uptime`), and load average (`/proc/loadavg`) across both GNU/Linux and BusyBox/Alpine hosts in one round trip. Results are parsed into a `ServerHealthData` record and surfaced in the UI.
 
 ### 21b. Session Reachability Monitor (Inventory-wide TCP Probes)
 

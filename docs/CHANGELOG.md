@@ -12,6 +12,34 @@
 
 All notable changes to Heimdall are documented in this file.
 
+## Unreleased (branch dev): SSH subsystem audit, certificates, active agent management, diagnostics, and hardening
+
+### Phase 1: Core SSH hardening, key generation, agents, tunnels, and terminal UX
+
+- Removed SSH username logging across connection paths and added a static logging guard test; hardened Plink host-key probing and temporary `PlinkSizeSession` cleanup.
+- Upgraded SSH Key Generator (`SSHKEY`) to support Ed25519, ECDSA (P-256/P-384/P-521), and RSA in OpenSSH (`openssh-key-v1` with `bcrypt`) and PKCS#8 PEM formats, plus OpenSSH config export (`SshConfigExporter`).
+- Added gateway keyboard-interactive 2FA with transport bounds, per-host agent key memory, `gpg-agent` support (Pageant compatibility), `SshAgentInspector`, public-key deployment (`SshPublicKeyDeployer` / `ssh-copy-id`), and multi-algorithm host-key storage.
+- Upgraded `ServerHealthMonitor` to a single multiplexed `LC_ALL=C` shell exec collecting CPU, RAM, swap, disk, uptime, and load average across GNU/Linux and BusyBox/Alpine hosts; added manual SOCKS5 (`-D`) and Remote (`-R`) tunnels in the Tunnel Panel.
+- Added configurable terminal scrollback, case-sensitive and regex terminal search, background-tab bell alert, and decomposed `EmbeddedSshView` and `SshHandler` into focused partial classes.
+
+### Phase 2: OpenSSH certificates, active agent management, presets, companion SFTP, and highlights
+
+- Added per-gateway agent key picker in `GatewayDialog`, per-algorithm Known Hosts revocation, and localized public-key deployment from `SshKeyAuditView`.
+- Added saved tunnel presets (`SavedTunnelPresetDto`) in `TunnelsViewModel` and direct SSH session port forwards (`-L`/`-D`/`-R`, `SshLocalForwardSpec` with IPv6 round-trip support).
+- Shared the active companion `SshClient` for SFTP exec channels (`SharedSshClientExecCommandRunner`), reused pinned host keys, and added SFTP keyboard-interactive 2FA support.
+- Added OpenSSH v01 host certificate parser (`OpenSshCertificateParser`) and cryptographic verifier (`OpenSshCertificateVerifier`), `@cert-authority` auto-trust, `@revoked` enforcement (certificate, CA, and subject-key fingerprints), startup and import policy loading, and certificate auditing in `SshKeyAuditEngine`.
+- Added active SSH agent management (`IMutableSshAgent`, `SshAgentManager`, `SshAgentKeyPayloadBuilder`) for OpenSSH Agent and Pageant (add key with optional TTL, remove key, remove all) with explicit zeroing of private-key wire and shared-memory buffers.
+- Added safe real-time terminal regex log highlights with configurable color rules in Settings and a live toolbar toggle, further split `EmbeddedSshView` (`Broadcast`, `LocalizationAndStatus`, `WebViewMessaging`), and added opt-in Docker `sshd` integration tests (`RealSshdIntegrationTests`, `[SshdLabFact]`).
+
+### Phase 3: Crypto diagnostics, direct `-L` editor, zero-reprobe companion SFTP, `Include` expansion, and polish
+
+- Added live SSH session crypto diagnostics (`SshSessionDiagnostics`, `SshShellSession.GetDiagnostics()`, `SessionInfoButton` tooltip/copy with weak-algorithm warning) and active ON/OFF visual state on `HighlightsToggleButton`.
+- Added a direct SSH local port forwards (`-L`) multiline editor with inline validation in `ServerDialog`, preserving `SshLocalForwards` for non-SSH profiles.
+- Wired `PreResolvedHostKeyVerifier` for zero-reprobe companion SFTP handoff (still enforcing `@revoked`) and hardened trusted-CA certificate verification to hard-reject invalid, expired, or tampered certificates with zero TOFU fallback.
+- Surfaced an active `@cert-authority` and `@revoked` policy summary badge with tooltip in `Settings > SSH & SFTP > Trusted host keys`.
+- Added safe recursive `Include` expansion (`OpenSshConfigParser.ParseFile` in `OpenSshConfigParser.Includes.cs`) with globbing and depth, file-count, size, cycle, traversal, ancestor-reparse-point, UNC (`\\` and `//`), and `Match`-scope guards.
+- Added a confirmed **Clear Agent** action in `SshKeyAuditView` and classified Pageant TTL refusals distinctly (`LifetimeNotSupported`).
+
 ## 2026-11-27: Reused RDP controls, keyboard after a tab close, self-update relaunch waits on the application (v2026.112701)
 
 Merged as #906 to #909. The user-facing summary is in the release notes.
