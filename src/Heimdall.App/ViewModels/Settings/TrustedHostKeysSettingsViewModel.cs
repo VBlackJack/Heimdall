@@ -17,6 +17,7 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
+using System.Security.Cryptography;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Heimdall.App.Services;
@@ -76,6 +77,12 @@ public sealed partial class TrustedHostKeysSettingsViewModel : ObservableObject,
     [ObservableProperty]
     private string _policyDetailsTooltip = string.Empty;
 
+    [ObservableProperty]
+    private string _newPolicyHostPatterns = "*";
+
+    [ObservableProperty]
+    private string _newPolicyKeyOrFingerprint = string.Empty;
+
     public TrustedHostKeysSettingsViewModel(
         IHostKeyTrustService trustService,
         KnownHostsImporter knownHostsImporter,
@@ -115,12 +122,15 @@ public sealed partial class TrustedHostKeysSettingsViewModel : ObservableObject,
         _trustService.EntryTrusted += OnEntryTrusted;
         _trustService.EntryRemoved += OnEntryRemoved;
         _trustService.EntryReplaced += OnEntryReplaced;
+        _trustService.PolicyChanged += OnPolicyChanged;
         _localizer.LocaleChanged += OnLocaleChanged;
 
         Refresh();
     }
 
     public ObservableCollection<TrustedHostKeyRowViewModel> Rows { get; } = [];
+
+    public ObservableCollection<KnownHostsPolicyRowViewModel> PolicyRows { get; } = [];
 
     public TrustedHostKeySortColumn SortColumn { get; private set; } = TrustedHostKeySortColumn.LastSeen;
 
@@ -389,6 +399,126 @@ public sealed partial class TrustedHostKeysSettingsViewModel : ObservableObject,
         ApplyFilterAndSort();
     }
 
+    [RelayCommand]
+    private void AddCertAuthority()
+        => AddPolicy(isCertAuthority: true);
+
+    [RelayCommand]
+    private void AddRevokedKey()
+        => AddPolicy(isCertAuthority: false);
+
+    [RelayCommand]
+    private async Task RemovePolicyAsync(KnownHostsPolicyRowViewModel? row)
+    {
+        if (row is null)
+        {
+            return;
+        }
+
+        var confirmed = await _dialogService.ShowConfirmAsync(
+            _localizer["DialogTrustedHostKeyPolicyRemoveTitle"],
+            _localizer.Format("DialogTrustedHostKeyPolicyRemoveMessage", row.KindDisplay, row.HostPatterns, row.Fingerprint),
+            "warning").ConfigureAwait(true);
+
+        if (!confirmed)
+        {
+            return;
+        }
+
+        bool removed = row.IsCertAuthority
+            ? _trustService.RemoveCertAuthority(row.HostPatterns, row.Fingerprint)
+            : _trustService.RemoveRevokedKey(row.HostPatterns, row.Fingerprint);
+
+        if (removed)
+        {
+            RefreshPolicySummary();
+            StatusMessage = _localizer.Format("ToastPolicyRemoved", row.KindDisplay, row.HostPatterns);
+        }
+    }
+
+    private void AddPolicy(bool isCertAuthority)
+    {
+        var hostPatterns = NewPolicyHostPatterns?.Trim() ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(hostPatterns))
+        {
+            StatusMessage = _localizer["TrustedHostKeysPolicyInvalidHost"];
+            return;
+        }
+
+        if (!TryNormalizePolicyFingerprint(NewPolicyKeyOrFingerprint, out var fingerprint))
+        {
+            StatusMessage = _localizer["TrustedHostKeysPolicyInvalidKey"];
+            return;
+        }
+
+        if (isCertAuthority)
+        {
+            _trustService.AddCertAuthority(hostPatterns, fingerprint);
+        }
+        else
+        {
+            _trustService.AddRevokedKey(hostPatterns, fingerprint);
+        }
+
+        NewPolicyKeyOrFingerprint = string.Empty;
+        RefreshPolicySummary();
+        var kindLabel = isCertAuthority
+            ? _localizer["TrustedHostKeysPolicyKindCa"]
+            : _localizer["TrustedHostKeysPolicyKindRevoked"];
+        StatusMessage = _localizer.Format("ToastPolicyAdded", kindLabel, hostPatterns);
+    }
+
+    /// <summary>
+    /// Accepts either a canonical <c>SHA256:...</c> fingerprint or an OpenSSH public key line
+    /// (<c>&lt;key-type&gt; &lt;base64-blob&gt; [comment]</c>) and returns the normalized
+    /// <c>SHA256:...</c> fingerprint.
+    /// </summary>
+    internal static bool TryNormalizePolicyFingerprint(string? rawInput, out string fingerprint)
+    {
+        fingerprint = string.Empty;
+        if (string.IsNullOrWhiteSpace(rawInput))
+        {
+            return false;
+        }
+
+        var trimmed = rawInput.Trim();
+        if (trimmed.StartsWith("SHA256:", StringComparison.OrdinalIgnoreCase))
+        {
+            var payload = trimmed["SHA256:".Length..].Trim().TrimEnd('=');
+            if (payload.Length < 32 || payload.Any(char.IsWhiteSpace))
+            {
+                return false;
+            }
+
+            fingerprint = "SHA256:" + payload;
+            return true;
+        }
+
+        var tokens = trimmed.Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries);
+        string? base64Candidate = tokens.Length >= 2 ? tokens[1] : null;
+        if (string.IsNullOrWhiteSpace(base64Candidate))
+        {
+            return false;
+        }
+
+        try
+        {
+            var blob = Convert.FromBase64String(base64Candidate);
+            if (blob.Length < 16)
+            {
+                return false;
+            }
+
+            var hash = SHA256.HashData(blob);
+            fingerprint = "SHA256:" + Convert.ToBase64String(hash).TrimEnd('=');
+            return true;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
+
     private void RefreshPolicySummary()
     {
         var cas = _trustService.GetCertAuthorities();
@@ -396,9 +526,22 @@ public sealed partial class TrustedHostKeysSettingsViewModel : ObservableObject,
         CertAuthorityCount = cas.Count;
         RevokedKeyCount = revoked.Count;
 
+        PolicyRows.Clear();
+        var caKind = _localizer["TrustedHostKeysPolicyKindCa"];
+        foreach (var (pattern, fp) in cas)
+        {
+            PolicyRows.Add(new KnownHostsPolicyRowViewModel(true, caKind, pattern, fp));
+        }
+
+        var revokedKind = _localizer["TrustedHostKeysPolicyKindRevoked"];
+        foreach (var (pattern, fp) in revoked)
+        {
+            PolicyRows.Add(new KnownHostsPolicyRowViewModel(false, revokedKind, pattern, fp));
+        }
+
         if (!HasSecurityPolicies)
         {
-            PolicySummaryText = string.Empty;
+            PolicySummaryText = _localizer["TrustedHostKeysPolicyEmpty"];
             PolicyDetailsTooltip = string.Empty;
             return;
         }
@@ -459,6 +602,9 @@ public sealed partial class TrustedHostKeysSettingsViewModel : ObservableObject,
     private void OnEntryReplaced(string hostPort, HostKeyEntry oldEntry, HostKeyEntry newEntry)
         => _dispatcher.Invoke(() => RefreshHostRows(hostPort));
 
+    private void OnPolicyChanged()
+        => _dispatcher.Invoke(RefreshPolicySummary);
+
     private void OnLocaleChanged(string locale)
         => _dispatcher.Invoke(RefreshLocalizedRows);
 
@@ -476,8 +622,26 @@ public sealed partial class TrustedHostKeysSettingsViewModel : ObservableObject,
         _trustService.EntryTrusted -= OnEntryTrusted;
         _trustService.EntryRemoved -= OnEntryRemoved;
         _trustService.EntryReplaced -= OnEntryReplaced;
+        _trustService.PolicyChanged -= OnPolicyChanged;
         _localizer.LocaleChanged -= OnLocaleChanged;
     }
+}
+
+public sealed class KnownHostsPolicyRowViewModel(
+    bool isCertAuthority,
+    string kindDisplay,
+    string hostPatterns,
+    string fingerprint)
+{
+    public bool IsCertAuthority { get; } = isCertAuthority;
+
+    public string KindDisplay { get; } = kindDisplay;
+
+    public string HostPatterns { get; } = hostPatterns;
+
+    public string Fingerprint { get; } = fingerprint;
+
+    public string FingerprintDisplay { get; } = fingerprint.Length <= 22 ? fingerprint : fingerprint[..22] + "...";
 }
 
 public sealed partial class TrustedHostKeyRowViewModel : ObservableObject

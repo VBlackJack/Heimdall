@@ -240,6 +240,7 @@ public sealed class OpenSshConfigImporter(IConfigManager configManager, Localiza
             SshPort = candidate.Port,
             SshUsername = string.IsNullOrWhiteSpace(candidate.User) ? null : candidate.User,
             SshKeyPath = string.IsNullOrWhiteSpace(candidate.IdentityFile) ? null : candidate.IdentityFile,
+            SshCertificatePath = string.IsNullOrWhiteSpace(candidate.CertificateFile) ? null : candidate.CertificateFile,
             SshGatewayId = string.IsNullOrWhiteSpace(sshGatewayId) ? null : sshGatewayId,
             SshAgentForwarding = candidate.ForwardAgent,
             SshCompression = candidate.Compression,

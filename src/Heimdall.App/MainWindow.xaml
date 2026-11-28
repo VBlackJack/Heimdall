@@ -4374,34 +4374,125 @@
                                                   AutomationProperties.HelpText="{loc:Translate SettingsSyncKnownHostsAtStartupHint}"/>
                                         <controls:SettingDefaultMarker DataContext="{Binding Settings.Defaults[SyncKnownHostsAtStartup]}"/>
                                         <TextBlock Text="{loc:Translate SettingsSyncKnownHostsAtStartupHint}" Foreground="{DynamicResource TextTertiaryBrush}" FontSize="{StaticResource FontSizeCaption}" Margin="20,4,0,12" TextWrapping="Wrap"/>
-                                        <Border Background="{DynamicResource SurfaceBrush}"
-                                                BorderBrush="{DynamicResource BorderBrush}"
-                                                BorderThickness="1"
-                                                CornerRadius="{StaticResource CornerRadiusSm}"
-                                                Padding="10,6"
-                                                Margin="0,0,0,8"
-                                                ToolTip="{Binding Settings.TrustedHostKeys.PolicyDetailsTooltip}"
-                                                Visibility="{Binding Settings.TrustedHostKeys.HasSecurityPolicies, Converter={StaticResource BoolToVisibilityConverter}}">
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                </Grid.ColumnDefinitions>
-                                                <TextBlock Grid.Column="0"
-                                                           FontFamily="{StaticResource FontFamilyIcons}"
-                                                           Text="&#xE72E;"
-                                                           FontSize="{StaticResource IconSizeSmall}"
-                                                           Foreground="{DynamicResource AccentTextBrush}"
-                                                           VerticalAlignment="Center"/>
-                                                <TextBlock Grid.Column="1"
-                                                           Text="{Binding Settings.TrustedHostKeys.PolicySummaryText}"
-                                                           FontSize="{StaticResource FontSizeCaption}"
-                                                           Foreground="{DynamicResource TextSecondaryBrush}"
-                                                           Margin="8,0,0,0"
-                                                           VerticalAlignment="Center"
-                                                           TextWrapping="Wrap"/>
-                                            </Grid>
-                                        </Border>
+                                        <Expander Background="{DynamicResource SurfaceBrush}"
+                                                  BorderBrush="{DynamicResource BorderBrush}"
+                                                  BorderThickness="1"
+                                                  Padding="10,6"
+                                                  Margin="0,0,0,8"
+                                                  ToolTip="{Binding Settings.TrustedHostKeys.PolicyDetailsTooltip}"
+                                                  AutomationProperties.Name="{loc:Translate TrustedHostKeysPolicySectionTitle}">
+                                            <Expander.Header>
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock FontFamily="{StaticResource FontFamilyIcons}"
+                                                               Text="&#xE72E;"
+                                                               FontSize="{StaticResource IconSizeSmall}"
+                                                               Foreground="{DynamicResource AccentTextBrush}"
+                                                               VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{loc:Translate TrustedHostKeysPolicySectionTitle}"
+                                                               FontSize="{StaticResource FontSizeCaption}"
+                                                               FontWeight="SemiBold"
+                                                               Foreground="{DynamicResource TextPrimaryBrush}"
+                                                               Margin="8,0,8,0"
+                                                               VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding Settings.TrustedHostKeys.PolicySummaryText}"
+                                                               FontSize="{StaticResource FontSizeCaption}"
+                                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                                               VerticalAlignment="Center"
+                                                               TextWrapping="Wrap"/>
+                                                </StackPanel>
+                                            </Expander.Header>
+                                            <StackPanel Margin="0,8,0,0">
+                                                <Grid Margin="0,0,0,8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="160"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBox Grid.Column="0"
+                                                             Text="{Binding Settings.TrustedHostKeys.NewPolicyHostPatterns, UpdateSourceTrigger=PropertyChanged}"
+                                                             Style="{StaticResource WatermarkTextBoxStyle}"
+                                                             Tag="{loc:Translate TrustedHostKeysPolicyHostHint}"
+                                                             ToolTip="{loc:Translate TrustedHostKeysPolicyHostHint}"
+                                                             AutomationProperties.Name="{loc:Translate TrustedHostKeysPolicyHostHint}"
+                                                             Margin="0,0,6,0"/>
+                                                    <TextBox Grid.Column="1"
+                                                             Text="{Binding Settings.TrustedHostKeys.NewPolicyKeyOrFingerprint, UpdateSourceTrigger=PropertyChanged}"
+                                                             Style="{StaticResource WatermarkTextBoxStyle}"
+                                                             Tag="{loc:Translate TrustedHostKeysPolicyKeyHint}"
+                                                             ToolTip="{loc:Translate TrustedHostKeysPolicyKeyHint}"
+                                                             AutomationProperties.Name="{loc:Translate TrustedHostKeysPolicyKeyHint}"
+                                                             Margin="0,0,6,0"/>
+                                                    <Button Grid.Column="2"
+                                                            Command="{Binding Settings.TrustedHostKeys.AddCertAuthorityCommand}"
+                                                            Content="{loc:Translate BtnAddCertAuthority}"
+                                                            Style="{DynamicResource SecondaryButtonStyle}"
+                                                            Padding="8,3"
+                                                            Margin="0,0,6,0"
+                                                            FontSize="{StaticResource FontSizeCaption}"
+                                                            AutomationProperties.Name="{loc:Translate BtnAddCertAuthority}"/>
+                                                    <Button Grid.Column="3"
+                                                            Command="{Binding Settings.TrustedHostKeys.AddRevokedKeyCommand}"
+                                                            Content="{loc:Translate BtnAddRevokedKey}"
+                                                            Style="{DynamicResource SecondaryButtonStyle}"
+                                                            Padding="8,3"
+                                                            FontSize="{StaticResource FontSizeCaption}"
+                                                            AutomationProperties.Name="{loc:Translate BtnAddRevokedKey}"/>
+                                                </Grid>
+                                                <ItemsControl ItemsSource="{Binding Settings.TrustedHostKeys.PolicyRows}"
+                                                              Visibility="{Binding Settings.TrustedHostKeys.HasSecurityPolicies, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Border Background="{DynamicResource CardBrush}"
+                                                                    BorderBrush="{DynamicResource BorderBrush}"
+                                                                    BorderThickness="1"
+                                                                    CornerRadius="{StaticResource CornerRadiusSm}"
+                                                                    Padding="8,4"
+                                                                    Margin="0,0,0,4">
+                                                                <Grid>
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="120"/>
+                                                                        <ColumnDefinition Width="160"/>
+                                                                        <ColumnDefinition Width="*"/>
+                                                                        <ColumnDefinition Width="Auto"/>
+                                                                    </Grid.ColumnDefinitions>
+                                                                    <TextBlock Grid.Column="0"
+                                                                               Text="{Binding KindDisplay}"
+                                                                               FontSize="{StaticResource FontSizeCaption}"
+                                                                               FontWeight="SemiBold"
+                                                                               Foreground="{DynamicResource AccentTextBrush}"
+                                                                               VerticalAlignment="Center"/>
+                                                                    <TextBlock Grid.Column="1"
+                                                                               Text="{Binding HostPatterns}"
+                                                                               FontFamily="{StaticResource FontFamilyMonospace}"
+                                                                               FontSize="{StaticResource FontSizeCaption}"
+                                                                               Foreground="{DynamicResource TextPrimaryBrush}"
+                                                                               VerticalAlignment="Center"
+                                                                               TextTrimming="CharacterEllipsis"
+                                                                               ToolTip="{Binding HostPatterns}"/>
+                                                                    <TextBlock Grid.Column="2"
+                                                                               Text="{Binding FingerprintDisplay}"
+                                                                               FontFamily="{StaticResource FontFamilyMonospace}"
+                                                                               FontSize="{StaticResource FontSizeCaption}"
+                                                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                                                               Margin="8,0,8,0"
+                                                                               VerticalAlignment="Center"
+                                                                               ToolTip="{Binding Fingerprint}"/>
+                                                                    <Button Grid.Column="3"
+                                                                            Command="{Binding DataContext.Settings.TrustedHostKeys.RemovePolicyCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                                            CommandParameter="{Binding}"
+                                                                            Content="{loc:Translate BtnRemove}"
+                                                                            Style="{StaticResource GhostButtonStyle}"
+                                                                            Padding="6,2"
+                                                                            FontSize="{StaticResource FontSizeCaption}"
+                                                                            AutomationProperties.Name="{loc:Translate BtnRemove}"/>
+                                                                </Grid>
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </Expander>
                                         <TextBox Text="{Binding Settings.TrustedHostKeys.SearchText, UpdateSourceTrigger=PropertyChanged}"
                                                  Style="{StaticResource WatermarkTextBoxStyle}"
                                                  Tag="{loc:Translate HintTrustedHostKeysSearch}"

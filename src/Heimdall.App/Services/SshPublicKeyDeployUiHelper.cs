@@ -261,6 +261,7 @@ internal static class SshPublicKeyDeployUiHelper
                 LogicalPort = logicalPort,
                 Username = target.SshUsername ?? string.Empty,
                 KeyPath = string.IsNullOrWhiteSpace(target.SshKeyPath) ? null : target.SshKeyPath,
+                CertificatePath = string.IsNullOrWhiteSpace(target.SshCertificatePath) ? null : target.SshCertificatePath,
                 Password = password,
                 KeyPassphrase = keyPassphrase,
                 SshAgentPreference = settings.SshAgentPreference,

@@ -929,6 +929,26 @@ public static class SshConnectionFactory
         return null;
     }
 
+    /// <summary>
+    /// Resolves the OpenSSH user certificate path for <paramref name="keyPath"/>: uses an explicit
+    /// path when configured, otherwise auto-discovers a sibling <c>{keyPath}-cert.pub</c> file.
+    /// </summary>
+    internal static string? ResolveUserCertificatePath(string keyPath, string? explicitCertificatePath)
+    {
+        if (!string.IsNullOrWhiteSpace(explicitCertificatePath))
+        {
+            return explicitCertificatePath.Trim();
+        }
+
+        if (string.IsNullOrWhiteSpace(keyPath))
+        {
+            return null;
+        }
+
+        var autoCertPath = keyPath + "-cert.pub";
+        return File.Exists(autoCertPath) ? autoCertPath : null;
+    }
+
     private static void AddPrivateKeyMethod(
         ICollection<AuthenticationMethod> methods,
         SshConnectionParams connectionParams,
@@ -941,9 +961,19 @@ public static class SshConnectionFactory
         try
         {
             var keyPassphrase = ResolveKeyPassphrase(connectionParams);
-            keyFile = string.IsNullOrEmpty(keyPassphrase)
-                ? new PrivateKeyFile(keyPath)
-                : new PrivateKeyFile(keyPath, keyPassphrase);
+            var certPath = ResolveUserCertificatePath(keyPath, connectionParams.CertificatePath);
+            if (!string.IsNullOrWhiteSpace(certPath))
+            {
+                keyFile = new PrivateKeyFile(keyPath, keyPassphrase, certPath);
+                Core.Logging.FileLogger.Info(
+                    $"SSH user certificate attached for {connectionParams.Host}:{connectionParams.Port}");
+            }
+            else
+            {
+                keyFile = string.IsNullOrEmpty(keyPassphrase)
+                    ? new PrivateKeyFile(keyPath)
+                    : new PrivateKeyFile(keyPath, keyPassphrase);
+            }
 
             methods.Add(new PrivateKeyAuthenticationMethod(connectionParams.Username, keyFile));
             ownedResources?.Add(keyFile);

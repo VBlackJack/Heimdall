@@ -105,6 +105,7 @@
                                   MinWidth="220">
                             <ComboBoxItem x:Name="FormatOpenSshItem" Content="" Tag="OpenSsh"/>
                             <ComboBoxItem x:Name="FormatPkcs8Item" Content="" Tag="Pkcs8Pem"/>
+                            <ComboBoxItem x:Name="FormatPpkV3Item" Content="" Tag="PuttyPpkV3"/>
                         </ComboBox>
                     </DockPanel>
 

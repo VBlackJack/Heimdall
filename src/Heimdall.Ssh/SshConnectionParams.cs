@@ -50,8 +50,14 @@ public sealed class SshConnectionParams
     /// <summary>SSH username for authentication.</summary>
     public required string Username { get; init; }
 
-    /// <summary>Path to a private key file (PEM or OpenSSH format). Optional.</summary>
+    /// <summary>Path to a private key file (PEM, OpenSSH, or PuTTY PPK format). Optional.</summary>
     public string? KeyPath { get; init; }
+
+    /// <summary>
+    /// Optional path to an OpenSSH user certificate file (<c>-cert.pub</c>) paired with <see cref="KeyPath"/>.
+    /// When omitted, a sibling <c>{KeyPath}-cert.pub</c> file is automatically detected if present.
+    /// </summary>
+    public string? CertificatePath { get; init; }
 
     /// <summary>Plaintext password for SSH password authentication.</summary>
     public string? Password { get; init; }

@@ -256,6 +256,16 @@ public static partial class OpenSshConfigParser
             return;
         }
 
+        if (directive.Equals("certificatefile", StringComparison.OrdinalIgnoreCase))
+        {
+            if (block.CertificateFile is null)
+            {
+                block.CertificateFile = ExpandIdentityFile(value, userProfile, lineNumber, diagnostics);
+            }
+
+            return;
+        }
+
         if (directive.Equals("proxyjump", StringComparison.OrdinalIgnoreCase))
         {
             if (block.ProxyJumpValue is null)
@@ -460,6 +470,7 @@ public static partial class OpenSshConfigParser
                 var effectivePort = block.ObtainedPort ?? globalDefaults.ObtainedPort ?? HostBlockState.DefaultPort;
                 var effectiveUser = block.User ?? globalDefaults.User;
                 var effectiveIdentityFile = block.IdentityFile ?? globalDefaults.IdentityFile;
+                var effectiveCertificateFile = block.CertificateFile ?? globalDefaults.CertificateFile;
                 var effectiveForwardAgent = block.ForwardAgent ?? globalDefaults.ForwardAgent ?? false;
                 var effectiveCompression = block.Compression ?? globalDefaults.Compression ?? false;
                 var effectiveDynamicForward = block.DynamicForwardPort ?? globalDefaults.DynamicForwardPort;
@@ -478,6 +489,7 @@ public static partial class OpenSshConfigParser
                     Port = effectivePort,
                     User = effectiveUser,
                     IdentityFile = effectiveIdentityFile,
+                    CertificateFile = effectiveCertificateFile,
                     SourceLineNumber = block.SourceLineNumber,
                     ProxyJumpChain = BuildProxyJumpChain(alias, hostName, block, blockByAlias, diagnostics),
                     ForwardAgent = effectiveForwardAgent,
@@ -975,6 +987,8 @@ public static partial class OpenSshConfigParser
         public string? User { get; set; }
 
         public string? IdentityFile { get; set; }
+
+        public string? CertificateFile { get; set; }
 
         public string? ProxyJumpValue { get; set; }
 

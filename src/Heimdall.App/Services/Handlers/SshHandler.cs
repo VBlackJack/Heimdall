@@ -251,6 +251,7 @@ internal sealed partial class SshHandler : IProtocolHandler, IDisposable
             Password = ConnectionHelpers.DecryptPassword(server.SshPasswordEncrypted),
             KeyPassphrase = ConnectionHelpers.DecryptPassword(server.SshKeyPassphraseEncrypted),
             KeyPath = string.IsNullOrWhiteSpace(server.SshKeyPath) ? null : server.SshKeyPath,
+            CertificatePath = string.IsNullOrWhiteSpace(server.SshCertificatePath) ? null : server.SshCertificatePath,
             SshAgentPreference = settings.SshAgentPreference,
             AgentKeyFingerprint = server.SshAgentKeyFingerprint,
             UseLegacyPasswordAsKeyPassphrase = server.UsesLegacySshCredentialMapping,

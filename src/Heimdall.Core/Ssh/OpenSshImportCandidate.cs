@@ -47,6 +47,11 @@ public sealed record OpenSshImportCandidate
     public string? IdentityFile { get; init; }
 
     /// <summary>
+    /// Gets the optional OpenSSH user certificate file path (<c>CertificateFile</c>) after tilde expansion.
+    /// </summary>
+    public string? CertificateFile { get; init; }
+
+    /// <summary>
     /// Gets the 1-based source line number of the Host directive.
     /// </summary>
     public int SourceLineNumber { get; init; }

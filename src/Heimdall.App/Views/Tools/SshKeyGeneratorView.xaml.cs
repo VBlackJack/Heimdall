@@ -41,10 +41,12 @@ public partial class SshKeyGeneratorView : UserControl, IToolView
     private const string MaskedPlaceholder = "********";
     private const string PublicKeyFileExtension = ".pub";
     private const string PemPrivateKeyFileExtension = ".pem";
+    private const string PpkPrivateKeyFileExtension = ".ppk";
 
     private string PublicKeyFileFilter => L("ToolSshKeyGenPubFilter");
     private string PemPrivateKeyFileFilter => L("ToolSshKeyGenPrivFilter");
     private string OpenSshPrivateKeyFileFilter => L("ToolSshKeyGenPrivOpenSshFilter");
+    private string PpkPrivateKeyFileFilter => L("ToolSshKeyGenPrivPpkFilter");
 
     private readonly TimedSecretClipboard _secretClipboard = TimedSecretClipboard.CreateDefault();
     private LocalizationManager? _localizer;
@@ -127,6 +129,7 @@ public partial class SshKeyGeneratorView : UserControl, IToolView
         EcdsaP521Item.Content = L("ToolSshKeyGenEcdsaP521");
         FormatOpenSshItem.Content = L("ToolSshKeyGenFormatOpenSsh");
         FormatPkcs8Item.Content = L("ToolSshKeyGenFormatPkcs8");
+        FormatPpkV3Item.Content = L("ToolSshKeyGenFormatPpkV3");
         Ed25519Notice.Text = L("ToolSshKeyGenEd25519Notice");
         Ed25519Item.ToolTip = L("ToolSshKeyGenEd25519Tooltip");
 
@@ -229,9 +232,12 @@ public partial class SshKeyGeneratorView : UserControl, IToolView
     private SshPrivateKeyFormat GetSelectedFormat()
     {
         var tag = (FormatCombo.SelectedItem as ComboBoxItem)?.Tag as string;
-        return string.Equals(tag, "Pkcs8Pem", StringComparison.Ordinal)
-            ? SshPrivateKeyFormat.Pkcs8Pem
-            : SshPrivateKeyFormat.OpenSsh;
+        return tag switch
+        {
+            "Pkcs8Pem" => SshPrivateKeyFormat.Pkcs8Pem,
+            "PuttyPpkV3" => SshPrivateKeyFormat.PuttyPpkV3,
+            _ => SshPrivateKeyFormat.OpenSsh
+        };
     }
 
     private void OnCopyPublicKeyClick(object sender, RoutedEventArgs e)
@@ -293,12 +299,18 @@ public partial class SshKeyGeneratorView : UserControl, IToolView
     {
         if (string.IsNullOrEmpty(_privateKey)) return;
 
-        var isOpenSsh = _lastGeneratedFormat == SshPrivateKeyFormat.OpenSsh;
+        var (fileName, filter, defaultExt) = _lastGeneratedFormat switch
+        {
+            SshPrivateKeyFormat.OpenSsh => (_defaultFileBaseName, OpenSshPrivateKeyFileFilter, string.Empty),
+            SshPrivateKeyFormat.PuttyPpkV3 => (_defaultFileBaseName + PpkPrivateKeyFileExtension, PpkPrivateKeyFileFilter, PpkPrivateKeyFileExtension),
+            _ => (_defaultFileBaseName + PemPrivateKeyFileExtension, PemPrivateKeyFileFilter, PemPrivateKeyFileExtension)
+        };
+
         var dialog = new SaveFileDialog
         {
-            FileName = isOpenSsh ? _defaultFileBaseName : _defaultFileBaseName + PemPrivateKeyFileExtension,
-            Filter = isOpenSsh ? OpenSshPrivateKeyFileFilter : PemPrivateKeyFileFilter,
-            DefaultExt = isOpenSsh ? string.Empty : PemPrivateKeyFileExtension
+            FileName = fileName,
+            Filter = filter,
+            DefaultExt = defaultExt
         };
 
         if (dialog.ShowDialog() == true)

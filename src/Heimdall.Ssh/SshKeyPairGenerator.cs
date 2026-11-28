@@ -43,7 +43,8 @@ public enum SshKeyAlgorithm
 public enum SshPrivateKeyFormat
 {
     OpenSsh,
-    Pkcs8Pem
+    Pkcs8Pem,
+    PuttyPpkV3
 }
 
 /// <summary>
@@ -72,6 +73,13 @@ public static class SshKeyPairGenerator
     private const int AesBlockLength = 16;
     private const int OpenSshUnencryptedBlockSize = 8;
     private const int PemLineLength = 70;
+    private const int PpkLineLength = 64;
+    private const int PpkArgon2MemoryKb = 8192;
+    private const int PpkArgon2Passes = 13;
+    private const int PpkArgon2Parallelism = 1;
+    private const int PpkArgon2SaltLength = 16;
+    private const int PpkMacKeyLength = 32;
+    private const string PpkCipherAes256Cbc = "aes256-cbc";
 
     private const string OpenSshRsaPrefix = "ssh-rsa";
     private const string OpenSshEd25519Prefix = "ssh-ed25519";
@@ -149,6 +157,12 @@ public static class SshKeyPairGenerator
                     comment,
                     passphrase),
                 SshPrivateKeyFormat.Pkcs8Pem => ExportEd25519Pkcs8Pem(privateSeed, passphrase),
+                SshPrivateKeyFormat.PuttyPpkV3 => EncodePuttyPpkV3PrivateKey(
+                    OpenSshEd25519Prefix,
+                    publicBlob,
+                    writer => WriteOpenSshBytes(writer, privateSeed),
+                    comment,
+                    passphrase),
                 _ => throw new ArgumentOutOfRangeException(nameof(format), format, "Unsupported private key format.")
             };
 
@@ -189,6 +203,12 @@ public static class SshKeyPairGenerator
                     comment,
                     passphrase),
                 SshPrivateKeyFormat.Pkcs8Pem => ExportNetPkcs8Pem(rsa, passphrase),
+                SshPrivateKeyFormat.PuttyPpkV3 => EncodePuttyPpkV3PrivateKey(
+                    OpenSshRsaPrefix,
+                    publicBlob,
+                    writer => WritePuttyRsaPrivatePayload(writer, parameters),
+                    comment,
+                    passphrase),
                 _ => throw new ArgumentOutOfRangeException(nameof(format), format, "Unsupported private key format.")
             };
 
@@ -233,6 +253,12 @@ public static class SshKeyPairGenerator
                     comment,
                     passphrase),
                 SshPrivateKeyFormat.Pkcs8Pem => ExportNetPkcs8Pem(ecdsa, passphrase),
+                SshPrivateKeyFormat.PuttyPpkV3 => EncodePuttyPpkV3PrivateKey(
+                    keyType,
+                    publicBlob,
+                    writer => WriteOpenSshMpint(writer, parameters.D!),
+                    comment,
+                    passphrase),
                 _ => throw new ArgumentOutOfRangeException(nameof(format), format, "Unsupported private key format.")
             };
 
@@ -428,6 +454,179 @@ public static class SshKeyPairGenerator
         WriteOpenSshMpint(stream, parameters.InverseQ!);
         WriteOpenSshMpint(stream, parameters.P!);
         WriteOpenSshMpint(stream, parameters.Q!);
+    }
+
+    private static void WritePuttyRsaPrivatePayload(MemoryStream stream, RSAParameters parameters)
+    {
+        WriteOpenSshMpint(stream, parameters.D!);
+        WriteOpenSshMpint(stream, parameters.P!);
+        WriteOpenSshMpint(stream, parameters.Q!);
+        WriteOpenSshMpint(stream, parameters.InverseQ!);
+    }
+
+    private static string EncodePuttyPpkV3PrivateKey(
+        string algorithmName,
+        byte[] publicKeyBlob,
+        Action<MemoryStream> writePrivateKeyFields,
+        string comment,
+        string passphrase)
+    {
+        var encrypt = !string.IsNullOrEmpty(passphrase);
+        var sanitizedComment = comment.Replace("\r", string.Empty, StringComparison.Ordinal)
+            .Replace("\n", string.Empty, StringComparison.Ordinal);
+        var encryptionName = encrypt ? PpkCipherAes256Cbc : OpenSshCipherNone;
+
+        byte[] rawPrivatePlaintext;
+        using (var privStream = new MemoryStream())
+        {
+            writePrivateKeyFields(privStream);
+            rawPrivatePlaintext = privStream.ToArray();
+        }
+
+        byte[] paddedPrivatePlaintext = rawPrivatePlaintext;
+        byte[]? derived = null;
+        byte[]? salt = null;
+        byte[]? passphraseBytes = null;
+        try
+        {
+            if (encrypt)
+            {
+                var padLength = (AesBlockLength - (rawPrivatePlaintext.Length % AesBlockLength)) % AesBlockLength;
+                if (padLength > 0)
+                {
+                    paddedPrivatePlaintext = new byte[rawPrivatePlaintext.Length + padLength];
+                    Buffer.BlockCopy(rawPrivatePlaintext, 0, paddedPrivatePlaintext, 0, rawPrivatePlaintext.Length);
+                    RandomNumberGenerator.Fill(paddedPrivatePlaintext.AsSpan(rawPrivatePlaintext.Length, padLength));
+                }
+            }
+
+            byte[] privateWireBytes;
+            byte[] macKey;
+            if (encrypt)
+            {
+                salt = RandomNumberGenerator.GetBytes(PpkArgon2SaltLength);
+                passphraseBytes = Encoding.UTF8.GetBytes(passphrase);
+                derived = new byte[Aes256KeyLength + AesBlockLength + PpkMacKeyLength];
+
+                var argon2Params = new Argon2Parameters.Builder(Argon2Parameters.Argon2id)
+                    .WithVersion(Argon2Parameters.Version13)
+                    .WithSalt(salt)
+                    .WithMemoryAsKB(PpkArgon2MemoryKb)
+                    .WithIterations(PpkArgon2Passes)
+                    .WithParallelism(PpkArgon2Parallelism)
+                    .Build();
+                var argon2 = new Argon2BytesGenerator();
+                argon2.Init(argon2Params);
+                argon2.GenerateBytes(passphraseBytes, derived, 0, derived.Length);
+
+                var cipherKey = derived.AsSpan(0, Aes256KeyLength).ToArray();
+                var iv = derived.AsSpan(Aes256KeyLength, AesBlockLength).ToArray();
+                macKey = derived.AsSpan(Aes256KeyLength + AesBlockLength, PpkMacKeyLength).ToArray();
+                try
+                {
+                    using var aes = Aes.Create();
+                    aes.Key = cipherKey;
+                    privateWireBytes = aes.EncryptCbc(paddedPrivatePlaintext, iv, PaddingMode.None);
+                }
+                finally
+                {
+                    CryptographicOperations.ZeroMemory(cipherKey);
+                    CryptographicOperations.ZeroMemory(iv);
+                }
+            }
+            else
+            {
+                privateWireBytes = paddedPrivatePlaintext;
+                macKey = [];
+            }
+
+            byte[] mac;
+            try
+            {
+                using var macStream = new MemoryStream();
+                WriteOpenSshString(macStream, algorithmName);
+                WriteOpenSshString(macStream, encryptionName);
+                WriteOpenSshBytes(macStream, Encoding.UTF8.GetBytes(sanitizedComment));
+                WriteOpenSshBytes(macStream, publicKeyBlob);
+                WriteOpenSshBytes(macStream, paddedPrivatePlaintext);
+                var macInput = macStream.ToArray();
+                try
+                {
+                    mac = HMACSHA256.HashData(macKey, macInput);
+                }
+                finally
+                {
+                    CryptographicOperations.ZeroMemory(macInput);
+                }
+            }
+            finally
+            {
+                if (macKey.Length > 0)
+                {
+                    CryptographicOperations.ZeroMemory(macKey);
+                }
+            }
+
+            var publicLines = WrapBase64Lines(Convert.ToBase64String(publicKeyBlob), PpkLineLength);
+            var privateLines = WrapBase64Lines(Convert.ToBase64String(privateWireBytes), PpkLineLength);
+
+            var sb = new StringBuilder();
+            sb.Append("PuTTY-User-Key-File-3: ").AppendLine(algorithmName);
+            sb.Append("Encryption: ").AppendLine(encryptionName);
+            sb.Append("Comment: ").AppendLine(sanitizedComment);
+            sb.Append("Public-Lines: ").AppendLine(publicLines.Count.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            foreach (var line in publicLines)
+            {
+                sb.AppendLine(line);
+            }
+
+            if (encrypt && salt is not null)
+            {
+                sb.AppendLine("Key-Derivation: Argon2id");
+                sb.Append("Argon2-Memory: ").AppendLine(PpkArgon2MemoryKb.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                sb.Append("Argon2-Passes: ").AppendLine(PpkArgon2Passes.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                sb.Append("Argon2-Parallelism: ").AppendLine(PpkArgon2Parallelism.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                sb.Append("Argon2-Salt: ").AppendLine(Convert.ToHexString(salt).ToLowerInvariant());
+            }
+
+            sb.Append("Private-Lines: ").AppendLine(privateLines.Count.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            foreach (var line in privateLines)
+            {
+                sb.AppendLine(line);
+            }
+
+            sb.Append("Private-MAC: ").Append(Convert.ToHexString(mac).ToLowerInvariant());
+            return sb.ToString();
+        }
+        finally
+        {
+            CryptographicOperations.ZeroMemory(rawPrivatePlaintext);
+            if (!ReferenceEquals(paddedPrivatePlaintext, rawPrivatePlaintext))
+            {
+                CryptographicOperations.ZeroMemory(paddedPrivatePlaintext);
+            }
+
+            if (derived is not null)
+            {
+                CryptographicOperations.ZeroMemory(derived);
+            }
+
+            if (passphraseBytes is not null)
+            {
+                CryptographicOperations.ZeroMemory(passphraseBytes);
+            }
+        }
+    }
+
+    private static List<string> WrapBase64Lines(string base64, int lineLength)
+    {
+        var lines = new List<string>(Math.Max(1, (base64.Length + lineLength - 1) / lineLength));
+        for (var i = 0; i < base64.Length; i += lineLength)
+        {
+            lines.Add(base64.Substring(i, Math.Min(lineLength, base64.Length - i)));
+        }
+
+        return lines;
     }
 
     private static void WriteEcdsaPrivatePayload(

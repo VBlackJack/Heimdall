@@ -407,6 +407,7 @@ public sealed partial class TunnelManager
             Port = intermediateLocalPort,
             Username = nextGateway.Username,
             KeyPath = nextGateway.KeyPath,
+            CertificatePath = nextGateway.CertificatePath,
             Password = nextGateway.Password,
             KeyPassphrase = nextGateway.KeyPassphrase,
             SshAgentPreference = nextGateway.SshAgentPreference,

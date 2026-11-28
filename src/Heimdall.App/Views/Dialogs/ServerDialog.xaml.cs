@@ -450,6 +450,21 @@ public partial class ServerDialog : Window
         }
     }
 
+    private void OnBrowseSshCertificateClick(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = _localizer?["ServerDialogBrowseCertTitle"] ?? "Select SSH User Certificate",
+            Filter = _localizer?["ServerDialogBrowseCertFilter"] ?? "SSH Certificates (*-cert.pub;*.pub)|*-cert.pub;*.pub|All Files (*.*)|*.*",
+            CheckFileExists = true
+        };
+
+        if (dialog.ShowDialog(this) == true && DataContext is ServerDialogViewModel vm)
+        {
+            vm.SshCertificatePath = dialog.FileName;
+        }
+    }
+
     private async void OnEditGatewayClick(object sender, RoutedEventArgs e)
     {
         if (DataContext is not ServerDialogViewModel vm) return;
@@ -574,8 +589,10 @@ public partial class ServerDialog : Window
         System.Windows.Automation.AutomationProperties.SetLabeledBy(DlgSrv_WinRmIdentityCombo, DlgSrv_WinRmIdentityLabel);
         System.Windows.Automation.AutomationProperties.SetLabeledBy(DlgSrv_WinRmUsernameBox, DlgSrv_BasicWinRmUsernameLabel);
         System.Windows.Automation.AutomationProperties.SetLabeledBy(DlgSrv_SshKeyPathBox, DlgSrv_BasicSshKeyLabel);
+        System.Windows.Automation.AutomationProperties.SetLabeledBy(DlgSrv_SshCertPathBox, DlgSrv_BasicSshCertLabel);
         System.Windows.Automation.AutomationProperties.SetLabeledBy(DlgSrv_SshAgentKeyCombo, DlgSrv_BasicSshAgentKeyLabel);
         DlgSrv_BasicBrowseBtn.Content = _localizer["ServerDialogBtnBrowse"];
+        DlgSrv_BasicBrowseCertBtn.Content = _localizer["ServerDialogBtnBrowse"];
         // SSH auth hints are bound to computed ViewModel properties.
         DlgSrv_BasicVncCredentialsTitle.Text = _localizer["ServerDialogVncCredentials"];
         DlgSrv_BasicVncCredentialsDesc.Text = _localizer["ServerDialogVncCredentialsDesc"];

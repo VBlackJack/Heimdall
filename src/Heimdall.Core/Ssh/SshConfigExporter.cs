@@ -37,7 +37,8 @@ public sealed record SshConfigHostEntry(
     int RemoteBindPort = 0,
     int RemoteLocalPort = 0,
     int ServerAliveInterval = 0,
-    IReadOnlyList<string>? LocalForwards = null);
+    IReadOnlyList<string>? LocalForwards = null,
+    string? CertificateFile = null);
 
 /// <summary>
 /// Pure OpenSSH <c>~/.ssh/config</c> exporter for single hosts and full Heimdall inventories.
@@ -83,6 +84,12 @@ public static class SshConfigExporter
         if (!string.IsNullOrWhiteSpace(identityFile))
         {
             sb.Append(ConfigIndent).Append("IdentityFile ").AppendLine(FormatDirectiveValue(identityFile));
+        }
+
+        var certificateFile = SanitizePathValue(entry.CertificateFile);
+        if (!string.IsNullOrWhiteSpace(certificateFile))
+        {
+            sb.Append(ConfigIndent).Append("CertificateFile ").AppendLine(FormatDirectiveValue(certificateFile));
         }
 
         var proxyJump = SanitizeToken(entry.ProxyJump);
@@ -249,7 +256,8 @@ public static class SshConfigExporter
                 RemoteBindPort: server.RemoteBindPort,
                 RemoteLocalPort: server.RemoteLocalPort,
                 ServerAliveInterval: defaultServerAliveInterval,
-                LocalForwards: server.SshLocalForwards));
+                LocalForwards: server.SshLocalForwards,
+                CertificateFile: server.SshCertificatePath));
 
             if (!string.IsNullOrWhiteSpace(block))
             {

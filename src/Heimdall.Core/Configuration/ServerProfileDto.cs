@@ -284,6 +284,7 @@ public sealed class ServerProfileDto : IJsonOnDeserialized
         set => _sshAgentKeyFingerprint = string.IsNullOrWhiteSpace(value) ? null : value;
     }
     public string? SshKeyPath { get; set; }
+    public string? SshCertificatePath { get; set; }
     public string? SshPasswordEncrypted { get; set; }
     public string? SshKeyPassphraseEncrypted
     {

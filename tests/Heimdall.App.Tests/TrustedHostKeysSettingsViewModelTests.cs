@@ -286,6 +286,38 @@ public sealed class TrustedHostKeysSettingsViewModelTests
         Assert.Contains("bad.example.com", fixture.ViewModel.PolicyDetailsTooltip, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task SecurityPolicies_AddFromPublicKeyAndRemove_UpdatesTrustStoreAndRows()
+    {
+        var fixture = await VmFixture.CreateAsync();
+        var generatedCa = SshKeyPairGenerator.Generate(SshKeyAlgorithm.Ed25519, "ca@corp");
+
+        fixture.ViewModel.NewPolicyHostPatterns = "*.prod.example.com";
+        fixture.ViewModel.NewPolicyKeyOrFingerprint = generatedCa.PublicKeyOpenSsh;
+        fixture.ViewModel.AddCertAuthorityCommand.Execute(null);
+
+        Assert.Equal(1, fixture.ViewModel.CertAuthorityCount);
+        var caRow = Assert.Single(fixture.ViewModel.PolicyRows);
+        Assert.True(caRow.IsCertAuthority);
+        Assert.Equal("*.prod.example.com", caRow.HostPatterns);
+        Assert.Equal(generatedCa.Fingerprint, caRow.Fingerprint);
+        Assert.Empty(fixture.ViewModel.NewPolicyKeyOrFingerprint);
+
+        fixture.ViewModel.NewPolicyHostPatterns = "*";
+        fixture.ViewModel.NewPolicyKeyOrFingerprint = "SHA256:0123456789abcdef0123456789abcdef0123456789a";
+        fixture.ViewModel.AddRevokedKeyCommand.Execute(null);
+
+        Assert.Equal(1, fixture.ViewModel.RevokedKeyCount);
+        Assert.Equal(2, fixture.ViewModel.PolicyRows.Count);
+
+        fixture.Dialog.ConfirmResult = true;
+        await fixture.ViewModel.RemovePolicyCommand.ExecuteAsync(caRow);
+
+        Assert.Equal(0, fixture.ViewModel.CertAuthorityCount);
+        Assert.Equal(1, fixture.ViewModel.RevokedKeyCount);
+        Assert.Single(fixture.ViewModel.PolicyRows);
+    }
+
     private static HostKeyEntry Entry(
         string fingerprint,
         int daysAgo,

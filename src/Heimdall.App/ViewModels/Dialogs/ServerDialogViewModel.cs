@@ -594,6 +594,9 @@ public partial class ServerDialogViewModel : ObservableValidator
     private string _sshKeyPath = "";
 
     [ObservableProperty]
+    private string _sshCertificatePath = "";
+
+    [ObservableProperty]
     private string _sshPassword = "";
 
     [ObservableProperty]
@@ -845,6 +848,12 @@ public partial class ServerDialogViewModel : ObservableValidator
     public bool HasSshKeyPath => !string.IsNullOrWhiteSpace(SshKeyPath);
 
     /// <summary>
+    /// Whether the optional SSH user certificate path field should be shown.
+    /// </summary>
+    public bool HasSshKeyOrCertificatePath =>
+        !string.IsNullOrWhiteSpace(SshKeyPath) || !string.IsNullOrWhiteSpace(SshCertificatePath);
+
+    /// <summary>
     /// Returns the hint that describes which SSH authentication method will be
     /// attempted, based on the current state of the SSH credential fields.
     /// Order of precedence matches <see cref="Heimdall.App.Services.Handlers.SshHandler"/>:
@@ -882,6 +891,7 @@ public partial class ServerDialogViewModel : ObservableValidator
     partial void OnSshKeyPathChanged(string value)
     {
         OnPropertyChanged(nameof(HasSshKeyPath));
+        OnPropertyChanged(nameof(HasSshKeyOrCertificatePath));
         OnPropertyChanged(nameof(SshAuthHint));
         ResetTestChip();
         if (string.IsNullOrWhiteSpace(value))
@@ -894,6 +904,11 @@ public partial class ServerDialogViewModel : ObservableValidator
             // branch has already dropped.
             OnPropertyChanged(nameof(HasStoredSshKeyPassphrase));
         }
+    }
+
+    partial void OnSshCertificatePathChanged(string value)
+    {
+        OnPropertyChanged(nameof(HasSshKeyOrCertificatePath));
     }
 
     partial void OnSshPasswordChanged(string value)
@@ -2901,6 +2916,7 @@ public partial class ServerDialogViewModel : ObservableValidator
             SshUsername = string.IsNullOrWhiteSpace(SshUsername) ? null : SshUsername,
             SshPort = SshPort,
             SshKeyPath = sshKeyPath,
+            SshCertificatePath = string.IsNullOrWhiteSpace(SshCertificatePath) ? null : SshCertificatePath.Trim(),
             SshPasswordEncrypted = string.IsNullOrEmpty(SshPassword)
                 ? ExistingSshPasswordEncrypted
                 : Heimdall.Core.Security.CredentialProtector.Protect(SshPassword),
@@ -3139,6 +3155,7 @@ public partial class ServerDialogViewModel : ObservableValidator
         vm.SshUsername = dto.SshUsername ?? "";
         vm.SshPort = dto.SshPort;
         vm.SshKeyPath = dto.SshKeyPath ?? "";
+        vm.SshCertificatePath = dto.SshCertificatePath ?? "";
         vm.SshCompression = dto.SshCompression;
         vm.SshX11Forwarding = dto.SshX11Forwarding;
         vm.SshCryptoPolicySelection = dto.SshCryptoPolicy?.ToString() ?? "";

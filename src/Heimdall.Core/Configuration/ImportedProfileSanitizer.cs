@@ -72,6 +72,7 @@ public static class ImportedProfileSanitizer
     private static readonly (string LabelKey, Func<ServerProfileDto, string?> Get, Action<ServerProfileDto> Clear)[] LocalPathFields =
     [
         ("ServerDialogLabelSshKey", static profile => profile.SshKeyPath, static profile => profile.SshKeyPath = null),
+        ("ServerDialogLabelSshCertificate", static profile => profile.SshCertificatePath, static profile => profile.SshCertificatePath = null),
         ("ServerDialogLabelIcaFilePath", static profile => profile.CitrixIcaFilePath, static profile => profile.CitrixIcaFilePath = null),
         ("ServerDialogLabelExecutable", static profile => profile.LocalShellExecutable, static profile => profile.LocalShellExecutable = null),
         ("ServerDialogLabelWorkingDir", static profile => profile.LocalShellWorkingDirectory, static profile => profile.LocalShellWorkingDirectory = null),
