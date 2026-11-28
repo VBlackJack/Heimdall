@@ -127,6 +127,65 @@
                     <ComboBoxItem Content="{loc:Translate SettingsSshCryptoPolicyLegacy}" Tag="LegacyCompatible"/>
                 </ComboBox>
 
+                <TextBlock Text="{loc:Translate SshProxyTypeLabel}" Style="{StaticResource DialogLabelStyle}" Margin="0,12,0,4"/>
+                <ComboBox x:Name="CmbProxyType"
+                          SelectedValue="{Binding SshProxyTypeSelection}"
+                          SelectedValuePath="Tag"
+                          AutomationProperties.Name="{loc:Translate SshProxyTypeLabel}"
+                          Style="{StaticResource DialogFormComboBoxStyle}">
+                    <ComboBoxItem Content="{loc:Translate SshProxyTypeNone}" Tag=""/>
+                    <ComboBoxItem Content="{loc:Translate SshProxyTypeHttp}" Tag="Http"/>
+                    <ComboBoxItem Content="{loc:Translate SshProxyTypeSocks5}" Tag="Socks5"/>
+                    <ComboBoxItem Content="{loc:Translate SshProxyTypeSocks4}" Tag="Socks4"/>
+                </ComboBox>
+                <StackPanel Visibility="{Binding HasSshProxy, Converter={StaticResource BoolToVisibilityConverter}}" Margin="0,8,0,0">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="96"/>
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                            <TextBlock Text="{loc:Translate SshProxyHostLabel}" Style="{StaticResource DialogLabelStyle}" Margin="0,0,0,4"/>
+                            <TextBox Text="{Binding SshProxyHost, UpdateSourceTrigger=PropertyChanged}"
+                                     AutomationProperties.Name="{loc:Translate SshProxyHostLabel}"
+                                     Style="{StaticResource DialogFormTextBoxStyle}"/>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1">
+                            <TextBlock Text="{loc:Translate SshProxyPortLabel}" Style="{StaticResource DialogLabelStyle}" Margin="0,0,0,4"/>
+                            <TextBox Text="{Binding SshProxyPortText, UpdateSourceTrigger=PropertyChanged}"
+                                     AutomationProperties.Name="{loc:Translate SshProxyPortLabel}"
+                                     Style="{StaticResource DialogFormTextBoxStyle}"/>
+                        </StackPanel>
+                    </Grid>
+                    <TextBlock Text="{loc:Translate SshProxyUsernameLabel}" Style="{StaticResource DialogLabelStyle}" Margin="0,8,0,4"/>
+                    <TextBox Text="{Binding SshProxyUsername, UpdateSourceTrigger=PropertyChanged}"
+                             AutomationProperties.Name="{loc:Translate SshProxyUsernameLabel}"
+                             Style="{StaticResource DialogFormTextBoxStyle}"/>
+                    <TextBlock Text="{loc:Translate SshProxyPasswordLabel}" Style="{StaticResource DialogLabelStyle}" Margin="0,8,0,4"/>
+                    <PasswordBox x:Name="ProxyPasswordBox"
+                                 AutomationProperties.Name="{loc:Translate SshProxyPasswordLabel}"
+                                 Style="{StaticResource DialogFormPasswordBoxStyle}"
+                                 PasswordChanged="OnCredentialPasswordChanged"/>
+                    <StackPanel Orientation="Horizontal"
+                                Margin="0,6,0,0"
+                                Visibility="{Binding HasStoredSshProxyPassword, Converter={StaticResource BoolToVisibilityConverter}}">
+                        <TextBlock Text="{loc:Translate GatewayPasswordSaved}"
+                                   Style="{StaticResource DialogHintTextStyle}"
+                                   VerticalAlignment="Center"/>
+                        <Button Content="{loc:Translate GatewayPasswordClear}"
+                                Command="{Binding ClearStoredSshProxyPasswordCommand}"
+                                Click="OnClearStoredCredentialClick"
+                                Tag="ProxyPasswordBox"
+                                AutomationProperties.Name="{loc:Translate SshProxyClearStoredPassword}"
+                                Style="{StaticResource GhostButtonStyle}"
+                                FontSize="{StaticResource FontSizeCaption}"
+                                Padding="8,2"
+                                MinHeight="0"
+                                Margin="8,0,0,0"
+                                VerticalAlignment="Center"/>
+                    </StackPanel>
+                </StackPanel>
+
                 <TextBlock x:Name="LblAgentKey" Style="{StaticResource DialogLabelStyle}" Margin="0,12,0,4"/>
                 <Grid>
                     <Grid.ColumnDefinitions>

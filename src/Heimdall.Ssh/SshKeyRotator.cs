@@ -149,6 +149,11 @@ public static class SshKeyRotator
             DisableAgentAuthentication = true,
             AgentKeyFingerprint = null,
             CryptoPolicy = baseParams.CryptoPolicy,
+            ProxyType = baseParams.ProxyType,
+            ProxyHost = baseParams.ProxyHost,
+            ProxyPort = baseParams.ProxyPort,
+            ProxyUsername = baseParams.ProxyUsername,
+            ProxyPassword = baseParams.ProxyPassword,
             ConnectTimeout = baseParams.ConnectTimeout,
             AuthenticationTimeout = TimeSpan.FromSeconds(30),
             KeyboardInteractiveResponder = null

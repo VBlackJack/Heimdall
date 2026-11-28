@@ -86,6 +86,38 @@ public partial class GatewayDialogViewModel : ObservableValidator
     private string _sshCryptoPolicySelection = "";
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSshProxy))]
+    private string _sshProxyTypeSelection = "";
+
+    [ObservableProperty]
+    private string _sshProxyHost = "";
+
+    [ObservableProperty]
+    private string _sshProxyPortText = "";
+
+    [ObservableProperty]
+    private string _sshProxyUsername = "";
+
+    [ObservableProperty]
+    private string _sshProxyPassword = "";
+
+    public string? ExistingSshProxyPasswordEncrypted { get; set; }
+
+    public bool HasSshProxy => !string.IsNullOrEmpty(SshProxyTypeSelection);
+
+    public bool HasStoredSshProxyPassword => !string.IsNullOrEmpty(ExistingSshProxyPasswordEncrypted);
+
+    [RelayCommand]
+    private void ClearStoredSshProxyPassword()
+    {
+        ExistingSshProxyPasswordEncrypted = null;
+        SshProxyPassword = "";
+        OnPropertyChanged(nameof(HasStoredSshProxyPassword));
+        IsDirty = true;
+        InvalidateDiagnosticResult();
+    }
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasChosenSshAgentKey))]
     private string? _sshAgentKeyFingerprint;
 
@@ -497,6 +529,20 @@ public partial class GatewayDialogViewModel : ObservableValidator
             SshCryptoPolicy = Enum.TryParse<Heimdall.Core.Ssh.SshCryptoPolicy>(SshCryptoPolicySelection, out var parsedCryptoPolicy)
                 ? parsedCryptoPolicy
                 : null,
+            SshProxyType = Enum.TryParse<Heimdall.Core.Ssh.SshProxyType>(SshProxyTypeSelection, out var parsedProxyType)
+                ? parsedProxyType
+                : Heimdall.Core.Ssh.SshProxyType.None,
+            SshProxyHost = string.IsNullOrWhiteSpace(SshProxyHost) ? null : SshProxyHost.Trim(),
+            SshProxyPort = int.TryParse(SshProxyPortText?.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var parsedProxyPort)
+                && parsedProxyPort is > 0 and <= 65535
+                ? parsedProxyPort
+                : 0,
+            SshProxyUsername = string.IsNullOrWhiteSpace(SshProxyUsername) ? null : SshProxyUsername.Trim(),
+            SshProxyPasswordEncrypted = !HasSshProxy
+                ? null
+                : string.IsNullOrEmpty(SshProxyPassword)
+                    ? ExistingSshProxyPasswordEncrypted
+                    : Heimdall.Core.Security.CredentialProtector.Protect(SshProxyPassword),
             SshAgentKeyFingerprint = string.IsNullOrWhiteSpace(SshAgentKeyFingerprint)
                 ? null
                 : SshAgentKeyFingerprint,
@@ -557,6 +603,11 @@ public partial class GatewayDialogViewModel : ObservableValidator
         vm.KeyPath = dto.KeyPath ?? "";
         vm.SshCertificatePath = dto.SshCertificatePath ?? "";
         vm.SshCryptoPolicySelection = dto.SshCryptoPolicy?.ToString() ?? "";
+        vm.SshProxyTypeSelection = dto.SshProxyType == Heimdall.Core.Ssh.SshProxyType.None ? "" : dto.SshProxyType.ToString();
+        vm.SshProxyHost = dto.SshProxyHost ?? "";
+        vm.SshProxyPortText = dto.SshProxyPort > 0 ? dto.SshProxyPort.ToString(CultureInfo.InvariantCulture) : "";
+        vm.SshProxyUsername = dto.SshProxyUsername ?? "";
+        vm.ExistingSshProxyPasswordEncrypted = dto.SshProxyPasswordEncrypted;
         vm.SshAgentKeyFingerprint = dto.SshAgentKeyFingerprint;
         vm.SelectedParentGatewayId = dto.ParentGatewayId ?? "";
         vm.HostKeyFingerprint = dto.HostKeyFingerprint ?? "";

@@ -48,6 +48,19 @@ public static class ImportedProfileValidator
         ValidateOptionalPort(errors, profile.SocksProxyPort, nameof(profile.SocksProxyPort));
         ValidateOptionalPort(errors, profile.RemoteBindPort, nameof(profile.RemoteBindPort));
         ValidateOptionalPort(errors, profile.RemoteLocalPort, nameof(profile.RemoteLocalPort));
+        ValidateOptionalPort(errors, profile.SshProxyPort, nameof(profile.SshProxyPort));
+
+        if (!Enum.IsDefined(profile.SshProxyType))
+        {
+            errors.Add(
+                $"{nameof(profile.SshProxyType)}: unsupported value '{(int)profile.SshProxyType}'.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(profile.SshProxyHost)
+            && CanonicalizeHost(profile.SshProxyHost) is null)
+        {
+            errors.Add($"{nameof(profile.SshProxyHost)}: not a usable host '{profile.SshProxyHost}'.");
+        }
 
         if (!Enum.IsDefined(profile.WinRmIdentityMode))
         {

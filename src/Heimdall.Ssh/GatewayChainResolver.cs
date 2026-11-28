@@ -171,6 +171,12 @@ public static class GatewayChainResolver
             keyPassphrase = decryptPassword(gateway.SshKeyPassphraseEncrypted);
         }
 
+        string? proxyPassword = null;
+        if (!string.IsNullOrEmpty(gateway.SshProxyPasswordEncrypted))
+        {
+            proxyPassword = decryptPassword(gateway.SshProxyPasswordEncrypted);
+        }
+
         return new SshConnectionParams
         {
             Host = gateway.Host,
@@ -182,6 +188,11 @@ public static class GatewayChainResolver
             KeyPassphrase = keyPassphrase,
             SshAgentPreference = sshAgentPreference,
             CryptoPolicy = SshCryptoPolicyResolver.Resolve(gateway.SshCryptoPolicy, sshCryptoPolicy),
+            ProxyType = gateway.SshProxyType,
+            ProxyHost = string.IsNullOrWhiteSpace(gateway.SshProxyHost) ? null : gateway.SshProxyHost.Trim(),
+            ProxyPort = gateway.SshProxyPort,
+            ProxyUsername = string.IsNullOrWhiteSpace(gateway.SshProxyUsername) ? null : gateway.SshProxyUsername.Trim(),
+            ProxyPassword = proxyPassword,
             AgentKeyFingerprint = gateway.SshAgentKeyFingerprint,
             UseLegacyPasswordAsKeyPassphrase = gateway.UsesLegacySshCredentialMapping,
             LegacyCredentialName = gateway.Name

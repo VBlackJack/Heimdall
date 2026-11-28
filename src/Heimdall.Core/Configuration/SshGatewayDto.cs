@@ -58,6 +58,21 @@ public sealed class SshGatewayDto
     /// </summary>
     public Ssh.SshCryptoPolicy? SshCryptoPolicy { get; set; }
 
+    /// <summary>Optional outbound proxy type (HTTP CONNECT, SOCKS5, SOCKS4) used to reach this gateway.</summary>
+    public Ssh.SshProxyType SshProxyType { get; set; } = Ssh.SshProxyType.None;
+
+    /// <summary>Proxy hostname or IP address when <see cref="SshProxyType"/> is not <see cref="Ssh.SshProxyType.None"/>.</summary>
+    public string? SshProxyHost { get; set; }
+
+    /// <summary>Proxy TCP port when <see cref="SshProxyType"/> is not <see cref="Ssh.SshProxyType.None"/>.</summary>
+    public int SshProxyPort { get; set; }
+
+    /// <summary>Optional proxy authentication username.</summary>
+    public string? SshProxyUsername { get; set; }
+
+    /// <summary>Optional DPAPI-encrypted proxy authentication password.</summary>
+    public string? SshProxyPasswordEncrypted { get; set; }
+
     public string? SshPasswordEncrypted { get; set; }
     public string? SshKeyPassphraseEncrypted
     {

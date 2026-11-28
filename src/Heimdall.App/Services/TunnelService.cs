@@ -1026,6 +1026,15 @@ public sealed class TunnelService : ITunnelService
             {
                 WriteLengthPrefixedString(payload, "policy:" + gwPolicy);
             }
+
+            if (gateway.SshProxyType != SshProxyType.None)
+            {
+                WriteLengthPrefixedString(payload, "proxy:" + gateway.SshProxyType);
+                WriteLengthPrefixedString(payload, gateway.SshProxyHost ?? string.Empty);
+                WriteLengthPrefixedString(payload, gateway.SshProxyPort.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                WriteLengthPrefixedString(payload, gateway.SshProxyUsername ?? string.Empty);
+                WriteLengthPrefixedString(payload, gateway.SshProxyPasswordEncrypted ?? string.Empty);
+            }
         }
 
         byte[] hash = SHA256.HashData(payload.ToArray());

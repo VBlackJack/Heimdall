@@ -146,6 +146,7 @@ public partial class GatewayDialog : Window
         if (DataContext is not GatewayDialogViewModel vm || !vm.TestGatewayRouteCommand.CanExecute(null)) return;
         vm.Password = PasswordBox.Password;
         vm.KeyPassphrase = vm.HasKeyPath ? KeyPassphraseBox.Password : "";
+        vm.SshProxyPassword = vm.HasSshProxy ? ProxyPasswordBox.Password : "";
         vm.TestGatewayRouteCommand.Execute(null);
     }
 
@@ -170,6 +171,7 @@ public partial class GatewayDialog : Window
         {
             PasswordBox.Clear();
             KeyPassphraseBox.Clear();
+            ProxyPasswordBox.Clear();
         });
     }
 
@@ -209,6 +211,7 @@ public partial class GatewayDialog : Window
         // Transfer PasswordBox value (WPF PasswordBox cannot be databound)
         vm.Password = PasswordBox.Password;
         vm.KeyPassphrase = vm.HasKeyPath ? KeyPassphraseBox.Password : "";
+        vm.SshProxyPassword = vm.HasSshProxy ? ProxyPasswordBox.Password : "";
 
         // Save is the default button, so Enter reaches here with the focus still in a box. The
         // port is pushed again here, and text it could not convert blocks the save instead of

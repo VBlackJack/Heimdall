@@ -406,6 +406,11 @@ public sealed partial class SshAuthorizedKeysDialogViewModel : ObservableObject
                 UseLegacyPasswordAsKeyPassphrase = _target.UsesLegacySshCredentialMapping,
                 LegacyCredentialName = _target.DisplayName,
                 CryptoPolicy = SshCryptoPolicyResolver.Resolve(_target.SshCryptoPolicy, _settings.SshCryptoPolicy),
+                ProxyType = logicalHost is not null ? SshProxyType.None : _target.SshProxyType,
+                ProxyHost = logicalHost is not null || string.IsNullOrWhiteSpace(_target.SshProxyHost) ? null : _target.SshProxyHost.Trim(),
+                ProxyPort = logicalHost is not null ? 0 : _target.SshProxyPort,
+                ProxyUsername = logicalHost is not null || string.IsNullOrWhiteSpace(_target.SshProxyUsername) ? null : _target.SshProxyUsername.Trim(),
+                ProxyPassword = logicalHost is not null ? null : ConnectionHelpers.DecryptPassword(_target.SshProxyPasswordEncrypted),
                 OnBeforeAgentSign = SshAgentSignConfirmHelper.BuildBeforeSignNotification(_localizer, reportStatus: null),
                 ConfirmAgentSign = SshAgentSignConfirmHelper.BuildConfirmCallback(
                     _settings,

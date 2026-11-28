@@ -222,6 +222,7 @@ public partial class ServerDialog : Window
         // Transfer PasswordBox values if they exist in the visual tree
         var sshPwBox = FindName("SshPasswordBox") as System.Windows.Controls.PasswordBox;
         var sshKeyPassphraseBox = FindName("SshKeyPassphraseBox") as System.Windows.Controls.PasswordBox;
+        var sshProxyPwBox = FindName("SshProxyPasswordBox") as System.Windows.Controls.PasswordBox;
         var rdpPwBox = FindName("RdpPasswordBox") as System.Windows.Controls.PasswordBox;
         var vncPwBox = FindName("VncPasswordBox") as System.Windows.Controls.PasswordBox;
         var webPwBox = FindName("WebPasswordBox") as System.Windows.Controls.PasswordBox;
@@ -233,6 +234,11 @@ public partial class ServerDialog : Window
         if (sshKeyPassphraseBox is not null)
         {
             vm.SshKeyPassphrase = vm.HasSshKeyPath ? sshKeyPassphraseBox.Password : "";
+        }
+
+        if (sshProxyPwBox is not null)
+        {
+            vm.SshProxyPassword = vm.HasSshProxy ? sshProxyPwBox.Password : "";
         }
 
         if (rdpPwBox is not null) vm.RdpPassword = rdpPwBox.Password;

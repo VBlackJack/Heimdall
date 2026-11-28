@@ -7093,5 +7093,15 @@
   "ToolSshServerAuditDriftImproved": "+ Mejorado",
   "ToolSshServerAuditDriftRegressed": "- Regresi\u00f3n",
   "ToolSshServerAuditDriftUnchanged": "= Igual",
-  "ToolSshServerAuditDriftNew": "Nuevo"
+  "ToolSshServerAuditDriftNew": "Nuevo",
+  "SshProxyTypeLabel": "Proxy saliente",
+  "SshProxyTypeNone": "Ninguno (directo)",
+  "SshProxyTypeHttp": "HTTP CONNECT",
+  "SshProxyTypeSocks5": "SOCKS5",
+  "SshProxyTypeSocks4": "SOCKS4",
+  "SshProxyHostLabel": "Host del proxy",
+  "SshProxyPortLabel": "Puerto del proxy",
+  "SshProxyUsernameLabel": "Usuario del proxy (opcional)",
+  "SshProxyPasswordLabel": "Contrase\u00f1a del proxy (opcional)",
+  "SshProxyClearStoredPassword": "Borrar contrase\u00f1a del proxy guardada"
 }

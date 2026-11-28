@@ -2124,6 +2124,75 @@
                                                 <ComboBoxItem Content="{loc:Translate SettingsSshCryptoPolicyLegacy}" Tag="LegacyCompatible"/>
                                             </ComboBox>
                                         </Grid>
+                                        <Grid Margin="0,10,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="180"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="{loc:Translate SshProxyTypeLabel}" Style="{StaticResource LabelStyle}" Margin="0,6,0,0"/>
+                                            <ComboBox Grid.Column="1"
+                                                      AutomationProperties.Name="{loc:Translate SshProxyTypeLabel}"
+                                                      SelectedValue="{Binding SshProxyTypeSelection}"
+                                                      SelectedValuePath="Tag"
+                                                      Style="{StaticResource DialogFormComboBoxStyle}">
+                                                <ComboBoxItem Content="{loc:Translate SshProxyTypeNone}" Tag=""/>
+                                                <ComboBoxItem Content="{loc:Translate SshProxyTypeHttp}" Tag="Http"/>
+                                                <ComboBoxItem Content="{loc:Translate SshProxyTypeSocks5}" Tag="Socks5"/>
+                                                <ComboBoxItem Content="{loc:Translate SshProxyTypeSocks4}" Tag="Socks4"/>
+                                            </ComboBox>
+                                        </Grid>
+                                        <StackPanel Visibility="{Binding HasSshProxy, Converter={StaticResource BoolToVisibilityConverter}}" Margin="0,8,0,0">
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="180"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="96"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="{loc:Translate SshProxyHostLabel}" Style="{StaticResource LabelStyle}" Margin="0,6,0,0"/>
+                                                <TextBox Grid.Column="1" Text="{Binding SshProxyHost, UpdateSourceTrigger=PropertyChanged}"
+                                                         AutomationProperties.Name="{loc:Translate SshProxyHostLabel}"
+                                                         Margin="0,0,8,0"
+                                                         Style="{StaticResource DialogFormTextBoxStyle}"/>
+                                                <TextBox Grid.Column="2" Text="{Binding SshProxyPortText, UpdateSourceTrigger=PropertyChanged}"
+                                                         AutomationProperties.Name="{loc:Translate SshProxyPortLabel}"
+                                                         Style="{StaticResource DialogFormTextBoxStyle}"/>
+                                            </Grid>
+                                            <Grid Margin="0,8,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="180"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="{loc:Translate SshProxyUsernameLabel}" Style="{StaticResource LabelStyle}" Margin="0,6,0,0"/>
+                                                <TextBox Grid.Column="1" Text="{Binding SshProxyUsername, UpdateSourceTrigger=PropertyChanged}"
+                                                         AutomationProperties.Name="{loc:Translate SshProxyUsernameLabel}"
+                                                         Style="{StaticResource DialogFormTextBoxStyle}"/>
+                                            </Grid>
+                                            <Grid Margin="0,8,0,0">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="180"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="{loc:Translate SshProxyPasswordLabel}" Style="{StaticResource LabelStyle}" Margin="0,6,0,0"/>
+                                                <StackPanel Grid.Column="1">
+                                                    <PasswordBox x:Name="SshProxyPasswordBox"
+                                                                 AutomationProperties.Name="{loc:Translate SshProxyPasswordLabel}"
+                                                                 Style="{StaticResource DialogFormPasswordBoxStyle}"
+                                                                 PasswordChanged="OnCredentialPasswordChanged"/>
+                                                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0"
+                                                                Visibility="{Binding HasStoredSshProxyPassword, Converter={StaticResource BoolToVisibilityConverter}}">
+                                                        <TextBlock Text="{loc:Translate GatewayPasswordSaved}" Style="{StaticResource DialogHintTextStyle}" VerticalAlignment="Center"/>
+                                                        <Button Content="{loc:Translate GatewayPasswordClear}"
+                                                                Command="{Binding ClearStoredSshProxyPasswordCommand}"
+                                                                Click="OnClearStoredCredentialClick"
+                                                                Tag="SshProxyPasswordBox"
+                                                                AutomationProperties.Name="{loc:Translate SshProxyClearStoredPassword}"
+                                                                Style="{StaticResource GhostButtonStyle}"
+                                                                FontSize="{StaticResource FontSizeCaption}"
+                                                                Padding="8,2" MinHeight="0" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                                                    </StackPanel>
+                                                </StackPanel>
+                                            </Grid>
+                                        </StackPanel>
                                         <StackPanel Margin="0,14,0,0">
                                             <CheckBox x:Name="DlgSrv_SshCompressionCb" TabIndex="81" AutomationProperties.Name="{loc:Translate A11yServerSshCompression}" IsChecked="{Binding SshCompression}" Style="{StaticResource DialogFormCheckBoxStyle}"/>
                                             <CheckBox x:Name="DlgSrv_SshAgentFwdCb" TabIndex="82" AutomationProperties.Name="{loc:Translate A11yServerSshAgentForwarding}" IsChecked="{Binding SshAgentForwarding}" Style="{StaticResource DialogFormCheckBoxStyle}" Margin="0,6,0,0"/>

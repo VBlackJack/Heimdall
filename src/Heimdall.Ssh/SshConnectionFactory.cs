@@ -131,14 +131,8 @@ public static class SshConnectionFactory
 
         var authMethods = BuildAuthMethods(connectionParams, agentRegistry);
 
-        var info = new ConnectionInfo(
-            connectionParams.Host,
-            connectionParams.Port,
-            connectionParams.Username,
-            [.. authMethods])
-        {
-            Timeout = ClientTimeout(connectionParams)
-        };
+        var info = BuildConnectionInfo(connectionParams, [.. authMethods]);
+        info.Timeout = ClientTimeout(connectionParams);
 
         ConfigureTransportOptions(info, connectionParams);
         return info;
@@ -236,14 +230,8 @@ public static class SshConnectionFactory
         {
             var authMethods = BuildAuthMethods(connectionParams, agentRegistry, ownedResources);
 
-            var info = new ConnectionInfo(
-                connectionParams.Host,
-                connectionParams.Port,
-                connectionParams.Username,
-                [.. authMethods])
-            {
-                Timeout = ClientTimeout(connectionParams)
-            };
+            var info = BuildConnectionInfo(connectionParams, [.. authMethods]);
+            info.Timeout = ClientTimeout(connectionParams);
 
             ConfigureTransportOptions(info, connectionParams);
             return new OwnedConnectionInfo(info, ownedResources);
@@ -256,6 +244,53 @@ public static class SshConnectionFactory
     }
 
     private const string DelayedZlibCompression = "zlib@openssh.com";
+
+    /// <summary>
+    /// Builds an SSH.NET <see cref="ConnectionInfo"/> applying optional HTTP CONNECT, SOCKS5, or SOCKS4
+    /// outbound proxy configuration when enabled and valid.
+    /// </summary>
+    internal static ConnectionInfo BuildConnectionInfo(
+        SshConnectionParams connectionParams,
+        AuthenticationMethod[] authMethods,
+        string? usernameOverride = null)
+    {
+        ArgumentNullException.ThrowIfNull(connectionParams);
+        ArgumentNullException.ThrowIfNull(authMethods);
+
+        string effectiveUser = usernameOverride ?? connectionParams.Username;
+
+        if (connectionParams.ProxyType != SshProxyType.None
+            && !string.IsNullOrWhiteSpace(connectionParams.ProxyHost)
+            && connectionParams.ProxyPort is > 0 and <= 65535)
+        {
+            ProxyTypes proxyType = connectionParams.ProxyType switch
+            {
+                SshProxyType.Http => ProxyTypes.Http,
+                SshProxyType.Socks5 => ProxyTypes.Socks5,
+                SshProxyType.Socks4 => ProxyTypes.Socks4,
+                _ => ProxyTypes.None
+            };
+            if (proxyType != ProxyTypes.None)
+            {
+                return new ConnectionInfo(
+                    connectionParams.Host,
+                    connectionParams.Port,
+                    effectiveUser,
+                    proxyType,
+                    connectionParams.ProxyHost.Trim(),
+                    connectionParams.ProxyPort,
+                    connectionParams.ProxyUsername ?? string.Empty,
+                    connectionParams.ProxyPassword ?? string.Empty,
+                    authMethods);
+            }
+        }
+
+        return new ConnectionInfo(
+            connectionParams.Host,
+            connectionParams.Port,
+            effectiveUser,
+            authMethods);
+    }
 
     /// <summary>
     /// Applies transport-level compression preference (<c>zlib@openssh.com</c>) and
@@ -458,14 +493,11 @@ public static class SshConnectionFactory
         var username = string.IsNullOrWhiteSpace(connectionParams.Username)
             ? ProbeUsername
             : connectionParams.Username;
-        var connectionInfo = new ConnectionInfo(
-            connectionParams.Host,
-            connectionParams.Port,
-            username,
-            new NoneAuthenticationMethod(username))
-        {
-            Timeout = connectionParams.ConnectTimeout
-        };
+        var connectionInfo = BuildConnectionInfo(
+            connectionParams,
+            [new NoneAuthenticationMethod(username)],
+            usernameOverride: username);
+        connectionInfo.Timeout = connectionParams.ConnectTimeout;
         ApplyCryptoPolicy(connectionInfo, connectionParams.CryptoPolicy);
 
         HostKeyPresentation? presentation = null;
