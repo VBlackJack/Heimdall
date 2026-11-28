@@ -571,7 +571,7 @@ public static class SshAuthorizedKeysService
         return await RunCommandOnClientAsync(client, commandText, ct).ConfigureAwait(false);
     }
 
-    private static async Task<SshClient> OpenConnectedClientAsync(
+    internal static async Task<SshClient> OpenConnectedClientAsync(
         SshConnectionParams connParams,
         HostKeyStore hostKeyStore,
         IHostKeyVerifier verifier,
@@ -605,7 +605,7 @@ public static class SshAuthorizedKeysService
         }
     }
 
-    private static async Task<(int? ExitStatus, string Output, string Error)> RunCommandOnClientAsync(
+    internal static async Task<(int? ExitStatus, string Output, string Error)> RunCommandOnClientAsync(
         SshClient client,
         string commandText,
         CancellationToken ct)
@@ -623,7 +623,7 @@ public static class SshAuthorizedKeysService
         return (cmd.ExitStatus, output ?? string.Empty, cmd.Error ?? string.Empty);
     }
 
-    private static SshAuthorizedKeysListResult ParseListResponse(int? exitStatus, string output, string error)
+    internal static SshAuthorizedKeysListResult ParseListResponse(int? exitStatus, string output, string error)
     {
         if (output.Contains(SymlinkRefusedMarker, StringComparison.Ordinal))
         {
@@ -679,7 +679,7 @@ public static class SshAuthorizedKeysService
             ExitStatus: exitStatus);
     }
 
-    private static SshAuthorizedKeysMutationResult ParseRemoveResponse(int? exitStatus, string output, string error)
+    internal static SshAuthorizedKeysMutationResult ParseRemoveResponse(int? exitStatus, string output, string error)
     {
         if (output.Contains(SymlinkRefusedMarker, StringComparison.Ordinal))
         {

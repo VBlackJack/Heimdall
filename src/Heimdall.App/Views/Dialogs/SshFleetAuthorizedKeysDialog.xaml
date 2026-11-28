@@ -1,0 +1,203 @@
+<Window x:Class="Heimdall.App.Views.Dialogs.SshFleetAuthorizedKeysDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:behaviors="clr-namespace:Heimdall.App.Behaviors"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:loc="clr-namespace:Heimdall.App.Localization"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:Heimdall.App.ViewModels.Dialogs"
+        d:DataContext="{d:DesignInstance Type=vm:SshFleetAuthorizedKeysDialogViewModel, IsDesignTimeCreatable=False}"
+        mc:Ignorable="d"
+        Title="{loc:Translate SshFleetAuthKeysDialogTitle}"
+        Width="920"
+        Height="620"
+        MinWidth="720"
+        MinHeight="480"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource BackgroundBrush}"
+        ResizeMode="CanResizeWithGrip"
+        behaviors:WorkingAreaMinimumBehavior.IsEnabled="True"
+        behaviors:DialogChromeBehavior.HideCaptionButtons="True"
+        ShowInTaskbar="False">
+
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="/Themes/DialogCommonStyles.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+            <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Grid Margin="{StaticResource SpacingLg}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <DockPanel Grid.Row="0" Margin="0,0,0,10">
+            <StackPanel>
+                <TextBlock Text="{loc:Translate SshFleetAuthKeysDialogTitle}"
+                           FontSize="{StaticResource FontSizeTitle}"
+                           FontWeight="SemiBold"
+                           Foreground="{DynamicResource TextPrimaryBrush}"/>
+                <TextBlock Text="{loc:Translate SshFleetAuthKeysSubtitle}"
+                           Margin="0,2,0,0"
+                           FontSize="{StaticResource FontSizeCaption}"
+                           Foreground="{DynamicResource TextSecondaryBrush}"
+                           TextWrapping="Wrap"/>
+            </StackPanel>
+        </DockPanel>
+
+        <Grid Grid.Row="1" Margin="0,0,0,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBox Grid.Column="0"
+                     Text="{Binding SearchQuery, UpdateSourceTrigger=PropertyChanged}"
+                     Style="{StaticResource DialogFormTextBoxStyle}"
+                     FontFamily="{StaticResource FontFamilyMonospace}"
+                     Margin="0,0,8,0"
+                     AutomationProperties.Name="{loc:Translate SshFleetAuthKeysSearchPlaceholder}"
+                     ToolTip="{loc:Translate SshFleetAuthKeysSearchPlaceholder}"/>
+            <Button Grid.Column="1"
+                    Content="{loc:Translate SshFleetAuthKeysBtnScan}"
+                    Command="{Binding ScanFleetCommand}"
+                    IsEnabled="{Binding CanInteract}"
+                    Style="{DynamicResource PrimaryButtonStyle}"
+                    Padding="12,4"
+                    Margin="0,0,8,0"
+                    AutomationProperties.Name="{loc:Translate SshFleetAuthKeysBtnScan}"/>
+            <Button Grid.Column="2"
+                    Content="{loc:Translate ToolCmdLibBroadcastSelectAll}"
+                    Command="{Binding SelectAllCommand}"
+                    IsEnabled="{Binding HasMatches}"
+                    Style="{DynamicResource SecondaryButtonStyle}"
+                    Margin="0,0,6,0"
+                    AutomationProperties.Name="{loc:Translate ToolCmdLibBroadcastSelectAll}"/>
+            <Button Grid.Column="3"
+                    Content="{loc:Translate ToolCmdLibBroadcastSelectNone}"
+                    Command="{Binding SelectNoneCommand}"
+                    IsEnabled="{Binding HasMatches}"
+                    Style="{DynamicResource SecondaryButtonStyle}"
+                    AutomationProperties.Name="{loc:Translate ToolCmdLibBroadcastSelectNone}"/>
+        </Grid>
+
+        <StackPanel Grid.Row="2" Margin="0,0,0,6">
+            <ProgressBar Height="4"
+                         IsIndeterminate="True"
+                         Margin="0,0,0,6"
+                         Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibilityConverter}}"/>
+            <TextBlock Text="{Binding SummaryText}"
+                       FontSize="{StaticResource FontSizeCaption}"
+                       Foreground="{DynamicResource TextSecondaryBrush}"
+                       Visibility="{Binding HasSummary, Converter={StaticResource BoolToVisibilityConverter}}"/>
+        </StackPanel>
+
+        <DataGrid Grid.Row="3"
+                  ItemsSource="{Binding Matches}"
+                  AutoGenerateColumns="False"
+                  CanUserAddRows="False"
+                  CanUserDeleteRows="False"
+                  SelectionMode="Single"
+                  Style="{DynamicResource ThemedDataGridStyle}"
+                  ColumnHeaderStyle="{DynamicResource ThemedDataGridColumnHeaderStyle}"
+                  CellStyle="{DynamicResource ThemedDataGridCellStyle}"
+                  AutomationProperties.Name="{loc:Translate SshFleetAuthKeysDialogTitle}">
+            <DataGrid.RowStyle>
+                <Style TargetType="{x:Type DataGridRow}"
+                       BasedOn="{StaticResource ThemedDataGridRowStyle}">
+                    <Setter Property="AutomationProperties.Name">
+                        <Setter.Value>
+                            <MultiBinding Converter="{StaticResource AccessibleRowNameConverter}">
+                                <Binding Source="{x:Static loc:LocalizationSource.Instance}" Path="[A11ySshFleetAuthKeyRow]"/>
+                                <Binding Path="DisplayName"/>
+                                <Binding Path="KeyType"/>
+                                <Binding Path="Fingerprint"/>
+                                <Binding Path="Comment"/>
+                            </MultiBinding>
+                        </Setter.Value>
+                    </Setter>
+                </Style>
+            </DataGrid.RowStyle>
+            <DataGrid.Columns>
+                <DataGridTemplateColumn Header="" Width="38">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <CheckBox IsChecked="{Binding IsSelected, UpdateSourceTrigger=PropertyChanged}"
+                                      Checked="OnRowSelectionChanged"
+                                      Unchecked="OnRowSelectionChanged"
+                                      HorizontalAlignment="Center"
+                                      VerticalAlignment="Center"
+                                      AutomationProperties.Name="{Binding DisplayName}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTextColumn Header="{loc:Translate SshFleetAuthKeysColServer}" Binding="{Binding DisplayName}" IsReadOnly="True" Width="150"/>
+                <DataGridTextColumn Header="{loc:Translate SshFleetAuthKeysColEndpoint}" Binding="{Binding Endpoint}" IsReadOnly="True" Width="150"/>
+                <DataGridTextColumn Header="#" Binding="{Binding LineNumber}" IsReadOnly="True" Width="42"/>
+                <DataGridTextColumn Header="{loc:Translate SshAuthKeysColType}" Binding="{Binding KeyType}" IsReadOnly="True" Width="115"/>
+                <DataGridTextColumn Header="{loc:Translate SshAuthKeysColFingerprint}" Binding="{Binding Fingerprint}" IsReadOnly="True" Width="180"/>
+                <DataGridTextColumn Header="{loc:Translate SshAuthKeysColOptions}" Binding="{Binding Options}" IsReadOnly="True" Width="120"/>
+                <DataGridTextColumn Header="{loc:Translate SshAuthKeysColComment}" Binding="{Binding Comment}" IsReadOnly="True" Width="*"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <TextBlock Grid.Row="4"
+                   Text="{Binding StatusMessage}"
+                   FontSize="{StaticResource FontSizeCaption}"
+                   TextWrapping="Wrap"
+                   Margin="0,8,0,0"
+                   Visibility="{Binding HasStatusMessage, Converter={StaticResource BoolToVisibilityConverter}}">
+            <TextBlock.Style>
+                <Style TargetType="TextBlock">
+                    <Setter Property="Foreground" Value="{DynamicResource SuccessTextBrush}"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsStatusError}" Value="True">
+                            <Setter Property="Foreground" Value="{DynamicResource ErrorTextBrush}"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBlock.Style>
+        </TextBlock>
+
+        <DockPanel Grid.Row="5" Margin="0,12,0,0">
+            <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+                <Button Content="{loc:Translate SshFleetAuthKeysBtnExportCsv}"
+                        Click="OnExportCsvClick"
+                        IsEnabled="{Binding CanExport}"
+                        Style="{DynamicResource SecondaryButtonStyle}"
+                        Margin="0,0,8,0"
+                        AutomationProperties.Name="{loc:Translate SshFleetAuthKeysBtnExportCsv}"/>
+                <Button Content="{loc:Translate SshFleetAuthKeysBtnExportMarkdown}"
+                        Click="OnExportMarkdownClick"
+                        IsEnabled="{Binding CanExport}"
+                        Style="{DynamicResource SecondaryButtonStyle}"
+                        AutomationProperties.Name="{loc:Translate SshFleetAuthKeysBtnExportMarkdown}"/>
+            </StackPanel>
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="{loc:Translate SshFleetAuthKeysBtnRevoke}"
+                        Command="{Binding RevokeSelectedCommand}"
+                        IsEnabled="{Binding CanRevokeSelected}"
+                        Style="{DynamicResource SecondaryButtonStyle}"
+                        Foreground="{DynamicResource ErrorTextBrush}"
+                        Margin="0,0,8,0"
+                        AutomationProperties.Name="{loc:Translate SshFleetAuthKeysBtnRevoke}"/>
+                <Button Content="{loc:Translate BtnClose}"
+                        IsCancel="True"
+                        Click="OnCloseClick"
+                        Style="{DynamicResource SecondaryButtonStyle}"
+                        MinWidth="96"
+                        AutomationProperties.Name="{loc:Translate BtnClose}"/>
+            </StackPanel>
+        </DockPanel>
+    </Grid>
+</Window>

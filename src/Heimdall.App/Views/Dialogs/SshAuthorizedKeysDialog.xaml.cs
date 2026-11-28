@@ -19,7 +19,10 @@ using System.Text;
 using System.Windows;
 using Heimdall.App.Theming;
 using Heimdall.App.ViewModels.Dialogs;
+using Heimdall.Core.Configuration;
+using Heimdall.Core.Localization;
 using Heimdall.Core.Security;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Heimdall.App.Views.Dialogs;
 
@@ -77,6 +80,26 @@ public partial class SshAuthorizedKeysDialog : Window
         catch (UnauthorizedAccessException)
         {
         }
+    }
+
+    private void OnSearchFleetClick(object sender, RoutedEventArgs e)
+    {
+        var services = (Application.Current as App)?.Services;
+        var configManager = services?.GetService<IConfigManager>();
+        var localizer = services?.GetService<LocalizationManager>();
+        if (configManager is null || localizer is null)
+        {
+            return;
+        }
+
+        string? query = (DataContext as SshAuthorizedKeysDialogViewModel)?.SelectedEntry?.Fingerprint;
+        var fleetVm = new SshFleetAuthorizedKeysDialogViewModel(services, configManager, localizer, query);
+        var fleetDialog = new SshFleetAuthorizedKeysDialog
+        {
+            DataContext = fleetVm,
+            Owner = this
+        };
+        fleetDialog.ShowDialog();
     }
 
     private void OnCloseClick(object sender, RoutedEventArgs e)

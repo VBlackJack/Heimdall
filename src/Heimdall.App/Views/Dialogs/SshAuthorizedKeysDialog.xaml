@@ -41,6 +41,12 @@
 
         <DockPanel Grid.Row="0" Margin="0,0,0,10">
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                <Button Content="{loc:Translate SshAuthKeysBtnSearchFleet}"
+                        Click="OnSearchFleetClick"
+                        IsEnabled="{Binding CanInteract}"
+                        Style="{DynamicResource SecondaryButtonStyle}"
+                        Margin="0,0,8,0"
+                        AutomationProperties.Name="{loc:Translate SshAuthKeysBtnSearchFleet}"/>
                 <Button Content="{loc:Translate SshAuthKeysBtnRefresh}"
                         Command="{Binding RefreshCommand}"
                         IsEnabled="{Binding CanInteract}"

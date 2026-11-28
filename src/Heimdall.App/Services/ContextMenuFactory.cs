@@ -165,6 +165,9 @@ public sealed class ContextMenuFactory
                 vm.Localize("TreeCtxManageAuthorizedKeys"),
                 vm.ServerList.ManageAuthorizedKeysCommand,
                 server));
+            menu.Items.Add(CreateMenuItem(
+                vm.Localize("TreeCtxFleetAuthorizedKeys"),
+                vm.ServerList.ManageFleetAuthorizedKeysCommand));
             if (!Heimdall.Core.Configuration.SharedSessionIds.IsShared(server.Id))
             {
                 menu.Items.Add(CreateMenuItem(

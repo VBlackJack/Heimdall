@@ -2879,6 +2879,32 @@ public partial class ServerListViewModel : ObservableObject, IDisposable, ISessi
         }
     }
 
+    [RelayCommand]
+    private void ManageFleetAuthorizedKeys()
+    {
+        try
+        {
+            var services = (Application.Current as App)?.Services;
+            if (services is null)
+            {
+                return;
+            }
+
+            var vm = new ViewModels.Dialogs.SshFleetAuthorizedKeysDialogViewModel(services, _configManager, _localizer);
+            var dialog = new Views.Dialogs.SshFleetAuthorizedKeysDialog
+            {
+                DataContext = vm,
+                Owner = Application.Current?.MainWindow
+            };
+            dialog.ShowDialog();
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Warn($"Fleet SSH authorized_keys manager failed: {ex.Message}");
+            StatusMessageRequested?.Invoke(ex.Message);
+        }
+    }
+
     private string? PromptForPublicKeyFile()
     {
         var dialog = new OpenFileDialog
