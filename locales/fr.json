@@ -6932,10 +6932,12 @@
   "HotForwardStatusAdded": "Redirection de port active sur le port {0}",
   "HotForwardStatusRemoved": "Redirection de port ferm\u00e9e (port {0})",
   "TerminalDropUploadTitle": "Envoyer des fichiers via SFTP",
-  "TerminalDropUploadConfirmMessage": "Envoyer {0} fichier(s) ({1}) dans le r\u00e9pertoire distant {2} ?",
+  "TerminalDropUploadConfirmMessageOne": "Envoyer {0} fichier ({1}) dans le r\u00e9pertoire distant {2} ?",
+  "TerminalDropUploadConfirmMessage": "Envoyer {0} fichiers ({1}) dans le r\u00e9pertoire distant {2} ?",
   "TerminalDropUploadConnecting": "Connexion SFTP pour l'envoi des fichiers d\u00e9pos\u00e9s...",
   "TerminalDropUploadProgress": "Envoi de {0}...",
-  "TerminalDropUploadDone": "{0} fichier(s) envoy\u00e9(s) vers {1}",
+  "TerminalDropUploadDoneOne": "{0} fichier envoy\u00e9 vers {1}",
+  "TerminalDropUploadDone": "{0} fichiers envoy\u00e9s vers {1}",
   "TerminalDropUploadFailed": "\u00c9chec de l'envoi : {0}",
   "TerminalDropUploadNoProfile": "Impossible d'envoyer les fichiers d\u00e9pos\u00e9s : profil SSH introuvable.",
   "TerminalDropUploadOverwriteTitle": "Remplacer le fichier distant ?",
@@ -7008,7 +7010,11 @@
   "ToolSshAuditFleetBtnScan": "Analyser le parc",
   "ToolSshAuditFleetBtnExportCsv": "Exporter CSV",
   "ToolSshAuditFleetEmpty": "Cliquez sur Analyser le parc pour auditer hors-ligne les profils SSH locaux, passerelles, certificats et cl\u00e9s d'h\u00f4te.",
-  "ToolSshAuditFleetSummary": "Score : {0}/100 ({1} profils, {2} passerelles, {3} cl\u00e9s d'h\u00f4te, {4} constat(s))",
+  "ToolSshAuditFleetSummary": "Score : {0}/100 ({1} profils, {2} passerelles, {3} cl\u00e9s d'h\u00f4te, {4})",
+  "ToolSshAuditFleetFindingsOne": "{0} constat",
+  "ToolSshAuditFleetFindings": "{0} constats",
   "ToolSshAuditFleetClean": "Aucun probl\u00e8me de conformit\u00e9 d\u00e9tect\u00e9 sur votre parc SSH local.",
-  "ToolSshAuditFleetError": "\u00c9chec de l'analyse de conformit\u00e9 du parc : {0}"
+  "ToolSshAuditFleetError": "\u00c9chec de l'analyse de conformit\u00e9 du parc : {0}",
+  "ErrorSshAgentSigningDeclined": "La signature par l'agent SSH a \u00e9t\u00e9 refus\u00e9e par l'utilisateur.",
+  "SshKeyRotateErrOutputExists": "Le fichier de cl\u00e9 de destination existe d\u00e9j\u00e0. Choisissez un nouveau chemin pour ne jamais \u00e9craser une cl\u00e9 existante."
 }

@@ -223,6 +223,12 @@ public static class SshFleetComplianceAnalyzer
         var audit = SshKeyAuditEngine.Audit(content);
         if (audit is null)
         {
+            findings.Add(new SshFleetFinding(
+                SshFleetFindingSeverity.Warning,
+                label,
+                targetKind,
+                "KEY_FILE_UNPARSEABLE",
+                "Configured SSH key file is corrupt or not a recognized SSH key format."));
             return;
         }
 
@@ -335,7 +341,9 @@ public static class SshFleetComplianceAnalyzer
 
     private static string? TryReadBoundedLocalFile(string path)
     {
-        if (string.IsNullOrWhiteSpace(path) || path.StartsWith(@"\\", StringComparison.Ordinal))
+        if (string.IsNullOrWhiteSpace(path)
+            || path.StartsWith(@"\\", StringComparison.Ordinal)
+            || path.StartsWith("//", StringComparison.Ordinal))
         {
             return null;
         }

@@ -938,8 +938,8 @@
                         var z = promptZones[i];
                         if (z.promptMarker && !z.promptMarker.isDisposed && z.promptMarker.line >= 0) {
                             kept.push(z);
-                        } else if (z.decoration && typeof z.decoration.dispose === 'function') {
-                            try { z.decoration.dispose(); } catch (e) { }
+                        } else {
+                            disposeZone(z);
                         }
                     }
                     promptZones = kept;
@@ -1020,14 +1020,16 @@
                     var text = lines.join('\n');
                     var encoded = new TextEncoder().encode(text);
                     var maxBytes = 1024 * 1024;
+                    var truncatedFlag = '0';
                     if (encoded.length > maxBytes) {
+                        truncatedFlag = '1';
                         var cut = encoded.length - maxBytes;
                         while (cut < encoded.length && (encoded[cut] & utf8ContinuationMask) === utf8ContinuationBits) {
                             cut++;
                         }
                         encoded = encoded.subarray(cut);
                     }
-                    postMessage('last-cmd-output:' + bytesToBase64Chunked(encoded));
+                    postMessage('last-cmd-output:' + truncatedFlag + ':' + bytesToBase64Chunked(encoded));
                 }
 
                 if (typeof term.registerOscHandler === 'function') {

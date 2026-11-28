@@ -38,7 +38,7 @@ public sealed partial class HotPortForwardDialogViewModel : ObservableObject
         ForwardModes =
         [
             new ModeOption(SshSessionForwardKind.Local, _localizer["NewTunnelModeLocal"]),
-            new ModeOption(SshSessionForwardKind.DynamicSocks, _localizer["NewTunnelModeDynamicSocks"]),
+            new ModeOption(SshSessionForwardKind.DynamicSocks, _localizer["NewTunnelModeDynamicSocks5"]),
             new ModeOption(SshSessionForwardKind.Remote, _localizer["NewTunnelModeRemote"])
         ];
         _selectedModeOption = ForwardModes[0];

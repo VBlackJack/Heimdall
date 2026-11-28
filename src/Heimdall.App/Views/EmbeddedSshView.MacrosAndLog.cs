@@ -173,7 +173,7 @@ public partial class EmbeddedSshView
         }
     }
 
-    private async Task OpenMaskedCopyForLastCommandAsync(string outputText)
+    private async Task OpenMaskedCopyForLastCommandAsync(string outputText, bool truncated)
     {
         if (_disposed)
         {
@@ -200,7 +200,7 @@ public partial class EmbeddedSshView
             var clipboard = services?.GetService(typeof(IClipboardService)) as IClipboardService
                 ?? new WpfClipboardService();
             var vm = await ViewModels.Dialogs.MaskedCopyDialogViewModel
-                .CreateAsync(outputText, truncated: false, _localizer, clipboard)
+                .CreateAsync(outputText, truncated, _localizer, clipboard)
                 .ConfigureAwait(true);
 
             if (dialogService is not null)

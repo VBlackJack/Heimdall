@@ -203,7 +203,7 @@
                             <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}"/>
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding IsSshfpMatch}" Value="True">
-                                    <Setter Property="BorderBrush" Value="{DynamicResource SuccessBrush}"/>
+                                    <Setter Property="BorderBrush" Value="{DynamicResource SuccessIndicatorBrush}"/>
                                 </DataTrigger>
                                 <DataTrigger Binding="{Binding IsSshfpMismatch}" Value="True">
                                     <Setter Property="BorderBrush" Value="{DynamicResource ErrorIndicatorBrush}"/>

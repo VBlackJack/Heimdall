@@ -118,6 +118,29 @@ public partial class SshServerAuditView : UserControl, IToolView
     private void ParseArgument(string argument)
     {
         var trimmed = argument.Trim();
+        if (System.Net.IPAddress.TryParse(trimmed, out _))
+        {
+            _vm.Host = trimmed;
+            return;
+        }
+
+        if (trimmed.StartsWith('['))
+        {
+            int closeBracket = trimmed.IndexOf(']');
+            if (closeBracket > 1)
+            {
+                _vm.Host = trimmed[1..closeBracket];
+                if (closeBracket + 1 < trimmed.Length && trimmed[closeBracket + 1] == ':'
+                    && int.TryParse(trimmed[(closeBracket + 2)..], out int bracketPort)
+                    && bracketPort is > 0 and <= 65535)
+                {
+                    _vm.Port = bracketPort.ToString();
+                }
+
+                return;
+            }
+        }
+
         var colonIndex = trimmed.LastIndexOf(':');
         if (colonIndex > 0 && int.TryParse(trimmed[(colonIndex + 1)..], out var port) && port is > 0 and <= 65535)
         {
@@ -128,6 +151,18 @@ public partial class SshServerAuditView : UserControl, IToolView
         {
             _vm.Host = trimmed;
         }
+    }
+
+    private static string SanitizeHostForFileName(string host)
+    {
+        char[] invalid = Path.GetInvalidFileNameChars();
+        var sb = new StringBuilder(host.Length);
+        foreach (char c in host)
+        {
+            sb.Append(c == ':' || Array.IndexOf(invalid, c) >= 0 ? '-' : c);
+        }
+
+        return sb.Length > 0 ? sb.ToString() : "host";
     }
 
     private void ApplyLocalization()
@@ -326,8 +361,8 @@ public partial class SshServerAuditView : UserControl, IToolView
         {
             var dialog = new Microsoft.Win32.SaveFileDialog
             {
-                Filter = "HTML (*.html)|*.html",
-                FileName = $"ssh-audit-{_vm.Report.Snapshot.Host}.html"
+                Filter = L("FileDialogHtmlFilter"),
+                FileName = $"ssh-audit-{SanitizeHostForFileName(_vm.Report.Snapshot.Host)}.html"
             };
             if (dialog.ShowDialog() == true)
             {
@@ -349,8 +384,8 @@ public partial class SshServerAuditView : UserControl, IToolView
         {
             var dialog = new Microsoft.Win32.SaveFileDialog
             {
-                Filter = "CSV (*.csv)|*.csv",
-                FileName = $"ssh-audit-{_vm.Report.Snapshot.Host}.csv"
+                Filter = L("FileDialogCsvFilter"),
+                FileName = $"ssh-audit-{SanitizeHostForFileName(_vm.Report.Snapshot.Host)}.csv"
             };
             if (dialog.ShowDialog() == true)
             {

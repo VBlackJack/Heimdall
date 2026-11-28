@@ -6932,10 +6932,12 @@
   "HotForwardStatusAdded": "Redirecci\u00f3n de puerto activa en el puerto {0}",
   "HotForwardStatusRemoved": "Redirecci\u00f3n de puerto cerrada (puerto {0})",
   "TerminalDropUploadTitle": "Subir archivos por SFTP",
-  "TerminalDropUploadConfirmMessage": "\u00bfSubir {0} archivo(s) ({1}) al directorio remoto {2}?",
+  "TerminalDropUploadConfirmMessageOne": "\u00bfSubir {0} archivo ({1}) al directorio remoto {2}?",
+  "TerminalDropUploadConfirmMessage": "\u00bfSubir {0} archivos ({1}) al directorio remoto {2}?",
   "TerminalDropUploadConnecting": "Conectando SFTP para subir los archivos arrastrados...",
   "TerminalDropUploadProgress": "Subiendo {0}...",
-  "TerminalDropUploadDone": "{0} archivo(s) subido(s) a {1}",
+  "TerminalDropUploadDoneOne": "{0} archivo subido a {1}",
+  "TerminalDropUploadDone": "{0} archivos subidos a {1}",
   "TerminalDropUploadFailed": "Error al subir: {0}",
   "TerminalDropUploadNoProfile": "No se pueden subir los archivos: no se encontr\u00f3 un perfil SSH para esta sesi\u00f3n.",
   "TerminalDropUploadOverwriteTitle": "\u00bfSobrescribir archivo remoto?",
@@ -7008,7 +7010,11 @@
   "ToolSshAuditFleetBtnScan": "Analizar flota",
   "ToolSshAuditFleetBtnExportCsv": "Exportar CSV",
   "ToolSshAuditFleetEmpty": "Haz clic en Analizar flota para auditar sin conexi\u00f3n perfiles SSH locales, pasarelas, certificados y claves de host.",
-  "ToolSshAuditFleetSummary": "Puntuaci\u00f3n: {0}/100 ({1} perfiles, {2} pasarelas, {3} claves de host, {4} hallazgo(s))",
+  "ToolSshAuditFleetSummary": "Puntuaci\u00f3n: {0}/100 ({1} perfiles, {2} pasarelas, {3} claves de host, {4})",
+  "ToolSshAuditFleetFindingsOne": "{0} hallazgo",
+  "ToolSshAuditFleetFindings": "{0} hallazgos",
   "ToolSshAuditFleetClean": "No se encontraron problemas de cumplimiento en tu flota SSH local.",
-  "ToolSshAuditFleetError": "Error al analizar la flota SSH: {0}"
+  "ToolSshAuditFleetError": "Error al analizar la flota SSH: {0}",
+  "ErrorSshAgentSigningDeclined": "La firma del agente SSH fue rechazada por el usuario.",
+  "SshKeyRotateErrOutputExists": "El archivo de clave destino ya existe. Elige una nueva ruta para no sobrescribir una clave existente."
 }

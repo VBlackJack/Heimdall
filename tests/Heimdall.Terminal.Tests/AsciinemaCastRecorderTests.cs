@@ -70,6 +70,30 @@ public sealed class AsciinemaCastRecorderTests
     }
 
     [Fact]
+    public void WriteOutput_PreservesMultibyteUtf8WhenLeadingChunkHasZeroCompleteChars()
+    {
+        byte[] eAcute = Encoding.UTF8.GetBytes("é"); // [0xC3, 0xA9]
+        byte[] euro = Encoding.UTF8.GetBytes("€");   // [0xE2, 0x82, 0xAC]
+        var recorder = new AsciinemaCastRecorder(80, 24);
+        recorder.WriteOutput(eAcute.AsSpan(0, 1));   // 0 complete chars -> must buffer 0xC3
+        recorder.WriteOutput(eAcute.AsSpan(1, 1));
+        recorder.WriteOutput(euro.AsSpan(0, 2));     // 0 complete chars -> must buffer 0xE2 0x82
+        recorder.WriteOutput(euro.AsSpan(2, 1));
+        recorder.Stop();
+
+        string cast = recorder.SerializeToCastV2(maskSecrets: false, out bool refused, out _);
+        Assert.False(refused);
+
+        string[] lines = cast.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        string combined = string.Concat(lines.Skip(1).Select(l =>
+        {
+            using var doc = JsonDocument.Parse(l);
+            return doc.RootElement[2].GetString();
+        }));
+        Assert.Equal("é€", combined);
+    }
+
+    [Fact]
     public void SerializeToCastV2_WithMaskSecrets_RedactsSecretSplitAcrossTwoChunks()
     {
         var recorder = new AsciinemaCastRecorder(80, 24);

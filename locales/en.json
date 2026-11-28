@@ -6932,10 +6932,12 @@
   "HotForwardStatusAdded": "Session port forward active on port {0}",
   "HotForwardStatusRemoved": "Session port forward closed (port {0})",
   "TerminalDropUploadTitle": "Upload files via SFTP",
-  "TerminalDropUploadConfirmMessage": "Upload {0} file(s) ({1}) to remote directory {2}?",
+  "TerminalDropUploadConfirmMessageOne": "Upload {0} file ({1}) to remote directory {2}?",
+  "TerminalDropUploadConfirmMessage": "Upload {0} files ({1}) to remote directory {2}?",
   "TerminalDropUploadConnecting": "Connecting SFTP for dropped file upload...",
   "TerminalDropUploadProgress": "Uploading {0}...",
-  "TerminalDropUploadDone": "Uploaded {0} file(s) to {1}",
+  "TerminalDropUploadDoneOne": "Uploaded {0} file to {1}",
+  "TerminalDropUploadDone": "Uploaded {0} files to {1}",
   "TerminalDropUploadFailed": "Upload failed: {0}",
   "TerminalDropUploadNoProfile": "Cannot upload dropped files: no SSH profile found for this session.",
   "TerminalDropUploadOverwriteTitle": "Overwrite remote file?",
@@ -7008,7 +7010,11 @@
   "ToolSshAuditFleetBtnScan": "Scan Fleet",
   "ToolSshAuditFleetBtnExportCsv": "Export CSV",
   "ToolSshAuditFleetEmpty": "Click Scan Fleet to audit local SSH profiles, gateways, certificates, and pinned host keys offline.",
-  "ToolSshAuditFleetSummary": "Score: {0}/100 ({1} profiles, {2} gateways, {3} host keys, {4} finding(s))",
+  "ToolSshAuditFleetSummary": "Score: {0}/100 ({1} profiles, {2} gateways, {3} host keys, {4})",
+  "ToolSshAuditFleetFindingsOne": "{0} finding",
+  "ToolSshAuditFleetFindings": "{0} findings",
   "ToolSshAuditFleetClean": "No compliance issues found across your local SSH fleet.",
-  "ToolSshAuditFleetError": "Fleet compliance scan failed: {0}"
+  "ToolSshAuditFleetError": "Fleet compliance scan failed: {0}",
+  "ErrorSshAgentSigningDeclined": "SSH agent signing was declined by the user.",
+  "SshKeyRotateErrOutputExists": "Output key file already exists. Choose a new file path so the existing key is never overwritten."
 }

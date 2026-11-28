@@ -118,6 +118,8 @@ public sealed class AsciinemaCastRecorder
             int charCount = _utf8Decoder.GetCharCount(data, flush: false);
             if (charCount == 0)
             {
+                // Still call GetChars so incomplete multi-byte UTF-8 leading bytes are buffered.
+                _ = _utf8Decoder.GetChars(data, Span<char>.Empty, flush: false);
                 return;
             }
 

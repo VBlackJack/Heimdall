@@ -58,6 +58,40 @@ internal static class ToolGatewayConnector
             List<SshGatewayDto> gateways = GatewayChainResolver.ResolveChainDtos(gateway.Id, settings.SshGateways);
             List<SshConnectionParams> chain = GatewayChainResolver.ToConnectionParams(
                 gateways, CredentialProtector.Unprotect, settings.SshAgentPreference);
+            if (settings.SshConfirmAgentSigning)
+            {
+                chain = chain.Select(hop => new SshConnectionParams
+                {
+                    Host = hop.Host,
+                    Port = hop.Port,
+                    LogicalHost = hop.LogicalHost,
+                    LogicalPort = hop.LogicalPort,
+                    Username = hop.Username,
+                    KeyPath = hop.KeyPath,
+                    CertificatePath = hop.CertificatePath,
+                    Password = hop.Password,
+                    KeyPassphrase = hop.KeyPassphrase,
+                    UseLegacyPasswordAsKeyPassphrase = hop.UseLegacyPasswordAsKeyPassphrase,
+                    LegacyCredentialName = hop.LegacyCredentialName,
+                    SshAgentPreference = hop.SshAgentPreference,
+                    AgentKeyFingerprint = hop.AgentKeyFingerprint,
+                    ConfirmAgentSign = SshAgentSignConfirmHelper.BuildConfirmCallback(
+                        settings,
+                        hop.HostKeyVerificationHost,
+                        hop.HostKeyVerificationPort,
+                        localizer,
+                        ct),
+                    AgentForwarding = hop.AgentForwarding,
+                    Compression = hop.Compression,
+                    CryptoPolicy = hop.CryptoPolicy,
+                    X11Forwarding = hop.X11Forwarding,
+                    ConnectTimeout = hop.ConnectTimeout,
+                    AuthenticationTimeout = hop.AuthenticationTimeout,
+                    KeepAliveIntervalSeconds = hop.KeepAliveIntervalSeconds,
+                    KeyboardInteractive = hop.KeyboardInteractive,
+                    KeyboardInteractiveResponder = hop.KeyboardInteractiveResponder
+                }).ToList();
+            }
             return await ConnectCoreAsync(chain, trust, localizer, settings.SshKeepAliveIntervalSeconds, ct)
                 .ConfigureAwait(false);
         }, ct).ConfigureAwait(false);

@@ -82,7 +82,7 @@ public static class SshKeyRotator
             "[ -f \"$ak\" ] && " +
             "tmp=$(mktemp \"$HOME/.ssh/.authorized_keys.heimdall.XXXXXX\") && " +
             "chmod 600 \"$tmp\" && " +
-            "(grep -Fv -- \"$old_id\" \"$ak\" > \"$tmp\" || true) && " +
+            "(grep -Fv -- \"$old_id\" \"$ak\" > \"$tmp\"; rc=$?; [ \"$rc\" -le 1 ]) && " +
             $"if [ -s \"$tmp\" ] && grep -Fq -- \"$new_id\" \"$tmp\"; then " +
             $"mv -f \"$tmp\" \"$ak\" && chmod 600 \"$ak\" && echo {OldKeyRemovedMarker}; " +
             $"else rm -f \"$tmp\"; echo {InvariantFailedMarker}; exit 1; fi";

@@ -2857,7 +2857,13 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
 
             bool confirmed = await _main.DialogService.ShowConfirmAsync(
                 _localizer["TerminalDropUploadTitle"],
-                _localizer.Format("TerminalDropUploadConfirmMessage", localPaths.Count, previewNames, targetLabel));
+                _localizer.FormatCount(
+                    localPaths.Count,
+                    "TerminalDropUploadConfirmMessageOne",
+                    "TerminalDropUploadConfirmMessage",
+                    localPaths.Count,
+                    previewNames,
+                    targetLabel));
             if (!confirmed)
             {
                 return;
@@ -2865,8 +2871,12 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
 
             Heimdall.Sftp.IRemoteBrowser? browser = companionView?.ActiveBrowser;
             ISessionResult? transientSession = null;
+            using var uploadCts = new CancellationTokenSource();
+            void OnViewUnloaded(object? _, System.Windows.RoutedEventArgs __) => uploadCts.Cancel();
+            sshView.Unloaded += OnViewUnloaded;
             try
             {
+                CancellationToken uploadCt = uploadCts.Token;
                 if (browser is null)
                 {
                     IProfileLookup lookup = _main.ServerList.ProfileLookup;
@@ -2882,8 +2892,8 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
 
                     InvokeOnUi(() => _main.StatusText = _localizer["TerminalDropUploadConnecting"]);
                     var connectResult = await _main.ServerList.ConnectionService
-                        .ConnectSftpAsync(sftpProfile, settings, sshView.ActiveSshSession?.ResolvedHostKeyVerifier, CancellationToken.None)
-                        .ConfigureAwait(false);
+                        .ConnectSftpAsync(sftpProfile, settings, sshView.ActiveSshSession?.ResolvedHostKeyVerifier, uploadCt)
+                        .ConfigureAwait(true);
 
                     if (!connectResult.Success || connectResult.Session is not SftpSessionBundle bundle)
                     {
@@ -2900,6 +2910,7 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                 int uploaded = 0;
                 foreach (string localPath in localPaths)
                 {
+                    uploadCt.ThrowIfCancellationRequested();
                     string fileName = System.IO.Path.GetFileName(localPath);
                     if (!Heimdall.Core.Ssh.TerminalDropPathValidator.TryCombineRemoteFilePath(
                             sanitizedDir,
@@ -2912,8 +2923,8 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                     InvokeOnUi(() => _main.StatusText = _localizer.Format("TerminalDropUploadProgress", fileName));
                     try
                     {
-                        await browser.UploadFileAsync(localPath, remotePath, overwrite: false, CancellationToken.None)
-                            .ConfigureAwait(false);
+                        await browser.UploadFileAsync(localPath, remotePath, overwrite: false, uploadCt)
+                            .ConfigureAwait(true);
                         uploaded++;
                     }
                     catch (Heimdall.Sftp.RemoteDestinationExistsException)
@@ -2926,8 +2937,8 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                             continue;
                         }
 
-                        await browser.UploadFileAsync(localPath, remotePath, overwrite: true, CancellationToken.None)
-                            .ConfigureAwait(false);
+                        await browser.UploadFileAsync(localPath, remotePath, overwrite: true, uploadCt)
+                            .ConfigureAwait(true);
                         uploaded++;
                     }
                 }
@@ -2937,10 +2948,20 @@ public sealed partial class SessionCoordinator : ObservableObject, IDisposable
                     InvokeOnUi(() => _ = companionView.RefreshCurrentDirectoryAsync());
                 }
 
-                InvokeOnUi(() => _main.StatusText = _localizer.Format("TerminalDropUploadDone", uploaded, targetLabel));
+                InvokeOnUi(() => _main.StatusText = _localizer.FormatCount(
+                    uploaded,
+                    "TerminalDropUploadDoneOne",
+                    "TerminalDropUploadDone",
+                    uploaded,
+                    targetLabel));
+            }
+            catch (OperationCanceledException)
+            {
+                // Tab closed mid-upload; transient session is cleaned up in finally.
             }
             finally
             {
+                sshView.Unloaded -= OnViewUnloaded;
                 SafeDisposeSessionResult(transientSession);
             }
         }

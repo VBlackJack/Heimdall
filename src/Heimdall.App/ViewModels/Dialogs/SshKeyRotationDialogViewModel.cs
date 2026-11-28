@@ -134,7 +134,18 @@ public sealed partial class SshKeyRotationDialogViewModel : ObservableObject
 
     public void CancelActiveRotation()
     {
-        _cts?.Cancel();
+        try
+        {
+            _cts?.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+        finally
+        {
+            _cts?.Dispose();
+            _cts = null;
+        }
     }
 
     [RelayCommand]
@@ -177,6 +188,18 @@ public sealed partial class SshKeyRotationDialogViewModel : ObservableObject
         }
 
         string publicKeyPath = privateKeyPath + ".pub";
+        string fullNewPrivatePath = Path.GetFullPath(privateKeyPath);
+        string? fullCurrentKeyPath = string.IsNullOrWhiteSpace(_target.SshKeyPath)
+            ? null
+            : Path.GetFullPath(_target.SshKeyPath);
+        if (File.Exists(fullNewPrivatePath)
+            || File.Exists(publicKeyPath)
+            || (fullCurrentKeyPath is not null
+                && string.Equals(fullNewPrivatePath, fullCurrentKeyPath, StringComparison.OrdinalIgnoreCase)))
+        {
+            ReportError(_localizer["SshKeyRotateErrOutputExists"]);
+            return;
+        }
 
         _cts?.Cancel();
         _cts?.Dispose();
@@ -190,6 +213,8 @@ public sealed partial class SshKeyRotationDialogViewModel : ObservableObject
         ProgressLog = string.Empty;
 
         TunnelLease? tunnelLease = null;
+        bool wroteNewKeyFiles = false;
+        bool profilePersisted = false;
         try
         {
             // Step 1: Generate new key pair & write to new files (never overwrite old key in place).
@@ -203,7 +228,7 @@ public sealed partial class SshKeyRotationDialogViewModel : ObservableObject
                     SshPrivateKeyFormat.OpenSsh),
                 ct).ConfigureAwait(true);
 
-            string? dir = Path.GetDirectoryName(Path.GetFullPath(privateKeyPath));
+            string? dir = Path.GetDirectoryName(fullNewPrivatePath);
             if (!string.IsNullOrWhiteSpace(dir))
             {
                 Directory.CreateDirectory(dir);
@@ -211,6 +236,7 @@ public sealed partial class SshKeyRotationDialogViewModel : ObservableObject
 
             SshKeyFileWriter.WritePrivateKey(privateKeyPath, pair.PrivateKey);
             SshKeyFileWriter.WritePublicKey(publicKeyPath, pair.PublicKeyOpenSsh);
+            wroteNewKeyFiles = true;
 
             // Prepare optional gateway tunnel lease once for deploy + verify + cleanup.
             int targetPort = _target.SshPort > 0 ? _target.SshPort : DefaultPorts.Ssh;
@@ -352,6 +378,7 @@ public sealed partial class SshKeyRotationDialogViewModel : ObservableObject
                 return;
             }
 
+            profilePersisted = true;
             Succeeded = true;
 
             // Step 5: Atomically remove the old public key from remote authorized_keys (optional).
@@ -397,8 +424,31 @@ public sealed partial class SshKeyRotationDialogViewModel : ObservableObject
         }
         finally
         {
+            if (wroteNewKeyFiles && !profilePersisted)
+            {
+                TryDeleteOrphanedKeyFile(privateKeyPath);
+                TryDeleteOrphanedKeyFile(publicKeyPath);
+            }
+
             tunnelLease?.Dispose();
+            _cts?.Dispose();
+            _cts = null;
             IsRunning = false;
+        }
+    }
+
+    private static void TryDeleteOrphanedKeyFile(string path)
+    {
+        try
+        {
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
+        }
+        catch (Exception ex)
+        {
+            FileLogger.Debug($"[SshKeyRotation] failed to delete orphaned key file '{path}': {ex.Message}");
         }
     }
 

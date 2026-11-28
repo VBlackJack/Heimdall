@@ -376,7 +376,7 @@ public partial class EmbeddedSshView
         BeginInvokeIfAvailable(UpdateSessionCryptoInfo);
     }
 
-    private void OnHotForwardClick(object sender, RoutedEventArgs e)
+    private async void OnHotForwardClick(object sender, RoutedEventArgs e)
     {
         if (_disposed || _session is not { IsConnected: true } session || _localizer is null)
         {
@@ -395,7 +395,13 @@ public partial class EmbeddedSshView
             return;
         }
 
-        var addResult = session.AddSessionPortForward(vm.Result);
+        var request = vm.Result;
+        var addResult = await Task.Run(() => session.AddSessionPortForward(request)).ConfigureAwait(true);
+        if (_disposed)
+        {
+            return;
+        }
+
         if (!addResult.Success)
         {
             var errMsg = string.Format(
@@ -412,7 +418,7 @@ public partial class EmbeddedSshView
         UpdateSessionCryptoInfo();
         var portNum = addResult.Forward is { IsRemoteOnly: true }
             ? addResult.Forward.RemoteBindPort
-            : addResult.Forward?.LocalPort ?? vm.Result.LocalPort;
+            : addResult.Forward?.LocalPort ?? request.LocalPort;
         UpdateStatus(
             SessionStatusTokens.Connected,
             displayTextOverride: string.Format(

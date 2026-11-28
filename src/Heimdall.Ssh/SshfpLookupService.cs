@@ -169,7 +169,8 @@ public sealed class SshfpLookupService : ISshfpResolver
     {
         using var udp = new UdpClient(server.AddressFamily);
         var endpoint = new IPEndPoint(server, DnsPort);
-        await udp.SendAsync(query, endpoint, ct).ConfigureAwait(false);
+        udp.Connect(endpoint);
+        await udp.SendAsync(query, ct).ConfigureAwait(false);
         var result = await udp.ReceiveAsync(ct).ConfigureAwait(false);
         return result.Buffer;
     }

@@ -48,6 +48,8 @@ public partial class SshKeyAuditView : UserControl, IToolView
     private readonly SshKeyAuditViewModel _vm;
     private DispatcherTimer? _debounceTimer;
     private SshFleetComplianceReport? _lastFleetReport;
+    private CancellationTokenSource? _fleetScanCts;
+    private bool _disposed;
 
     private sealed class FindingDisplayItem
     {
@@ -839,6 +841,16 @@ public partial class SshKeyAuditView : UserControl, IToolView
 
     private async void OnScanFleetClick(object sender, RoutedEventArgs e)
     {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _fleetScanCts?.Cancel();
+        _fleetScanCts?.Dispose();
+        _fleetScanCts = new CancellationTokenSource();
+        CancellationToken ct = _fleetScanCts.Token;
+
         BtnScanFleet.IsEnabled = false;
         try
         {
@@ -852,7 +864,17 @@ public partial class SshKeyAuditView : UserControl, IToolView
             }
 
             var servers = await configManager.LoadServersAsync().ConfigureAwait(true);
+            if (_disposed || ct.IsCancellationRequested)
+            {
+                return;
+            }
+
             var settings = await configManager.LoadSettingsAsync().ConfigureAwait(true);
+            if (_disposed || ct.IsCancellationRequested)
+            {
+                return;
+            }
+
             var hostKeys = hostKeyStore is null
                 ? []
                 : hostKeyStore.GetAllAlgorithmEntries()
@@ -872,9 +894,21 @@ public partial class SshKeyAuditView : UserControl, IToolView
                 servers,
                 settings.SshGateways,
                 hostKeys,
-                settings.SshCryptoPolicy)).ConfigureAwait(true);
+                settings.SshCryptoPolicy), ct).ConfigureAwait(true);
+
+            if (_disposed || ct.IsCancellationRequested)
+            {
+                return;
+            }
 
             _lastFleetReport = report;
+            string findingsFragment = _localizer is not null
+                ? _localizer.FormatCount(
+                    report.Findings.Count,
+                    "ToolSshAuditFleetFindingsOne",
+                    "ToolSshAuditFleetFindings",
+                    report.Findings.Count)
+                : report.Findings.Count.ToString(CultureInfo.CurrentCulture);
             FleetComplianceSummary.Text = string.Format(
                 CultureInfo.CurrentCulture,
                 L("ToolSshAuditFleetSummary"),
@@ -882,7 +916,7 @@ public partial class SshKeyAuditView : UserControl, IToolView
                 report.ProfilesAudited,
                 report.GatewaysAudited,
                 report.HostKeysAudited,
-                report.Findings.Count);
+                findingsFragment);
             BtnExportFleetCsv.Visibility = Visibility.Visible;
 
             if (report.Findings.Count == 0)
@@ -911,17 +945,27 @@ public partial class SshKeyAuditView : UserControl, IToolView
                 }).ToList();
             }
         }
+        catch (OperationCanceledException)
+        {
+            // View closed or superseded by another scan.
+        }
         catch (Exception ex)
         {
             Heimdall.Core.Logging.FileLogger.Warn($"[SshKeyAudit] Fleet compliance scan failed: {ex.Message}");
-            FleetComplianceStatusText.Text = string.Format(
-                CultureInfo.CurrentCulture,
-                L("ToolSshAuditFleetError"),
-                ex.Message);
+            if (!_disposed)
+            {
+                FleetComplianceStatusText.Text = string.Format(
+                    CultureInfo.CurrentCulture,
+                    L("ToolSshAuditFleetError"),
+                    ex.Message);
+            }
         }
         finally
         {
-            BtnScanFleet.IsEnabled = true;
+            if (!_disposed)
+            {
+                BtnScanFleet.IsEnabled = true;
+            }
         }
     }
 
@@ -954,7 +998,7 @@ public partial class SshKeyAuditView : UserControl, IToolView
         {
             var dlg = new Microsoft.Win32.SaveFileDialog
             {
-                Filter = "CSV (*.csv)|*.csv",
+                Filter = L("FileDialogCsvFilter"),
                 FileName = $"ssh-fleet-compliance-{DateTime.UtcNow:yyyyMMdd}.csv"
             };
             if (dlg.ShowDialog() == true)
@@ -1003,6 +1047,11 @@ public partial class SshKeyAuditView : UserControl, IToolView
     /// <inheritdoc/>
     public void Dispose()
     {
+        _disposed = true;
+        _fleetScanCts?.Cancel();
+        _fleetScanCts?.Dispose();
+        _fleetScanCts = null;
+
         if (_localizer is not null) _localizer.LocaleChanged -= OnLocaleChanged;
         if (_themeService is not null) _themeService.ThemeChanged -= OnThemeChanged;
         _vm.PropertyChanged -= OnVmPropertyChanged;

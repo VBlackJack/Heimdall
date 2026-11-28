@@ -102,11 +102,55 @@ public static class FailureClassifier
             SshAgentSigningDeclinedException declined =>
                 new SshFailureInfo(SshFailureCode.AgentSigningDeclined, declined.Message, true, ex),
 
+            _ when FindNested<SshAgentSigningDeclinedException>(ex) is { } nestedDeclined =>
+                new SshFailureInfo(SshFailureCode.AgentSigningDeclined, nestedDeclined.Message, true, ex),
+
             SshException sshEx =>
                 ClassifySshException(sshEx, connectionParams),
 
             _ => new SshFailureInfo(SshFailureCode.Unknown, ex.Message, true, ex)
         };
+    }
+
+    private static TException? FindNested<TException>(Exception ex) where TException : Exception
+    {
+        if (ex is AggregateException agg)
+        {
+            foreach (Exception inner in agg.InnerExceptions)
+            {
+                if (inner is TException match)
+                {
+                    return match;
+                }
+
+                if (FindNested<TException>(inner) is { } deeper)
+                {
+                    return deeper;
+                }
+            }
+
+            return null;
+        }
+
+        Exception? current = ex.InnerException;
+        int depth = 0;
+        while (current is not null && depth < 16)
+        {
+            if (current is TException match)
+            {
+                return match;
+            }
+
+            if (current is AggregateException innerAgg)
+            {
+                return FindNested<TException>(innerAgg);
+            }
+
+            current = current.InnerException;
+            depth++;
+        }
+
+        return null;
     }
 
     /// <summary>

@@ -109,7 +109,7 @@ public sealed class ToolPackSettingsTests : IDisposable
             .Where(descriptor => descriptor.Pack == ToolPack.Audit)
             .Select(descriptor => descriptor.Id)
             .ToArray();
-        Assert.Equal(10, disabledIds.Length);
+        Assert.Equal(11, disabledIds.Length);
         Assert.Equal(auditIds.Order(StringComparer.Ordinal), disabledIds.Order(StringComparer.Ordinal));
     }
 }

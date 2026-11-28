@@ -1421,10 +1421,24 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
 
         if (message.StartsWith(MsgLastCmdOutput, StringComparison.Ordinal))
         {
-            string b64 = message[MsgLastCmdOutput.Length..];
+            string payload = message[MsgLastCmdOutput.Length..];
+            if (string.IsNullOrEmpty(payload))
+            {
+                _ = Dispatcher.BeginInvoke(() => _ = OpenMaskedCopyForLastCommandAsync(string.Empty, truncated: false));
+                return;
+            }
+
+            bool truncated = false;
+            string b64 = payload;
+            if (payload.Length >= 2 && payload[1] == ':' && (payload[0] == '0' || payload[0] == '1'))
+            {
+                truncated = payload[0] == '1';
+                b64 = payload[2..];
+            }
+
             if (string.IsNullOrEmpty(b64))
             {
-                _ = Dispatcher.BeginInvoke(() => _ = OpenMaskedCopyForLastCommandAsync(string.Empty));
+                _ = Dispatcher.BeginInvoke(() => _ = OpenMaskedCopyForLastCommandAsync(string.Empty, truncated));
                 return;
             }
 
@@ -1433,7 +1447,7 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
                 try
                 {
                     string outputText = Encoding.UTF8.GetString(Convert.FromBase64String(b64));
-                    _ = Dispatcher.BeginInvoke(() => _ = OpenMaskedCopyForLastCommandAsync(outputText));
+                    _ = Dispatcher.BeginInvoke(() => _ = OpenMaskedCopyForLastCommandAsync(outputText, truncated));
                 }
                 catch (FormatException ex)
                 {
@@ -1575,6 +1589,11 @@ public partial class EmbeddedSshView : UserControl, IDisposable, ITerminalComman
         if (text.StartsWith(MsgBuffer, StringComparison.Ordinal))
         {
             return $"{MsgBuffer}<{text.Length - MsgBuffer.Length} chars>";
+        }
+
+        if (text.StartsWith(MsgLastCmdOutput, StringComparison.Ordinal))
+        {
+            return $"{MsgLastCmdOutput}<{text.Length - MsgLastCmdOutput.Length} chars>";
         }
 
         if (text.StartsWith("data:", StringComparison.OrdinalIgnoreCase))

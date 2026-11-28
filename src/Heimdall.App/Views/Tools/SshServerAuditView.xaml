@@ -146,7 +146,7 @@
                                 <StackPanel HorizontalAlignment="Center">
                                     <TextBlock x:Name="LblGradeCaption" FontSize="{StaticResource FontSizeCaption}"
                                                Foreground="{DynamicResource TextOnAccentBrush}" HorizontalAlignment="Center"/>
-                                    <TextBlock x:Name="TxtGrade" FontSize="28" FontWeight="Bold"
+                                    <TextBlock x:Name="TxtGrade" FontSize="{StaticResource FontSizeHeadline}" FontWeight="Bold"
                                                Foreground="{DynamicResource TextOnAccentBrush}" HorizontalAlignment="Center"/>
                                 </StackPanel>
                             </Border>
